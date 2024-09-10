@@ -1,0 +1,12 @@
+# Service/Clients
+dapr >= 1.13.0
+
+# API
+fastapi >= 0.111.1
+uvicorn >= 0.30.3
+pydantic >= 2.8.2
+pydantic-settings >= 2.3.4
+
+# Utils
+structlog >= 24.4.0
+cachetools >= 5.4.0
