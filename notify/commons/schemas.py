@@ -112,7 +112,7 @@ class CloudEventBase(BaseModel):
         }
 
         # Create the inner model
-        DataModel = create_model(f"{cls.__name__}Schema" ** inner_fields)  # type: ignore
+        DataModel = create_model(f"{cls.__name__}Schema", **inner_fields)  # type: ignore
 
         # Add the data field with the inner model
         outer_fields["data"] = (DataModel, Field(...))
