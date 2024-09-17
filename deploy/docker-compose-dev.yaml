@@ -1,5 +1,7 @@
 include:
   - ./docker-compose-redis.yaml
+  - ./docker-compose-mongodb.yaml
+  - ./docker-compose-novu.yaml
 
 services:
   app:
