@@ -1,3 +1,7 @@
+# Issue: Triggering a workflow using topics does not do anything
+# Reference: https://discord.com/channels/895029566685462578/1252528273733320724/1252528449982038070
+# Set `IS_TOPIC_NOTIFICATION_ENABLED=true` in env
+
 services:
   api:
     image: 'ghcr.io/novuhq/novu/api:0.24.0'
@@ -42,6 +46,7 @@ services:
       NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
       API_CONTEXT_PATH: ${API_CONTEXT_PATH}
       IS_MULTI_TENANCY_ENABLED: ${IS_MULTI_TENANCY_ENABLED}
+      IS_TOPIC_NOTIFICATION_ENABLED: ${IS_TOPIC_NOTIFICATION_ENABLED}
     ports:
       - '3000:3000'
   worker:
@@ -82,6 +87,7 @@ services:
       BROADCAST_QUEUE_CHUNK_SIZE: ${BROADCAST_QUEUE_CHUNK_SIZE}
       MULTICAST_QUEUE_CHUNK_SIZE: ${MULTICAST_QUEUE_CHUNK_SIZE}
       IS_MULTI_TENANCY_ENABLED: ${IS_MULTI_TENANCY_ENABLED}
+      IS_TOPIC_NOTIFICATION_ENABLED: ${IS_TOPIC_NOTIFICATION_ENABLED}
   ws:
     image: 'ghcr.io/novuhq/novu/ws:0.24.0'
     depends_on:
