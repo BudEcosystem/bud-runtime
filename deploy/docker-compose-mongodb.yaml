@@ -17,6 +17,12 @@ services:
       - mongodb:/data/db
     ports:
       - 27017:27017
+    networks:
+      - bud-microframe-nw
 
 volumes:
   mongodb: ~
+
+networks:
+  bud-microframe-nw:
+    name: bud-microframe-$NAMESPACE

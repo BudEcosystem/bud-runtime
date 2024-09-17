@@ -4,6 +4,8 @@ services:
     depends_on:
       - mongodb
       - redis
+    networks:
+      - bud-microframe-nw
     container_name: bud-mf-$NAMESPACE-api
     restart: unless-stopped
     logging:
@@ -47,6 +49,8 @@ services:
     depends_on:
       - mongodb
       - redis
+    networks:
+      - bud-microframe-nw
     container_name: bud-mf-$NAMESPACE-worker
     restart: unless-stopped
     logging:
@@ -83,6 +87,8 @@ services:
     depends_on:
       - mongodb
       - redis
+    networks:
+      - bud-microframe-nw
     container_name: bud-mf-$NAMESPACE-ws
     restart: unless-stopped
     logging:
@@ -111,6 +117,8 @@ services:
     depends_on:
       - api
       - worker
+    networks:
+      - bud-microframe-nw
     container_name: bud-mf-$NAMESPACE-web
     restart: unless-stopped
     logging:
@@ -135,6 +143,8 @@ services:
       - api
       - worker
       - web
+    networks:
+      - bud-microframe-nw
     container_name: bud-mf-$NAMESPACE-widget
     restart: unless-stopped
     logging:
@@ -154,6 +164,8 @@ services:
   embed:
     depends_on:
       - widget
+    networks:
+      - bud-microframe-nw
     image: 'ghcr.io/novuhq/novu/embed:0.24.0'
     container_name: bud-mf-$NAMESPACE-embed
     restart: unless-stopped
@@ -168,3 +180,7 @@ services:
       NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
     ports:
       - 4701:4701
+
+networks:
+  bud-microframe-nw:
+    name: bud-microframe-$NAMESPACE
