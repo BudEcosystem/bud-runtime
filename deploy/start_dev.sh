@@ -35,6 +35,11 @@ DOCKER_COMPOSE_FILE="./deploy/docker-compose-dev.yaml"
 BUILD_FLAG=""
 DETACH_FLAG=""
 
+# Mongo DB
+MONGO_INITDB_ROOT_USERNAME="root"
+MONGO_INITDB_ROOT_PASSWORD="secret"
+export MONGO_INITDB_ROOT_USERNAME MONGO_INITDB_ROOT_PASSWORD
+
 function display_help() {
     echo "Usage: $0 [options]"
     echo
