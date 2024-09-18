@@ -119,3 +119,10 @@ class NovuApiClientException(Exception):
         """Raise for errors related to Novu service operations."""
         self.message = message
         super().__init__(self.message)
+
+
+class NovuInitialSeederException(Exception):
+    def __init__(self, message: str = "Error occurred while initial seeding.") -> None:
+        """Raise for errors related to seeding data operations."""
+        self.message = message
+        super().__init__(self.message)

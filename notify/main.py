@@ -17,6 +17,8 @@
 """The main entry point for the application, initializing the FastAPI app and setting up the application's lifespan management, including configuration and secret syncs."""
 
 import asyncio
+import os
+import signal
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator
 
@@ -26,9 +28,13 @@ from fastapi.openapi.utils import get_openapi
 from .commons import logging
 from .commons.config import app_settings
 from .commons.constants import Environment
+from .commons.exceptions import NovuApiClientException, NovuInitialSeederException
+from .commons.helpers import retry
 from .core import sync_routes
 from .core.meta_routes import meta_router
 from .core.notify_routes import notify_router
+from .shared.novu_service import NovuService
+from .shared.seeder_service import InitialSeeder
 
 
 logger = logging.get_logger(__name__)
@@ -69,6 +75,44 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         task = asyncio.create_task(schedule_secrets_and_config_sync())
     else:
         task = None
+
+    async def shutdown_app(message: str) -> None:
+        """Shutdown the application by logging the provided message and sending a termination signal.
+
+        Args:
+        message (str): The error message to log before shutting down the application.
+
+        Returns:
+        None
+        """
+        logger.error(message)
+        logger.info("Shutting down application ...")
+        os.kill(os.getpid(), signal.SIGTERM)
+
+    @retry(max_attempts=36, delay=5, backoff_factor=1)
+    async def check_novu_backend_health() -> None:
+        """Retry checking the health of the Novu backend service with a maximum of 36 attempts with delay of 5 seconds (36*5=180sec).
+
+        This function calls the health check of the Novu service and retries if the service is unavailable.
+
+        Returns:
+        None
+
+        Raises:
+        NovuApiClientException: If the health check fails after all retry attempts.
+        """
+        await NovuService().health_check()
+
+    # Check Novu backend health and execute initial seeding.
+    # Shutdown the application if the health check or seeding fails.
+    try:
+        await check_novu_backend_health()
+        await InitialSeeder().execute()
+    except (NovuApiClientException, NovuInitialSeederException) as err:
+        await shutdown_app(err.message)
+    except Exception as err:
+        logger.exception(f"Unexpected error during initial setup. {err}")
+        await shutdown_app("Unexpected error during initial setup.")
 
     yield
 
