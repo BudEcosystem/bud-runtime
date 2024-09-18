@@ -17,10 +17,13 @@
 """Provides utility functions and wrappers for interacting with Novu components."""
 
 import asyncio
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
 import aiohttp
 from aiohttp import client_exceptions
+from novu.api import ChangeApi
+from novu.dto.change import ChangeDto
+from requests.exceptions import HTTPError
 
 from notify.commons import logging
 from notify.commons.config import app_settings
@@ -317,3 +320,111 @@ class NovuService(NovuBaseApiClient):
                 return response
             else:
                 raise NovuApiClientException(f"Failed to perform health check: {response}")
+
+    @_handle_exception
+    async def get_changes(self, api_key: Optional[str] = None, environment: str = "dev") -> Iterable[ChangeDto]:
+        """Fetch the list of changes from the Novu API.
+
+        This method retrieves changes from the Novu API for the specified environment.
+
+        Args:
+            api_key (Optional[str]): An optional API key to authenticate the request. If not provided,
+                it will be fetched using the `_resolve_api_key` method.
+            environment (str): The environment to fetch changes for. Default is "dev".
+
+        Returns:
+            Iterable[ChangeDto]: A list of changes from the API.
+
+        Raises:
+            NovuApiClientException: If an error occurs while fetching changes from the API.
+        """
+        novu_api_key = await self._resolve_api_key(api_key=api_key, environment=environment)
+
+        try:
+            # Fetch the list of changes using the Novu API
+            response = ChangeApi(self.base_url, api_key=novu_api_key).list()
+            return response.data
+        except HTTPError as err:
+            error_message = err.response.json().get("message", "Unknown error occurred")
+            raise NovuApiClientException(f"Failed to get changes: {error_message}") from None
+
+    @_handle_exception
+    async def apply_bulk_changes(
+        self,
+        change_ids: List[str],
+        api_key: Optional[str] = None,
+        environment: str = "dev",
+    ) -> Iterable[ChangeDto]:
+        """Apply a list of changes in bulk using the Novu API.
+
+        Args:
+        change_ids (List[str]): A list of change IDs to apply.
+        api_key (Optional[str]): The API key to authenticate with Novu. Defaults to `None`.
+        env (str): The environment in which to apply the changes (e.g., 'dev' or 'prod'). Defaults to 'dev'.
+
+        Returns:
+        Iterable[ChangeDto]: A collection of applied changes.
+
+        Raises:
+        NovuApiClientException: If an error occurs during the change application.
+        """
+        novu_api_key = await self._resolve_api_key(api_key=api_key, environment=environment)
+        try:
+            response = ChangeApi(self.base_url, api_key=novu_api_key).bulk_apply(change_ids)
+            return response
+        except HTTPError as err:
+            error_message = err.response.json().get("message", "Unknown error occurred")
+            raise NovuApiClientException(f"Failed to apply changes: {error_message}") from None
+
+    @_handle_exception
+    async def fetch_and_apply_changes(self, api_key: Optional[str] = None, environment: str = "dev") -> None:
+        """Fetch and apply changes from the Novu API.
+
+        This function first retrieves all changes using the `get_changes` method,
+        collects their IDs, and then applies them using the `apply_changes` method.
+
+        Args:
+        api_key (Optional[str]): The API key to authenticate with Novu. Defaults to `None`.
+        env (str): The environment from which to fetch and apply changes (e.g., 'dev' or 'prod'). Defaults to 'dev'.
+
+        Returns:
+        None
+
+        Raises:
+        NovuApiClientException: If an error occurs during the process of fetching or applying changes.
+        """
+        all_changes = await self.get_changes(api_key, environment)
+        change_ids = [change._id for change in all_changes]
+        logger.debug(f"Found {len(change_ids)} changes to apply")
+
+        if change_ids:
+            applied_changes = await self.apply_bulk_changes(change_ids, api_key, environment)
+            for change in applied_changes:
+                logger.debug(f"Applied change: {change._id}")
+
+    async def _resolve_api_key(self, api_key: Optional[str] = None, environment: str = "dev") -> Optional[str]:
+        """Resolve the API key based on the input or environment.
+
+        This method returns the provided API key if given, otherwise it resolves
+        the key based on the specified environment ('dev' or 'prod').
+
+        Args:
+        api_key (Optional[str]): A manually provided API key. Defaults to `None`.
+        environment (str): The environment from which to resolve the API key ('dev' or 'prod'). Defaults to 'dev'.
+
+        Returns:
+        Optional[str]: The resolved API key, or `None` if no API key is available for the environment.
+
+        Raises:
+        None
+        """
+        if api_key:
+            return api_key
+
+        return (
+            app_settings.novu_dev_api_key
+            if environment == "dev"
+            else app_settings.novu_prod_api_key
+            if environment == "prod"
+            else None
+        )
