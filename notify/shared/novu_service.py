@@ -16,7 +16,7 @@
 
 """Provides utility functions and wrappers for interacting with Novu components."""
 
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import aiohttp
 
@@ -33,7 +33,7 @@ class NovuBaseApiClient:
 
     async def _handle_response(
         self, response: aiohttp.ClientResponse, json: bool = True
-    ) -> Tuple[bool, Union[Dict[str, Union[List, Dict, str, int]], str]]:
+    ) -> Tuple[bool, Union[Dict[str, Any], str]]:
         """Handle the API response and return a success status and corresponding data.
 
         Args:
