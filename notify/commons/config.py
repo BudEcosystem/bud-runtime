@@ -192,6 +192,21 @@ class AppConfig(BaseConfig):
         "grpc", json_schema_extra=SyncDetails(sync=True).model_dump(exclude_unset=True)
     )
 
+    # Novu configs
+    # FIXME: Didn't get value from secret json
+    novu_user_email: str = Field(
+        "admin@bud.studio",
+        json_schema_extra=SyncDetails(sync=True).model_dump(exclude_unset=True),
+    )
+    novu_user_password: str = Field(
+        "Admin@1234",
+        json_schema_extra=SyncDetails(sync=True).model_dump(exclude_unset=True),
+    )
+    novu_api_base_url: str = Field(
+        "http://localhost:3000",
+        json_schema_extra=SyncDetails(sync=True).model_dump(exclude_unset=True),
+    )
+
     @model_validator(mode="before")
     @classmethod
     def resolve_env(cls, data: Dict[str, Any]) -> Dict[str, Any]:
