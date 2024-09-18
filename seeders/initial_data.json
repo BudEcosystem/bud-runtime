@@ -1,0 +1,11 @@
+{
+    "user": {
+        "first_name": "Bud",
+        "last_name": "Studio"
+    },
+    "organization": {
+        "name": "Bud Studio",
+        "job_title": "engineer",
+        "domain": "bud.studio"
+    }
+}
