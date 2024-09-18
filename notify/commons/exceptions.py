@@ -112,3 +112,10 @@ class SuppressAndLog:
             return result
 
         return wrapper
+
+
+class NovuApiClientException(Exception):
+    def __init__(self, message: str = "Error occurred while calling Novu API.") -> None:
+        """Raise for errors related to Novu service operations."""
+        self.message = message
+        super().__init__(self.message)
