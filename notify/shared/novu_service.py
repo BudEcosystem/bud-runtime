@@ -16,9 +16,11 @@
 
 """Provides utility functions and wrappers for interacting with Novu components."""
 
-from typing import Any, Dict, List, Optional, Tuple, Union
+import asyncio
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import aiohttp
+from aiohttp import client_exceptions
 
 from notify.commons import logging
 from notify.commons.config import app_settings
@@ -60,14 +62,14 @@ class NovuBaseApiClient:
             else:
                 return True, await response.text()
         except aiohttp.ClientResponseError as http_err:
-            logger.exception(http_err)
             json_body = await response.json()
             message = json_body.get("message", str(http_err))
             error_message = message[0] if isinstance(message, list) else message
+            logger.error(error_message)
         except aiohttp.ClientError as request_error:
             logger.exception(request_error)
             error_message = "Bad request to server"
-        except (ValueError, aiohttp.client_exceptions.ContentTypeError) as value_err:
+        except (ValueError, client_exceptions.ContentTypeError) as value_err:
             logger.exception(value_err)
             error_message = "Invalid response from server"
         except Exception as e:
@@ -83,6 +85,49 @@ class NovuService(NovuBaseApiClient):
         """Initialize the NovuService with the base URL for Novu API."""
         self.base_url = app_settings.novu_api_base_url
 
+    @staticmethod
+    def _handle_exception(func: Callable[..., Any]) -> Callable[..., Any]:
+        """Handle exceptions for both synchronous and asynchronous functions.
+
+        This decorator wraps a function to handle exceptions, converting them into a
+        custom `NovuApiClientException` with a specific message. It distinguishes between
+        asynchronous and synchronous functions, applying appropriate handling for each.
+
+        Args:
+        func (Callable[..., Any]): The function to be wrapped by the decorator.
+
+        Returns:
+        Callable[..., Any]: The wrapped function with added exception handling.
+
+        Raises:
+        NovuApiClientException: If a `ClientConnectionError` or any other exception occurs.
+        """
+        if asyncio.iscoroutinefunction(func):
+
+            async def async_wrapper(self, *args: Any, **kwargs: Any) -> Any:
+                try:
+                    return await func(self, *args, **kwargs)
+                except client_exceptions.ClientConnectionError:
+                    raise NovuApiClientException("Failed to connect to server") from None
+                except Exception as err:
+                    logger.exception(err)
+                    raise NovuApiClientException("Unexpected error occurred") from None
+
+            return async_wrapper
+        else:
+
+            def sync_wrapper(self, *args: Any, **kwargs: Any) -> Any:
+                try:
+                    return func(self, *args, **kwargs)
+                except client_exceptions.ClientConnectionError:
+                    raise NovuApiClientException("Failed to connect to server") from None
+                except Exception as err:
+                    logger.exception(err)
+                    raise NovuApiClientException("Unexpected error occurred") from None
+
+            return sync_wrapper
+
+    @_handle_exception
     async def create_user(self, first_name: str, last_name: str, email: str, password: str) -> Optional[str]:
         """Create a new user in the Novu service.
 
@@ -112,6 +157,7 @@ class NovuService(NovuBaseApiClient):
             else:
                 raise NovuApiClientException(f"Failed to create user: {response}")
 
+    @_handle_exception
     async def login_user(self, email: str, password: str) -> Optional[str]:
         """Log in a user and retrieve the authentication token.
 
@@ -134,14 +180,15 @@ class NovuService(NovuBaseApiClient):
             else:
                 raise NovuApiClientException(f"Failed to login user: {response}")
 
-    async def list_organizations(self, token: str) -> Union[List[Dict], None]:
+    @_handle_exception
+    async def list_organizations(self, token: str) -> Optional[List[Dict]]:
         """Retrieve a list of organizations associated with the authenticated user.
 
         Args:
             token (str): The authentication token for the API request.
 
         Returns:
-            Union[List[Dict], None]: A list of organizations if the request is successful, or None if an error occurs.
+            Optional[List[Dict]]: A list of organizations if the request is successful, or None if an error occurs.
 
         Raises:
             NovuApiClientException: If the request to retrieve organizations fails.
@@ -155,13 +202,14 @@ class NovuService(NovuBaseApiClient):
             else:
                 raise NovuApiClientException(f"Failed to list organizations: {response}")
 
+    @_handle_exception
     async def create_organization(
         self,
         token: str,
         name: str,
         job_title: str,
         domain: str,
-    ) -> Union[Dict, None]:
+    ) -> Optional[Dict]:
         """Create a new organization in Novu.
 
         Args:
@@ -171,7 +219,7 @@ class NovuService(NovuBaseApiClient):
             domain (str): The domain of the organization.
 
         Returns:
-            Union[Dict, None]: The response data containing organization details if the request is successful, or None if an error occurs.
+            Optional[Dict]: The response data containing organization details if the request is successful, or None if an error occurs.
 
         Raises:
             NovuApiClientException: If the request to create the organization fails.
@@ -197,14 +245,15 @@ class NovuService(NovuBaseApiClient):
             else:
                 raise NovuApiClientException(f"Failed to create organization: {response}")
 
-    async def get_environments(self, token: str) -> Union[List, None]:
+    @_handle_exception
+    async def get_environments(self, token: str) -> Optional[List]:
         """Retrieve environment details from Novu.
 
         Args:
             token (str): The authentication token for the API request.
 
         Returns:
-            Union[List, None]: A dictionary containing environment details, such as API keys, app identifiers, and environment IDs,
+            Optional[List]: A dictionary containing environment details, such as API keys, app identifiers, and environment IDs,
             if the request is successful. Returns None if an error occurs.
 
         Raises:
@@ -226,7 +275,8 @@ class NovuService(NovuBaseApiClient):
             else:
                 raise NovuApiClientException(f"Failed to get environments: {response}")
 
-    async def get_prod_session_token(self, prod_env_id: str, dev_token: str) -> Union[str, None]:
+    @_handle_exception
+    async def get_prod_session_token(self, prod_env_id: str, dev_token: str) -> Optional[str]:
         """Switch to a production environment and retrieve a session token.
 
         Args:
@@ -234,7 +284,7 @@ class NovuService(NovuBaseApiClient):
             dev_token (str): The development environment token.
 
         Returns:
-            Union[str, None]: The session token for the production environment if the request is successful.
+            Optional[str]: The session token for the production environment if the request is successful.
             Returns None if an error occurs.
 
         Raises:
@@ -249,11 +299,12 @@ class NovuService(NovuBaseApiClient):
             else:
                 raise NovuApiClientException(f"Failed to switch environments: {response}")
 
-    async def health_check(self) -> Union[Dict, None]:
+    @_handle_exception
+    async def health_check(self) -> Optional[str]:
         """Perform a health check on the API endpoint.
 
         Returns:
-            Union[Dict, None]: The raw response content from the health check endpoint if the request is successful.
+            Optional[str]: The raw response content from the health check endpoint if the request is successful.
             Returns None if an error occurs.
 
         Raises:
