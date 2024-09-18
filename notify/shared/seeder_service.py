@@ -57,6 +57,7 @@ class InitialSeeder(NovuService):
         await self._ensure_organization()
         await self._login_user()  # Re-login required to get environment details
         await self._ensure_apply_envs()
+        await self._apply_changes_to_production()
 
         logger.debug("Initial seeding completed")
 
@@ -182,3 +183,21 @@ class InitialSeeder(NovuService):
             raise NovuInitialSeederException("Seeder data is not defined")
         elif not isinstance(self.data, dict):
             raise NovuInitialSeederException(f"Seeder data must be a dictionary, got {type(self.data).__name__}")
+
+    async def _apply_changes_to_production(self) -> None:
+        """Apply changes to the production environment.
+
+        Fetches and applies changes in the production environment by using
+        the development API key. If any errors occur during the process,
+        they are caught and handled gracefully.
+
+        Raises:
+        NovuInitialSeederException: If the changes cannot be applied.
+        """
+        # To apply changes in production environment, use dev api key
+        logger.debug("Fetching and applying changes to production environment")
+        try:
+            await self.fetch_and_apply_changes()
+        except NovuApiClientException as err:
+            logger.error(err.message)
+            raise NovuInitialSeederException("Unable to apply changes to production") from None
