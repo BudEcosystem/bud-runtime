@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from dapr.conf import settings as dapr_settings
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, DirectoryPath, Field, model_validator
 from pydantic_settings import BaseSettings
 
 from notify.__about__ import __version__
@@ -192,18 +192,37 @@ class AppConfig(BaseConfig):
         "grpc", json_schema_extra=SyncDetails(sync=True).model_dump(exclude_unset=True)
     )
 
-    # Novu configs
-    # FIXME: Didn't get value from secret json
+    # Novu
     novu_user_email: str = Field(
         "admin@bud.studio",
-        json_schema_extra=SyncDetails(sync=True).model_dump(exclude_unset=True),
+        json_schema_extra=SyncDetails(
+            sync=True,
+            alias="novu_credentials.email",
+        ).model_dump(exclude_unset=True),
     )
     novu_user_password: str = Field(
         "Admin@1234",
         json_schema_extra=SyncDetails(sync=True).model_dump(exclude_unset=True),
     )
     novu_api_base_url: str = Field(
-        "http://localhost:3000",
+        "http://api:3000",
+        json_schema_extra=SyncDetails(sync=True, alias="novu_api_base_url").model_dump(exclude_unset=True),
+    )
+
+    # Novu environments
+    novu_dev_api_key: Optional[str] = None
+    novu_dev_app_id: Optional[str] = None
+    novu_dev_env_id: Optional[str] = None
+    novu_prod_api_key: Optional[str] = None
+    novu_prod_app_id: Optional[str] = None
+    novu_prod_env_id: Optional[str] = None
+
+    # Base Directory
+    base_dir: DirectoryPath = Path(__file__).parent.parent.parent
+
+    # Seeder
+    initial_data_path: str = Field(
+        f"{base_dir}/seeders/initial_data.json",
         json_schema_extra=SyncDetails(sync=True).model_dump(exclude_unset=True),
     )
 
