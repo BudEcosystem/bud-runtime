@@ -21,8 +21,20 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
 import aiohttp
 from aiohttp import client_exceptions
-from novu.api import ChangeApi
+from novu.api import (
+    ChangeApi,
+    IntegrationApi,
+    NotificationGroupApi,
+    NotificationTemplateApi,
+)
 from novu.dto.change import ChangeDto
+from novu.dto.integration import IntegrationDto
+from novu.dto.notification_group import NotificationGroupDto
+from novu.dto.notification_template import (
+    NotificationStepDto,
+    NotificationTemplateDto,
+    NotificationTemplateFormDto,
+)
 from requests.exceptions import HTTPError
 
 from notify.commons import logging
@@ -428,3 +440,178 @@ class NovuService(NovuBaseApiClient):
             if environment == "prod"
             else None
         )
+
+    @_handle_exception
+    async def get_workflow_groups(
+        self, api_key: Optional[str] = None, environment: str = "dev"
+    ) -> Iterable[NotificationGroupDto]:
+        """Fetch the list of workflow groups from the Novu API.
+
+        Args:
+        api_key (Optional[str]): The API key to use for authentication. Defaults to `None`.
+        environment (str): The environment to use for fetching the API key, either 'dev' or 'prod'. Defaults to 'dev'.
+
+        Returns:
+        Iterable[NotificationGroupDto]: A list of notification groups.
+
+        Raises:
+        NovuApiClientException: If the API request fails.
+        """
+        novu_api_key = await self._resolve_api_key(api_key=api_key, environment=environment)
+
+        try:
+            # Fetch the list of workflow groups using the Novu API
+            response = NotificationGroupApi(self.base_url, api_key=novu_api_key).list()
+            return response.data
+        except HTTPError as err:
+            error_message = err.response.json().get("message", "Unknown error occurred")
+            raise NovuApiClientException(f"Failed to get workflow groups: {error_message}") from None
+
+    @_handle_exception
+    async def get_active_integrations(
+        self, api_key: Optional[str] = None, environment: str = "dev"
+    ) -> Iterable[IntegrationDto]:
+        """Fetch the list of active integrations from the Novu API.
+
+        Args:
+        api_key (Optional[str]): The API key to use for authentication. If not provided, it resolves based on the environment.
+        environment (str): The environment to fetch the API key from ('dev' or 'prod'). Defaults to 'dev'.
+
+        Returns:
+        Iterable[IntegrationDto]: A list of active integrations.
+
+        Raises:
+        NovuApiClientException: If the API request fails.
+        """
+        novu_api_key = await self._resolve_api_key(api_key=api_key, environment=environment)
+
+        try:
+            # Fetch the list of active integrations using the Novu API
+            response = IntegrationApi(self.base_url, api_key=novu_api_key).list(only_active=True)
+            return response
+        except HTTPError as err:
+            error_message = err.response.json().get("message", "Unknown error occurred")
+            raise NovuApiClientException(f"Failed to get active integrations: {error_message}") from None
+
+    @_handle_exception
+    async def create_integration(
+        self,
+        data: Dict,
+        environment_id: str,
+        check: bool = True,
+        api_key: Optional[str] = None,
+        environment: str = "dev",
+    ) -> IntegrationDto:
+        """Create a new integration in the Novu system.
+
+        Args:
+        data (Dict): The integration data to be created, containing provider ID, channel, active status, and credentials.
+        environment_id (str): The environment ID where the integration will be created.
+        check (bool): Whether to check if the integration is already active. Defaults to True.
+        api_key (Optional[str]): The API key to use for authentication. If not provided, resolves based on the environment.
+        environment (str): The environment to fetch the API key from ('dev' or 'prod'). Defaults to 'dev'.
+
+        Returns:
+        IntegrationDto: The created integration object.
+
+        Raises:
+        NovuApiClientException: If the API request to create the integration fails.
+        """
+        novu_api_key = await self._resolve_api_key(api_key=api_key, environment=environment)
+
+        # Create the integration object on an environment
+        integration = IntegrationDto(
+            provider_id=data["providerId"],
+            channel=data["channel"],
+            active=data["active"],
+            _environment_id=environment_id,
+            credentials=data["credentials"],
+        )
+
+        try:
+            # Create the integration using the Novu API
+            response = IntegrationApi(self.base_url, api_key=novu_api_key).create(integration=integration, check=check)
+            return response
+        except HTTPError as err:
+            error_message = err.response.json().get("message", "Unknown error occurred")
+            raise NovuApiClientException(f"Failed to create integration: {error_message}") from None
+
+    @_handle_exception
+    async def get_workflows(
+        self, api_key: Optional[str] = None, environment: str = "dev"
+    ) -> Iterable[NotificationTemplateDto]:
+        """Fetch the list of workflows (notification templates) from the Novu API.
+
+        Args:
+        api_key (Optional[str]): The API key to use for authentication. If not provided, resolves based on the environment.
+        environment (str): The environment to fetch the API key from ('dev' or 'prod'). Defaults to 'dev'.
+
+        Returns:
+        Iterable[NotificationTemplateDto]: A list of notification templates (workflows) retrieved from the Novu API.
+
+        Raises:
+        NovuApiClientException: If the API request to fetch workflows fails.
+        """
+        novu_api_key = await self._resolve_api_key(api_key=api_key, environment=environment)
+
+        try:
+            # Fetch the list of workflows using the Novu API
+            response = NotificationTemplateApi(self.base_url, api_key=novu_api_key).list()
+            return response.data
+        except HTTPError as err:
+            error_message = err.response.json().get("message", "Unknown error occurred")
+            raise NovuApiClientException(f"Failed to get workflows: {error_message}") from None
+
+    @_handle_exception
+    async def create_workflow(
+        self,
+        data: Dict,
+        steps: List,
+        group_id: str,
+        api_key: Optional[str] = None,
+        environment: str = "dev",
+    ) -> NotificationTemplateDto:
+        """Create a new workflow (notification template) in the Novu system.
+
+        Args:
+        data (Dict): The metadata for the workflow including `name`, `description`, and `active` status.
+        steps (List): A list of steps to be included in the workflow, each containing details such as `active` and `template`.
+        group_id (str): The ID of the notification group to associate the workflow with.
+        api_key (Optional[str]): The API key to use for authentication. If not provided, resolves based on the environment.
+        environment (str): The environment to fetch the API key from ('dev' or 'prod'). Defaults to 'dev'.
+
+        Returns:
+        NotificationTemplateDto: The created workflow as returned by the Novu API.
+
+        Raises:
+        NovuApiClientException: If the API request to create the workflow fails.
+        """
+        novu_api_key = await self._resolve_api_key(api_key=api_key, environment=environment)
+
+        # Create workflow steps
+        workflow_steps = []
+        for step in steps:
+            workflow_step = NotificationStepDto(
+                active=step["active"],
+                template=step["template"],
+            )
+            workflow_steps.append(workflow_step)
+
+        # Create workflow
+        workflow_template = NotificationTemplateFormDto(
+            active=data["active"],
+            name=data["name"],
+            description=data["description"],
+            steps=workflow_steps,
+            notification_group_id=group_id,
+        )
+
+        try:
+            # Fetch the list of workflows using the Novu API
+            response = NotificationTemplateApi(self.base_url, api_key=novu_api_key).create(
+                notification_template=workflow_template
+            )
+            return response
+        except HTTPError as err:
+            error_message = err.response.json().get("message", "Unknown error occurred")
+            raise NovuApiClientException(f"Failed to create workflow: {error_message}") from None
