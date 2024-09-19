@@ -28,13 +28,17 @@ from fastapi.openapi.utils import get_openapi
 from .commons import logging
 from .commons.config import app_settings
 from .commons.constants import Environment
-from .commons.exceptions import NovuApiClientException, NovuInitialSeederException
+from .commons.exceptions import (
+    NovuApiClientException,
+    NovuInitialSeederException,
+    NovuNotificationSeederException,
+)
 from .commons.helpers import retry
 from .core import sync_routes
 from .core.meta_routes import meta_router
 from .core.notify_routes import notify_router
 from .shared.novu_service import NovuService
-from .shared.seeder_service import InitialSeeder
+from .shared.seeder_service import InitialSeeder, NotificationSeeder
 
 
 logger = logging.get_logger(__name__)
@@ -108,7 +112,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     try:
         await check_novu_backend_health()
         await InitialSeeder().execute()
-    except (NovuApiClientException, NovuInitialSeederException) as err:
+        await NotificationSeeder().execute()
+    except (
+        NovuApiClientException,
+        NovuInitialSeederException,
+        NovuNotificationSeederException,
+    ) as err:
         await shutdown_app(err.message)
     except Exception as err:
         logger.exception(f"Unexpected error during initial setup. {err}")
