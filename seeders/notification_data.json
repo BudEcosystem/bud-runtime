@@ -1,0 +1,49 @@
+{
+    "provider": {
+        "providerId": "novu",
+        "channel": "in_app",
+        "active": true,
+        "credentials": {}
+    },
+    "workflows": [
+        {
+            "active": true,
+            "name": "bud-notification",
+            "description": "Notification system for Budserve",
+            "steps": [
+                {
+                    "active": true,
+                    "template": {
+                        "content": "Example {{Content}}",
+                        "contentType": "editor",
+                        "subject": "",
+                        "type": "in_app",
+                        "cta": {
+                            "data": {
+                                "url": "https://bud.studio"
+                            },
+                            "type": "redirect",
+                            "action": {
+                                "buttons": [
+                                    {
+                                        "type": "primary",
+                                        "content": "submit"
+                                    }
+                                ],
+                                "status": "pending"
+                            }
+                        },
+                        "variables": [
+                            {
+                                "type": "String",
+                                "name": "Content",
+                                "defaultValue": "lorem ipsum",
+                                "required": true
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+    ]
+}

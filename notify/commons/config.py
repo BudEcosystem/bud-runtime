@@ -221,8 +221,8 @@ class AppConfig(BaseConfig):
     base_dir: DirectoryPath = Path(__file__).parent.parent.parent
 
     # Seeder
-    initial_data_path: str = Field(
-        f"{base_dir}/seeders/initial_data.json",
+    seeder_path: str = Field(
+        f"{base_dir}/seeders",
         json_schema_extra=SyncDetails(sync=True).model_dump(exclude_unset=True),
     )
 
