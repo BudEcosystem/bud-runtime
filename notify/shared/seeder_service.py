@@ -58,7 +58,7 @@ class NovuInitialSeeder(NovuService):
         Raises:
             NovuSeederException: If any step of the seeding process fails.
         """
-        logger.debug("Initial seeding started")
+        logger.info("Initial seeding started")
 
         await self._validate_data()
         await self._ensure_user()
@@ -69,7 +69,7 @@ class NovuInitialSeeder(NovuService):
         await self._ensure_layouts()
         await self._apply_changes_to_production()
 
-        logger.debug("Initial seeding completed")
+        logger.info("Initial seeding completed")
 
     async def _login_user(self) -> None:
         """Log in the user and store the session token.
@@ -294,7 +294,7 @@ class NovuWorkflowSeeder(NovuService):
         Raises:
         NovuSeederException: If any step of the seeding process fails.
         """
-        logger.debug("Workflow seeding started")
+        logger.info("Workflow seeding started")
 
         await self._validate_data()
         await self._get_default_workflow_group()
@@ -302,7 +302,7 @@ class NovuWorkflowSeeder(NovuService):
         await self._ensure_workflows()
         await self._apply_changes_to_production()
 
-        logger.debug("Workflow seeding completed")
+        logger.info("Workflow seeding completed")
 
     async def _validate_data(self) -> None:
         """Validate the seeder data to ensure it is properly defined and in the correct format.

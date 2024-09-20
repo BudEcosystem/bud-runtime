@@ -28,17 +28,17 @@ from fastapi.openapi.utils import get_openapi
 from .commons import logging
 from .commons.config import app_settings
 from .commons.constants import Environment
-from .commons.exceptions import (
-    NovuApiClientException,
-    NovuInitialSeederException,
-    NovuNotificationSeederException,
-)
+from .commons.exceptions import NovuApiClientException, NovuSeederException
 from .commons.helpers import retry
 from .core import sync_routes
 from .core.meta_routes import meta_router
 from .core.notify_routes import notify_router
 from .shared.novu_service import NovuService
-from .shared.seeder_service import InitialSeeder, NotificationSeeder
+from .shared.seeder_service import (
+    NovuInitialSeeder,
+    NovuIntegrationSeeder,
+    NovuWorkflowSeeder,
+)
 
 
 logger = logging.get_logger(__name__)
@@ -111,12 +111,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Shutdown the application if the health check or seeding fails.
     try:
         await check_novu_backend_health()
-        await InitialSeeder().execute()
-        await NotificationSeeder().execute()
+        await NovuInitialSeeder().execute()
+        await NovuWorkflowSeeder().execute()
+        await NovuIntegrationSeeder().execute()
     except (
         NovuApiClientException,
-        NovuInitialSeederException,
-        NovuNotificationSeederException,
+        NovuSeederException,
     ) as err:
         await shutdown_app(err.message)
     except Exception as err:
