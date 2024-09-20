@@ -21,6 +21,7 @@ from notify.commons.config import app_settings
 from notify.commons.exceptions import (
     NovuApiClientException,
     NovuInitialSeederException,
+    NovuIntegrationSeederException,
     NovuNotificationSeederException,
     NovuWorkflowSeederException,
 )
@@ -34,6 +35,7 @@ logger = logging.get_logger(__name__)
 INITIAL_DATA_PATH = f"{app_settings.seeder_path}/initial_data.json"
 NOTIFICATION_DATA_PATH = f"{app_settings.seeder_path}/notification_data.json"
 WORKFLOW_SEEDER_PATH = f"{app_settings.seeder_path}/workflows.json"
+INTEGRATION_SEEDER_PATH = f"{app_settings.seeder_path}/integrations.json"
 HTML_CONTENT_PATH = f"{app_settings.seeder_path}/html"
 
 
@@ -578,3 +580,87 @@ class NovuWorkflowSeeder(NovuService):
         except NovuApiClientException as err:
             logger.error(err.message)
             raise NovuWorkflowSeederException("Unable to apply changes to production") from None
+
+
+class NovuIntegrationSeeder(NovuService):
+    """Class to handle initial seeding of integrations for the application.
+
+    This class performs a series of steps to ensure that integrations are created
+    during the application's startup process.
+    """
+
+    def __init__(self) -> None:
+        """Initialize the NovuIntegrationSeeder instance with the provided data."""
+        super().__init__()
+        self.data = read_json_file(INTEGRATION_SEEDER_PATH)
+
+    async def execute(self) -> None:
+        """Execute the integration seeding process.
+
+        Applies the integration data to the production environment.
+
+        Raises:
+        NovuIntegrationSeederException: If any step of the seeding process fails.
+        """
+        logger.info("Integration seeding started")
+
+        await self._validate_data()
+        await self._ensure_integrations()
+
+        logger.info("Integration seeding completed")
+
+    async def _validate_data(self) -> None:
+        """Validate the seeder data to ensure it is properly defined and in the correct format.
+
+        Raises:
+        NovuIntegrationSeederException: If the seeder data is not defined or not a dictionary.
+        """
+        logger.debug("Validating seeder data")
+        if self.data is None:
+            raise NovuIntegrationSeederException("Seeder data is not defined")
+        elif not isinstance(self.data, list):
+            raise NovuIntegrationSeederException(f"Seeder data must be a list, got {type(self.data).__name__}")
+
+    async def _ensure_integrations(self) -> None:
+        """Ensure that required integrations are present.
+
+        This method checks the active integrations by fetching them from Novu, compares
+        them with the integration data provided, and creates any missing integrations
+        in the production environment.
+
+        If an integration is already present, its creation is skipped. If any error occurs
+        during fetching or creation, appropriate exceptions are raised.
+
+        Raises:
+        NovuIntegrationSeederException: If fetching or creating integrations fails.
+        """
+        # Fetch active integrations from Novu
+        try:
+            present_integrations = await self.get_active_integrations(environment="prod")
+            logger.debug("Fetched all active integrations")
+        except NovuApiClientException as err:
+            logger.error(err.message)
+            raise NovuIntegrationSeederException("Unable to get integrations") from None
+
+        # Create a list of present integration provider IDs for quick lookup
+        present_integration_providers = [integration.provider_id for integration in present_integrations]
+
+        # Iterate through the seeder integration data
+        for seeder_integration in self.data:
+            provider_id = seeder_integration["providerId"]
+
+            # Check if the integration already exists, and skip creation if found
+            if provider_id in present_integration_providers:
+                logger.debug(f"Integration of '{provider_id}' found, skipping creation")
+                continue
+
+            # Create the missing integration
+            logger.debug(f"Integration of '{provider_id}' not found, creating")
+            try:
+                created_integration = await self.create_integration(
+                    seeder_integration, app_settings.novu_prod_env_id, environment="prod"
+                )
+                logger.debug(f"Integration {created_integration.provider_id} created successfully in production")
+            except NovuApiClientException as err:
+                logger.error(err.message)
+                raise NovuIntegrationSeederException(f"Unable to create {provider_id} integration") from None
