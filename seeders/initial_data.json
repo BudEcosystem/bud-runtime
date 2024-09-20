@@ -10,7 +10,7 @@
     },
     "layouts": [
         {
-            "name": "BudDefaultLayout",
+            "name": "bud-default-layout",
             "description": "Default Bud email layout",
             "content": "bud_default_layout.html",
             "is_default": true,
@@ -18,8 +18,14 @@
             "variables": [
                 {
                     "type": "String",
-                    "name": "branding.logo",
-                    "defaultValue": "",
+                    "name": "bud.logo",
+                    "defaultValue": "https://framerusercontent.com/images/M1Y4n80MQmGCeoj54sQ1H2G6XPo.png?scale-down-to=512",
+                    "required": false
+                },
+                {
+                    "type": "String",
+                    "name": "bud.color",
+                    "defaultValue": "#e35bd3",
                     "required": false
                 }
             ]
