@@ -605,9 +605,10 @@ class NovuService(NovuBaseApiClient):
         workflow_template = NotificationTemplateFormDto(
             active=data["active"],
             name=data["name"],
-            description=data["description"],
+            description=data.get("description", ""),
             steps=workflow_steps,
             notification_group_id=group_id,
+            tags=data.get("tags", []),
         )
 
         try:
