@@ -42,11 +42,9 @@ from requests.exceptions import HTTPError
 from notify.commons import logging
 from notify.commons.config import app_settings
 from notify.commons.exceptions import NovuApiClientException
-from notify.commons.helpers import read_file_content
 
 
 logger = logging.get_logger(__name__)
-HTML_CONTENT_PATH = f"{app_settings.seeder_path}/html"
 
 
 class NovuBaseApiClient:
@@ -640,17 +638,12 @@ class NovuService(NovuBaseApiClient):
         """
         novu_api_key = await self._resolve_api_key(api_key=api_key, environment=environment)
 
-        # Read the HTML content from the specified file
-        html_content = read_file_content(f"{HTML_CONTENT_PATH}/{data['content']}")
-        if not html_content:
-            raise NovuApiClientException(f"Failed to read HTML content: {data['content']}")
-
         url = f"{self.base_url}/v1/layouts"
         headers = {"Authorization": f"ApiKey {novu_api_key}"}
         payload = {
             "name": data["name"],
             "description": data["description"],
-            "content": html_content,
+            "content": data["content"],
             "isDefault": data["is_default"],
             "identifier": data["identifier"],
             "variables": data["variables"],

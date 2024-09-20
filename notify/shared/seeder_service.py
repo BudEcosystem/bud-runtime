@@ -65,6 +65,7 @@ class NovuInitialSeeder(NovuService):
         await self._ensure_organization()
         await self._login_user()  # Re-login required to get environment details
         await self._ensure_apply_envs()
+        await self._validate_modify_layout_content()
         await self._ensure_layouts()
         await self._apply_changes_to_production()
 
@@ -246,6 +247,30 @@ class NovuInitialSeeder(NovuService):
             except NovuApiClientException as err:
                 logger.error(err.message)
                 raise NovuSeederException(f"Unable to create layout {seeder_layout['name']}") from None
+
+    async def _validate_modify_layout_content(self) -> None:
+        """Validate and modify the layout seeder data.
+
+        This method read specified content files and update seeder data.
+
+        If layout content path is invalid, an exception is raised.
+
+        Raises:
+            NovuSeederException: If layout content path is invalid.
+        """
+        logger.debug("Validating and modifying layout content")
+        # Iterate over layouts to validate and modify content
+        for layout in self.data["layouts"]:
+            # Read the HTML content from the specified file
+            html_content = read_file_content(f"{HTML_CONTENT_PATH}/{layout['content']}")
+            if not html_content:
+                raise NovuSeederException(f"Failed to read HTML content from layout: {layout['content']}")
+
+        logger.debug(f"HTML content for layout '{layout['content']}' loaded successfully.")
+        # NOTE: Replace the old content with the new content
+        layout["content"] = html_content
+
+        logger.debug("Layout content data validation and modification complete.")
 
 
 class NovuWorkflowSeeder(NovuService):
