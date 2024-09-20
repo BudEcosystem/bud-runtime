@@ -24,11 +24,13 @@ from aiohttp import client_exceptions
 from novu.api import (
     ChangeApi,
     IntegrationApi,
+    LayoutApi,
     NotificationGroupApi,
     NotificationTemplateApi,
 )
 from novu.dto.change import ChangeDto
 from novu.dto.integration import IntegrationDto
+from novu.dto.layout import LayoutDto
 from novu.dto.notification_group import NotificationGroupDto
 from novu.dto.notification_template import (
     NotificationStepDto,
@@ -40,9 +42,11 @@ from requests.exceptions import HTTPError
 from notify.commons import logging
 from notify.commons.config import app_settings
 from notify.commons.exceptions import NovuApiClientException
+from notify.commons.helpers import read_file_content
 
 
 logger = logging.get_logger(__name__)
+HTML_CONTENT_PATH = f"{app_settings.seeder_path}/html"
 
 
 class NovuBaseApiClient:
@@ -615,3 +619,77 @@ class NovuService(NovuBaseApiClient):
         except HTTPError as err:
             error_message = err.response.json().get("message", "Unknown error occurred")
             raise NovuApiClientException(f"Failed to create workflow: {error_message}") from None
+
+    @_handle_exception
+    async def create_layout(
+        self, data: Dict, api_key: Optional[str] = None, environment: str = "dev"
+    ) -> Dict[str, Any]:
+        """Create a new layout using the Novu API.
+
+        Args:
+        data (Dict[str, Any]): A dictionary containing layout information such as name, description, content file name, is_default, identifier, and variables.
+        api_key (Optional[str]): The API key for the Novu environment. If not provided, it will be resolved based on the environment.
+        environment (str): The environment in which to operate (e.g., 'dev' or 'prod'). Defaults to 'dev'.
+
+        Returns:
+        Dict[str, Any]: A dictionary containing the newly created layout's data.
+
+        Raises:
+        NovuApiClientException: If the layout creation fails or there is an issue with reading the content file.
+        """
+        novu_api_key = await self._resolve_api_key(api_key=api_key, environment=environment)
+
+        # Read the HTML content from the specified file
+        html_content = read_file_content(f"{HTML_CONTENT_PATH}/{data['content']}")
+        if not html_content:
+            raise NovuApiClientException(f"Failed to read HTML content: {data['content']}")
+
+        url = f"{self.base_url}/v1/layouts"
+        headers = {"Authorization": f"ApiKey {novu_api_key}"}
+        payload = {
+            "name": data["name"],
+            "description": data["description"],
+            "content": html_content,
+            "isDefault": data["is_default"],
+            "identifier": data["identifier"],
+            "variables": data["variables"],
+        }
+
+        async with aiohttp.ClientSession() as session, session.post(url, headers=headers, json=payload) as response:
+            is_success, response = await self._handle_response(response)
+            if is_success:
+                return response["data"]
+            else:
+                raise NovuApiClientException(f"Failed to create layout: {response}")
+
+    @_handle_exception
+    async def get_layouts(
+        self,
+        page: int = 0,
+        limit: int = 100,
+        api_key: Optional[str] = None,
+        environment: str = "dev",
+    ) -> Iterable[LayoutDto]:
+        """Fetch a list of layouts from the Novu API.
+
+        Args:
+        page (int): The page number of results to retrieve. Defaults to 0.
+        limit (int): The maximum number of layouts to retrieve per request. Defaults to 100.
+        api_key (Optional[str]): The API key for the Novu environment. If not provided, it will be resolved based on the environment.
+        environment (str): The environment in which to operate (e.g., 'dev' or 'prod'). Defaults to 'dev'.
+
+        Returns:
+        List[LayoutDto]: A list of LayoutDto objects representing the layouts.
+
+        Raises:
+        NovuApiClientException: If there is an error while fetching layouts from the Novu API.
+        """
+        novu_api_key = await self._resolve_api_key(api_key=api_key, environment=environment)
+
+        try:
+            # Fetch the list of layouts using the Novu API
+            response = LayoutApi(self.base_url, api_key=novu_api_key).list(page=page, limit=limit)
+            return response.data
+        except HTTPError as err:
+            error_message = err.response.json().get("message", "Unknown error occurred")
+            raise NovuApiClientException(f"Failed to get layouts: {error_message}") from None
