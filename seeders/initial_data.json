@@ -7,5 +7,22 @@
         "name": "Bud Studio",
         "job_title": "engineer",
         "domain": "bud.studio"
-    }
+    },
+    "layouts": [
+        {
+            "name": "BudDefaultLayout",
+            "description": "Default Bud email layout",
+            "content": "bud_default_layout.html",
+            "is_default": true,
+            "identifier": "bud_default_layout",
+            "variables": [
+                {
+                    "type": "String",
+                    "name": "branding.logo",
+                    "defaultValue": "",
+                    "required": false
+                }
+            ]
+        }
+    ]
 }
