@@ -64,6 +64,7 @@ class InitialSeeder(NovuService):
         await self._ensure_organization()
         await self._login_user()  # Re-login required to get environment details
         await self._ensure_apply_envs()
+        await self._ensure_layouts()
         await self._apply_changes_to_production()
 
         logger.debug("Initial seeding completed")
@@ -208,6 +209,42 @@ class InitialSeeder(NovuService):
         except NovuApiClientException as err:
             logger.error(err.message)
             raise NovuInitialSeederException("Unable to apply changes to production") from None
+
+    async def _ensure_layouts(self) -> None:
+        """Ensure that the required layouts are present in Novu.
+
+        This method compares the layouts fetched from the Novu API with the layouts defined in the seeder data.
+        If a layout is missing in Novu, it is created via the `create_layout` method.
+
+        Raises:
+        NovuInitialSeederException: If there is an issue fetching or creating layouts.
+        """
+        logger.debug("Ensuring layouts are seeded")
+
+        # Fetch existing layouts from Novu
+        try:
+            existing_novu_layouts = await self.get_layouts()
+            logger.debug("Fetched all layouts from novu")
+        except NovuApiClientException as err:
+            logger.error(err.message)
+            raise NovuInitialSeederException("Unable to get layouts") from None
+
+        existing_layout_names = [layout.name for layout in existing_novu_layouts]
+        seeder_layouts = self.data["layouts"]
+
+        for seeder_layout in seeder_layouts:
+            # Check if the layout already exists in Novu
+            if seeder_layout["name"] in existing_layout_names:
+                logger.debug(f"Layout {seeder_layout['name']} already exists")
+                continue
+
+            # If not, create the layout
+            logger.debug(f"Layout {seeder_layout['name']} does not exist, creating")
+            try:
+                await self.create_layout(seeder_layout)
+            except NovuApiClientException as err:
+                logger.error(err.message)
+                raise NovuInitialSeederException(f"Unable to create layout {seeder_layout['name']}") from None
 
 
 class NotificationSeeder(NovuService):
