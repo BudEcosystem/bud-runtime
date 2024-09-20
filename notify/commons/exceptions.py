@@ -121,22 +121,8 @@ class NovuApiClientException(Exception):
         super().__init__(self.message)
 
 
-class NovuInitialSeederException(Exception):
-    def __init__(self, message: str = "Error occurred while initial seeding.") -> None:
+class NovuSeederException(Exception):
+    def __init__(self, message: str = "Error occurred while seeding.") -> None:
         """Raise for errors related to seeding data operations."""
-        self.message = message
-        super().__init__(self.message)
-
-
-class NovuWorkflowSeederException(Exception):
-    def __init__(self, message: str = "Error occurred while workflow seeding.") -> None:
-        """Raise for errors related to seeding workflow data."""
-        self.message = message
-        super().__init__(self.message)
-
-
-class NovuIntegrationSeederException(Exception):
-    def __init__(self, message: str = "Error occurred while integration seeding.") -> None:
-        """Raise for errors related to seeding integration data."""
         self.message = message
         super().__init__(self.message)

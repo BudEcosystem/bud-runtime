@@ -18,12 +18,7 @@
 
 from notify.commons import logging
 from notify.commons.config import app_settings
-from notify.commons.exceptions import (
-    NovuApiClientException,
-    NovuInitialSeederException,
-    NovuIntegrationSeederException,
-    NovuWorkflowSeederException,
-)
+from notify.commons.exceptions import NovuApiClientException, NovuSeederException
 from notify.commons.helpers import read_file_content, read_json_file
 
 from .novu_service import NovuService
@@ -59,7 +54,7 @@ class InitialSeeder(NovuService):
         environment details.
 
         Raises:
-            NovuInitialSeederException: If any step of the seeding process fails.
+            NovuSeederException: If any step of the seeding process fails.
         """
         logger.debug("Initial seeding started")
 
@@ -80,7 +75,7 @@ class InitialSeeder(NovuService):
         session token. Raises an exception if the login fails.
 
         Raises:
-        NovuInitialSeederException: If the login fails due to an API client exception.
+        NovuSeederException: If the login fails due to an API client exception.
         """
         logger.debug("Logging in user")
         try:
@@ -90,7 +85,7 @@ class InitialSeeder(NovuService):
             self.dev_session_token = session_token
         except NovuApiClientException as err:
             logger.error(err.message)
-            raise NovuInitialSeederException("User login failed") from None
+            raise NovuSeederException("User login failed") from None
 
     async def _ensure_user(self) -> None:
         """Ensure the user exists by creating or logging in.
@@ -100,7 +95,7 @@ class InitialSeeder(NovuService):
         Updates the session token on successful login or creation.
 
         Raises:
-        NovuInitialSeederException: If user creation and login fail.
+        NovuSeederException: If user creation and login fail.
         """
         logger.debug("Ensuring user exists or logging in")
         first_name = self.data["user"]["first_name"]
@@ -127,7 +122,7 @@ class InitialSeeder(NovuService):
         organizations. If the organization does not exist, it will be created.
 
         Raises:
-        NovuInitialSeederException: If there is an error during the organization
+        NovuSeederException: If there is an error during the organization
         listing or creation process.
         """
         logger.debug("Ensuring organization exists")
@@ -151,7 +146,7 @@ class InitialSeeder(NovuService):
             logger.debug("Organization created successfully")
         except NovuApiClientException as err:
             logger.error(err.message)
-            raise NovuInitialSeederException("Organization seeding failed") from None
+            raise NovuSeederException("Organization seeding failed") from None
 
     async def _ensure_apply_envs(self) -> None:
         logger.debug("Applying environment details")
@@ -182,19 +177,19 @@ class InitialSeeder(NovuService):
             logger.debug("Environment details applied successfully")
         except NovuApiClientException as err:
             logger.error(f"Error during environment retrieval or application settings update: {err.message}")
-            raise NovuInitialSeederException("Unable to retrieve environment details") from None
+            raise NovuSeederException("Unable to retrieve environment details") from None
 
     async def _validate_data(self) -> None:
         """Validate the seeder data to ensure it is properly defined and in the correct format.
 
         Raises:
-        NovuInitialSeederException: If the seeder data is not defined or not a dictionary.
+        NovuSeederException: If the seeder data is not defined or not a dictionary.
         """
         logger.debug("Validating seeder data")
         if self.data is None:
-            raise NovuInitialSeederException("Seeder data is not defined")
+            raise NovuSeederException("Seeder data is not defined")
         elif not isinstance(self.data, dict):
-            raise NovuInitialSeederException(f"Seeder data must be a dictionary, got {type(self.data).__name__}")
+            raise NovuSeederException(f"Seeder data must be a dictionary, got {type(self.data).__name__}")
 
     async def _apply_changes_to_production(self) -> None:
         """Apply changes to the production environment.
@@ -204,7 +199,7 @@ class InitialSeeder(NovuService):
         they are caught and handled gracefully.
 
         Raises:
-        NovuInitialSeederException: If the changes cannot be applied.
+        NovuSeederException: If the changes cannot be applied.
         """
         # To apply changes in production environment, use dev api key
         logger.debug("Fetching and applying changes to production environment")
@@ -212,7 +207,7 @@ class InitialSeeder(NovuService):
             await self.fetch_and_apply_changes()
         except NovuApiClientException as err:
             logger.error(err.message)
-            raise NovuInitialSeederException("Unable to apply changes to production") from None
+            raise NovuSeederException("Unable to apply changes to production") from None
 
     async def _ensure_layouts(self) -> None:
         """Ensure that the required layouts are present in Novu.
@@ -221,7 +216,7 @@ class InitialSeeder(NovuService):
         If a layout is missing in Novu, it is created via the `create_layout` method.
 
         Raises:
-        NovuInitialSeederException: If there is an issue fetching or creating layouts.
+        NovuSeederException: If there is an issue fetching or creating layouts.
         """
         logger.debug("Ensuring layouts are seeded")
 
@@ -231,7 +226,7 @@ class InitialSeeder(NovuService):
             logger.debug("Fetched all layouts from novu")
         except NovuApiClientException as err:
             logger.error(err.message)
-            raise NovuInitialSeederException("Unable to get layouts") from None
+            raise NovuSeederException("Unable to get layouts") from None
 
         existing_layout_names = [layout.name for layout in existing_novu_layouts]
         seeder_layouts = self.data["layouts"]
@@ -248,7 +243,7 @@ class InitialSeeder(NovuService):
                 await self.create_layout(seeder_layout)
             except NovuApiClientException as err:
                 logger.error(err.message)
-                raise NovuInitialSeederException(f"Unable to create layout {seeder_layout['name']}") from None
+                raise NovuSeederException(f"Unable to create layout {seeder_layout['name']}") from None
 
 
 class NovuWorkflowSeeder(NovuService):
@@ -270,7 +265,7 @@ class NovuWorkflowSeeder(NovuService):
         Applies the workflow data to the production environment.
 
         Raises:
-        NovuWorkflowSeederException: If any step of the seeding process fails.
+        NovuSeederException: If any step of the seeding process fails.
         """
         logger.debug("Workflow seeding started")
 
@@ -286,13 +281,13 @@ class NovuWorkflowSeeder(NovuService):
         """Validate the seeder data to ensure it is properly defined and in the correct format.
 
         Raises:
-        NovuWorkflowSeederException: If the seeder data is not defined or not a dictionary.
+        NovuSeederException: If the seeder data is not defined or not a dictionary.
         """
         logger.debug("Validating seeder data")
         if self.data is None:
-            raise NovuWorkflowSeederException("Seeder data is not defined")
+            raise NovuSeederException("Seeder data is not defined")
         elif not isinstance(self.data, list):
-            raise NovuWorkflowSeederException(f"Seeder data must be a list, got {type(self.data).__name__}")
+            raise NovuSeederException(f"Seeder data must be a list, got {type(self.data).__name__}")
 
     async def _validate_modify_template_data(self) -> None:
         """Validate and modify the workflow seeder data.
@@ -304,7 +299,7 @@ class NovuWorkflowSeeder(NovuService):
         If a layout ID or content is invalid, an exception is raised.
 
         Raises:
-            NovuWorkflowSeederException: If the layout ID in the template is invalid.
+            NovuSeederException: If the layout ID in the template is invalid.
         """
         # Fetch existing layouts from Novu
         try:
@@ -312,7 +307,7 @@ class NovuWorkflowSeeder(NovuService):
             logger.debug("Fetched all layouts from novu")
         except NovuApiClientException as err:
             logger.error(err.message)
-            raise NovuWorkflowSeederException("Unable to get layouts") from None
+            raise NovuSeederException("Unable to get layouts") from None
 
         # Map layout names to layout IDs for quick lookup
         layout_details = {layout.name: layout._id for layout in existing_novu_layouts}
@@ -327,7 +322,7 @@ class NovuWorkflowSeeder(NovuService):
 
                     # Validate layout ID
                     if layout_name not in layout_details:
-                        raise NovuWorkflowSeederException(
+                        raise NovuSeederException(
                             f"Invalid email layout {layout_name} found for {workflow['name']} workflow"
                         )
 
@@ -337,7 +332,7 @@ class NovuWorkflowSeeder(NovuService):
                     # Read the HTML content from the specified file
                     html_content = read_file_content(f"{HTML_CONTENT_PATH}/{template['content']}")
                     if not html_content:
-                        raise NovuWorkflowSeederException(f"Failed to read HTML content: {template['content']}")
+                        raise NovuSeederException(f"Failed to read HTML content: {template['content']}")
 
                     logger.debug(f"HTML content for template '{template['content']}' loaded successfully.")
                     # NOTE: Replace the old content with the new content
@@ -352,7 +347,7 @@ class NovuWorkflowSeeder(NovuService):
         `workflow_group_id` to the ID of the first group in the list.
 
         Raises:
-        NovuWorkflowSeederException: If there is an error retrieving the workflow groups.
+        NovuSeederException: If there is an error retrieving the workflow groups.
         """
         try:
             workflow_groups = await self.get_workflow_groups()
@@ -361,11 +356,11 @@ class NovuWorkflowSeeder(NovuService):
                 self.workflow_group_id = workflow_groups[0]._id
                 logger.debug("Found default workflow group details")
             else:
-                raise NovuWorkflowSeederException("No workflow groups found")
+                raise NovuSeederException("No workflow groups found")
 
         except NovuApiClientException as err:
             logger.error(err.message)
-            raise NovuWorkflowSeederException("Unable to get default workflow group details") from None
+            raise NovuSeederException("Unable to get default workflow group details") from None
 
     async def _ensure_workflows(self) -> None:
         """Ensure that all required workflows are present in the system.
@@ -374,14 +369,14 @@ class NovuWorkflowSeeder(NovuService):
         If a workflow is not found, it is created with its corresponding steps.
 
         Raises:
-        NovuWorkflowSeederException: If there is an error fetching or creating workflows.
+        NovuSeederException: If there is an error fetching or creating workflows.
         """
         try:
             present_workflows = await self.get_workflows()
             logger.debug("Fetched all present workflows")
         except NovuApiClientException as err:
             logger.error(err.message)
-            raise NovuWorkflowSeederException("Unable to get workflows") from None
+            raise NovuSeederException("Unable to get workflows") from None
 
         present_workflow_names = [workflow.name for workflow in present_workflows]
 
@@ -399,7 +394,7 @@ class NovuWorkflowSeeder(NovuService):
                 logger.debug(f"Workflow created successfully {created_workflow._id}")
             except NovuApiClientException as err:
                 logger.error(err.message)
-                raise NovuWorkflowSeederException("Unable to create workflow") from None
+                raise NovuSeederException("Unable to create workflow") from None
 
     async def _apply_changes_to_production(self) -> None:
         """Apply changes to the production environment.
@@ -409,7 +404,7 @@ class NovuWorkflowSeeder(NovuService):
         they are caught and handled gracefully.
 
         Raises:
-        NovuWorkflowSeederException: If the changes cannot be applied.
+        NovuSeederException: If the changes cannot be applied.
         """
         # To apply changes in production environment, use dev api key
         logger.debug("Fetching and applying changes to production environment")
@@ -417,7 +412,7 @@ class NovuWorkflowSeeder(NovuService):
             await self.fetch_and_apply_changes()
         except NovuApiClientException as err:
             logger.error(err.message)
-            raise NovuWorkflowSeederException("Unable to apply changes to production") from None
+            raise NovuSeederException("Unable to apply changes to production") from None
 
 
 class NovuIntegrationSeeder(NovuService):
@@ -438,7 +433,7 @@ class NovuIntegrationSeeder(NovuService):
         Applies the integration data to the production environment.
 
         Raises:
-        NovuIntegrationSeederException: If any step of the seeding process fails.
+        NovuSeederException: If any step of the seeding process fails.
         """
         logger.info("Integration seeding started")
 
@@ -451,13 +446,13 @@ class NovuIntegrationSeeder(NovuService):
         """Validate the seeder data to ensure it is properly defined and in the correct format.
 
         Raises:
-        NovuIntegrationSeederException: If the seeder data is not defined or not a dictionary.
+        NovuSeederException: If the seeder data is not defined or not a dictionary.
         """
         logger.debug("Validating seeder data")
         if self.data is None:
-            raise NovuIntegrationSeederException("Seeder data is not defined")
+            raise NovuSeederException("Seeder data is not defined")
         elif not isinstance(self.data, list):
-            raise NovuIntegrationSeederException(f"Seeder data must be a list, got {type(self.data).__name__}")
+            raise NovuSeederException(f"Seeder data must be a list, got {type(self.data).__name__}")
 
     async def _ensure_integrations(self) -> None:
         """Ensure that required integrations are present.
@@ -470,7 +465,7 @@ class NovuIntegrationSeeder(NovuService):
         during fetching or creation, appropriate exceptions are raised.
 
         Raises:
-        NovuIntegrationSeederException: If fetching or creating integrations fails.
+        NovuSeederException: If fetching or creating integrations fails.
         """
         # Fetch active integrations from Novu
         try:
@@ -478,7 +473,7 @@ class NovuIntegrationSeeder(NovuService):
             logger.debug("Fetched all active integrations")
         except NovuApiClientException as err:
             logger.error(err.message)
-            raise NovuIntegrationSeederException("Unable to get integrations") from None
+            raise NovuSeederException("Unable to get integrations") from None
 
         # Create a list of present integration provider IDs for quick lookup
         present_integration_providers = [integration.provider_id for integration in present_integrations]
@@ -501,4 +496,4 @@ class NovuIntegrationSeeder(NovuService):
                 logger.debug(f"Integration {created_integration.provider_id} created successfully in production")
             except NovuApiClientException as err:
                 logger.error(err.message)
-                raise NovuIntegrationSeederException(f"Unable to create {provider_id} integration") from None
+                raise NovuSeederException(f"Unable to create {provider_id} integration") from None
