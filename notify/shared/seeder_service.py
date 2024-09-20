@@ -16,6 +16,8 @@
 
 """Provides a service class for seeding data."""
 
+import os
+
 from notify.commons import logging
 from notify.commons.config import app_settings
 from notify.commons.exceptions import NovuApiClientException, NovuSeederException
@@ -26,14 +28,14 @@ from .novu_service import NovuService
 
 logger = logging.get_logger(__name__)
 
-INITIAL_DATA_PATH = f"{app_settings.seeder_path}/initial_data.json"
-NOTIFICATION_DATA_PATH = f"{app_settings.seeder_path}/notification_data.json"
-WORKFLOW_SEEDER_PATH = f"{app_settings.seeder_path}/workflows.json"
-INTEGRATION_SEEDER_PATH = f"{app_settings.seeder_path}/integrations.json"
-HTML_CONTENT_PATH = f"{app_settings.seeder_path}/html"
+# Default path of seeding data sources
+INITIAL_SEEDER_PATH = os.path.join(app_settings.seeder_path, "initial_data.json")
+WORKFLOW_SEEDER_PATH = os.path.join(app_settings.seeder_path, "workflows.json")
+INTEGRATION_SEEDER_PATH = os.path.join(app_settings.seeder_path, "integrations.json")
+HTML_CONTENT_PATH = os.path.join(app_settings.seeder_path, "html")
 
 
-class InitialSeeder(NovuService):
+class NovuInitialSeeder(NovuService):
     """Class to handle initial seeding of data for the application.
 
     This class performs a series of steps to ensure that necessary data (user, organization, environments)
@@ -43,7 +45,7 @@ class InitialSeeder(NovuService):
     def __init__(self) -> None:
         """Initialize the InitialSeeder instance with the provided data."""
         super().__init__()
-        self.data = read_json_file(INITIAL_DATA_PATH)
+        self.data = read_json_file(INITIAL_SEEDER_PATH)
         self.dev_session_token = None
         self.prod_session_token = None
 

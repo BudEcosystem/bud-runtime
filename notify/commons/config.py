@@ -16,6 +16,7 @@
 
 """Manages application and secret configurations, utilizing environment variables and Dapr's configuration store for syncing."""
 
+import os
 from datetime import datetime, timedelta, timezone
 from distutils.util import strtobool
 from pathlib import Path
@@ -222,7 +223,7 @@ class AppConfig(BaseConfig):
 
     # Seeder
     seeder_path: str = Field(
-        f"{base_dir}/seeders",
+        default=os.path.join(base_dir, "seeders"),
         json_schema_extra=SyncDetails(sync=True).model_dump(exclude_unset=True),
     )
 
