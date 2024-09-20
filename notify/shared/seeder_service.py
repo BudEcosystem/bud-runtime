@@ -22,7 +22,6 @@ from notify.commons.exceptions import (
     NovuApiClientException,
     NovuInitialSeederException,
     NovuIntegrationSeederException,
-    NovuNotificationSeederException,
     NovuWorkflowSeederException,
 )
 from notify.commons.helpers import read_file_content, read_json_file
@@ -252,167 +251,6 @@ class InitialSeeder(NovuService):
                 raise NovuInitialSeederException(f"Unable to create layout {seeder_layout['name']}") from None
 
 
-class NotificationSeeder(NovuService):
-    """Handles the seeding of notification-related data in the Novu system.
-
-    This class is responsible for ensuring that all necessary notification integrations and workflows
-    are present in the Novu system.
-    """
-
-    def __init__(self) -> None:
-        """Initialize the NotificationSeeder instance with the provided data."""
-        super().__init__()
-        self.data = read_json_file(NOTIFICATION_DATA_PATH)
-        self.workflow_group_id = None
-
-    async def execute(self) -> None:
-        """Execute the notification seeding process.
-
-        Applies the notification data to the production environment.
-
-        Raises:
-        NovuNotificationSeederException: If any step of the seeding process fails.
-        """
-        logger.debug("Notification seeding started")
-
-        await self._validate_data()
-        await self._get_default_workflow_group()
-        await self._ensure_integrations()
-        await self._ensure_workflows()
-        await self._apply_changes_to_production()
-
-        logger.debug("Notification seeding completed")
-
-    async def _validate_data(self) -> None:
-        """Validate the seeder data to ensure it is properly defined and in the correct format.
-
-        Raises:
-        NovuNotificationSeederException: If the seeder data is not defined or not a dictionary.
-        """
-        logger.debug("Validating seeder data")
-        if self.data is None:
-            raise NovuNotificationSeederException("Seeder data is not defined")
-        elif not isinstance(self.data, dict):
-            raise NovuNotificationSeederException(f"Seeder data must be a dictionary, got {type(self.data).__name__}")
-
-    async def _get_default_workflow_group(self) -> None:
-        """Fetch and sets the default workflow group ID for the notification system.
-
-        This method retrieves the list of workflow groups from the Novu API and sets the
-        `workflow_group_id` to the ID of the first group in the list.
-
-        Raises:
-        NovuNotificationSeederException: If there is an error retrieving the workflow groups.
-        """
-        try:
-            workflow_groups = await self.get_workflow_groups()
-
-            if workflow_groups:
-                self.workflow_group_id = workflow_groups[0]._id
-                logger.debug("Found default workflow group details")
-            else:
-                raise NovuNotificationSeederException("No workflow groups found")
-
-        except NovuApiClientException as err:
-            logger.error(err.message)
-            raise NovuNotificationSeederException("Unable to get default workflow group details") from None
-
-    async def _ensure_integrations(self) -> None:
-        """Ensure that a notification integration for the in-app channel is active.
-
-        This method checks the list of active integrations and looks for an in-app
-        notification integration. If no such integration exists, it attempts to create one.
-
-        Raises:
-        NovuNotificationSeederException: If there is an error fetching or creating integrations.
-        """
-        try:
-            integrations = await self.get_active_integrations()
-            logger.debug("Fetched all active notification integrations")
-
-            for integration in integrations:
-                if integration.channel == "in_app":
-                    logger.debug("In-app notification integration found")
-                    return
-
-            logger.debug("Unable to found active notification integration")
-            await self._create_notification_integration()
-
-        except NovuApiClientException as err:
-            logger.error(err.message)
-            raise NovuNotificationSeederException("Unable to get integrations") from None
-
-    async def _create_notification_integration(self) -> None:
-        """Create a new notification integration for the in-app channel.
-
-        This method creates a new notification integration if no active integration
-        is found for the in-app notification channel.
-
-        Raises:
-        NovuNotificationSeederException: If there is an error during integration creation.
-        """
-        logger.debug("Creating notification integration")
-        try:
-            integration = await self.create_integration(self.data["provider"], app_settings.novu_dev_env_id)
-            logger.debug(f"Notification integration created successfully {integration._id}")
-        except NovuApiClientException as err:
-            logger.error(err.message)
-            raise NovuNotificationSeederException("Unable to create notification integration") from None
-
-    async def _ensure_workflows(self) -> None:
-        """Ensure that all required workflows are present in the system.
-
-        This method checks if the workflows defined in the seeder data are already present.
-        If a workflow is not found, it is created with its corresponding steps.
-
-        Raises:
-        NovuNotificationSeederException: If there is an error fetching or creating workflows.
-        """
-        try:
-            present_workflows = await self.get_workflows()
-            logger.debug("Fetched all present workflows")
-        except NovuApiClientException as err:
-            logger.error(err.message)
-            raise NovuNotificationSeederException("Unable to get workflows") from None
-
-        present_workflow_names = [workflow.name for workflow in present_workflows]
-        seeder_workflows = self.data["workflows"]
-
-        for seeder_workflow in seeder_workflows:
-            if seeder_workflow["name"] in present_workflow_names:
-                logger.debug(f"Workflow '{seeder_workflow['name']}' found, skipping creation")
-                continue
-
-            logger.debug(f"Workflow '{seeder_workflow['name']}' not found, creating")
-            seeder_workflow_steps = seeder_workflow.pop("steps")
-            try:
-                created_workflow = await self.create_workflow(
-                    seeder_workflow, seeder_workflow_steps, self.workflow_group_id
-                )
-                logger.debug(f"Workflow created successfully {created_workflow._id}")
-            except NovuApiClientException as err:
-                logger.error(err.message)
-                raise NovuNotificationSeederException("Unable to create workflow") from None
-
-    async def _apply_changes_to_production(self) -> None:
-        """Apply changes to the production environment.
-
-        Fetches and applies changes in the production environment by using
-        the development API key. If any errors occur during the process,
-        they are caught and handled gracefully.
-
-        Raises:
-        NovuInitialSeederException: If the changes cannot be applied.
-        """
-        # To apply changes in production environment, use dev api key
-        logger.debug("Fetching and applying changes to production environment")
-        try:
-            await self.fetch_and_apply_changes()
-        except NovuApiClientException as err:
-            logger.error(err.message)
-            raise NovuInitialSeederException("Unable to apply changes to production") from None
-
-
 class NovuWorkflowSeeder(NovuService):
     """Class to handle initial seeding of workflow for the application.
 
@@ -536,7 +374,7 @@ class NovuWorkflowSeeder(NovuService):
         If a workflow is not found, it is created with its corresponding steps.
 
         Raises:
-        NovuNotificationSeederException: If there is an error fetching or creating workflows.
+        NovuWorkflowSeederException: If there is an error fetching or creating workflows.
         """
         try:
             present_workflows = await self.get_workflows()
