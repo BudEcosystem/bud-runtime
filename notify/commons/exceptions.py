@@ -133,3 +133,10 @@ class NovuNotificationSeederException(Exception):
         """Raise for errors related to seeding notification data."""
         self.message = message
         super().__init__(self.message)
+
+
+class NovuWorkflowSeederException(Exception):
+    def __init__(self, message: str = "Error occurred while workflow seeding.") -> None:
+        """Raise for errors related to seeding workflow data."""
+        self.message = message
+        super().__init__(self.message)

@@ -22,8 +22,9 @@ from notify.commons.exceptions import (
     NovuApiClientException,
     NovuInitialSeederException,
     NovuNotificationSeederException,
+    NovuWorkflowSeederException,
 )
-from notify.commons.helpers import read_json_file
+from notify.commons.helpers import read_file_content, read_json_file
 
 from .novu_service import NovuService
 
@@ -32,6 +33,8 @@ logger = logging.get_logger(__name__)
 
 INITIAL_DATA_PATH = f"{app_settings.seeder_path}/initial_data.json"
 NOTIFICATION_DATA_PATH = f"{app_settings.seeder_path}/notification_data.json"
+WORKFLOW_SEEDER_PATH = f"{app_settings.seeder_path}/workflows.json"
+HTML_CONTENT_PATH = f"{app_settings.seeder_path}/html"
 
 
 class InitialSeeder(NovuService):
@@ -406,3 +409,172 @@ class NotificationSeeder(NovuService):
         except NovuApiClientException as err:
             logger.error(err.message)
             raise NovuInitialSeederException("Unable to apply changes to production") from None
+
+
+class NovuWorkflowSeeder(NovuService):
+    """Class to handle initial seeding of workflow for the application.
+
+    This class performs a series of steps to ensure that necessary data (workflow, steps)
+    is created or updated during the application's startup process.
+    """
+
+    def __init__(self) -> None:
+        """Initialize the NovuWorkflowSeeder instance with the provided data."""
+        super().__init__()
+        self.data = read_json_file(WORKFLOW_SEEDER_PATH)
+        self.workflow_group_id = None
+
+    async def execute(self) -> None:
+        """Execute the workflow seeding process.
+
+        Applies the workflow data to the production environment.
+
+        Raises:
+        NovuWorkflowSeederException: If any step of the seeding process fails.
+        """
+        logger.debug("Workflow seeding started")
+
+        await self._validate_data()
+        await self._get_default_workflow_group()
+        await self._validate_modify_template_data()
+        await self._ensure_workflows()
+        await self._apply_changes_to_production()
+
+        logger.debug("Workflow seeding completed")
+
+    async def _validate_data(self) -> None:
+        """Validate the seeder data to ensure it is properly defined and in the correct format.
+
+        Raises:
+        NovuWorkflowSeederException: If the seeder data is not defined or not a dictionary.
+        """
+        logger.debug("Validating seeder data")
+        if self.data is None:
+            raise NovuWorkflowSeederException("Seeder data is not defined")
+        elif not isinstance(self.data, list):
+            raise NovuWorkflowSeederException(f"Seeder data must be a list, got {type(self.data).__name__}")
+
+    async def _validate_modify_template_data(self) -> None:
+        """Validate and modify the workflow seeder data.
+
+        This method fetches the existing layouts from Novu, validates if the
+        layout IDs in the workflow steps match the existing layouts, and
+        update seeder data if necessary.
+
+        If a layout ID or content is invalid, an exception is raised.
+
+        Raises:
+            NovuWorkflowSeederException: If the layout ID in the template is invalid.
+        """
+        # Fetch existing layouts from Novu
+        try:
+            existing_novu_layouts = await self.get_layouts()
+            logger.debug("Fetched all layouts from novu")
+        except NovuApiClientException as err:
+            logger.error(err.message)
+            raise NovuWorkflowSeederException("Unable to get layouts") from None
+
+        # Map layout names to layout IDs for quick lookup
+        layout_details = {layout.name: layout._id for layout in existing_novu_layouts}
+
+        # Iterate over workflows to validate and modify email templates
+        for workflow in self.data:
+            for step in workflow["steps"]:
+                template = step["template"]
+                if template["type"] == "email":
+                    layout_name = template["layoutId"]
+                    logger.debug(f"Validating email layout for {workflow['name']} workflow")
+
+                    # Validate layout ID
+                    if layout_name not in layout_details:
+                        raise NovuWorkflowSeederException(
+                            f"Invalid email layout {layout_name} found for {workflow['name']} workflow"
+                        )
+
+                    # NOTE: Replace the old layout ID(name) with the new layout ID(id)
+                    template["layoutId"] = layout_details[layout_name]
+
+                    # Read the HTML content from the specified file
+                    html_content = read_file_content(f"{HTML_CONTENT_PATH}/{template['content']}")
+                    if not html_content:
+                        raise NovuWorkflowSeederException(f"Failed to read HTML content: {template['content']}")
+
+                    logger.debug(f"HTML content for template '{template['content']}' loaded successfully.")
+                    # NOTE: Replace the old content with the new content
+                    template["content"] = html_content
+
+        logger.debug("Workflow template data validation and modification complete.")
+
+    async def _get_default_workflow_group(self) -> None:
+        """Fetch and sets the default workflow group ID for the notification system.
+
+        This method retrieves the list of workflow groups from the Novu API and sets the
+        `workflow_group_id` to the ID of the first group in the list.
+
+        Raises:
+        NovuWorkflowSeederException: If there is an error retrieving the workflow groups.
+        """
+        try:
+            workflow_groups = await self.get_workflow_groups()
+
+            if workflow_groups:
+                self.workflow_group_id = workflow_groups[0]._id
+                logger.debug("Found default workflow group details")
+            else:
+                raise NovuWorkflowSeederException("No workflow groups found")
+
+        except NovuApiClientException as err:
+            logger.error(err.message)
+            raise NovuWorkflowSeederException("Unable to get default workflow group details") from None
+
+    async def _ensure_workflows(self) -> None:
+        """Ensure that all required workflows are present in the system.
+
+        This method checks if the workflows defined in the seeder data are already present.
+        If a workflow is not found, it is created with its corresponding steps.
+
+        Raises:
+        NovuNotificationSeederException: If there is an error fetching or creating workflows.
+        """
+        try:
+            present_workflows = await self.get_workflows()
+            logger.debug("Fetched all present workflows")
+        except NovuApiClientException as err:
+            logger.error(err.message)
+            raise NovuWorkflowSeederException("Unable to get workflows") from None
+
+        present_workflow_names = [workflow.name for workflow in present_workflows]
+
+        for seeder_workflow in self.data:
+            if seeder_workflow["name"] in present_workflow_names:
+                logger.debug(f"Workflow '{seeder_workflow['name']}' found, skipping creation")
+                continue
+
+            logger.debug(f"Workflow '{seeder_workflow['name']}' not found, creating")
+            seeder_workflow_steps = seeder_workflow.pop("steps")
+            try:
+                created_workflow = await self.create_workflow(
+                    seeder_workflow, seeder_workflow_steps, self.workflow_group_id
+                )
+                logger.debug(f"Workflow created successfully {created_workflow._id}")
+            except NovuApiClientException as err:
+                logger.error(err.message)
+                raise NovuWorkflowSeederException("Unable to create workflow") from None
+
+    async def _apply_changes_to_production(self) -> None:
+        """Apply changes to the production environment.
+
+        Fetches and applies changes in the production environment by using
+        the development API key. If any errors occur during the process,
+        they are caught and handled gracefully.
+
+        Raises:
+        NovuWorkflowSeederException: If the changes cannot be applied.
+        """
+        # To apply changes in production environment, use dev api key
+        logger.debug("Fetching and applying changes to production environment")
+        try:
+            await self.fetch_and_apply_changes()
+        except NovuApiClientException as err:
+            logger.error(err.message)
+            raise NovuWorkflowSeederException("Unable to apply changes to production") from None
