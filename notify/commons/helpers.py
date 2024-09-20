@@ -18,6 +18,7 @@
 
 import asyncio
 import json
+import os
 import time
 from functools import wraps
 from typing import Any, Callable, Dict, Optional
@@ -147,3 +148,26 @@ def read_json_file(file_path: str) -> Optional[Dict[str, Any]]:
         logger.exception(f"An unexpected error occurred: {e}")
 
     return None
+
+
+def read_file_content(file_path: str) -> Optional[str]:
+    """Read and returns the content of a file.
+
+    This function reads the content of a file specified by the `file_path`.
+    If any error occurs (e.g., the file does not exist or cannot be read),
+    the function returns `None`.
+
+    Args:
+        file_path (str): The path to the file to be read.
+
+    Returns:
+        Optional[str]: The content of the file as a string, or `None` if an error occurs.
+    """
+    if not os.path.exists(file_path):
+        return None
+
+    try:
+        with open(file_path, "r") as file:
+            return file.read()
+    except (PermissionError, OSError):
+        return None
