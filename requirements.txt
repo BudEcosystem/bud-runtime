@@ -6,7 +6,11 @@ fastapi >= 0.111.1
 uvicorn >= 0.30.3
 pydantic >= 2.8.2
 pydantic-settings >= 2.3.4
+aiohttp==3.10.5
 
 # Utils
 structlog >= 24.4.0
 cachetools >= 5.4.0
+
+# Novu
+novu==1.14.0

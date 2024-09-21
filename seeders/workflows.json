@@ -1,0 +1,70 @@
+[
+    {
+        "active": true,
+        "name": "bud-notification",
+        "description": "Notification system for Budserve",
+        "tags": ["in_app", "system"],
+        "steps": [
+            {
+                "active": true,
+                "template": {
+                    "content": "Example {{Content}}",
+                    "contentType": "editor",
+                    "subject": "",
+                    "type": "in_app",
+                    "cta": {
+                        "data": {
+                            "url": "https://bud.studio"
+                        },
+                        "type": "redirect",
+                        "action": {
+                            "buttons": [
+                                {
+                                    "type": "primary",
+                                    "content": "submit"
+                                }
+                            ],
+                            "status": "pending"
+                        }
+                    },
+                    "variables": [
+                        {
+                            "type": "String",
+                            "name": "Content",
+                            "defaultValue": "lorem ipsum",
+                            "required": true
+                        }
+                    ]
+                }
+            }
+        ]
+    },
+    {
+        "active": true,
+        "name": "bud-email-login",
+        "description": "Login workflow for budserve",
+        "tags": ["email", "user"],
+        "steps": [
+            {
+                "active": true,
+                "template": {
+                    "content": "bud_login.html",
+                    "contentType": "customHtml",
+                    "subject": "Logged in successfully",
+                    "senderName": "Bud Studio",
+                    "type": "email",
+                    "variables": [
+                        {
+                            "type": "String",
+                            "name": "User",
+                            "defaultValue": "Bud User",
+                            "required": true
+                        }
+                    ],
+                    "preheader": "",
+                    "layoutId": "bud-default-layout"
+                }
+            }
+        ]
+    }
+]
