@@ -33,6 +33,7 @@ from .commons.helpers import retry
 from .core import sync_routes
 from .core.meta_routes import meta_router
 from .core.notify_routes import notify_router
+from .integrations.integration_routes import integration_router
 from .shared.novu_service import NovuService
 from .shared.seeder_service import (
     NovuInitialSeeder,
@@ -147,6 +148,7 @@ internal_router.include_router(sync_routes.sync_router)
 
 app.include_router(internal_router)
 app.include_router(notify_router)
+app.include_router(integration_router)
 
 
 # Override schemas for Swagger documentation
