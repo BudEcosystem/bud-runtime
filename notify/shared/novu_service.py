@@ -33,7 +33,6 @@ from novu.dto.integration import IntegrationDto
 from novu.dto.layout import LayoutDto
 from novu.dto.notification_group import NotificationGroupDto
 from novu.dto.notification_template import (
-    NotificationStepDto,
     NotificationTemplateDto,
     NotificationTemplateFormDto,
 )
@@ -42,6 +41,8 @@ from requests.exceptions import HTTPError
 from notify.commons import logging
 from notify.commons.config import app_settings
 from notify.commons.exceptions import NovuApiClientException
+
+from .novu_schemas import NovuLayout
 
 
 logger = logging.get_logger(__name__)
@@ -498,8 +499,7 @@ class NovuService(NovuBaseApiClient):
     @_handle_exception
     async def create_integration(
         self,
-        data: Dict,
-        environment_id: str,
+        integration_data: IntegrationDto,
         check: bool = True,
         api_key: Optional[str] = None,
         environment: str = "dev",
@@ -507,8 +507,7 @@ class NovuService(NovuBaseApiClient):
         """Create a new integration in the Novu system.
 
         Args:
-        data (Dict): The integration data to be created, containing provider ID, channel, active status, and credentials.
-        environment_id (str): The environment ID where the integration will be created.
+        integration_data (IntegrationDto): The integration data to be created, containing provider ID, channel, active status, and credentials.
         check (bool): Whether to check if the integration is already active. Defaults to True.
         api_key (Optional[str]): The API key to use for authentication. If not provided, resolves based on the environment.
         environment (str): The environment to fetch the API key from ('dev' or 'prod'). Defaults to 'dev'.
@@ -521,18 +520,11 @@ class NovuService(NovuBaseApiClient):
         """
         novu_api_key = await self._resolve_api_key(api_key=api_key, environment=environment)
 
-        # Create the integration object on an environment
-        integration = IntegrationDto(
-            provider_id=data["providerId"],
-            channel=data["channel"],
-            active=data["active"],
-            _environment_id=environment_id,
-            credentials=data["credentials"],
-        )
-
         try:
             # Create the integration using the Novu API
-            response = IntegrationApi(self.base_url, api_key=novu_api_key).create(integration=integration, check=check)
+            response = IntegrationApi(self.base_url, api_key=novu_api_key).create(
+                integration=integration_data, check=check
+            )
             return response
         except HTTPError as err:
             error_message = err.response.json().get("message", "Unknown error occurred")
@@ -567,18 +559,14 @@ class NovuService(NovuBaseApiClient):
     @_handle_exception
     async def create_workflow(
         self,
-        data: Dict,
-        steps: List,
-        group_id: str,
+        workflow_data: NotificationTemplateFormDto,
         api_key: Optional[str] = None,
         environment: str = "dev",
     ) -> NotificationTemplateDto:
         """Create a new workflow (notification template) in the Novu system.
 
         Args:
-        data (Dict): The metadata for the workflow including `name`, `description`, and `active` status.
-        steps (List): A list of steps to be included in the workflow, each containing details such as `active` and `template`.
-        group_id (str): The ID of the notification group to associate the workflow with.
+        workflow_data (NotificationTemplateFormDto): The metadata for the workflow including `name`, `description`, and `active` status.
         api_key (Optional[str]): The API key to use for authentication. If not provided, resolves based on the environment.
         environment (str): The environment to fetch the API key from ('dev' or 'prod'). Defaults to 'dev'.
 
@@ -589,30 +577,10 @@ class NovuService(NovuBaseApiClient):
         NovuApiClientException: If the API request to create the workflow fails.
         """
         novu_api_key = await self._resolve_api_key(api_key=api_key, environment=environment)
-
-        # Create workflow steps
-        workflow_steps = []
-        for step in steps:
-            workflow_step = NotificationStepDto(
-                active=step["active"],
-                template=step["template"],
-            )
-            workflow_steps.append(workflow_step)
-
-        # Create workflow
-        workflow_template = NotificationTemplateFormDto(
-            active=data["active"],
-            name=data["name"],
-            description=data.get("description", ""),
-            steps=workflow_steps,
-            notification_group_id=group_id,
-            tags=data.get("tags", []),
-        )
-
         try:
             # Fetch the list of workflows using the Novu API
             response = NotificationTemplateApi(self.base_url, api_key=novu_api_key).create(
-                notification_template=workflow_template
+                notification_template=workflow_data
             )
             return response
         except HTTPError as err:
@@ -621,12 +589,12 @@ class NovuService(NovuBaseApiClient):
 
     @_handle_exception
     async def create_layout(
-        self, data: Dict, api_key: Optional[str] = None, environment: str = "dev"
+        self, layout_data: NovuLayout, api_key: Optional[str] = None, environment: str = "dev"
     ) -> Dict[str, Any]:
         """Create a new layout using the Novu API.
 
         Args:
-        data (Dict[str, Any]): A dictionary containing layout information such as name, description, content file name, is_default, identifier, and variables.
+        layout_data (NovuLayout): A pydantic schema containing layout information such as name, description, content file name, is_default, identifier, and variables.
         api_key (Optional[str]): The API key for the Novu environment. If not provided, it will be resolved based on the environment.
         environment (str): The environment in which to operate (e.g., 'dev' or 'prod'). Defaults to 'dev'.
 
@@ -640,14 +608,7 @@ class NovuService(NovuBaseApiClient):
 
         url = f"{self.base_url}/v1/layouts"
         headers = {"Authorization": f"ApiKey {novu_api_key}"}
-        payload = {
-            "name": data["name"],
-            "description": data["description"],
-            "content": data["content"],
-            "isDefault": data["is_default"],
-            "identifier": data["identifier"],
-            "variables": data["variables"],
-        }
+        payload = layout_data.model_dump()
 
         async with aiohttp.ClientSession() as session, session.post(url, headers=headers, json=payload) as response:
             is_success, response = await self._handle_response(response)
