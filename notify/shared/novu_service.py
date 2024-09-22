@@ -648,3 +648,124 @@ class NovuService(NovuBaseApiClient):
         except HTTPError as err:
             error_message = err.response.json().get("message", "Unknown error occurred")
             raise NovuApiClientException(f"Failed to get layouts: {error_message}") from None
+
+    @_handle_exception
+    async def set_integration_as_primary(
+        self, integration_id: str, api_key: Optional[str] = None, environment: str = "dev"
+    ) -> Dict[str, Any]:
+        """Set the specified integration as the primary integration for the given environment.
+
+        Args:
+            integration_id (str): The ID of the integration to set as primary.
+            api_key (Optional[str], optional): The API key to authenticate with Novu. Defaults to None,
+                                               in which case the key will be resolved based on the environment.
+            environment (str, optional): The environment in which the integration is being set as primary. Defaults to "dev".
+
+        Returns:
+            Dict[str, Any]: The data of the integration marked as primary.
+
+        Raises:
+            NovuApiClientException: If the request to mark the integration as primary fails.
+        """
+        novu_api_key = await self._resolve_api_key(api_key=api_key, environment=environment)
+
+        url = f"{self.base_url}/v1/integrations/{integration_id}/set-primary"
+        headers = {"Authorization": f"ApiKey {novu_api_key}"}
+
+        async with aiohttp.ClientSession() as session, session.post(url, headers=headers) as response:
+            is_success, response = await self._handle_response(response)
+            if is_success:
+                return response["data"]
+            else:
+                raise NovuApiClientException(f"Failed to mark integration as primary: {response}")
+
+    @_handle_exception
+    async def get_integrations_curl(self, api_key: Optional[str] = None, environment: str = "dev") -> Dict[str, Any]:
+        """Fetch the list of integrations from Novu for a specified environment.
+
+        Args:
+            api_key (Optional[str], optional): The API key to authenticate with Novu. Defaults to None,
+                                               in which case the key will be resolved based on the environment.
+            environment (str, optional): The environment for which the integrations are being fetched. Defaults to "dev".
+
+        Returns:
+            Dict[str, Any]: A dictionary containing the list of integrations.
+
+        Raises:
+            NovuApiClientException: If the request to list integrations fails.
+        """
+        novu_api_key = await self._resolve_api_key(api_key=api_key, environment=environment)
+
+        url = f"{self.base_url}/v1/integrations/"
+        headers = {"Authorization": f"ApiKey {novu_api_key}"}
+
+        async with aiohttp.ClientSession() as session, session.get(url, headers=headers) as response:
+            is_success, response = await self._handle_response(response)
+            if is_success:
+                return response["data"]
+            else:
+                raise NovuApiClientException(f"Failed to list integrations: {response}")
+
+    @_handle_exception
+    async def update_integration(
+        self,
+        integration_data: IntegrationDto,
+        check: bool = True,
+        api_key: Optional[str] = None,
+        environment: str = "dev",
+    ) -> IntegrationDto:
+        """Update an existing integration in Novu with the provided integration data.
+
+        Args:
+            integration_data (IntegrationDto): The integration data to be updated.
+            check (bool, optional): Whether to perform a pre-check before updating the integration. Defaults to True.
+            api_key (Optional[str], optional): API key for authentication. Defaults to None, in which case it's resolved based on the environment.
+            environment (str, optional): The environment in which the integration exists (e.g., "dev", "prod"). Defaults to "dev".
+
+        Returns:
+            IntegrationDto: The updated integration data.
+
+        Raises:
+            NovuApiClientException: If the integration update fails due to an HTTP error.
+        """
+        novu_api_key = await self._resolve_api_key(api_key=api_key, environment=environment)
+
+        try:
+            # Update the integration using the Novu API
+            response = IntegrationApi(self.base_url, api_key=novu_api_key).update(
+                integration=integration_data, check=check
+            )
+            return response
+        except HTTPError as err:
+            error_message = err.response.json().get("message", "Unknown error occurred")
+            raise NovuApiClientException(f"Failed to update integration: {error_message}") from None
+
+    @_handle_exception
+    async def delete_integration(
+        self,
+        integration_id: str,
+        api_key: Optional[str] = None,
+        environment: str = "dev",
+    ) -> None:
+        """Delete an integration from Novu based on the given integration ID.
+
+        Args:
+            integration_id (str): The ID of the integration to be deleted.
+            api_key (Optional[str], optional): API key for authentication. Defaults to None, in which case it's resolved based on the environment.
+            environment (str, optional): The environment in which the integration exists (e.g., "dev", "prod"). Defaults to "dev".
+
+        Returns:
+            IntegrationDto: The deleted integration data if successful.
+
+        Raises:
+            NovuApiClientException: If the integration deletion fails due to an HTTP error.
+        """
+        novu_api_key = await self._resolve_api_key(api_key=api_key, environment=environment)
+
+        try:
+            # Delete the integration using the Novu API
+            IntegrationApi(self.base_url, api_key=novu_api_key).delete(integration_id=integration_id)
+            return
+        except HTTPError as err:
+            error_message = err.response.json().get("message", "Unknown error occurred")
+            raise NovuApiClientException(f"Failed to delete integration: {error_message}") from None
