@@ -18,10 +18,17 @@
 
 import os
 
+from novu.dto.integration import IntegrationDto
+from novu.dto.notification_template import (
+    NotificationStepDto,
+    NotificationTemplateFormDto,
+)
+
 from notify.commons import logging
 from notify.commons.config import app_settings
 from notify.commons.exceptions import NovuApiClientException, NovuSeederException
 from notify.commons.helpers import read_file_content, read_json_file
+from notify.shared.novu_schemas import NovuLayout
 
 from .novu_service import NovuService
 
@@ -241,9 +248,17 @@ class NovuInitialSeeder(NovuService):
                 continue
 
             # If not, create the layout
+            layout_data = NovuLayout(
+                name=seeder_layout["name"],
+                description=seeder_layout["description"],
+                content=seeder_layout["content"],
+                is_default=seeder_layout["is_default"],
+                identifier=seeder_layout["identifier"],
+                variables=seeder_layout["variables"],
+            )
             logger.debug(f"Layout {seeder_layout['name']} does not exist, creating")
             try:
-                await self.create_layout(seeder_layout)
+                await self.create_layout(layout_data)
             except NovuApiClientException as err:
                 logger.error(err.message)
                 raise NovuSeederException(f"Unable to create layout {seeder_layout['name']}") from None
@@ -414,10 +429,28 @@ class NovuWorkflowSeeder(NovuService):
 
             logger.debug(f"Workflow '{seeder_workflow['name']}' not found, creating")
             seeder_workflow_steps = seeder_workflow.pop("steps")
-            try:
-                created_workflow = await self.create_workflow(
-                    seeder_workflow, seeder_workflow_steps, self.workflow_group_id
+
+            # Create workflow steps
+            workflow_steps = []
+            for seeder_workflow_step in seeder_workflow_steps:
+                workflow_step = NotificationStepDto(
+                    active=seeder_workflow_step["active"],
+                    template=seeder_workflow_step["template"],
                 )
+                workflow_steps.append(workflow_step)
+
+            # Create workflow
+            workflow_template_data = NotificationTemplateFormDto(
+                active=seeder_workflow["active"],
+                name=seeder_workflow["name"],
+                description=seeder_workflow.get("description", ""),
+                steps=workflow_steps,
+                notification_group_id=self.workflow_group_id,
+                tags=seeder_workflow.get("tags", []),
+            )
+
+            try:
+                created_workflow = await self.create_workflow(workflow_template_data)
                 logger.debug(f"Workflow created successfully {created_workflow._id}")
             except NovuApiClientException as err:
                 logger.error(err.message)
@@ -517,9 +550,14 @@ class NovuIntegrationSeeder(NovuService):
             # Create the missing integration
             logger.debug(f"Integration of '{provider_id}' not found, creating")
             try:
-                created_integration = await self.create_integration(
-                    seeder_integration, app_settings.novu_prod_env_id, environment="prod"
+                integration_data = IntegrationDto(
+                    provider_id=seeder_integration["providerId"],
+                    channel=seeder_integration["channel"],
+                    active=seeder_integration["active"],
+                    _environment_id=app_settings.novu_prod_env_id,
+                    credentials=seeder_integration["credentials"],
                 )
+                created_integration = await self.create_integration(integration_data, environment="prod")
                 logger.debug(f"Integration {created_integration.provider_id} created successfully in production")
             except NovuApiClientException as err:
                 logger.error(err.message)
