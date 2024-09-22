@@ -109,3 +109,91 @@ class Environment(str, Enum):
             bool: `True` if debugging is enabled, `False` otherwise.
         """
         return {"PRODUCTION": False}.get(self.value, True)
+
+
+class NovuEmailProviderId(Enum):
+    """Enumeration of email provider IDs for Novu integration.
+
+    This enum defines all possible email providers supported by Novu. Each
+    provider corresponds to a specific email service used for sending emails.
+
+    Attributes:
+        MAILTRAP: Mailtrap email provider.
+        BRAZE: Braze email provider.
+        PLUNK: Plunk email provider.
+        SENDGRID: SendGrid email provider.
+        MAILJET: Mailjet email provider.
+        POSTMARK: Postmark email provider.
+        MAILGUN: Mailgun email provider.
+        SENDINBLUE: Sendinblue email provider.
+        MANDRILL: Mandrill email provider.
+        SES: Amazon SES email provider.
+        MAILERSEND: MailerSend email provider.
+        MICROSOFT_OUTLOOK365: Microsoft Outlook 365 email provider.
+        RESEND: Resend email provider.
+        INFOBIP: Infobip email provider.
+        EMAIL_WEBHOOK: Email Webhook provider.
+        NETCORE: Netcore email provider.
+        CUSTOM_SMTP: Custom SMTP email provider (e.g., Nodemailer).
+        SPARKPOST: SparkPost email provider.
+    """
+
+    MAILTRAP = "mailtrap"
+    BRAZE = "braze"
+    PLUNK = "plunk"
+    SENDGRID = "sendgrid"
+    MAILJET = "mailjet"
+    POSTMARK = "postmark"
+    MAILGUN = "mailgun"
+    SENDINBLUE = "sendinblue"
+    MANDRILL = "mandrill"
+    SES = "ses"
+    MAILERSEND = "mailersend"
+    MICROSOFT_OUTLOOK365 = "outlook365"
+    RESEND = "resend"
+    INFOBIP = "infobip-email"
+    EMAIL_WEBHOOK = "email-webhook"
+    NETCORE = "netcore"
+    CUSTOM_SMTP = "nodemailer"
+    SPARKPOST = "sparkpost"
+
+
+class NovuChannel(Enum):
+    """Represents various communication channels supported by Bud's notification system.
+
+    Attributes:
+        SMS: Represents the SMS communication channel.
+        EMAIL: Represents the email communication channel.
+        CHAT: Represents the chat communication channel.
+        PUSH: Represents the push notification communication channel.
+    """
+
+    SMS = "sms"
+    EMAIL = "email"
+    CHAT = "chat"
+    PUSH = "push"
+
+
+# Mapping of Novu channel to provider
+NOVU_CHANNEL_PROVIDER_MAPPING = {
+    "email": {
+        "mailtrap": "Mailtrap",
+        "braze": "Braze",
+        "plunk": "Plunk",
+        "sendgrid": "SendGrid",
+        "mailjet": "Mailjet",
+        "postmark": "Postmark",
+        "mailgun": "Mailgun",
+        "sendinblue": "Sendinblue",
+        "mandrill": "Mandrill",
+        "ses": "SES",
+        "mailersend": "MailerSend",
+        "outlook365": "Microsoft Outlook365",
+        "resend": "Resend",
+        "infobip-email": "Infobip",
+        "email-webhook": "Email Webhook",
+        "netcore": "Netcore",
+        "nodemailer": "Custom SMTP",
+        "sparkpost": "SparkPost",
+    }
+}
