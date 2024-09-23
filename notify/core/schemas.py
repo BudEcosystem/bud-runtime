@@ -17,7 +17,7 @@
 
 """Contains core Pydantic schemas used for data validation and serialization within the core services."""
 
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -27,20 +27,17 @@ from notify.commons.schemas import CloudEventBase, SuccessResponse
 class NotificationRequest(CloudEventBase):
     """Represents a notification request."""
 
-    subscriber_id: str
-
-    title: str
-    message: str
-
-    redirect_url: Optional[str] = None
-    primary_action: Optional[str] = None
-    secondary_action: Optional[str] = None
+    name: str
+    recipients: Union[str, List[str]]
+    payload: dict
 
 
 class NotificationResponse(SuccessResponse):
     """Represents a notification response."""
 
-    notification_id: str
+    acknowledged: bool
+    status: str
+    transaction_id: str
 
 
 class SubscriberRequest(CloudEventBase):
