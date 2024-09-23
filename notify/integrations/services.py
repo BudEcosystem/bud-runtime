@@ -80,8 +80,8 @@ class IntegrationsService(NovuService):
 
         # If no active integrations exist for this channel, mark the new one as primary
         if len(active_channel_integrations) == 0:
-            primary_integration = await self.set_integration_as_primary(db_integration._id, environment="prod")
-            logger.debug(f"Marked {data.provider_id} integration as primary: {primary_integration._id}")
+            _ = await self.set_integration_as_primary(db_integration._id, environment="prod")
+            logger.debug(f"Marked {data.provider_id} integration as primary")
 
         return db_integration
 
