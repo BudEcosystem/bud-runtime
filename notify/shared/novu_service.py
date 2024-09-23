@@ -27,6 +27,7 @@ from novu.api import (
     LayoutApi,
     NotificationGroupApi,
     NotificationTemplateApi,
+    SubscriberApi,
 )
 from novu.dto.change import ChangeDto
 from novu.dto.integration import IntegrationDto
@@ -36,6 +37,7 @@ from novu.dto.notification_template import (
     NotificationTemplateDto,
     NotificationTemplateFormDto,
 )
+from novu.dto.subscriber import BulkResultSubscriberDto, SubscriberDto
 from requests.exceptions import HTTPError
 
 from notify.commons import logging
@@ -764,8 +766,186 @@ class NovuService(NovuBaseApiClient):
 
         try:
             # Delete the integration using the Novu API
-            IntegrationApi(self.base_url, api_key=novu_api_key).delete(integration_id=integration_id)
+            _ = IntegrationApi(self.base_url, api_key=novu_api_key).delete(integration_id=integration_id)
             return
         except HTTPError as err:
             error_message = err.response.json().get("message", "Unknown error occurred")
             raise NovuApiClientException(f"Failed to delete integration: {error_message}") from None
+
+    @_handle_exception
+    async def create_subscriber(
+        self,
+        subscriber_data: SubscriberDto,
+        api_key: Optional[str] = None,
+        environment: str = "dev",
+    ) -> SubscriberDto:
+        """Create a new subscriber within the Novu system.
+
+        Args:
+            subscriber_data (SubscriberDto): The data for the subscriber to be created.
+            api_key (Optional[str]): The API key for Novu. If not provided, it will be resolved based on the environment.
+            environment (str): The environment to use for the API call. Defaults to "dev".
+
+        Raises:
+            NovuApiClientException: If the creation of the subscriber fails due to an API error.
+
+        Returns:
+            SubscriberDto: The created subscriber's data.
+        """
+        novu_api_key = await self._resolve_api_key(api_key=api_key, environment=environment)
+        try:
+            response = SubscriberApi(self.base_url, api_key=novu_api_key).create(subscriber=subscriber_data)
+            return response
+        except HTTPError as err:
+            error_message = err.response.json().get("message", "Unknown error occurred")
+            raise NovuApiClientException(f"Failed to create subscriber: {error_message}") from None
+
+    @_handle_exception
+    async def bulk_create_subscribers(
+        self,
+        subscriber_data: Iterable[SubscriberDto],
+        api_key: Optional[str] = None,
+        environment: str = "dev",
+    ) -> BulkResultSubscriberDto:
+        """Create multiple subscribers in bulk within the Novu system.
+
+        Args:
+            subscriber_data (Iterable[SubscriberDto]): An iterable of subscriber data to be created.
+            api_key (Optional[str]): The API key for Novu. If not provided, it will be resolved based on the environment.
+            environment (str): The environment to use for the API call. Defaults to "dev".
+
+        Raises:
+            NovuApiClientException: If the bulk creation of subscribers fails due to an API error.
+
+        Returns:
+            BulkResultSubscriberDto: The result of the bulk creation process.
+        """
+        # The bulk API is limited to 500 subscribers per request.
+        if len(subscriber_data) > 500:
+            raise NovuApiClientException("Cannot create more than 500 subscribers at once")
+
+        novu_api_key = await self._resolve_api_key(api_key=api_key, environment=environment)
+        try:
+            response = SubscriberApi(self.base_url, api_key=novu_api_key).bulk_create(subscribers=subscriber_data)
+            return response
+        except HTTPError as err:
+            error_message = err.response.json().get("message", "Unknown error occurred")
+            raise NovuApiClientException(f"Failed to create subscribers: {error_message}") from None
+
+    @_handle_exception
+    async def get_all_subscribers(
+        self,
+        page: int = 0,
+        limit: int = 10,
+        api_key: Optional[str] = None,
+        environment: str = "dev",
+    ) -> List:
+        """Retrieve a paginated list of all subscribers from the Novu system.
+
+        Args:
+            page (int): The page number to retrieve. Defaults to 0.
+            limit (int): The maximum number of subscribers to return per page. Defaults to 10.
+            api_key (Optional[str]): The API key for Novu. If not provided, it will be resolved based on the environment.
+            environment (str): The environment to use for the API call. Defaults to "dev".
+
+        Raises:
+            NovuApiClientException: If listing subscribers fails due to an API error.
+
+        Returns:
+            List: A paginated list of subscribers.
+        """
+        novu_api_key = await self._resolve_api_key(api_key=api_key, environment=environment)
+
+        url = f"{self.base_url}/v1/subscribers?page={page}&limit={limit}"
+        headers = {"Authorization": f"ApiKey {novu_api_key}"}
+
+        async with aiohttp.ClientSession() as session, session.get(url, headers=headers) as response:
+            is_success, response = await self._handle_response(response)
+            if is_success:
+                return response["data"]
+            else:
+                raise NovuApiClientException(f"Failed to list subscribers: {response}")
+
+    @_handle_exception
+    async def retrieve_subscriber(
+        self,
+        subscriber_id: str,
+        api_key: Optional[str] = None,
+        environment: str = "dev",
+    ) -> SubscriberDto:
+        """Retrieve a subscriber's details from the Novu system.
+
+        Args:
+            subscriber_id (str): The ID of the subscriber to retrieve.
+            api_key (Optional[str]): The API key for Novu. If not provided, it will be resolved based on the environment.
+            environment (str): The environment to use for the API call. Defaults to "dev".
+
+        Raises:
+            NovuApiClientException: If the subscriber retrieval fails due to an API error.
+
+        Returns:
+            SubscriberDto: The retrieved subscriber data from the Novu API.
+        """
+        novu_api_key = await self._resolve_api_key(api_key=api_key, environment=environment)
+        try:
+            response = SubscriberApi(self.base_url, api_key=novu_api_key).get(subscriber_id=subscriber_id)
+            return response
+        except HTTPError as err:
+            error_message = err.response.json().get("message", "Unknown error occurred")
+            raise NovuApiClientException(f"Failed to retrieve subscriber: {error_message}") from None
+
+    @_handle_exception
+    async def update_subscriber(
+        self,
+        subscriber_data: SubscriberDto,
+        api_key: Optional[str] = None,
+        environment: str = "dev",
+    ) -> SubscriberDto:
+        """Update a subscriber's information in the Novu system.
+
+        Args:
+            subscriber_data (SubscriberDto): The data of the subscriber to be updated.
+            api_key (Optional[str]): The API key for Novu. If not provided, it will be resolved based on the environment.
+            environment (str): The environment to use for the API call. Defaults to "dev".
+
+        Raises:
+            NovuApiClientException: If the subscriber update fails due to an API error.
+
+        Returns:
+            SubscriberDto: The updated subscriber data returned by the Novu API.
+        """
+        novu_api_key = await self._resolve_api_key(api_key=api_key, environment=environment)
+        try:
+            response = SubscriberApi(self.base_url, api_key=novu_api_key).put(subscriber=subscriber_data)
+            return response
+        except HTTPError as err:
+            error_message = err.response.json().get("message", "Unknown error occurred")
+            raise NovuApiClientException(f"Failed to update subscriber: {error_message}") from None
+
+    @_handle_exception
+    async def delete_subscriber(
+        self,
+        subscriber_id: str,
+        api_key: Optional[str] = None,
+        environment: str = "dev",
+    ) -> None:
+        """Delete a subscriber from the Novu system.
+
+        Args:
+            subscriber_id (str): The ID of the subscriber to be deleted.
+            api_key (Optional[str]): The API key for Novu. If not provided, it will be resolved based on the environment.
+            environment (str): The environment to use for the API call. Defaults to "dev".
+
+        Raises:
+            NovuApiClientException: If the subscriber deletion fails due to an API error.
+
+        Returns:
+            None: This method does not return any value.
+        """
+        novu_api_key = await self._resolve_api_key(api_key=api_key, environment=environment)
+        try:
+            _ = SubscriberApi(self.base_url, api_key=novu_api_key).delete(subscriber_id=subscriber_id)
+            return
+        except HTTPError as err:
+            error_message = err.response.json().get("message", "Unknown error occurred")
+            raise NovuApiClientException(f"Failed to delete subscriber: {error_message}") from None
