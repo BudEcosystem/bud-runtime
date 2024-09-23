@@ -19,6 +19,7 @@
 
 from typing import Dict, List
 
+from novu.dto.event import EventDto
 from novu.dto.subscriber import SubscriberDto
 
 from notify.commons import logging
@@ -26,6 +27,7 @@ from notify.commons.exceptions import NovuApiClientException
 from notify.shared.novu_service import NovuService
 
 from .schemas import (
+    NotificationRequest,
     SubscriberItem,
     SubscriberRequest,
     SubscriberUpdateRequest,
@@ -278,6 +280,36 @@ class SubscriberService(NovuService):
         try:
             await self.delete_subscriber(subscriber_id, environment="prod")
             logger.debug("Deleted subscriber successfully")
+        except NovuApiClientException as err:
+            logger.error(err.message)
+            raise
+
+
+class NotificationService(NovuService):
+    """Implements notification services for sending notifications."""
+
+    async def trigger_novu_notification_event(self, notification_data: NotificationRequest) -> EventDto:
+        """Triggers a notification event in Novu based on the provided notification data.
+
+        This method sends a notification event to Novu using the specified notification name,
+        recipients, and payload.
+
+        Args:
+            notification_data (NotificationRequest): The request object containing the notification
+                name, recipients, and payload data.
+
+        Returns:
+            EventDto: An object containing details about the triggered event, including its status.
+
+        Raises:
+            NovuApiClientException: If there is an issue with triggering the event via Novu.
+        """
+        try:
+            event_data = await self.trigger_event(
+                notification_data.name, notification_data.recipients, notification_data.payload, environment="prod"
+            )
+            logger.debug(f"Triggered notification successfully. Status: {event_data.status}")
+            return event_data
         except NovuApiClientException as err:
             logger.error(err.message)
             raise
