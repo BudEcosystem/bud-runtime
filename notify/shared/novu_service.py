@@ -23,6 +23,7 @@ import aiohttp
 from aiohttp import client_exceptions
 from novu.api import (
     ChangeApi,
+    EventApi,
     IntegrationApi,
     LayoutApi,
     NotificationGroupApi,
@@ -30,6 +31,7 @@ from novu.api import (
     SubscriberApi,
 )
 from novu.dto.change import ChangeDto
+from novu.dto.event import EventDto
 from novu.dto.integration import IntegrationDto
 from novu.dto.layout import LayoutDto
 from novu.dto.notification_group import NotificationGroupDto
@@ -949,3 +951,42 @@ class NovuService(NovuBaseApiClient):
         except HTTPError as err:
             error_message = err.response.json().get("message", "Unknown error occurred")
             raise NovuApiClientException(f"Failed to delete subscriber: {error_message}") from None
+
+    @_handle_exception
+    async def trigger_event(
+        self,
+        name: str,
+        recipients: Union[str, List[str]],
+        payload: dict = None,
+        api_key: Optional[str] = None,
+        environment: str = "dev",
+    ) -> EventDto:
+        """Triggers a notification event in Novu based on the provided notification data.
+
+        This method sends a notification event to Novu using the specified notification name,
+        recipients, and payload.
+
+        Args:
+            notification_data (NotificationRequest): The request object containing the notification
+                name, recipients, and payload data.
+
+        Returns:
+            EventDto: An object containing details about the triggered event, including its status.
+
+        Raises:
+            NovuApiClientException: If there is an issue with triggering the event via Novu.
+        """
+        novu_api_key = await self._resolve_api_key(api_key=api_key, environment=environment)
+
+        # Set the payload to an empty dictionary if it's None
+        if payload is None:
+            payload = {}
+
+        try:
+            event_data = EventApi(self.base_url, api_key=novu_api_key).trigger(
+                name=name, recipients=recipients, payload=payload
+            )
+            return event_data
+        except HTTPError as err:
+            error_message = err.response.json().get("message", "Unknown error occurred")
+            raise NovuApiClientException(f"Failed to trigger event: {error_message}") from None
