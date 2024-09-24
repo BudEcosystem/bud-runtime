@@ -25,7 +25,7 @@ from novu.dto.notification_template import (
 )
 
 from notify.commons import logging
-from notify.commons.config import app_settings
+from notify.commons.config import app_settings, secrets_settings
 from notify.commons.exceptions import NovuApiClientException, NovuSeederException
 from notify.commons.helpers import read_file_content, read_json_file
 from notify.shared.novu_schemas import NovuLayout
@@ -90,7 +90,9 @@ class NovuInitialSeeder(NovuService):
         logger.debug("Logging in user")
         try:
             # Attempt to log in and obtain the session token
-            session_token = await self.login_user(app_settings.novu_user_email, app_settings.novu_user_password)
+            session_token = await self.login_user(
+                secrets_settings.novu_user_email, secrets_settings.novu_user_password
+            )
             logger.debug("User logged in successfully")
             self.dev_session_token = session_token
         except NovuApiClientException as err:
@@ -115,8 +117,8 @@ class NovuInitialSeeder(NovuService):
             session_token = await self.create_user(
                 first_name,
                 last_name,
-                app_settings.novu_user_email,
-                app_settings.novu_user_password,
+                secrets_settings.novu_user_email,
+                secrets_settings.novu_user_password,
             )
             logger.debug("User created successfully")
             self.dev_session_token = session_token
@@ -175,14 +177,14 @@ class NovuInitialSeeder(NovuService):
             logger.debug("Nouv production environment details retrieved")
 
             # Update application settings with environment details
-            app_settings.novu_dev_api_key = dev_env_details["Development"]["api_keys"][0]
-            app_settings.novu_prod_api_key = prod_env_details["Production"]["api_keys"][0]
+            secrets_settings.novu_dev_api_key = dev_env_details["Development"]["api_keys"][0]
+            secrets_settings.novu_prod_api_key = prod_env_details["Production"]["api_keys"][0]
 
-            app_settings.novu_dev_env_id = dev_env_details["Development"]["environment_id"]
-            app_settings.novu_prod_env_id = prod_env_details["Production"]["environment_id"]
+            secrets_settings.novu_dev_env_id = dev_env_details["Development"]["environment_id"]
+            secrets_settings.novu_prod_env_id = prod_env_details["Production"]["environment_id"]
 
-            app_settings.novu_dev_env_id = dev_env_details["Development"]["app_identifier"]
-            app_settings.novu_prod_env_id = prod_env_details["Production"]["app_identifier"]
+            secrets_settings.novu_dev_app_id = dev_env_details["Development"]["app_identifier"]
+            secrets_settings.novu_prod_app_id = prod_env_details["Production"]["app_identifier"]
 
             logger.debug("Environment details applied successfully")
         except NovuApiClientException as err:
@@ -554,7 +556,7 @@ class NovuIntegrationSeeder(NovuService):
                     provider_id=seeder_integration["providerId"],
                     channel=seeder_integration["channel"],
                     active=seeder_integration["active"],
-                    _environment_id=app_settings.novu_prod_env_id,
+                    _environment_id=secrets_settings.novu_prod_env_id,
                     credentials=seeder_integration["credentials"],
                 )
                 created_integration = await self.create_integration(integration_data, environment="prod")

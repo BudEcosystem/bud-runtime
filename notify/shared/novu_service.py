@@ -43,7 +43,7 @@ from novu.dto.subscriber import BulkResultSubscriberDto, SubscriberDto
 from requests.exceptions import HTTPError
 
 from notify.commons import logging
-from notify.commons.config import app_settings
+from notify.commons.config import app_settings, secrets_settings
 from notify.commons.exceptions import NovuApiClientException
 
 from .novu_schemas import NovuLayout
@@ -441,9 +441,9 @@ class NovuService(NovuBaseApiClient):
             return api_key
 
         return (
-            app_settings.novu_dev_api_key
+            secrets_settings.novu_dev_api_key
             if environment == "dev"
-            else app_settings.novu_prod_api_key
+            else secrets_settings.novu_prod_api_key
             if environment == "prod"
             else None
         )
