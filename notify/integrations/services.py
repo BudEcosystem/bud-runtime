@@ -22,7 +22,7 @@ from typing import List
 from novu.dto.integration import IntegrationDto
 
 from notify.commons import logging
-from notify.commons.config import app_settings
+from notify.commons.config import secrets_settings
 from notify.commons.exceptions import NovuApiClientException
 from notify.shared.novu_service import NovuService
 
@@ -67,7 +67,7 @@ class IntegrationsService(NovuService):
             channel=data.channel.value,
             active=data.active,
             credentials=data.credentials,
-            _environment_id=app_settings.novu_prod_env_id,
+            _environment_id=secrets_settings.novu_prod_env_id,
         )
 
         # Create the integration in Novu
@@ -139,7 +139,7 @@ class IntegrationsService(NovuService):
             channel=data.channel.value,
             active=data.active,
             credentials=data.credentials,
-            _environment_id=app_settings.novu_prod_env_id,
+            _environment_id=secrets_settings.novu_prod_env_id,
             _id=integration_id,
         )
 
