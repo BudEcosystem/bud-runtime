@@ -20,7 +20,6 @@ from fastapi import APIRouter, Response, status
 from fastapi.exceptions import HTTPException
 
 from notify.commons import logging
-from notify.commons.api_utils import pubsub_api_endpoint
 from notify.commons.exceptions import NovuApiClientException
 from notify.commons.schemas import SuccessResponse
 
@@ -40,7 +39,6 @@ integration_router = APIRouter()
     description="Create a new integration. Can be used for both API and PubSub. Refer to IntegrationRequest schema for details.",
     tags=["Integrations"],
 )
-@pubsub_api_endpoint(IntegrationRequest)
 async def create_integration(integration: IntegrationRequest) -> Response:
     """Create a new integration in the Novu service.
 
@@ -89,7 +87,6 @@ async def create_integration(integration: IntegrationRequest) -> Response:
     description="List all integrations. Can be used for both API and PubSub. Refer to IntegrationRequest schema for details.",
     tags=["Integrations"],
 )
-@pubsub_api_endpoint(IntegrationRequest)  # TODO: remove unused IntegrationRequest
 async def get_all_integrations() -> Response:
     """Fetch and return a list of all integrations.
 
@@ -129,7 +126,6 @@ async def get_all_integrations() -> Response:
     description="Updates the specified integration. Can be used for both API and PubSub. Refer to IntegrationRequest schema for details.",
     tags=["Integrations"],
 )
-@pubsub_api_endpoint(IntegrationRequest)  # TODO: remove unused IntegrationRequest
 async def update_integration(integration_id: str, integration: IntegrationRequest) -> Response:
     """Update an existing integration in the Novu system.
 
@@ -179,7 +175,6 @@ async def update_integration(integration_id: str, integration: IntegrationReques
     description="Deletes the specified integration. Can be used for both API and PubSub. Refer to IntegrationRequest schema for details.",
     tags=["Integrations"],
 )
-@pubsub_api_endpoint(IntegrationRequest)  # TODO: remove unused IntegrationRequest
 async def delete_integration(integration_id: str) -> Response:
     """Delete an integration from the Novu system.
 
@@ -221,7 +216,6 @@ async def delete_integration(integration_id: str) -> Response:
     description="Sets the specified integration as primary. Can be used for both API and PubSub. Refer to IntegrationRequest schema for details.",
     tags=["Integrations"],
 )
-@pubsub_api_endpoint(IntegrationRequest)  # TODO: remove unused IntegrationRequest
 async def set_integration_as_primary(integration_id: str) -> Response:
     """Set an integration as primary in the Novu system.
 
