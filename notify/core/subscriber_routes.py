@@ -22,7 +22,6 @@ from fastapi import APIRouter, Response, status
 from fastapi.exceptions import HTTPException
 
 from notify.commons import logging
-from notify.commons.api_utils import pubsub_api_endpoint
 from notify.commons.exceptions import NovuApiClientException
 from notify.commons.schemas import SuccessResponse
 
@@ -48,7 +47,6 @@ subscriber_router = APIRouter()
     description="Create a new subscriber. Can be used for both API and PubSub. Refer to SubscriberRequest schema for details.",
     tags=["Subscribers"],
 )
-@pubsub_api_endpoint(SubscriberRequest)
 async def create_subscriber(subscriber: SubscriberRequest) -> Response:
     """Create a new subscriber in the Novu system.
 
@@ -111,7 +109,6 @@ async def create_subscriber(subscriber: SubscriberRequest) -> Response:
     description="Create bulk subscribers. Can be used for both API and PubSub. Refer to SubscriberRequest schema for details.",
     tags=["Subscribers"],
 )
-@pubsub_api_endpoint(SubscriberRequest)
 async def create_bulk_subscribers(subscribers: List[SubscriberRequest]) -> Response:
     """Create multiple subscribers in bulk within the Novu system.
 
@@ -163,7 +160,6 @@ async def create_bulk_subscribers(subscribers: List[SubscriberRequest]) -> Respo
     description="List all subscribers. Can be used for both API and PubSub. Refer to SubscriberRequest schema for details.",
     tags=["Subscribers"],
 )
-@pubsub_api_endpoint(SubscriberRequest)  # TODO: remove unused SubscriberRequest
 async def get_all_subscribers(page: int = 0, limit: int = 10) -> Response:
     """Retrieve a list of all subscribers from the Novu system.
 
@@ -212,7 +208,6 @@ async def get_all_subscribers(page: int = 0, limit: int = 10) -> Response:
     description="Retrieves the specified subscriber. Can be used for both API and PubSub. Refer to SubscriberRequest schema for details.",
     tags=["Subscribers"],
 )
-@pubsub_api_endpoint(SubscriberRequest)  # TODO: remove unused SubscriberRequest
 async def retrieve_subscriber(
     subscriber_id: str,
 ) -> Response:
@@ -274,7 +269,6 @@ async def retrieve_subscriber(
     description="Updates the specified subscriber. Can be used for both API and PubSub. Refer to SubscriberRequest schema for details.",
     tags=["Subscribers"],
 )
-@pubsub_api_endpoint(SubscriberUpdateRequest)  # TODO: remove unused SubscriberRequest
 async def update_subscriber(subscriber_id: str, subscriber: SubscriberUpdateRequest) -> Response:
     """Update the details of a specific subscriber in the Novu system.
 
@@ -336,7 +330,6 @@ async def update_subscriber(subscriber_id: str, subscriber: SubscriberUpdateRequ
     description="Deletes the specified subscriber. Can be used for both API and PubSub. Refer to SubscriberRequest schema for details.",
     tags=["Subscribers"],
 )
-@pubsub_api_endpoint(SubscriberRequest)  # TODO: remove unused SubscriberRequest
 async def delete_subscriber(subscriber_id: str) -> Response:
     """Delete a specific subscriber from the Novu system.
 
