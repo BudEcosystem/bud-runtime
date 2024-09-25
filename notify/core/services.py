@@ -28,7 +28,7 @@ from notify.shared.novu_service import NovuService
 
 from .schemas import (
     NotificationRequest,
-    SubscriberItem,
+    SubscriberBase,
     SubscriberRequest,
     SubscriberUpdateRequest,
 )
@@ -142,7 +142,7 @@ class SubscriberService(NovuService):
             "failed": failed,
         }
 
-    async def list_novu_subscribers(self, page: int = 0, limit: int = 10) -> List[SubscriberItem]:
+    async def list_novu_subscribers(self, page: int = 0, limit: int = 10) -> List[SubscriberBase]:
         """Retrieve a list of subscribers from the Novu system.
 
         This method fetches subscribers in a paginated manner, allowing for
@@ -171,25 +171,7 @@ class SubscriberService(NovuService):
             logger.error(err.message)
             raise
 
-        subscribers = [
-            SubscriberItem(
-                subscriber_id=subscriber.get("subscriberId"),
-                email=subscriber.get("email"),
-                first_name=subscriber.get("firstName"),
-                last_name=subscriber.get("lastName"),
-                phone=subscriber.get("phone"),
-                avatar=subscriber.get("avatar"),
-                locale=subscriber.get("locale"),
-                id=subscriber.get("_id"),
-                channels=subscriber.get("channels", []),
-                created_at=subscriber.get("createdAt"),
-                updated_at=subscriber.get("updatedAt"),
-                is_online=subscriber.get("isOnline"),
-                last_online_at=subscriber.get("lastOnlineAt"),
-                data=subscriber.get("data", {}),
-            )
-            for subscriber in db_subscribers
-        ]
+        subscribers = [SubscriberBase(**subscriber) for subscriber in db_subscribers["data"]]
 
         return subscribers
 

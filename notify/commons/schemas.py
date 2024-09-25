@@ -21,7 +21,14 @@ from http import HTTPStatus
 from typing import Any, ClassVar, Dict, Optional, Set, Tuple, Type, Union
 
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, create_model, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    create_model,
+    model_validator,
+)
 from typing_extensions import Annotated
 
 
@@ -263,6 +270,20 @@ class SuccessResponse(ResponseBase):
             data["message"] = HTTPStatus(data["code"]).description
 
         return data
+
+
+class PaginatedSuccessResponse(SuccessResponse):
+    """Define a paginated success response with optional message and parameters.
+
+    Inherits from `SuccessResponse` and specifies default values and validation for success responses.
+
+    Attributes:
+        page (int): The current page number.
+        limit (int): The number of items per page.
+    """
+
+    page: int
+    limit: int
 
 
 class ErrorResponse(ResponseBase):
