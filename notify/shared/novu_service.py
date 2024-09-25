@@ -41,7 +41,7 @@ from novu.dto.notification_template import (
     NotificationTemplateFormDto,
 )
 from novu.dto.subscriber import BulkResultSubscriberDto, SubscriberDto
-from novu.dto.topic import PaginatedTopicDto, TopicDto
+from novu.dto.topic import PaginatedTopicDto, TopicDto, TriggerTopicDto
 from requests.exceptions import HTTPError
 
 from notify.commons import logging
@@ -960,6 +960,7 @@ class NovuService(NovuBaseApiClient):
         name: str,
         recipients: Union[str, List[str]],
         payload: Optional[Dict] = None,
+        actor: Optional[str] = None,
         api_key: Optional[str] = None,
         environment: str = "dev",
     ) -> EventDto:
@@ -986,12 +987,58 @@ class NovuService(NovuBaseApiClient):
 
         try:
             event_data = EventApi(self.base_url, api_key=novu_api_key).trigger(
-                name=name, recipients=recipients, payload=payload
+                name=name, recipients=recipients, payload=payload, actor=actor
             )
             return event_data
         except HTTPError as err:
             error_message = err.response.json().get("message", "Unknown error occurred")
             raise NovuApiClientException(f"Failed to trigger event: {error_message}") from None
+
+    @_handle_exception
+    async def trigger_topic_event(
+        self,
+        name: str,
+        topic_keys: Union[str, List[str]],
+        payload: Optional[Dict] = None,
+        actor: Optional[str] = None,
+        api_key: Optional[str] = None,
+        environment: str = "dev",
+    ) -> EventDto:
+        """Triggers a notification topic event in Novu based on the provided notification data.
+
+        This method sends a notification event to Novu using the specified notification name,
+        recipients, and payload.
+
+        Args:
+            notification_data (NotificationRequest): The request object containing the notification
+                name, recipients, and payload data.
+
+        Returns:
+            EventDto: An object containing details about the triggered event, including its status.
+
+        Raises:
+            NovuApiClientException: If there is an issue with triggering the event via Novu.
+        """
+        novu_api_key = await self._resolve_api_key(api_key=api_key, environment=environment)
+
+        # Set the payload to an empty dictionary if it's None
+        if payload is None:
+            payload = {}
+
+        # Convert topic_keys to a list of topic trigger dataclass objects
+        topics = [
+            TriggerTopicDto(topic_key=key, type="Topic")
+            for key in (topic_keys if isinstance(topic_keys, list) else [topic_keys])
+        ]
+
+        try:
+            event_data = EventApi(self.base_url, api_key=novu_api_key).trigger_topic(
+                name=name, topics=topics, payload=payload, actor=actor
+            )
+            return event_data
+        except HTTPError as err:
+            error_message = err.response.json().get("message", "Unknown error occurred")
+            raise NovuApiClientException(f"Failed to trigger topic event: {error_message}") from None
 
     @_handle_exception
     async def create_topic(

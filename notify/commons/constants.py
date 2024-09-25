@@ -197,3 +197,15 @@ NOVU_CHANNEL_PROVIDER_MAPPING = {
         "sparkpost": "SparkPost",
     }
 }
+
+
+class NotificationType(Enum):
+    """Represents the type of a notification.
+
+    Attributes:
+        EVENT: Notification triggered by an event.
+        TOPIC: Notification related to a specific topic.
+    """
+
+    EVENT = "event"
+    TOPIC = "topic"  # TODO: add broadcast, bulk event triggering

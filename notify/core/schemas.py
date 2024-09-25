@@ -19,8 +19,10 @@
 
 from typing import List, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+from typing_extensions import Self
 
+from notify.commons.constants import NotificationType
 from notify.commons.schemas import (
     CloudEventBase,
     PaginatedSuccessResponse,
@@ -34,9 +36,29 @@ from notify.commons.schemas import (
 class NotificationRequest(CloudEventBase):
     """Represents a notification request."""
 
-    name: str
-    recipients: Union[str, List[str]]
-    payload: dict
+    notification_type: NotificationType = NotificationType.EVENT
+    name: str  # Workflow identifier
+    subscriber_ids: Optional[Union[str, List[str]]] = None
+    payload: dict = Field(default_factory=dict)
+    actor: Optional[str] = None
+    topic_keys: Optional[Union[str, List[str]]] = None
+
+    @model_validator(mode="after")
+    def check_required_fields(self) -> Self:
+        """Check if required fields are present in the request.
+
+        Raises:
+            ValueError: If `subscriber_ids` is not present for event notifications.
+            ValueError: If `topic_keys` is not present for topic notifications.
+
+        Returns:
+            Self: The instance of the class.
+        """
+        if self.notification_type == NotificationType.EVENT and not self.subscriber_ids:
+            raise ValueError("subscriber_ids is required for event notifications")
+        if self.notification_type == NotificationType.TOPIC and not self.topic_keys:
+            raise ValueError("topic_keys is required for topic notifications")
+        return self
 
 
 class NotificationResponse(SuccessResponse):

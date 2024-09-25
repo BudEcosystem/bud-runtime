@@ -25,6 +25,7 @@ from novu.dto.subscriber import SubscriberDto
 from novu.dto.topic import TopicDto
 
 from notify.commons import logging
+from notify.commons.constants import NotificationType
 from notify.commons.exceptions import NovuApiClientException
 from notify.shared.novu_service import NovuService
 
@@ -471,9 +472,26 @@ class NotificationService(NovuService):
             NovuApiClientException: If there is an issue with triggering the event via Novu.
         """
         try:
-            event_data = await self.trigger_event(
-                notification_data.name, notification_data.recipients, notification_data.payload, environment="prod"
-            )
+            if notification_data.notification_type == NotificationType.EVENT:
+                event_data = await self.trigger_event(
+                    notification_data.name,
+                    notification_data.subscriber_ids,
+                    notification_data.payload,
+                    notification_data.actor,
+                    environment="prod",
+                )
+            elif notification_data.notification_type == NotificationType.TOPIC:
+                event_data = await self.trigger_topic_event(
+                    notification_data.name,
+                    notification_data.topic_keys,
+                    notification_data.payload,
+                    notification_data.actor,
+                    environment="prod",
+                )
+            else:
+                raise NovuApiClientException(
+                    message=f"Notification type {notification_data.notification_type.value} is not supported."
+                )
             logger.debug(f"Triggered notification successfully. Status: {event_data.status}")
             return event_data
         except NovuApiClientException as err:
