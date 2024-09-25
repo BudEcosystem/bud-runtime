@@ -17,7 +17,7 @@
 
 """Implements provider services and business logic that power the microservices, including key functionality and integrations."""
 
-from typing import List
+from typing import Dict, List
 
 from novu.dto.integration import IntegrationDto
 
@@ -26,7 +26,7 @@ from notify.commons.config import secrets_settings
 from notify.commons.exceptions import NovuApiClientException
 from notify.shared.novu_service import NovuService
 
-from .schemas import IntegrationListItem, IntegrationRequest
+from .schemas import IntegrationBase, IntegrationRequest
 
 
 logger = logging.get_logger(__name__)
@@ -85,11 +85,11 @@ class IntegrationsService(NovuService):
 
         return db_integration
 
-    async def list_novu_integrations(self) -> List[IntegrationListItem]:
+    async def list_novu_integrations(self) -> List[IntegrationBase]:
         """Return a list of all Novu integrations.
 
         Returns:
-            List[IntegrationListItem]: A list of integration items containing the details of each integration.
+            List[IntegrationBase]: A list of integration items containing the details of each integration.
 
         Raises:
             NovuApiClientException: If the API call to retrieve integrations fails.
@@ -101,21 +101,9 @@ class IntegrationsService(NovuService):
             logger.error(err.message)
             raise
 
-        # Convert the raw integration data into IntegrationListItem objects
+        # Convert the raw integration data into IntegrationBase objects
         integrations = [
-            IntegrationListItem(
-                id=integration["_id"],
-                provider_id=integration["providerId"],
-                channel=integration["channel"],
-                active=integration["active"],
-                created_at=integration["createdAt"],
-                updated_at=integration["updatedAt"],
-                deleted=integration["deleted"],
-                primary=integration["primary"],
-                credentials=integration["credentials"],
-            )
-            for integration in db_integrations
-            if integration["channel"] != "in_app"
+            IntegrationBase(**integration) for integration in db_integrations if integration["channel"] != "in_app"
         ]
 
         return integrations
@@ -169,7 +157,7 @@ class IntegrationsService(NovuService):
             logger.error(err.message)
             raise
 
-    async def set_novu_integration_as_primary(self, integration_id: str) -> IntegrationDto:
+    async def set_novu_integration_as_primary(self, integration_id: str) -> Dict:
         """Mark the specified integration as the primary integration in the Novu system.
 
         Args:

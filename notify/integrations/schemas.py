@@ -17,9 +17,9 @@
 
 """Contains Pydantic schemas used for data validation and serialization within the integrations."""
 
-from typing import List, Optional
+from typing import Optional
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from typing_extensions import Self
 
 from notify.commons import logging
@@ -28,7 +28,9 @@ from notify.commons.constants import (
     NovuChannel,
     NovuEmailProviderId,
 )
-from notify.commons.schemas import CloudEventBase, SuccessResponse
+from notify.commons.schemas import (
+    SuccessResponse,
+)
 
 
 logger = logging.get_logger(__name__)
@@ -63,7 +65,7 @@ class NovuIntegrationCredentials(BaseModel):
         populate_by_name = True
 
 
-class IntegrationRequest(CloudEventBase):
+class IntegrationRequest(BaseModel):
     """Represents an integration request."""
 
     provider_id: NovuEmailProviderId
@@ -123,25 +125,27 @@ class IntegrationRequest(CloudEventBase):
 class IntegrationResponse(SuccessResponse):
     """Represents an integration response."""
 
+    model_config = ConfigDict(extra="ignore")
+
     provider_id: str
     channel: str
     active: bool
-    id: Optional[str] = None
+    id: Optional[str] = Field(None, alias="_id")
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
     deleted: Optional[bool] = None
 
 
-class IntegrationListItem(BaseModel):
+class IntegrationBase(BaseModel):
     """Represents individual item in integration list response."""
 
-    provider_id: str
+    provider_id: str = Field(None, alias="providerId")
     channel: str
     active: bool
     credentials: Optional[dict] = None
-    id: Optional[str] = None
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
+    id: Optional[str] = Field(None, alias="_id")
+    created_at: Optional[str] = Field(None, alias="createdAt")
+    updated_at: Optional[str] = Field(None, alias="updatedAt")
     deleted: Optional[bool] = None
     primary: Optional[bool] = None
 
@@ -149,4 +153,15 @@ class IntegrationListItem(BaseModel):
 class IntegrationListResponse(SuccessResponse):
     """Represents an integration list response."""
 
-    integrations: List[IntegrationListItem]
+    model_config = ConfigDict(extra="ignore")
+
+    integrations: list[IntegrationBase]
+
+
+class IntegrationCurlResponse(IntegrationResponse):
+    """Represents an integration response received from the Novu API."""
+
+    provider_id: str = Field(None, alias="providerId")
+    id: Optional[str] = Field(None, alias="_id")
+    created_at: Optional[str] = Field(None, alias="createdAt")
+    updated_at: Optional[str] = Field(None, alias="updatedAt")
