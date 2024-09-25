@@ -33,7 +33,7 @@ notify_router = APIRouter()
 
 
 @notify_router.post(
-    "/notification/trigger",
+    "/notification",
     response_model=NotificationResponse,
     status_code=status.HTTP_201_CREATED,
     description="Triggers a notification. Can be used for both API and PubSub. Refer to NotificationRequest schema for details.",
@@ -64,8 +64,8 @@ async def trigger_notification(notification: NotificationRequest) -> Response:
         event_data = await NotificationService().trigger_novu_notification_event(notification)
         logger.info(f"Triggered notification successfully. Status: {event_data.status}")
         return NotificationResponse(
-            object="info",
-            message="Notification triggered successfully",
+            object="notification",
+            message="",
             acknowledged=event_data.acknowledged,
             status=event_data.status,
             transaction_id=event_data.transaction_id,
