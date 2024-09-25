@@ -28,6 +28,9 @@ from notify.commons.schemas import (
 )
 
 
+# Schemas related to notifications
+
+
 class NotificationRequest(CloudEventBase):
     """Represents a notification request."""
 
@@ -42,6 +45,9 @@ class NotificationResponse(SuccessResponse):
     acknowledged: bool
     status: str
     transaction_id: str
+
+
+# Schemas related to subscribers
 
 
 class SubscriberRequest(BaseModel):
@@ -125,3 +131,70 @@ class SubscriberResponse(SuccessResponse):
     is_online: Optional[bool] = Field(None, alias="isOnline")
     last_online_at: Optional[str] = Field(None, alias="lastOnlineAt")
     data: Optional[dict] = None
+
+
+# Schemas related to topics
+
+
+class TopicRequest(BaseModel):
+    """Represents a topic request."""
+
+    topic_name: str
+    topic_key: str
+
+
+class TopicUpdateRequest(BaseModel):
+    """Represents a topic update request."""
+
+    topic_name: str
+
+
+class TopicSubscriberRequest(BaseModel):
+    """Represents a topic update request."""
+
+    subscribers: Union[list[str], str]
+
+
+class TopicBase(BaseModel):
+    """Represents a topic base response."""
+
+    key: str
+    name: Optional[str] = None
+    _id: Optional[str] = None
+    subscribers: Optional[List[str]] = None
+
+
+class PaginatedTopicResponse(PaginatedSuccessResponse):
+    """Represents a topic paginated response."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    topics: list[TopicBase]
+
+
+class TopicResponse(SuccessResponse):
+    """Represents a topic list response."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    key: str
+    name: Optional[str] = None
+    _id: Optional[str] = Field(None, alias="_id")
+    subscribers: Optional[List[str]] = None
+
+
+class TopicCheckSubscriberResponse(SuccessResponse):
+    """Represents a topic check subscriber response."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    is_subscribed: bool
+
+
+class TopicAddSubscriberResponse(SuccessResponse):
+    """Represents a topic add subscriber response."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    success: list = Field(default_factory=list)
+    failed: list = Field(default_factory=list)
