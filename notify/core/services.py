@@ -17,6 +17,7 @@
 
 """Implements core services and business logic that power the microservices, including key functionality and integrations."""
 
+from dataclasses import asdict
 from typing import Dict, List, Optional
 
 from novu.dto.event import EventDto
@@ -317,7 +318,7 @@ class TopicService(NovuService):
             logger.error(err.message)
             raise
 
-        topics = [TopicBase(**topic) for topic in db_topics.data]
+        topics = [TopicBase(**asdict(topic)) for topic in db_topics.data]
 
         return topics
 

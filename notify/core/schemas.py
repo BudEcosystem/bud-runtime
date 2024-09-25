@@ -160,7 +160,7 @@ class TopicBase(BaseModel):
 
     key: str
     name: Optional[str] = None
-    _id: Optional[str] = None
+    id: Optional[str] = Field(None, alias="_id")
     subscribers: Optional[List[str]] = None
 
 
@@ -179,7 +179,7 @@ class TopicResponse(SuccessResponse):
 
     key: str
     name: Optional[str] = None
-    _id: Optional[str] = Field(None, alias="_id")
+    id: Optional[str] = Field(None, alias="_id")
     subscribers: Optional[List[str]] = None
 
 
