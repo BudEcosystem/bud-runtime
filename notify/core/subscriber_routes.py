@@ -16,6 +16,7 @@
 
 """Defines metadata routes for the microservices, providing endpoints for retrieving subscriber information."""
 
+from dataclasses import asdict
 from typing import List
 
 from fastapi import APIRouter, Response, status
@@ -26,8 +27,8 @@ from notify.commons.exceptions import NovuApiClientException
 from notify.commons.schemas import SuccessResponse
 
 from .schemas import (
-    SubscriberBulkResponse,
-    SubscriberListResponse,
+    PaginatedSubscriberResponse,
+    SubscriberBulkCreateResponse,
     SubscriberRequest,
     SubscriberResponse,
     SubscriberUpdateRequest,
@@ -37,15 +38,14 @@ from .services import SubscriberService
 
 logger = logging.get_logger(__name__)
 
-subscriber_router = APIRouter()
+subscriber_router = APIRouter(prefix="/subscribers", tags=["Subscribers"])
 
 
 @subscriber_router.post(
-    "/subscribers",
+    "",
     response_model=SubscriberResponse,
     status_code=status.HTTP_201_CREATED,
     description="Create a new subscriber. Can be used for both API and PubSub. Refer to SubscriberRequest schema for details.",
-    tags=["Subscribers"],
 )
 async def create_subscriber(subscriber: SubscriberRequest) -> Response:
     """Create a new subscriber in the Novu system.
@@ -74,23 +74,10 @@ async def create_subscriber(subscriber: SubscriberRequest) -> Response:
         db_subscriber = await SubscriberService().create_novu_subscriber(subscriber)
         logger.info("Subscriber created successfully")
         return SubscriberResponse(
-            object="info",
-            message="Subscriber created successfully.",
+            object="subscriber",
+            message="",
             code=status.HTTP_201_CREATED,
-            subscriber_id=db_subscriber.subscriber_id,
-            email=db_subscriber.email,
-            first_name=db_subscriber.first_name,
-            last_name=db_subscriber.last_name,
-            phone=db_subscriber.phone,
-            avatar=db_subscriber.avatar,
-            locale=db_subscriber.locale,
-            id=db_subscriber._id,
-            channels=db_subscriber.channels,
-            created_at=db_subscriber.created_at,
-            updated_at=db_subscriber.updated_at,
-            is_online=db_subscriber.is_online,
-            last_online_at=db_subscriber.last_online_at,
-            data=db_subscriber.data,
+            **asdict(db_subscriber),
         ).to_http_response()
     except NovuApiClientException:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to create subscriber") from None
@@ -103,11 +90,10 @@ async def create_subscriber(subscriber: SubscriberRequest) -> Response:
 
 
 @subscriber_router.post(
-    "/subscribers/bulk",
+    "/bulk-create",
     response_model=SubscriberResponse,
-    status_code=status.HTTP_201_CREATED,
+    status_code=status.HTTP_200_OK,
     description="Create bulk subscribers. Can be used for both API and PubSub. Refer to SubscriberRequest schema for details.",
-    tags=["Subscribers"],
 )
 async def create_bulk_subscribers(subscribers: List[SubscriberRequest]) -> Response:
     """Create multiple subscribers in bulk within the Novu system.
@@ -135,13 +121,11 @@ async def create_bulk_subscribers(subscribers: List[SubscriberRequest]) -> Respo
     try:
         db_subscriber = await SubscriberService().bulk_create_novu_subscriber(subscribers)
         logger.info("Subscriber bulk created successfully")
-        return SubscriberBulkResponse(
-            object="info",
-            message="Subscriber bulk created successfully.",
-            code=status.HTTP_201_CREATED,
-            created=db_subscriber.get("created", []),
-            updated=db_subscriber.get("updated", []),
-            failed=db_subscriber.get("failed", []),
+        return SubscriberBulkCreateResponse(
+            object="subscriber.bulk.create",
+            message="",
+            code=status.HTTP_200_OK,
+            **db_subscriber,
         ).to_http_response()
     except NovuApiClientException:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to create subscribers") from None
@@ -154,8 +138,8 @@ async def create_bulk_subscribers(subscribers: List[SubscriberRequest]) -> Respo
 
 
 @subscriber_router.get(
-    "/subscribers",
-    response_model=SubscriberListResponse,
+    "",
+    response_model=PaginatedSubscriberResponse,
     status_code=status.HTTP_200_OK,
     description="List all subscribers. Can be used for both API and PubSub. Refer to SubscriberRequest schema for details.",
     tags=["Subscribers"],
@@ -185,11 +169,13 @@ async def get_all_subscribers(page: int = 0, limit: int = 10) -> Response:
     try:
         db_subscribers = await SubscriberService().list_novu_subscribers(page=page, limit=limit)
         logger.info("Successfully retrieved the list of subscribers")
-        return SubscriberListResponse(
-            object="info",
-            message="Successfully retrieved the subscribers list",
+        return PaginatedSubscriberResponse(
+            object="subscriber.list",
+            message="",
             subscribers=db_subscribers,
             code=status.HTTP_200_OK,
+            page=page,
+            limit=limit,
         ).to_http_response()
     except NovuApiClientException:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to list subscribers") from None
@@ -202,7 +188,7 @@ async def get_all_subscribers(page: int = 0, limit: int = 10) -> Response:
 
 
 @subscriber_router.get(
-    "/subscribers/{subscriber_id}",
+    "/{subscriber_id}",
     response_model=SubscriberResponse,
     status_code=status.HTTP_200_OK,
     description="Retrieves the specified subscriber. Can be used for both API and PubSub. Refer to SubscriberRequest schema for details.",
@@ -234,23 +220,10 @@ async def retrieve_subscriber(
         db_subscriber = await SubscriberService().retrieve_novu_subscriber(subscriber_id)
         logger.info("Successfully retrieved the subscriber")
         return SubscriberResponse(
-            object="info",
-            message="Successfully retrieved the subscriber",
-            code=status.HTTP_201_CREATED,
-            subscriber_id=db_subscriber.subscriber_id,
-            email=db_subscriber.email,
-            first_name=db_subscriber.first_name,
-            last_name=db_subscriber.last_name,
-            phone=db_subscriber.phone,
-            avatar=db_subscriber.avatar,
-            locale=db_subscriber.locale,
-            id=db_subscriber._id,
-            channels=db_subscriber.channels,
-            created_at=db_subscriber.created_at,
-            updated_at=db_subscriber.updated_at,
-            is_online=db_subscriber.is_online,
-            last_online_at=db_subscriber.last_online_at,
-            data=db_subscriber.data,
+            object="subscriber",
+            message="",
+            code=status.HTTP_200_OK,
+            **asdict(db_subscriber),
         ).to_http_response()
     except NovuApiClientException:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to retrieve subscriber") from None
@@ -263,7 +236,7 @@ async def retrieve_subscriber(
 
 
 @subscriber_router.put(
-    "/subscribers/{subscriber_id}",
+    "/{subscriber_id}",
     response_model=SubscriberResponse,
     status_code=status.HTTP_200_OK,
     description="Updates the specified subscriber. Can be used for both API and PubSub. Refer to SubscriberRequest schema for details.",
@@ -293,23 +266,10 @@ async def update_subscriber(subscriber_id: str, subscriber: SubscriberUpdateRequ
         db_subscriber = await SubscriberService().update_novu_subscriber(subscriber_id, subscriber)
         logger.info("Subscriber updated successfully.")
         return SubscriberResponse(
-            object="info",
-            message="Subscriber updated successfully.",
-            code=status.HTTP_201_CREATED,
-            subscriber_id=db_subscriber.subscriber_id,
-            email=db_subscriber.email,
-            first_name=db_subscriber.first_name,
-            last_name=db_subscriber.last_name,
-            phone=db_subscriber.phone,
-            avatar=db_subscriber.avatar,
-            locale=db_subscriber.locale,
-            id=db_subscriber._id,
-            channels=db_subscriber.channels,
-            created_at=db_subscriber.created_at,
-            updated_at=db_subscriber.updated_at,
-            is_online=db_subscriber.is_online,
-            last_online_at=db_subscriber.last_online_at,
-            data=db_subscriber.data,
+            object="subscriber",
+            message="",
+            code=status.HTTP_200_OK,
+            **asdict(db_subscriber),
         ).to_http_response()
     except NovuApiClientException:
         raise HTTPException(
@@ -324,7 +284,7 @@ async def update_subscriber(subscriber_id: str, subscriber: SubscriberUpdateRequ
 
 
 @subscriber_router.delete(
-    "/subscribers/{subscriber_id}",
+    "/s{subscriber_id}",
     response_model=SuccessResponse,
     status_code=status.HTTP_200_OK,
     description="Deletes the specified subscriber. Can be used for both API and PubSub. Refer to SubscriberRequest schema for details.",
@@ -354,8 +314,8 @@ async def delete_subscriber(subscriber_id: str) -> Response:
         logger.info("Subscriber deleted successfully.")
         return SuccessResponse(
             object="info",
-            message="Subscriber deleted successfully",
-            code=status.HTTP_204_NO_CONTENT,
+            message="",
+            code=status.HTTP_200_OK,
         ).to_http_response()
     except NovuApiClientException:
         raise HTTPException(

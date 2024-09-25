@@ -841,7 +841,7 @@ class NovuService(NovuBaseApiClient):
         limit: int = 10,
         api_key: Optional[str] = None,
         environment: str = "dev",
-    ) -> List:
+    ) -> Dict:
         """Retrieve a paginated list of all subscribers from the Novu system.
 
         Args:
@@ -864,7 +864,7 @@ class NovuService(NovuBaseApiClient):
         async with aiohttp.ClientSession() as session, session.get(url, headers=headers) as response:
             is_success, response = await self._handle_response(response)
             if is_success:
-                return response["data"]
+                return response
             else:
                 raise NovuApiClientException(f"Failed to list subscribers: {response}")
 
@@ -957,7 +957,7 @@ class NovuService(NovuBaseApiClient):
         self,
         name: str,
         recipients: Union[str, List[str]],
-        payload: dict = None,
+        payload: Optional[Dict] = None,
         api_key: Optional[str] = None,
         environment: str = "dev",
     ) -> EventDto:

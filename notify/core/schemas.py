@@ -19,9 +19,13 @@
 
 from typing import List, Optional, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
-from notify.commons.schemas import CloudEventBase, SuccessResponse
+from notify.commons.schemas import (
+    CloudEventBase,
+    PaginatedSuccessResponse,
+    SuccessResponse,
+)
 
 
 class NotificationRequest(CloudEventBase):
@@ -40,7 +44,7 @@ class NotificationResponse(SuccessResponse):
     transaction_id: str
 
 
-class SubscriberRequest(CloudEventBase):
+class SubscriberRequest(BaseModel):
     """Represents a subscriber request."""
 
     subscriber_id: str
@@ -53,7 +57,7 @@ class SubscriberRequest(CloudEventBase):
     data: Optional[dict] = None
 
 
-class SubscriberUpdateRequest(CloudEventBase):
+class SubscriberUpdateRequest(BaseModel):
     """Represents a subscriber update request."""
 
     email: Optional[str] = None
@@ -65,27 +69,18 @@ class SubscriberUpdateRequest(CloudEventBase):
     data: Optional[dict] = None
 
 
-class SubscriberSdk(BaseModel):
-    """Represents a subscriber response."""
+class SubscriberBulkCreateResponse(SuccessResponse):
+    """Represents a subscriber bulk response."""
 
-    subscriber_id: str
-    email: Optional[str] = None
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
-    phone: Optional[str] = None
-    avatar: Optional[str] = None
-    locale: Optional[str] = None
-    id: Optional[str] = Field(None, alias="_id")
-    channels: Optional[list] = None
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
-    is_online: Optional[bool] = None
-    last_online_at: Optional[str] = None
-    data: Optional[dict] = None
+    model_config = ConfigDict(extra="ignore")
+
+    created: list = Field(default_factory=list)
+    updated: list = Field(default_factory=list)
+    failed: list = Field(default_factory=list)
 
 
-class SubscriberItem(BaseModel):
-    """Represents a subscriber list item."""
+class SubscriberBase(BaseModel):
+    """Represents a subscriber list response."""
 
     subscriber_id: str = Field(None, alias="subscriberId")
     email: Optional[str] = None
@@ -94,7 +89,7 @@ class SubscriberItem(BaseModel):
     phone: Optional[str] = None
     avatar: Optional[str] = None
     locale: Optional[str] = None
-    id: Optional[str] = None
+    id: Optional[str] = Field(None, alias="_id")
     channels: Optional[list] = None
     created_at: Optional[str] = Field(None, alias="createdAt")
     updated_at: Optional[str] = Field(None, alias="updatedAt")
@@ -103,34 +98,30 @@ class SubscriberItem(BaseModel):
     data: Optional[dict] = None
 
 
-class SubscriberBulkResponse(SuccessResponse):
-    """Represents a subscriber bulk response."""
+class PaginatedSubscriberResponse(PaginatedSuccessResponse):
+    """Represents a subscriber paginated response."""
 
-    created: list
-    updated: list
-    failed: list
+    model_config = ConfigDict(extra="ignore")
+
+    subscribers: list[SubscriberBase]
 
 
 class SubscriberResponse(SuccessResponse):
     """Represents a subscriber list response."""
 
-    subscriber_id: str
+    model_config = ConfigDict(extra="ignore")
+
+    subscriber_id: str = Field(None, alias="subscriberId")
     email: Optional[str] = None
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
+    first_name: Optional[str] = Field(None, alias="firstName")
+    last_name: Optional[str] = Field(None, alias="lastName")
     phone: Optional[str] = None
     avatar: Optional[str] = None
     locale: Optional[str] = None
-    id: Optional[str] = None
+    id: Optional[str] = Field(None, alias="_id")
     channels: Optional[list] = None
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
-    is_online: Optional[bool] = None
-    last_online_at: Optional[str] = None
+    created_at: Optional[str] = Field(None, alias="createdAt")
+    updated_at: Optional[str] = Field(None, alias="updatedAt")
+    is_online: Optional[bool] = Field(None, alias="isOnline")
+    last_online_at: Optional[str] = Field(None, alias="lastOnlineAt")
     data: Optional[dict] = None
-
-
-class SubscriberListResponse(SuccessResponse):
-    """Represents a subscriber list response."""
-
-    subscribers: List[SubscriberItem]
