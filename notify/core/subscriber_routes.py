@@ -91,7 +91,7 @@ async def create_subscriber(subscriber: SubscriberRequest) -> Response:
 
 @subscriber_router.post(
     "/bulk-create",
-    response_model=SubscriberResponse,
+    response_model=SubscriberBulkCreateResponse,
     status_code=status.HTTP_200_OK,
     description="Create bulk subscribers. Can be used for both API and PubSub. Refer to SubscriberRequest schema for details.",
 )
