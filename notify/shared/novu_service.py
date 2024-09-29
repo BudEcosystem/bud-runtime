@@ -1041,6 +1041,45 @@ class NovuService(NovuBaseApiClient):
             raise NovuApiClientException(f"Failed to trigger topic event: {error_message}") from None
 
     @_handle_exception
+    async def trigger_broadcast(
+        self,
+        name: str,
+        payload: Optional[Dict] = None,
+        actor: Optional[str] = None,
+        api_key: Optional[str] = None,
+        environment: str = "dev",
+    ) -> EventDto:
+        """Triggers a broadcast event via the Novu API.
+
+        Args:
+            name (str): The name of the broadcast event to trigger.
+            payload (Optional[Dict], optional): The data payload to send with the event. Defaults to an empty dictionary if not provided.
+            actor (Optional[str], optional): The actor responsible for triggering the event. Defaults to None.
+            api_key (Optional[str], optional): The API key for authentication. If not provided, it is resolved based on the environment. Defaults to None.
+            environment (str, optional): The environment to resolve the API key from. Defaults to "dev".
+
+        Returns:
+            EventDto: The data representing the broadcast event as returned by the Novu API.
+
+        Raises:
+            NovuApiClientException: Raised when the API call fails, with the error message provided by the Novu API.
+        """
+        novu_api_key = await self._resolve_api_key(api_key=api_key, environment=environment)
+
+        # Set the payload to an empty dictionary if it's None
+        if payload is None:
+            payload = {}
+
+        try:
+            event_data = EventApi(self.base_url, api_key=novu_api_key).broadcast(
+                name=name, payload=payload, actor=actor
+            )
+            return event_data
+        except HTTPError as err:
+            error_message = err.response.json().get("message", "Unknown error occurred")
+            raise NovuApiClientException(f"Failed to trigger broadcast: {error_message}") from None
+
+    @_handle_exception
     async def create_topic(
         self,
         topic_key: str,

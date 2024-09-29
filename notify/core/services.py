@@ -488,6 +488,13 @@ class NotificationService(NovuService):
                     notification_data.actor,
                     environment="prod",
                 )
+            elif notification_data.notification_type == NotificationType.BROADCAST:
+                event_data = await self.trigger_broadcast(
+                    notification_data.name,
+                    notification_data.payload,
+                    notification_data.actor,
+                    environment="prod",
+                )
             else:
                 raise NovuApiClientException(
                     message=f"Notification type {notification_data.notification_type.value} is not supported."
