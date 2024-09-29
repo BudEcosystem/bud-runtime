@@ -20,11 +20,10 @@ from dataclasses import asdict
 from typing import List
 
 from fastapi import APIRouter, Response, status
-from fastapi.exceptions import HTTPException
 
 from notify.commons import logging
 from notify.commons.exceptions import NovuApiClientException
-from notify.commons.schemas import SuccessResponse
+from notify.commons.schemas import ErrorResponse, SuccessResponse
 
 from .schemas import (
     PaginatedSubscriberResponse,
@@ -43,9 +42,22 @@ subscriber_router = APIRouter(prefix="/subscribers", tags=["Subscribers"])
 
 @subscriber_router.post(
     "",
-    response_model=SubscriberResponse,
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_201_CREATED: {
+            "model": SubscriberResponse,
+            "description": "Successfully created subscriber",
+        },
+    },
     status_code=status.HTTP_201_CREATED,
-    description="Create a new subscriber. Can be used for both API and PubSub. Refer to SubscriberRequest schema for details.",
+    description="Create a new subscriber. Can be used for API. Refer to SubscriberRequest schema for details.",
 )
 async def create_subscriber(subscriber: SubscriberRequest) -> Response:
     """Create a new subscriber in the Novu system.
@@ -62,11 +74,6 @@ async def create_subscriber(subscriber: SubscriberRequest) -> Response:
     Returns:
         Response: An HTTP response indicating the status of the operation,
                   along with the created subscriber's details.
-
-    Raises:
-        HTTPException: Raises an HTTP 400 error if subscriber creation fails
-                       due to client-related issues, or raises an HTTP 500 error
-                       for unexpected server errors.
     """
     logger.debug("Received request to create a new subscriber")
 
@@ -80,20 +87,38 @@ async def create_subscriber(subscriber: SubscriberRequest) -> Response:
             **asdict(db_subscriber),
         ).to_http_response()
     except NovuApiClientException:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to create subscriber") from None
+        return ErrorResponse(
+            code=status.HTTP_400_BAD_REQUEST,
+            type="BadRequest",
+            message="Failed to create subscriber",
+        )
     except Exception as err:
         logger.exception(f"Unexpected error occurred while creating subscriber. {err}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected error occurred while creating subscriber.",
-        ) from None
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            type="InternalServerError",
+            message="Unexpected error occurred while creating subscriber.",
+        )
 
 
 @subscriber_router.post(
     "/bulk-create",
-    response_model=SubscriberBulkCreateResponse,
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": SubscriberBulkCreateResponse,
+            "description": "Successfully created multiple subscribers",
+        },
+    },
     status_code=status.HTTP_200_OK,
-    description="Create bulk subscribers. Can be used for both API and PubSub. Refer to SubscriberRequest schema for details.",
+    description="Create bulk subscribers. Can be used for API. Refer to SubscriberRequest schema for details.",
 )
 async def create_bulk_subscribers(subscribers: List[SubscriberRequest]) -> Response:
     """Create multiple subscribers in bulk within the Novu system.
@@ -110,11 +135,6 @@ async def create_bulk_subscribers(subscribers: List[SubscriberRequest]) -> Respo
         Response: An HTTP response indicating the status of the bulk
                   creation operation, along with details of created,
                   updated, and failed subscribers.
-
-    Raises:
-        HTTPException: Raises an HTTP 400 error if bulk creation fails due
-                       to client-related issues, or raises an HTTP 500 error
-                       for unexpected server errors.
     """
     logger.debug("Received request to create a new subscriber")
 
@@ -128,20 +148,38 @@ async def create_bulk_subscribers(subscribers: List[SubscriberRequest]) -> Respo
             **db_subscriber,
         ).to_http_response()
     except NovuApiClientException:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to create subscribers") from None
+        return ErrorResponse(
+            code=status.HTTP_400_BAD_REQUEST,
+            type="BadRequest",
+            message="Failed to create subscribers",
+        )
     except Exception as err:
         logger.exception(f"Unexpected error occurred while creating subscribers. {err}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected error occurred while creating subscribers.",
-        ) from None
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            type="InternalServerError",
+            message="Unexpected error occurred while creating subscribers.",
+        )
 
 
 @subscriber_router.get(
     "",
-    response_model=PaginatedSubscriberResponse,
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": PaginatedSubscriberResponse,
+            "description": "Successfully listed subscribers",
+        },
+    },
     status_code=status.HTTP_200_OK,
-    description="List all subscribers. Can be used for both API and PubSub. Refer to SubscriberRequest schema for details.",
+    description="List all subscribers. Can be used for API. Refer to SubscriberRequest schema for details.",
 )
 async def get_all_subscribers(page: int = 0, limit: int = 10) -> Response:
     """Retrieve a list of all subscribers from the Novu system.
@@ -157,11 +195,6 @@ async def get_all_subscribers(page: int = 0, limit: int = 10) -> Response:
     Returns:
         Response: An HTTP response containing the list of subscribers along
                   with relevant metadata.
-
-    Raises:
-        HTTPException: Raises an HTTP 400 error if the listing fails due to
-                       client-related issues, or raises an HTTP 500 error for
-                       unexpected server errors.
     """
     logger.debug("Received request to list all subscribers")
 
@@ -177,20 +210,38 @@ async def get_all_subscribers(page: int = 0, limit: int = 10) -> Response:
             limit=limit,
         ).to_http_response()
     except NovuApiClientException:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to list subscribers") from None
+        return ErrorResponse(
+            code=status.HTTP_400_BAD_REQUEST,
+            type="BadRequest",
+            message="Failed to list subscribers",
+        )
     except Exception as err:
         logger.exception(f"Unexpected error while listing subscribers. {err}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected error while listing subscribers.",
-        ) from None
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            type="InternalServerError",
+            message="Unexpected error while listing subscribers.",
+        )
 
 
 @subscriber_router.get(
     "/{subscriber_id}",
-    response_model=SubscriberResponse,
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": SubscriberResponse,
+            "description": "Successfully retrieved subscriber",
+        },
+    },
     status_code=status.HTTP_200_OK,
-    description="Retrieves the specified subscriber. Can be used for both API and PubSub. Refer to SubscriberRequest schema for details.",
+    description="Retrieves the specified subscriber. Can be used for API. Refer to SubscriberRequest schema for details.",
 )
 async def retrieve_subscriber(
     subscriber_id: str,
@@ -206,11 +257,6 @@ async def retrieve_subscriber(
     Returns:
         Response: An HTTP response containing the details of the requested
                   subscriber.
-
-    Raises:
-        HTTPException: Raises an HTTP 400 error if the retrieval fails due to
-                       client-related issues, or raises an HTTP 500 error for
-                       unexpected server errors.
     """
     logger.debug("Received request to retrieve subscriber")
 
@@ -224,20 +270,38 @@ async def retrieve_subscriber(
             **asdict(db_subscriber),
         ).to_http_response()
     except NovuApiClientException:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to retrieve subscriber") from None
+        return ErrorResponse(
+            code=status.HTTP_400_BAD_REQUEST,
+            type="BadRequest",
+            message="Failed to retrieve subscriber",
+        )
     except Exception as err:
         logger.exception(f"Unexpected error while retrieving subscriber. {err}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected error while retrieving subscriber.",
-        ) from None
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            type="InternalServerError",
+            message="Unexpected error while retrieving subscriber.",
+        )
 
 
 @subscriber_router.put(
     "/{subscriber_id}",
-    response_model=SubscriberResponse,
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": SubscriberResponse,
+            "description": "Successfully updated subscriber",
+        },
+    },
     status_code=status.HTTP_200_OK,
-    description="Updates the specified subscriber. Can be used for both API and PubSub. Refer to SubscriberRequest schema for details.",
+    description="Updates the specified subscriber. Can be used for API. Refer to SubscriberRequest schema for details.",
 )
 async def update_subscriber(subscriber_id: str, subscriber: SubscriberUpdateRequest) -> Response:
     """Update the details of a specific subscriber in the Novu system.
@@ -251,11 +315,6 @@ async def update_subscriber(subscriber_id: str, subscriber: SubscriberUpdateRequ
 
     Returns:
         Response: An HTTP response containing the updated details of the subscriber.
-
-    Raises:
-        HTTPException: Raises an HTTP 400 error if the update fails due to
-                       client-related issues, or raises an HTTP 500 error for
-                       unexpected server errors.
     """
     logger.debug("Received request to update subscriber")
 
@@ -269,22 +328,38 @@ async def update_subscriber(subscriber_id: str, subscriber: SubscriberUpdateRequ
             **asdict(db_subscriber),
         ).to_http_response()
     except NovuApiClientException:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to update the subscriber."
-        ) from None
+        return ErrorResponse(
+            code=status.HTTP_400_BAD_REQUEST,
+            type="BadRequest",
+            message="Failed to update subscriber",
+        )
     except Exception as err:
         logger.exception(f"Unexpected error occurred while updating subscriber. {err}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred while trying to update the subscriber.",
-        ) from None
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            type="InternalServerError",
+            message="An unexpected error occurred while trying to update the subscriber.",
+        )
 
 
 @subscriber_router.delete(
     "/{subscriber_id}",
-    response_model=SuccessResponse,
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Successfully deleted subscriber",
+        },
+    },
     status_code=status.HTTP_200_OK,
-    description="Deletes the specified subscriber. Can be used for both API and PubSub. Refer to SubscriberRequest schema for details.",
+    description="Deletes the specified subscriber. Can be used for API. Refer to SubscriberRequest schema for details.",
 )
 async def delete_subscriber(subscriber_id: str) -> Response:
     """Delete a specific subscriber from the Novu system.
@@ -297,11 +372,6 @@ async def delete_subscriber(subscriber_id: str) -> Response:
 
     Returns:
         Response: An HTTP response indicating successful deletion of the subscriber.
-
-    Raises:
-        HTTPException: Raises an HTTP 400 error if the deletion fails due to
-                       client-related issues, or raises an HTTP 500 error for
-                       unexpected server errors.
     """
     logger.debug("Received request to delete subscriber.")
 
@@ -314,12 +384,15 @@ async def delete_subscriber(subscriber_id: str) -> Response:
             code=status.HTTP_200_OK,
         ).to_http_response()
     except NovuApiClientException:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to delete the subscriber."
-        ) from None
+        return ErrorResponse(
+            code=status.HTTP_400_BAD_REQUEST,
+            type="BadRequest",
+            message="Failed to delete the subscriber",
+        )
     except Exception as err:
         logger.exception(f"Unexpected error occurred while deleting subscriber. {err}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred while trying to delete the subscriber.",
-        ) from None
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            type="InternalServerError",
+            message="An unexpected error occurred while trying to delete the subscriber.",
+        )

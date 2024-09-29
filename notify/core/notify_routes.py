@@ -17,11 +17,11 @@
 """Defines metadata routes for the microservices, providing endpoints for retrieving service-level information."""
 
 from fastapi import APIRouter, Response, status
-from fastapi.exceptions import HTTPException
 
 from notify.commons import logging
 from notify.commons.api_utils import pubsub_api_endpoint
 from notify.commons.exceptions import NovuApiClientException
+from notify.commons.schemas import ErrorResponse
 
 from .schemas import NotificationRequest, NotificationResponse
 from .services import NotificationService
@@ -34,7 +34,20 @@ notify_router = APIRouter()
 
 @notify_router.post(
     "/notification",
-    response_model=NotificationResponse,
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": NotificationResponse,
+            "description": "Successfully triggered notification",
+        },
+    },
     status_code=status.HTTP_200_OK,
     description="Triggers a notification. Can be used for both API and PubSub. Refer to NotificationRequest schema for details.",
     tags=["Notifications"],
@@ -54,10 +67,6 @@ async def trigger_notification(notification: NotificationRequest) -> Response:
     Returns:
         Response: A response object containing the status of the notification triggering
         process and related information.
-
-    Raises:
-        HTTPException: Raised with a 400 status code if the notification fails to trigger.
-        HTTPException: Raised with a 500 status code for unexpected errors during processing.
     """
     logger.debug("Received request to trigger a notification")
     try:
@@ -72,10 +81,15 @@ async def trigger_notification(notification: NotificationRequest) -> Response:
             code=status.HTTP_200_OK,
         ).to_http_response()
     except NovuApiClientException:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to trigger notification") from None
+        return ErrorResponse(
+            code=status.HTTP_400_BAD_REQUEST,
+            type="BadRequest",
+            message="Failed to trigger notification",
+        )
     except Exception as err:
         logger.exception(f"Unexpected error occurred while triggering notification. {err}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected error occurred while triggering notification.",
-        ) from None
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            type="InternalServerError",
+            message="Unexpected error occurred while triggering notification.",
+        )

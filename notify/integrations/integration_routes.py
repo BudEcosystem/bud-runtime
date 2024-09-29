@@ -19,11 +19,10 @@
 from dataclasses import asdict
 
 from fastapi import APIRouter, Response, status
-from fastapi.exceptions import HTTPException
 
 from notify.commons import logging
 from notify.commons.exceptions import NovuApiClientException
-from notify.commons.schemas import SuccessResponse
+from notify.commons.schemas import ErrorResponse, SuccessResponse
 
 from .schemas import (
     IntegrationCurlResponse,
@@ -41,9 +40,22 @@ integration_router = APIRouter(prefix="/integrations", tags=["Integrations"])
 
 @integration_router.post(
     "",
-    response_model=IntegrationResponse,
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_201_CREATED: {
+            "model": IntegrationResponse,
+            "description": "Successfully created integration",
+        },
+    },
     status_code=status.HTTP_201_CREATED,
-    description="Create a new integration. Can be used for both API and PubSub. Refer to IntegrationRequest schema for details.",
+    description="Create a new integration. Can be used for API. Refer to IntegrationRequest schema for details.",
 )
 async def create_integration(integration: IntegrationRequest) -> Response:
     """Create a new integration in the Novu service.
@@ -71,20 +83,38 @@ async def create_integration(integration: IntegrationRequest) -> Response:
             code=status.HTTP_200_OK,
         ).to_http_response()
     except NovuApiClientException:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to create integration") from None
+        return ErrorResponse(
+            code=status.HTTP_400_BAD_REQUEST,
+            type="BadRequest",
+            message="Failed to create integration",
+        )
     except Exception as err:
         logger.exception(f"Unexpected error occurred while creating integration. {err}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected error occurred while creating integration.",
-        ) from None
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            type="InternalServerError",
+            message="Unexpected error occurred while creating integration.",
+        )
 
 
 @integration_router.get(
     "",
-    response_model=IntegrationListResponse,
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": IntegrationListResponse,
+            "description": "Successfully listed integrations",
+        },
+    },
     status_code=status.HTTP_200_OK,
-    description="List all integrations. Can be used for both API and PubSub. Refer to IntegrationRequest schema for details.",
+    description="List all integrations. Can be used for API. Refer to IntegrationRequest schema for details.",
 )
 async def get_all_integrations() -> Response:
     """Fetch and return a list of all integrations.
@@ -109,20 +139,38 @@ async def get_all_integrations() -> Response:
             code=status.HTTP_200_OK,
         ).to_http_response()
     except NovuApiClientException:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to list integrations") from None
+        return ErrorResponse(
+            code=status.HTTP_400_BAD_REQUEST,
+            type="BadRequest",
+            message="Failed to list integrations",
+        )
     except Exception as err:
         logger.exception(f"Unexpected error while listing integrations. {err}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected error while listing integrations.",
-        ) from None
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            type="InternalServerError",
+            message="Unexpected error while listing integrations.",
+        )
 
 
 @integration_router.put(
     "/{integration_id}",
-    response_model=IntegrationResponse,
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": IntegrationResponse,
+            "description": "Successfully updated integration",
+        },
+    },
     status_code=status.HTTP_200_OK,
-    description="Updates the specified integration. Can be used for both API and PubSub. Refer to IntegrationRequest schema for details.",
+    description="Updates the specified integration. Can be used for API. Refer to IntegrationRequest schema for details.",
 )
 async def update_integration(integration_id: str, integration: IntegrationRequest) -> Response:
     """Update an existing integration in the Novu system.
@@ -133,9 +181,6 @@ async def update_integration(integration_id: str, integration: IntegrationReques
 
     Returns:
         Response: A response containing the updated integration information.
-
-    Raises:
-        HTTPException: If the operation fails due to a client or server error.
     """
     logger.debug("Received request to update integration")
 
@@ -149,22 +194,38 @@ async def update_integration(integration_id: str, integration: IntegrationReques
             **asdict(db_integration),
         ).to_http_response()
     except NovuApiClientException:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to update the integration."
-        ) from None
+        return ErrorResponse(
+            code=status.HTTP_400_BAD_REQUEST,
+            type="BadRequest",
+            message="Failed to update the integration.",
+        )
     except Exception as err:
         logger.exception(f"Unexpected error occurred while updating integration. {err}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred while trying to update the integration.",
-        ) from None
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            type="InternalServerError",
+            message="An unexpected error occurred while trying to update the integration.",
+        )
 
 
 @integration_router.delete(
     "/{integration_id}",
-    response_model=SuccessResponse,
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Successfully deleted integration",
+        },
+    },
     status_code=status.HTTP_200_OK,
-    description="Deletes the specified integration. Can be used for both API and PubSub. Refer to IntegrationRequest schema for details.",
+    description="Deletes the specified integration. Can be used for API. Refer to IntegrationRequest schema for details.",
 )
 async def delete_integration(integration_id: str) -> Response:
     """Delete an integration from the Novu system.
@@ -174,9 +235,6 @@ async def delete_integration(integration_id: str) -> Response:
 
     Returns:
         Response: A response indicating the success of the operation.
-
-    Raises:
-        HTTPException: If the operation fails due to a client or server error.
     """
     logger.debug("Received request to delete integration.")
 
@@ -189,22 +247,38 @@ async def delete_integration(integration_id: str) -> Response:
             code=status.HTTP_200_OK,
         ).to_http_response()
     except NovuApiClientException:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to delete the integration."
-        ) from None
+        return ErrorResponse(
+            code=status.HTTP_400_BAD_REQUEST,
+            type="BadRequest",
+            message="Failed to delete the integration.",
+        )
     except Exception as err:
         logger.exception(f"Unexpected error occurred while deleting integration. {err}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred while trying to delete the integration.",
-        ) from None
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            type="InternalServerError",
+            message="An unexpected error occurred while trying to delete the integration.",
+        )
 
 
 @integration_router.post(
     "/{integration_id}/set-primary",
-    response_model=IntegrationResponse,
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": IntegrationResponse,
+            "description": "Successfully set integration as primary",
+        },
+    },
     status_code=status.HTTP_200_OK,
-    description="Sets the specified integration as primary. Can be used for both API and PubSub. Refer to IntegrationRequest schema for details.",
+    description="Sets the specified integration as primary. Can be used for API. Refer to IntegrationRequest schema for details.",
 )
 async def set_integration_as_primary(integration_id: str) -> Response:
     """Set an integration as primary in the Novu system.
@@ -214,9 +288,6 @@ async def set_integration_as_primary(integration_id: str) -> Response:
 
     Returns:
         Response: A response indicating the success of the operation, including integration details.
-
-    Raises:
-        HTTPException: If the operation fails due to a client or server error.
     """
     logger.debug(f"Received request to set integration {integration_id} as primary.")
 
@@ -230,12 +301,15 @@ async def set_integration_as_primary(integration_id: str) -> Response:
             **db_integration,
         ).to_http_response()
     except NovuApiClientException:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to set integration as primary"
-        ) from None
+        return ErrorResponse(
+            code=status.HTTP_400_BAD_REQUEST,
+            type="BadRequest",
+            message="Failed to set integration as primary",
+        )
     except Exception as err:
         logger.exception(f"Unexpected error occurred while setting integration as primary. {err}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred while trying to set the integration as primary.",
-        ) from None
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            type="InternalServerError",
+            message="An unexpected error occurred while trying to set the integration as primary.",
+        )
