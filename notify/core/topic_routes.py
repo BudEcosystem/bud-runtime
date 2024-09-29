@@ -20,11 +20,10 @@ from dataclasses import asdict
 from typing import Optional
 
 from fastapi import APIRouter, Response, status
-from fastapi.exceptions import HTTPException
 
 from notify.commons import logging
 from notify.commons.exceptions import NovuApiClientException
-from notify.commons.schemas import SuccessResponse
+from notify.commons.schemas import ErrorResponse, SuccessResponse
 
 from .schemas import (
     PaginatedTopicResponse,
@@ -45,9 +44,22 @@ topic_router = APIRouter(prefix="/topics", tags=["Topics"])
 
 @topic_router.post(
     "",
-    response_model=TopicResponse,
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_201_CREATED: {
+            "model": TopicResponse,
+            "description": "Successfully created topic",
+        },
+    },
     status_code=status.HTTP_201_CREATED,
-    description="Create a new topic. Can be used for both API and PubSub. Refer to TopicRequest schema for details.",
+    description="Create a new topic. Can be used for API. Refer to TopicRequest schema for details.",
 )
 async def create_topic(topic: TopicRequest) -> Response:
     """Create a new topic.
@@ -57,10 +69,6 @@ async def create_topic(topic: TopicRequest) -> Response:
 
     Returns:
         Response: The HTTP response containing the created topic details.
-
-    Raises:
-        HTTPException: If the topic creation fails due to a Novu API client error (400 Bad Request).
-        HTTPException: If an unexpected error occurs during the topic creation process (500 Internal Server Error).
     """
     logger.debug("Received request to create a new topic")
 
@@ -74,20 +82,38 @@ async def create_topic(topic: TopicRequest) -> Response:
             **asdict(db_topic),
         ).to_http_response()
     except NovuApiClientException:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to create topic") from None
+        return ErrorResponse(
+            code=status.HTTP_400_BAD_REQUEST,
+            type="BadRequest",
+            message="Failed to create topic",
+        )
     except Exception as err:
         logger.exception(f"Unexpected error occurred while creating topic. {err}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected error occurred while creating topic.",
-        ) from None
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            type="InternalServerError",
+            message="Unexpected error occurred while creating topic.",
+        )
 
 
 @topic_router.get(
     "",
-    response_model=PaginatedTopicResponse,
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": PaginatedTopicResponse,
+            "description": "Successfully listed topics",
+        },
+    },
     status_code=status.HTTP_200_OK,
-    description="List all topics. Can be used for both API and PubSub. Refer to TopicRequest schema for details.",
+    description="List all topics. Can be used for API. Refer to TopicRequest schema for details.",
 )
 async def get_all_topics(page: int = 0, limit: int = 10, key: Optional[str] = None) -> Response:
     """Retrieve a list of all topics with pagination.
@@ -99,10 +125,6 @@ async def get_all_topics(page: int = 0, limit: int = 10, key: Optional[str] = No
 
     Returns:
         Response: The HTTP response containing the list of topics and pagination details.
-
-    Raises:
-        HTTPException: If the topic listing fails due to a Novu API client error (400 Bad Request).
-        HTTPException: If an unexpected error occurs during the topic listing process (500 Internal Server Error).
     """
     logger.debug("Received request to list all topics")
 
@@ -118,20 +140,38 @@ async def get_all_topics(page: int = 0, limit: int = 10, key: Optional[str] = No
             limit=limit,
         ).to_http_response()
     except NovuApiClientException:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to list topics") from None
+        return ErrorResponse(
+            code=status.HTTP_400_BAD_REQUEST,
+            type="BadRequest",
+            message="Failed to list topics",
+        )
     except Exception as err:
         logger.exception(f"Unexpected error while listing topics. {err}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected error while listing topics.",
-        ) from None
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            type="InternalServerError",
+            message="Unexpected error while listing topics.",
+        )
 
 
 @topic_router.get(
     "/{key}",
-    response_model=TopicResponse,
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": TopicResponse,
+            "description": "Successfully retrieved topic",
+        },
+    },
     status_code=status.HTTP_200_OK,
-    description="Retrieves the specified topic. Can be used for both API and PubSub. Refer to TopicRequest schema for details.",
+    description="Retrieves the specified topic. Can be used for API. Refer to TopicRequest schema for details.",
 )
 async def retrieve_topic(
     key: str,
@@ -143,10 +183,6 @@ async def retrieve_topic(
 
     Returns:
         Response: The HTTP response containing the details of the retrieved topic.
-
-    Raises:
-        HTTPException: If the topic retrieval fails due to a Novu API client error (400 Bad Request).
-        HTTPException: If an unexpected error occurs during the topic retrieval process (500 Internal Server Error).
     """
     logger.debug("Received request to retrieve topic")
 
@@ -160,20 +196,38 @@ async def retrieve_topic(
             **asdict(db_topic),
         ).to_http_response()
     except NovuApiClientException:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to retrieve topic") from None
+        return ErrorResponse(
+            code=status.HTTP_400_BAD_REQUEST,
+            type="BadRequest",
+            message="Failed to retrieve topic",
+        )
     except Exception as err:
         logger.exception(f"Unexpected error while retrieving topic. {err}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected error while retrieving topic.",
-        ) from None
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            type="InternalServerError",
+            message="Unexpected error while retrieving topic.",
+        )
 
 
 @topic_router.put(
     "/{key}",
-    response_model=TopicResponse,
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": TopicResponse,
+            "description": "Successfully updated topic",
+        },
+    },
     status_code=status.HTTP_200_OK,
-    description="Updates the specified topic. Can be used for both API and PubSub. Refer to TopicRequest schema for details.",
+    description="Updates the specified topic. Can be used for API. Refer to TopicRequest schema for details.",
     tags=["Topics"],
 )
 async def update_topic(key: str, topic: TopicUpdateRequest) -> Response:
@@ -185,10 +239,6 @@ async def update_topic(key: str, topic: TopicUpdateRequest) -> Response:
 
     Returns:
         Response: The HTTP response containing the details of the updated topic.
-
-    Raises:
-        HTTPException: If the topic update fails due to a Novu API client error (400 Bad Request).
-        HTTPException: If an unexpected error occurs during the topic update process (500 Internal Server Error).
     """
     logger.debug("Received request to update topic")
 
@@ -202,20 +252,38 @@ async def update_topic(key: str, topic: TopicUpdateRequest) -> Response:
             **asdict(db_topic),
         ).to_http_response()
     except NovuApiClientException:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to update the topic.") from None
+        return ErrorResponse(
+            code=status.HTTP_400_BAD_REQUEST,
+            type="BadRequest",
+            message="Failed to update the topic.",
+        )
     except Exception as err:
         logger.exception(f"Unexpected error occurred while updating topic. {err}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred while trying to update the topic.",
-        ) from None
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            type="InternalServerError",
+            message="An unexpected error occurred while trying to update the topic.",
+        )
 
 
 @topic_router.delete(
     "/{key}",
-    response_model=SuccessResponse,
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Successfully deleted topic",
+        },
+    },
     status_code=status.HTTP_200_OK,
-    description="Deletes the specified topic. Can be used for both API and PubSub. Refer to TopicRequest schema for details.",
+    description="Deletes the specified topic. Can be used for API. Refer to TopicRequest schema for details.",
     tags=["Topics"],
 )
 async def delete_topic(key: str) -> Response:
@@ -226,10 +294,6 @@ async def delete_topic(key: str) -> Response:
 
     Returns:
         Response: The HTTP response confirming the deletion of the topic.
-
-    Raises:
-        HTTPException: If the topic deletion fails due to a Novu API client error (400 Bad Request).
-        HTTPException: If an unexpected error occurs during the topic deletion process (500 Internal Server Error).
     """
     logger.debug("Received request to delete topic.")
 
@@ -242,20 +306,38 @@ async def delete_topic(key: str) -> Response:
             code=status.HTTP_200_OK,
         ).to_http_response()
     except NovuApiClientException:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to delete the topic.") from None
+        return ErrorResponse(
+            code=status.HTTP_400_BAD_REQUEST,
+            type="BadRequest",
+            message="Failed to delete the topic.",
+        )
     except Exception as err:
         logger.exception(f"Unexpected error occurred while deleting topic. {err}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred while trying to delete the topic.",
-        ) from None
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            type="InternalServerError",
+            message="An unexpected error occurred while trying to delete the topic.",
+        )
 
 
 @topic_router.post(
     "{key}/add-subscribers",
-    response_model=TopicAddSubscriberResponse,
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": TopicAddSubscriberResponse,
+            "description": "Successfully added subscriber to topic",
+        },
+    },
     status_code=status.HTTP_200_OK,
-    description="Adds a subscriber to the specified topic. Can be used for both API and PubSub. Refer to TopicRequest schema for details.",
+    description="Adds a subscriber to the specified topic. Can be used for API. Refer to TopicRequest schema for details.",
 )
 async def add_subscriber_to_topic(key: str, topic: TopicSubscriberRequest) -> Response:
     """Add subscribers to a specific topic identified by its key.
@@ -267,10 +349,6 @@ async def add_subscriber_to_topic(key: str, topic: TopicSubscriberRequest) -> Re
     Returns:
         Response: The HTTP response indicating the result of adding subscribers to the topic, including
                   lists of successfully added and failed subscribers.
-
-    Raises:
-        HTTPException: If adding subscribers fails due to a Novu API client error (400 Bad Request).
-        HTTPException: If an unexpected error occurs during the process of adding subscribers (500 Internal Server Error).
     """
     logger.debug("Received request to add subscribers to topic")
 
@@ -285,22 +363,38 @@ async def add_subscriber_to_topic(key: str, topic: TopicSubscriberRequest) -> Re
             failed=response["failed"],
         ).to_http_response()
     except NovuApiClientException:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to add subscribers to topic"
-        ) from None
+        return ErrorResponse(
+            code=status.HTTP_400_BAD_REQUEST,
+            type="BadRequest",
+            message="Failed to add subscribers to topic",
+        )
     except Exception as err:
         logger.exception(f"Unexpected error occurred while adding subscribers to topic. {err}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected error occurred while adding subscribers to topic.",
-        ) from None
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            type="InternalServerError",
+            message="Unexpected error occurred while adding subscribers to topic.",
+        )
 
 
 @topic_router.post(
     "{key}/remove-subscribers",
-    response_model=SuccessResponse,
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Successfully removed subscriber from topic",
+        },
+    },
     status_code=status.HTTP_200_OK,
-    description="Removes a subscriber from the specified topic. Can be used for both API and PubSub. Refer to TopicRequest schema for details.",
+    description="Removes a subscriber from the specified topic. Can be used for API. Refer to TopicRequest schema for details.",
 )
 async def remove_subscriber_from_topic(key: str, topic: TopicSubscriberRequest) -> Response:
     """Remove subscribers from a specific topic identified by its key.
@@ -311,10 +405,6 @@ async def remove_subscriber_from_topic(key: str, topic: TopicSubscriberRequest) 
 
     Returns:
         Response: The HTTP response indicating the result of removing subscribers from the topic.
-
-    Raises:
-        HTTPException: If removing subscribers fails due to a Novu API client error (400 Bad Request).
-        HTTPException: If an unexpected error occurs during the process of removing subscribers (500 Internal Server Error).
     """
     logger.debug("Received request to remove subscribers from topic")
 
@@ -323,22 +413,38 @@ async def remove_subscriber_from_topic(key: str, topic: TopicSubscriberRequest) 
         logger.info("Subscriber removed from topic successfully")
         return SuccessResponse(object="info", message="", code=status.HTTP_200_OK).to_http_response()
     except NovuApiClientException:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to remove subscribers from topic"
-        ) from None
+        return ErrorResponse(
+            code=status.HTTP_400_BAD_REQUEST,
+            type="BadRequest",
+            message="Failed to remove subscribers from topic",
+        )
     except Exception as err:
         logger.exception(f"Unexpected error occurred while removing subscribers from topic. {err}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected error occurred while removing subscribers from topic.",
-        ) from None
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            type="InternalServerError",
+            message="Unexpected error occurred while removing subscribers from topic.",
+        )
 
 
 @topic_router.get(
     "/{key}/subscribers/{subscriber_id}",
-    response_model=TopicCheckSubscriberResponse,
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": TopicCheckSubscriberResponse,
+            "description": "Successfully checked subscriber status in topic",
+        },
+    },
     status_code=status.HTTP_200_OK,
-    description="Checks if a subscriber is subscribed to the specified topic. Can be used for both API and PubSub. Refer to TopicRequest schema for details.",
+    description="Checks if a subscriber is subscribed to the specified topic. Can be used for API. Refer to TopicRequest schema for details.",
 )
 async def check_subscriber_in_topic(
     key: str,
@@ -352,10 +458,6 @@ async def check_subscriber_in_topic(
 
     Returns:
         Response: The HTTP response indicating whether the subscriber is subscribed to the topic.
-
-    Raises:
-        HTTPException: If checking the subscriber status fails due to a Novu API client error (400 Bad Request).
-        HTTPException: If an unexpected error occurs during the check process (500 Internal Server Error).
     """
     logger.debug("Received request to check if subscriber is subscribed to topic")
 
@@ -366,12 +468,15 @@ async def check_subscriber_in_topic(
             object="info", message="", code=status.HTTP_200_OK, is_subscribed=is_subscribed
         ).to_http_response()
     except NovuApiClientException:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to check if subscriber is subscribed"
-        ) from None
+        return ErrorResponse(
+            code=status.HTTP_400_BAD_REQUEST,
+            type="BadRequest",
+            message="Failed to check if subscriber is subscribed",
+        )
     except Exception as err:
         logger.exception(f"Unexpected error while checking if subscriber is subscribed. {err}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected error while checking if subscriber is subscribed.",
-        ) from None
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            type="InternalServerError",
+            message="Unexpected error while checking if subscriber is subscribed.",
+        )
