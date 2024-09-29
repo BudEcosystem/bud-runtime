@@ -58,6 +58,8 @@ class NotificationRequest(CloudEventBase):
             raise ValueError("subscriber_ids is required for event notifications")
         if self.notification_type == NotificationType.TOPIC and not self.topic_keys:
             raise ValueError("topic_keys is required for topic notifications")
+        if self.notification_type == NotificationType.BROADCAST and (self.subscriber_ids or self.topic_keys):
+            raise ValueError("subscriber_ids and topic_keys are not allowed for broadcast notifications")
         return self
 
 

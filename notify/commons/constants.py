@@ -205,7 +205,9 @@ class NotificationType(Enum):
     Attributes:
         EVENT: Notification triggered by an event.
         TOPIC: Notification related to a specific topic.
+        BROADCAST: Notification triggered by a broadcast.
     """
 
     EVENT = "event"
-    TOPIC = "topic"  # TODO: add broadcast, bulk event triggering
+    TOPIC = "topic"
+    BROADCAST = "broadcast"  # TODO: bulk event triggering
