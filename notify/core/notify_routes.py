@@ -35,7 +35,7 @@ notify_router = APIRouter()
 @notify_router.post(
     "/notification",
     response_model=NotificationResponse,
-    status_code=status.HTTP_201_CREATED,
+    status_code=status.HTTP_200_OK,
     description="Triggers a notification. Can be used for both API and PubSub. Refer to NotificationRequest schema for details.",
     tags=["Notifications"],
 )

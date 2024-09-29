@@ -29,6 +29,7 @@ from novu.api import (
     NotificationGroupApi,
     NotificationTemplateApi,
     SubscriberApi,
+    TopicApi,
 )
 from novu.dto.change import ChangeDto
 from novu.dto.event import EventDto
@@ -40,6 +41,7 @@ from novu.dto.notification_template import (
     NotificationTemplateFormDto,
 )
 from novu.dto.subscriber import BulkResultSubscriberDto, SubscriberDto
+from novu.dto.topic import PaginatedTopicDto, TopicDto, TriggerTopicDto
 from requests.exceptions import HTTPError
 
 from notify.commons import logging
@@ -958,6 +960,7 @@ class NovuService(NovuBaseApiClient):
         name: str,
         recipients: Union[str, List[str]],
         payload: Optional[Dict] = None,
+        actor: Optional[str] = None,
         api_key: Optional[str] = None,
         environment: str = "dev",
     ) -> EventDto:
@@ -984,9 +987,297 @@ class NovuService(NovuBaseApiClient):
 
         try:
             event_data = EventApi(self.base_url, api_key=novu_api_key).trigger(
-                name=name, recipients=recipients, payload=payload
+                name=name, recipients=recipients, payload=payload, actor=actor
             )
             return event_data
         except HTTPError as err:
             error_message = err.response.json().get("message", "Unknown error occurred")
             raise NovuApiClientException(f"Failed to trigger event: {error_message}") from None
+
+    @_handle_exception
+    async def trigger_topic_event(
+        self,
+        name: str,
+        topic_keys: Union[str, List[str]],
+        payload: Optional[Dict] = None,
+        actor: Optional[str] = None,
+        api_key: Optional[str] = None,
+        environment: str = "dev",
+    ) -> EventDto:
+        """Triggers a notification topic event in Novu based on the provided notification data.
+
+        This method sends a notification event to Novu using the specified notification name,
+        recipients, and payload.
+
+        Args:
+            notification_data (NotificationRequest): The request object containing the notification
+                name, recipients, and payload data.
+
+        Returns:
+            EventDto: An object containing details about the triggered event, including its status.
+
+        Raises:
+            NovuApiClientException: If there is an issue with triggering the event via Novu.
+        """
+        novu_api_key = await self._resolve_api_key(api_key=api_key, environment=environment)
+
+        # Set the payload to an empty dictionary if it's None
+        if payload is None:
+            payload = {}
+
+        # Convert topic_keys to a list of topic trigger dataclass objects
+        topics = [
+            TriggerTopicDto(topic_key=key, type="Topic")
+            for key in (topic_keys if isinstance(topic_keys, list) else [topic_keys])
+        ]
+
+        try:
+            event_data = EventApi(self.base_url, api_key=novu_api_key).trigger_topic(
+                name=name, topics=topics, payload=payload, actor=actor
+            )
+            return event_data
+        except HTTPError as err:
+            error_message = err.response.json().get("message", "Unknown error occurred")
+            raise NovuApiClientException(f"Failed to trigger topic event: {error_message}") from None
+
+    @_handle_exception
+    async def create_topic(
+        self,
+        topic_key: str,
+        topic_name: str,
+        api_key: Optional[str] = None,
+        environment: str = "dev",
+    ) -> TopicDto:
+        """Create a new topic in the system.
+
+        Args:
+            topic_key (str): The unique key identifying the topic.
+            topic_name (str): The display name for the topic.
+            api_key (Optional[str], optional): The API key for authentication. Defaults to None.
+            environment (str, optional): The environment to use ("dev" or "prod"). Defaults to "dev".
+
+        Returns:
+            TopicDto: The created topic object.
+
+        Raises:
+            NovuApiClientException: If the topic creation fails.
+        """
+        novu_api_key = await self._resolve_api_key(api_key=api_key, environment=environment)
+        try:
+            response = TopicApi(self.base_url, api_key=novu_api_key).create(key=topic_key, name=topic_name)
+            return response
+        except HTTPError as err:
+            error_message = err.response.json().get("message", "Unknown error occurred")
+            raise NovuApiClientException(f"Failed to create topic: {error_message}") from None
+
+    @_handle_exception
+    async def get_all_topics(
+        self,
+        page: int = 0,
+        limit: int = 10,
+        topic_key: Optional[str] = None,
+        api_key: Optional[str] = None,
+        environment: str = "dev",
+    ) -> PaginatedTopicDto:
+        """Retrieve a paginated list of topics.
+
+        Args:
+            page (int, optional): The page number to retrieve. Defaults to 0.
+            limit (int, optional): The number of topics per page. Defaults to 10.
+            topic_key (Optional[str], optional): A filter for the topic key. Defaults to None.
+            api_key (Optional[str], optional): The API key for authentication. Defaults to None.
+            environment (str, optional): The environment to use ("dev" or "prod"). Defaults to "dev".
+
+        Returns:
+            PaginatedTopicDto: A paginated list of topics.
+
+        Raises:
+            NovuApiClientException: If listing topics fails.
+        """
+        novu_api_key = await self._resolve_api_key(api_key=api_key, environment=environment)
+        try:
+            response = TopicApi(self.base_url, api_key=novu_api_key).list(page, limit, topic_key)
+            return response
+        except HTTPError as err:
+            error_message = err.response.json().get("message", "Unknown error occurred")
+            raise NovuApiClientException(f"Failed to list topics: {error_message}") from None
+
+    @_handle_exception
+    async def retrieve_topic(
+        self,
+        topic_key: str,
+        api_key: Optional[str] = None,
+        environment: str = "dev",
+    ) -> TopicDto:
+        """Retrieve a specific topic by its key.
+
+        Args:
+            topic_key (str): The unique key identifying the topic.
+            api_key (Optional[str], optional): The API key for authentication. Defaults to None.
+            environment (str, optional): The environment to use ("dev" or "prod"). Defaults to "dev".
+
+        Returns:
+            TopicDto: The retrieved topic object.
+
+        Raises:
+            NovuApiClientException: If retrieving the topic fails.
+        """
+        novu_api_key = await self._resolve_api_key(api_key=api_key, environment=environment)
+        try:
+            response = TopicApi(self.base_url, api_key=novu_api_key).get(topic_key)
+            return response
+        except HTTPError as err:
+            error_message = err.response.json().get("message", "Unknown error occurred")
+            raise NovuApiClientException(f"Failed to retrieve topic: {error_message}") from None
+
+    @_handle_exception
+    async def update_topic(
+        self,
+        topic_key: str,
+        topic_name: str,
+        api_key: Optional[str] = None,
+        environment: str = "dev",
+    ) -> TopicDto:
+        """Update a topic's name by its key.
+
+        Args:
+            topic_key (str): The unique key identifying the topic.
+            topic_name (str): The new name for the topic.
+            api_key (Optional[str], optional): The API key for authentication. Defaults to None.
+            environment (str, optional): The environment to use ("dev" or "prod"). Defaults to "dev".
+
+        Returns:
+            TopicDto: The updated topic object.
+
+        Raises:
+            NovuApiClientException: If updating the topic fails.
+        """
+        novu_api_key = await self._resolve_api_key(api_key=api_key, environment=environment)
+        try:
+            response = TopicApi(self.base_url, api_key=novu_api_key).rename(topic_key, topic_name)
+            return response
+        except HTTPError as err:
+            error_message = err.response.json().get("message", "Unknown error occurred")
+            raise NovuApiClientException(f"Failed to update topic: {error_message}") from None
+
+    @_handle_exception
+    async def delete_topic(
+        self,
+        topic_key: str,
+        api_key: Optional[str] = None,
+        environment: str = "dev",
+    ) -> None:
+        """Delete a topic by its key.
+
+        Args:
+            topic_key (str): The unique key identifying the topic.
+            api_key (Optional[str], optional): The API key for authentication. Defaults to None.
+            environment (str, optional): The environment to use ("dev" or "prod"). Defaults to "dev".
+
+        Returns:
+            None: If the topic is successfully deleted.
+
+        Raises:
+            NovuApiClientException: If deleting the topic fails.
+        """
+        novu_api_key = await self._resolve_api_key(api_key=api_key, environment=environment)
+        try:
+            response = TopicApi(self.base_url, api_key=novu_api_key).delete(topic_key)
+            return response
+        except HTTPError as err:
+            error_message = err.response.json().get("message", "Unknown error occurred")
+            raise NovuApiClientException(f"Failed to delete topic: {error_message}") from None
+
+    @_handle_exception
+    async def add_subscribers_to_topic(
+        self,
+        topic_key: str,
+        subscribers: Union[list[str], str],
+        api_key: Optional[str] = None,
+        environment: str = "dev",
+    ) -> Tuple[List[str], Dict[str, List[str]]]:
+        """Add subscribers to a specific topic.
+
+        Args:
+            topic_key (str): The unique key identifying the topic.
+            subscribers (Union[list[str], str]): The subscribers to be added, either as a list or a single string.
+            api_key (Optional[str], optional): The API key for authentication. Defaults to None.
+            environment (str, optional): The environment to use ("dev" or "prod"). Defaults to "dev".
+
+        Returns:
+            Tuple[List[str], Dict[str, List[str]]]:
+            First element returned is a list of succeeded subscriptions.
+
+            Second element returned is a dict of failed subscriptions
+            (key the reason and value contains a list of reference which fail for the reason).
+
+        Raises:
+            NovuApiClientException: If adding subscribers to the topic fails.
+        """
+        novu_api_key = await self._resolve_api_key(api_key=api_key, environment=environment)
+        try:
+            response = TopicApi(self.base_url, api_key=novu_api_key).subscribe(topic_key, subscribers)
+            return response
+        except HTTPError as err:
+            error_message = err.response.json().get("message", "Unknown error occurred")
+            raise NovuApiClientException(f"Failed to add subscribers to topic: {error_message}") from None
+
+    @_handle_exception
+    async def remove_subscribers_from_topic(
+        self,
+        topic_key: str,
+        subscribers: Union[list[str], str],
+        api_key: Optional[str] = None,
+        environment: str = "dev",
+    ) -> None:
+        """Remove subscribers from a specific topic.
+
+        Args:
+            topic_key (str): The unique key identifying the topic.
+            subscribers (Union[list[str], str]): The subscribers to be removed, either as a list or a single string.
+            api_key (Optional[str], optional): The API key for authentication. Defaults to None.
+            environment (str, optional): The environment to use ("dev" or "prod"). Defaults to "dev".
+
+        Returns:
+            None: If the subscribers are successfully removed from the topic.
+
+        Raises:
+            NovuApiClientException: If removing subscribers from the topic fails.
+        """
+        novu_api_key = await self._resolve_api_key(api_key=api_key, environment=environment)
+        try:
+            response = TopicApi(self.base_url, api_key=novu_api_key).unsubscribe(topic_key, subscribers)
+            return response
+        except HTTPError as err:
+            error_message = err.response.json().get("message", "Unknown error occurred")
+            raise NovuApiClientException(f"Failed to remove subscribers from topic: {error_message}") from None
+
+    @_handle_exception
+    async def check_subscribers_in_topic(
+        self,
+        topic_key: str,
+        subscriber_id: str,
+        api_key: Optional[str] = None,
+        environment: str = "dev",
+    ) -> bool:
+        """Check if a specific subscriber is subscribed to a topic.
+
+        Args:
+            topic_key (str): The unique key identifying the topic.
+            subscriber_id (str): The unique ID of the subscriber.
+            api_key (Optional[str], optional): The API key for authentication. Defaults to None.
+            environment (str, optional): The environment to use ("dev" or "prod"). Defaults to "dev".
+
+        Returns:
+            bool: True if the subscriber is subscribed to the topic, False otherwise.
+
+        Raises:
+            NovuApiClientException: If checking subscriber status fails.
+        """
+        novu_api_key = await self._resolve_api_key(api_key=api_key, environment=environment)
+        try:
+            response = TopicApi(self.base_url, api_key=novu_api_key).subscribed(topic_key, subscriber_id)
+            return response
+        except HTTPError as err:
+            error_message = err.response.json().get("message", "Unknown error occurred")
+            raise NovuApiClientException(f"Failed to check subscribers in topic: {error_message}") from None

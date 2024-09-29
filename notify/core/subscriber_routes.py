@@ -91,7 +91,7 @@ async def create_subscriber(subscriber: SubscriberRequest) -> Response:
 
 @subscriber_router.post(
     "/bulk-create",
-    response_model=SubscriberResponse,
+    response_model=SubscriberBulkCreateResponse,
     status_code=status.HTTP_200_OK,
     description="Create bulk subscribers. Can be used for both API and PubSub. Refer to SubscriberRequest schema for details.",
 )
@@ -142,7 +142,6 @@ async def create_bulk_subscribers(subscribers: List[SubscriberRequest]) -> Respo
     response_model=PaginatedSubscriberResponse,
     status_code=status.HTTP_200_OK,
     description="List all subscribers. Can be used for both API and PubSub. Refer to SubscriberRequest schema for details.",
-    tags=["Subscribers"],
 )
 async def get_all_subscribers(page: int = 0, limit: int = 10) -> Response:
     """Retrieve a list of all subscribers from the Novu system.
@@ -192,7 +191,6 @@ async def get_all_subscribers(page: int = 0, limit: int = 10) -> Response:
     response_model=SubscriberResponse,
     status_code=status.HTTP_200_OK,
     description="Retrieves the specified subscriber. Can be used for both API and PubSub. Refer to SubscriberRequest schema for details.",
-    tags=["Subscribers"],
 )
 async def retrieve_subscriber(
     subscriber_id: str,
@@ -240,7 +238,6 @@ async def retrieve_subscriber(
     response_model=SubscriberResponse,
     status_code=status.HTTP_200_OK,
     description="Updates the specified subscriber. Can be used for both API and PubSub. Refer to SubscriberRequest schema for details.",
-    tags=["Subscribers"],
 )
 async def update_subscriber(subscriber_id: str, subscriber: SubscriberUpdateRequest) -> Response:
     """Update the details of a specific subscriber in the Novu system.
@@ -284,11 +281,10 @@ async def update_subscriber(subscriber_id: str, subscriber: SubscriberUpdateRequ
 
 
 @subscriber_router.delete(
-    "/s{subscriber_id}",
+    "/{subscriber_id}",
     response_model=SuccessResponse,
     status_code=status.HTTP_200_OK,
     description="Deletes the specified subscriber. Can be used for both API and PubSub. Refer to SubscriberRequest schema for details.",
-    tags=["Subscribers"],
 )
 async def delete_subscriber(subscriber_id: str) -> Response:
     """Delete a specific subscriber from the Novu system.

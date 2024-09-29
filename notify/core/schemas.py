@@ -19,8 +19,10 @@
 
 from typing import List, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+from typing_extensions import Self
 
+from notify.commons.constants import NotificationType
 from notify.commons.schemas import (
     CloudEventBase,
     PaginatedSuccessResponse,
@@ -28,12 +30,35 @@ from notify.commons.schemas import (
 )
 
 
+# Schemas related to notifications
+
+
 class NotificationRequest(CloudEventBase):
     """Represents a notification request."""
 
-    name: str
-    recipients: Union[str, List[str]]
-    payload: dict
+    notification_type: NotificationType = NotificationType.EVENT
+    name: str  # Workflow identifier
+    subscriber_ids: Optional[Union[str, List[str]]] = None
+    payload: dict = Field(default_factory=dict)
+    actor: Optional[str] = None
+    topic_keys: Optional[Union[str, List[str]]] = None
+
+    @model_validator(mode="after")
+    def check_required_fields(self) -> Self:
+        """Check if required fields are present in the request.
+
+        Raises:
+            ValueError: If `subscriber_ids` is not present for event notifications.
+            ValueError: If `topic_keys` is not present for topic notifications.
+
+        Returns:
+            Self: The instance of the class.
+        """
+        if self.notification_type == NotificationType.EVENT and not self.subscriber_ids:
+            raise ValueError("subscriber_ids is required for event notifications")
+        if self.notification_type == NotificationType.TOPIC and not self.topic_keys:
+            raise ValueError("topic_keys is required for topic notifications")
+        return self
 
 
 class NotificationResponse(SuccessResponse):
@@ -42,6 +67,9 @@ class NotificationResponse(SuccessResponse):
     acknowledged: bool
     status: str
     transaction_id: str
+
+
+# Schemas related to subscribers
 
 
 class SubscriberRequest(BaseModel):
@@ -125,3 +153,70 @@ class SubscriberResponse(SuccessResponse):
     is_online: Optional[bool] = Field(None, alias="isOnline")
     last_online_at: Optional[str] = Field(None, alias="lastOnlineAt")
     data: Optional[dict] = None
+
+
+# Schemas related to topics
+
+
+class TopicRequest(BaseModel):
+    """Represents a topic request."""
+
+    topic_name: str
+    topic_key: str
+
+
+class TopicUpdateRequest(BaseModel):
+    """Represents a topic update request."""
+
+    topic_name: str
+
+
+class TopicSubscriberRequest(BaseModel):
+    """Represents a topic update request."""
+
+    subscribers: Union[list[str], str]
+
+
+class TopicBase(BaseModel):
+    """Represents a topic base response."""
+
+    key: str
+    name: Optional[str] = None
+    id: Optional[str] = Field(None, alias="_id")
+    subscribers: Optional[List[str]] = None
+
+
+class PaginatedTopicResponse(PaginatedSuccessResponse):
+    """Represents a topic paginated response."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    topics: list[TopicBase]
+
+
+class TopicResponse(SuccessResponse):
+    """Represents a topic list response."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    key: str
+    name: Optional[str] = None
+    id: Optional[str] = Field(None, alias="_id")
+    subscribers: Optional[List[str]] = None
+
+
+class TopicCheckSubscriberResponse(SuccessResponse):
+    """Represents a topic check subscriber response."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    is_subscribed: bool
+
+
+class TopicAddSubscriberResponse(SuccessResponse):
+    """Represents a topic add subscriber response."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    success: list = Field(default_factory=list)
+    failed: list = Field(default_factory=list)

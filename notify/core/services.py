@@ -17,12 +17,15 @@
 
 """Implements core services and business logic that power the microservices, including key functionality and integrations."""
 
-from typing import Dict, List
+from dataclasses import asdict
+from typing import Dict, List, Optional
 
 from novu.dto.event import EventDto
 from novu.dto.subscriber import SubscriberDto
+from novu.dto.topic import TopicDto
 
 from notify.commons import logging
+from notify.commons.constants import NotificationType
 from notify.commons.exceptions import NovuApiClientException
 from notify.shared.novu_service import NovuService
 
@@ -31,6 +34,10 @@ from .schemas import (
     SubscriberBase,
     SubscriberRequest,
     SubscriberUpdateRequest,
+    TopicBase,
+    TopicRequest,
+    TopicSubscriberRequest,
+    TopicUpdateRequest,
 )
 
 
@@ -267,6 +274,184 @@ class SubscriberService(NovuService):
             raise
 
 
+class TopicService(NovuService):
+    """Implements topic services for managing topics."""
+
+    async def create_novu_topic(self, data: TopicRequest) -> TopicDto:
+        """Create a new topic in Novu.
+
+        Args:
+            data (TopicRequest): The topic request object containing `topic_key` and `topic_name`.
+
+        Returns:
+            TopicDto: The created topic details.
+
+        Raises:
+            NovuApiClientException: If the topic creation fails.
+        """
+        try:
+            db_topic = await self.create_topic(data.topic_key, data.topic_name, environment="prod")
+            logger.debug(f"Created Novu topic: {db_topic._id}")
+        except NovuApiClientException as err:
+            logger.error(err.message)
+            raise
+
+        return db_topic
+
+    async def list_novu_topics(self, page: int = 0, limit: int = 10, key: Optional[str] = None) -> List[TopicBase]:
+        """List topics in Novu.
+
+        Args:
+            page (int, optional): The page number for pagination. Defaults to 0.
+            limit (int, optional): The maximum number of topics to return. Defaults to 10.
+            key (Optional[str], optional): A filter key for the topics. Defaults to None.
+
+        Returns:
+            List[TopicBase]: A list of topic details.
+
+        Raises:
+            NovuApiClientException: If the topic listing fails.
+        """
+        try:
+            db_topics = await self.get_all_topics(page=page, limit=limit, topic_key=key, environment="prod")
+            logger.debug(f"Found {len(db_topics.data)} topics")
+        except NovuApiClientException as err:
+            logger.error(err.message)
+            raise
+
+        topics = [TopicBase(**asdict(topic)) for topic in db_topics.data]
+
+        return topics
+
+    async def retrieve_novu_topic(self, topic_key: str) -> TopicDto:
+        """Retrieve a topic from Novu by its key.
+
+        Args:
+            topic_key (str): The key of the topic to retrieve.
+
+        Returns:
+            TopicDto: The retrieved topic details.
+
+        Raises:
+            NovuApiClientException: If the topic retrieval fails.
+        """
+        try:
+            db_topic = await self.retrieve_topic(topic_key, environment="prod")
+            logger.debug("Retrieved topic successfully")
+            return db_topic
+        except NovuApiClientException as err:
+            logger.error(err.message)
+            raise
+
+    async def update_novu_topic(self, topic_key: str, data: TopicUpdateRequest) -> TopicDto:
+        """Update an existing topic in Novu.
+
+        Args:
+            topic_key (str): The key of the topic to update.
+            data (TopicUpdateRequest): The updated topic details.
+
+        Returns:
+            TopicDto: The updated topic details.
+
+        Raises:
+            NovuApiClientException: If the topic update fails.
+        """
+        try:
+            db_topic = await self.update_topic(topic_key, data.topic_name, environment="prod")
+            logger.debug("Updated topic successfully")
+            return db_topic
+        except NovuApiClientException as err:
+            logger.error(err.message)
+            raise
+
+    async def delete_novu_topic(self, topic_key: str) -> None:
+        """Delete a topic from Novu by its key.
+
+        Args:
+            topic_key (str): The key of the topic to delete.
+
+        Returns:
+            None
+
+        Raises:
+            NovuApiClientException: If the topic deletion fails.
+        """
+        try:
+            await self.delete_topic(topic_key, environment="prod")
+            logger.debug("Deleted topic successfully")
+        except NovuApiClientException as err:
+            logger.error(err.message)
+            raise
+
+    async def add_subscribers_to_novu_topic(self, topic_key: str, data: TopicSubscriberRequest) -> Dict[str, List]:
+        """Add subscribers to a Novu topic.
+
+        Args:
+            topic_key (str): The key of the topic to which subscribers will be added.
+            data (TopicSubscriberRequest): The subscribers to add to the topic.
+
+        Returns:
+            Dict[str, List]: A dictionary with lists of successful and failed subscriber IDs.
+
+        Raises:
+            NovuApiClientException: If adding subscribers to the topic fails.
+        """
+        try:
+            response = await self.add_subscribers_to_topic(topic_key, data.subscribers, environment="prod")
+            logger.debug("Added subscribers to topic successfully")
+            success_subscribers = response[0]
+            failed_subscribers = [sub_id for failure_reason in response[1].values() for sub_id in failure_reason]
+            return {
+                "success": success_subscribers,
+                "failed": failed_subscribers,
+            }
+        except NovuApiClientException as err:
+            logger.error(err.message)
+            raise
+
+    async def remove_subscribers_from_novu_topic(self, topic_key: str, data: TopicSubscriberRequest) -> None:
+        """Remove subscribers from a Novu topic.
+
+        Args:
+            topic_key (str): The key of the topic from which subscribers will be removed.
+            data (TopicSubscriberRequest): The subscribers to remove from the topic.
+
+        Returns:
+            None
+
+        Raises:
+            NovuApiClientException: If an error occurs while removing subscribers from the topic.
+        """
+        try:
+            await self.remove_subscribers_from_topic(topic_key, data.subscribers, environment="prod")
+            logger.debug("Removed subscribers from topic successfully")
+            return
+        except NovuApiClientException as err:
+            logger.error(err.message)
+            raise
+
+    async def check_subscriber_exists_in_novu_topic(self, topic_key: str, subscriber_id: str) -> bool:
+        """Check if a subscriber exists in a Novu topic.
+
+        Args:
+            topic_key (str): The key of the topic to check.
+            subscriber_id (str): The ID of the subscriber to check.
+
+        Returns:
+            bool: True if the subscriber exists in the topic, False otherwise.
+
+        Raises:
+            NovuApiClientException: If an error occurs while checking the subscriber's existence in the topic.
+        """
+        try:
+            is_subscribed = await self.check_subscribers_in_topic(topic_key, subscriber_id, environment="prod")
+            logger.debug(f"Result of checking subscriber {subscriber_id} in topic {topic_key}: {is_subscribed}")
+            return is_subscribed
+        except NovuApiClientException as err:
+            logger.error(err.message)
+            raise
+
+
 class NotificationService(NovuService):
     """Implements notification services for sending notifications."""
 
@@ -287,9 +472,26 @@ class NotificationService(NovuService):
             NovuApiClientException: If there is an issue with triggering the event via Novu.
         """
         try:
-            event_data = await self.trigger_event(
-                notification_data.name, notification_data.recipients, notification_data.payload, environment="prod"
-            )
+            if notification_data.notification_type == NotificationType.EVENT:
+                event_data = await self.trigger_event(
+                    notification_data.name,
+                    notification_data.subscriber_ids,
+                    notification_data.payload,
+                    notification_data.actor,
+                    environment="prod",
+                )
+            elif notification_data.notification_type == NotificationType.TOPIC:
+                event_data = await self.trigger_topic_event(
+                    notification_data.name,
+                    notification_data.topic_keys,
+                    notification_data.payload,
+                    notification_data.actor,
+                    environment="prod",
+                )
+            else:
+                raise NovuApiClientException(
+                    message=f"Notification type {notification_data.notification_type.value} is not supported."
+                )
             logger.debug(f"Triggered notification successfully. Status: {event_data.status}")
             return event_data
         except NovuApiClientException as err:
