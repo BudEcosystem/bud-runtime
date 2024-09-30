@@ -186,6 +186,9 @@ class NovuInitialSeeder(NovuService):
             secrets_settings.novu_dev_app_id = dev_env_details["Development"]["app_identifier"]
             secrets_settings.novu_prod_app_id = prod_env_details["Production"]["app_identifier"]
 
+            # Export it to the system environment
+            os.environ["NOVU_PROD_APP_ID"] = prod_env_details["Production"]["app_identifier"]
+
             logger.debug("Environment details applied successfully")
         except NovuApiClientException as err:
             logger.error(f"Error during environment retrieval or application settings update: {err.message}")

@@ -8,7 +8,7 @@
             {
                 "active": true,
                 "template": {
-                    "content": "Example {{Content}}",
+                    "content": "{{Content}}",
                     "contentType": "editor",
                     "subject": "",
                     "type": "in_app",
@@ -41,23 +41,23 @@
     },
     {
         "active": true,
-        "name": "bud-email-login",
-        "description": "Login workflow for budserve",
+        "name": "bud-reset-password",
+        "description": "Reset password workflow for budserve",
         "tags": ["email", "user"],
         "steps": [
             {
                 "active": true,
                 "template": {
-                    "content": "bud_login.html",
+                    "content": "bud_reset_password.html",
                     "contentType": "customHtml",
-                    "subject": "Logged in successfully",
+                    "subject": "Reset Your Bud Account Password",
                     "senderName": "Bud Studio",
                     "type": "email",
                     "variables": [
                         {
                             "type": "String",
-                            "name": "User",
-                            "defaultValue": "Bud User",
+                            "name": "Password",
+                            "defaultValue": "",
                             "required": true
                         }
                     ],

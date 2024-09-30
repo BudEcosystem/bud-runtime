@@ -19,7 +19,7 @@
                 {
                     "type": "String",
                     "name": "bud.logo",
-                    "defaultValue": "https://framerusercontent.com/images/M1Y4n80MQmGCeoj54sQ1H2G6XPo.png?scale-down-to=512",
+                    "defaultValue": "https://bud.studio/logo-black.svg",
                     "required": false
                 },
                 {
