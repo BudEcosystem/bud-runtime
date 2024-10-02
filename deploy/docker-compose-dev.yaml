@@ -20,6 +20,7 @@ services:
       DAPR_GRPC_PORT: ${DAPR_GRPC_PORT:-}
       DAPR_API_METHOD_INVOCATION_PROTOCOL: ${DAPR_API_METHOD_INVOCATION_PROTOCOL:-grpc}
       DAPR_API_TOKEN: ${DAPR_API_TOKEN:-}
+      ENABLE_PROFILER: ${ENABLE_PROFILER:-}
     ports:
       - "$DAPR_GRPC_PORT:$DAPR_GRPC_PORT" # Dapr instances communicate over gRPC so gRPC port needs to be exposed
       - "$DAPR_HTTP_PORT:$DAPR_HTTP_PORT" # Expose Dapr HTTP port for service invocation

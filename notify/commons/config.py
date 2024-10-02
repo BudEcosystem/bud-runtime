@@ -207,6 +207,9 @@ class AppConfig(BaseConfig):
         alias="SEEDER_PATH",
     )
 
+    # Profiling
+    profiler_enabled: bool = Field(False, alias="ENABLE_PROFILER")
+
     @model_validator(mode="before")
     @classmethod
     def resolve_env(cls, data: Dict[str, Any]) -> Dict[str, Any]:
