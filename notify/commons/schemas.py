@@ -83,7 +83,8 @@ class CloudEventBase(BaseModel):
     tracestate: Optional[str] = None
     traceparent: Optional[str] = None
 
-    type: str
+    # NOTE: commented out since name is used as workflow identifier
+    # type: str
     time: str
 
     def is_pubsub(self) -> bool:
