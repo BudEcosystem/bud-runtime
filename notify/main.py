@@ -33,6 +33,7 @@ from .commons.helpers import retry
 from .core import sync_routes
 from .core.meta_routes import meta_router
 from .core.notify_routes import notify_router
+from .core.profiler_middleware import ProfilerMiddleware
 from .core.subscriber_routes import subscriber_router
 from .core.topic_routes import topic_router
 from .integrations.integration_routes import integration_router
@@ -143,6 +144,9 @@ app = FastAPI(
     lifespan=lifespan,
     openapi_url=None if app_settings.env == Environment.PRODUCTION else "/openapi.json",
 )
+
+if app_settings.profiler_enabled:
+    app.add_middleware(ProfilerMiddleware)
 
 internal_router = APIRouter()
 internal_router.include_router(meta_router)

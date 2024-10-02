@@ -40,6 +40,10 @@ MONGO_INITDB_ROOT_USERNAME="root"
 MONGO_INITDB_ROOT_PASSWORD="secret"
 export MONGO_INITDB_ROOT_USERNAME MONGO_INITDB_ROOT_PASSWORD
 
+# notify application
+ENABLE_PROFILER="false"
+export ENABLE_PROFILER
+
 function display_help() {
     echo "Usage: $0 [options]"
     echo
