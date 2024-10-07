@@ -1,0 +1,308 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: novu-api
+  namespace: bud-microframe-${NAMESPACE}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: novu-api
+  template:
+    metadata:
+      labels:
+        app: novu-api
+    spec:
+      containers:
+      - name: novu-api
+        image: ghcr.io/novuhq/novu/api:0.24.0
+        ports:
+        - containerPort: 3000
+        env:
+          - name: NODE_ENV
+            value: ${NODE_ENV}
+          - name: API_ROOT_URL
+            value: ${API_ROOT_URL}
+        volumeMounts:
+        - name: secrets-volume
+          mountPath: /etc/secrets
+      volumes:
+      - name: secrets-volume
+        secret:
+          secretName: novu-secrets
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: novu-api-service
+  namespace: bud-microframe-${NAMESPACE}
+spec:
+  ports:
+  - port: 3000
+    targetPort: 3000
+  selector:
+    app: novu-api
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: novu-secrets
+  namespace: bud-microframe-${NAMESPACE}
+data:
+  AWS_ACCESS_KEY_ID: base64encoded_value
+  AWS_SECRET_ACCESS_KEY: base64encoded_value
+  JWT_SECRET: base64encoded_value
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  labels:
+    app: api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      containers:
+      - name: api
+        image: ghcr.io/novuhq/novu/api:0.24.0
+        ports:
+        - containerPort: 3000
+        envFrom:
+        - configMapRef:
+            name: api-config
+        - secretRef:
+            name: api-secrets
+        resources:
+          limits:
+            memory: "256Mi"
+            cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+spec:
+  selector:
+    app: api
+  ports:
+    - protocol: TCP
+      port: 3000
+      targetPort: 3000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  labels:
+    app: worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: worker
+  template:
+    metadata:
+      labels:
+        app: worker
+    spec:
+      containers:
+      - name: worker
+        image: ghcr.io/novuhq/novu/worker:0.24.0
+        envFrom:
+        - configMapRef:
+            name: worker-config
+        - secretRef:
+            name: worker-secrets
+        ports:
+        - containerPort: 6379
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: worker
+spec:
+  selector:
+    app: worker
+  ports:
+    - protocol: TCP
+      port: 6379
+      targetPort: 6379
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ws
+  labels:
+    app: ws
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ws
+  template:
+    metadata:
+      labels:
+        app: ws
+    spec:
+      containers:
+      - name: ws
+        image: ghcr.io/novuhq/novu/ws:0.24.0
+        envFrom:
+        - configMapRef:
+            name: ws-config
+        - secretRef:
+            name: ws-secrets
+        ports:
+        - containerPort: 3002
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ws
+spec:
+  selector:
+    app: ws
+  ports:
+    - protocol: TCP
+      port: 3002
+      targetPort: 3002
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  labels:
+    app: web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+      - name: web
+        image: ghcr.io/novuhq/novu/web:0.24.0
+        envFrom:
+        - configMapRef:
+            name: web-config
+        ports:
+        - containerPort: 4200
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+spec:
+  selector:
+    app: web
+  ports:
+    - protocol: TCP
+      port: 4200
+      targetPort: 4200
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: widget
+  labels:
+    app: widget
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: widget
+  template:
+    metadata:
+      labels:
+        app: widget
+    spec:
+      containers:
+      - name: widget
+        image: ghcr.io/novuhq/novu/widget:0.24.0
+        envFrom:
+        - configMapRef:
+            name: widget-config
+        ports:
+        - containerPort: 4500
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: widget
+spec:
+  selector:
+    app: widget
+  ports:
+    - protocol: TCP
+      port: 4500
+      targetPort: 4500
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: embed
+  labels:
+    app: embed
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: embed
+  template:
+    metadata:
+      labels:
+        app: embed
+    spec:
+      containers:
+      - name: embed
+        image: ghcr.io/novuhq/novu/embed:0.24.0
+        envFrom:
+        - configMapRef:
+            name: embed-config
+        ports:
+        - containerPort: 4701
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: embed
+spec:
+  selector:
+    app: embed
+  ports:
+    - protocol: TCP
+      port: 4701
+      targetPort: 4701
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-config
+data:
+  NODE_ENV: production
+  API_ROOT_URL: http://api:3000
+  DISABLE_USER_REGISTRATION: "true"
+  # Add more environment variables as needed
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: api-secrets
+type: Opaque
+stringData:
+  MONGO_URL: mongodb://mongo:27017
+  JWT_SECRET: your-jwt-secret
+  AWS_ACCESS_KEY_ID: your-access-key
+  AWS_SECRET_ACCESS_KEY: your-secret-access-key

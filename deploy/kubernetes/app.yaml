@@ -1,0 +1,113 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bud-mf-${NAMESPACE}-${APP_NAME}
+  namespace: bud-microframe-${NAMESPACE}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ${APP_NAME}
+  template:
+    metadata:
+      labels:
+        app: ${APP_NAME}
+    spec:
+      containers:
+      - name: ${APP_NAME}
+        image: bud-microframe/${APP_NAME}:${NAMESPACE}
+        command: ["uvicorn", "${APP_NAME}.main:app", "--host", "0.0.0.0", "--port", "${APP_PORT}"]
+        ports:
+        - containerPort: ${APP_PORT:-8000}
+        env:
+        - name: NAMESPACE
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: NAMESPACE
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: LOG_LEVEL
+        - name: CONFIGSTORE_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: CONFIGSTORE_NAME
+        - name: SECRETSTORE_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: SECRETSTORE_NAME
+        - name: DAPR_API_METHOD_INVOCATION_PROTOCOL
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: DAPR_API_METHOD_INVOCATION_PROTOCOL
+        - name: DAPR_API_TOKEN
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: DAPR_API_TOKEN
+        - name: ENABLE_PROFILER
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: ENABLE_PROFILER
+        - name: DAPR_HTTP_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: DAPR_HTTP_PORT
+        - name: DAPR_GRPC_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: DAPR_GRPC_PORT
+
+        resources:
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+      - name: dapr-sidecar
+        image: daprio/daprd:edge
+        command: [
+          "./daprd",
+          "--app-id", "$APP_NAME",
+          "--app-port", "$APP_PORT",
+          "--dapr-http-port", "$DAPR_HTTP_PORT",
+          "--placement-host-address", "placement:50006",
+          "--resources-path", "/components",
+          "--config", "/config/appconfig.yaml",
+          "--log-as-json"
+        ]
+        env:
+        - name: NAMESPACE
+          valueFrom:
+            configMapKeyRef:
+              name: dapr-config
+              key: NAMESPACE
+        - name: DAPR_API_TOKEN
+          valueFrom:
+            configMapKeyRef:
+              name: dapr-config
+              key: DAPR_API_TOKEN
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app-service
+  namespace: bud-microframe-${NAMESPACE}
+spec:
+  ports:
+  - port: ${APP_PORT:-8000}
+    targetPort: ${APP_PORT:-8000}
+  selector:
+    app: ${APP_NAME}
+  type: ClusterIP
+---
