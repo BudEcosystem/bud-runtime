@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: novu-api
-  namespace: bud-microframe-${NAMESPACE}
+  namespace: bud-microframe-development
 spec:
   replicas: 1
   selector:
@@ -35,7 +35,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: novu-api-service
-  namespace: bud-microframe-${NAMESPACE}
+  namespace: bud-microframe-development
 spec:
   ports:
   - port: 3000
@@ -48,7 +48,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: novu-secrets
-  namespace: bud-microframe-${NAMESPACE}
+  namespace: bud-microframe-development
 data:
   AWS_ACCESS_KEY_ID: base64encoded_value
   AWS_SECRET_ACCESS_KEY: base64encoded_value
@@ -302,7 +302,7 @@ metadata:
   name: api-secrets
 type: Opaque
 stringData:
-  MONGO_URL: mongodb://mongo:27017
-  JWT_SECRET: your-jwt-secret
-  AWS_ACCESS_KEY_ID: your-access-key
-  AWS_SECRET_ACCESS_KEY: your-secret-access-key
+  MONGO_URL: mongodb://root:secret@mongodb:27017/novu-db?authSource=admin
+  JWT_SECRET: a173a1378b1089d2a24a76502bdce4905fe69b71efdfe95d9f1fdfc5110f78f3
+  AWS_ACCESS_KEY_ID: test
+  AWS_SECRET_ACCESS_KEY: test

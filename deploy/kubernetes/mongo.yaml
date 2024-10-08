@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mongodb
-  namespace: bud-microframe-${NAMESPACE}
+  namespace: bud-microframe-development
 spec:
   replicas: 1
   selector:
@@ -20,16 +20,16 @@ spec:
         - containerPort: 27017
         env:
         - name: MONGO_INITDB_ROOT_USERNAME
-          value: ${MONGO_INITDB_ROOT_USERNAME}
+          value: root
         - name: MONGO_INITDB_ROOT_PASSWORD
-          value: ${MONGO_INITDB_ROOT_PASSWORD}
+          value: secret
 
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: mongodb-service
-  namespace: bud-microframe-${NAMESPACE}
+  namespace: bud-microframe-development
 spec:
   ports:
   - port: 27017
