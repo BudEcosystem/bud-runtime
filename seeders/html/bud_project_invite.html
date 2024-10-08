@@ -1,0 +1,43 @@
+<img src="{{ bud.logo }}" alt="" width="100" height="80">
+
+<h1>
+    Hello {{ user.name }}
+</h1>
+<p hidden>
+    {{ user.password }}
+</p>
+
+{{# if user.is_budserve_user}}
+<p style="color: #516775;">
+    You have been invited to join the project <strong>{{ project.name }}</strong> on Budserve.
+</p>
+<p style="color: #516775;">
+    <strong>Project Overview:</strong> {{ project.description }}
+</p>
+<p style="color: #516775;">
+    Click the button below to view the project:
+</p>
+<a href="{{ project.url }}" style="display: inline-block; padding: 10px 20px; color: white; background-color: #007BFF; text-decoration: none; border-radius: 5px;">
+    View Project
+</a>
+{{ else }}
+<p style="color: #516775;">
+    You have been invited to join the project <strong>{{ project.name }}</strong> on Budserve. Since you're not yet part of Budserve, please use the temporary password below to log in and access the project:
+</p>
+<p style="color: #516775; font-weight: bold; margin: 20px 0px;">
+    Temporary Password: {{ user.password }}
+</p>
+<p style="color: #516775;">
+    <strong>Project Overview:</strong> {{ project.description }}
+</p>
+<p style="color: #516775;">
+    Click the button below to access the project:
+</p>
+<a href="{{ project.url }}" style="display: inline-block; padding: 10px 20px; color: white; background-color: #007BFF; text-decoration: none; border-radius: 5px;">
+    Access Project
+</a>
+{{/if}}
+
+<p style="color: #516775; margin-top: 15px;">
+    Thanks, <br> The Bud Team
+</p>
