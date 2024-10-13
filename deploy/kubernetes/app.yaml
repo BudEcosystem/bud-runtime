@@ -1,9 +1,39 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: appconfig
+  namespace: dapr-system
+spec:
+  type: secretstores.kubernetes
+  version: v1
+  metadata:
+  - name: yaml
+    value: |
+      NAMESPACE: dapr-system
+      LOG_LEVEL: DEBUG
+      CONFIGSTORE_NAME: configstore
+      SECRETSTORE_NAME: secretstore-local
+      DAPR_API_METHOD_INVOCATION_PROTOCOL: grpc
+      DAPR_API_TOKEN: aVsS8i6aUevzP8uIL2LO6Q==
+      ENABLE_PROFILER: "false"
+      DAPR_HTTP_PORT: "3510"
+      DAPR_GRPC_PORT: "50001"
+      NOVU_API_BASE_URL: "http://api.dapr-system:3000"
+      PATH: "/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+      LANG: "C.UTF-8"
+      GPG_KEY: "A035C8C19219BA821ECEA86B64E628F8D684696D"
+      PYTHON_VERSION: "3.11.0"
+      PYTHON_PIP_VERSION: "22.3"
+      PYTHON_SETUPTOOLS_VERSION: "65.5.0"
+      PYTHON_GET_PIP_URL: "https://github.com/pypa/get-pip/raw/66030fa03382b4914d4c4d0896961a0bdeeeb274/public/get-pip.py"
+      PYTHON_GET_PIP_SHA256: "1e501cf004eac1b7eb1f97266d28f995ae835d30250bec7f8850562703067dc6"
+
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: bud-mf-development-notify
-  namespace: bud-microframe-development
+  namespace: dapr-system
 spec:
   replicas: 1
   selector:
@@ -13,6 +43,12 @@ spec:
     metadata:
       labels:
         app: notify
+      annotations:
+        dapr.io/enabled: "true"
+        dapr.io/app-id: "bud-mf-development-notify"
+        dapr.io/app-port: "3000"
+        dapr.io/config: "appconfig-notify"
+        dapr.io/placement-host-address: "dapr-placement-server.dapr-system:50005"
     spec:
       containers:
       - name: notify
@@ -21,52 +57,8 @@ spec:
         ports:
         - containerPort: 3000
         env:
-        - name: NAMESPACE
-          valueFrom:
-            configMapKeyRef:
-              name: app-config
-              key: NAMESPACE
-        - name: LOG_LEVEL
-          valueFrom:
-            configMapKeyRef:
-              name: app-config
-              key: LOG_LEVEL
-        - name: CONFIGSTORE_NAME
-          valueFrom:
-            configMapKeyRef:
-              name: app-config
-              key: CONFIGSTORE_NAME
-        - name: SECRETSTORE_NAME
-          valueFrom:
-            configMapKeyRef:
-              name: app-config
-              key: SECRETSTORE_NAME
-        - name: DAPR_API_METHOD_INVOCATION_PROTOCOL
-          valueFrom:
-            configMapKeyRef:
-              name: app-config
-              key: DAPR_API_METHOD_INVOCATION_PROTOCOL
-        - name: DAPR_API_TOKEN
-          valueFrom:
-            configMapKeyRef:
-              name: app-config
-              key: DAPR_API_TOKEN
-        - name: ENABLE_PROFILER
-          valueFrom:
-            configMapKeyRef:
-              name: app-config
-              key: ENABLE_PROFILER
-        - name: DAPR_HTTP_PORT
-          valueFrom:
-            configMapKeyRef:
-              name: app-config
-              key: DAPR_HTTP_PORT
-        - name: DAPR_GRPC_PORT
-          valueFrom:
-            configMapKeyRef:
-              name: app-config
-              key: DAPR_GRPC_PORT
-
+        - name: APP_CONFIG
+          value: "{}"  # Dapr will inject the configuration values
         resources:
           limits:
             memory: "512Mi"
@@ -74,35 +66,13 @@ spec:
           requests:
             memory: "256Mi"
             cpu: "250m"
-      - name: dapr-sidecar
-        image: daprio/daprd:edge
-        command: [
-          "./daprd",
-          "--app-id", "$APP_NAME",
-          "--app-port", "$APP_PORT",
-          "--dapr-http-port", "$DAPR_HTTP_PORT",
-          "--placement-host-address", "placement:50006",
-          "--resources-path", "/components",
-          "--config", "/config/appconfig.yaml",
-          "--log-as-json"
-        ]
-        env:
-        - name: NAMESPACE
-          valueFrom:
-            configMapKeyRef:
-              name: dapr-config
-              key: NAMESPACE
-        - name: DAPR_API_TOKEN
-          valueFrom:
-            configMapKeyRef:
-              name: dapr-config
-              key: DAPR_API_TOKEN
+
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: app-service
-  namespace: bud-microframe-development
+  namespace: dapr-system
 spec:
   ports:
   - port: 3000
@@ -110,4 +80,3 @@ spec:
   selector:
     app: notify
   type: ClusterIP
----

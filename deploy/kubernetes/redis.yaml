@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: redis
-  namespace: bud-microframe-development
+  namespace: dapr-system
 spec:
   replicas: 1
   selector:
@@ -18,13 +18,13 @@ spec:
         image: redis:alpine
         ports:
         - containerPort: 6379
-        command: ["redis-server", "--requirepass", "ertfrrf4r43"]
+        command: ["redis-server", "--requirepass", "budpassword"]
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: redis-service
-  namespace: bud-microframe-development
+  namespace: dapr-system
 spec:
   ports:
   - port: 6379

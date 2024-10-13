@@ -1,65 +1,61 @@
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: novu-api
-  namespace: bud-microframe-development
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: novu-api
-  template:
-    metadata:
-      labels:
-        app: novu-api
-    spec:
-      containers:
-      - name: novu-api
-        image: ghcr.io/novuhq/novu/api:0.24.0
-        ports:
-        - containerPort: 3000
-        env:
-          - name: NODE_ENV
-            value: ${NODE_ENV}
-          - name: API_ROOT_URL
-            value: ${API_ROOT_URL}
-        volumeMounts:
-        - name: secrets-volume
-          mountPath: /etc/secrets
-      volumes:
-      - name: secrets-volume
-        secret:
-          secretName: novu-secrets
----
 apiVersion: v1
-kind: Service
+kind: ConfigMap
 metadata:
-  name: novu-api-service
-  namespace: bud-microframe-development
-spec:
-  ports:
-  - port: 3000
-    targetPort: 3000
-  selector:
-    app: novu-api
-  type: ClusterIP
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: novu-secrets
-  namespace: bud-microframe-development
+  name: app-config
+  namespace: dapr-system
 data:
-  AWS_ACCESS_KEY_ID: base64encoded_value
-  AWS_SECRET_ACCESS_KEY: base64encoded_value
-  JWT_SECRET: base64encoded_value
+  PORT: "3000"
+  REDIS_CACHE_SERVICE_HOST: ""
+  S3_BUCKET_NAME: "novu-local"
+  JWT_SECRET: "a173a1378b1089d2a24a76502bdce4905fe69b71efdfe95d9f1fdfc5110f78f3"
+  SENTRY_DSN: ""
+  REDIS_PASSWORD: "budpassword"
+  MONGO_MIN_POOL_SIZE: "100"
+  API_CONTEXT_PATH: ""
+  WEB_CONTEXT_PATH: ""
+  MONGO_MAX_POOL_SIZE: "200"
+  WIDGET_URL: "http://web.dapr-system:4200"                     # Updated
+  S3_REGION: "us-east-1"
+  GLOBAL_CONTEXT_PATH: ""
+  AWS_ACCESS_KEY_ID: "test"
+  STORE_ENCRYPTION_KEY: "050c6a4e1ee59527f68729ce87f06562"
+  AWS_SECRET_ACCESS_KEY: "test"
+  REDIS_HOST: "redis-service.dapr-system"
+  REDIS_PORT: "6379"
+  WIDGET_EMBED_PATH: "http://embed:4701/embed.umd.min.js" # Updated
+  FRONT_BASE_URL: "http://web.dapr-system:4200"                  # Updated
+  REDIS_DB_INDEX: "2"
+  DOCKER_REDIS_SERVICE_PORT: "6379"
+  NODE_ENV: "production"
+  MONGO_URL: "mongodb://root:secret@mongodb-service:27017/novu-db?authSource=admin"
+  WS_CONTEXT_PATH: ""
+  IS_TOPIC_NOTIFICATION_ENABLED: "true"
+  BROADCAST_QUEUE_CHUNK_SIZE: ""
+  DISABLE_USER_REGISTRATION: "false"
+  WIDGET_CONTEXT_PATH: ""
+  WS_PORT: "3002"
+  IS_MULTI_TENANCY_ENABLED: "true"
+  S3_LOCAL_STACK: "http://localhost:4566"           # Keep localhost for local stack, adjust if using in cluster
+  API_ROOT_URL: "http://api.dapr-system:3000"                    # Updated
+  NEW_RELIC_LICENSE_KEY: "47d729d903a431e73598eb03eda7322eFFFFNRAL"
+  HOST_NAME: "http://web.dapr-system:4200"                       # Updated
+  MULTICAST_QUEUE_CHUNK_SIZE: ""
+  NEW_RELIC_APP_NAME: ""
+  REDIS_CACHE_SERVICE_PORT: "6379"
+  REACT_APP_WS_URL: "http://ws.dapr-system:3002"                 # Updated
+  PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+  NODE_VERSION: "20.11.1"
+  YARN_VERSION: "1.22.19"
+  NX_DAEMON: "false"
+  CI: "true"
+  NEW_RELIC_NO_CONFIG_FILE: "true"
+  NEW_RELIC_APP_NAME: "notify"
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: api
-  labels:
-    app: api
+  namespace: dapr-system
 spec:
   replicas: 1
   selector:
@@ -77,32 +73,13 @@ spec:
         - containerPort: 3000
         envFrom:
         - configMapRef:
-            name: api-config
-        - secretRef:
-            name: api-secrets
-        resources:
-          limits:
-            memory: "256Mi"
-            cpu: "500m"
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: api
-spec:
-  selector:
-    app: api
-  ports:
-    - protocol: TCP
-      port: 3000
-      targetPort: 3000
+            name: app-config
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: worker
-  labels:
-    app: worker
+  namespace: dapr-system
 spec:
   replicas: 1
   selector:
@@ -118,30 +95,15 @@ spec:
         image: ghcr.io/novuhq/novu/worker:0.24.0
         envFrom:
         - configMapRef:
-            name: worker-config
-        - secretRef:
-            name: worker-secrets
+            name: app-config
         ports:
         - containerPort: 6379
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: worker
-spec:
-  selector:
-    app: worker
-  ports:
-    - protocol: TCP
-      port: 6379
-      targetPort: 6379
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: ws
-  labels:
-    app: ws
+  namespace: dapr-system
 spec:
   replicas: 1
   selector:
@@ -157,30 +119,15 @@ spec:
         image: ghcr.io/novuhq/novu/ws:0.24.0
         envFrom:
         - configMapRef:
-            name: ws-config
-        - secretRef:
-            name: ws-secrets
+            name: app-config
         ports:
         - containerPort: 3002
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: ws
-spec:
-  selector:
-    app: ws
-  ports:
-    - protocol: TCP
-      port: 3002
-      targetPort: 3002
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: web
-  labels:
-    app: web
+  namespace: dapr-system
 spec:
   replicas: 1
   selector:
@@ -196,28 +143,15 @@ spec:
         image: ghcr.io/novuhq/novu/web:0.24.0
         envFrom:
         - configMapRef:
-            name: web-config
+            name: app-config
         ports:
         - containerPort: 4200
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: web
-spec:
-  selector:
-    app: web
-  ports:
-    - protocol: TCP
-      port: 4200
-      targetPort: 4200
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: widget
-  labels:
-    app: widget
+  namespace: dapr-system
 spec:
   replicas: 1
   selector:
@@ -231,28 +165,79 @@ spec:
       containers:
       - name: widget
         image: ghcr.io/novuhq/novu/widget:0.24.0
+        command: ["pnpm", "start:static:widget"]  # Specify the command here
         envFrom:
         - configMapRef:
-            name: widget-config
+            name: app-config
         ports:
         - containerPort: 4500
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: widget
+  name: api
+  namespace: dapr-system
 spec:
+  ports:
+  - port: 3000
+    targetPort: 3000
+  selector:
+    app: api
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: worker
+  namespace: dapr-system
+spec:
+  ports:
+  - port: 6379
+    targetPort: 6379
+  selector:
+    app: worker
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ws
+  namespace: dapr-system
+spec:
+  ports:
+  - port: 3002
+    targetPort: 3002
+  selector:
+    app: ws
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  namespace: dapr-system
+spec:
+  ports:
+  - port: 4200
+    targetPort: 4200
+  selector:
+    app: web
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: widget
+  namespace: dapr-system
+spec:
+  ports:
+  - port: 4500
+    targetPort: 4500
   selector:
     app: widget
-  ports:
-    - protocol: TCP
-      port: 4500
-      targetPort: 4500
+---
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: embed
+  namespace: dapr-system
   labels:
     app: embed
 spec:
@@ -270,7 +255,7 @@ spec:
         image: ghcr.io/novuhq/novu/embed:0.24.0
         envFrom:
         - configMapRef:
-            name: embed-config
+            name: app-config
         ports:
         - containerPort: 4701
 ---
@@ -278,6 +263,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: embed
+  namespace: dapr-system
 spec:
   selector:
     app: embed
@@ -285,24 +271,3 @@ spec:
     - protocol: TCP
       port: 4701
       targetPort: 4701
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: api-config
-data:
-  NODE_ENV: production
-  API_ROOT_URL: http://api:3000
-  DISABLE_USER_REGISTRATION: "true"
-  # Add more environment variables as needed
-
-apiVersion: v1
-kind: Secret
-metadata:
-  name: api-secrets
-type: Opaque
-stringData:
-  MONGO_URL: mongodb://root:secret@mongodb:27017/novu-db?authSource=admin
-  JWT_SECRET: a173a1378b1089d2a24a76502bdce4905fe69b71efdfe95d9f1fdfc5110f78f3
-  AWS_ACCESS_KEY_ID: test
-  AWS_SECRET_ACCESS_KEY: test

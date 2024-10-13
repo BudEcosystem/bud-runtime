@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mongodb
-  namespace: bud-microframe-development
+  namespace: dapr-system
 spec:
   replicas: 1
   selector:
@@ -29,7 +29,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: mongodb-service
-  namespace: bud-microframe-development
+  namespace: dapr-system
 spec:
   ports:
   - port: 27017
