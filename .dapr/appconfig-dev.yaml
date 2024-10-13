@@ -1,8 +1,8 @@
 apiVersion: dapr.io/v1alpha1
 kind: Configuration
 metadata:
-  name: appconfig
-  namespace: default
+  name: appconfig-notify
+  namespace: dapr-system
 spec:
   tracing:
     samplingRate: "1"
@@ -11,6 +11,12 @@ spec:
   #      endpointAddress: http://localhost:9411/api/v2/spans
   secrets:
     scopes:
-      - storeName: local-secretstore
+      - storeName: secretstore-local
         defaultAccess: allow
-        deniedSecrets: [ ]
+        deniedSecrets: []
+  metric:
+    enabled: true
+  accessControl:
+    defaultAction: allow
+    trustDomain: "public"
+    policies: []

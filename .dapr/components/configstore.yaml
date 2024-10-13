@@ -1,20 +1,15 @@
-# Reference: https://docs.dapr.io/reference/components-reference/supported-configuration-stores/redis-configuration-store/
-
 apiVersion: dapr.io/v1alpha1
 kind: Component
 metadata:
   name: configstore
-  namespace: development
+  namespace: dapr-system
 spec:
   type: configuration.redis
+  version: v1  # Add the version field
   metadata:
     - name: redisHost
-      secretKeyRef:
-        name: redis_secret.uri
-        key: redis_secret.uri
+      value: "redis-service.dapr-system:6379"  # Directly set the Redis URI
     - name: redisPassword
-      secretKeyRef:
-        name: redis_secret.password
-        key: redis_secret.password
+      value: "budpassword"  # Directly set the Redis password
 auth:
   secretStore: secretstore-local
