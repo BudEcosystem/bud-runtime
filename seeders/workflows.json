@@ -8,30 +8,15 @@
             {
                 "active": true,
                 "template": {
-                    "content": "{{Content}}",
+                    "content": "{{ content.message }}",
                     "contentType": "editor",
                     "subject": "",
                     "type": "in_app",
-                    "cta": {
-                        "data": {
-                            "url": "https://bud.studio"
-                        },
-                        "type": "redirect",
-                        "action": {
-                            "buttons": [
-                                {
-                                    "type": "primary",
-                                    "content": "submit"
-                                }
-                            ],
-                            "status": "pending"
-                        }
-                    },
                     "variables": [
                         {
                             "type": "String",
-                            "name": "Content",
-                            "defaultValue": "lorem ipsum",
+                            "name": "content.message",
+                            "defaultValue": "",
                             "required": true
                         }
                     ]

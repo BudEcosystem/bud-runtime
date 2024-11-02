@@ -244,15 +244,11 @@ class NovuInitialSeeder(NovuService):
             raise NovuSeederException("Unable to get layouts") from None
 
         existing_layout_names = [layout.name for layout in existing_novu_layouts]
+        existing_layout_name_to_id = {layout.name: layout._id for layout in existing_novu_layouts}
         seeder_layouts = self.data["layouts"]
 
         for seeder_layout in seeder_layouts:
-            # Check if the layout already exists in Novu
-            if seeder_layout["name"] in existing_layout_names:
-                logger.debug(f"Layout {seeder_layout['name']} already exists")
-                continue
-
-            # If not, create the layout
+            # Create layout data
             layout_data = NovuLayout(
                 name=seeder_layout["name"],
                 description=seeder_layout["description"],
@@ -261,12 +257,22 @@ class NovuInitialSeeder(NovuService):
                 identifier=seeder_layout["identifier"],
                 variables=seeder_layout["variables"],
             )
-            logger.debug(f"Layout {seeder_layout['name']} does not exist, creating")
-            try:
-                await self.create_layout(layout_data)
-            except NovuApiClientException as err:
-                logger.error(err.message)
-                raise NovuSeederException(f"Unable to create layout {seeder_layout['name']}") from None
+            # Check if the layout already exists in Novu
+            if seeder_layout["name"] in existing_layout_names:
+                logger.debug(f"Layout {seeder_layout['name']} already exists, updating")
+                try:
+                    await self.update_layout(existing_layout_name_to_id[seeder_layout["name"]], layout_data)
+                except NovuApiClientException as err:
+                    logger.error(err.message)
+                    raise NovuSeederException(f"Unable to create layout {seeder_layout['name']}") from None
+            else:
+                # If not, create the layout
+                logger.debug(f"Layout {seeder_layout['name']} does not exist, creating")
+                try:
+                    await self.create_layout(layout_data)
+                except NovuApiClientException as err:
+                    logger.error(err.message)
+                    raise NovuSeederException(f"Unable to create layout {seeder_layout['name']}") from None
 
     async def _validate_modify_layout_content(self) -> None:
         """Validate and modify the layout seeder data.
@@ -426,13 +432,10 @@ class NovuWorkflowSeeder(NovuService):
             raise NovuSeederException("Unable to get workflows") from None
 
         present_workflow_names = [workflow.name for workflow in present_workflows]
+        present_workflow_name_to_id = {workflow.name: workflow._id for workflow in present_workflows}
 
         for seeder_workflow in self.data:
-            if seeder_workflow["name"] in present_workflow_names:
-                logger.debug(f"Workflow '{seeder_workflow['name']}' found, skipping creation")
-                continue
-
-            logger.debug(f"Workflow '{seeder_workflow['name']}' not found, creating")
+            # Collect workflow steps
             seeder_workflow_steps = seeder_workflow.pop("steps")
 
             # Create workflow steps
@@ -453,13 +456,24 @@ class NovuWorkflowSeeder(NovuService):
                 notification_group_id=self.workflow_group_id,
                 tags=seeder_workflow.get("tags", []),
             )
+            if seeder_workflow["name"] in present_workflow_names:
+                logger.debug(f"Workflow '{seeder_workflow['name']}' found, updating")
+                try:
+                    await self.update_workflow(
+                        present_workflow_name_to_id[seeder_workflow["name"]], workflow_template_data
+                    )
+                except NovuApiClientException as err:
+                    logger.error(err.message)
+                    raise NovuSeederException("Unable to update workflow") from None
+            else:
+                logger.debug(f"Workflow '{seeder_workflow['name']}' not found, creating")
 
-            try:
-                created_workflow = await self.create_workflow(workflow_template_data)
-                logger.debug(f"Workflow created successfully {created_workflow._id}")
-            except NovuApiClientException as err:
-                logger.error(err.message)
-                raise NovuSeederException("Unable to create workflow") from None
+                try:
+                    created_workflow = await self.create_workflow(workflow_template_data)
+                    logger.debug(f"Workflow created successfully {created_workflow._id}")
+                except NovuApiClientException as err:
+                    logger.error(err.message)
+                    raise NovuSeederException("Unable to create workflow") from None
 
     async def _apply_changes_to_production(self) -> None:
         """Apply changes to the production environment.

@@ -18,7 +18,7 @@ services:
         max-size: '50m'
         max-file: '5'
     env_file: 
-      - .env
+      - ../.env
     environment:
       NODE_ENV: ${NODE_ENV}
       API_ROOT_URL: ${API_ROOT_URL}
@@ -64,7 +64,7 @@ services:
         max-size: '50m'
         max-file: '5'
     env_file: 
-      - .env
+      - ../.env
     environment:
       NODE_ENV: ${NODE_ENV}
       MONGO_URL: ${MONGO_URL}
@@ -103,7 +103,7 @@ services:
         max-size: '50m'
         max-file: '5'
     env_file: 
-      - .env
+      - ../.env
     environment:
       PORT: ${WS_PORT}
       NODE_ENV: ${NODE_ENV}
@@ -133,7 +133,7 @@ services:
         max-size: '50m'
         max-file: '5'
     env_file: 
-      - .env
+      - ../.env
     environment:
       REACT_APP_API_URL: ${API_ROOT_URL}
       REACT_APP_ENVIRONMENT: ${NODE_ENV}
@@ -159,7 +159,7 @@ services:
         max-size: '50m'
         max-file: '5'
     env_file: 
-      - .env
+      - ../.env
     environment:
       REACT_APP_API_URL: ${API_ROOT_URL}
       REACT_APP_WS_URL: ${REACT_APP_WS_URL}

@@ -22,7 +22,7 @@ from typing import List, Optional, Union
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing_extensions import Self
 
-from notify.commons.constants import NotificationType
+from notify.commons.constants import NotificationCategory, NotificationType
 from notify.commons.schemas import (
     CloudEventBase,
     PaginatedSuccessResponse,
@@ -33,18 +33,39 @@ from notify.commons.schemas import (
 # Schemas related to notifications
 
 
+class NotificationContent(BaseModel):
+    """Represents the content of a notification."""
+
+    title: str | None = None
+    message: str | None = None
+    status: str | None = None
+    primary_action: str | None = None
+    secondary_action: str | None = None
+
+
+class NotificationPayload(BaseModel):
+    """Schema for notification payload."""
+
+    category: NotificationCategory
+    type: str | None = None
+    event: str | None = None
+    workflow_id: str | None = None
+    source: str
+    content: NotificationContent
+
+
 class NotificationRequest(CloudEventBase):
     """Represents a notification request."""
 
     notification_type: NotificationType = NotificationType.EVENT
     name: str  # Workflow identifier
     subscriber_ids: Optional[Union[str, List[str]]] = None
-    payload: dict = Field(default_factory=dict)
     actor: Optional[str] = None
     topic_keys: Optional[Union[str, List[str]]] = None
+    payload: NotificationPayload
 
     @model_validator(mode="after")
-    def check_required_fields(self) -> Self:
+    def validate_notification_rules(self) -> Self:
         """Check if required fields are present in the request.
 
         Raises:
@@ -60,6 +81,9 @@ class NotificationRequest(CloudEventBase):
             raise ValueError("topic_keys is required for topic notifications")
         if self.notification_type == NotificationType.BROADCAST and (self.subscriber_ids or self.topic_keys):
             raise ValueError("subscriber_ids and topic_keys are not allowed for broadcast notifications")
+
+        # Convert payload to dict
+        self.payload = self.payload.model_dump()
         return self
 
 

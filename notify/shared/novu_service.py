@@ -594,6 +594,38 @@ class NovuService(NovuBaseApiClient):
             raise NovuApiClientException(f"Failed to create workflow: {error_message}") from None
 
     @_handle_exception
+    async def update_workflow(
+        self,
+        workflow_id: str,
+        workflow_data: NotificationTemplateFormDto,
+        api_key: Optional[str] = None,
+        environment: str = "dev",
+    ) -> NotificationTemplateDto:
+        """Update a workflow (notification template) in the Novu system.
+
+        Args:
+        workflow_data (NotificationTemplateFormDto): The metadata for the workflow including `name`, `description`, and `active` status.
+        api_key (Optional[str]): The API key to use for authentication. If not provided, resolves based on the environment.
+        environment (str): The environment to fetch the API key from ('dev' or 'prod'). Defaults to 'dev'.
+
+        Returns:
+        NotificationTemplateDto: The updated workflow as returned by the Novu API.
+
+        Raises:
+        NovuApiClientException: If the API request to update the workflow fails.
+        """
+        novu_api_key = await self._resolve_api_key(api_key=api_key, environment=environment)
+        try:
+            # Fetch the list of workflows using the Novu API
+            response = NotificationTemplateApi(self.base_url, api_key=novu_api_key).update(
+                notification_template_id=workflow_id, notification_template=workflow_data
+            )
+            return response
+        except HTTPError as err:
+            error_message = err.response.json().get("message", "Unknown error occurred")
+            raise NovuApiClientException(f"Failed to update workflow: {error_message}") from None
+
+    @_handle_exception
     async def create_layout(
         self, layout_data: NovuLayout, api_key: Optional[str] = None, environment: str = "dev"
     ) -> Dict[str, Any]:
@@ -622,6 +654,37 @@ class NovuService(NovuBaseApiClient):
                 return response["data"]
             else:
                 raise NovuApiClientException(f"Failed to create layout: {response}")
+
+    @_handle_exception
+    async def update_layout(
+        self, layout_id: str, layout_data: NovuLayout, api_key: Optional[str] = None, environment: str = "dev"
+    ) -> Dict[str, Any]:
+        """Update a layout using the Novu API.
+
+        Args:
+        layout_id (str): The ID of the layout to update.
+        layout_data (NovuLayout): A pydantic schema containing layout information such as name, description, content file name, is_default, identifier, and variables.
+        api_key (Optional[str]): The API key for the Novu environment. If not provided, it will be resolved based on the environment.
+        environment (str): The environment in which to operate (e.g., 'dev' or 'prod'). Defaults to 'dev'.
+
+        Returns:
+        Dict[str, Any]: A dictionary containing the updated layout's data.
+
+        Raises:
+        NovuApiClientException: If the layout creation fails or there is an issue with reading the content file.
+        """
+        novu_api_key = await self._resolve_api_key(api_key=api_key, environment=environment)
+
+        url = f"{self.base_url}/v1/layouts/{layout_id}"
+        headers = {"Authorization": f"ApiKey {novu_api_key}"}
+        payload = layout_data.model_dump()
+
+        async with aiohttp.ClientSession() as session, session.patch(url, headers=headers, json=payload) as response:
+            is_success, response = await self._handle_response(response)
+            if is_success:
+                return response["data"]
+            else:
+                raise NovuApiClientException(f"Failed to update layout: {response}")
 
     @_handle_exception
     async def get_layouts(
