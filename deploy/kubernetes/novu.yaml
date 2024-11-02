@@ -33,7 +33,7 @@ data:
   BROADCAST_QUEUE_CHUNK_SIZE: ""
   DISABLE_USER_REGISTRATION: "false"
   WIDGET_CONTEXT_PATH: ""
-  WS_PORT: "3002"
+  WS_PORT: "3000"
   IS_MULTI_TENANCY_ENABLED: "true"
   S3_LOCAL_STACK: "http://localhost:4566"           # Keep localhost for local stack, adjust if using in cluster
   API_ROOT_URL: "http://api.dapr-system:3000"                    # Updated
@@ -42,7 +42,7 @@ data:
   MULTICAST_QUEUE_CHUNK_SIZE: ""
   NEW_RELIC_APP_NAME: ""
   REDIS_CACHE_SERVICE_PORT: "6379"
-  REACT_APP_WS_URL: "http://ws.dapr-system:3002"                 # Updated
+  REACT_APP_WS_URL: "http://ws.dapr-system:3000"                 # Updated
   PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
   NODE_VERSION: "20.11.1"
   YARN_VERSION: "1.22.19"
@@ -121,7 +121,7 @@ spec:
         - configMapRef:
             name: app-config
         ports:
-        - containerPort: 3002
+        - containerPort: 3000
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -203,8 +203,8 @@ metadata:
   namespace: dapr-system
 spec:
   ports:
-  - port: 3002
-    targetPort: 3002
+  - port: 3000
+    targetPort: 3000
   selector:
     app: ws
 ---

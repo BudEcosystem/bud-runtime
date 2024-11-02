@@ -23,7 +23,13 @@ spec:
           value: root
         - name: MONGO_INITDB_ROOT_PASSWORD
           value: secret
-
+        volumeMounts:
+        - mountPath: /data/db               # MongoDB’s data directory
+          name: mongodb-storage
+      volumes:
+      - name: mongodb-storage
+        persistentVolumeClaim:
+          claimName: mongodb-pvc
 ---
 apiVersion: v1
 kind: Service
@@ -37,3 +43,29 @@ spec:
   selector:
     app: mongodb
   type: ClusterIP
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mongodb-pv
+  namespace: dapr-system
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path  # Change if using a different StorageClass
+  hostPath:
+    path: "/datadisk/pvc/mongodb-data"   # Path on the host; adjust as needed
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongodb-pvc
+  namespace: dapr-system
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: local-path  # Must match the PV's storageClassName

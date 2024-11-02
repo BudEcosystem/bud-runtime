@@ -19,6 +19,13 @@ spec:
         ports:
         - containerPort: 6379
         command: ["redis-server", "--requirepass", "budpassword"]
+        volumeMounts:
+        - mountPath: /data                     # Redis data directory
+          name: redis-storage
+      volumes:
+      - name: redis-storage
+        persistentVolumeClaim:
+          claimName: redis-pvc
 ---
 apiVersion: v1
 kind: Service
@@ -32,3 +39,30 @@ spec:
   selector:
     app: redis
   type: ClusterIP
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: redis-pv
+  namespace: dapr-system
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path  # Change this if you're using a different StorageClass
+  hostPath:
+    path: "/datadisk/pvc/redis-data"      # Path on the host; adjust as needed
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-pvc
+  namespace: dapr-system
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: local-path   # Must match the PV's storageClassName
