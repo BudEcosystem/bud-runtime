@@ -1,7 +1,7 @@
 services:
-  mongodb:
+  budnotify-mongodb:
     image: mongo
-    container_name: bud-mf-$NAMESPACE-mongodb
+    container_name: bud-serve-$NAMESPACE-$APP_NAME-mongodb
     restart: unless-stopped
     logging:
       driver: 'json-file'
@@ -14,14 +14,14 @@ services:
       - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
       - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
     volumes:
-      - mongodb:/data/db
+      - budnotify_mongodb:/data/db
     ports:
       - 27017:27017
     networks:
       - bud-microframe-nw
 
 volumes:
-  mongodb: ~
+  budnotify_mongodb: ~
 
 networks:
   bud-microframe-nw:

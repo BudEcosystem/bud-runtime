@@ -3,14 +3,14 @@
 # Set `IS_TOPIC_NOTIFICATION_ENABLED=true` in env
 
 services:
-  api:
+  budnotify-api:
     image: 'ghcr.io/novuhq/novu/api:0.24.0'
     depends_on:
-      - mongodb
-      - redis
+      - budnotify-mongodb
+      - budnotify-redis
     networks:
       - bud-microframe-nw
-    container_name: bud-mf-$NAMESPACE-api
+    container_name: bud-serve-$NAMESPACE-$APP_NAME-api
     restart: unless-stopped
     logging:
       driver: 'json-file'
@@ -49,14 +49,14 @@ services:
       IS_TOPIC_NOTIFICATION_ENABLED: ${IS_TOPIC_NOTIFICATION_ENABLED}
     ports:
       - '3000:3000'
-  worker:
+  budnotify-worker:
     image: 'ghcr.io/novuhq/novu/worker:0.24.0'
     depends_on:
-      - mongodb
-      - redis
+      - budnotify-mongodb
+      - budnotify-redis
     networks:
       - bud-microframe-nw
-    container_name: bud-mf-$NAMESPACE-worker
+    container_name: bud-serve-$NAMESPACE-$APP_NAME-worker
     restart: unless-stopped
     logging:
       driver: 'json-file'
@@ -88,14 +88,14 @@ services:
       MULTICAST_QUEUE_CHUNK_SIZE: ${MULTICAST_QUEUE_CHUNK_SIZE}
       IS_MULTI_TENANCY_ENABLED: ${IS_MULTI_TENANCY_ENABLED}
       IS_TOPIC_NOTIFICATION_ENABLED: ${IS_TOPIC_NOTIFICATION_ENABLED}
-  ws:
+  budnotify-ws:
     image: 'ghcr.io/novuhq/novu/ws:0.24.0'
     depends_on:
-      - mongodb
-      - redis
+      - budnotify-mongodb
+      - budnotify-redis
     networks:
       - bud-microframe-nw
-    container_name: bud-mf-$NAMESPACE-ws
+    container_name: bud-serve-$NAMESPACE-$APP_NAME-ws
     restart: unless-stopped
     logging:
       driver: 'json-file'
@@ -118,14 +118,14 @@ services:
       NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
     ports:
       - '3002:3002'
-  web:
+  budnotify-web:
     image: 'ghcr.io/novuhq/novu/web:0.24.0'
     depends_on:
-      - api
-      - worker
+      - budnotify-api
+      - budnotify-worker
     networks:
       - bud-microframe-nw
-    container_name: bud-mf-$NAMESPACE-web
+    container_name: bud-serve-$NAMESPACE-$APP_NAME-web
     restart: unless-stopped
     logging:
       driver: 'json-file'
@@ -143,15 +143,15 @@ services:
       IS_MULTI_TENANCY_ENABLED: ${IS_MULTI_TENANCY_ENABLED}
     ports:
       - 4200:4200
-  widget:
+  budnotify-widget:
     image: 'ghcr.io/novuhq/novu/widget:0.24.0'
     depends_on:
-      - api
-      - worker
-      - web
+      - budnotify-api
+      - budnotify-worker
+      - budnotify-web
     networks:
       - bud-microframe-nw
-    container_name: bud-mf-$NAMESPACE-widget
+    container_name: bud-serve-$NAMESPACE-$APP_NAME-widget
     restart: unless-stopped
     logging:
       driver: 'json-file'
@@ -167,13 +167,13 @@ services:
       WIDGET_CONTEXT_PATH: ${WIDGET_CONTEXT_PATH}
     ports:
       - 4500:4500
-  embed:
+  budnotify-embed:
     depends_on:
-      - widget
+      - budnotify-widget
     networks:
       - bud-microframe-nw
     image: 'ghcr.io/novuhq/novu/embed:0.24.0'
-    container_name: bud-mf-$NAMESPACE-embed
+    container_name: bud-serve-$NAMESPACE-$APP_NAME-embed
     restart: unless-stopped
     logging:
       driver: 'json-file'

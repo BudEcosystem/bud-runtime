@@ -194,7 +194,7 @@ class AppConfig(BaseConfig):
     )
 
     novu_api_base_url: str = Field(
-        "http://api:3000",
+        "http://budnotify-api:3000",
         alias="NOVU_API_BASE_URL",
     )
 
