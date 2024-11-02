@@ -1,18 +1,23 @@
+# Reference: https://docs.dapr.io/reference/components-reference/supported-pubsub/setup-redis-pubsub/
 apiVersion: dapr.io/v1alpha1
 kind: Component
 metadata:
   name: pubsub-redis
-  namespace: dapr-system
+  namespace: development
 spec:
   type: pubsub.redis
   version: v1
   metadata:
     - name: redisHost
-      value: "redis-service.dapr-system:6379"  # Directly set the Redis URI
+      secretKeyRef:
+        name: redis_secret.uri
+        key: redis_secret.uri
     - name: redisPassword
-      value: "budpassword"  # Directly set the Redis password
+      secretKeyRef:
+        name: redis_secret.password
+        key: redis_secret.password
     - name: consumerID
-      value: "{appID}"  # Replace {appID} with the actual application ID
+      value: "{appID}"
     - name: concurrency
       value: "10"
 auth:
