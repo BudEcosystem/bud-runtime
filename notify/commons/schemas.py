@@ -83,9 +83,9 @@ class CloudEventBase(BaseModel):
     tracestate: Optional[str] = None
     traceparent: Optional[str] = None
 
-    # NOTE: commented out since name is used as workflow identifier
+    # NOTE: commented out since name is used as workflow identifier, time will be handle from novu
     # type: str
-    time: str
+    # time: str
 
     def is_pubsub(self) -> bool:
         """Check if the event is a PubSub event."""

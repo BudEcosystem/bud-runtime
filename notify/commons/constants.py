@@ -211,3 +211,15 @@ class NotificationType(Enum):
     EVENT = "event"
     TOPIC = "topic"
     BROADCAST = "broadcast"  # TODO: bulk event triggering
+
+
+class NotificationCategory(str, Enum):
+    """Represents the type of an internal notification.
+
+    Attributes:
+        INAPP: Represents the in-app notification type.
+        INTERNAL: Represents the internal notification type.
+    """
+
+    INAPP = "inapp"
+    INTERNAL = "internal"
