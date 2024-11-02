@@ -39,7 +39,7 @@ The project consists of several containers:
     ```bash
     cd bud-serve-notify
 
-    ./deploy/start_dev.sh --app-name notify --redis-password <redis_password> --build
+    ./deploy/start_dev.sh --app-name notify --build
     ```
     **Note**
     - Use redis-password same as in secrets.json
