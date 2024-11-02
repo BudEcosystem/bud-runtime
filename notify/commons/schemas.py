@@ -18,7 +18,7 @@
 
 import re
 from http import HTTPStatus
-from typing import Any, ClassVar, Dict, Optional, Set, Tuple, Type, Union
+from typing import Any, ClassVar, Dict, List, Optional, Set, Tuple, Type, Union
 
 from fastapi.responses import JSONResponse
 from pydantic import (
@@ -30,6 +30,8 @@ from pydantic import (
     model_validator,
 )
 from typing_extensions import Annotated
+
+from .constants import WorkflowStatus
 
 
 lowercase_string = Annotated[str, StringConstraints(to_lower=True)]
@@ -324,3 +326,21 @@ class ErrorResponse(ResponseBase):
         data["message"] = data.get("message") or HTTPStatus(data["code"]).description
 
         return data
+
+
+class WorkflowStep(BaseModel):
+    """Define a workflow step."""
+
+    id: str
+    title: str
+    description: str
+
+
+class WorkflowMetadataResponse(ResponseBase):
+    """Define a workflow metadata response."""
+
+    object: lowercase_string = "workflow_metadata"
+    workflow_id: str
+    steps: List[WorkflowStep]
+    status: WorkflowStatus
+    eta: int

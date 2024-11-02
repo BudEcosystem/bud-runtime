@@ -223,3 +223,12 @@ class NotificationCategory(str, Enum):
 
     INAPP = "inapp"
     INTERNAL = "internal"
+
+
+class WorkflowStatus(str, Enum):
+    """Enumerate workflow statuses."""
+
+    PENDING = "PENDING"
+    RUNNING = "RUNNING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"

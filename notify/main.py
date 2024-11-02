@@ -25,6 +25,8 @@ from typing import Any, AsyncIterator
 from fastapi import APIRouter, FastAPI
 from fastapi.openapi.utils import get_openapi
 
+from notify.core import meta_routes
+
 from .commons import logging
 from .commons.config import app_settings
 from .commons.constants import Environment
@@ -68,6 +70,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         from random import randint
 
         await asyncio.sleep(3)
+        await meta_routes.register_service()
+        await asyncio.sleep(1.5)
+
         while True:
             await sync_routes.sync_configurations()
             await sync_routes.sync_secrets()

@@ -194,7 +194,7 @@ class AppConfig(BaseConfig):
     )
 
     novu_api_base_url: str = Field(
-        "http://api:3000",
+        "http://budnotify-api:3000",
         alias="NOVU_API_BASE_URL",
     )
 
@@ -209,6 +209,10 @@ class AppConfig(BaseConfig):
 
     # Profiling
     profiler_enabled: bool = Field(False, alias="ENABLE_PROFILER")
+
+    pubsub_name: Optional[str] = None
+    pubsub_topic: Optional[str] = None
+    dead_letter_topic: Optional[str] = None
 
     @model_validator(mode="before")
     @classmethod
