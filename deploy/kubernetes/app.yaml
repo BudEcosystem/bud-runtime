@@ -52,7 +52,7 @@ spec:
     spec:
       containers:
       - name: notify
-        image: docker.io/bud-microframe/notify:development
+        image: docker.io/library/bud-serve-notify:latest
         command: ["uvicorn", "notify.main:app", "--host", "0.0.0.0", "--port", "3000"]
         ports:
         - containerPort: 3000
@@ -66,6 +66,13 @@ spec:
           requests:
             memory: "256Mi"
             cpu: "250m"
+        volumeMounts:
+        - mountPath: /data                    # Path inside the container to mount the PVC
+          name: notify-storage                 # Reference to the volume name defined below
+      volumes:
+      - name: notify-storage
+        persistentVolumeClaim:
+          claimName: bud-notify-1              # Name of the PVC created earlier
 
 ---
 apiVersion: v1
@@ -80,3 +87,32 @@ spec:
   selector:
     app: notify
   type: ClusterIP
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: bud-notify-1          # Name of the PVC
+  namespace: dapr-system          # Namespace (adjust as needed)
+spec:
+  accessModes:
+    - ReadWriteOnce           # Can also be ReadOnlyMany or ReadWriteMany, depending on your storage
+  resources:
+    requests:
+      storage: 5Gi            # Requested storage size
+  storageClassName: local-path  # Name of your StorageClass (adjust if needed)
+  volumeMode: Filesystem
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: bud-notify-1
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-path
+  hostPath:
+    path: /datadisk/pvc/bud-notify-pv  # Adjust this path as needed
+
