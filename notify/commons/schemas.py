@@ -19,6 +19,7 @@
 import re
 from http import HTTPStatus
 from typing import Any, ClassVar, Dict, List, Optional, Set, Tuple, Type, Union
+import datetime
 
 from fastapi.responses import JSONResponse
 from pydantic import (
@@ -76,8 +77,7 @@ class CloudEventBase(BaseModel):
     topic: Optional[str] = None
     pubsubname: Optional[str] = None
     source: Optional[str] = None
-
-    out_topic: Optional[str] = None
+    source_topic: Optional[str] = None
 
     data: Optional[Dict[str, Any]] = None
 
@@ -85,9 +85,11 @@ class CloudEventBase(BaseModel):
     tracestate: Optional[str] = None
     traceparent: Optional[str] = None
 
-    # NOTE: commented out since name is used as workflow identifier, time will be handle from novu
-    # type: str
-    # time: str
+    type: Optional[str] = None
+    time: str = Field(
+        default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat() + "Z"
+    )  # type: ignore
+    debug: bool = Field(default=False)
 
     def is_pubsub(self) -> bool:
         """Check if the event is a PubSub event."""
