@@ -33,7 +33,7 @@ notify_router = APIRouter()
 
 
 @notify_router.post(
-    "/notification",
+    "/notifications",
     responses={
         status.HTTP_500_INTERNAL_SERVER_ERROR: {
             "model": ErrorResponse,
