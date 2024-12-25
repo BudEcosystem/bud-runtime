@@ -17,7 +17,7 @@
 
 """Contains core Pydantic schemas used for data validation and serialization within the core services."""
 
-from typing import List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing_extensions import Self
@@ -39,8 +39,11 @@ class NotificationContent(BaseModel):
     title: str | None = None
     message: str | None = None
     status: str | None = None
+    result: Optional[Dict[str, Any]] = None
     primary_action: str | None = None
     secondary_action: str | None = None
+    icon: str | None = None
+    tag: str | None = None
 
 
 class NotificationPayload(BaseModel):
