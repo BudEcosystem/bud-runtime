@@ -479,6 +479,15 @@ class NovuWorkflowSeeder(NovuService):
             # Collect workflow steps
             seeder_workflow_steps = seeder_workflow.pop("steps")
 
+            # Add feedId to the template
+            if seeder_workflow["name"] in self.workflow_name_feed_id_mapper:
+                for seeder_workflow_step in seeder_workflow_steps:
+                    if seeder_workflow_step["template"]["type"] == "in_app":
+                        seeder_workflow_step["template"]["feedId"] = self.workflow_name_feed_id_mapper[
+                            seeder_workflow["name"]
+                        ]
+                logger.debug(f"FeedId added to the template for {seeder_workflow['name']} workflow")
+
             # Create workflow steps
             workflow_steps = []
             for seeder_workflow_step in seeder_workflow_steps:
