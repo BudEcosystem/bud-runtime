@@ -246,3 +246,11 @@ class TopicAddSubscriberResponse(SuccessResponse):
 
     success: list = Field(default_factory=list)
     failed: list = Field(default_factory=list)
+
+
+class CredentialsResponse(SuccessResponse):
+    """Represents a credentials response."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    prod_app_id: str | None = None

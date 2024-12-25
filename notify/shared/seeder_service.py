@@ -185,10 +185,9 @@ class NovuInitialSeeder(NovuService):
             secrets_settings.novu_prod_env_id = prod_env_details["Production"]["environment_id"]
 
             secrets_settings.novu_dev_app_id = dev_env_details["Development"]["app_identifier"]
-            secrets_settings.novu_prod_app_id = prod_env_details["Production"]["app_identifier"]
 
-            # Export it to the system environment
-            os.environ["NOVU_PROD_APP_ID"] = prod_env_details["Production"]["app_identifier"]
+            # NOTE: used for frontend integration
+            secrets_settings.novu_prod_app_id = prod_env_details["Production"]["app_identifier"]
 
             logger.debug("Environment details applied successfully")
         except NovuApiClientException as err:
