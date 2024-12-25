@@ -17,13 +17,14 @@
 """Provides utility functions and wrappers for interacting with Novu components."""
 
 import asyncio
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Tuple, Union
 
 import aiohttp
 from aiohttp import client_exceptions
 from novu.api import (
     ChangeApi,
     EventApi,
+    FeedApi,
     IntegrationApi,
     LayoutApi,
     NotificationGroupApi,
@@ -33,6 +34,7 @@ from novu.api import (
 )
 from novu.dto.change import ChangeDto
 from novu.dto.event import EventDto
+from novu.dto.feed import FeedDto
 from novu.dto.integration import IntegrationDto
 from novu.dto.layout import LayoutDto
 from novu.dto.notification_group import NotificationGroupDto
@@ -1383,3 +1385,57 @@ class NovuService(NovuBaseApiClient):
         except HTTPError as err:
             error_message = err.response.json().get("message", "Unknown error occurred")
             raise NovuApiClientException(f"Failed to check subscribers in topic: {error_message}") from None
+
+    @_handle_exception
+    async def create_feed(
+        self,
+        feed_name: str,
+        api_key: Optional[str] = None,
+        environment: str = "dev",
+    ) -> FeedDto:
+        """Create a new feed.
+
+        Args:
+            feed_name (str): The unique name for feed.
+            api_key (Optional[str], optional): The API key for authentication. Defaults to None.
+            environment (str, optional): The environment to use ("dev" or "prod"). Defaults to "dev".
+
+        Returns:
+            FeedDto: Created feed object.
+
+        Raises:
+            NovuApiClientException: If feed creation fails.
+        """
+        novu_api_key = await self._resolve_api_key(api_key=api_key, environment=environment)
+        try:
+            response = FeedApi(self.base_url, api_key=novu_api_key).create(feed_name)
+            return response
+        except HTTPError as err:
+            error_message = err.response.json().get("message", "Unknown error occurred")
+            raise NovuApiClientException(f"Failed to create feed: {error_message}") from None
+
+    @_handle_exception
+    async def get_all_feeds(
+        self,
+        api_key: Optional[str] = None,
+        environment: str = "dev",
+    ) -> Iterator[FeedDto]:
+        """Retrieve a list of feeds.
+
+        Args:
+            api_key (Optional[str], optional): The API key for authentication. Defaults to None.
+            environment (str, optional): The environment to use ("dev" or "prod"). Defaults to "dev".
+
+        Returns:
+            Iterator[FeedDto]: An iterator of feeds.
+
+        Raises:
+            NovuApiClientException: If listing feeds fails.
+        """
+        novu_api_key = await self._resolve_api_key(api_key=api_key, environment=environment)
+        try:
+            response = FeedApi(self.base_url, api_key=novu_api_key).list()
+            return response
+        except HTTPError as err:
+            error_message = err.response.json().get("message", "Unknown error occurred")
+            raise NovuApiClientException(f"Failed to list feeds: {error_message}") from None
