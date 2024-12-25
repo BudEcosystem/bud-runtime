@@ -2,8 +2,8 @@
     {
         "active": true,
         "name": "bud-notification",
-        "description": "Notification system for Budserve",
-        "tags": ["in_app", "system"],
+        "description": "In app notification system for Budserve",
+        "tags": ["inapp", "system"],
         "steps": [
             {
                 "active": true,
@@ -19,7 +19,34 @@
                             "defaultValue": "",
                             "required": true
                         }
-                    ]
+                    ],
+                    "feedId": null
+                }
+            }
+        ]
+    },
+    {
+        "active": true,
+        "name": "bud-internal",
+        "description": "Internal notification system for Budserve",
+        "tags": ["internal", "system"],
+        "steps": [
+            {
+                "active": true,
+                "template": {
+                    "content": "{{ content.message }}",
+                    "contentType": "editor",
+                    "subject": "",
+                    "type": "in_app",
+                    "variables": [
+                        {
+                            "type": "String",
+                            "name": "content.message",
+                            "defaultValue": "",
+                            "required": true
+                        }
+                    ],
+                    "feedId": null
                 }
             }
         ]
