@@ -39,6 +39,7 @@ logger = logging.get_logger(__name__)
 INITIAL_SEEDER_PATH = os.path.join(app_settings.seeder_path, "initial_data.json")
 WORKFLOW_SEEDER_PATH = os.path.join(app_settings.seeder_path, "workflows.json")
 INTEGRATION_SEEDER_PATH = os.path.join(app_settings.seeder_path, "integrations.json")
+FEED_SEEDER_PATH = os.path.join(app_settings.seeder_path, "feeds.json")
 HTML_CONTENT_PATH = os.path.join(app_settings.seeder_path, "html")
 
 
@@ -184,10 +185,9 @@ class NovuInitialSeeder(NovuService):
             secrets_settings.novu_prod_env_id = prod_env_details["Production"]["environment_id"]
 
             secrets_settings.novu_dev_app_id = dev_env_details["Development"]["app_identifier"]
-            secrets_settings.novu_prod_app_id = prod_env_details["Production"]["app_identifier"]
 
-            # Export it to the system environment
-            os.environ["NOVU_PROD_APP_ID"] = prod_env_details["Production"]["app_identifier"]
+            # NOTE: used for frontend integration
+            secrets_settings.novu_prod_app_id = prod_env_details["Production"]["app_identifier"]
 
             logger.debug("Environment details applied successfully")
         except NovuApiClientException as err:
@@ -310,6 +310,7 @@ class NovuWorkflowSeeder(NovuService):
         """Initialize the NovuWorkflowSeeder instance with the provided data."""
         super().__init__()
         self.data = read_json_file(WORKFLOW_SEEDER_PATH)
+        self.feeds_data = read_json_file(FEED_SEEDER_PATH)
         self.workflow_group_id = None
 
     async def execute(self) -> None:
@@ -325,6 +326,7 @@ class NovuWorkflowSeeder(NovuService):
         await self._validate_data()
         await self._get_default_workflow_group()
         await self._validate_modify_template_data()
+        await self._ensure_feeds()
         await self._ensure_workflows()
         await self._apply_changes_to_production()
 
@@ -415,6 +417,44 @@ class NovuWorkflowSeeder(NovuService):
             logger.error(err.message)
             raise NovuSeederException("Unable to get default workflow group details") from None
 
+    async def _ensure_feeds(self) -> None:
+        """Ensure that all required feeds are present in the system.
+
+        This method checks if the feeds defined in the seeder data are already present.
+        If a feed is not found, it is created.
+        """
+        try:
+            present_feeds = await self.get_all_feeds()
+            logger.debug("Fetched all present feeds")
+        except NovuApiClientException as err:
+            logger.error(err.message)
+            raise NovuSeederException("Unable to get feeds") from None
+
+        present_feed_name_to_id = {feed.name: feed._id for feed in present_feeds}
+        present_feed_names = present_feed_name_to_id.keys()
+
+        self.workflow_name_feed_id_mapper = {}
+
+        for seeder_feed in self.feeds_data:
+            if seeder_feed["feed_name"] in present_feed_names:
+                logger.debug(f"Feed '{seeder_feed['feed_name']}' found, skipping creation")
+                self.workflow_name_feed_id_mapper[seeder_feed["workflow_name"]] = present_feed_name_to_id[
+                    seeder_feed["feed_name"]
+                ]
+                continue
+
+            logger.debug(f"Feed '{seeder_feed['feed_name']}' not found, creating")
+            try:
+                created_feed = await self.create_feed(seeder_feed["feed_name"])
+                logger.debug(f"Feed created successfully {created_feed._id}")
+                self.workflow_name_feed_id_mapper[seeder_feed["workflow_name"]] = created_feed._id
+            except NovuApiClientException as err:
+                logger.error(err.message)
+                raise NovuSeederException("Unable to create feed") from None
+            except Exception as err:
+                logger.exception(err)
+                raise NovuSeederException("Unable to create feed") from None
+
     async def _ensure_workflows(self) -> None:
         """Ensure that all required workflows are present in the system.
 
@@ -437,6 +477,15 @@ class NovuWorkflowSeeder(NovuService):
         for seeder_workflow in self.data:
             # Collect workflow steps
             seeder_workflow_steps = seeder_workflow.pop("steps")
+
+            # Add feedId to the template
+            if seeder_workflow["name"] in self.workflow_name_feed_id_mapper:
+                for seeder_workflow_step in seeder_workflow_steps:
+                    if seeder_workflow_step["template"]["type"] == "in_app":
+                        seeder_workflow_step["template"]["feedId"] = self.workflow_name_feed_id_mapper[
+                            seeder_workflow["name"]
+                        ]
+                logger.debug(f"FeedId added to the template for {seeder_workflow['name']} workflow")
 
             # Create workflow steps
             workflow_steps = []

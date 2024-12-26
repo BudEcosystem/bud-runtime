@@ -36,6 +36,7 @@ from .core import sync_routes
 from .core.meta_routes import meta_router
 from .core.notify_routes import notify_router
 from .core.profiler_middleware import ProfilerMiddleware
+from .core.settings_routes import settings_router
 from .core.subscriber_routes import subscriber_router
 from .core.topic_routes import topic_router
 from .integrations.integration_routes import integration_router
@@ -157,12 +158,12 @@ internal_router = APIRouter()
 internal_router.include_router(meta_router)
 internal_router.include_router(sync_routes.sync_router)
 
+app.include_router(integration_router)
 app.include_router(internal_router)
 app.include_router(notify_router)
-app.include_router(integration_router)
+app.include_router(settings_router)
 app.include_router(subscriber_router)
 app.include_router(topic_router)
-
 
 # Override schemas for Swagger documentation
 app.openapi_schema = None  # Clear the cached schema
