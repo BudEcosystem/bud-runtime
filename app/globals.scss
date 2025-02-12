@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.chat-app {
+    background: #101010;
+    height: 100%;
+}
+
+.chat-message-form{
+    border: 1px solid #1F1F1F
+}
+
+.rce-mbox{
+    background: transparent;
+    box-shadow: none;
+    padding: 1rem;
+}
+
+.rce-mbox-forward{
+    background: transparent;
+}
+
+.rce-mbox-time{
+    color: #757575;
+}
+
+.rce-mbox-right{
+    border: 1px solid #1F1F1F;
+    text-align: right;
+    background: #FFFFFF03;
+}
