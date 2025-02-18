@@ -4,6 +4,7 @@ import { useChat } from "@ai-sdk/react";
 import { UIMessage } from "@ai-sdk/ui-utils";
 import NavBar from "./bud/components/navigation/NavBar";
 import { Image } from "antd";
+import Markdown from 'react-markdown'
 
 function Loading() {
   return (
@@ -124,7 +125,7 @@ function AIMessage(props: UIMessage) {
           height={"1.5rem"}
         />
       </div>
-      <span className="message-text ai-message">{props.content}</span>
+      <Markdown className="message-text ai-message">{props.content}</Markdown>
     </div>
   );
 }
