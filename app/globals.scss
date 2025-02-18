@@ -2,31 +2,63 @@
 @tailwind components;
 @tailwind utilities;
 
+body {
+  background: #101010;
+  color: #ffffff;
+}
+
 .chat-app {
-    background: #101010;
-    height: 100%;
+  background: #101010;
+  height: 100%;
 }
 
-.chat-message-form{
-    border: 1px solid #1F1F1F
+.chat-message-form {
+  border: 1px solid #1f1f1f;
 }
 
-.rce-mbox{
-    background: transparent;
-    box-shadow: none;
-    padding: 1rem;
+.rce-mbox {
+  background: transparent;
+  box-shadow: none;
+  padding: 1rem;
 }
 
-.rce-mbox-forward{
-    background: transparent;
+.rce-mbox-forward {
+  background: transparent;
 }
 
-.rce-mbox-time{
-    color: #757575;
+.rce-mbox-time {
+  color: #757575;
 }
 
-.rce-mbox-right{
-    border: 1px solid #1F1F1F;
-    text-align: right;
-    background: #FFFFFF03;
+.rce-mbox-right {
+  border: 1px solid #1f1f1f;
+  text-align: right;
+  background: #ffffff03;
+}
+
+.ant-btn-default {
+  background-color: #1f1f1f !important;
+  border: 1px solid #757575 !important;
+  color: #eeeeee !important;
+  font-size: 0.75rem;
+  font-weight: 400;
+  margin-right: 1rem;
+
+  &:hover {
+    background-color: #1f1f1f !important;
+    border: 1px solid #b3b3b3 !important;
+  }
+}
+
+.ant-btn-primary {
+  background-color: #1e0c34 !important;
+  border: 1px solid #965cde !important;
+  color: #eeeeee !important;
+  font-size: 0.75rem;
+  font-weight: 400;
+
+  &:hover {
+    background-color: #7f4f9b !important;
+    border: 1px solid #7f4f9b !important;
+  }
 }
