@@ -19,7 +19,7 @@
                 {
                     "type": "String",
                     "name": "bud.logo",
-                    "defaultValue": "https://bud.studio/logo-black.svg",
+                    "defaultValue": "https://admin-dev.bud.studio/_next/static/media/budicon.e5415863.png",
                     "required": false
                 },
                 {

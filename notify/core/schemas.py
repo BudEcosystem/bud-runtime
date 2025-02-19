@@ -36,6 +36,9 @@ from notify.commons.schemas import (
 class NotificationContent(BaseModel):
     """Represents the content of a notification."""
 
+    # allow extra fields
+    model_config = ConfigDict(extra="allow")
+
     title: str | None = None
     message: str | None = None
     status: str | None = None
