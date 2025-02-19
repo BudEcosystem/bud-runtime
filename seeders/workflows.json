@@ -96,37 +96,37 @@
                     "variables": [
                         {
                             "type": "String",
-                            "name": "user.name",
+                            "name": "content.user.name",
                             "defaultValue": "Bud User",
                             "required": true
                         },
                         {
                             "type": "String",
-                            "name": "user.password",
+                            "name": "content.user.password",
                             "defaultValue": "",
                             "required": false
                         },
                         {
                             "type": "Boolean",
-                            "name": "user.is_budserve_user",
+                            "name": "content.user.is_budserve_user",
                             "defaultValue": true,
                             "required": true
                         },
                         {
                             "type": "String",
-                            "name": "project.name",
+                            "name": "content.project.name",
                             "defaultValue": "Budserve Project",
                             "required": true
                         },
                         {
                             "type": "String",
-                            "name": "project.description",
+                            "name": "content.project.description",
                             "defaultValue": "Budserve Project Description",
                             "required": true
                         },
                         {
                             "type": "String",
-                            "name": "project.url",
+                            "name": "content.project.url",
                             "defaultValue": "https://bud.studio",
                             "required": true
                         }
