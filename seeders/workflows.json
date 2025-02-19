@@ -68,7 +68,7 @@
                     "variables": [
                         {
                             "type": "String",
-                            "name": "Password",
+                            "name": "content.password",
                             "defaultValue": "",
                             "required": true
                         }
