@@ -240,26 +240,16 @@
                                   valign="top"
                                   align="center"
                                 >
-                                  <img
-                                    class="max-width"
-                                    border="0"
-                                    style="
-                                            display: block;
-                                            color: #000000;
-                                            text-decoration: none;
-                                            font-family: Helvetica, arial,
-                                              sans-serif;
-                                            font-size: 16px;
-                                            max-width: 240px !important;
-                                            width: 50%;
-                                            height: auto !important;
-                                          "
-                                    src="{{bud.logo}}"
-                                    alt=""
-                                    width="200"
-                                    data-responsive="true"
-                                    data-proportionally-constrained="false"
-                                  />
+                                  <div style="
+                                      display: block;
+                                      width: 200px;
+                                      height: 50px;
+                                      max-width: 240px !important;
+                                      background: url('{{bud.logo}}');
+                                      background-size: contain;
+                                      background-repeat: no-repeat;
+                                      background-position: center;">
+                                  </div>
                                 </td>
                               </tr>
                               </tbody>
