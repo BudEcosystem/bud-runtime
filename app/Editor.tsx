@@ -12,6 +12,7 @@ import { ContentEditable } from "@lexical/react/LexicalContentEditable";
 import { LexicalErrorBoundary } from "@lexical/react/LexicalErrorBoundary";
 import { HistoryPlugin } from "@lexical/react/LexicalHistoryPlugin";
 import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
+import { OnChangePlugin } from "@lexical/react/LexicalOnChangePlugin";
 import {
   $isTextNode,
   DOMConversionMap,
@@ -25,6 +26,9 @@ import {
   TextNode,
 } from "lexical";
 import ToolbarPlugin from "./plugin/ToolbarPlugin";
+import { useCallback, useState } from "react";
+import { ChatRequestOptions } from "ai";
+import { Image } from "antd";
 
 const MIN_ALLOWED_FONT_SIZE = 8;
 const MAX_ALLOWED_FONT_SIZE = 72;
@@ -189,28 +193,64 @@ const editorConfig = {
   },
 };
 
-export default function Editor() {
+interface EditorProps {
+  input: string;
+  handleInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handleSubmit: (
+    event?: {
+      preventDefault?: () => void;
+    },
+    chatRequestOptions?: ChatRequestOptions
+  ) => void;
+}
+
+export default function Editor(props: EditorProps) {
   return (
-    <LexicalComposer initialConfig={editorConfig}>
-      <div className="editor-container">
-        <ToolbarPlugin />
-        <div className="editor-inner">
-          <RichTextPlugin
-            contentEditable={
-              <ContentEditable
-                className="editor-input"
-                aria-placeholder={placeholder}
-                placeholder={
-                  <div className="editor-placeholder">{placeholder}</div>
+    <div className="flex flex-row w-full  fixed left-0 bottom-0 justify-center items-center mb-[.5rem] bg-[#101010]">
+      <form
+        onSubmit={props.handleSubmit}
+        className="chat-message-form max-w-2xl  w-full  flex items-center justify-center  border-t-2 rounded-[0.625rem] relative z-10"
+      >
+        <div className="blur-[0.5rem] absolute top-0 left-0 right-0 bottom-0 bg-[#FFFFFF03] rounded-[0.5rem] " />
+        <LexicalComposer initialConfig={editorConfig}>
+          <div className="editor-container">
+            <ToolbarPlugin />
+            <OnChangePlugin onChange={(editorState, editor) => {
+                const data= editorState.toJSON() as any;
+                const children  = data?.root?.children?.[0]?.children as any;
+                console.log(children[0]?.text);
+                // props.handleInputChange({ target: { value:  } as unknown as EventTarget })
+            }} />
+            <div className="editor-inner">
+              <RichTextPlugin
+                contentEditable={
+                  <ContentEditable
+                    value={props.input}
+                    className="editor-input"
+                    name="editor"
+                    
+                    aria-placeholder={placeholder}
+                    placeholder={
+                      <div className="editor-placeholder">{placeholder}</div>
+                    }
+                  />
                 }
+                ErrorBoundary={LexicalErrorBoundary}
               />
-            }
-            ErrorBoundary={LexicalErrorBoundary}
-          />
-          <HistoryPlugin />
-          <AutoFocusPlugin />
-        </div>
-      </div>
-    </LexicalComposer>
+              <HistoryPlugin />
+              <AutoFocusPlugin />
+            </div>
+          </div>
+        </LexicalComposer>
+        <button
+          className="z-[999] absolute text-[#EEEEEE30] border-[#757575] border-[1px] rounded-[0.5rem] p-[.5rem] hover:bg-[#1F1F1F4D] hover:text-[#FFF] right-[0.5rem] bottom-[0.5rem] flex items-center gap-[.5rem]"
+          type="button"
+          onClick={props.handleSubmit}
+        >
+          Send
+          <Image src="icons/send.svg" alt="send" preview={false} />
+        </button>
+      </form>
+    </div>
   );
 }
