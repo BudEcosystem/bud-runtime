@@ -169,30 +169,14 @@ export default function Chat() {
             </button>
           </div>
         )}
-
-
-            <Editor
+      <Editor 
               handleInputChange={handleInputChange}
               handleSubmit={handleSubmit}
               input={input}
               // isLoading={isLoading}
               // error={error}
             />
-            {/* 
-            <input
-              className=" w-full  p-2 border border-gray-300 rounded shadow-xl placeholder-[#757575] placeholder-[.75rem] text-[.875rem] bg-transparent  border-[#e5e5e5] outline-none border-none text-[#757575] z-10"
-              value={input}
-              placeholder="Type a message and press Enter to send"
-              onChange={handleInputChange}
-              onSubmit={handleSubmit}
-              disabled={isLoading || error != null}
-            />
-            <button type="submit" className="ml-2 flex items-center">
-              <Image src="icons/send.svg" alt="send"
-              preview={false}
-               />
-            </button> */}
-     
+        
       </div>
     </main>
   );

@@ -207,20 +207,21 @@ interface EditorProps {
 export default function Editor(props: EditorProps) {
   return (
     <div className="flex flex-row w-full  fixed left-0 bottom-0 justify-center items-center mb-[.5rem] bg-[#101010]">
-      <form
-        onSubmit={props.handleSubmit}
-        className="chat-message-form max-w-2xl  w-full  flex items-center justify-center  border-t-2 rounded-[0.625rem] relative z-10"
-      >
+      <form className="chat-message-form max-w-2xl  w-full  flex items-center justify-center  border-t-2 rounded-[0.625rem] relative z-10">
         <div className="blur-[0.5rem] absolute top-0 left-0 right-0 bottom-0 bg-[#FFFFFF03] rounded-[0.5rem] " />
         <LexicalComposer initialConfig={editorConfig}>
           <div className="editor-container">
             <ToolbarPlugin />
-            <OnChangePlugin onChange={(editorState, editor) => {
-                const data= editorState.toJSON() as any;
-                const children  = data?.root?.children?.[0]?.children as any;
+            <OnChangePlugin
+              onChange={(editorState, editor) => {
+                const data = editorState.toJSON() as any;
+                const children = data?.root?.children?.[0]?.children as any;
                 console.log(children[0]?.text);
-                // props.handleInputChange({ target: { value:  } as unknown as EventTarget })
-            }} />
+                props.handleInputChange({
+                  target: { value: children[0]?.text } as any,
+                } as any);
+              }}
+            />
             <div className="editor-inner">
               <RichTextPlugin
                 contentEditable={
@@ -228,7 +229,6 @@ export default function Editor(props: EditorProps) {
                     value={props.input}
                     className="editor-input"
                     name="editor"
-                    
                     aria-placeholder={placeholder}
                     placeholder={
                       <div className="editor-placeholder">{placeholder}</div>
