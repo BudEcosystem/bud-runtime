@@ -6,6 +6,11 @@ import NavBar from "./bud/components/navigation/NavBar";
 import { Image } from "antd";
 import Editor from "./bud/chat/Editor";
 import Messages from "./bud/chat/Messages";
+import { Flex, Layout } from "antd";
+import HistoryList from "./bud/chat/HistoryList";
+import SettingsList from "./bud/chat/SettingsList";
+
+const { Header, Footer, Sider, Content } = Layout;
 
 function Loading() {
   return (
@@ -80,31 +85,78 @@ export default function Chat() {
   });
 
   return (
-    <main className="chat-container ">
-      <NavBar />
-      <div className="flex flex-col w-full py-24 mx-auto stretch px-[.5rem] max-w-2xl">
-        <Messages messages={messages} />
-        {isLoading && <Loading />}
-        {error && (
-          <div className="mt-4">
-            <div className="text-red-500">An error occurred.</div>
-            <button
-              type="button"
-              className="px-4 py-2 mt-4 text-blue-500 border border-blue-500 rounded-md"
-              onClick={() => reload()}
-            >
-              Retry
+    <Layout className="chat-container ">
+      <Sider width="25%" className="rounded-l-[1rem]">
+        <div className="flex flex-row py-[1rem] px-[1.5rem] bg-[#101010] border-b-[1px] border-[#1F1F1F] h-[58px]">
+          <div className="flex flex-row items-center gap-[1rem] p-[.5rem] bg-[#101010]">
+            <Image
+              src="icons/minimize.svg"
+              alt="bud"
+              width={".75rem"}
+              height={".75rem"}
+            />
+            <span className="text-[#EEE] text-[1rem] font-[400]">Chats</span>
+          </div>
+        </div>
+        <HistoryList data={[1, 2, 3]} />
+      </Sider>
+      <Layout className="border-[1px] border-[#1F1F1F] rounded-[1rem]">
+        <Header>
+          <NavBar />
+        </Header>
+        <Content>
+          <div className="flex flex-col w-full py-24 mx-auto stretch px-[.5rem] max-w-2xl">
+            <Messages messages={messages} />
+            {isLoading && <Loading />}
+            {error && (
+              <div className="mt-4">
+                <div className="text-red-500">An error occurred.</div>
+                <button
+                  type="button"
+                  className="px-4 py-2 mt-4 text-blue-500 border border-blue-500 rounded-md"
+                  onClick={() => reload()}
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+          </div>
+        </Content>
+        <Footer>
+          <Editor
+            handleInputChange={handleInputChange}
+            handleSubmit={handleSubmit}
+            input={input}
+            // isLoading={isLoading}
+            // error={error}
+          />
+        </Footer>
+      </Layout>
+      <Sider width="25%" className="rounded-r-[1rem]">
+        <div className="flex flex-row py-[1rem] px-[1.5rem] bg-[#101010] border-b-[1px] border-[#1F1F1F] h-[58px] justify-between">
+          <div className="flex flex-row items-center gap-[1rem] p-[.5rem] bg-[#101010]">
+            <Image
+              src="icons/minimize.svg"
+              alt="bud"
+              width={".75rem"}
+              height={".75rem"}
+            />
+            <span className="text-[#EEE] text-[1rem] font-[400]">Settings</span>
+          </div>
+          <div>
+            <button className="flex items-center flex-row gap-[.5rem] text-[#EEE] text-[.625rem] font-[400] p-[.5rem] bg-[#FFFFFF08] rounded-[0.5rem]">
+              Save as Preset
+              <Image
+                src="icons/save.svg"
+                alt="bud"
+                width={".75rem"}
+                height={".75rem"}
+              />
             </button>
           </div>
-        )}
-        <Editor
-          handleInputChange={handleInputChange}
-          handleSubmit={handleSubmit}
-          input={input}
-          // isLoading={isLoading}
-          // error={error}
-        />
-      </div>
-    </main>
+        </div>
+        <SettingsList data={[1, 2, 3]} />
+      </Sider>
+    </Layout>
   );
 }

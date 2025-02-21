@@ -16,7 +16,7 @@ function NavBar() {
   ];
 
   return (
-    <div className=" text-[#FFF] p-[1rem] flex justify-between items-center h-[58px] relative sticky top-0  z-10 bg-[#101010]">
+    <div className=" text-[#FFF] p-[1rem] flex justify-between items-center h-[58px] relative sticky top-0  z-10 bg-[#101010] border-b-[1px] border-[#1F1F1F]">
       <div className="blur-[0.5rem] absolute top-0 left-0 right-0 bottom-0 bg-[#FFFFFF03] rounded-[0.5rem]" />
       <button className="flex items-center">
         <Image

@@ -7,6 +7,29 @@ body {
   color: #ffffff;
 }
 
+.chat-container{
+  border-radius: 1rem !important;
+  padding: 1rem !important;
+}
+
+.ant-layout-header{
+  padding: 0 !important;
+  height: 60px !important;
+}
+
+.ant-layout-footer,
+.ant-layout-header,
+.ant-layout-sider,
+.ant-layout,
+.ant-layout-content {
+  background: #101010 !important;
+  color: #ffffff !important;
+}
+
+.ant-layout-sider {
+ border: #1F1F1F 1px solid !important;
+}
+
 .chat-app {
   background: #101010;
   height: 100%;
@@ -83,7 +106,7 @@ body {
   min-height: 170px;
   background: #101010;
   resize: none;
-  font-size: .75rem;
+  font-size: 0.75rem;
   caret-color: rgb(5, 5, 5);
   position: relative;
   tab-size: 1;
@@ -101,7 +124,7 @@ body {
   text-overflow: ellipsis;
   top: 1rem;
   left: 1rem;
-  font-size: .75rem;
+  font-size: 0.75rem;
   user-select: none;
   display: inline-block;
   pointer-events: none;
@@ -419,7 +442,7 @@ pre::-webkit-scrollbar-thumb {
   line-height: 16px;
   background-size: contain;
 }
-i{
+i {
   background-repeat: no-repeat;
   text-align: center;
   background-size: 100%;
