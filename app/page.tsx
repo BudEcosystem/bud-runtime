@@ -144,7 +144,7 @@ export default function Chat() {
             <span className="text-[#EEE] text-[1rem] font-[400]">Settings</span>
           </div>
           <div>
-            <button className="flex items-center flex-row gap-[.5rem] text-[#EEE] text-[.625rem] font-[400] p-[.5rem] bg-[#FFFFFF08] rounded-[0.5rem]">
+            <button className="flex items-center flex-row gap-[.5rem] text-[#B3B3B3] text-[.625rem] font-[400] p-[.5rem] bg-[#FFFFFF08] rounded-[0.5rem] border-[1px] border-[#1F1F1F]">
               Save as Preset
               <Image
                 src="icons/save.svg"

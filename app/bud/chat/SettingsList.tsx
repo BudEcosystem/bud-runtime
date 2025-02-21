@@ -1,7 +1,14 @@
 import { Image } from "antd";
 import React from "react";
 
-function SettingsListItem() {
+interface SettingsListItemProps {
+  title: string;
+  description: string;
+  icon: string;
+  children: React.ReactNode;
+}
+
+function SettingsListItem(props: SettingsListItemProps) {
   const [open, setOpen] = React.useState(false);
 
   return (
@@ -22,7 +29,7 @@ function SettingsListItem() {
             height={".875rem"}
           />
           <span className="text-[#B3B3B3] text-[.75rem] font-[400]">
-            System information
+            {props.title}
           </span>
         </div>
         <div className="flex flex-row items-center gap-[1rem] p-[.5rem]">
@@ -38,28 +45,7 @@ function SettingsListItem() {
           />
         </div>
       </div>
-      <div>
-        {open && (
-          <div className="flex flex-col gap-[.5rem] p-[.5rem]">
-            <div className="flex flex-row items-center gap-[1rem]">
-              <span className="text-[#B3B3B3] text-[.75rem] font-[400]">
-                System information
-              </span>
-              <span className="text-[#B3B3B3] text-[.75rem] font-[400]">
-                System information
-              </span>
-            </div>
-            <div className="flex flex-row items-center gap-[1rem]">
-              <span className="text-[#B3B3B3] text-[.75rem] font-[400]">
-                System information
-              </span>
-              <span className="text-[#B3B3B3] text-[.75rem] font-[400]">
-                System information
-              </span>
-            </div>
-          </div>
-        )}
-      </div>
+      <div>{open && props.children}</div>
     </div>
   );
 }
@@ -69,10 +55,65 @@ interface SettingsListProps {
 }
 
 function SettingsList({ data }: SettingsListProps) {
+
+  const components = [
+    {
+      title: "General",
+      description: "General settings",
+      icon: "icons/circle-settings.svg",
+      children: (
+        <div className="flex flex-col w-full gap-[1rem] py-[.5rem]">
+          <div className="flex flex-row items-center gap-[1rem] p-[.5rem]">
+            <span className="text-[#B3B3B3] text-[.75rem] font-[400]">
+              Language
+            </span>
+            <span className="text-[#B3B3B3] text-[.75rem] font-[400]">
+              English
+            </span>
+          </div>
+          <div className="flex flex-row items-center gap-[1rem] p-[.5rem]">
+            <span className="text-[#B3B3B3] text-[.75rem] font-[400]">
+              Theme
+            </span>
+            <span className="text-[#B3B3B3] text-[.75rem] font-[400]">
+              Dark
+            </span>
+          </div>
+        </div>
+      ),
+    },
+    {
+      title: "Notifications",
+      description: "Notification settings",
+      icon: "icons/circle-settings.svg",
+      children: (
+        <div className="flex flex-col w-full gap-[1rem] py-[.5rem]">
+          <div className="flex flex-row items-center gap-[1rem] p-[.5rem]">
+            <span className="text-[#B3B3B3] text-[.75rem] font-[400]">
+              Email
+            </span>
+            <span className="text-[#B3B3B3] text-[.75rem] font-[400]">
+              Enabled
+            </span>
+          </div>
+          <div className="flex flex-row items-center gap-[1rem] p-[.5rem]">
+            <span className="text-[#B3B3B3] text-[.75rem] font-[400]">
+              Push
+            </span>
+            <span className="text-[#B3B3B3] text-[.75rem] font-[400]">
+              Enabled
+            </span>
+          </div>
+        </div>
+      ),
+    },
+
+  ]
+
   return (
     <div className="flex flex-col w-full h-full bg-[#101010]  ">
-      {data?.map((item, index) => (
-        <SettingsListItem key={index} />
+      {components?.map((item, index) => (
+        <SettingsListItem key={index} {...item} />
       ))}
     </div>
   );
