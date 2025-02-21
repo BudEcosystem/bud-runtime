@@ -4,8 +4,8 @@ import { useChat } from "@ai-sdk/react";
 import { UIMessage } from "@ai-sdk/ui-utils";
 import NavBar from "./bud/components/navigation/NavBar";
 import { Image } from "antd";
-import Markdown from 'react-markdown'
-import Editor from "./Editor";
+import Editor from "./bud/chat/Editor";
+import Messages from "./bud/chat/Messages";
 
 function Loading() {
   return (
@@ -62,75 +62,6 @@ function Loading() {
   );
 }
 
-function Message(props: UIMessage) {
-  return (
-    <div
-      className="text-[#FFFFFF] relative mb-[1.5rem] text-[.75rem]  rounded-[.625rem] py-[.75rem] "
-      style={{
-        right: props.role === "user" ? 0 : 0,
-      }}
-    >
-      {props.role === "user" ? (
-        <div className="flex justify-end">
-          <UserMessage {...props} />
-        </div>
-      ) : (
-        <div className="flex justify-start ">
-          <AIMessage {...props} />
-        </div>
-      )}
-    </div>
-  );
-}
-
-function UserMessage(props: UIMessage) {
-  return (
-    <div className="flex flex-row items-center gap-[.5rem]">
-      <div className="flex items-center justify-end gap-[.5rem] ">
-        <button>
-          <Image
-            preview={false}
-            src="icons/copy.svg"
-            alt="bud"
-            width={"0.625rem"}
-            height={"0.625rem"}
-          />
-        </button>
-        <button>
-          <Image
-            preview={false}
-            src="icons/edit.svg"
-            alt="bud"
-            width={"0.625rem"}
-            height={"0.625rem"}
-          />
-        </button>
-      </div>
-      <span className="message-text user-message relative  p-[.5rem] rounded-[0.5rem] border-[#1F1F1F4D] border-[1px] text-[#FFF] text-right">
-        <div className="blur-[0.5rem] absolute top-0 left-0 right-0 bottom-0 bg-[#FFFFFF05] rounded-[0.5rem]" />
-        {props.content}
-      </span>
-    </div>
-  );
-}
-
-function AIMessage(props: UIMessage) {
-  return (
-    <div className="flex flex-row items-center gap-[.5rem]">
-      <div className="mr-[.5rem]">
-        <Image
-          preview={false}
-          src="icons/budrect.svg"
-          alt="bud"
-          width={"1.5rem"}
-          height={"1.5rem"}
-        />
-      </div>
-      <Markdown className="message-text ai-message">{props.content}</Markdown>
-    </div>
-  );
-}
-
 export default function Chat() {
   const {
     error,
@@ -152,11 +83,8 @@ export default function Chat() {
     <main className="chat-container ">
       <NavBar />
       <div className="flex flex-col w-full py-24 mx-auto stretch px-[.5rem] max-w-2xl">
-        {messages.map((m) => (
-          <Message {...m} key={m.id} />
-        ))}
+        <Messages messages={messages} />
         {isLoading && <Loading />}
-
         {error && (
           <div className="mt-4">
             <div className="text-red-500">An error occurred.</div>
@@ -169,14 +97,13 @@ export default function Chat() {
             </button>
           </div>
         )}
-      <Editor 
-              handleInputChange={handleInputChange}
-              handleSubmit={handleSubmit}
-              input={input}
-              // isLoading={isLoading}
-              // error={error}
-            />
-        
+        <Editor
+          handleInputChange={handleInputChange}
+          handleSubmit={handleSubmit}
+          input={input}
+          // isLoading={isLoading}
+          // error={error}
+        />
       </div>
     </main>
   );

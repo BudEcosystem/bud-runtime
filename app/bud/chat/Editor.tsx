@@ -25,8 +25,7 @@ import {
   ParagraphNode,
   TextNode,
 } from "lexical";
-import ToolbarPlugin from "./plugin/ToolbarPlugin";
-import { useCallback, useState } from "react";
+import ToolbarPlugin from "../../plugin/ToolbarPlugin";
 import { ChatRequestOptions } from "ai";
 import { Image } from "antd";
 
