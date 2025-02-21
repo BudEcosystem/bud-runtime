@@ -7,14 +7,39 @@ body {
   color: #ffffff;
 }
 
-.chat-container{
-  border-radius: 1rem !important;
-  padding: 1rem !important;
+*::-webkit-scrollbar-track {
+  -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
+  background-color: #f5f5f5;
 }
 
-.ant-layout-header{
+*::-webkit-scrollbar {
+  width: 4px;
+  background-color: #965cde;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: #1f1f1f;
+  border: 2px solid #965cde;
+}
+
+.chat-container {
+  border-radius: 1rem !important;
+  padding: 1rem !important;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.fill-primary {
+  fill: #965cde;
+  // fill: #5b5bd6;
+}
+
+.ant-layout-header {
   padding: 0 !important;
   height: 60px !important;
+}
+.ant-layout-footer{
+  padding-bottom: 0 !important;
 }
 
 .ant-layout-footer,
@@ -27,7 +52,7 @@ body {
 }
 
 .ant-layout-sider {
- border: #1F1F1F 1px solid !important;
+  border: #1f1f1f 1px solid !important;
 }
 
 .chat-app {
@@ -499,4 +524,72 @@ i.numbered-list {
 
 i.bulleted-list {
   background-image: url(/icons/bullet-list.svg);
+}
+.budSlider {
+  .ant-tooltip {
+    .ant-tooltip-inner {
+      background-color: #965cde !important;
+      color: #eeeeee !important;
+      font-size: 0.625rem;
+      font-weight: 400 !important;
+      min-width: 1.2rem;
+      height: 1.05rem;
+      min-height: 1.1rem;
+      max-height: 1.05rem;
+      padding: 0 3px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      border-radius: 4px;
+    }
+
+    .ant-tooltip-arrow::after {
+      width: 5.970563px !important;
+      height: 5.970563px !important;
+      border-radius: 0 0 1px 0;
+    }
+
+    .ant-tooltip-arrow::after {
+      background-color: #965cde !important;
+    }
+
+    .ant-tooltip-arrow {
+      bottom: 1.5px;
+    }
+  }
+}
+
+.ant-switch-checked {
+  background: #965cde !important;
+}
+
+.ant-select {
+  width: 100%;
+  color: white !important;
+
+  .ant-select-open {
+    color: white !important;
+  }
+
+  .ant-select-selector {
+    background: transparent !important;
+    padding: 0.8rem 0rem;
+    border: 0.5px solid #757575 !important;
+    color: white !important;
+    box-shadow: none !important;
+  }
+
+  .rc-virtual-list-holder {
+    background: #101010 !important;
+    border: 1px solid #1f1f1f !important;
+  }
+}
+
+.ant-select-selection-placeholder {
+  padding-left: 0.3rem;
+  color: #cfcfcf40;
+}
+
+.ant-select-selection-overflow {
+  font-size: 0.75rem !important;
 }

@@ -100,13 +100,26 @@ export default function Chat() {
         </div>
         <HistoryList data={[1, 2, 3]} />
       </Sider>
-      <Layout className="border-[1px] border-[#1F1F1F] rounded-[1rem]">
+      <Layout className="border-[1px] border-[#1F1F1F] rounded-[1rem] ">
         <Header>
           <NavBar />
         </Header>
-        <Content>
+        <Content className="overflow-hidden overflow-y-auto">
           <div className="flex flex-col w-full py-24 mx-auto stretch px-[.5rem] max-w-2xl">
             <Messages messages={messages} />
+            {!isLoading && !error && messages.length === 0 && (
+              <div className="mt-4 text-[#EEEEEE] text-center">
+                <Image
+                  src="icons/load.svg"
+                  alt="bud"
+                  width={"3.125rem"}
+                  height={"3.125rem"}
+                />
+                <div className="mt-[.75rem] text-[.75rem]">
+                  No model selected, select a model to send a message
+                </div>
+              </div>
+            )}
             {isLoading && <Loading />}
             {error && (
               <div className="mt-4">
@@ -122,7 +135,7 @@ export default function Chat() {
             )}
           </div>
         </Content>
-        <Footer>
+        <Footer className="sticky bottom-0">
           <Editor
             handleInputChange={handleInputChange}
             handleSubmit={handleSubmit}
