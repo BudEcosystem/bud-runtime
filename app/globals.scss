@@ -121,7 +121,6 @@ body {
 }
 
 .editor-inner {
-  background: #fff;
   position: relative;
   border-bottom-left-radius: 1rem;
   border-bottom-right-radius: 1rem;
@@ -129,7 +128,11 @@ body {
 
 .editor-input {
   min-height: 170px;
-  background: #101010;
+  border-bottom-left-radius: 1rem;
+  border-bottom-right-radius: 1rem;
+  border: none;
+  
+  background: #1F1F1F;
   resize: none;
   font-size: 0.75rem;
   caret-color: rgb(5, 5, 5);
@@ -387,7 +390,7 @@ pre::-webkit-scrollbar-thumb {
 .toolbar {
   display: flex;
   margin-bottom: 1px;
-  background: #101010;
+  background: #1F1F1F;
   padding: 4px;
   border-top-left-radius: 10px;
   border-top-right-radius: 10px;

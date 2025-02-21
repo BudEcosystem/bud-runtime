@@ -205,40 +205,6 @@ function SettingsList({ data }: SettingsListProps) {
               />
             </div>
           </div>
-          <div className="flex flex-row items-center gap-[.625rem] p-[.5rem] w-full">
-            <span className="text-[#EEEEEE] text-[.75rem] font-[400] text-nowrap w-full">
-              Context Overflow
-            </span>
-            <div className="flex flex-row items-center gap-[.5rem] w-full">
-              <Select
-                defaultValue="Select"
-                className="w-full"
-                mode="tags"
-                tagRender={(props) => (
-                  <Tag
-                    closable
-                    className=" text-[.625rem] font-[400]  rounded-[0.5rem] p-[.25rem]"
-                    style={{
-                      background: getChromeColor("#D1B854"),
-                      borderColor: getChromeColor("#D1B854"),
-                      color: "#D1B854",
-                    }}
-                    closeIcon={
-                      <Image
-                        src="icons/close.svg"
-                        preview={false}
-                        className="!w-[.625rem] !h-[.625rem]"
-                      />
-                    }
-                  >
-                    {props.label}
-                  </Tag>
-                )}
-              >
-                <Select.Option value="Select">Select</Select.Option>
-              </Select>
-            </div>
-          </div>
           <div className="flex flex-row items-center gap-[.5rem] p-[.5rem]">
             <span className="text-[#EEEEEE] text-[.75rem] font-[400]">
               Top P Sampling
@@ -323,7 +289,7 @@ function SettingsList({ data }: SettingsListProps) {
   ];
 
   return (
-    <div className="flex flex-col w-full h-full bg-[#101010]  ">
+    <div className="flex flex-col w-full h-full bg-[#101010]  overflow-y-auto pb-[5rem]">
       {components?.map((item, index) => (
         <SettingsListItem key={index} {...item} />
       ))}
