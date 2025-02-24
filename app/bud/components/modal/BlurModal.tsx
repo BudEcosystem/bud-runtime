@@ -16,7 +16,7 @@ export default function BlurModal(props: BlurModalProps) {
       open={props.open}
       onClose={props.onClose}
       classNames={{
-        content: "!p-0 bg-transparent border-0",
+        content: "!p-0 !bg-transparent border-0",
       }}
       footer={null}
       closeIcon={null}
