@@ -1,0 +1,30 @@
+/*font css ----------------------------------------------------- start*/
+@font-face {
+    font-family: latoBold;
+    src: url("../font/Lato-Bold.ttf")
+}
+@font-face {
+    font-family: latoSemibold;
+    src: url("../font/Lato-Semibold.ttf")
+}
+@font-face {
+    font-family: latoMedium;
+    src: url("../font/Lato-Medium.ttf")
+}
+@font-face {
+    font-family: latoRegular;
+    src: url("../font/Lato-Regular.ttf")
+}
+@font-face {
+    font-family: latoLight;
+    src: url("../font/Lato-Light.ttf")
+}
+@font-face {
+    font-family: latoThin;
+    src: url("../font/Lato-Thin.ttf")
+}
+@font-face {
+    font-family: latoItalic;
+    src: url("../font/Lato-italic.ttf")
+}
+/*font css ----------------------------------------------------- end*/
