@@ -16,9 +16,8 @@ function NavBar() {
   ];
 
   return (
-    <div className=" text-[#FFF] p-[1rem] flex justify-between items-center h-[58px] relative sticky top-0  z-10 bg-[#101010] border-b-[1px] border-[#1F1F1F]">
-      <div className="blur-[0.5rem] absolute top-0 left-0 right-0 bottom-0 bg-[#FFFFFF03] rounded-[0.5rem]" />
-      <button className="flex items-center">
+    <div className="topBg text-[#FFF] p-[1rem] flex justify-between items-center h-[3.625rem] relative sticky top-0  z-10 bg-[#101010] border-b-[1px] border-b-[#1F1F1F]">
+      <button className="flex items-center w-[1.475rem] height-[1.475rem] p-[.2rem] rounded-[6px] flex justify-center items-center hover:!bg-[#FFFFFF08]">
         <Image
           src={"/icons/history.svg"}
           width={"1.125rem"}
@@ -28,8 +27,8 @@ function NavBar() {
         />
       </button>
       <LoadModel />
-      <div className="flex items-center gap-[1rem]">
-        <button>
+      <div className="flex items-center gap-[.5rem]">
+        <button className="w-[1.475rem] height-[1.475rem] p-[.2rem] rounded-[6px] flex justify-center items-center hover:!bg-[#FFFFFF08]">
           <Image
             src={"/icons/settings.svg"}
             width={"1.125rem"}
@@ -38,7 +37,7 @@ function NavBar() {
             preview={false}
           />
         </button>
-        <button>
+        <button className="w-[1.475rem] height-[1.475rem] p-[.2rem] rounded-[6px] flex justify-center items-center hover:!bg-[#FFFFFF08]">
           <Image
             src={"/icons/plus.svg"}
             width={"1.125rem"}
@@ -47,7 +46,7 @@ function NavBar() {
             preview={false}
           />
         </button>
-        <button>
+        <button className="mr-[.4rem] w-[1.475rem] height-[1.475rem] p-[.2rem] rounded-[6px] flex justify-center items-center hover:!bg-[#FFFFFF08]">
           <Image
             src={"/icons/more.svg"}
             width={"1.125rem"}

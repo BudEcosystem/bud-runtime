@@ -28,6 +28,7 @@ import {
 import ToolbarPlugin from "../../plugin/ToolbarPlugin";
 import { ChatRequestOptions } from "ai";
 import { Image } from "antd";
+import { useState } from "react";
 
 const MIN_ALLOWED_FONT_SIZE = 8;
 const MAX_ALLOWED_FONT_SIZE = 72;
@@ -204,9 +205,13 @@ interface EditorProps {
 }
 
 export default function Editor(props: EditorProps) {
+  const [isHovered, setIsHovered] = useState<boolean>(false);
+  const handleChange = (value: string) => {
+    console.log(`selected ${value}`);
+  };
   return (
-    <div className="flex flex-row w-full justify-center items-center mb-[.5rem] bg-[#101010]">
-      <form className="chat-message-form   w-full  flex items-center justify-center  border-t-2 rounded-[0.625rem] relative z-10">
+    <div className="flex flex-row w-full justify-center items-center mb-[.55rem] ">
+      <form className="chat-message-form   w-full  flex items-center justify-center  border-t-2 rounded-[0.625rem] bg-[#101010] relative z-10 overflow-hidden">
         <div className="blur-[0.5rem] absolute top-0 left-0 right-0 bottom-0 bg-[#FFFFFF03] rounded-[0.5rem] " />
         <LexicalComposer initialConfig={editorConfig}>
           <div className="editor-container">
@@ -241,14 +246,21 @@ export default function Editor(props: EditorProps) {
             </div>
           </div>
         </LexicalComposer>
-        <button
-          className="z-[999] absolute text-[#EEEEEE30] border-[#757575] border-[1px] rounded-[0.5rem] p-[.5rem] hover:bg-[#1F1F1F4D] hover:text-[#FFF] right-[0.5rem] bottom-[0.5rem] flex items-center gap-[.5rem]"
-          type="button"
-          onClick={props.handleSubmit}
-        >
-          Send
-          <Image src="icons/send.svg" alt="send" preview={false} />
-        </button>
+        <div className="absolute flex justify-between items-end w-full bottom-0 left-0 right-0 px-[.85rem] pb-[.95rem]">
+          <div></div>
+          <button
+            className="Open-Sans text-[400]z-[999] text-[.75rem] text-[#EEEEEE] border-[#757575] border-[1px] rounded-[6px] p-[.2rem] hover:bg-[#1F1F1F4D] hover:text-[#FFFFFF]  flex items-center gap-[.5rem] px-[.8rem] py-[.15rem] bg-[#1F1F1F] hover:bg-[#965CDE] hover:text-[#FFFFFF]"
+            type="button"
+            onClick={props.handleSubmit}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+          >
+            Send
+            <div className="w-[1.25rem] h-[1.25rem]">
+              <Image src={isHovered ? 'icons/send-white.png' : 'icons/send.png'} alt="send" preview={false} />
+            </div>
+          </button>
+        </div>
       </form>
     </div>
   );
