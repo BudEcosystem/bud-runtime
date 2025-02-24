@@ -1,35 +1,14 @@
-import { Button, Modal, Popover } from "antd";
-import React from "react";
+import { Button } from "antd";
+import React, { useEffect } from "react";
 import SearchHeaderInput from "./input/SearchHeaderInput";
 import { ModelListCard } from "./ModelListCard";
 import BlurModal from "./modal/BlurModal";
+import { useEndPoints } from "../hooks/useEndPoint";
 
 function ModelLoaderComponent() {
-  const [models, setModels] = React.useState([
-    {
-      id: "1",
-      name: "Model Name",
-      description: "Model Description",
-      uri: "https://www.example.com",
-      tags: ["tag1", "tag2"],
-      provider: {
-        icon: "https://www.example.com/icon.png",
-      },
-      is_present_in_model: true,
-    },
-    {
-      id: "2",
-      description: "Model Description",
-      name: "Model Name",
-      uri: "https://www.example.com",
-      tags: ["tag1", "tag2"],
-      provider: {
-        icon: "https://www.example.com/icon.png",
-      },
-      is_present_in_model: false,
-    },
-  ]);
+  const { endPoints } = useEndPoints();
   const [searchValue, setSearchValue] = React.useState("");
+  const [selected, setSelected] = React.useState("");
 
   return (
     <div>
@@ -47,7 +26,7 @@ function ModelLoaderComponent() {
           <div className="text-[#757575] text-[0.75rem] font-[400]">
             Currently Loaded
             <span className="text-[#FFF] text-[0.75rem] font-[400] ml-[0.25rem]">
-              1
+              {endPoints.length}
             </span>
           </div>
           <div className="text-[#757575] text-[0.625rem] font-[400]">
@@ -57,20 +36,17 @@ function ModelLoaderComponent() {
             </span>
           </div>
         </div>
-        {models.map((model) => (
+        {endPoints.map((model) => (
           <ModelListCard
-            data={{
-              id: "1",
-              name: "Model Name",
-              description: "Model Description",
-              uri: "https://www.example.com",
-              tags: ["tag1", "tag2"],
-              provider: {
-                icon: "https://www.example.com/icon.png",
-              },
-              is_present_in_model: false,
+            key={model.id}
+            data={model}
+            selected={selected === model.id}
+            handleClick={() => {
+              if (selected === model.id) {
+                setSelected("");
+              }
+              setSelected(model.id);
             }}
-            selected={model.is_present_in_model}
           />
         ))}
       </div>
@@ -86,11 +62,17 @@ function ModelLoaderComponent() {
 }
 function LoadModel() {
   const [open, setOpen] = React.useState(false);
+  const { endPoints, getEndPoints } = useEndPoints();
 
   React.useEffect(() => {
     document.documentElement.scrollTop = document.documentElement.clientHeight;
     document.documentElement.scrollLeft = document.documentElement.clientWidth;
   }, []);
+
+  useEffect(() => {
+    console.log("getEndPoints");
+    getEndPoints({ page: 1, limit: 10 });
+  }, [open]);
 
   return (
     <div>

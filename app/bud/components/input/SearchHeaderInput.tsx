@@ -88,8 +88,8 @@ export default function SearchHeaderInput({
       variant="filled"
       prefix={searchIcon}
       size="large"
-      // suffix={<CrossIcon  className="cursor-pointer text-[#757575] hover:text-[#EEEEEE] !p-[.5rem]"
-      //   onClick={() => setSearchValue("")} />}
+      suffix={<CrossIcon  className="cursor-pointer text-[#757575] hover:text-[#EEEEEE] !p-[.5rem]"
+        onClick={() => setSearchValue("")} />}
     />
   );
 }

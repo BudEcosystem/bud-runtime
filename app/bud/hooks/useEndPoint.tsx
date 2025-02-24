@@ -1,49 +1,76 @@
-import { create } from 'zustand';
+import { axiosInstance } from "@/app/api/requests";
+import { create } from "zustand";
+import { apiKey, tempApiBaseUrl } from "../environment";
+import axios from "axios";
 
 function successToast(message: string) {
   console.log(message);
 }
 
-export type Endpoint = {
-  "id": string,
-  "name": string,
-  "status": string,
-  "deployment_config": {
-    "avg_context_length": number
-    "avg_sequence_length": number,
-    "concurrent_requests": number
-  },
-  "created_at": string,
-  "modified_at": string,
-}
+type Provider = {
+  id: string;
+  name: string;
+  description: string;
+  type: string;
+  icon: string;
+};
+type Tag = {
+  name: string;
+  color: string;
+};
 
-export const useEndPoints = create<
-  {
-    pageSource: string;
-    getEndPoints: ({
-      id,
-      page,
-      limit,
-      name,
-    }: {
-      id: any;
-      page: any;
-      limit: any;
-      name?: string;
-      order_by?: string;
-    }) => void;
-  }
->((set, get) => ({
-  pageSource: '',
-  clusterDetails: undefined,
+type Model = {
+  id: string;
+  name: string;
+  description: string;
+  uri: string;
+  tags: Tag[];
+  provider: Provider;
+  is_present_in_model: boolean;
+};
+
+
+
+type Project = {
+  name: string;
+  description: string;
+  tags: Tag[];
+  icon: string;
+  id: string;
+};
+
+export type Endpoint = {
+  id: string;
+  name: string;
+  status: string;
+  model: Model;
+  project: Project;
+  created_at: string;
+};
+
+export const useEndPoints = create<{
+  endPoints: Endpoint[];
+  getEndPoints: ({ page, limit }: { page: number; limit: number }) => void;
+}>((set, get) => ({
   endPoints: [],
-  getEndPoints: async ({
-    id,
-    page,
-    limit,
-    name,
-    order_by = "-created_at",
-  }) => {
-    
+  getEndPoints: async ({ page = 1, limit = 25 }) => {
+    const result = await axios
+      .get(`${tempApiBaseUrl}/playground/deployments`, {
+        params: {
+          page: page,
+          limit: limit,
+        },
+        headers: {
+          "api-key": apiKey,
+        },
+      })
+      .then((res) => {
+        console.log(res.data.endpoints);
+        set({ endPoints: res.data.endpoints });
+        return res.data.endpoints;
+      });
+
+    console.log(result);
+    return result;
   },
 }));

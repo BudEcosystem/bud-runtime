@@ -1,5 +1,5 @@
 import axios from "axios";
-import { apiBaseUrl } from "../bud/environment";
+import { apiBaseUrl, apiKey } from "../bud/environment";
 // import { errorToast } from "./../../components/toast";
 
 function errorToast(message: string) {
@@ -27,10 +27,15 @@ axiosInstance.interceptors.request.use(
       Token = localStorage.getItem("access_token");
     }
     const accessToken = Token ? Token : "";
-    if (accessToken) {
-      if (config.headers)
-        config.headers.Authorization = `Bearer ${accessToken}`;
-    }
+    // if (accessToken) {
+    //   if (config.headers) {
+    //     config.headers.Authorization = `Bearer ${accessToken}`;
+    //   }
+    // } else {
+      if (config.headers) {
+        config.headers['api-key'] = apiKey;
+      }
+    // }
     return config;
   },
   (error) => {
@@ -79,6 +84,7 @@ const handleErrorResponse = (err: any) => {
     // });
     return false;
   } else if (err.response && err.response.code === 500) {
+    console.log('err', err);
     errorToast(err.response.data?.message || "Internal Server Error");
     window.location.reload();
     return false;

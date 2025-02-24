@@ -1,13 +1,11 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import { UIMessage } from "@ai-sdk/ui-utils";
 import NavBar from "./bud/components/navigation/NavBar";
-import { Image, Select } from "antd";
-import { DownOutlined } from '@ant-design/icons';
+import { Image } from "antd";
 import Editor from "./bud/chat/Editor";
 import Messages from "./bud/chat/Messages";
-import { Flex, Layout } from "antd";
+import { Layout } from "antd";
 import HistoryList from "./bud/chat/HistoryList";
 import SettingsList from "./bud/chat/SettingsList";
 import { useState } from "react";

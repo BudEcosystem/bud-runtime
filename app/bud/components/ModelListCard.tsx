@@ -4,6 +4,7 @@ import React from "react";
 import { assetBaseUrl } from "../environment";
 import CustomPopover from "./customPopover";
 import { getChromeColor } from "../utils/color";
+import { Endpoint } from "../hooks/useEndPoint";
 
 type Model = {
   id: string;
@@ -26,30 +27,31 @@ export function ModelListCard({
 }: {
   selected?: boolean;
   handleClick?: () => void;
-  data: Model;
+  data: Endpoint;
   hideSeeMore?: boolean;
   hideSelect?: boolean;
 }) {
   const [hover, setHover] = React.useState(false);
 
-  const { name, tags } = data;
+  const { name, model } = data;
 
-  const imageUrl = assetBaseUrl + (data?.provider?.icon || data.uri);
+  const imageUrl = assetBaseUrl + (data?.model?.provider?.icon || data?.model.uri);
   const fallbackImageUrl = assetBaseUrl + "/icons/providers/openai.png";
 
   return (
     <div
       onMouseEnter={() => setHover(true)}
       onClick={() => {
-        if (data.is_present_in_model) return;
         handleClick?.();
       }}
       onMouseLeave={() => setHover(false)}
-      className={`pt-[1.05rem] pb-[.8rem] cursor-pointer hover:shadow-lg pl-[1.5rem] border-y-[0.5px] border-y-[#1F1F1F] hover:border-[#757575] h-[80px] flex-row flex border-box hover:bg-[#FFFFFF08] 
-          items-center justify-center
-        ${
-        data.is_present_in_model ? "opacity-30 !cursor-not-allowed" : ""
-      }`}
+      className={`pt-[1.05rem] pb-[.8rem] cursor-pointer 
+        hover:shadow-lg pl-[1.5rem] border-y-[0.5px] border-y-[#1F1F1F] 
+        hover:border-[#757575] h-[80px] flex-row flex border-box 
+        hover:bg-[#FFFFFF08] 
+          items-center justify-center ${
+            selected ? "bg-[#FFFFFF08]" : "bg-[#1F1F1F]"
+          }`}
     >
       <div className="bg-[#1F1F1F] rounded-[0.515625rem] w-[2.6875rem] h-[2.6875rem] flex justify-center items-center mr-[1rem] shrink-0 grow-0">
         <div className=" w-[1.68rem] h-[1.68rem] flex justify-center items-center shrink-0 grow-0">
@@ -71,9 +73,9 @@ export function ModelListCard({
             }}
           >
             {/* <CustomPopover title={name}> */}
-              <div className="text-[#EEEEEE] mr-2 text-[0.875rem] truncate overflow-hidden whitespace-nowrap">
-                {name}
-              </div>
+            <div className="text-[#EEEEEE] mr-2 text-[0.875rem] truncate overflow-hidden whitespace-nowrap">
+              {name}
+            </div>
             {/* </CustomPopover> */}
           </div>
           <div className="justify-end items-center h-[1.5rem] flex absolute right-[1.5rem] top-[50%] transform -translate-y-1/2">
@@ -100,17 +102,17 @@ export function ModelListCard({
             </div>
           </div>
         </div>
-        <div className="text-[#757575] w-full overflow-hidden text-ellipsis text-xs">
-          {tags.map((tag) => (
+        <div className="text-[#757575] w-full overflow-hidden text-ellipsis text-xs mt-[0.25rem]">
+          {model?.tags.map((tag) => (
             <Tag
               className=" !text-[.625rem] font-[400] rounded-[0.5rem] !px-[.375rem] !h-[1.25rem] flex items-center justify-center leading-[1.25rem]"
               style={{
-                background: getChromeColor("#D1B854"),
-                borderColor: getChromeColor("#D1B854"),
-                color: "#D1B854",
+                background: getChromeColor(tag.color || "#D1B854"),
+                borderColor: getChromeColor(tag.color || "#D1B854"),
+                color: tag.color || "#D1B854",
               }}
             >
-              {tag}
+              {tag.name}
             </Tag>
           ))}
         </div>
