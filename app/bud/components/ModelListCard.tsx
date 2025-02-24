@@ -45,11 +45,13 @@ export function ModelListCard({
         handleClick?.();
       }}
       onMouseLeave={() => setHover(false)}
-      className={`pt-[1.05rem] pb-[.8rem] cursor-pointer hover:shadow-lg pl-[1.5rem] border-y-[0.5px] border-y-[#1F1F1F] hover:border-[#757575] flex-row flex border-box hover:bg-[#FFFFFF08] ${
+      className={`pt-[1.05rem] pb-[.8rem] cursor-pointer hover:shadow-lg pl-[1.5rem] border-y-[0.5px] border-y-[#1F1F1F] hover:border-[#757575] h-[80px] flex-row flex border-box hover:bg-[#FFFFFF08] 
+          items-center justify-center
+        ${
         data.is_present_in_model ? "opacity-30 !cursor-not-allowed" : ""
       }`}
     >
-      <div className="bg-[#1F1F1F] rounded-[0.515625rem] w-[2.6875rem] h-[2.6875rem] flex justify-center items-center mr-[1.3rem] shrink-0 grow-0">
+      <div className="bg-[#1F1F1F] rounded-[0.515625rem] w-[2.6875rem] h-[2.6875rem] flex justify-center items-center mr-[1rem] shrink-0 grow-0">
         <div className=" w-[1.68rem] h-[1.68rem] flex justify-center items-center shrink-0 grow-0">
           <Image
             preview={false}
@@ -60,21 +62,21 @@ export function ModelListCard({
           />
         </div>
       </div>
-      <div className="flex justify-between flex-col w-full max-w-[85%]">
-        <div className="flex items-center justify-between ">
+      <div className="flex justify-between flex-col w-full max-w-[95%] relative">
+        <div className="flex items-center gap-[.625rem] w-full">
           <div
             className="flex flex-grow max-w-[90%]"
             style={{
               width: hover || selected ? "12rem" : "90%",
             }}
           >
-            <CustomPopover title={name}>
+            {/* <CustomPopover title={name}> */}
               <div className="text-[#EEEEEE] mr-2 text-[0.875rem] truncate overflow-hidden whitespace-nowrap">
                 {name}
               </div>
-            </CustomPopover>
+            {/* </CustomPopover> */}
           </div>
-          <div className="justify-end items-center">
+          <div className="justify-end items-center h-[1.5rem] flex absolute right-[1.5rem] top-[50%] transform -translate-y-1/2">
             <div
               className={`items-center text-[0.75rem] cursor-pointer text-[#757575] hover:text-[#EEEEEE] flex whitespace-nowrap`}
               onClick={async (e) => {
