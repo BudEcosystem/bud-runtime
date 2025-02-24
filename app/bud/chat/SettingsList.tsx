@@ -141,7 +141,7 @@ function SettingsList({ data }: SettingsListProps) {
                 tagRender={(props) => (
                   <Tag
                     closable
-                    className=" text-[.625rem] font-[400]  rounded-[0.5rem] p-[.25rem]"
+                    className=" !text-[.625rem] font-[400]  rounded-[0.5rem] !p-[.25rem]"
                     style={{
                       background: getChromeColor("#D1B854"),
                       borderColor: getChromeColor("#D1B854"),

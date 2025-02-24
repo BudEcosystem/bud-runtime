@@ -1,8 +1,33 @@
 import { Button, Popover } from "antd";
 import React from "react";
 import SearchHeaderInput from "./input/SearchHeaderInput";
+import { ModelListCard } from "./ModelListCard";
 
 function ModelLoaderComponent() {
+  const [models, setModels] = React.useState([
+    {
+      id: "1",
+      name: "Model Name",
+      description: "Model Description",
+      uri: "https://www.example.com",
+      tags: ["tag1", "tag2"],
+      provider: {
+        icon: "https://www.example.com/icon.png",
+      },
+      is_present_in_model: false,
+    },
+    {
+      id: "2",
+      description: "Model Description",
+      name: "Model Name",
+      uri: "https://www.example.com",
+      tags: ["tag1", "tag2"],
+      provider: {
+        icon: "https://www.example.com/icon.png",
+      },
+      is_present_in_model: false,
+    },
+  ]);
   const [searchValue, setSearchValue] = React.useState("");
 
   return (
@@ -15,6 +40,23 @@ function ModelLoaderComponent() {
           expanded
           placeholder="Model names, Tags, Tasks, Parameter sizes"
         />
+      </div>
+      <div className="w-full h-[320px] overflow-y-auto scrollbar-thin scrollbar-thumb-[#757575] scrollbar-track-[#1E1E1E] scrollbar-thumb-rounded-full scrollbar-track-rounded-full mt-[1rem]">
+        {models.map((model) => (
+          <ModelListCard
+            data={{
+              id: "1",
+              name: "Model Name",
+              description: "Model Description",
+              uri: "https://www.example.com",
+              tags: ["tag1", "tag2"],
+              provider: {
+                icon: "https://www.example.com/icon.png",
+              },
+              is_present_in_model: false,
+            }}
+          />
+        ))}
       </div>
     </div>
   );
@@ -31,7 +73,7 @@ function LoadModel() {
   return (
     <div>
       <Popover
-      rootClassName="!mt-[-3.25rem]"
+        rootClassName="!mt-[-3.25rem]"
         arrow={false}
         content={<ModelLoaderComponent />}
         open={open}

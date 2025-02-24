@@ -617,3 +617,10 @@ i.bulleted-list {
   color: #ffffff !important;
   padding: 1.25rem !important;
 }
+
+
+.antPopoverArrow {
+  .ant-popover-arrow::before {
+    background-color: #202020 !important;
+  }
+}
