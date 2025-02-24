@@ -13,12 +13,12 @@ function SettingsListItem(props: SettingsListItemProps) {
   const [open, setOpen] = React.useState(false);
 
   return (
-    <div className="flex flex-col w-full  bg-[#101010] px-[1rem] py-[.5rem] border-[1px] border-[#1F1F1F] ">
+    <div className="flex flex-col w-full  bg-[#101010] px-[.4rem] py-[.5rem] border-[0px] border-b-[1px] border-[#1F1F1F] ">
       <div
-        className="flex flex-row items-center gap-[1rem] py-[.5rem] justify-between"
+        className="flex flex-row items-center gap-[1rem] px-[.3rem] justify-between"
         onClick={() => setOpen(!open)}
       >
-        <div className="flex flex-row items-center gap-[.5rem] p-[.5rem]">
+        <div className="flex flex-row items-center gap-[.4rem] p-[.5rem]">
           <Image
             src="icons/circle-settings.svg"
             className={`transform transition-transform ${
@@ -26,10 +26,10 @@ function SettingsListItem(props: SettingsListItemProps) {
             }`}
             preview={false}
             alt="bud"
-            width={".875rem"}
-            height={".875rem"}
+            width={".75rem"}
+            height={".75rem"}
           />
-          <span className="text-[#B3B3B3] text-[.75rem] font-[400]">
+          <span className="text-[#B3B3B3] text-[.75rem] font-[400] pt-[.05rem]">
             {props.title}
           </span>
         </div>
