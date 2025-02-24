@@ -4,7 +4,8 @@
 
 @font-face {
   font-family: "Open-Sans";
-  src: url("./../public/font/Open_Sans/OpenSans-VariableFont_wdth,wght.ttf") format("truetype");
+  src: url("./../public/font/Open_Sans/OpenSans-VariableFont_wdth,wght.ttf")
+    format("truetype");
 }
 
 @font-face {
@@ -39,10 +40,10 @@ body {
   // width: 100% !important;
 }
 .topBg {
-   background-image: url(./../public/images/top-bg.png) !important;
-   background-size: cover !important;
-   background-repeat: no-repeat !important;
-   background-position: center !important;
+  background-image: url(./../public/images/top-bg.png) !important;
+  background-size: cover !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
 }
 
 .leftBg {
@@ -58,7 +59,6 @@ body {
   background-repeat: no-repeat !important;
   background-position: 0px 0px !important;
 }
-
 
 .ant-layout {
   font-size: 16px !important;
@@ -85,8 +85,8 @@ body {
 }
 
 .chat-container {
-  border-radius: .0.875rem !important;
-  padding: .7rem !important;
+  border-radius: 0.875rem !important;
+  padding: 0.7rem !important;
   height: 100vh;
   overflow: hidden;
 }
@@ -180,7 +180,7 @@ body {
 }
 
 .editor-container {
-  background-color: #1F1F1F;
+  background-color: #1f1f1f;
   color: #000;
   position: relative;
   line-height: 1.5rem;
@@ -197,8 +197,8 @@ body {
 
 .editor-input {
   min-height: 122px;
-  border-bottom-left-radius: .5rem;
-  border-bottom-right-radius: .5rem;
+  border-bottom-left-radius: 0.5rem;
+  border-bottom-right-radius: 0.5rem;
   border: none;
 
   // background: #1F1F1F;
@@ -208,7 +208,7 @@ body {
   position: relative;
   tab-size: 1;
   outline: 0;
-  padding: .5rem 10px;
+  padding: 0.5rem 10px;
   caret-color: #757575;
   color: #757575;
   padding-left: 1rem;
@@ -487,8 +487,8 @@ pre::-webkit-scrollbar-thumb {
 .toolbar button.toolbar-item i.format {
   background-size: contain;
   display: inline-block;
-  height: .75rem;
-  width: .75rem;
+  height: 0.75rem;
+  width: 0.75rem;
   margin-top: 2px;
   vertical-align: -0.25em;
   display: flex;
@@ -669,9 +669,7 @@ i.bulleted-list {
   font-size: 0.75rem !important;
 }
 
-
 .custom-ant-input {
-
   // border: .5px solid #757575 !important;
   input::placeholder {
     color: #757575 !important;
@@ -684,11 +682,10 @@ i.bulleted-list {
   }
 }
 
-.ant-popover-inner{
+.ant-popover-inner {
   color: #ffffff !important;
   padding: 0 !important;
 }
-
 
 .antPopoverArrow {
   .ant-popover-arrow::before {
@@ -700,18 +697,20 @@ i.bulleted-list {
     height: 2.375rem;
 
     .ant-select-arrow {
-      height: .625rem;
+      height: 0.625rem;
     }
 
     .ant-select-selector {
-      background-color: #1E0C344D !important;
+      background-color: #1e0c344d !important;
       border: 1px solid #67488c !important;
       border-radius: 6px !important;
-      box-shadow: 0 1px 1px rgba(187, 132, 255, 0.3), 0 0px 1px rgba(187, 132, 255, 0.2) !important;
+      box-shadow: 0 1px 1px rgba(187, 132, 255, 0.3),
+        0 0px 1px rgba(187, 132, 255, 0.2) !important;
     }
 
     &:hover .ant-select-selector {
-      box-shadow: 0 1px 4px rgba(187, 132, 255, 0.3), 0 1px 5px rgba(187, 132, 255, 0.2) !important;
+      box-shadow: 0 1px 4px rgba(187, 132, 255, 0.3),
+        0 1px 5px rgba(187, 132, 255, 0.2) !important;
     }
 
     // .menuList {
@@ -753,35 +752,35 @@ i.bulleted-list {
       border: 1px solid #1f1f1f !important;
       border-radius: 6px;
       min-width: 100px;
-    
+
       .ant-select-selection-placeholder {
         padding-left: 10px;
         color: #cfcfcf40;
         font-weight: 300 !important;
       }
-    
+
       .ant-select-item-option-selected {
         background: transparent !important;
       }
-    
+
       .ant-select-selection-item {
         color: white !important;
       }
-    
+
       .ant-select {
         color: #eeeeee !important;
-    
+
         .ant-select-arrow {
           color: #eeeeee !important;
         }
       }
-    
+
       .ant-select-item {
         color: white !important;
         font-size: 0.75rem;
         // line-height: 100%;
       }
-    
+
       .ant-select-item.ant-select-item-option-active {
         background: #1f1f1f !important;
       }
@@ -792,6 +791,73 @@ i.bulleted-list {
     font-family: "Lato-Regular" !important;
     font-size: 1rem !important;
     font-weight: 400 !important;
-    color: #EEEEEE !important;
+    color: #eeeeee !important;
   }
+}
+
+.ant-input,
+.ant-input-outlined {
+  background: transparent !important;
+  // background: black !important;
+  border: 0.5px solid #757575 !important;
+  color: white !important;
+  border-radius: 6px !important;
+
+  &.drawerInp {
+    background: transparent !important;
+
+    &::placeholder {
+      color: #808080 !important;
+      font-weight: 300 !important;
+    }
+  }
+
+  &:focus {
+    border: 0.5px solid #eeeeee !important;
+  }
+}
+
+.ant-input::placeholder {
+  color: #808080;
+  font-size: 0.75rem;
+}
+
+.ant-select-selection-placeholder {
+  color: #808080 !important;
+  font-weight: 300 !important;
+}
+
+.ant-input-affix-wrapper > input.ant-input {
+  background: transparent !important;
+  // background: black !important;
+  border: none !important;
+  color: white;
+}
+
+.ant-input-affix-wrapper > input.ant-input {
+  background: transparent !important;
+}
+
+.ant-input-affix-wrapper > input.ant-input::placeholder {
+  color: #808080;
+  font-weight: 300 !important;
+  text-indent: 0.5rem;
+  font-size: 0.75rem;
+}
+
+.ant-input-affix-wrapper > textarea.ant-input::placeholder {
+  color: #808080;
+  font-weight: 300 !important;
+  font-size: 0.75rem;
+}
+
+input.ant-input:-webkit-autofill {
+  background-color: transparent !important;
+  color: inherit !important;
+  box-shadow: 0 0 0px 1000px transparent inset !important;
+}
+
+.ant-select-single.ant-select-lg {
+  // min-height: 44px;
+  min-height: 40px;
 }

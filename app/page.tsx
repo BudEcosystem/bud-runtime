@@ -71,6 +71,8 @@ function Loading() {
 }
 
 export default function Chat() {
+  const [toggleLeft, setToggleLeft] = useState<boolean>(false);
+  const [toggleRight, setToggleRight] = useState<boolean>(false);
   const [isHovered, setIsHovered] = useState<boolean>(false);
   const {
     error,
@@ -92,10 +94,13 @@ export default function Chat() {
   };
   return (
     <Layout className="chat-container">
-      <Sider width="20.8%" className="rounded-l-[1rem]">
+      <Sider width="20.8%" className="rounded-l-[1rem]"
+        style={{ display: toggleLeft ? "block" : "none" }}
+      >
         <div className="leftBg w-full h-full">
           <div className="flex flex-row py-[1rem] px-[1.5rem] bg-[#101010] border-b-[1px] border-[#1F1F1F] h-[3.625rem]">
-            <div className="flex flex-row items-center gap-[.85rem] p-[.5rem] bg-[#101010]">
+            <div className="flex flex-row items-center gap-[.85rem] p-[.5rem] bg-[#101010] cursor-pointer"
+            onClick={() => setToggleLeft(!toggleLeft)}>
               <Image
                 preview={false}
                 src="icons/minimize.svg"
@@ -133,7 +138,12 @@ export default function Chat() {
       </Sider>
       <Layout className="border-[1px] border-[#1F1F1F] border-l-0 border-r-0">
         <Header>
-          <NavBar />
+          <NavBar
+            isLeftSidebarOpen={toggleLeft}
+            isRightSidebarOpen={toggleRight}
+            onToggleLeftSidebar={() => setToggleLeft(!toggleLeft)}
+            onToggleRightSidebar={() => setToggleRight(!toggleRight)}
+          />
         </Header>
         <Content className="overflow-hidden overflow-y-auto">
           <div className="flex flex-col w-full py-24 mx-auto stretch px-[.5rem] max-w-2xl ">
@@ -177,10 +187,14 @@ export default function Chat() {
           />
         </Footer>
       </Layout>
-      <Sider width="20.8%" className="rounded-r-[1rem] Open-Sans">
+      <Sider width="20.8%" className="rounded-r-[1rem] Open-Sans"
+        style={{ display: toggleRight ? "block" : "none" }}
+      >
         <div className="rightBg w-full h-full">
           <div className="flex flex-row pt-[.7rem] pb-[.4rem] px-[.9rem] bg-[#101010] border-b-[1px] border-[#1F1F1F] h-[3.625rem] justify-between items-center">
-            <div className="flex flex-row items-center gap-[.65rem] bg-[#101010] pl-[.15rem]">
+            <div className="flex flex-row items-center gap-[.65rem] bg-[#101010] pl-[.15rem] cursor-pointer"
+            
+            onClick={() => setToggleRight(!toggleRight)}>
               <Image
                 preview={false}
                 src="icons/minimize.svg"

@@ -1,6 +1,9 @@
-import { Image, Select, Slider, Switch, Tag, Tooltip } from "antd";
+import { Image, Select, Tag } from "antd";
 import React from "react";
 import { getChromeColor } from "../utils/color";
+import SliderInput from "../components/input/SliderInput";
+import InlineInput from "../components/input/InlineInput";
+import InlineSwitch from "../components/input/InlineSwitch";
 
 interface SettingsListItemProps {
   title: string;
@@ -63,63 +66,28 @@ function SettingsList({ data }: SettingsListProps) {
       icon: "icons/circle-settings.svg",
       children: (
         <div className="flex flex-col w-full gap-[.5rem] py-[.375rem]">
-          <div className="flex flex-row items-center gap-[.5rem] p-[.5rem]">
-            <span className="text-[#EEEEEE] text-[.75rem] font-[400]">
-              Temperature
-            </span>
-            <Tooltip title="Temperature">
-              <Image
-                src="icons/info.svg"
-                preview={false}
-                alt="bud"
-                width={".875rem"}
-                height={".875rem"}
-              />
-            </Tooltip>
-          </div>
-          <div className="flex items-center justify-center mt-[.8rem]">
-            <div className="text-[#757575] text-[.75rem] mr-1 ">5</div>
-            <Slider
-              className="budSlider mt-10 w-full"
-              defaultValue={30}
-              min={0}
-              max={100}
-              step={1}
-              tooltip={{
-                open: true,
-                getPopupContainer: (trigger) =>
-                  (trigger.parentNode as HTMLElement) || document.body, // Cast parentNode to HTMLElement
-              }}
-              styles={{
-                track: {
-                  backgroundColor: "#965CDE",
-                },
-                rail: {
-                  backgroundColor: "#212225",
-                  height: 4,
-                },
-              }}
-            />
-            <div className="text-[#757575] text-[.75rem] ml-1">100</div>
-          </div>
-          <div className="flex flex-row items-center gap-[.625rem] p-[.5rem]">
-            <span className="text-[#EEEEEE] text-[.75rem] font-[400] text-nowrap w-full">
-              Limit Response Length
-            </span>
-            <Switch defaultChecked />
-          </div>
-
-          <div className="flex flex-row items-center gap-[.625rem] p-[.5rem] w-full">
-            <span className="text-[#EEEEEE] text-[.75rem] font-[400] text-nowrap w-full">
-              Sequence Length
-            </span>
-            <div className="flex flex-row items-center gap-[.5rem]">
-              <input
-                type="number"
-                className="bg-[#101010] text-[#EEEEEE] border-[1px] border-[#1F1F1F] rounded-[0.5rem] p-[.5rem] w-full"
-              />
-            </div>
-          </div>
+          <SliderInput
+            title="Temperature"
+            min={0}
+            max={100}
+            step={1}
+            defaultValue={30}
+            value={30}
+            onChange={(value) => console.log(value)}
+          />
+          <InlineSwitch
+            title="Limit Response Length"
+            value={true}
+            defaultValue={true}
+            onChange={(value) => console.log(value)}
+          />
+          <InlineInput
+            title="Sequence Length"
+            value="30"
+            defaultValue="30"
+            type="number"
+            onChange={(value) => console.log(value)}
+          />
         </div>
       ),
     },
@@ -183,106 +151,38 @@ function SettingsList({ data }: SettingsListProps) {
       icon: "icons/circle-settings.svg",
       children: (
         <div className="flex flex-col w-full gap-[.5rem] py-[.375rem]">
-          <div className="flex flex-row items-center gap-[.625rem] p-[.5rem] w-full">
-            <span className="text-[#EEEEEE] text-[.75rem] font-[400] text-nowrap w-full">
-              Tool K Sampling
-            </span>
-            <div className="flex flex-row items-center gap-[.5rem]">
-              <input
-                type="number"
-                className="bg-[#101010] text-[#EEEEEE] border-[1px] border-[#1F1F1F] rounded-[0.5rem] p-[.5rem] w-full"
-              />
-            </div>
-          </div>
-          <div className="flex flex-row items-center gap-[.625rem] p-[.5rem] w-full">
-            <span className="text-[#EEEEEE] text-[.75rem] font-[400] text-nowrap w-full">
-              Repeat Penalty
-            </span>
-            <div className="flex flex-row items-center gap-[.5rem]">
-              <input
-                type="number"
-                className="bg-[#101010] text-[#EEEEEE] border-[1px] border-[#1F1F1F] rounded-[0.5rem] p-[.5rem] w-full"
-              />
-            </div>
-          </div>
-          <div className="flex flex-row items-center gap-[.5rem] p-[.5rem]">
-            <span className="text-[#EEEEEE] text-[.75rem] font-[400]">
-              Top P Sampling
-            </span>
-            <Tooltip title="Top P Sampling">
-              <Image
-                src="icons/info.svg"
-                preview={false}
-                alt="bud"
-                width={".875rem"}
-                height={".875rem"}
-              />
-            </Tooltip>
-          </div>
-          <div className="flex items-center justify-center mt-[.8rem]">
-            <div className="text-[#757575] text-[.75rem] mr-1 ">5</div>
-            <Slider
-              className="budSlider mt-10 w-full"
-              defaultValue={30}
-              min={0}
-              max={100}
-              step={1}
-              tooltip={{
-                open: true,
-                getPopupContainer: (trigger) =>
-                  (trigger.parentNode as HTMLElement) || document.body, // Cast parentNode to HTMLElement
-              }}
-              styles={{
-                track: {
-                  backgroundColor: "#965CDE",
-                },
-                rail: {
-                  backgroundColor: "#212225",
-                  height: 4,
-                },
-              }}
-            />
-            <div className="text-[#757575] text-[.75rem] ml-1">100</div>
-          </div>
-          <div className="flex flex-row items-center gap-[.5rem] p-[.5rem]">
-            <span className="text-[#EEEEEE] text-[.75rem] font-[400]">
-              Min P Sampling
-            </span>
-            <Tooltip title="Min P Sampling">
-              <Image
-                src="icons/info.svg"
-                preview={false}
-                alt="bud"
-                width={".875rem"}
-                height={".875rem"}
-              />
-            </Tooltip>
-          </div>
-          <div className="flex items-center justify-center mt-[.8rem]">
-            <div className="text-[#757575] text-[.75rem] mr-1 ">5</div>
-            <Slider
-              className="budSlider mt-10 w-full"
-              defaultValue={30}
-              min={0}
-              max={100}
-              step={1}
-              tooltip={{
-                open: true,
-                getPopupContainer: (trigger) =>
-                  (trigger.parentNode as HTMLElement) || document.body, // Cast parentNode to HTMLElement
-              }}
-              styles={{
-                track: {
-                  backgroundColor: "#965CDE",
-                },
-                rail: {
-                  backgroundColor: "#212225",
-                  height: 4,
-                },
-              }}
-            />
-            <div className="text-[#757575] text-[.75rem] ml-1">100</div>
-          </div>
+          <InlineInput
+            title="Tool K Sampling"
+            value="30"
+            defaultValue="30"
+            type="number"
+            onChange={(value) => console.log(value)}
+          />
+          <InlineInput
+            title="Repeat Penalty"
+            value="30"
+            defaultValue="30"
+            type="number"
+            onChange={(value) => console.log(value)}
+          />
+          <SliderInput
+            title="Top P Sampling"
+            min={5}
+            max={100}
+            step={1}
+            defaultValue={30}
+            value={30}
+            onChange={(value) => console.log(value)}
+          />
+          <SliderInput
+            title="Min P Sampling"
+            min={5}
+            max={100}
+            step={1}
+            defaultValue={30}
+            value={30}
+            onChange={(value) => console.log(value)}
+          />
         </div>
       ),
     },
