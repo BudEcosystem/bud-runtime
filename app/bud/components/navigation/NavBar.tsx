@@ -44,6 +44,11 @@ function NavBar({
           preview={false}
         />
       </button>
+      <div
+        style={{
+          display: isLeftSidebarOpen ? "block" : "none",
+        }}
+      />
       <LoadModel />
       <div className="flex items-center gap-[.5rem]">
         <button

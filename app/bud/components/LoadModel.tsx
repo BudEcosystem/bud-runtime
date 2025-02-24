@@ -1,7 +1,8 @@
-import { Button, Popover } from "antd";
+import { Button, Modal, Popover } from "antd";
 import React from "react";
 import SearchHeaderInput from "./input/SearchHeaderInput";
 import { ModelListCard } from "./ModelListCard";
+import BlurModal from "./modal/BlurModal";
 
 function ModelLoaderComponent() {
   const [models, setModels] = React.useState([
@@ -31,9 +32,7 @@ function ModelLoaderComponent() {
   const [searchValue, setSearchValue] = React.useState("");
 
   return (
-    <div className="w-[520px] h-[400px] bg-[#1E1E1E25] rounded-[.625rem] relative">
-      <div className="blur  absolute top-0 left-0 w-full h-full bg-[#1E1E1E25] rounded-[.625rem] z-[-1] backdrop-filter backdrop-blur-[4px]"/>
-
+    <div>
       <div className="p-[1.25rem]">
         <SearchHeaderInput
           searchValue={searchValue}
@@ -78,11 +77,13 @@ function ModelLoaderComponent() {
     </div>
   );
 }
-{/* <div>
+{
+  /* <div>
     <Button type="primary" className="text-[#FFF] w-[196px] !h-[1.875rem]">
       <div className="text-[#FFF] text-[.75rem]"> Load Model</div>
     </Button>
-  </div> */}
+  </div> */
+}
 function LoadModel() {
   const [open, setOpen] = React.useState(false);
 
@@ -93,20 +94,21 @@ function LoadModel() {
 
   return (
     <div>
-      <Popover
-        rootClassName="!mt-[-3.25rem]"
-        arrow={false}
-        content={<ModelLoaderComponent />}
+      <BlurModal
+        width="520px"
+        height="400px"
         open={open}
+        onClose={() => setOpen(false)}
       >
-        <Button
-          type="primary"
-          className="text-[#FFF] w-[196px] h-[32px]"
-          onClick={() => setOpen(!open)}
-        >
-          Load Model
-        </Button>
-      </Popover>
+        <ModelLoaderComponent />
+      </BlurModal>
+      <Button
+        type="primary"
+        className="text-[#FFF] w-[196px] h-[32px]"
+        onClick={() => setOpen(!open)}
+      >
+        Load Model
+      </Button>
     </div>
   );
 }

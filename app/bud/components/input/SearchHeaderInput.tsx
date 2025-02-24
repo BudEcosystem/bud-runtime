@@ -1,5 +1,6 @@
 // SearchHeaderInput.tsx
 import { Input } from "antd";
+import { CrossIcon } from "lucide-react";
 import React, { useRef, useEffect } from "react";
 
 interface SearchHeaderInputProps {
@@ -87,7 +88,8 @@ export default function SearchHeaderInput({
       variant="filled"
       prefix={searchIcon}
       size="large"
-      suffix={<div className="w-[0px]"></div>}
+      // suffix={<CrossIcon  className="cursor-pointer text-[#757575] hover:text-[#EEEEEE] !p-[.5rem]"
+      //   onClick={() => setSearchValue("")} />}
     />
   );
 }

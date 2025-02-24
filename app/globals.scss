@@ -682,16 +682,6 @@ i.bulleted-list {
   }
 }
 
-.ant-popover-inner {
-  color: #ffffff !important;
-  padding: 0 !important;
-}
-
-.antPopoverArrow {
-  .ant-popover-arrow::before {
-    background-color: #202020 !important;
-  }
-}
 .custom-select {
   .ant-select {
     height: 2.375rem;
@@ -860,4 +850,18 @@ input.ant-input:-webkit-autofill {
 .ant-select-single.ant-select-lg {
   // min-height: 44px;
   min-height: 40px;
+}
+
+
+.ant-popover-inner{
+  background: #1f1f1f25 !important;
+  color: #ffffff !important;
+  padding: 0 !important;
+}
+
+
+.antPopoverArrow {
+  .ant-popover-arrow::before {
+    background-color: #202020 !important;
+  }
 }
