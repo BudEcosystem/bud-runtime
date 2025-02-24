@@ -596,3 +596,24 @@ i.bulleted-list {
 .ant-select-selection-overflow {
   font-size: 0.75rem !important;
 }
+
+
+.custom-ant-input {
+
+  // border: .5px solid #757575 !important;
+  input::placeholder {
+    color: #757575 !important;
+    /* Your desired placeholder color */
+    opacity: 1;
+    /* Ensure it’s fully opaque */
+  }
+  .ant-input-suffix {
+    display: none !important;
+  }
+}
+
+.ant-popover-inner{
+  background: #1f1f1f !important;
+  color: #ffffff !important;
+  padding: 1.25rem !important;
+}
