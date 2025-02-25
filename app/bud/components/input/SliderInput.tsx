@@ -3,6 +3,7 @@ import React from "react";
 
 interface SliderInputProps {
   title: string;
+  description?: string;
   min: number;
   max: number;
   step: number;
@@ -14,19 +15,28 @@ interface SliderInputProps {
 function SliderInput(props: SliderInputProps) {
   return (
     <>
-      <div className="flex flex-row items-center gap-[.5rem] p-[.5rem]">
-        <span className="text-[#EEEEEE] text-[.75rem] font-[400]">
-          {props.title}
-        </span>
-        <Tooltip title="Top P Sampling">
-          <Image
-            src="icons/info.svg"
-            preview={false}
-            alt="bud"
-            width={".875rem"}
-            height={".875rem"}
-          />
-        </Tooltip>
+      <div className="flex flex-col items-start  p-[.5rem]">
+        <div className="flex flex-row justify-start gap-[.5rem]">
+          <span className="text-[#EEEEEE] text-[.75rem] font-[400]">
+            {props.title}
+          </span>
+          <Tooltip title="Top P Sampling">
+            <Image
+              src="icons/info.svg"
+              preview={false}
+              alt="bud"
+              width={".875rem"}
+              height={".875rem"}
+            />
+          </Tooltip>
+        </div>
+        {props.description && (
+          <div>
+            <span className="text-[#757575] text-[.625rem] font-[400]">
+              {props.description}
+            </span>
+          </div>
+        )}
       </div>
       <div className="flex items-center justify-center mt-[.8rem]">
         <div className="text-[#757575] text-[.75rem] mr-1 ">{props.min}</div>
