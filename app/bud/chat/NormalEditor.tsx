@@ -2,7 +2,7 @@ import { Image } from "antd";
 import { RectangleEllipsisIcon, StopCircleIcon } from "lucide-react";
 import React, { useState } from "react";
 
-interface NormalEditorProps {
+export interface EditorProps {
   input: string;
   handleSubmit: (e: React.FormEvent) => void;
   isLoading: boolean;
@@ -18,7 +18,7 @@ function NormalEditor({
   stop,
   error,
   handleInputChange,
-}: NormalEditorProps) {
+}: EditorProps) {
   const [isHovered, setIsHovered] = useState<boolean>(false);
 
   return (

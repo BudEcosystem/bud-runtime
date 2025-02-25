@@ -212,7 +212,8 @@ body {
   padding: 0.5rem 10px;
   caret-color: #757575;
   color: #757575;
-  padding-left: 1rem;
+  padding-left: 2.4rem;
+  padding-top: 1.1rem;
 }
 
 .editor-placeholder {
@@ -220,12 +221,14 @@ body {
   overflow: hidden;
   position: absolute;
   text-overflow: ellipsis;
-  top: 1rem;
-  left: 1rem;
+  top: 0;
+  left: 0;
   font-size: 0.75rem;
   user-select: none;
   display: inline-block;
   pointer-events: none;
+  padding-left: 2.4rem;
+  padding-top: 1.1rem;
 }
 
 .editor-text-bold {
@@ -599,6 +602,18 @@ i.numbered-list {
 
 i.bulleted-list {
   background-image: url(/icons/bullet-list.svg);
+}
+
+i.attachment {
+  background-image: url(/icons/attachment.svg);
+}
+
+i.smiley {
+  background-image: url(/icons/smiley.svg);
+}
+
+i.toggle-editor {
+  background-image: url(/icons/toggle-editor.svg);
 }
 
 .budSlider {

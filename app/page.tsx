@@ -118,26 +118,6 @@ export default function Chat() {
           </div>
           <div className="h-[calc(100vh-3.625rem)]">
             <HistoryList data={[1, 2, 3]} />
-            {/* <div className="px-[.9rem] py-[3.1rem]">
-            <div className="custom-select">
-              <Select
-                getPopupContainer={(trigger) =>
-                  (trigger.parentNode as HTMLElement) || document.body
-                }
-                suffixIcon={<DownOutlined style={{ color: '#EEEEEE' }} />}
-                className=" !text-[1rem] text-[#EEEEEE] font-[400]"
-                defaultValue="Presets"
-                style={{ width: '100%' }}
-                onChange={handleChange}
-                options={[
-                  { value: 'Presets', label: 'Presets' },
-                  { value: 'lucy', label: 'Lucy' },
-                  { value: 'Yiminghe', label: 'yiminghe' },
-                  { value: 'disabled', label: 'Disabled', disabled: true },
-                ]}
-              />
-            </div>
-          </div> */}
           </div>
         </div>
       </Sider>
@@ -186,7 +166,17 @@ export default function Chat() {
           </div>
         </Content>
         <Footer className="sticky bottom-0 !px-[2.6875rem]">
-          <NormalEditor
+          {/* <NormalEditor
+            isLoading={isLoading}
+            error={error}
+            stop={stop}
+            handleInputChange={handleInputChange}
+            handleSubmit={handleSubmit}
+            input={input}
+            // isLoading={isLoading}
+            // error={error}
+          /> */}
+          <Editor
             isLoading={isLoading}
             error={error}
             stop={stop}

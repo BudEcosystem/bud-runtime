@@ -84,28 +84,8 @@ export default function ToolbarPlugin() {
 
   return (
     <div className="toolbar mb-[4rem]" ref={toolbarRef}>
-      {/* <button
-        disabled={!canUndo}
-        onClick={() => {
-          editor.dispatchCommand(UNDO_COMMAND, undefined);
-        }}
-        className="toolbar-item spaced"
-        aria-label="Undo"
-      >
-        <i className="format undo" />
-      </button>
       <button
-        disabled={!canRedo}
-        onClick={() => {
-          editor.dispatchCommand(REDO_COMMAND, undefined);
-        }}
-        className="toolbar-item"
-        aria-label="Redo"
-      >
-        <i className="format redo" />
-      </button>
-      <Divider /> */}
-      <button
+        type="button"
         onClick={() => {
           editor.dispatchCommand(FORMAT_TEXT_COMMAND, "bold");
         }}
@@ -115,6 +95,7 @@ export default function ToolbarPlugin() {
         <i className="format bold" />
       </button>
       <button
+        type="button"
         onClick={() => {
           editor.dispatchCommand(FORMAT_TEXT_COMMAND, "italic");
         }}
@@ -124,6 +105,7 @@ export default function ToolbarPlugin() {
         <i className="format italic" />
       </button>
       <button
+        type="button"
         onClick={() => {
           editor.dispatchCommand(FORMAT_TEXT_COMMAND, "underline");
         }}
@@ -133,6 +115,7 @@ export default function ToolbarPlugin() {
         <i className="format underline" />
       </button>
       <button
+        type="button"
         onClick={() => {
           editor.dispatchCommand(FORMAT_TEXT_COMMAND, "strikethrough");
         }}
@@ -142,6 +125,7 @@ export default function ToolbarPlugin() {
         <i className="format strikethrough" />
       </button>
       <button
+        type="button"
         onClick={() => {
           editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, "left");
         }}
@@ -151,6 +135,7 @@ export default function ToolbarPlugin() {
         <i className="format numbered-list" />
       </button>
       <button
+        type="button"
         onClick={() => {
           editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, "left");
         }}
@@ -160,6 +145,7 @@ export default function ToolbarPlugin() {
         <i className="format bulleted-list" />
       </button>
       <button
+        type="button"
         onClick={() => {
           editor.dispatchCommand(INDENT_CONTENT_COMMAND, undefined);
         }}
@@ -168,43 +154,6 @@ export default function ToolbarPlugin() {
       >
         <i className="format indent" />
       </button>
-
-      {/* <button
-        onClick={() => {
-          editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, "left");
-        }}
-        className="toolbar-item spaced"
-        aria-label="Left Align"
-      >
-        <i className="format left-align" />
-      </button>
-      <button
-        onClick={() => {
-          editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, "center");
-        }}
-        className="toolbar-item spaced"
-        aria-label="Center Align"
-      >
-        <i className="format center-align" />
-      </button>
-      <button
-        onClick={() => {
-          editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, "right");
-        }}
-        className="toolbar-item spaced"
-        aria-label="Right Align"
-      >
-        <i className="format right-align" />
-      </button>
-      <button
-        onClick={() => {
-          editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, "justify");
-        }}
-        className="toolbar-item"
-        aria-label="Justify Align"
-      >
-        <i className="format justify-align" />
-      </button>{" "} */}
     </div>
   );
 }

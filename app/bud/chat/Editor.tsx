@@ -29,6 +29,7 @@ import ToolbarPlugin from "../../plugin/ToolbarPlugin";
 import { ChatRequestOptions } from "ai";
 import { Image } from "antd";
 import { useState } from "react";
+import { EditorProps } from "./NormalEditor";
 
 const MIN_ALLOWED_FONT_SIZE = 8;
 const MAX_ALLOWED_FONT_SIZE = 72;
@@ -193,29 +194,19 @@ const editorConfig = {
   },
 };
 
-interface EditorProps {
-  input: string;
-  handleInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  handleSubmit: (
-    event?: {
-      preventDefault?: () => void;
-    },
-    chatRequestOptions?: ChatRequestOptions
-  ) => void;
-}
-
 export default function Editor(props: EditorProps) {
+  const [toggleFormat, setToggleFormat] = useState<boolean>(false);
   const [isHovered, setIsHovered] = useState<boolean>(false);
   const handleChange = (value: string) => {
     console.log(`selected ${value}`);
   };
   return (
-    <div className="flex flex-row w-full justify-center items-center mb-[.55rem] ">
-      <form className="chat-message-form   w-full  flex items-center justify-center  border-t-2 rounded-[0.625rem] bg-[#101010] relative z-10 overflow-hidden">
+    <div className="flex flex-row w-full justify-center items-center mb-[.55rem]  px-[1rem]">
+      <form className="chat-message-form  max-w-3xl   w-full  flex items-center justify-center  border-t-2 rounded-[0.625rem] bg-[#101010] relative z-10 overflow-hidden">
         <div className="blur-[0.5rem] absolute top-0 left-0 right-0 bottom-0 bg-[#FFFFFF03] rounded-[0.5rem] " />
         <LexicalComposer initialConfig={editorConfig}>
           <div className="editor-container">
-            <ToolbarPlugin />
+            {toggleFormat && <ToolbarPlugin />}
             <OnChangePlugin
               onChange={(editorState, editor) => {
                 const data = editorState.toJSON() as any;
@@ -227,6 +218,14 @@ export default function Editor(props: EditorProps) {
               }}
             />
             <div className="editor-inner">
+              <div className="flex items-center w-[1.25rem] h-[1.25rem] mt-[1.25rem] absolute top-0 left-[1.25rem]">
+                <Image
+                  src="icons/bud.svg"
+                  alt="attachment"
+                  className="pr-[.5rem] w-full h-full"
+                  preview={false}
+                />
+              </div>
               <RichTextPlugin
                 contentEditable={
                   <ContentEditable
@@ -246,20 +245,55 @@ export default function Editor(props: EditorProps) {
             </div>
           </div>
         </LexicalComposer>
-        <div className="absolute flex justify-between items-end w-full bottom-0 left-0 right-0 px-[.85rem] pb-[.95rem]">
-          <div></div>
-          <button
-            className="Open-Sans text-[400]z-[999] text-[.75rem] text-[#EEEEEE] border-[#757575] border-[1px] rounded-[6px] p-[.2rem] hover:bg-[#1F1F1F4D] hover:text-[#FFFFFF]  flex items-center gap-[.5rem] px-[.8rem] py-[.15rem] bg-[#1F1F1F] hover:bg-[#965CDE] hover:text-[#FFFFFF]"
-            type="button"
-            onClick={props.handleSubmit}
-            onMouseEnter={() => setIsHovered(true)}
-            onMouseLeave={() => setIsHovered(false)}
-          >
-            Send
-            <div className="w-[1.25rem] h-[1.25rem]">
-              <Image src={isHovered ? 'icons/send-white.png' : 'icons/send.png'} alt="send" preview={false} />
-            </div>
-          </button>
+        <div className="absolute flex justify-between items-end w-full bottom-0 left-0 right-0 pr-[.85rem] pl-[.25rem]">
+          <div className="toolbar pb-[.65rem]">
+            <button
+              type="button"
+              onClick={() => {}}
+              className={"toolbar-item spaced " + (false ? "active" : "")}
+              aria-label="Format Attachment"
+            >
+              <i className="format attachment" />
+            </button>
+            <button
+              type="button"
+              onClick={() => {}}
+              className={"toolbar-item spaced " + (false ? "active" : "")}
+              aria-label="Format smiley"
+            >
+              <i className="format smiley" />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setToggleFormat(!toggleFormat);
+              }}
+              className={
+                "toolbar-item spaced " + (toggleFormat ? "active" : "")
+              }
+              aria-label="Format Editor"
+            >
+              <i className="format toggle-editor" />
+            </button>
+          </div>
+          <div className="pb-[.95rem]">
+            <button
+              className="Open-Sans text-[400]z-[999] text-[.75rem] text-[#EEEEEE] border-[#757575] border-[1px] rounded-[6px] p-[.2rem] hover:bg-[#1F1F1F4D] hover:text-[#FFFFFF]  flex items-center gap-[.5rem] px-[.8rem] py-[.15rem] bg-[#1F1F1F] hover:bg-[#965CDE] hover:text-[#FFFFFF]"
+              type="button"
+              onClick={props.handleSubmit}
+              onMouseEnter={() => setIsHovered(true)}
+              onMouseLeave={() => setIsHovered(false)}
+            >
+              Send
+              <div className="w-[1.25rem] h-[1.25rem]">
+                <Image
+                  src={isHovered ? "icons/send-white.png" : "icons/send.png"}
+                  alt="send"
+                  preview={false}
+                />
+              </div>
+            </button>
+          </div>
         </div>
       </form>
     </div>
