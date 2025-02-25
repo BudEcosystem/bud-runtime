@@ -107,6 +107,7 @@ export function ModelListCard({
         <div className="text-[#757575] w-full overflow-hidden text-ellipsis text-xs mt-[0.25rem]">
           {model?.tags.map((tag) => (
             <Tag
+              key={tag.name}
               className=" !text-[.625rem] font-[400] rounded-[0.5rem] !px-[.375rem] !h-[1.25rem] flex items-center justify-center leading-[1.25rem]"
               style={{
                 background: getChromeColor(tag.color || "#D1B854"),
