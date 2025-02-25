@@ -8,6 +8,7 @@ import { useState } from "react";
 import NormalEditor from "../components/input/NormalEditor";
 import MessageLoading from "./MessageLoading";
 import NavBar from "../components/navigation/NavBar";
+import { apiKey, copyCodeApiBaseUrl } from "../environment";
 
 const { Header, Footer, Sider, Content } = Layout;
 
@@ -25,6 +26,20 @@ export default function Chat() {
     reload,
     stop,
   } = useChat({
+    api: `${copyCodeApiBaseUrl}`,
+    headers: {
+      "api-key": `${apiKey}`,
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: {
+      model: 'gpt',
+      max_tokens: 100,
+      temperature: 0.5,
+      top_p: 1,
+      frequency_penalty: 0,
+      presence_penalty: 0,
+      stop: ["\n"],
+    },
     onFinish(message, { usage, finishReason }) {
       console.log("Usage", usage);
       console.log("FinishReason", finishReason);
