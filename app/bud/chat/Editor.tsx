@@ -12,7 +12,11 @@ import { ContentEditable } from "@lexical/react/LexicalContentEditable";
 import { LexicalErrorBoundary } from "@lexical/react/LexicalErrorBoundary";
 import { HistoryPlugin } from "@lexical/react/LexicalHistoryPlugin";
 import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
+import { PlainTextPlugin } from "@lexical/react/LexicalPlainTextPlugin";
 import { OnChangePlugin } from "@lexical/react/LexicalOnChangePlugin";
+import { ClearEditorPlugin } from "@lexical/react/LexicalClearEditorPlugin";
+import { $generateHtmlFromNodes } from "@lexical/html";
+
 import {
   $isTextNode,
   DOMConversionMap,
@@ -25,6 +29,7 @@ import {
   ParagraphNode,
   TextNode,
 } from "lexical";
+
 import ToolbarPlugin from "../../plugin/ToolbarPlugin";
 import { ChatRequestOptions } from "ai";
 import { Image } from "antd";
@@ -209,11 +214,11 @@ export default function Editor(props: EditorProps) {
             {toggleFormat && <ToolbarPlugin />}
             <OnChangePlugin
               onChange={(editorState, editor) => {
-                const data = editorState.toJSON() as any;
-                const children = data?.root?.children?.[0]?.children as any;
-                console.log(children[0]?.text);
+                const data = $generateHtmlFromNodes(editor);
+                console.log(data);
+                debugger;
                 props.handleInputChange({
-                  target: { value: children[0]?.text } as any,
+                  target: { value: data } as any,
                 } as any);
               }}
             />
@@ -226,6 +231,9 @@ export default function Editor(props: EditorProps) {
                   preview={false}
                 />
               </div>
+              <ClearEditorPlugin />
+
+              {/* {toggleFormat ? ( */}
               <RichTextPlugin
                 contentEditable={
                   <ContentEditable
@@ -240,7 +248,18 @@ export default function Editor(props: EditorProps) {
                 }
                 ErrorBoundary={LexicalErrorBoundary}
               />
-              <HistoryPlugin />
+              {/* ) : (
+                <PlainTextPlugin
+                  contentEditable={
+                    <ContentEditable
+                      aria-placeholder={"Enter some text..."}
+                      placeholder={<div>Enter some text...</div>}
+                    />
+                  }
+                  ErrorBoundary={LexicalErrorBoundary}
+                />
+              )}
+              <HistoryPlugin /> */}
               <AutoFocusPlugin />
             </div>
           </div>

@@ -166,17 +166,7 @@ export default function Chat() {
           </div>
         </Content>
         <Footer className="sticky bottom-0 !px-[2.6875rem]">
-          {/* <NormalEditor
-            isLoading={isLoading}
-            error={error}
-            stop={stop}
-            handleInputChange={handleInputChange}
-            handleSubmit={handleSubmit}
-            input={input}
-            // isLoading={isLoading}
-            // error={error}
-          /> */}
-          <Editor
+          <NormalEditor
             isLoading={isLoading}
             error={error}
             stop={stop}
@@ -186,6 +176,16 @@ export default function Chat() {
             // isLoading={isLoading}
             // error={error}
           />
+          {/* <Editor
+            isLoading={isLoading}
+            error={error}
+            stop={stop}
+            handleInputChange={handleInputChange}
+            handleSubmit={handleSubmit}
+            input={input}
+            // isLoading={isLoading}
+            // error={error}
+          /> */}
         </Footer>
       </Layout>
       <Sider
