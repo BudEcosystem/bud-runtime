@@ -189,6 +189,7 @@ export default function Chat() {
           <NormalEditor
             isLoading={isLoading}
             error={error}
+            stop={stop}
             handleInputChange={handleInputChange}
             handleSubmit={handleSubmit}
             input={input}

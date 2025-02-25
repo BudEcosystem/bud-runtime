@@ -1,11 +1,13 @@
 import { Image } from "antd";
-import React from "react";
+import { RectangleEllipsisIcon, StopCircleIcon } from "lucide-react";
+import React, { useState } from "react";
 
 interface NormalEditorProps {
   input: string;
   handleSubmit: (e: React.FormEvent) => void;
   isLoading: boolean;
   error?: Error;
+  stop?: () => void;
   handleInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
@@ -13,9 +15,12 @@ function NormalEditor({
   input,
   handleSubmit,
   isLoading,
+  stop,
   error,
   handleInputChange,
 }: NormalEditorProps) {
+  const [isHovered, setIsHovered] = useState<boolean>(false);
+
   return (
     <div className="flex flex-row w-full justify-center items-center mb-[.55rem] ">
       <form
@@ -38,8 +43,31 @@ function NormalEditor({
           onSubmit={handleSubmit}
           disabled={isLoading || error != null}
         />
-        <button type="submit" className="ml-2 flex items-center">
-          <Image src="icons/send.svg" alt="send" preview={false} />
+        <button
+          className="Open-Sans text-[400] z-[999] text-[.75rem] text-[#EEEEEE] border-[#757575] border-[1px] rounded-[6px] p-[.2rem] hover:bg-[#1F1F1F4D] hover:text-[#FFFFFF]  flex items-center gap-[.5rem] px-[.8rem] py-[.15rem] bg-[#1F1F1F] hover:bg-[#965CDE] hover:text-[#FFFFFF]"
+          type="submit"
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+          onClick={(e)=>{
+            if(isLoading){
+              e.preventDefault();
+              stop && stop();
+            }
+          }}
+        >
+          {isLoading ? "Stop" : "Send"}
+          {isLoading ?
+          <div className="w-[1.25rem] h-[1.25rem]">
+            <StopCircleIcon width={20} height={20} />
+          </div>
+          :
+          <div className="w-[1.25rem] h-[1.25rem]">
+            <Image
+              src={isHovered ? "icons/send-white.png" : "icons/send.png"}
+              alt="send"
+              preview={false}
+            />
+          </div>}
         </button>
       </form>
     </div>
