@@ -20,12 +20,14 @@ type Model = {
 
 export function ModelListCard({
   selected,
+  selectable,
   handleClick,
   data,
   hideSeeMore,
   hideSelect,
 }: {
   selected?: boolean;
+  selectable?: boolean;
   handleClick?: () => void;
   data: Endpoint;
   hideSeeMore?: boolean;
@@ -50,7 +52,7 @@ export function ModelListCard({
         hover:border-[#757575] h-[80px] flex-row flex border-box 
         hover:bg-[#FFFFFF08] 
           items-center justify-center ${
-            selected ? "bg-[#FFFFFF08]" : "bg-[#1F1F1F]"
+            selectable ? selected ? "bg-[#FFFFFF08]" : "bg-[#1F1F1F]" : ""
           }`}
     >
       <div className="bg-[#1F1F1F] rounded-[0.515625rem] w-[2.6875rem] h-[2.6875rem] flex justify-center items-center mr-[1rem] shrink-0 grow-0">

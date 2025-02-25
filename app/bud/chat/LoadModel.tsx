@@ -4,6 +4,7 @@ import SearchHeaderInput from "../components/input/SearchHeaderInput";
 import { ModelListCard } from "../components/ModelListCard";
 import BlurModal from "../components/modal/BlurModal";
 import { Endpoint, useEndPoints } from "../hooks/useEndPoint";
+import { ChevronDown, ChevronUp } from "lucide-react";
 
 interface LoadModelProps {
   open: boolean;
@@ -41,7 +42,7 @@ function LoadModel(props: LoadModelProps) {
               placeholder="Model names, Tags, Tasks, Parameter sizes"
             />
           </div>
-          <div className="w-full h-[320px] overflow-y-auto scrollbar-thin scrollbar-thumb-[#757575] scrollbar-track-[#1E1E1E] scrollbar-thumb-rounded-full scrollbar-track-rounded-full">
+          <div className="w-full  overflow-y-auto scrollbar-thin scrollbar-thumb-[#757575] scrollbar-track-[#1E1E1E] scrollbar-thumb-rounded-full scrollbar-track-rounded-full">
             <div className="flex justify-between items-center px-[1.25rem] py-[0.625rem]">
               <div className="text-[#757575] text-[0.75rem] font-[400]">
                 Currently Loaded
@@ -60,7 +61,45 @@ function LoadModel(props: LoadModelProps) {
               <ModelListCard
                 key={endpoint.id}
                 data={endpoint}
+                selectable
                 selected={props.selected?.id === endpoint.id}
+                handleClick={() => {
+                  // if (props.selected?.id === endpoint.id) {
+                  //   return props.setSelected(null);
+                  // }
+                  props.setSelected(endpoint);
+                  props.setOpenEdit(true);
+                  props.setOpen(false);
+                }}
+              />
+            ))}
+          </div>
+          <div className="w-full h-[320px] overflow-y-auto scrollbar-thin scrollbar-thumb-[#757575] scrollbar-track-[#1E1E1E] scrollbar-thumb-rounded-full scrollbar-track-rounded-full">
+            <div className="flex justify-between items-center px-[1.25rem] py-[0.625rem]">
+              <div className="text-[#757575] text-[0.75rem] font-[400]">
+                Models Available
+                <span className="text-[#FFF] text-[0.75rem] font-[400] ml-[0.25rem]">
+                  {endPoints.length}
+                </span>
+              </div>
+              <div className="flex items-center gap-x-[0.25rem] justify-between">
+                <div className="text-[#B3B3B3] text-[0.5rem] font-[400] flex items-center gap-x-[0.25rem] bg-[#1E1E1E] rounded-[6px] px-[0.5rem] py-[0.25rem]">
+                  Recency
+                  <ChevronUp
+                    width={9}
+                    height={9}
+                    className="text-[#B3B3B3] cursor-pointer text-[0.6rem]"
+                  />
+                </div>
+                <span className="text-[#FFF] text-[0.5rem] font-[400] ml-[0.25rem]">
+                  Size
+                </span>
+              </div>
+            </div>
+            {endPoints.map((endpoint) => (
+              <ModelListCard
+                key={endpoint.id}
+                data={endpoint}
                 handleClick={() => {
                   // if (props.selected?.id === endpoint.id) {
                   //   return props.setSelected(null);

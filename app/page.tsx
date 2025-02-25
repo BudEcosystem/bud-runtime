@@ -9,6 +9,7 @@ import { Layout } from "antd";
 import HistoryList from "./bud/chat/HistoryList";
 import SettingsList from "./bud/chat/SettingsList";
 import { useState } from "react";
+import NormalEditor from "./bud/chat/NormalEditor";
 
 const { Header, Footer, Sider, Content } = Layout;
 
@@ -92,13 +93,17 @@ export default function Chat() {
   };
   return (
     <Layout className="chat-container">
-      <Sider width="20.8%" className="rounded-l-[1rem]"
+      <Sider
+        width="20.8%"
+        className="rounded-l-[1rem]"
         style={{ display: toggleLeft ? "block" : "none" }}
       >
         <div className="leftBg w-full h-full">
           <div className="flex flex-row py-[1rem] px-[1.5rem] bg-[#101010] border-b-[1px] border-[#1F1F1F] h-[3.625rem]">
-            <div className="flex flex-row items-center gap-[.85rem] p-[.5rem] bg-[#101010] cursor-pointer"
-            onClick={() => setToggleLeft(!toggleLeft)}>
+            <div
+              className="flex flex-row items-center gap-[.85rem] p-[.5rem] bg-[#101010] cursor-pointer"
+              onClick={() => setToggleLeft(!toggleLeft)}
+            >
               <Image
                 preview={false}
                 src="icons/minimize.svg"
@@ -106,7 +111,9 @@ export default function Chat() {
                 width={".75rem"}
                 height={".75rem"}
               />
-              <span className="Lato-Regular text-[#EEE] text-[1rem] font-[400]">Chats</span>
+              <span className="Lato-Regular text-[#EEE] text-[1rem] font-[400]">
+                Chats
+              </span>
             </div>
           </div>
           <div className="h-[calc(100vh-3.625rem)]">
@@ -152,11 +159,14 @@ export default function Chat() {
                   preview={false}
                   src="icons/load.svg"
                   alt="bud"
-                  width={"3.125rem"}
-                  height={"3.125rem"}
+                  width={"330px"}
+                  height={"130px"}
                 />
-                <div className="mt-[.75rem] text-[.75rem]">
-                  No model selected, select a model to send a message
+                <div className="mt-[.75rem] text-[1.375rem]">
+                  Hello there 👋
+                </div>
+                <div className="text-[1.375rem]">
+                  Select a model to get started
                 </div>
               </div>
             )}
@@ -176,23 +186,28 @@ export default function Chat() {
           </div>
         </Content>
         <Footer className="sticky bottom-0 !px-[2.6875rem]">
-          <Editor
+          <NormalEditor
+            isLoading={isLoading}
+            error={error}
             handleInputChange={handleInputChange}
             handleSubmit={handleSubmit}
             input={input}
-          // isLoading={isLoading}
-          // error={error}
+            // isLoading={isLoading}
+            // error={error}
           />
         </Footer>
       </Layout>
-      <Sider width="20.8%" className="rounded-r-[1rem] Open-Sans"
+      <Sider
+        width="20.8%"
+        className="rounded-r-[1rem] Open-Sans"
         style={{ display: toggleRight ? "block" : "none" }}
       >
         <div className="rightBg w-full h-full">
           <div className="flex flex-row pt-[.7rem] pb-[.4rem] px-[.9rem] bg-[#101010] border-b-[1px] border-[#1F1F1F] h-[3.625rem] justify-between items-center">
-            <div className="flex flex-row items-center gap-[.65rem] bg-[#101010] pl-[.15rem] cursor-pointer"
-            
-            onClick={() => setToggleRight(!toggleRight)}>
+            <div
+              className="flex flex-row items-center gap-[.65rem] bg-[#101010] pl-[.15rem] cursor-pointer"
+              onClick={() => setToggleRight(!toggleRight)}
+            >
               <Image
                 preview={false}
                 src="icons/minimize.svg"
@@ -200,10 +215,13 @@ export default function Chat() {
                 width={".85rem"}
                 height={".85rem"}
               />
-              <span className="Lato-Regular text-[#EEE] text-[1rem] font-[300]">Settings</span>
+              <span className="Lato-Regular text-[#EEE] text-[1rem] font-[300]">
+                Settings
+              </span>
             </div>
             <div>
-              <button className="flex items-center flex-row gap-[.4rem] h-[1.375rem] text-[#B3B3B3] text-[300] text-[.625rem] font-[400] p-[.35rem] bg-[#FFFFFF08] rounded-[0.375rem] border-[1px] border-[#1F1F1F] hover:bg-[#965CDE] hover:text-[#FFFFFF]"
+              <button
+                className="flex items-center flex-row gap-[.4rem] h-[1.375rem] text-[#B3B3B3] text-[300] text-[.625rem] font-[400] p-[.35rem] bg-[#FFFFFF08] rounded-[0.375rem] border-[1px] border-[#1F1F1F] hover:bg-[#965CDE] hover:text-[#FFFFFF]"
                 onMouseEnter={() => setIsHovered(true)}
                 onMouseLeave={() => setIsHovered(false)}
               >
