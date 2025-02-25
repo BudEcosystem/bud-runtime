@@ -62,9 +62,9 @@ function LoadModel(props: LoadModelProps) {
                 data={endpoint}
                 selected={props.selected?.id === endpoint.id}
                 handleClick={() => {
-                  if (props.selected?.id === endpoint.id) {
-                    return props.setSelected(null);
-                  }
+                  // if (props.selected?.id === endpoint.id) {
+                  //   return props.setSelected(null);
+                  // }
                   props.setSelected(endpoint);
                   props.setOpenEdit(true);
                   props.setOpen(false);

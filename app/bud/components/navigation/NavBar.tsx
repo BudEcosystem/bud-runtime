@@ -70,6 +70,10 @@ function NavBar({
         data={selectedModel}
         open={openEdit}
         setOpen={setOpenEdit}
+        onBack={() => {
+          setOpenEdit(false);
+          setOpen(true);
+        }}
       />
       <div className="flex items-center gap-[.5rem]">
         <button

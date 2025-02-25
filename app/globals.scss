@@ -865,3 +865,31 @@ input.ant-input:-webkit-autofill {
     background-color: #202020 !important;
   }
 }
+
+
+.ant-btn-default {
+  background-color: #1F1F1F !important;
+  border: 1px solid #757575 !important;
+  color: #EEEEEE !important;
+  font-size: .75rem;
+  font-weight: 400;
+  margin-right: 1rem;
+
+  &:hover {
+    background-color: #1F1F1F !important;
+    border: 1px solid #B3B3B3 !important;
+  }
+}
+
+.ant-btn-primary {
+  background-color: #1E0C34 !important;
+  border: 1px solid #965CDE !important;
+  color: #EEEEEE !important;
+  font-size: .75rem;
+  font-weight: 400;
+
+  &:hover {
+    background-color: #7f4f9b !important;
+    border: 1px solid #7f4f9b !important;
+  }
+}
