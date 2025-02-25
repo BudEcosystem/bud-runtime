@@ -1,16 +1,13 @@
-"use client";
-
 import { useChat } from "@ai-sdk/react";
-import NavBar from "./components/bud/components/navigation/NavBar";
 import { Image } from "antd";
-import Editor from "./components/bud/components/input/Editor";
-import Messages from "./components/bud/chat/Messages";
+import Messages from "./Messages";
 import { Layout } from "antd";
-import HistoryList from "./components/bud/chat/HistoryList";
-import SettingsList from "./components/bud/chat/SettingsList";
+import HistoryList from "./HistoryList";
+import SettingsList from "./SettingsList";
 import { useState } from "react";
-import NormalEditor from "./components/bud/components/input/NormalEditor";
-import MessageLoading from "./components/bud/chat/MessageLoading";
+import NormalEditor from "../components/input/NormalEditor";
+import MessageLoading from "./MessageLoading";
+import NavBar from "../components/navigation/NavBar";
 
 const { Header, Footer, Sider, Content } = Layout;
 
