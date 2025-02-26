@@ -1,5 +1,6 @@
 import { createContext } from "react";
 import { apiKey } from "../components/bud/environment";
+import { PostMessage } from "../components/bud/hooks/useMessages";
 
 type Provider = {
   id: string;
@@ -58,9 +59,9 @@ type ChatContextType = {
   // set chat session id
   setChatSessionId: (chatSessionId: string) => void;
   // messages history
-  messages: any[];
+  messages: PostMessage[];
   // set messages history
-  setMessages: (messages: any[]) => void;
+  setMessages: (messages: PostMessage[]) => void;
 };
 
 const ChatContext = createContext<ChatContextType>({

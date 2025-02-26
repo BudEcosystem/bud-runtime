@@ -1,6 +1,6 @@
 import { apiKey, tempApiBaseUrl } from "../environment";
 import axios from "axios";
-import { useContext } from "react";
+import { useContext, useEffect } from "react";
 import ChatContext from "@/app/context/ChatContext";
 
 export type PostMessage = {
@@ -19,24 +19,51 @@ export type PostMessage = {
 };
 
 export function useMessages() {
-  const { apiKey: apiKeyState, setChatSessionId } = useContext(ChatContext);
+  const {
+    apiKey: apiKeyState,
+    token,
+    setChatSessionId,
+    setMessages,
+  } = useContext(ChatContext);
 
   async function createMessage(body: PostMessage) {
-    const result = await axios
-      .post(`${tempApiBaseUrl}/playground/messages`, body, {
-        params: {},
-        headers: {
-          "api-key": apiKey,
-        },
-      })
-      .then((res) => {
-        console.log(res.data.endpoints);
-        return res.data.endpoints;
-      });
+    if (token) {
+      const result = await axios
+        .post(`${tempApiBaseUrl}/playground/messages`, body, {
+          params: {},
+          headers: {
+            "api-key": apiKey,
+          },
+        })
+        .then((res) => {
+          console.log(res.data.endpoints);
+          return res.data.endpoints;
+        });
 
-    console.log(result);
-    return result;
+      console.log(result);
+      return result;
+    } else if (apiKey) {
+      // store to local storage
+      const existing = localStorage.getItem(apiKey);
+      if (existing) {
+        const data = JSON.parse(existing);
+        data.push(body);
+        localStorage.setItem(apiKey, JSON.stringify(data));
+      } else {
+        localStorage.setItem(apiKey, JSON.stringify([body]));
+      }
+    }
   }
+
+  useEffect(() => {
+    if (apiKey) {
+      const existing = localStorage.getItem(apiKey);
+      if (existing) {
+        const data = JSON.parse(existing);
+        setMessages(data);
+      }
+    }
+  }, [apiKey]);
 
   return { createMessage };
 }

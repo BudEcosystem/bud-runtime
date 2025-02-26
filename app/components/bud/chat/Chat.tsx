@@ -1,6 +1,6 @@
 import { Message, useChat } from "@ai-sdk/react";
 import { Image } from "antd";
-import Messages from "./Messages";
+import { Messages, HistoryMessages } from "./Messages";
 import { Layout } from "antd";
 import HistoryList from "./HistoryList";
 import SettingsList from "./SettingsList";
@@ -16,13 +16,16 @@ import { useMessages } from "../hooks/useMessages";
 const { Header, Footer, Sider, Content } = Layout;
 
 function Chat() {
-  const { apiKey } = useContext(ChatContext);
+  const { apiKey, messages: historyMessages } = useContext(ChatContext);
   const { createMessage } = useMessages();
   const [toggleLeft, setToggleLeft] = useState<boolean>(false);
   const [toggleRight, setToggleRight] = useState<boolean>(false);
   const [isHovered, setIsHovered] = useState<boolean>(false);
 
   const onFinish = (message: Message, { usage, finishReason }: any) => {
+    console.log("Message", message);
+    console.log("FinishReason", finishReason);
+    
     createMessage({
       chat_session_id: "1234",
       deployment_id: "1234",
@@ -31,7 +34,7 @@ function Chat() {
       is_cache: false,
       output_tokens: 1234,
       prompt: message.content,
-      response: [],
+      response: message.parts as any[],
       token_per_sec: 1234,
       total_tokens: 1234,
       tpot: 1234,
@@ -132,24 +135,28 @@ function Chat() {
         </Header>
         <Content className="overflow-hidden overflow-y-auto">
           <div className="flex flex-col w-full py-24 mx-auto stretch px-[.5rem] max-w-2xl ">
+            <HistoryMessages messages={historyMessages} />
             <Messages messages={messages} />
-            {!isLoading && !error && messages.length === 0 && (
-              <div className="mt-4 text-[#EEEEEE] text-center">
-                <Image
-                  preview={false}
-                  src="icons/load.svg"
-                  alt="bud"
-                  width={"330px"}
-                  height={"130px"}
-                />
-                <div className="mt-[.75rem] text-[1.375rem]">
-                  Hello there 👋
+            {!isLoading &&
+              !error &&
+              historyMessages.length === 0 &&
+              messages.length === 0 && (
+                <div className="mt-4 text-[#EEEEEE] text-center">
+                  <Image
+                    preview={false}
+                    src="icons/load.svg"
+                    alt="bud"
+                    width={"330px"}
+                    height={"130px"}
+                  />
+                  <div className="mt-[.75rem] text-[1.375rem]">
+                    Hello there 👋
+                  </div>
+                  <div className="text-[1.375rem]">
+                    Select a model to get started
+                  </div>
                 </div>
-                <div className="text-[1.375rem]">
-                  Select a model to get started
-                </div>
-              </div>
-            )}
+              )}
             {isLoading && <MessageLoading />}
             {error && (
               <div className="mt-4">
@@ -171,7 +178,23 @@ function Chat() {
             error={error}
             stop={stop}
             handleInputChange={handleInputChange}
-            handleSubmit={handleSubmit}
+            handleSubmit={(e) => {
+              createMessage({
+                chat_session_id: "1234",
+                deployment_id: "1234",
+                e2e_latency: 1234,
+                input_tokens: 1234,
+                is_cache: false,
+                output_tokens: 1234,
+                prompt: input,
+                response: [],
+                token_per_sec: 1234,
+                total_tokens: 1234,
+                tpot: 1234,
+                ttft: 1234,
+              });
+              handleSubmit(e);
+            }}
             input={input}
           />
         </Footer>

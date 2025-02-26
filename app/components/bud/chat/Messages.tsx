@@ -2,8 +2,9 @@ import { UIMessage } from "@ai-sdk/ui-utils";
 import { Image } from "antd";
 import React from "react";
 import Markdown from "react-markdown";
+import { PostMessage } from "../hooks/useMessages";
 
-function Message(props: UIMessage) {
+function Message(props: { content: string; role: string }) {
   return (
     <div
       className="text-[#FFFFFF] relative mb-[1.5rem] text-[.75rem]  rounded-[.625rem] py-[.75rem] "
@@ -24,7 +25,7 @@ function Message(props: UIMessage) {
   );
 }
 
-function UserMessage(props: UIMessage) {
+function UserMessage(props: { content: string; role: string }) {
   return (
     <div className="flex flex-row items-center gap-[.5rem]">
       <div className="flex items-center justify-end gap-[.5rem] ">
@@ -55,7 +56,7 @@ function UserMessage(props: UIMessage) {
   );
 }
 
-function AIMessage(props: UIMessage) {
+function AIMessage(props: { content: string; role: string }) {
   return (
     <div className="flex flex-row items-center gap-[.5rem]">
       <div className="mr-[.5rem]">
@@ -76,8 +77,22 @@ interface MessagesProps {
   messages: UIMessage[];
 }
 
-function Messages({ messages }: MessagesProps) {
+interface HistoryMessagesProps {
+  messages: PostMessage[];
+}
+
+export function Messages({ messages }: MessagesProps) {
   return messages.map((m) => <Message {...m} key={m.id} />);
 }
 
-export default Messages;
+export function HistoryMessages({ messages }: HistoryMessagesProps) {
+  return messages.map((m, index) => (
+    <>
+      <Message
+        content={m.response?.[0]?.text || m.prompt }
+        role={m.response?.[0]?.text ? "ai" : "user"}
+        key={m.chat_session_id + index}
+      />
+    </>
+  ));
+}
