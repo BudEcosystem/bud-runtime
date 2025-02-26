@@ -8,6 +8,7 @@ import { ChevronUp } from "lucide-react";
 import ChatContext, { Endpoint } from "@/app/context/ChatContext";
 import RootContext from "@/app/context/RootContext";
 import { assetBaseUrl } from "../environment";
+import { ChatType } from "@/app/page";
 
 interface LoadModelProps {
   open: boolean;
@@ -25,17 +26,20 @@ function LoadModel(props: LoadModelProps) {
     document.documentElement.scrollLeft = document.documentElement.clientWidth;
   }, []);
 
-  const handleSelect = (endpoint: Endpoint) => {
+  const handleSelect = (chat: ChatType, endpoint: Endpoint) => {
+    if (!chat) return;
+    console.log("Selected", endpoint, chats);
     let updatedChats = [...chats];
-    updatedChats = updatedChats.map((chat) => {
-      if (chat.id === chat.id) {
-        chat.selectedDeployment = endpoint;
-        chat.settings = {
-          ...chat.settings,
+    updatedChats = updatedChats.map((_chat) => {
+      if (_chat.id === chat.id) {
+        _chat.selectedDeployment = endpoint;
+        _chat.settings = {
+          ..._chat.settings,
         };
       }
       return chat;
     });
+    console.log("Selected", updatedChats);
     setChats(updatedChats);
     props.setOpen(false);
   };
@@ -80,7 +84,9 @@ function LoadModel(props: LoadModelProps) {
                 selectable
                 selected={chat?.selectedDeployment?.id === endpoint.id}
                 handleClick={() => {
-                  handleSelect(endpoint);
+                  if (chat) {
+                    handleSelect(chat, endpoint);
+                  }
                 }}
               />
             ))}
@@ -112,7 +118,9 @@ function LoadModel(props: LoadModelProps) {
                 key={endpoint.id}
                 data={endpoint}
                 handleClick={() => {
-                  handleSelect(endpoint);
+                  if (chat) {
+                    handleSelect(chat, endpoint);
+                  }
                 }}
               />
             ))}

@@ -251,7 +251,6 @@ function Chat() {
 
 function ChatWithStore(props: { chat: ChatType }) {
   const [endpoints, setEndpoints] = useState<Endpoint[]>([]);
-  const [chatSessionId, setChatSessionId] = useState<string>("");
   const [messages, setMessages] = useState<any[]>([]);
 
   return (

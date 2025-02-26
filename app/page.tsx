@@ -28,12 +28,30 @@ export type ChatType = {
 
 const apiKeyList = [
   "budserve_tYak6eMumQTwZ60IsZSa5RQa3WafUSPeG5CHHEgl",
-  "budserve_tYak6eMumQTwZ60IsZSa5RQa3WafUSPeG5CHHEgl",
-  "budserve_tYak6eMumQTwZ60IsZSa5RQa3WafUSPeG5CHHEgl",
-  "budserve_tYak6eMumQTwZ60IsZSa5RQa3WafUSPeG5CHHEgl",
-  "budserve_tYak6eMumQTwZ60IsZSa5RQa3WafUSPeG5CHHEgl",
-  "budserve_tYak6eMumQTwZ60IsZSa5RQa3WafUSPeG5CHHEgl",
+  "1budserve_tYak6eMumQTwZ60IsZSa5RQa3WafUSPeG5CHHEgl",
+  "3budserve_tYak6eMumQTwZ60IsZSa5RQa3WafUSPeG5CHHEgl",
+  "4budserve_tYak6eMumQTwZ60IsZSa5RQa3WafUSPeG5CHHEgl",
+  "5budserve_tYak6eMumQTwZ60IsZSa5RQa3WafUSPeG5CHHEgl",
+  "7budserve_tYak6eMumQTwZ60IsZSa5RQa3WafUSPeG5CHHEgl",
 ];
+
+const chatIds = [
+  "1",
+  "2",
+  "3",
+  "4",
+  "5",
+  "6",
+]
+
+const chatSessionIds = [
+  "1",
+  "2",
+  "3",
+  "4",
+  "5",
+  "6",
+]
 
 export default function Page() {
   const [chats, setChats] = useState<ChatType[]>([]);
@@ -41,10 +59,10 @@ export default function Page() {
   const createChat = () => {
     const updatedChats = [...chats];
     updatedChats.push({
-      id: Math.random().toString(36).substring(7),
+      id:  chatIds[updatedChats.length],
       apiKey: apiKeyList[updatedChats.length],
       token: "",
-      chatSessionId:  Math.random().toString(36).substring(7),
+      chatSessionId: chatSessionIds[updatedChats.length],
       selectedDeployment : null,
       settings: {
         temperature: 0.7,
