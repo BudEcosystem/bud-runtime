@@ -18,7 +18,7 @@ import { ChatType } from "@/app/page";
 const { Header, Footer, Sider, Content } = Layout;
 
 function Chat() {
-  const { apiKey, messages: historyMessages } = useContext(ChatContext);
+  const { chat, messages: historyMessages } = useContext(ChatContext);
   const { createMessage } = useMessages();
   const [toggleLeft, setToggleLeft] = useState<boolean>(false);
   const [toggleRight, setToggleRight] = useState<boolean>(false);
@@ -31,16 +31,16 @@ function Chat() {
     createMessage({
       chat_session_id: "1234",
       deployment_id: "1234",
-      e2e_latency: 1234,
-      input_tokens: 1234,
+      e2e_latency: usage.e2e_latency,
+      input_tokens: usage.input_tokens,
       is_cache: false,
-      output_tokens: 1234,
+      output_tokens: usage.output_tokens,
       prompt: message.content,
       response: message.parts as any[],
-      token_per_sec: 1234,
-      total_tokens: 1234,
-      tpot: 1234,
-      ttft: 1234,
+      token_per_sec: usage.token_per_sec,
+      total_tokens: usage.total_tokens,
+      tpot: usage.tpot,
+      ttft: usage.ttft,
     });
     console.log("Usage", usage);
   };
@@ -55,13 +55,14 @@ function Chat() {
     reload,
     stop,
   } = useChat(
-    apiKey
+    chat?.apiKey
       ? {
-          api: `${copyCodeApiBaseUrl}`,
-          headers: {
-            "api-key": `${apiKey}`,
-            Authorization: `Bearer ${apiKey}`,
-          },
+          // uncomment this line to use the copy code api provided by the backend
+          // api: `${copyCodeApiBaseUrl}`,
+          // headers: {
+          //   "api-key": `${chat?.apiKey}`,
+          //   Authorization: `Bearer ${chat?.apiKey}`,
+          // },
           body: {
             model: "gpt",
             max_tokens: 100,
@@ -182,18 +183,18 @@ function Chat() {
             handleInputChange={handleInputChange}
             handleSubmit={(e) => {
               createMessage({
-                chat_session_id: "1234",
+                chat_session_id: chat?.chatSessionId || "",
                 deployment_id: "1234",
-                e2e_latency: 1234,
-                input_tokens: 1234,
+                e2e_latency: 0,
+                input_tokens: 0,
                 is_cache: false,
-                output_tokens: 1234,
+                output_tokens: 0,
                 prompt: input,
                 response: [],
-                token_per_sec: 1234,
-                total_tokens: 1234,
-                tpot: 1234,
-                ttft: 1234,
+                token_per_sec: 0,
+                total_tokens: 0,
+                tpot: 0,
+                ttft: 0,
               });
               handleSubmit(e);
             }}
@@ -253,16 +254,13 @@ function ChatWithStore(props: { chat: ChatType }) {
   const [chatSessionId, setChatSessionId] = useState<string>("");
   const [messages, setMessages] = useState<any[]>([]);
 
-
   return (
     <ChatContext.Provider
       value={{
-        apiKey:  props.chat.apiKey,
-        token: props.chat.token,
+        chat: props.chat,
+        token: "",
         endpoints,
         setEndpoints,
-        chatSessionId,
-        setChatSessionId,
         messages,
         setMessages,
       }}

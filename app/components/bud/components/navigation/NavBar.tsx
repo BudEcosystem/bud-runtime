@@ -2,7 +2,7 @@ import React, { useContext } from "react";
 
 import { Image } from "antd";
 import LoadModel from "../../chat/LoadModel";
-import { Endpoint } from "@/app/context/ChatContext";
+import ChatContext, { Endpoint } from "@/app/context/ChatContext";
 import RootContext from "@/app/context/RootContext";
 
 interface NavBarProps {
@@ -20,9 +20,6 @@ function NavBar({
 }: NavBarProps) {
   const { setChats, chats } = useContext(RootContext);
   const [open, setOpen] = React.useState(false);
-  const [selectedModel, setSelectedModel] = React.useState<Endpoint | null>(
-    null
-  );
 
   return (
     <div className="topBg text-[#FFF] p-[1rem] flex justify-between items-center h-[3.625rem] relative sticky top-0  z-10 bg-[#101010] border-b-[1px] border-b-[#1F1F1F]">
@@ -49,8 +46,6 @@ function NavBar({
       <LoadModel
         open={open}
         setOpen={setOpen}
-        selected={selectedModel}
-        setSelected={setSelectedModel}
       />
       <div className="flex items-center gap-[.5rem]">
         <button

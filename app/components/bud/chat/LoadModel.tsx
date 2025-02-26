@@ -1,27 +1,44 @@
-import { Button } from "antd";
-import React from "react";
+import { Button, Image } from "antd";
+import React, { useContext } from "react";
 import SearchHeaderInput from "../components/input/SearchHeaderInput";
 import { ModelListCard } from "../components/ModelListCard";
 import BlurModal from "../components/modal/BlurModal";
 import { useEndPoints } from "../hooks/useEndPoint";
 import { ChevronUp } from "lucide-react";
-import { Endpoint } from "@/app/context/ChatContext";
+import ChatContext, { Endpoint } from "@/app/context/ChatContext";
+import RootContext from "@/app/context/RootContext";
+import { assetBaseUrl } from "../environment";
 
 interface LoadModelProps {
   open: boolean;
   setOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  selected: Endpoint | null;
-  setSelected: React.Dispatch<React.SetStateAction<Endpoint | null>>;
 }
 
 function LoadModel(props: LoadModelProps) {
   const { endpoints } = useEndPoints();
   const [searchValue, setSearchValue] = React.useState("");
+  const { chat } = useContext(ChatContext);
+  const { setChats, chats } = useContext(RootContext);
 
   React.useEffect(() => {
     document.documentElement.scrollTop = document.documentElement.clientHeight;
     document.documentElement.scrollLeft = document.documentElement.clientWidth;
   }, []);
+
+  const handleSelect = (endpoint: Endpoint) => {
+    let updatedChats = [...chats];
+    updatedChats = updatedChats.map((chat) => {
+      if (chat.id === chat.id) {
+        chat.selectedDeployment = endpoint;
+        chat.settings = {
+          ...chat.settings,
+        };
+      }
+      return chat;
+    });
+    setChats(updatedChats);
+    props.setOpen(false);
+  };
 
   return (
     <div>
@@ -61,10 +78,9 @@ function LoadModel(props: LoadModelProps) {
                 key={endpoint.id}
                 data={endpoint}
                 selectable
-                selected={props.selected?.id === endpoint.id}
+                selected={chat?.selectedDeployment?.id === endpoint.id}
                 handleClick={() => {
-                  props.setSelected(endpoint);
-                  props.setOpen(false);
+                  handleSelect(endpoint);
                 }}
               />
             ))}
@@ -96,21 +112,37 @@ function LoadModel(props: LoadModelProps) {
                 key={endpoint.id}
                 data={endpoint}
                 handleClick={() => {
-                  props.setSelected(endpoint);
-                  props.setOpen(false);
+                  handleSelect(endpoint);
                 }}
               />
             ))}
           </div>
         </div>
       </BlurModal>
-      <Button
-        type="primary"
-        className="text-[#FFF] w-[196px] h-[32px]"
-        onClick={() => props.setOpen(!props.open)}
-      >
-        Load Model
-      </Button>
+      {chat?.selectedDeployment ? (
+        <Button
+          type="default"
+          className="text-[#FFF] w-[196px] h-[32px]"
+          onClick={() => props.setOpen(!props.open)}
+        >
+          <Image
+            src={`${assetBaseUrl}/${chat.selectedDeployment?.model?.provider?.icon}`}
+            preview={false}
+            alt="bud"
+            width={"0.625rem"}
+            height={"0.625rem"}
+          />
+          {chat.selectedDeployment.name}
+        </Button>
+      ) : (
+        <Button
+          type="primary"
+          className="text-[#FFF] w-[196px] h-[32px]"
+          onClick={() => props.setOpen(!props.open)}
+        >
+          Load Model
+        </Button>
+      )}
     </div>
   );
 }

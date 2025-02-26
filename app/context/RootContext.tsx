@@ -1,7 +1,8 @@
 import { createContext } from "react";
+import { ChatType } from "../page";
 
 type RootContextType = {
-  chats: any[];
+  chats: ChatType[];
   setChats: (chats: any[]) => void;
   createChat: () => void;
 };
