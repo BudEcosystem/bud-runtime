@@ -29,8 +29,7 @@
     "react-dom": "^18",
     "react-markdown": "^9.0.1",
     "sass": "^1.84.0",
-    "zod": "3.23.8",
-    "zustand": "^5.0.3"
+    "zod": "3.23.8"
   },
   "devDependencies": {
     "@types/chroma-js": "^3.1.1",
