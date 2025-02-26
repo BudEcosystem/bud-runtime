@@ -28,7 +28,7 @@ function LoadModel(props: LoadModelProps) {
 
   const handleSelect = (chat: ChatType, endpoint: Endpoint) => {
     if (!chat) return;
-    console.log("Selected", endpoint, chats);
+    console.log("Selected Endpoint", endpoint, chats);
     let updatedChats = [...chats];
     updatedChats = updatedChats.map((_chat) => {
       if (_chat.id === chat.id) {

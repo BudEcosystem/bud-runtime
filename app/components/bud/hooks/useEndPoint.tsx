@@ -8,7 +8,7 @@ function successToast(message: string) {
 }
 
 export function useEndPoints() {
-  const { apiKey: apiKeyState, endpoints, setEndpoints } = useContext(ChatContext);
+  const { chat, endpoints, setEndpoints } = useContext(ChatContext);
 
   async function getEndPoints({ page = 1, limit = 25 }) {
     const result = await axios
@@ -18,7 +18,7 @@ export function useEndPoints() {
           limit: limit,
         },
         headers: {
-          "api-key": apiKey,
+          "api-key": chat?.apiKey,
         },
       })
       .then((res) => {
