@@ -5,10 +5,9 @@ import { ModelListCard } from "../components/ModelListCard";
 import BlurModal from "../components/modal/BlurModal";
 import { useEndPoints } from "../hooks/useEndPoint";
 import { ChevronUp } from "lucide-react";
-import ChatContext, { Endpoint } from "@/app/context/ChatContext";
+import ChatContext from "@/app/context/ChatContext";
 import RootContext from "@/app/context/RootContext";
 import { assetBaseUrl } from "../environment";
-import { ChatType } from "@/app/page";
 
 interface LoadModelProps {
   open: boolean;
@@ -19,30 +18,12 @@ function LoadModel(props: LoadModelProps) {
   const { endpoints } = useEndPoints();
   const [searchValue, setSearchValue] = React.useState("");
   const { chat } = useContext(ChatContext);
-  const { setChats, chats } = useContext(RootContext);
+  const { handleDeploymentSelect } = useContext(RootContext);
 
   React.useEffect(() => {
     document.documentElement.scrollTop = document.documentElement.clientHeight;
     document.documentElement.scrollLeft = document.documentElement.clientWidth;
   }, []);
-
-  const handleSelect = (chat: ChatType, endpoint: Endpoint) => {
-    if (!chat) return;
-    console.log("Selected Endpoint", endpoint, chats);
-    let updatedChats = [...chats];
-    updatedChats = updatedChats.map((_chat) => {
-      if (_chat.id === chat.id) {
-        _chat.selectedDeployment = endpoint;
-        _chat.settings = {
-          ..._chat.settings,
-        };
-      }
-      return chat;
-    });
-    console.log("Selected", updatedChats);
-    setChats(updatedChats);
-    props.setOpen(false);
-  };
 
   return (
     <div>
@@ -85,7 +66,8 @@ function LoadModel(props: LoadModelProps) {
                 selected={chat?.selectedDeployment?.id === endpoint.id}
                 handleClick={() => {
                   if (chat) {
-                    handleSelect(chat, endpoint);
+                    handleDeploymentSelect(chat, endpoint);
+                    props.setOpen(false);
                   }
                 }}
               />
@@ -119,7 +101,8 @@ function LoadModel(props: LoadModelProps) {
                 data={endpoint}
                 handleClick={() => {
                   if (chat) {
-                    handleSelect(chat, endpoint);
+                    handleDeploymentSelect(chat, endpoint);
+                    props.setOpen(false);
                   }
                 }}
               />

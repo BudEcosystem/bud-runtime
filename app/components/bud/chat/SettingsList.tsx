@@ -61,24 +61,11 @@ interface SettingsListProps {
 }
 
 function SettingsList({ data }: SettingsListProps) {
-  const { setChats, chats } = useContext(RootContext);
+  const { handleSettingsChange } = useContext(RootContext);
   const { chat } = useContext(ChatContext);
 
-  const handleChange = (prop: string, value: any) => {
-    let updatedChats = [...chats];
-    updatedChats = updatedChats.map((item) => {
-      if (item.id === chat?.id) {
-        return {
-          ...item,
-          settings: {
-            ...item.settings,
-            [prop]: value,
-          },
-        };
-      }
-      return item;
-    });
-    setChats(updatedChats);
+  const handleChange = (chat: any, key: string, value: any) => {
+    handleSettingsChange(chat, key, value);
   };
 
   const components = [
@@ -95,20 +82,22 @@ function SettingsList({ data }: SettingsListProps) {
             step={1}
             defaultValue={chat?.settings?.temperature || 0}
             value={chat?.settings?.temperature || 0}
-            onChange={(value) => handleChange("temperature", value)}
+            onChange={(value) => handleChange(chat, "temperature", value)}
           />
           <InlineSwitch
             title="Limit Response Length"
             value={chat?.settings?.limit_response_length || true}
             defaultValue={chat?.settings?.limit_response_length || true}
-            onChange={(value) => handleChange("limit_response_length", value)}
+            onChange={(value) =>
+              handleChange(chat, "limit_response_length", value)
+            }
           />
           <InlineInput
             title="Sequence Length"
             value={`${chat?.settings?.sequence_length || 0}`}
             defaultValue={`${chat?.settings?.sequence_length || 0}`}
             type="number"
-            onChange={(value) => handleChange("sequence_length", value)}
+            onChange={(value) => handleChange(chat, "sequence_length", value)}
           />
         </div>
       ),
@@ -127,7 +116,9 @@ function SettingsList({ data }: SettingsListProps) {
               <Select
                 defaultValue={chat?.settings?.context_overflow || []}
                 value={chat?.settings?.context_overflow || []}
-                onChange={(value) => handleChange("context_overflow", value)}
+                onChange={(value) =>
+                  handleChange(chat, "context_overflow", value)
+                }
                 className="w-full"
                 mode="tags"
                 tagRender={(props) => (
@@ -165,7 +156,7 @@ function SettingsList({ data }: SettingsListProps) {
               <Select
                 defaultValue={chat?.settings?.stop_strings || []}
                 value={chat?.settings?.stop_strings || []}
-                onChange={(value) => handleChange("stop_strings", value)}
+                onChange={(value) => handleChange(chat, "stop_strings", value)}
                 className="w-full"
               >
                 <Select.Option value="Select">Select</Select.Option>
@@ -186,14 +177,14 @@ function SettingsList({ data }: SettingsListProps) {
             value={`${chat?.settings?.tool_k_sampling || 0}`}
             defaultValue={`${chat?.settings?.tool_k_sampling || 0}`}
             type="number"
-            onChange={(value) => handleChange("tool_k_sampling", value)}
+            onChange={(value) => handleChange(chat, "tool_k_sampling", value)}
           />
           <InlineInput
             title="Repeat Penalty"
             value={`${chat?.settings?.repeat_penalty || 0}`}
             defaultValue={`${chat?.settings?.repeat_penalty || 0}`}
             type="number"
-            onChange={(value) => handleChange("repeat_penalty", value)}
+            onChange={(value) => handleChange(chat, "repeat_penalty", value)}
           />
           <SliderInput
             title="Top P Sampling"
@@ -202,7 +193,7 @@ function SettingsList({ data }: SettingsListProps) {
             step={1}
             defaultValue={chat?.settings?.top_p_sampling || 0}
             value={chat?.settings?.top_p_sampling || 0}
-            onChange={(value) => handleChange("top_p_sampling", value)}
+            onChange={(value) => handleChange(chat, "top_p_sampling", value)}
           />
           <SliderInput
             title="Min P Sampling"
@@ -211,7 +202,7 @@ function SettingsList({ data }: SettingsListProps) {
             step={1}
             defaultValue={chat?.settings?.min_p_sampling || 0}
             value={chat?.settings?.min_p_sampling || 0}
-            onChange={(value) => handleChange("min_p_sampling", value)}
+            onChange={(value) => handleChange(chat, "min_p_sampling", value)}
           />
         </div>
       ),

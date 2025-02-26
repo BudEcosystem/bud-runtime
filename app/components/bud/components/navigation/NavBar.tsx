@@ -18,7 +18,7 @@ function NavBar({
   isLeftSidebarOpen,
   isRightSidebarOpen,
 }: NavBarProps) {
-  const { setChats, chats } = useContext(RootContext);
+  const { createChat, chats } = useContext(RootContext);
   const [open, setOpen] = React.useState(false);
 
   return (
@@ -43,10 +43,7 @@ function NavBar({
           display: isLeftSidebarOpen ? "block" : "none",
         }}
       />
-      <LoadModel
-        open={open}
-        setOpen={setOpen}
-      />
+      <LoadModel open={open} setOpen={setOpen} />
       <div className="flex items-center gap-[.5rem]">
         <button
           style={{
@@ -64,9 +61,7 @@ function NavBar({
           />
         </button>
         <button
-          onClick={() => {
-            setChats([...chats, { id: chats.length + 1, messages: [] }]);
-          }}
+          onClick={createChat}
           className="w-[1.475rem] height-[1.475rem] p-[.2rem] rounded-[6px] flex justify-center items-center hover:!bg-[#FFFFFF08] cursor-pointer"
         >
           <Image

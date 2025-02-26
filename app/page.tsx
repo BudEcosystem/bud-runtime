@@ -1,7 +1,7 @@
 "use client";
 
 import Chat from "./components/bud/chat/Chat";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import RootContext from "./context/RootContext";
 import { Endpoint } from "./context/ChatContext";
 
@@ -35,35 +35,21 @@ const apiKeyList = [
   "7budserve_tYak6eMumQTwZ60IsZSa5RQa3WafUSPeG5CHHEgl",
 ];
 
-const chatIds = [
-  "1",
-  "2",
-  "3",
-  "4",
-  "5",
-  "6",
-]
+const chatIds = ["1", "2", "3", "4", "5", "6"];
 
-const chatSessionIds = [
-  "1",
-  "2",
-  "3",
-  "4",
-  "5",
-  "6",
-]
+const chatSessionIds = ["1", "2", "3", "4", "5", "6"];
 
 export default function Page() {
   const [chats, setChats] = useState<ChatType[]>([]);
 
-  const createChat = () => {
+  const createChat = useCallback(() => {
     const updatedChats = [...chats];
     updatedChats.push({
-      id:  chatIds[updatedChats.length],
+      id: chatIds[updatedChats.length],
       apiKey: apiKeyList[updatedChats.length],
       token: "",
       chatSessionId: chatSessionIds[updatedChats.length],
-      selectedDeployment : null,
+      selectedDeployment: null,
       settings: {
         temperature: 0.7,
         limit_response_length: false,
@@ -76,11 +62,58 @@ export default function Page() {
         min_p_sampling: 0.0,
       },
     });
+    console.log("createChat", updatedChats?.map((chat) => chat.id));
+    setChats(updatedChats);
+  }, [chats]);
+
+  const handleDeploymentSelect = useCallback(
+    (chat: ChatType, endpoint: Endpoint) => {
+      if (!chat) return;
+      let updatedChats = [...chats];
+      console.log("updatedChats", updatedChats);
+      updatedChats = updatedChats.map((_chat) => {
+        if (_chat.id === chat.id) {
+          console.log("Selected", _chat, chat);
+          _chat.selectedDeployment = endpoint;
+          _chat.settings = {
+            ..._chat.settings,
+          };
+        }
+        return _chat;
+      });
+      console.log("Selected", updatedChats);
+      setChats(updatedChats);
+    },
+    [chats]
+  );
+
+  const handleSettingsChange = (chat: ChatType, prop: string, value: any) => {
+    let updatedChats = [...chats];
+    updatedChats = updatedChats.map((item) => {
+      if (item.id === chat?.id) {
+        return {
+          ...item,
+          settings: {
+            ...item.settings,
+            [prop]: value,
+          },
+        };
+      }
+      return item;
+    });
     setChats(updatedChats);
   };
 
   return (
-    <RootContext.Provider value={{ chats, setChats, createChat }}>
+    <RootContext.Provider
+      value={{
+        chats,
+        setChats,
+        createChat,
+        handleDeploymentSelect,
+        handleSettingsChange,
+      }}
+    >
       <Chat />
     </RootContext.Provider>
   );
