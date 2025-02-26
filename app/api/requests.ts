@@ -1,5 +1,5 @@
 import axios from "axios";
-import { apiBaseUrl, apiKey } from "../bud/environment";
+import { apiBaseUrl, apiKey } from "../components/bud/environment";
 // import { errorToast } from "./../../components/toast";
 
 function errorToast(message: string) {
