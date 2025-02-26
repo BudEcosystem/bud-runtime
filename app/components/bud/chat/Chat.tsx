@@ -1,4 +1,4 @@
-import { useChat } from "@ai-sdk/react";
+import { Message, useChat } from "@ai-sdk/react";
 import { Image } from "antd";
 import Messages from "./Messages";
 import { Layout } from "antd";
@@ -11,14 +11,35 @@ import NavBar from "../components/navigation/NavBar";
 import { apiKey as apiKeyEnv, copyCodeApiBaseUrl } from "../environment";
 import ChatContext, { Endpoint } from "@/app/context/ChatContext";
 import { useEndPoints } from "../hooks/useEndPoint";
+import { useMessages } from "../hooks/useMessages";
 
 const { Header, Footer, Sider, Content } = Layout;
 
 function Chat() {
   const { apiKey } = useContext(ChatContext);
+  const { createMessage } = useMessages();
   const [toggleLeft, setToggleLeft] = useState<boolean>(false);
   const [toggleRight, setToggleRight] = useState<boolean>(false);
   const [isHovered, setIsHovered] = useState<boolean>(false);
+
+  const onFinish = (message: Message, { usage, finishReason }: any) => {
+    createMessage({
+      chat_session_id: "1234",
+      deployment_id: "1234",
+      e2e_latency: 1234,
+      input_tokens: 1234,
+      is_cache: false,
+      output_tokens: 1234,
+      prompt: message.content,
+      response: [],
+      token_per_sec: 1234,
+      total_tokens: 1234,
+      tpot: 1234,
+      ttft: 1234,
+    });
+    console.log("Usage", usage);
+  };
+
   const {
     error,
     input,
@@ -48,12 +69,14 @@ function Chat() {
           onFinish(message, { usage, finishReason }) {
             console.log("Usage", usage);
             console.log("FinishReason", finishReason);
+            onFinish(message, { usage, finishReason });
           },
         }
       : {
           onFinish(message, { usage, finishReason }) {
             console.log("Usage", usage);
             console.log("FinishReason", finishReason);
+            onFinish(message, { usage, finishReason });
           },
         }
   );
@@ -204,6 +227,8 @@ export default function ChatWithStore() {
   const [_apiKey, setApiKey] = useState<string>("");
   const [token, setToken] = useState<string>("");
   const [endpoints, setEndpoints] = useState<Endpoint[]>([]);
+  const [chatSessionId, setChatSessionId] = useState<string>("");
+  const [messages, setMessages] = useState<any[]>([]);
 
   return (
     <ChatContext.Provider
@@ -214,6 +239,10 @@ export default function ChatWithStore() {
         setEndpoints,
         setToken,
         setApiKey,
+        chatSessionId,
+        setChatSessionId,
+        messages,
+        setMessages,
       }}
     >
       <Chat />

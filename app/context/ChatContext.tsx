@@ -53,6 +53,14 @@ type ChatContextType = {
   setToken: (token: string) => void;
   // set api key
   setApiKey: (apiKey: string) => void;
+  // chat session id
+  chatSessionId: string;
+  // set chat session id
+  setChatSessionId: (chatSessionId: string) => void;
+  // messages history
+  messages: any[];
+  // set messages history
+  setMessages: (messages: any[]) => void;
 };
 
 const ChatContext = createContext<ChatContextType>({
@@ -63,6 +71,10 @@ const ChatContext = createContext<ChatContextType>({
   setEndpoints: (endpoints: Endpoint[]) => {},
   setToken: (token: string) => {},
   setApiKey: (apiKey: string) => {},
+  chatSessionId: "",
+  setChatSessionId: (chatSessionId: string) => {},
+  messages: [],
+  setMessages: (messages: any[]) => {},
 });
 
 export default ChatContext;
