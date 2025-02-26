@@ -30,7 +30,7 @@ import {
   TextNode,
 } from "lexical";
 
-import ToolbarPlugin from "../../../plugin/ToolbarPlugin";
+import ToolbarPlugin from "../../plugin/ToolbarPlugin";
 import { ChatRequestOptions } from "ai";
 import { Image } from "antd";
 import { useState } from "react";
