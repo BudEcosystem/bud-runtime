@@ -1,4 +1,4 @@
-import { tempApiBaseUrl } from "../environment";
+import { apiKey, tempApiBaseUrl } from "../environment";
 import axios from "axios";
 import { useContext } from "react";
 import ChatContext from "@/app/context/ChatContext";
@@ -8,7 +8,7 @@ function successToast(message: string) {
 }
 
 export function useEndPoints() {
-  const { apiKey, endpoints } = useContext(ChatContext);
+  const { apiKey: apiKeyState, endpoints, setEndpoints } = useContext(ChatContext);
 
   async function getEndPoints({ page = 1, limit = 25 }) {
     const result = await axios
@@ -23,6 +23,7 @@ export function useEndPoints() {
       })
       .then((res) => {
         console.log(res.data.endpoints);
+        setEndpoints(res.data.endpoints);
         return res.data.endpoints;
       });
 
