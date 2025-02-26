@@ -1,11 +1,11 @@
 import React, { useEffect } from "react";
 import BlurModal from "../components/modal/BlurModal";
-import { Endpoint, useEndPoints } from "../hooks/useEndPoint";
 import SliderInput from "../components/input/SliderInput";
 import LabelInput from "../components/input/LabelInput";
 import { Button, Checkbox, Image } from "antd";
 import { ChevronLeft } from "lucide-react";
 import { assetBaseUrl } from "../environment";
+import { Endpoint } from "@/app/context/ChatContext";
 
 interface LoadModelConfigProps {
   data: Endpoint | null;

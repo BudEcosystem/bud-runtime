@@ -1,22 +1,21 @@
 import { Button } from "antd";
-import React, { useEffect } from "react";
+import React from "react";
 import SearchHeaderInput from "../components/input/SearchHeaderInput";
 import { ModelListCard } from "../components/ModelListCard";
 import BlurModal from "../components/modal/BlurModal";
-import { Endpoint, useEndPoints } from "../hooks/useEndPoint";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { useEndPoints } from "../hooks/useEndPoint";
+import { ChevronUp } from "lucide-react";
+import { Endpoint } from "@/app/context/ChatContext";
 
 interface LoadModelProps {
   open: boolean;
   setOpen: React.Dispatch<React.SetStateAction<boolean>>;
   selected: Endpoint | null;
   setSelected: React.Dispatch<React.SetStateAction<Endpoint | null>>;
-  openEdit: boolean;
-  setOpenEdit: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 function LoadModel(props: LoadModelProps) {
-  const { endPoints } = useEndPoints();
+  const { endpoints } = useEndPoints();
   const [searchValue, setSearchValue] = React.useState("");
 
   React.useEffect(() => {
@@ -47,7 +46,7 @@ function LoadModel(props: LoadModelProps) {
               <div className="text-[#757575] text-[0.75rem] font-[400]">
                 Currently Loaded
                 <span className="text-[#FFF] text-[0.75rem] font-[400] ml-[0.25rem]">
-                  {endPoints.length}
+                  {endpoints.length}
                 </span>
               </div>
               <div className="text-[#757575] text-[0.625rem] font-[400]">
@@ -57,18 +56,14 @@ function LoadModel(props: LoadModelProps) {
                 </span>
               </div>
             </div>
-            {endPoints.map((endpoint) => (
+            {endpoints.map((endpoint) => (
               <ModelListCard
                 key={endpoint.id}
                 data={endpoint}
                 selectable
                 selected={props.selected?.id === endpoint.id}
                 handleClick={() => {
-                  // if (props.selected?.id === endpoint.id) {
-                  //   return props.setSelected(null);
-                  // }
                   props.setSelected(endpoint);
-                  props.setOpenEdit(true);
                   props.setOpen(false);
                 }}
               />
@@ -79,7 +74,7 @@ function LoadModel(props: LoadModelProps) {
               <div className="text-[#757575] text-[0.75rem] font-[400]">
                 Models Available
                 <span className="text-[#FFF] text-[0.75rem] font-[400] ml-[0.25rem]">
-                  {endPoints.length}
+                  {endpoints.length}
                 </span>
               </div>
               <div className="flex items-center gap-x-[0.25rem] justify-between">
@@ -96,16 +91,12 @@ function LoadModel(props: LoadModelProps) {
                 </span>
               </div>
             </div>
-            {endPoints.map((endpoint) => (
+            {endpoints.map((endpoint) => (
               <ModelListCard
                 key={endpoint.id}
                 data={endpoint}
                 handleClick={() => {
-                  // if (props.selected?.id === endpoint.id) {
-                  //   return props.setSelected(null);
-                  // }
                   props.setSelected(endpoint);
-                  props.setOpenEdit(true);
                   props.setOpen(false);
                 }}
               />

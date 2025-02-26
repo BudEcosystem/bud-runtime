@@ -4,15 +4,18 @@ import Messages from "./Messages";
 import { Layout } from "antd";
 import HistoryList from "./HistoryList";
 import SettingsList from "./SettingsList";
-import { useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import NormalEditor from "../components/input/NormalEditor";
 import MessageLoading from "./MessageLoading";
 import NavBar from "../components/navigation/NavBar";
-import { apiKey, copyCodeApiBaseUrl } from "../environment";
+import { apiKey as apiKeyEnv, copyCodeApiBaseUrl } from "../environment";
+import ChatContext, { Endpoint } from "@/app/context/ChatContext";
+import { useEndPoints } from "../hooks/useEndPoint";
 
 const { Header, Footer, Sider, Content } = Layout;
 
-export default function Chat() {
+function Chat() {
+  const { apiKey } = useContext(ChatContext);
   const [toggleLeft, setToggleLeft] = useState<boolean>(false);
   const [toggleRight, setToggleRight] = useState<boolean>(false);
   const [isHovered, setIsHovered] = useState<boolean>(false);
@@ -25,29 +28,46 @@ export default function Chat() {
     messages,
     reload,
     stop,
-  } = useChat({
-    api: `${copyCodeApiBaseUrl}`,
-    headers: {
-      "api-key": `${apiKey}`,
-      'Authorization': `Bearer ${apiKey}`,
-    },
-    body: {
-      model: 'gpt',
-      max_tokens: 100,
-      temperature: 0.5,
-      top_p: 1,
-      frequency_penalty: 0,
-      presence_penalty: 0,
-      stop: ["\n"],
-    },
-    onFinish(message, { usage, finishReason }) {
-      console.log("Usage", usage);
-      console.log("FinishReason", finishReason);
-    },
-  });
+  } = useChat(
+    apiKey
+      ? {
+          api: `${copyCodeApiBaseUrl}`,
+          headers: {
+            "api-key": `${apiKey}`,
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: {
+            model: "gpt",
+            max_tokens: 100,
+            temperature: 0.5,
+            top_p: 1,
+            frequency_penalty: 0,
+            presence_penalty: 0,
+            stop: ["\n"],
+          },
+          onFinish(message, { usage, finishReason }) {
+            console.log("Usage", usage);
+            console.log("FinishReason", finishReason);
+          },
+        }
+      : {
+          onFinish(message, { usage, finishReason }) {
+            console.log("Usage", usage);
+            console.log("FinishReason", finishReason);
+          },
+        }
+  );
   const handleChange = (value: string) => {
     console.log(`selected ${value}`);
   };
+
+  const { getEndPoints } = useEndPoints();
+
+  useEffect(() => {
+    console.log("getEndPoints");
+    getEndPoints({ page: 1, limit: 10 });
+  }, [open]);
+
   return (
     <Layout className="chat-container">
       <Sider
@@ -130,19 +150,7 @@ export default function Chat() {
             handleInputChange={handleInputChange}
             handleSubmit={handleSubmit}
             input={input}
-            // isLoading={isLoading}
-            // error={error}
           />
-          {/* <Editor
-            isLoading={isLoading}
-            error={error}
-            stop={stop}
-            handleInputChange={handleInputChange}
-            handleSubmit={handleSubmit}
-            input={input}
-            // isLoading={isLoading}
-            // error={error}
-          /> */}
         </Footer>
       </Layout>
       <Sider
@@ -189,5 +197,26 @@ export default function Chat() {
         </div>
       </Sider>
     </Layout>
+  );
+}
+
+export default function ChatWithStore() {
+  const [_apiKey, setApiKey] = useState<string>("");
+  const [token, setToken] = useState<string>("");
+  const [endpoints, setEndpoints] = useState<Endpoint[]>([]);
+
+  return (
+    <ChatContext.Provider
+      value={{
+        apiKey: _apiKey,
+        token,
+        endpoints,
+        setEndpoints,
+        setToken,
+        setApiKey,
+      }}
+    >
+      <Chat />
+    </ChatContext.Provider>
   );
 }

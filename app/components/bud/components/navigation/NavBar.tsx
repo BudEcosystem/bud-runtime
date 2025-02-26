@@ -1,11 +1,8 @@
-import React, { useEffect } from "react";
+import React from "react";
 
-import history from "../../images/icons/history.svg";
-import { Button, Image } from "antd";
-import Health from "../../chart/Health";
+import { Image } from "antd";
 import LoadModel from "../../chat/LoadModel";
-import { Endpoint, useEndPoints } from "../../hooks/useEndPoint";
-import LoadModelConfig from "../../chat/LoadModelConfig";
+import { Endpoint } from "@/app/context/ChatContext";
 
 interface NavBarProps {
   onToggleLeftSidebar: () => void;
@@ -21,20 +18,9 @@ function NavBar({
   isRightSidebarOpen,
 }: NavBarProps) {
   const [open, setOpen] = React.useState(false);
-  const [openEdit, setOpenEdit] = React.useState(false);
-
-  console.log("open", open);
-  console.log("openEdit", openEdit);
-
   const [selectedModel, setSelectedModel] = React.useState<Endpoint | null>(
     null
   );
-  const { endPoints, getEndPoints } = useEndPoints();
-
-  useEffect(() => {
-    console.log("getEndPoints");
-    getEndPoints({ page: 1, limit: 10 });
-  }, [open]);
 
   return (
     <div className="topBg text-[#FFF] p-[1rem] flex justify-between items-center h-[3.625rem] relative sticky top-0  z-10 bg-[#101010] border-b-[1px] border-b-[#1F1F1F]">
@@ -63,17 +49,6 @@ function NavBar({
         setOpen={setOpen}
         selected={selectedModel}
         setSelected={setSelectedModel}
-        openEdit={openEdit}
-        setOpenEdit={setOpenEdit}
-      />
-      <LoadModelConfig
-        data={selectedModel}
-        open={openEdit}
-        setOpen={setOpenEdit}
-        onBack={() => {
-          setOpenEdit(false);
-          setOpen(true);
-        }}
       />
       <div className="flex items-center gap-[.5rem]">
         <button
