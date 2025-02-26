@@ -12,6 +12,8 @@ import { apiKey as apiKeyEnv, copyCodeApiBaseUrl } from "../environment";
 import ChatContext, { Endpoint } from "@/app/context/ChatContext";
 import { useEndPoints } from "../hooks/useEndPoint";
 import { useMessages } from "../hooks/useMessages";
+import RootContext from "@/app/context/RootContext";
+import { ChatType } from "@/app/page";
 
 const { Header, Footer, Sider, Content } = Layout;
 
@@ -25,7 +27,7 @@ function Chat() {
   const onFinish = (message: Message, { usage, finishReason }: any) => {
     console.log("Message", message);
     console.log("FinishReason", finishReason);
-    
+
     createMessage({
       chat_session_id: "1234",
       deployment_id: "1234",
@@ -246,22 +248,19 @@ function Chat() {
   );
 }
 
-export default function ChatWithStore() {
-  const [_apiKey, setApiKey] = useState<string>("");
-  const [token, setToken] = useState<string>("");
+function ChatWithStore(props: { chat: ChatType }) {
   const [endpoints, setEndpoints] = useState<Endpoint[]>([]);
   const [chatSessionId, setChatSessionId] = useState<string>("");
   const [messages, setMessages] = useState<any[]>([]);
 
+
   return (
     <ChatContext.Provider
       value={{
-        apiKey: _apiKey,
-        token,
+        apiKey:  props.chat.apiKey,
+        token: props.chat.token,
         endpoints,
         setEndpoints,
-        setToken,
-        setApiKey,
         chatSessionId,
         setChatSessionId,
         messages,
@@ -270,5 +269,34 @@ export default function ChatWithStore() {
     >
       <Chat />
     </ChatContext.Provider>
+  );
+}
+
+export default function ChatWindowWithStore() {
+  const { chats, createChat } = useContext(RootContext);
+
+  return (
+    <Layout
+      className="!grid w-full h-full"
+      style={{
+        gridTemplateColumns: chats?.map(() => "1fr").join(" "),
+        gridGap: "1rem",
+      }}
+    >
+      {chats.map((chat, index) => (
+        <ChatWithStore key={index} chat={chat} />
+      ))}
+      {chats.length === 0 && (
+        <div className="flex justify-center items-center w-full h-full">
+          <button
+            onClick={createChat}
+            type="button"
+            className="px-4 py-2 text-blue-500 border border-blue-500 rounded-md z-50"
+          >
+            Create Chat
+          </button>
+        </div>
+      )}
+    </Layout>
   );
 }

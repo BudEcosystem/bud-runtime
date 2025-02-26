@@ -1,8 +1,9 @@
-import React from "react";
+import React, { useContext } from "react";
 
 import { Image } from "antd";
 import LoadModel from "../../chat/LoadModel";
 import { Endpoint } from "@/app/context/ChatContext";
+import RootContext from "@/app/context/RootContext";
 
 interface NavBarProps {
   onToggleLeftSidebar: () => void;
@@ -17,6 +18,7 @@ function NavBar({
   isLeftSidebarOpen,
   isRightSidebarOpen,
 }: NavBarProps) {
+  const { setChats, chats } = useContext(RootContext);
   const [open, setOpen] = React.useState(false);
   const [selectedModel, setSelectedModel] = React.useState<Endpoint | null>(
     null
@@ -66,7 +68,12 @@ function NavBar({
             preview={false}
           />
         </button>
-        <button className="w-[1.475rem] height-[1.475rem] p-[.2rem] rounded-[6px] flex justify-center items-center hover:!bg-[#FFFFFF08] cursor-pointer">
+        <button
+          onClick={() => {
+            setChats([...chats, { id: chats.length + 1, messages: [] }]);
+          }}
+          className="w-[1.475rem] height-[1.475rem] p-[.2rem] rounded-[6px] flex justify-center items-center hover:!bg-[#FFFFFF08] cursor-pointer"
+        >
           <Image
             src={"/icons/plus.svg"}
             width={"1.125rem"}

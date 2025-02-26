@@ -1,21 +1,15 @@
 import { createContext } from "react";
 
 type RootContextType = {
-  // The user's name
-  name: string;
-  // The user's age
-  email: string;
-  // api key
-  apiKey: string;
-  // token
-  token: string;
+  chats: any[];
+  setChats: (chats: any[]) => void;
+  createChat: () => void;
 };
 
 const RootContext = createContext<RootContextType>({
-  name: "",
-  email: "",
-  apiKey: "",
-  token: "",
+  chats: [],
+  setChats: () => {},
+  createChat: () => {},
 });
 
 export default RootContext;
