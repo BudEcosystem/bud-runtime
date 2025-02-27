@@ -51,7 +51,7 @@ function Chat() {
     }
 
     return {
-      model: chat.selectedDeployment?.model,
+      model: chat.selectedDeployment?.name,
       max_tokens: chat?.settings.limit_response_length ? chat?.settings.sequence_length : undefined,
       temperature: chat?.settings.temperature,
       top_k: chat?.settings.tool_k_sampling,
@@ -61,7 +61,7 @@ function Chat() {
       stop: chat?.settings.stop_strings,
       context: chat?.settings.context_overflow,
     };
-  }, [chat]);
+  }, [chat, chat?.settings.limit_response_length, chat?.settings.sequence_length, chat?.settings.temperature, chat?.settings.tool_k_sampling, chat?.settings.top_p_sampling, chat?.settings.repeat_penalty, chat?.settings.min_p_sampling, chat?.settings.stop_strings, chat?.settings.context_overflow, chat?.selectedDeployment?.model]);
 
   const {
     error,
@@ -76,11 +76,11 @@ function Chat() {
     chat?.apiKey
       ? {
           // uncomment this line to use the copy code api provided by the backend
-          // api: `${copyCodeApiBaseUrl}`,
-          // headers: {
-          //   "api-key": `${chat?.apiKey}`,
-          //   Authorization: `Bearer ${chat?.apiKey}`,
-          // },
+          api: `${copyCodeApiBaseUrl}`,
+          headers: {
+            "api-key": `${chat?.apiKey}`,
+            Authorization: `Bearer ${chat?.apiKey}`,
+          },
           body,
           onFinish(message, { usage, finishReason }) {
             console.log("Usage", usage);
