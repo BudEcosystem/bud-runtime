@@ -37,4 +37,4 @@ next-env.d.ts
 # chat persistence
 .chats
 
-.envpublic/images/obs-studio-31.0.1-macos-apple.dmg
+.env
