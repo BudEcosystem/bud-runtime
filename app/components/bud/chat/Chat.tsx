@@ -8,7 +8,7 @@ import { useContext, useEffect, useMemo, useState } from "react";
 import NormalEditor from "../components/input/NormalEditor";
 import MessageLoading from "./MessageLoading";
 import NavBar from "../components/navigation/NavBar";
-import { apiKey as apiKeyEnv, copyCodeApiBaseUrl } from "../environment";
+import { copyCodeApiBaseUrl } from "../environment";
 import ChatContext, { Endpoint } from "@/app/context/ChatContext";
 import { useEndPoints } from "../hooks/useEndPoint";
 import { useMessages } from "../hooks/useMessages";
@@ -105,15 +105,17 @@ function Chat() {
 
   useEffect(() => {
     console.log("getEndPoints");
-    getEndPoints({ page: 1, limit: 10 });
+    if(chat){
+      getEndPoints({ page: 1, limit: 10 });
+    }
   }, [open]);
 
   return (
-    <Layout className="chat-container">
+    <Layout className="chat-container ">
       <Sider
         width="20.8%"
-        className="rounded-l-[1rem]"
-        style={{ display: toggleLeft ? "block" : "none" }}
+        className={`leftSider rounded-l-[1rem] border-[1px] border-[#1F1F1F] border-r-[0px] overflow-hidden ml-[-20.8%] ease-in-out ${toggleLeft ? "visible ml-[0]" : "invisible ml-[-20.8%]"}`}
+        // style={{ display: toggleLeft ? "block" : "none" }}
       >
         <div className="leftBg w-full h-full">
           <div className="flex flex-row py-[1rem] px-[1.5rem] bg-[#101010] border-b-[1px] border-[#1F1F1F] h-[3.625rem]">
@@ -138,7 +140,8 @@ function Chat() {
           </div>
         </div>
       </Sider>
-      <Layout className="border-[1px] border-[#1F1F1F] border-l-0 border-r-0">
+      <Layout className={`centerLayout border-[1px] border-[#1F1F1F] ${!toggleLeft && '!rounded-l-[0.875rem] overflow-hidden'} ${!toggleRight && '!rounded-r-[0.875rem] overflow-hidden'}`}>
+      {/* <Layout className="border-[1px] border-[#1F1F1F] border-l-0 border-r-0"> */}
         <Header>
           <NavBar
             isLeftSidebarOpen={toggleLeft}
@@ -215,8 +218,8 @@ function Chat() {
       </Layout>
       <Sider
         width="20.8%"
-        className="rounded-r-[1rem] Open-Sans"
-        style={{ display: toggleRight ? "block" : "none" }}
+        className={`rightSider rounded-r-[1rem] border-[1px] border-[#1F1F1F] border-l-[0px] overflow-hidden Open-Sans mr-[-20.8%] ease-in-out ${toggleRight ? "visible mr-[0]" : "invisible mr-[-20.8%]"}`}
+        // style={{ display: toggleRight ? "block" : "none" }}
       >
         <div className="rightBg w-full h-full">
           <div className="flex flex-row pt-[.7rem] pb-[.4rem] px-[.9rem] bg-[#101010] border-b-[1px] border-[#1F1F1F] h-[3.625rem] justify-between items-center">

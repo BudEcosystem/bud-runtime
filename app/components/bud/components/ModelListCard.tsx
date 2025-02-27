@@ -1,10 +1,8 @@
-import { Checkbox, Image, Tag } from "antd";
-import { ChevronRight } from "lucide-react";
+import { Image, Tag } from "antd";
 import React from "react";
 import { assetBaseUrl } from "../environment";
-import CustomPopover from "./customPopover";
 import { getChromeColor } from "../utils/color";
-import { Endpoint } from "../hooks/useEndPoint";
+import { Endpoint } from "@/app/context/ChatContext";
 
 type Model = {
   id: string;

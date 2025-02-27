@@ -1,5 +1,5 @@
 import axios from "axios";
-import { apiBaseUrl, apiKey } from "../components/bud/environment";
+import { apiBaseUrl } from "../components/bud/environment";
 // import { errorToast } from "./../../components/toast";
 
 function errorToast(message: string) {
@@ -32,9 +32,9 @@ axiosInstance.interceptors.request.use(
     //     config.headers.Authorization = `Bearer ${accessToken}`;
     //   }
     // } else {
-      if (config.headers) {
-        config.headers['api-key'] = apiKey;
-      }
+      // if (config.headers) {
+      //   config.headers['api-key'] = apiKey;
+      // }
     // }
     return config;
   },
