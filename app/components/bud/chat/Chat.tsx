@@ -79,7 +79,7 @@ function Chat() {
           api: `${copyCodeApiBaseUrl}`,
           headers: {
             "api-key": `${chat?.apiKey}`,
-            Authorization: `Bearer ${chat?.apiKey}`,
+            Authorization: `Bearer ${localStorage.getItem("access_token") ? localStorage.getItem("access_token") : chat?.apiKey}`,
           },
           body,
           onFinish(message, { usage, finishReason }) {
@@ -283,9 +283,14 @@ function ChatWithStore(props: { chat: ChatType }) {
   );
 }
 
+
 export default function ChatWindowWithStore() {
   const { chats, createChat } = useContext(RootContext);
 
+  useEffect(() => {
+    console.log("localStorage.getItemaccess_token", localStorage.getItem("access_token"));
+  }, []);
+  
   return (
     <Layout
       className="!grid w-full h-full"

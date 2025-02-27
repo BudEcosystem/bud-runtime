@@ -1,7 +1,7 @@
 "use client";
 
 import Chat from "./components/bud/chat/Chat";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import RootContext from "./context/RootContext";
 import { Endpoint } from "./context/ChatContext";
 
@@ -104,6 +104,25 @@ export default function Page() {
     setChats(updatedChats);
   };
 
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      // Optionally check the event origin to ensure it is from a trusted source
+      if (event.origin !== 'http://localhost:3000') {
+        console.warn('Untrusted origin:', event.origin);
+        return;
+      }
+      localStorage.setItem("access_token", event.data.access_token);
+      localStorage.setItem("access_token", event.data.refresh_token);
+      console.log('Received message:', event.data);
+      // Now you can process event.data.token, etc.
+    };
+  
+    window.addEventListener('message', handleMessage);
+  
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+  
   return (
     <RootContext.Provider
       value={{
