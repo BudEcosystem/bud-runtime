@@ -105,7 +105,9 @@ function Chat() {
 
   useEffect(() => {
     console.log("getEndPoints");
-    getEndPoints({ page: 1, limit: 10 });
+    if(chat){
+      getEndPoints({ page: 1, limit: 10 });
+    }
   }, [open]);
 
   return (
