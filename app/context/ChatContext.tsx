@@ -1,5 +1,4 @@
 import { createContext } from "react";
-import { apiKey } from "../components/bud/environment";
 import { PostMessage } from "../components/bud/hooks/useMessages";
 import { ChatType } from "../page";
 

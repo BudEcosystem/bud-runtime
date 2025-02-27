@@ -8,7 +8,7 @@ import { useContext, useEffect, useMemo, useState } from "react";
 import NormalEditor from "../components/input/NormalEditor";
 import MessageLoading from "./MessageLoading";
 import NavBar from "../components/navigation/NavBar";
-import { apiKey as apiKeyEnv, copyCodeApiBaseUrl } from "../environment";
+import { copyCodeApiBaseUrl } from "../environment";
 import ChatContext, { Endpoint } from "@/app/context/ChatContext";
 import { useEndPoints } from "../hooks/useEndPoint";
 import { useMessages } from "../hooks/useMessages";
