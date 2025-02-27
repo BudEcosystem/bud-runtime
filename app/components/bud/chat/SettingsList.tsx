@@ -79,7 +79,7 @@ function SettingsList({ data }: SettingsListProps) {
             title="Temperature"
             min={0}
             max={100}
-            step={1}
+            step={.1}
             defaultValue={chat?.settings?.temperature || 0}
             value={chat?.settings?.temperature || 0}
             onChange={(value) => handleChange(chat, "temperature", value)}
@@ -188,18 +188,18 @@ function SettingsList({ data }: SettingsListProps) {
           />
           <SliderInput
             title="Top P Sampling"
-            min={5}
+            min={0}
             max={100}
-            step={1}
+            step={.1}
             defaultValue={chat?.settings?.top_p_sampling || 0}
             value={chat?.settings?.top_p_sampling || 0}
             onChange={(value) => handleChange(chat, "top_p_sampling", value)}
           />
           <SliderInput
             title="Min P Sampling"
-            min={5}
+            min={0}
             max={100}
-            step={1}
+            step={.1}
             defaultValue={chat?.settings?.min_p_sampling || 0}
             value={chat?.settings?.min_p_sampling || 0}
             onChange={(value) => handleChange(chat, "min_p_sampling", value)}

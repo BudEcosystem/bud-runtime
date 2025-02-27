@@ -4,7 +4,7 @@ import { Messages, HistoryMessages } from "./Messages";
 import { Layout } from "antd";
 import HistoryList from "./HistoryList";
 import SettingsList from "./SettingsList";
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import NormalEditor from "../components/input/NormalEditor";
 import MessageLoading from "./MessageLoading";
 import NavBar from "../components/navigation/NavBar";
@@ -45,6 +45,24 @@ function Chat() {
     console.log("Usage", usage);
   };
 
+  const body = useMemo(() => {
+    if (!chat) {
+      return;
+    }
+
+    return {
+      model: chat.selectedDeployment?.model,
+      max_tokens: chat?.settings.limit_response_length ? chat?.settings.sequence_length : undefined,
+      temperature: chat?.settings.temperature,
+      top_k: chat?.settings.tool_k_sampling,
+      top_p: chat?.settings.top_p_sampling,
+      frequency_penalty: chat?.settings.repeat_penalty,
+      presence_penalty: chat?.settings.min_p_sampling,
+      stop: chat?.settings.stop_strings,
+      context: chat?.settings.context_overflow,
+    };
+  }, [chat]);
+
   const {
     error,
     input,
@@ -63,15 +81,7 @@ function Chat() {
           //   "api-key": `${chat?.apiKey}`,
           //   Authorization: `Bearer ${chat?.apiKey}`,
           // },
-          body: {
-            model: "gpt",
-            max_tokens: 100,
-            temperature: 0.5,
-            top_p: 1,
-            frequency_penalty: 0,
-            presence_penalty: 0,
-            stop: ["\n"],
-          },
+          body,
           onFinish(message, { usage, finishReason }) {
             console.log("Usage", usage);
             console.log("FinishReason", finishReason);
@@ -79,6 +89,7 @@ function Chat() {
           },
         }
       : {
+          body,
           onFinish(message, { usage, finishReason }) {
             console.log("Usage", usage);
             console.log("FinishReason", finishReason);
