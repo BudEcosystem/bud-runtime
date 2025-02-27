@@ -24,6 +24,7 @@ function NavBar({
 
   return (
     <div className="topBg text-[#FFF] p-[1rem] flex justify-between items-center h-[3.625rem] relative sticky top-0  z-10 bg-[#101010] border-b-[1px] border-b-[#1F1F1F]">
+    {/* <div className="topBg text-[#FFF] p-[1rem] flex justify-between items-center h-[3.625rem] relative sticky top-0  z-10 bg-[#101010] border-b-[1px] border-b-[#1F1F1F]"> */}
       <button
         style={{
           display: isLeftSidebarOpen ? "none" : "block",

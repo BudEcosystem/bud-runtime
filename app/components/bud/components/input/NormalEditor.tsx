@@ -31,7 +31,7 @@ function NormalEditor({
         <div className="blur-[0.5rem] absolute top-0 left-0 right-0 bottom-0 bg-[#FFFFFF03] rounded-[0.5rem] " />
         <div className="flex flex-row items-center w-full pb-[2rem] pt-[.5rem]">
           <Image
-            src="icons/bud.svg"
+            src="icons/budrect.svg"
             alt="attachment"
             width={"1.25rem"}
             className="absolute left-0 top-[-.5rem] m-auto"
