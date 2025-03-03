@@ -113,8 +113,9 @@ export default function Page() {
         return;
       }
       localStorage.setItem("access_token", event.data.access_token);
-      localStorage.setItem("access_token", event.data.refresh_token);
+      localStorage.setItem("refresh_token", event.data.refresh_token);
       console.log('Received message:', event.data);
+      createChat()
       // Now you can process event.data.token, etc.
     };
   

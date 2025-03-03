@@ -150,7 +150,7 @@ function Chat() {
             onToggleRightSidebar={() => setToggleRight(!toggleRight)}
           />
         </Header>
-        <Content className="overflow-hidden overflow-y-auto">
+        <Content className="overflow-hidden overflow-y-auto hide-scrollbar">
           <div className="flex flex-col w-full py-24 mx-auto stretch px-[.5rem] max-w-2xl ">
             <HistoryMessages messages={historyMessages} />
             <Messages messages={messages} />

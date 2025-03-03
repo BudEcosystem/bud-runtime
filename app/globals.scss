@@ -918,3 +918,13 @@ input.ant-input:-webkit-autofill {
     border: 1px solid #7f4f9b !important;
   }
 }
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* For Firefox */
+.hide-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none; /* IE and Edge */
+}

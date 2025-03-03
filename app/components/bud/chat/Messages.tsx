@@ -85,14 +85,27 @@ export function Messages({ messages }: MessagesProps) {
   return messages.map((m) => <Message {...m} key={m.id} />);
 }
 
+// export function HistoryMessages({ messages }: HistoryMessagesProps) {
+//   return messages.map((m, index) => (
+//     <>
+//       <Message
+//         content={m.response?.[0]?.text || m.prompt }
+//         role={m.response?.[0]?.text ? "ai" : "user"}
+//         key={m.chat_session_id + index}
+//       />
+//     </>
+//   ));
+// }
 export function HistoryMessages({ messages }: HistoryMessagesProps) {
-  return messages.map((m, index) => (
+  return (
     <>
-      <Message
-        content={m.response?.[0]?.text || m.prompt }
-        role={m.response?.[0]?.text ? "ai" : "user"}
-        key={m.chat_session_id + index}
-      />
+      {messages.map((m, index) => (
+        <Message
+          content={m.response?.[0]?.text || m.prompt}
+          role={m.response?.[0]?.text ? "ai" : "user"}
+          key={m.chat_session_id ? `${m.chat_session_id}-${index}` : index}
+        />
+      ))}
     </>
-  ));
+  );
 }
