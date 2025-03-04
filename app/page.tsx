@@ -108,7 +108,8 @@ export default function Page() {
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       // Optionally check the event origin to ensure it is from a trusted source
-      if (event.origin !== 'http://localhost:3000') {
+      const allowedOrigins = ['http://localhost:3000', 'https://admin-dev.bud.studio'];
+      if (!allowedOrigins.includes(event.origin)) {
         console.warn('Untrusted origin:', event.origin);
         return;
       }
