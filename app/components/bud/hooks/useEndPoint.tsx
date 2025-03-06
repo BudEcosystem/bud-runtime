@@ -5,7 +5,7 @@ import ChatContext from "@/app/context/ChatContext";
 
 export function useEndPoints() {
   const { chat, endpoints, setEndpoints } = useContext(ChatContext);
-
+  const accessToken= localStorage.getItem('access_token')
   async function getEndPoints({ page = 1, limit = 25 }) {
     try {
       const result = await axios
@@ -13,9 +13,12 @@ export function useEndPoints() {
           params: {
             page: page,
             limit: limit,
+            search:false,
           },
           headers: {
-            "api-key": chat?.apiKey,
+            // "authorization": `Bearer ${localStorage.getItem("access_token") ? localStorage.getItem("access_token") : `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkMmUxZDYyYi1iYTk1LTQzODktOGYxZi00MGQ2ZjE4Y2Q1NDgiLCJ0eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQxMjUyODgxfQ.vFFHemLsLdou1XKA5L2JCzJ0_krmK5BPtXV_vAyOapA`}`,
+            "authorization": `Bearer ${localStorage.getItem("access_token") ? localStorage.getItem("access_token") : `${chat?.token}`}`,
+            // "api-key": chat?.apiKey,
           },
         })
         .then((res) => {

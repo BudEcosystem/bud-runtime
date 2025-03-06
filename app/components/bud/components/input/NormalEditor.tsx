@@ -44,7 +44,12 @@ function NormalEditor({
             rows={2}
             placeholder="Type a message and press Enter to send"
             onChange={(e) => handleInputChange(e)}
-            onSubmit={handleSubmit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          handleSubmit(e);
+              }
+            }}
             disabled={isLoading || error != null}
           />
         </div>

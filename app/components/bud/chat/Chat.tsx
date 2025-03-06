@@ -24,10 +24,10 @@ function Chat() {
   const [toggleRight, setToggleRight] = useState<boolean>(false);
   const [isHovered, setIsHovered] = useState<boolean>(false);
 
-  const onFinish = (message: Message, { usage, finishReason }: any) => {
+
+  const handleFinish = (message: Message, { usage, finishReason }: any) => {
     console.log("Message", message);
     console.log("FinishReason", finishReason);
-
     createMessage({
       chat_session_id: "1234",
       deployment_id: "1234",
@@ -54,48 +54,54 @@ function Chat() {
       model: chat.selectedDeployment?.name,
       max_tokens: chat?.settings.limit_response_length ? chat?.settings.sequence_length : undefined,
       temperature: chat?.settings.temperature,
-      top_k: chat?.settings.tool_k_sampling,
-      top_p: chat?.settings.top_p_sampling,
-      frequency_penalty: chat?.settings.repeat_penalty,
-      presence_penalty: chat?.settings.min_p_sampling,
-      stop: chat?.settings.stop_strings,
-      context: chat?.settings.context_overflow,
+      
+      // top_k: chat?.settings.tool_k_sampling,
+      // top_p: chat?.settings.top_p_sampling,
+      // frequency_penalty: chat?.settings.repeat_penalty,
+      // presence_penalty: chat?.settings.min_p_sampling,
+      // stop: chat?.settings.stop_strings,
+      // context: chat?.settings.context_overflow,
     };
   }, [chat, chat?.settings.limit_response_length, chat?.settings.sequence_length, chat?.settings.temperature, chat?.settings.tool_k_sampling, chat?.settings.top_p_sampling, chat?.settings.repeat_penalty, chat?.settings.min_p_sampling, chat?.settings.stop_strings, chat?.settings.context_overflow, chat?.selectedDeployment?.model]);
 
-  const {
-    error,
-    input,
-    isLoading,
-    handleInputChange,
-    handleSubmit,
-    messages,
-    reload,
-    stop,
-  } = useChat(
-    chat?.apiKey
-      ? {
-          // uncomment this line to use the copy code api provided by the backend
-          api: `${copyCodeApiBaseUrl}`,
-          headers: {
-            "api-key": `${chat?.apiKey}`,
-            Authorization: `Bearer ${localStorage.getItem("access_token") ? localStorage.getItem("access_token") : chat?.apiKey}`,
-          },
-          body,
-          onFinish(message, { usage, finishReason }) {
-            console.log("Usage", usage);
-            console.log("FinishReason", finishReason);
-            onFinish(message, { usage, finishReason });
-          },
-        }
+  const { error, input, isLoading, handleInputChange, handleSubmit, messages, reload, stop, } = useChat(
+    chat?.apiKey ? {
+      // uncomment this line to use the copy code api provided by the backend
+      api: `${copyCodeApiBaseUrl}`,
+      headers: {
+        "api-key": `${chat?.apiKey}`,
+        authorization: `Bearer ${localStorage.getItem("access_token") ? localStorage.getItem("access_token") : `${chat?.token}`}`,
+        "Project-Id": `${chat?.selectedDeployment?.project.id}`
+      },
+      body,
+      onFinish(message, { usage, finishReason }) {
+        console.log("message", message);
+        console.log("Usage", usage);
+        console.log("FinishReason", finishReason);
+        handleFinish(message, { usage, finishReason });
+      },
+      onError: error => {
+        console.error('An error occurred:', error);
+      },
+      onResponse: response => {
+        console.log('Received HTTP response from server:', response);
+      },
+    }
       : {
-          body,
-          onFinish(message, { usage, finishReason }) {
-            console.log("Usage", usage);
-            console.log("FinishReason", finishReason);
-            onFinish(message, { usage, finishReason });
-          },
-        }
+        body,
+        onFinish(message, { usage, finishReason }) {
+          console.log("message", message);
+          console.log("Usage", usage);
+          console.log("FinishReason", finishReason);
+          handleFinish(message, { usage, finishReason });
+        },
+        onError: error => {
+          console.error('An error occurred:', error);
+        },
+        onResponse: response => {
+          console.log('Received HTTP response from server:', response);
+        },
+      }
   );
   const handleChange = (value: string) => {
     console.log(`selected ${value}`);
@@ -105,17 +111,17 @@ function Chat() {
 
   useEffect(() => {
     console.log("getEndPoints");
-    if(chat){
+    if (chat) {
       getEndPoints({ page: 1, limit: 10 });
     }
-  }, [open]);
+  }, []);
 
   return (
     <Layout className="chat-container ">
       <Sider
         width="20.8%"
         className={`leftSider rounded-l-[1rem] border-[1px] border-[#1F1F1F] border-r-[0px] overflow-hidden ml-[-20.8%] ease-in-out ${toggleLeft ? "visible ml-[0]" : "invisible ml-[-20.8%]"}`}
-        // style={{ display: toggleLeft ? "block" : "none" }}
+      // style={{ display: toggleLeft ? "block" : "none" }}
       >
         <div className="leftBg w-full h-full">
           <div className="flex flex-row py-[1rem] px-[1.5rem] bg-[#101010] border-b-[1px] border-[#1F1F1F] h-[3.625rem]">
@@ -141,7 +147,7 @@ function Chat() {
         </div>
       </Sider>
       <Layout className={`centerLayout border-[1px] border-[#1F1F1F] ${!toggleLeft && '!rounded-l-[0.875rem] overflow-hidden'} ${!toggleRight && '!rounded-r-[0.875rem] overflow-hidden'}`}>
-      {/* <Layout className="border-[1px] border-[#1F1F1F] border-l-0 border-r-0"> */}
+        {/* <Layout className="border-[1px] border-[#1F1F1F] border-l-0 border-r-0"> */}
         <Header>
           <NavBar
             isLeftSidebarOpen={toggleLeft}
@@ -161,7 +167,7 @@ function Chat() {
                 <div className="mt-4 text-[#EEEEEE] text-center">
                   <Image
                     preview={false}
-                    src="icons/load.svg"
+                    src="icons/load.png"
                     alt="bud"
                     width={"330px"}
                     height={"130px"}
@@ -219,7 +225,7 @@ function Chat() {
       <Sider
         width="20.8%"
         className={`rightSider rounded-r-[1rem] border-[1px] border-[#1F1F1F] border-l-[0px] overflow-hidden Open-Sans mr-[-20.8%] ease-in-out ${toggleRight ? "visible mr-[0]" : "invisible mr-[-20.8%]"}`}
-        // style={{ display: toggleRight ? "block" : "none" }}
+      // style={{ display: toggleRight ? "block" : "none" }}
       >
         <div className="rightBg w-full h-full">
           <div className="flex flex-row pt-[.7rem] pb-[.4rem] px-[.9rem] bg-[#101010] border-b-[1px] border-[#1F1F1F] h-[3.625rem] justify-between items-center">
@@ -290,7 +296,7 @@ export default function ChatWindowWithStore() {
   useEffect(() => {
     console.log("localStorage.getItemaccess_token", localStorage.getItem("access_token"));
   }, []);
-  
+
   return (
     <Layout
       className="!grid w-full h-full"

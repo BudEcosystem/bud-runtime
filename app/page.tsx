@@ -47,7 +47,7 @@ export default function Page() {
     updatedChats.push({
       id: chatIds[updatedChats.length],
       apiKey: apiKeyList[updatedChats.length],
-      token: "",
+      token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkMmUxZDYyYi1iYTk1LTQzODktOGYxZi00MGQ2ZjE4Y2Q1NDgiLCJ0eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQxMjk3MTQ3fQ.bdP_8kVSbcgswHszcS_k8_ZaSyH2m_1Losed_o8y7ic",
       chatSessionId: chatSessionIds[updatedChats.length],
       selectedDeployment: null,
       settings: {
@@ -66,8 +66,7 @@ export default function Page() {
     setChats(updatedChats);
   }, [chats]);
 
-  const handleDeploymentSelect = useCallback(
-    (chat: ChatType, endpoint: Endpoint) => {
+  const handleDeploymentSelect = useCallback((chat: ChatType, endpoint: Endpoint) => {
       if (!chat) return;
       let updatedChats = [...chats];
       console.log("updatedChats", updatedChats);
@@ -119,12 +118,12 @@ export default function Page() {
       createChat()
       // Now you can process event.data.token, etc.
     };
-  
+
     window.addEventListener('message', handleMessage);
-  
+
     return () => window.removeEventListener('message', handleMessage);
   }, []);
-  
+
   return (
     <RootContext.Provider
       value={{
