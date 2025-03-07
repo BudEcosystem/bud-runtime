@@ -1,5 +1,3 @@
-"use client";
-
 import { Message, useChat } from "@ai-sdk/react";
 import { Image } from "antd";
 import { Messages, HistoryMessages } from "./Messages";
@@ -53,10 +51,10 @@ function Chat() {
     }
 
     return {
-      model: 'gpt-4o',
-      // model: chat.selectedDeployment?.name,
-      // max_tokens: chat?.settings.limit_response_length ? chat?.settings.sequence_length : undefined,
-      // temperature: chat?.settings.temperature,
+      // model: 'gpt-4o',
+      model: chat.selectedDeployment?.name,
+      max_tokens: chat?.settings.limit_response_length ? chat?.settings.sequence_length : undefined,
+      temperature: chat?.settings.temperature,
 
       // top_k: chat?.settings.tool_k_sampling,
       // top_p: chat?.settings.top_p_sampling,
@@ -70,21 +68,13 @@ function Chat() {
   const { error, input, isLoading, handleInputChange, handleSubmit, messages, reload, stop, } = useChat(
     !chat?.apiKey ? {
       // uncomment this line to use the copy code api provided by the backend
-      // api: `${copyCodeApiBaseUrl}`,
-      // api: 'https://api.openai.com/v1/chat/completions',
-      // headers: {
-      //   "Authorization": `Bearer ${OpenAiKey}`, // Make sure chat.apiKey holds your OpenAI key
-      //   "Content-Type": "application/json",
-      //   // "api-key": `${chat?.apiKey}`,
-      //   // authorization: `Bearer ${localStorage.getItem("access_token") ? localStorage.getItem("access_token") : `${chat?.token}`}`,
-      //   // "Project-Id": `${chat?.selectedDeployment?.project.id}`
-      // },
-      // body: {
-      //   model: 'gpt-4o',
-      //   projectId: '123'
-      //   // Other parameters as needed
-      // },
-    
+      api: `${copyCodeApiBaseUrl}`,
+      headers: {
+        "api-key": `${chat?.apiKey}`,
+        authorization: `Bearer ${localStorage.getItem("access_token") ? localStorage.getItem("access_token") : `${chat?.token}`}`,
+        "Project-Id": `${chat?.selectedDeployment?.project.id}`
+      },
+      body,
       onFinish(message, { usage, finishReason }) {
         console.log("message", message);
         console.log("Usage", usage);
