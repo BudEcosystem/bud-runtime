@@ -47,7 +47,7 @@ export default function Page() {
     updatedChats.push({
       id: chatIds[updatedChats.length],
       apiKey: apiKeyList[updatedChats.length],
-      token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkMmUxZDYyYi1iYTk1LTQzODktOGYxZi00MGQ2ZjE4Y2Q1NDgiLCJ0eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQxMjk3MTQ3fQ.bdP_8kVSbcgswHszcS_k8_ZaSyH2m_1Losed_o8y7ic",
+      token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkMmUxZDYyYi1iYTk1LTQzODktOGYxZi00MGQ2ZjE4Y2Q1NDgiLCJ0eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQxMzcwNTE4fQ.ydAb_7roB7X7gG53_kq3NS_lJHnfQtkuXWIXu87XUAQ",
       chatSessionId: chatSessionIds[updatedChats.length],
       selectedDeployment: null,
       settings: {

@@ -1,3 +1,5 @@
+"use client";
+
 import { Message, useChat } from "@ai-sdk/react";
 import { Image } from "antd";
 import { Messages, HistoryMessages } from "./Messages";
@@ -8,7 +10,7 @@ import { useContext, useEffect, useMemo, useState } from "react";
 import NormalEditor from "../components/input/NormalEditor";
 import MessageLoading from "./MessageLoading";
 import NavBar from "../components/navigation/NavBar";
-import { copyCodeApiBaseUrl } from "../environment";
+import { copyCodeApiBaseUrl, OpenAiKey } from "../environment";
 import ChatContext, { Endpoint } from "@/app/context/ChatContext";
 import { useEndPoints } from "../hooks/useEndPoint";
 import { useMessages } from "../hooks/useMessages";
@@ -51,10 +53,11 @@ function Chat() {
     }
 
     return {
-      model: chat.selectedDeployment?.name,
-      max_tokens: chat?.settings.limit_response_length ? chat?.settings.sequence_length : undefined,
-      temperature: chat?.settings.temperature,
-      
+      model: 'gpt-4o',
+      // model: chat.selectedDeployment?.name,
+      // max_tokens: chat?.settings.limit_response_length ? chat?.settings.sequence_length : undefined,
+      // temperature: chat?.settings.temperature,
+
       // top_k: chat?.settings.tool_k_sampling,
       // top_p: chat?.settings.top_p_sampling,
       // frequency_penalty: chat?.settings.repeat_penalty,
@@ -65,15 +68,23 @@ function Chat() {
   }, [chat, chat?.settings.limit_response_length, chat?.settings.sequence_length, chat?.settings.temperature, chat?.settings.tool_k_sampling, chat?.settings.top_p_sampling, chat?.settings.repeat_penalty, chat?.settings.min_p_sampling, chat?.settings.stop_strings, chat?.settings.context_overflow, chat?.selectedDeployment?.model]);
 
   const { error, input, isLoading, handleInputChange, handleSubmit, messages, reload, stop, } = useChat(
-    chat?.apiKey ? {
+    !chat?.apiKey ? {
       // uncomment this line to use the copy code api provided by the backend
-      api: `${copyCodeApiBaseUrl}`,
-      headers: {
-        "api-key": `${chat?.apiKey}`,
-        authorization: `Bearer ${localStorage.getItem("access_token") ? localStorage.getItem("access_token") : `${chat?.token}`}`,
-        "Project-Id": `${chat?.selectedDeployment?.project.id}`
-      },
-      body,
+      // api: `${copyCodeApiBaseUrl}`,
+      // api: 'https://api.openai.com/v1/chat/completions',
+      // headers: {
+      //   "Authorization": `Bearer ${OpenAiKey}`, // Make sure chat.apiKey holds your OpenAI key
+      //   "Content-Type": "application/json",
+      //   // "api-key": `${chat?.apiKey}`,
+      //   // authorization: `Bearer ${localStorage.getItem("access_token") ? localStorage.getItem("access_token") : `${chat?.token}`}`,
+      //   // "Project-Id": `${chat?.selectedDeployment?.project.id}`
+      // },
+      // body: {
+      //   model: 'gpt-4o',
+      //   projectId: '123'
+      //   // Other parameters as needed
+      // },
+    
       onFinish(message, { usage, finishReason }) {
         console.log("message", message);
         console.log("Usage", usage);
@@ -88,7 +99,6 @@ function Chat() {
       },
     }
       : {
-        body,
         onFinish(message, { usage, finishReason }) {
           console.log("message", message);
           console.log("Usage", usage);
