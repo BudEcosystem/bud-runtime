@@ -19,9 +19,11 @@
         "name": "next"
       }
     ],
+    "baseUrl": ".",
     "paths": {
       "@/*": ["./*"],
-      "@util/*": ["./util/*"]
+      "@util/*": ["./util/*"],
+      "@ai-sdk/ui-utils": ["node_modules/@ai-sdk/ui-utils/dist/index"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

@@ -925,3 +925,42 @@ input.ant-input:-webkit-autofill {
   scrollbar-width: none;
   -ms-overflow-style: none; /* IE and Edge */
 }
+// .ai-message {
+//   p {
+//     font-size: .75rem;
+//     font-weight: 400;
+//     color: #EEEEEE;
+//     font-family: "Open-Sans" !important;
+//     line-height: 1.2rem;
+//     letter-spacing: .04rem;
+//   }
+// }
+.ai-message {
+  font-size: 0.75rem !important;
+  font-weight: 400 !important;
+  color: #EEEEEE !important;
+  font-family: "Open-Sans", sans-serif !important;
+  line-height: 1.2rem !important;
+  letter-spacing: 0.04rem !important;
+}
+
+.tempClass {
+  // background-image: url(./../public/images/d.png) !important;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: 0px 0px;
+  // width: 100% !important;
+}
+.bg {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  backdrop-filter: blur(10px);
+  z-index: 5;
+}
+.fg {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  height: 100%;
+}
