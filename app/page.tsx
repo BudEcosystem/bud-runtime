@@ -1,9 +1,8 @@
 "use client";
-
-import Chat from "./components/bud/chat/Chat";
 import { useCallback, useEffect, useState } from "react";
-import RootContext from "./context/RootContext";
+import Chat from "./components/Chat";
 import { Endpoint } from "./context/ChatContext";
+import RootContext from "./context/RootContext";
 
 export type ChatSettings = {
   temperature: number;
@@ -27,7 +26,7 @@ export type ChatType = {
 };
 
 const apiKeyList = [
-  "budserve_tYak6eMumQTwZ60IsZSa5RQa3WafUSPeG5CHHEgl",
+  "budserve_NgMnHOzyQjCXGgmoFZrYNwS7LgqZU2VMcmz3bz4U",
   "1budserve_tYak6eMumQTwZ60IsZSa5RQa3WafUSPeG5CHHEgl",
   "3budserve_tYak6eMumQTwZ60IsZSa5RQa3WafUSPeG5CHHEgl",
   "4budserve_tYak6eMumQTwZ60IsZSa5RQa3WafUSPeG5CHHEgl",
@@ -39,15 +38,35 @@ const chatIds = ["1", "2", "3", "4", "5", "6"];
 
 const chatSessionIds = ["1", "2", "3", "4", "5", "6"];
 
-export default function Page() {
-  const [chats, setChats] = useState<ChatType[]>([]);
+const initialChat = {
+  id: chatIds[0],
+  apiKey: apiKeyList[0],
+  token: "",
+  chatSessionId: chatSessionIds[0],
+  selectedDeployment: null,
+  settings: {
+    temperature: 0.7,
+    limit_response_length: false,
+    sequence_length: 256,
+    context_overflow: [],
+    stop_strings: "",
+    tool_k_sampling: 0.7,
+    repeat_penalty: 1.0,
+    top_p_sampling: 0.9,
+    min_p_sampling: 0.0,
+  },
+};
+
+export default function Home() {
+  const [chats, setChats] = useState<ChatType[]>([initialChat]);
 
   const createChat = useCallback(() => {
     const updatedChats = [...chats];
     updatedChats.push({
       id: chatIds[updatedChats.length],
       apiKey: apiKeyList[updatedChats.length],
-      token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkMmUxZDYyYi1iYTk1LTQzODktOGYxZi00MGQ2ZjE4Y2Q1NDgiLCJ0eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQxMzc4MzYxfQ.izQ9kQbz2mVMIHED6cHnQOwwAq9HgneSmu5nxhwdwfE",
+      token:
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkMmUxZDYyYi1iYTk1LTQzODktOGYxZi00MGQ2ZjE4Y2Q1NDgiLCJ0eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQxMzc4MzYxfQ.izQ9kQbz2mVMIHED6cHnQOwwAq9HgneSmu5nxhwdwfE",
       chatSessionId: chatSessionIds[updatedChats.length],
       selectedDeployment: null,
       settings: {
@@ -62,11 +81,15 @@ export default function Page() {
         min_p_sampling: 0.0,
       },
     });
-    console.log("createChat", updatedChats?.map((chat) => chat.id));
+    console.log(
+      "createChat",
+      updatedChats?.map((chat) => chat.id)
+    );
     setChats(updatedChats);
   }, [chats]);
 
-  const handleDeploymentSelect = useCallback((chat: ChatType, endpoint: Endpoint) => {
+  const handleDeploymentSelect = useCallback(
+    (chat: ChatType, endpoint: Endpoint) => {
       if (!chat) return;
       let updatedChats = [...chats];
       console.log("updatedChats", updatedChats);
@@ -103,38 +126,42 @@ export default function Page() {
     setChats(updatedChats);
   };
 
-
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       // Optionally check the event origin to ensure it is from a trusted source
-      const allowedOrigins = ['http://localhost:3000', 'https://admin-dev.bud.studio'];
+      const allowedOrigins = [
+        "http://localhost:3000",
+        "https://admin-dev.bud.studio",
+      ];
       if (!allowedOrigins.includes(event.origin)) {
-        console.warn('Untrusted origin:', event.origin);
+        console.warn("Untrusted origin:", event.origin);
         return;
       }
       localStorage.setItem("access_token", event.data.access_token);
       localStorage.setItem("refresh_token", event.data.refresh_token);
-      console.log('Received message:', event.data);
-      createChat()
+      console.log("Received message:", event.data);
+      createChat();
       // Now you can process event.data.token, etc.
     };
 
-    window.addEventListener('message', handleMessage);
+    window.addEventListener("message", handleMessage);
 
-    return () => window.removeEventListener('message', handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
   }, []);
 
   return (
-    <RootContext.Provider
-      value={{
-        chats,
-        setChats,
-        createChat,
-        handleDeploymentSelect,
-        handleSettingsChange,
-      }}
-    >
-      <Chat />
-    </RootContext.Provider>
+    <main className="flex flex-col gap-8 row-start-2 items-center w-full h-[100vh] p-4">
+      <RootContext.Provider
+        value={{
+          chats,
+          setChats,
+          createChat,
+          handleDeploymentSelect,
+          handleSettingsChange,
+        }}
+      >
+        <Chat />
+      </RootContext.Provider>
+    </main>
   );
 }

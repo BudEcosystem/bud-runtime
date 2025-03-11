@@ -56,6 +56,8 @@ type ChatContextType = {
   messages: PostMessage[];
   // set messages history
   setMessages: (messages: PostMessage[]) => void;
+  sessions: any[];
+  setSessions: (sessions: any[]) => void;
 };
 
 const ChatContext = createContext<ChatContextType>({
@@ -63,9 +65,11 @@ const ChatContext = createContext<ChatContextType>({
   chat: undefined,
   token: "",
   endpoints: [],
-  setEndpoints: (endpoints: Endpoint[]) => {},
+  setEndpoints: (_: Endpoint[]) => {},
   messages: [],
-  setMessages: (messages: any[]) => {},
+  setMessages: (_: any[]) => {},
+  sessions: [],
+  setSessions: (_: any[]) => {},
 });
 
 export default ChatContext;
