@@ -1,6 +1,5 @@
 "use client";
 
-import { tempApiBaseUrl } from "../environment";
 import axios from "axios";
 import { useContext } from "react";
 import ChatContext from "@/app/context/ChatContext";

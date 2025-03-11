@@ -29,7 +29,7 @@ export function useMessages() {
     try {
       if (apiKey) {
         const result = await axios
-          .post(`${tempApiBaseUrl}/playground/messages`, body, {
+          .post(`/api/messages`, body, {
             params: {},
             headers: {
               Authorization: `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkMmUxZDYyYi1iYTk1LTQzODktOGYxZi00MGQ2ZjE4Y2Q1NDgiLCJ0eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQxNjkxNjAxfQ.-W1JatgUZ1zkQOjhCrSVcK_8oojWN0GOcN5_X9uhAfY`,
