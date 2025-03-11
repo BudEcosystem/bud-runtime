@@ -67,8 +67,8 @@ function Chat() {
     };
   }, [chat, chat?.settings.limit_response_length, chat?.settings.sequence_length, chat?.settings.temperature, chat?.settings.tool_k_sampling, chat?.settings.top_p_sampling, chat?.settings.repeat_penalty, chat?.settings.min_p_sampling, chat?.settings.stop_strings, chat?.settings.context_overflow, chat?.selectedDeployment?.model]);
 
-  const { error, input, status, handleInputChange, handleSubmit, messages, reload, stop, } = useChat(
-    !chat?.apiKey ? {
+  const { error, input, isLoading, handleInputChange, handleSubmit, messages, reload, stop, } = useChat(
+    chat?.apiKey ? {
       // uncomment this line to use the copy code api provided by the backend
       api: `${copyCodeApiBaseUrl}`,
       headers: {
@@ -166,7 +166,7 @@ function Chat() {
           <div className="flex flex-col w-full py-24 mx-auto stretch px-[.5rem] max-w-2xl ">
             <HistoryMessages messages={historyMessages} />
             <Messages messages={messages} />
-            {status !== 'ready' &&
+            {
               !error &&
               historyMessages.length === 0 &&
               messages.length === 0 && (
@@ -186,7 +186,7 @@ function Chat() {
                   </div>
                 </div>
               )}
-            {status !== 'ready' && <MessageLoading />}
+            {isLoading && <MessageLoading />}
             {error && (
               <div className="mt-4">
                 <div className="text-red-500">An error occurred.</div>
@@ -203,7 +203,7 @@ function Chat() {
         </Content>
         <Footer className="sticky bottom-0 !px-[2.6875rem]">
           <NormalEditor
-            isLoading={status !== 'ready'}
+            isLoading={isLoading}
             error={error}
             stop={stop}
             handleInputChange={handleInputChange}
