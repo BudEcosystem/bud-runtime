@@ -13,6 +13,11 @@ import { useMessages } from "./bud/hooks/useMessages";
 import HistoryList from "./bud/chat/HistoryList";
 import SettingsList from "./bud/chat/SettingsList";
 import NormalEditor from "./bud/components/input/NormalEditor";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable";
 const { Header, Footer, Sider, Content } = Layout;
 
 export function Chat() {
@@ -97,49 +102,20 @@ export function Chat() {
     messages,
     reload,
     stop,
-  } = useChat(
-    // useOpenAI
-    //   ? {
-    //       // uncomment this line to use the copy code api provided by the backend
-    //       api: `${copyCodeApiBaseUrl}v1/chat/completions`,
-    //       headers: {
-    //         "api-key": chat?.apiKey || "",
-    //         authorization: chat?.token ? `Bearer ${chat?.token}` : "",
-    //         "Content-Type": "text/event-stream",
-    //         "Cache-Control": "no-cache",
-    //         "Transfer-Encoding": "chunked",
-    //         Connection: "keep-alive",
-    //       }, 
-    //       body,
-    //       onFinish(message, { usage, finishReason }) {
-    //         console.log("message", message);
-    //         console.log("Usage", usage);
-    //         console.log("FinishReason", finishReason);
-    //         handleFinish(message, { usage, finishReason });
-    //       },
-    //       onError: (error) => {
-    //         console.error("An error occurred:", error);
-    //       },
-    //       onResponse: (response) => {
-    //         console.log("Received HTTP response from server:", response);
-    //       },
-    //     }
-    //   :
-       {
-          onFinish(message, { usage, finishReason }) {
-            console.log("message", message);
-            console.log("Usage", usage);
-            console.log("FinishReason", finishReason);
-            handleFinish(message, { usage, finishReason });
-          },
-          onError: (error) => {
-            console.error("An error occurred:", error);
-          },
-          onResponse: (response) => {
-            console.log("Received HTTP response from server:", response);
-          },
-        }
-  );
+  } = useChat({
+    onFinish(message, { usage, finishReason }) {
+      console.log("message", message);
+      console.log("Usage", usage);
+      console.log("FinishReason", finishReason);
+      handleFinish(message, { usage, finishReason });
+    },
+    onError: (error) => {
+      console.error("An error occurred:", error);
+    },
+    onResponse: (response) => {
+      console.log("Received HTTP response from server:", response);
+    },
+  });
   const handleChange = (value: string) => {
     console.log(`selected ${value}`);
   };
@@ -359,14 +335,21 @@ export default function ChatWindowWithStore() {
   return (
     <div
       className="!grid w-full h-full"
-      style={{
-        gridTemplateColumns: chats?.map(() => "1fr").join(" "),
-        gridGap: "1rem",
-      }}
+  
     >
-      {chats.map((chat, index) => (
-        <ChatWithStore key={index} chat={chat} />
-      ))}
+      <ResizablePanelGroup
+        direction="horizontal"
+        className="h-full w-full"
+      >
+        {chats.map((chat, index) => (
+          <>
+          <ResizablePanel defaultSize={100}>
+            <ChatWithStore key={index} chat={chat} />
+            </ResizablePanel>
+            <ResizableHandle  />
+          </>
+        ))}
+      </ResizablePanelGroup>
     </div>
   );
 }

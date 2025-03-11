@@ -3,14 +3,7 @@ import { streamText } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { copyCodeApiBaseUrl } from '@/app/components/bud/environment';
 
-const proxyOpenAI = createOpenAI({
-  // custom settings, e.g.
-  baseURL: copyCodeApiBaseUrl,
-  // apiKey: "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",
-  headers: {
-    'Authorization': 'Bearer budserve_NgMnHOzyQjCXGgmoFZrYNwS7LgqZU2VMcmz3bz4U'
-  },
-});
+
 
 
 // Allow streaming responses up to 30 seconds
@@ -19,14 +12,23 @@ export const maxDuration = 30;
 export async function POST(req: Request) {
   // Extract the `messages` from the body of the request
   const x = await req.json()
-  const { messages, id, model } = x
+  const { messages, id, model, apiKey, token } = x
 
   console.log('chat id', id); // can be used for persisting the chat
   console.log('x', x); // can be used for persisting the chat
+  const proxyOpenAI = createOpenAI({
+    // custom settings, e.g.
+    baseURL: copyCodeApiBaseUrl,
+    // apiKey: "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",
+    headers: {
+      'Authorization': 'Bearer budserve_NgMnHOzyQjCXGgmoFZrYNwS7LgqZU2VMcmz3bz4U'
+    },
+    compatibility: "strict"
+  });
 
   // Call the language model
   const result = streamText({
-    model: proxyOpenAI('dontdelete'),
+    model: proxyOpenAI("dontdelete"),
     messages,
     async onFinish({ text, toolCalls, toolResults, usage, finishReason }) {
       console.log('text', text);
