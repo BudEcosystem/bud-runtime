@@ -37,8 +37,7 @@ export function useMessages() {
             },
           })
           .then((res) => {
-            console.log(res.data.endpoints);
-            return res.data.endpoints;
+            return res.data;
           });
   
         console.log(result);
@@ -63,7 +62,7 @@ export function useMessages() {
     // /playground/chat-sessions
 
     return await axios
-      .get(`${tempApiBaseUrl}/playground/chat-sessions`, {
+      .get(`/api/sessions`, {
         params: {},
         headers: {
           Authorization: `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkMmUxZDYyYi1iYTk1LTQzODktOGYxZi00MGQ2ZjE4Y2Q1NDgiLCJ0eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQxNjg5NzU5fQ.NXvJtLl6U9ckW_wQjHRrNJ9DtRjC1laBFfgpsnRo_Ts`,
@@ -71,7 +70,7 @@ export function useMessages() {
         },
       })
       .then((res) => {
-        return res.data.chat_sessions;
+        return res.data;
       });
   }
 

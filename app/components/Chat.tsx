@@ -312,20 +312,25 @@ function ChatWithStore(props: { chat: ChatType }) {
   }, []);
 
   return (
-    <ChatContext.Provider
-      value={{
-        chat: props.chat,
-        sessions,
-        setSessions,
-        token: "",
-        endpoints,
-        setEndpoints,
-        messages,
-        setMessages,
-      }}
-    >
-      <Chat />
-    </ChatContext.Provider>
+    <>
+      <ResizablePanel defaultSize={100}>
+        <ChatContext.Provider
+          value={{
+            chat: props.chat,
+            sessions,
+            setSessions,
+            token: "",
+            endpoints,
+            setEndpoints,
+            messages,
+            setMessages,
+          }}
+        >
+          <Chat />
+        </ChatContext.Provider>
+      </ResizablePanel>
+      <ResizableHandle />
+    </>
   );
 }
 
@@ -333,21 +338,10 @@ export default function ChatWindowWithStore() {
   const { chats, createChat } = useContext(RootContext);
 
   return (
-    <div
-      className="!grid w-full h-full"
-  
-    >
-      <ResizablePanelGroup
-        direction="horizontal"
-        className="h-full w-full"
-      >
+    <div className="!grid w-full h-full">
+      <ResizablePanelGroup direction="horizontal" className="h-full w-full">
         {chats.map((chat, index) => (
-          <>
-          <ResizablePanel defaultSize={100}>
-            <ChatWithStore key={index} chat={chat} />
-            </ResizablePanel>
-            <ResizableHandle  />
-          </>
+          <ChatWithStore key={index} chat={chat} />
         ))}
       </ResizablePanelGroup>
     </div>
