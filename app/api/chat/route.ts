@@ -21,8 +21,8 @@ export async function POST(req: Request) {
     baseURL: copyCodeApiBaseUrl,
     // apiKey: "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",
     headers: {
-      // 'Authorization': req.headers.get('authorization') || "",
-      'Authorization': 'Bearer budserve_NgMnHOzyQjCXGgmoFZrYNwS7LgqZU2VMcmz3bz4U',
+      'Authorization': req.headers.get('authorization') || "",
+      // 'Authorization': 'Bearer budserve_NgMnHOzyQjCXGgmoFZrYNwS7LgqZU2VMcmz3bz4U',
       'project-id': metadata.project_id,
     },
     compatibility: "strict"

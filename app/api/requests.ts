@@ -43,29 +43,6 @@ axiosInstance.interceptors.response.use(
     return response;
   },
   (err) => {
-    const status = err?.response?.status;
-    if (status === 401 && !isRefreshing) {
-      isRefreshing = true;
-      return refreshToken()
-        .then((newToken) => {
-          isRefreshing = false;
-          onRrefreshed(newToken);
-          refreshSubscribers = [];
-          return axiosInstance(err.config);
-        })
-        .catch((error) => {
-          isRefreshing = false;
-          refreshSubscribers = [];
-          return Promise.reject(error);
-        });
-    } else if (status === 401 && isRefreshing) {
-      return new Promise((resolve) => {
-        subscribeTokenRefresh((newToken: any) => {
-          err.config.headers.Authorization = `Bearer ${newToken}`;
-          resolve(axiosInstance(err.config));
-        });
-      });
-    }
     return handleErrorResponse(err);
   }
 );
@@ -104,25 +81,6 @@ const subscribeTokenRefresh = (callback: (newToken: any) => void) => {
   refreshSubscribers.push(callback);
 };
 
-const refreshToken = async () => {
-  try {
-    const response = await axiosInstance.post("token/refresh", {
-      refresh_token: localStorage.getItem("refresh_token"),
-    });
-    const data = response.data;
-    if (!data?.result) {
-      localStorage.clear();
-      return Promise.reject(data);
-    }
-    localStorage.setItem("access_token", data.result.access_token);
-    localStorage.setItem("refresh_token", data.result.refresh_token);
-    return data.result.access_token;
-  } catch (error) {
-    // errorToast(error?.response?.data?.error?.message || "Unauthorized Access");
-    localStorage.clear();
-    return Promise.reject(error);
-  }
-};
 
 const Get = (
   endPoint: string,
