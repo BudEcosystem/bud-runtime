@@ -48,7 +48,7 @@ function LoadModel(props: LoadModelProps) {
               <div className="text-[#757575] text-[0.75rem] font-[400]">
                 Currently Loaded
                 <span className="text-[#FFF] text-[0.75rem] font-[400] ml-[0.25rem]">
-                  {endpoints.length}
+                  {endpoints?.length}
                 </span>
               </div>
               <div className="text-[#757575] text-[0.625rem] font-[400]">
@@ -58,7 +58,7 @@ function LoadModel(props: LoadModelProps) {
                 </span>
               </div>
             </div>
-            {endpoints.map((endpoint) => (
+            {endpoints?.map((endpoint) => (
               <ModelListCard
                 key={endpoint.id}
                 data={endpoint}
@@ -78,7 +78,7 @@ function LoadModel(props: LoadModelProps) {
               <div className="text-[#757575] text-[0.75rem] font-[400]">
                 Models Available
                 <span className="text-[#FFF] text-[0.75rem] font-[400] ml-[0.25rem]">
-                  {endpoints.length}
+                  {endpoints?.length}
                 </span>
               </div>
               <div className="flex items-center gap-x-[0.25rem] justify-between">
@@ -95,7 +95,7 @@ function LoadModel(props: LoadModelProps) {
                 </span>
               </div>
             </div>
-            {endpoints.map((endpoint) => (
+            {endpoints?.map((endpoint) => (
               <ModelListCard
                 key={endpoint.id}
                 data={endpoint}

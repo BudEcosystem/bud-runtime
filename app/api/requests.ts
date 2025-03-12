@@ -16,7 +16,11 @@ axiosInstance.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("token");
     if (config.headers) {
-      config.headers.Authorization = token ? `Bearer ${token}` : "";
+      if (token?.startsWith('budserve_')) {
+        config.headers['api-key'] = token;
+      } else {
+        config.headers.Authorization = token ? `Bearer ${token}` : "";
+      }
     }
     return config;
   },
@@ -37,14 +41,8 @@ axiosInstance.interceptors.response.use(
 
 const handleErrorResponse = (err: any) => {
   if (err.response && err.response.status === 403) {
-    localStorage.clear();
-    // setTimeout(() => {
-    // window.location.replace("/");
-    // });
     return false;
   } else if (err.response && err.response.code === 500) {
-    console.log('err', err);
-    window.location.reload();
     return false;
   } else if (err.response && err.response.status === 422) {
     return false;
@@ -52,15 +50,6 @@ const handleErrorResponse = (err: any) => {
     return false;
   }
 };
-
-const onRrefreshed = (token: any) => {
-  refreshSubscribers.map((callback: (arg0: any) => any) => callback(token));
-};
-
-const subscribeTokenRefresh = (callback: (newToken: any) => void) => {
-  refreshSubscribers.push(callback);
-};
-
 
 const Get = (
   endPoint: string,

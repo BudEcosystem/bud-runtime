@@ -7,9 +7,8 @@ export async function POST(req: Request) {
 
   const body = await req.json();
   const authorization = req.headers.get('authorization');
-  if (!authorization) {
-    return NextResponse.json([]);
-  }
+  const apiKey = req.headers.get('api-key');
+
   try {
     const result = await axios
       .get(`${tempApiBaseUrl}/playground/deployments`, {
@@ -20,9 +19,11 @@ export async function POST(req: Request) {
         },
         headers: {
           authorization: authorization,
+          'api-key': apiKey,
         },
       })
       .then((response) => {
+        console.log("response", response);
         return response.data.endpoints;
       })
     return NextResponse.json(result);

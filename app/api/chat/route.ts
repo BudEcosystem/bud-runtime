@@ -12,7 +12,9 @@ export const maxDuration = 30;
 export async function POST(req: Request) {
   // Extract the `messages` from the body of the request
   const x = await req.json()
-  const { messages, id, model, apiKey, metadata } = x
+  const { messages, id, model, metadata } = x
+  const authorization = req.headers.get('authorization');
+  const apiKey = req.headers.get('api-key');
 
   console.log('chat id', id); // can be used for persisting the chat
   console.log('x', x); // can be used for persisting the chat
@@ -21,7 +23,7 @@ export async function POST(req: Request) {
     baseURL: copyCodeApiBaseUrl,
     // apiKey: "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",
     headers: {
-      'Authorization': req.headers.get('authorization') || "",
+      'Authorization': apiKey ? `Bearer ${apiKey}` : authorization ? authorization : "",
       // 'Authorization': 'Bearer budserve_NgMnHOzyQjCXGgmoFZrYNwS7LgqZU2VMcmz3bz4U',
       'project-id': metadata.project_id,
     },

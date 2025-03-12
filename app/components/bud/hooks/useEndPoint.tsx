@@ -10,16 +10,11 @@ export function useEndPoints() {
   const { endpoints, setEndpoints } = useContext(ChatContext);
   async function getEndPoints({ page = 1, limit = 25 }) {
     try {
-      const result = await AppRequest.Post(
-        `api/deployments`,
-        {
-          params: {
-            page: page,
-            limit: limit,
-            search: false,
-          },
-        }
-      ).then((res) => {
+      const result = await AppRequest.Post(`api/deployments`, {
+        page: page,
+        limit: limit,
+        search: false,
+      }).then((res) => {
         setEndpoints(res.data);
         return res.data;
       });

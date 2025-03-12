@@ -5,9 +5,7 @@ import { NextResponse } from 'next/server';
 export async function GET(req: Request) {
   console.log('GET /api/sessions');
   const authorization = req.headers.get('authorization');
-  if (!authorization) {
-    return NextResponse.json([]);
-  }
+  const apiKey = req.headers.get('api-key');
 
   try {
 
@@ -15,6 +13,7 @@ export async function GET(req: Request) {
       .get(`${tempApiBaseUrl}/playground/chat-sessions`, {
         headers: {
           authorization: authorization,
+          'api-key': apiKey,
         },
       })
       .then((response) => {

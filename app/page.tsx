@@ -3,7 +3,6 @@ import { useCallback, useEffect, useState } from "react";
 import Chat from "./components/Chat";
 import { Endpoint } from "./context/ChatContext";
 import RootContext from "./context/RootContext";
-import { useSearchParams } from "next/navigation";
 import { ActiveSession, Session } from "./components/bud/chat/HistoryList";
 import { useMessages } from "./components/bud/hooks/useMessages";
 import APIKey from "./components/APIKey";
@@ -16,9 +15,9 @@ export default function Home() {
   const [_refreshToken, _setRefreshToken] = useState<string | null>(null);
   const [_apiKey, _setApiKey] = useState<string | null>(null);
   const { getSessions } = useMessages();
-  const {getEndPoints} = useEndPoints();
+  const { getEndPoints } = useEndPoints();
 
-  const token = _accessToken || _apiKey || "";
+  const token = _apiKey || _accessToken || "";
 
   const [chats, setChats] = useState<ActiveSession[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -64,8 +63,15 @@ export default function Home() {
     if (!token) return;
 
     localStorage.setItem("token", token);
-    getSessions()
-    getEndPoints({ page: 1, limit: 25 });
+    return getEndPoints({ page: 1, limit: 25 })
+      .then(() => {
+        return getSessions();
+      })
+      .then((res) => {
+        if (chats.length === 0) {
+          createChat();
+        }
+      });
   }, [token]);
 
   const handleDeploymentSelect = useCallback(
