@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import Chat from "./components/Chat";
 import { Endpoint } from "./context/ChatContext";
 import RootContext from "./context/RootContext";
+import { useSearchParams } from "next/navigation";
 
 export type ChatSettings = {
   temperature: number;
@@ -58,6 +59,10 @@ const initialChat = {
 };
 
 export default function Home() {
+  const searchParams = useSearchParams();
+  const accessToken = searchParams.get("access_token");
+  const refreshToken = searchParams.get("refresh_token");
+
   const [chats, setChats] = useState<ChatType[]>([initialChat]);
 
   const createChat = useCallback(() => {
@@ -65,8 +70,7 @@ export default function Home() {
     updatedChats.push({
       id: chatIds[updatedChats.length],
       apiKey: apiKeyList[updatedChats.length],
-      token:
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkMmUxZDYyYi1iYTk1LTQzODktOGYxZi00MGQ2ZjE4Y2Q1NDgiLCJ0eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQxMzc4MzYxfQ.izQ9kQbz2mVMIHED6cHnQOwwAq9HgneSmu5nxhwdwfE",
+      token: "",
       chatSessionId: chatSessionIds[updatedChats.length],
       selectedDeployment: null,
       settings: {
@@ -81,12 +85,8 @@ export default function Home() {
         min_p_sampling: 0.0,
       },
     });
-    console.log(
-      "createChat",
-      updatedChats?.map((chat) => chat.id)
-    );
     setChats(updatedChats);
-  }, [chats]);
+  }, [chats, accessToken, refreshToken]);
 
   const handleDeploymentSelect = useCallback(
     (chat: ChatType, endpoint: Endpoint) => {
@@ -127,27 +127,10 @@ export default function Home() {
   };
 
   useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      // Optionally check the event origin to ensure it is from a trusted source
-      const allowedOrigins = [
-        "http://localhost:3000",
-        "https://admin-dev.bud.studio",
-      ];
-      if (!allowedOrigins.includes(event.origin)) {
-        console.warn("Untrusted origin:", event.origin);
-        return;
-      }
-      localStorage.setItem("access_token", event.data.access_token);
-      localStorage.setItem("refresh_token", event.data.refresh_token);
-      console.log("Received message:", event.data);
-      createChat();
-      // Now you can process event.data.token, etc.
-    };
-
-    window.addEventListener("message", handleMessage);
-
-    return () => window.removeEventListener("message", handleMessage);
-  }, []);
+    if (!accessToken || !refreshToken) return;
+    localStorage.setItem("access_token", accessToken);
+    localStorage.setItem("refresh_token", refreshToken);
+  }, [accessToken, refreshToken]);
 
   return (
     <main className="flex flex-col gap-8 row-start-2 items-center w-full h-[100vh] p-4">
