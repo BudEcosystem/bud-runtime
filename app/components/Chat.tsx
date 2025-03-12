@@ -7,7 +7,7 @@ import { HistoryMessages, Messages } from "./bud/chat/Messages";
 import MessageLoading from "./bud/chat/MessageLoading";
 import { Message, useChat } from "@ai-sdk/react";
 import { useEndPoints } from "./bud/hooks/useEndPoint";
-import { useMessages } from "./bud/hooks/useMessages";
+import { NEW_SESSION, useMessages } from "./bud/hooks/useMessages";
 import HistoryList, { ActiveSession, Session } from "./bud/chat/HistoryList";
 import SettingsList from "./bud/chat/SettingsList";
 import NormalEditor from "./bud/components/input/NormalEditor";
@@ -289,7 +289,6 @@ export function Chat() {
 }
 
 function ChatWithStore(props: { chat: ActiveSession }) {
-  const [endpoints, setEndpoints] = useState<Endpoint[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
 
   return (
@@ -298,9 +297,7 @@ function ChatWithStore(props: { chat: ActiveSession }) {
         <ChatContext.Provider
           value={{
             chat: props.chat,
-            endpoints,
-            setEndpoints,
-            messages,
+            messages: messages?.filter((m) => m.prompt !== NEW_SESSION),
             setMessages,
           }}
         >

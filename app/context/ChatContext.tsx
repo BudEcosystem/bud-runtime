@@ -46,10 +46,7 @@ export type Endpoint = {
 type ChatContextType = {
   // api key
   chat?: ActiveSession;
-  // endpoints
-  endpoints: Endpoint[];
-  // set endpoints
-  setEndpoints: (endpoints: Endpoint[]) => void;
+
   // messages history
   messages: PostMessage[];
   // set messages history
@@ -60,8 +57,6 @@ type ChatContextType = {
 const ChatContext = createContext<ChatContextType>({
   // default values
   chat: undefined,
-  endpoints: [],
-  setEndpoints: (_: Endpoint[]) => {},
   messages: [],
   setMessages: (_: any[]) => {},
 });

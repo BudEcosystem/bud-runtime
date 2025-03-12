@@ -11,6 +11,10 @@ type RootContextType = {
   token: string;
   sessions: Session[];
   setSessions: (sessions: Session[]) => void;
+  // endpoints
+  endpoints: Endpoint[];
+  // set endpoints
+  setEndpoints: (endpoints: Endpoint[]) => void;
 };
 
 const RootContext = createContext<RootContextType>({
@@ -22,6 +26,8 @@ const RootContext = createContext<RootContextType>({
   token: "",
   sessions: [],
   setSessions: (_: Session[]) => {},
+  endpoints: [],
+  setEndpoints: (_: Endpoint[]) => {},
 });
 
 export default RootContext;

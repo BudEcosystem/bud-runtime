@@ -4,6 +4,8 @@ import ChatContext from "@/app/context/ChatContext";
 import { AppRequest } from "@/app/api/requests";
 import RootContext from "@/app/context/RootContext";
 
+export const NEW_SESSION = "NEW_SESSION";
+
 export type PostMessage = {
   prompt: string;
   response: any;
@@ -23,7 +25,6 @@ export type PostMessage = {
 export function useMessages() {
   const { setSessions } = useContext(RootContext);
   const { chat, setMessages } = useContext(ChatContext);
-  const id = chat?.id;
 
   async function createMessage(body: PostMessage) {
     try {
@@ -34,6 +35,7 @@ export function useMessages() {
       );
 
       console.log(result);
+      const id = chat?.id;
 
       if (id) {
         // store to local storage
@@ -51,12 +53,12 @@ export function useMessages() {
     }
   }
 
-  async function createSession(deploymentId: string) {
+  async function createSession() {
     try {
       const body: PostMessage = {
-        prompt: "Create session",
+        prompt: NEW_SESSION,
         response: "Session created",
-        deployment_id: deploymentId,
+        deployment_id: "",
         input_tokens: 0,
         output_tokens: 0,
         total_tokens: 0,
@@ -66,9 +68,10 @@ export function useMessages() {
         e2e_latency: 0,
         is_cache: false,
       };
-      const result = await AppRequest.Post(`/api/messages`).then((res) => {
+      const result = await AppRequest.Post(`/api/sessions`).then((res) => {
         return res.data;
       });
+      const id = result.id;
       if (id) {
         // store to local storage
         const existing = localStorage.getItem(id);
@@ -80,6 +83,7 @@ export function useMessages() {
           localStorage.setItem(id, JSON.stringify([body]));
         }
       }
+      return result;
     } catch (error) {
       console.error(error);
     }
@@ -98,6 +102,7 @@ export function useMessages() {
   }
 
   useEffect(() => {
+    const id = chat?.id;
     if (id) {
       const existing = localStorage.getItem(id);
       if (existing) {
@@ -105,7 +110,7 @@ export function useMessages() {
         setMessages(data);
       }
     }
-  }, [id]);
+  }, [chat]);
 
   return { createMessage, getSessions, createSession };
 }

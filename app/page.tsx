@@ -8,14 +8,13 @@ import { useMessages } from "./components/bud/hooks/useMessages";
 import APIKey from "./components/APIKey";
 import { useEndPoints } from "./components/bud/hooks/useEndPoint";
 
-const chatIds = ["1", "2", "3", "4", "5", "6"];
-
 export default function Home() {
   const [_accessToken, _setAccessToken] = useState<string | null>(null);
   const [_refreshToken, _setRefreshToken] = useState<string | null>(null);
   const [_apiKey, _setApiKey] = useState<string | null>(null);
-  const { getSessions } = useMessages();
+  const { getSessions, createSession } = useMessages();
   const { getEndPoints } = useEndPoints();
+  const [endpoints, setEndpoints] = useState<Endpoint[]>([]);
 
   const token = _apiKey || _accessToken || "";
 
@@ -25,8 +24,9 @@ export default function Home() {
   const createChat = useCallback(async () => {
     console.log("Creating chat");
     const updatedChats = [...chats];
+    const result =  await createSession();
     updatedChats.push({
-      id: chatIds[updatedChats.length],
+      id: result.id,
       name: `Chat ${updatedChats.length + 1}`,
     });
     setChats(updatedChats);
@@ -68,12 +68,12 @@ export default function Home() {
       if (!token) return;
 
       localStorage.setItem("token", token);
-      return getEndPoints({ page: 1, limit: 25 })
+      return getSessions()
         .then(() => {
-          return getSessions();
+          return getEndPoints({ page: 1, limit: 25 });
         })
         .then((res) => {
-          if (chats.length === 0) {
+          if (chats.length === 0 && res) {
             createChat();
           }
         });
@@ -132,6 +132,8 @@ export default function Home() {
           token,
           sessions,
           setSessions,
+          endpoints,
+          setEndpoints,
         }}
       >
         {chats?.length === 0 && <APIKey />}

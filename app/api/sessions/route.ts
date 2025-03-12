@@ -1,5 +1,6 @@
 import { tempApiBaseUrl } from '@/app/components/bud/environment';
 import axios from 'axios';
+import { randomUUID } from 'crypto';
 import { NextResponse } from 'next/server';
 
 export async function GET(req: Request) {
@@ -25,4 +26,14 @@ export async function GET(req: Request) {
     return new NextResponse(error, { status: error.response?.status || 500 });
   }
 
+}
+
+
+export async function POST(req: Request) {
+  return NextResponse.json({
+    id: randomUUID(),
+    name: "session",
+    created_at: new Date().toISOString(),
+    modified_at: new Date().toISOString()
+  });
 }
