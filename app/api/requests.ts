@@ -1,10 +1,4 @@
 import axios from "axios";
-import { apiBaseUrl } from "../components/bud/environment";
-// import { errorToast } from "./../../components/toast";
-
-function errorToast(message: string) {
-  console.log(message);
-}
 
 export const axiosInstance = axios.create({
 });
@@ -14,21 +8,15 @@ let isRefreshing = false;
 let refreshSubscribers: any = [];
 
 if (typeof window !== "undefined") {
-  Token = localStorage.getItem("access_token");
+  Token = localStorage.getItem("token");
 }
 
 // Request interceptor
 axiosInstance.interceptors.request.use(
   (config) => {
-    if (config.url === "token/refresh") {
-      Token = "";
-    } else if (!Token) {
-      Token = localStorage.getItem("access_token");
-    }
-    const accessToken = Token ? Token : "";
-    const apiKey = localStorage.getItem("api_key");
+    const token = localStorage.getItem("token");
     if (config.headers) {
-      config.headers.Authorization = accessToken ? `Bearer ${accessToken}` : apiKey ? `Bearer ${apiKey}` : "";
+      config.headers.Authorization = token ? `Bearer ${token}` : "";
     }
     return config;
   },
@@ -56,19 +44,11 @@ const handleErrorResponse = (err: any) => {
     return false;
   } else if (err.response && err.response.code === 500) {
     console.log('err', err);
-    errorToast(err.response.data?.message || "Internal Server Error");
     window.location.reload();
     return false;
   } else if (err.response && err.response.status === 422) {
-    errorToast(
-      err.response?.data?.message ||
-      err.response?.data?.message?.[0].detail[0].msg ||
-      err.response?.data?.[0]?.detail[0].msg ||
-      "Internal Server Error"
-    );
     return false;
   } else {
-    errorToast(err.response?.data?.message || "Internal Server Error");
     return false;
   }
 };

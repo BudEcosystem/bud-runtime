@@ -7,3 +7,5 @@ export const novuSocketUrl = process.env.NEXT_PUBLIC_NOVU_SOCKET_URL;
 export const novuAppId = process.env.NEXT_PUBLIC_NOVU_APP_ID;
 export const copyCodeApiBaseUrl = process.env.NEXT_PUBLIC_COPY_CODE_API_BASE_URL;
 export const OpenAiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY;
+
+export const apiKey = 'budserve_NgMnHOzyQjCXGgmoFZrYNwS7LgqZU2VMcmz3bz4U';

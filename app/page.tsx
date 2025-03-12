@@ -4,95 +4,72 @@ import Chat from "./components/Chat";
 import { Endpoint } from "./context/ChatContext";
 import RootContext from "./context/RootContext";
 import { useSearchParams } from "next/navigation";
-
-export type ChatSettings = {
-  temperature: number;
-  limit_response_length: boolean;
-  sequence_length: number;
-  context_overflow: string[];
-  stop_strings: string;
-  tool_k_sampling: number;
-  repeat_penalty: number;
-  top_p_sampling: number;
-  min_p_sampling: number;
-};
-
-export type ChatType = {
-  id: string;
-  apiKey: string;
-  chatSessionId: string;
-  settings: ChatSettings;
-  selectedDeployment: Endpoint | null;
-};
-
-const apiKeyList = [
-  "budserve_NgMnHOzyQjCXGgmoFZrYNwS7LgqZU2VMcmz3bz4U",
-  "1budserve_tYak6eMumQTwZ60IsZSa5RQa3WafUSPeG5CHHEgl",
-  "3budserve_tYak6eMumQTwZ60IsZSa5RQa3WafUSPeG5CHHEgl",
-  "4budserve_tYak6eMumQTwZ60IsZSa5RQa3WafUSPeG5CHHEgl",
-  "5budserve_tYak6eMumQTwZ60IsZSa5RQa3WafUSPeG5CHHEgl",
-  "7budserve_tYak6eMumQTwZ60IsZSa5RQa3WafUSPeG5CHHEgl",
-];
+import { ActiveSession, Session } from "./components/bud/chat/HistoryList";
+import { useMessages } from "./components/bud/hooks/useMessages";
+import APIKey from "./components/APIKey";
+import { useEndPoints } from "./components/bud/hooks/useEndPoint";
 
 const chatIds = ["1", "2", "3", "4", "5", "6"];
 
-const chatSessionIds = ["1", "2", "3", "4", "5", "6"];
-
 export default function Home() {
-  const searchParams = useSearchParams();
-  const accessToken = searchParams.get("access_token");
-  const apiKey = searchParams.get("api_key");
-  const refreshToken = searchParams.get("refresh_token");
-  const [loading, setLoading] = useState(true);
+  const [_accessToken, _setAccessToken] = useState<string | null>(null);
+  const [_refreshToken, _setRefreshToken] = useState<string | null>(null);
+  const [_apiKey, _setApiKey] = useState<string | null>(null);
+  const { getSessions } = useMessages();
+  const {getEndPoints} = useEndPoints();
 
-  const [chats, setChats] = useState<ChatType[]>([]);
+  const token = _accessToken || _apiKey || "";
 
-  const createChat = useCallback(() => {
+  const [chats, setChats] = useState<ActiveSession[]>([]);
+  const [sessions, setSessions] = useState<Session[]>([]);
+
+  const createChat = useCallback(async () => {
     console.log("Creating chat");
     const updatedChats = [...chats];
     updatedChats.push({
       id: chatIds[updatedChats.length],
-      apiKey: apiKeyList[updatedChats.length],
-      chatSessionId: chatSessionIds[updatedChats.length],
-      selectedDeployment: null,
-      settings: {
-        temperature: 0.7,
-        limit_response_length: false,
-        sequence_length: 256,
-        context_overflow: [],
-        stop_strings: "",
-        tool_k_sampling: 0.7,
-        repeat_penalty: 1.0,
-        top_p_sampling: 0.9,
-        min_p_sampling: 0.0,
-      },
+      name: `Chat ${updatedChats.length + 1}`,
     });
     setChats(updatedChats);
-  }, [chats, accessToken, refreshToken]);
+  }, [chats]);
 
   useEffect(() => {
-    if (accessToken && refreshToken && chats.length === 0) {
-      createChat();
-    }
-    setLoading(false);
-  }, [accessToken, refreshToken]);
+    const init = () => {
+      if (typeof window === "undefined") return null;
+
+      const accessToken = window?.location.href
+        ?.split("access_token=")?.[1]
+        ?.split("&")[0];
+      const refreshToken = window?.location.href
+        ?.split("refresh_token=")?.[1]
+        ?.split("&")?.[0];
+
+      if (!accessToken || !refreshToken) return;
+      _setAccessToken(accessToken);
+      _setRefreshToken(refreshToken);
+    };
+    init();
+  }, []);
 
   useEffect(() => {
-    if (apiKey && chats.length === 0) {
-      createChat();
+    const apiKey = window?.location.href
+      ?.split("api_key=")?.[1]
+      ?.split("&")?.[0];
+    if (apiKey) {
+      _setApiKey(apiKey);
     }
-    setLoading(false);
-  }, [apiKey]);
+  }, []);
 
-  // useEffect(() => {
-  //   if (loading) return;
-  //   if (chats.length === 0) {
-  //     createChat();
-  //   }
-  // }, [loading]);
+  useEffect(() => {
+    if (!token) return;
+
+    localStorage.setItem("token", token);
+    getSessions()
+    getEndPoints({ page: 1, limit: 25 });
+  }, [token]);
 
   const handleDeploymentSelect = useCallback(
-    (chat: ChatType, endpoint: Endpoint) => {
+    (chat: ActiveSession, endpoint: Endpoint) => {
       if (!chat) return;
       let updatedChats = [...chats];
       console.log("updatedChats", updatedChats);
@@ -100,9 +77,6 @@ export default function Home() {
         if (_chat.id === chat.id) {
           console.log("Selected", _chat, chat);
           _chat.selectedDeployment = endpoint;
-          _chat.settings = {
-            ..._chat.settings,
-          };
         }
         return _chat;
       });
@@ -112,7 +86,11 @@ export default function Home() {
     [chats]
   );
 
-  const handleSettingsChange = (chat: ChatType, prop: string, value: any) => {
+  const handleSettingsChange = (
+    chat: ActiveSession,
+    prop: string,
+    value: any
+  ) => {
     let updatedChats = [...chats];
     updatedChats = updatedChats.map((item) => {
       if (item.id === chat?.id) {
@@ -121,19 +99,13 @@ export default function Home() {
           settings: {
             ...item.settings,
             [prop]: value,
-          },
+          } as any,
         };
       }
       return item;
     });
     setChats(updatedChats);
   };
-
-  useEffect(() => {
-    if (!accessToken || !refreshToken) return;
-    localStorage.setItem("access_token", accessToken);
-    localStorage.setItem("refresh_token", refreshToken);
-  }, [accessToken, refreshToken]);
 
   return (
     <main className="flex flex-col gap-8 row-start-2 items-center w-full h-[100vh] p-4">
@@ -144,8 +116,12 @@ export default function Home() {
           createChat,
           handleDeploymentSelect,
           handleSettingsChange,
+          token,
+          sessions,
+          setSessions,
         }}
       >
+        {chats?.length === 0 && <APIKey />}
         <Chat />
       </RootContext.Provider>
     </main>

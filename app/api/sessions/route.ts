@@ -2,28 +2,28 @@ import { tempApiBaseUrl } from '@/app/components/bud/environment';
 import axios from 'axios';
 import { NextResponse } from 'next/server';
 
-export async function GET(req: Request, res: Response) {
+export async function GET(req: Request) {
   console.log('GET /api/sessions');
   const authorization = req.headers.get('authorization');
-  if(!authorization) {
+  if (!authorization) {
     return NextResponse.json([]);
   }
 
-  const result = await axios
-    .get(`${tempApiBaseUrl}/playground/chat-sessions`, {
-      headers: {
-        authorization: authorization,
-      },
-    })
-    .then((response) => {
-      return response.data.chat_sessions;
-    })
-    .catch((err) => {
-      console.error(err.response);
-      return []
-    })
+  try {
 
-  console.log('result', result);
+    const result = await axios
+      .get(`${tempApiBaseUrl}/playground/chat-sessions`, {
+        headers: {
+          authorization: authorization,
+        },
+      })
+      .then((response) => {
+        return response.data.chat_sessions;
+      })
+    return NextResponse.json(result);
 
-  return NextResponse.json(result);
+  } catch (error: any) {
+    return new NextResponse(error, { status: error.response?.status || 500 });
+  }
+
 }

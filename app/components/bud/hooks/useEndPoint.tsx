@@ -7,8 +7,7 @@ import ChatContext from "@/app/context/ChatContext";
 import { AppRequest } from "@/app/api/requests";
 
 export function useEndPoints() {
-  const { chat, endpoints, setEndpoints } = useContext(ChatContext);
-  // const accessToken= localStorage.getItem('access_token')
+  const { endpoints, setEndpoints } = useContext(ChatContext);
   async function getEndPoints({ page = 1, limit = 25 }) {
     try {
       const result = await AppRequest.Post(

@@ -6,6 +6,7 @@ interface InlineInputProps {
   value: string;
   defaultValue: string;
   type: string;
+  placeholder?: string;
   onChange: (value: string) => void;
 }
 
@@ -18,6 +19,7 @@ export default function InlineInput(props: InlineInputProps) {
       <div className="flex flex-row items-center gap-[.5rem]">
         <Input
           type={props.type}
+          placeholder={props.placeholder}
           value={props.value}
           defaultValue={props.defaultValue}
           onChange={(e) => props.onChange(e.target.value)}

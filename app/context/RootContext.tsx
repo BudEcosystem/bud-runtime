@@ -1,21 +1,27 @@
 import { createContext } from "react";
-import { ChatType } from "../page";
 import { Endpoint } from "./ChatContext";
+import { ActiveSession, Session } from "../components/bud/chat/HistoryList";
 
 type RootContextType = {
-  chats: ChatType[];
-  setChats: (chats: any[]) => void;
+  chats: ActiveSession[];
+  setChats: (chats: Session[]) => void;
   createChat: () => void;
-  handleDeploymentSelect: (chat: ChatType, endpoint: Endpoint) => void;
-  handleSettingsChange: (chat: ChatType, prop: string, value: any) => void;
+  handleDeploymentSelect: (chat: ActiveSession, endpoint: Endpoint) => void;
+  handleSettingsChange: (chat: ActiveSession, prop: string, value: any) => void;
+  token: string;
+  sessions: Session[];
+  setSessions: (sessions: Session[]) => void;
 };
 
 const RootContext = createContext<RootContextType>({
   chats: [],
   setChats: () => {},
   createChat: () => {},
-  handleDeploymentSelect: (chat: ChatType, endpoint: Endpoint) => {},
-  handleSettingsChange: (chat: ChatType, prop: string, value: any) => {},
+  handleDeploymentSelect: (chat: ActiveSession, endpoint: Endpoint) => {},
+  handleSettingsChange: (chat: ActiveSession, prop: string, value: any) => {},
+  token: "",
+  sessions: [],
+  setSessions: (_: Session[]) => {},
 });
 
 export default RootContext;

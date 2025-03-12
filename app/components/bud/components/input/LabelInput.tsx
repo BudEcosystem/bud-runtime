@@ -9,6 +9,9 @@ interface LabelInputProps {
   value: string;
   onChange: (value: string) => void;
   className?: string;
+  type?: string;
+  min?: number;
+  max?: number;
 }
 
 export default function LabelInput(props: LabelInputProps) {
@@ -29,14 +32,15 @@ export default function LabelInput(props: LabelInputProps) {
           </CustomPopover>
         </div>
         <Input
-          type="number"
+          type={props.type}
+          min={props.min}
+          max={props.max}
           placeholder={props.placeholder}
           style={{
             backgroundColor: "transparent",
             color: "#EEEEEE",
             border: "0.5px solid #757575",
           }}
-          min={1}
           value={props.value}
           onChange={(e) => props.onChange(e.target.value)}
           size="large"

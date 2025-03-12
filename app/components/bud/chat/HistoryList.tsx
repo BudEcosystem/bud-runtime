@@ -1,5 +1,25 @@
+import { Endpoint } from "@/app/context/ChatContext";
 import { Image } from "antd";
 import React from "react";
+
+export type ChatSettings = {
+  temperature: number;
+  limit_response_length: boolean;
+  sequence_length: number;
+  context_overflow: string[];
+  stop_strings: string;
+  tool_k_sampling: number;
+  repeat_penalty: number;
+  top_p_sampling: number;
+  min_p_sampling: number;
+};
+
+export type ActiveSession = {
+  id: string;
+  name: string;
+  settings?: ChatSettings;
+  selectedDeployment?: Endpoint;
+};
 
 export type Session = {
   id: string;
@@ -9,12 +29,7 @@ export type Session = {
   modified_at: string;
 };
 
-function HistoryListItem({
-  data,
-}: {
-  data: Session;
-}
-) {
+function HistoryListItem({ data }: { data: Session }) {
   return (
     <div className="flex flex-row items-center gap-[1rem] p-[.45rem] px-[.65rem] justify-between border-[1px] border-[#1F1F1F] rounded-[8px] backdrop-blur-[10px]">
       <div className="flex flex-row items-center gap-[.6rem] px-[.27rem]">
@@ -37,7 +52,7 @@ function HistoryListItem({
 }
 
 interface HistoryListProps {
-    data: Session[];
+  data: Session[];
 }
 
 function HistoryList({ data }: HistoryListProps) {

@@ -1,7 +1,6 @@
 import { createContext } from "react";
 import { PostMessage } from "../components/bud/hooks/useMessages";
-import { ChatType } from "../page";
-import { Session } from "../components/bud/chat/HistoryList";
+import { ActiveSession, Session } from "../components/bud/chat/HistoryList";
 
 
 
@@ -46,9 +45,7 @@ export type Endpoint = {
 
 type ChatContextType = {
   // api key
-  chat?: ChatType;
-  // token
-  token: string;
+  chat?: ActiveSession;
   // endpoints
   endpoints: Endpoint[];
   // set endpoints
@@ -57,20 +54,16 @@ type ChatContextType = {
   messages: PostMessage[];
   // set messages history
   setMessages: (messages: PostMessage[]) => void;
-  sessions: Session[];
-  setSessions: (sessions: any[]) => void;
+
 };
 
 const ChatContext = createContext<ChatContextType>({
   // default values
   chat: undefined,
-  token: "",
   endpoints: [],
   setEndpoints: (_: Endpoint[]) => {},
   messages: [],
   setMessages: (_: any[]) => {},
-  sessions: [],
-  setSessions: (_: any[]) => {},
 });
 
 export default ChatContext;

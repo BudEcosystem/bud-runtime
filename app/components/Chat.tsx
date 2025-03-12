@@ -2,15 +2,13 @@ import { Image, Layout } from "antd";
 import { useContext, useEffect, useMemo, useState } from "react";
 import RootContext from "../context/RootContext";
 import ChatContext, { Endpoint } from "../context/ChatContext";
-import { ChatType } from "../page";
 import NavBar from "./bud/components/navigation/NavBar";
 import { HistoryMessages, Messages } from "./bud/chat/Messages";
 import MessageLoading from "./bud/chat/MessageLoading";
-import { copyCodeApiBaseUrl } from "./bud/environment";
 import { Message, useChat } from "@ai-sdk/react";
 import { useEndPoints } from "./bud/hooks/useEndPoint";
 import { useMessages } from "./bud/hooks/useMessages";
-import HistoryList, { Session } from "./bud/chat/HistoryList";
+import HistoryList, { ActiveSession, Session } from "./bud/chat/HistoryList";
 import SettingsList from "./bud/chat/SettingsList";
 import NormalEditor from "./bud/components/input/NormalEditor";
 import {
@@ -32,7 +30,8 @@ export function Chat() {
     setToggleRight(!toggleRight);
   };
 
-  const { chat, messages: historyMessages, sessions, token } = useContext(ChatContext);
+  const { sessions, token } = useContext(RootContext);
+  const { chat, messages: historyMessages } = useContext(ChatContext);
   const { createMessage } = useMessages();
 
   const handleFinish = (message: Message, { usage, finishReason }: any) => {
@@ -63,10 +62,10 @@ export function Chat() {
     return {
       // model: 'gpt-4o',
       model: chat.selectedDeployment?.name,
-      max_tokens: chat?.settings.limit_response_length
+      max_tokens: chat?.settings?.limit_response_length
         ? chat?.settings.sequence_length
         : undefined,
-      temperature: chat?.settings.temperature,
+      temperature: chat?.settings?.temperature,
       metadata: {
         project_id: `${chat?.selectedDeployment?.project.id}`,
       },
@@ -77,20 +76,8 @@ export function Chat() {
       // stop: chat?.settings.stop_strings,
       // context: chat?.settings.context_overflow,
     };
-  }, [
-    chat,
-    chat?.settings.limit_response_length,
-    chat?.settings.sequence_length,
-    chat?.settings.temperature,
-    chat?.settings.tool_k_sampling,
-    chat?.settings.top_p_sampling,
-    chat?.settings.repeat_penalty,
-    chat?.settings.min_p_sampling,
-    chat?.settings.stop_strings,
-    chat?.settings.context_overflow,
-    chat?.selectedDeployment?.model,
-  ]);
-  
+  }, [chat]);
+
   const {
     error,
     input,
@@ -101,8 +88,8 @@ export function Chat() {
     reload,
     stop,
   } = useChat({
-    headers:{
-      Authorization: token ? `Bearer ${token}` : chat?.apiKey ? `Bearer ${chat?.apiKey}` : ""
+    headers: {
+      Authorization: token ? `Bearer ${token}` : "",
     },
     body,
     onFinish(message, { usage, finishReason }) {
@@ -301,20 +288,9 @@ export function Chat() {
   );
 }
 
-function ChatWithStore(props: { chat: ChatType }) {
-  const { getSessions } = useMessages();
+function ChatWithStore(props: { chat: ActiveSession }) {
   const [endpoints, setEndpoints] = useState<Endpoint[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [token, setToken] = useState<string>("");
-
-  useEffect(() => {
-    getSessions().then((res) => {
-      console.log(res);
-      setSessions(res);
-    });
-    setToken(localStorage.getItem("access_token") || "");
-  }, []);
 
   return (
     <>
@@ -322,9 +298,6 @@ function ChatWithStore(props: { chat: ChatType }) {
         <ChatContext.Provider
           value={{
             chat: props.chat,
-            sessions,
-            setSessions,
-            token,
             endpoints,
             setEndpoints,
             messages,
@@ -340,7 +313,7 @@ function ChatWithStore(props: { chat: ChatType }) {
 }
 
 export default function ChatWindowWithStore() {
-  const { chats, createChat } = useContext(RootContext);
+  const { chats } = useContext(RootContext);
 
   return (
     <div className="!grid w-full h-full">
