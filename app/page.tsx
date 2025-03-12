@@ -20,8 +20,6 @@ export type ChatSettings = {
 export type ChatType = {
   id: string;
   apiKey: string;
-  accessToken: string;
-  refreshToken: string;
   chatSessionId: string;
   settings: ChatSettings;
   selectedDeployment: Endpoint | null;
@@ -54,8 +52,6 @@ export default function Home() {
     updatedChats.push({
       id: chatIds[updatedChats.length],
       apiKey: apiKeyList[updatedChats.length],
-      accessToken: accessToken || "",
-      refreshToken: refreshToken || "",
       chatSessionId: chatSessionIds[updatedChats.length],
       selectedDeployment: null,
       settings: {

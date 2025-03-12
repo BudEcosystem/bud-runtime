@@ -301,12 +301,14 @@ function ChatWithStore(props: { chat: ChatType }) {
   const [endpoints, setEndpoints] = useState<Endpoint[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
   const [sessions, setSessions] = useState<any[]>([]);
+  const [token, setToken] = useState<string>("");
 
   useEffect(() => {
     getSessions().then((res) => {
       console.log(res);
       setSessions(res);
     });
+    setToken(localStorage.getItem("access_token") || "");
   }, []);
 
   return (
@@ -317,7 +319,7 @@ function ChatWithStore(props: { chat: ChatType }) {
             chat: props.chat,
             sessions,
             setSessions,
-            token: "",
+            token,
             endpoints,
             setEndpoints,
             messages,

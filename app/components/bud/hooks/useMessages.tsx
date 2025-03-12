@@ -21,10 +21,10 @@ export type PostMessage = {
 };
 
 export function useMessages() {
-  const { chat, token, setMessages } = useContext(ChatContext);
+  const { chat, setMessages, token } = useContext(ChatContext);
   const apiKey = chat?.apiKey;
   const id = chat?.id;
-
+  
   async function createMessage(body: PostMessage) {
     try {
       if (apiKey) {
@@ -32,9 +32,7 @@ export function useMessages() {
           .post(`/api/messages`, body, {
             params: {},
             headers: {
-              Authorization: chat?.accessToken
-                ? `Bearer ${chat?.accessToken}`
-                : "",
+              Authorization: token ? `Bearer ${token}` : "",
               "api-key": apiKey,
             },
           })
@@ -67,7 +65,7 @@ export function useMessages() {
       .get(`/api/sessions`, {
         params: {},
         headers: {
-          Authorization: chat?.accessToken ? `Bearer ${chat?.accessToken}` : "",
+          Authorization: token ? `Bearer ${token}` : "",
           "api-key": apiKey,
         },
       })
