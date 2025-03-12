@@ -11,8 +11,8 @@ export function useEndPoints() {
   // const accessToken= localStorage.getItem('access_token')
   async function getEndPoints({ page = 1, limit = 25 }) {
     try {
-      const result = await AppRequest.Get(
-        `${tempApiBaseUrl}/playground/deployments`,
+      const result = await AppRequest.Post(
+        `api/deployments`,
         {
           params: {
             page: page,
@@ -21,9 +21,8 @@ export function useEndPoints() {
           },
         }
       ).then((res) => {
-        console.log(res.data.endpoints);
-        setEndpoints(res.data.endpoints);
-        return res.data.endpoints;
+        setEndpoints(res.data);
+        return res.data;
       });
 
       console.log(result);
