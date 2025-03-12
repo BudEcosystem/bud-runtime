@@ -20,7 +20,8 @@ export type ChatSettings = {
 export type ChatType = {
   id: string;
   apiKey: string;
-  token: string;
+  accessToken: string;
+  refreshToken: string;
   chatSessionId: string;
   settings: ChatSettings;
   selectedDeployment: Endpoint | null;
@@ -39,38 +40,22 @@ const chatIds = ["1", "2", "3", "4", "5", "6"];
 
 const chatSessionIds = ["1", "2", "3", "4", "5", "6"];
 
-const initialChat = {
-  id: chatIds[0],
-  apiKey: apiKeyList[0],
-  token: "",
-  chatSessionId: chatSessionIds[0],
-  selectedDeployment: null,
-  settings: {
-    temperature: 0.7,
-    limit_response_length: false,
-    sequence_length: 256,
-    context_overflow: [],
-    stop_strings: "",
-    tool_k_sampling: 0.7,
-    repeat_penalty: 1.0,
-    top_p_sampling: 0.9,
-    min_p_sampling: 0.0,
-  },
-};
-
 export default function Home() {
   const searchParams = useSearchParams();
   const accessToken = searchParams.get("access_token");
   const refreshToken = searchParams.get("refresh_token");
+  const [loading, setLoading] = useState(true);
 
-  const [chats, setChats] = useState<ChatType[]>([initialChat]);
+  const [chats, setChats] = useState<ChatType[]>([]);
 
   const createChat = useCallback(() => {
+    console.log("Creating chat");
     const updatedChats = [...chats];
     updatedChats.push({
       id: chatIds[updatedChats.length],
       apiKey: apiKeyList[updatedChats.length],
-      token: "",
+      accessToken: accessToken || "",
+      refreshToken: refreshToken || "",
       chatSessionId: chatSessionIds[updatedChats.length],
       selectedDeployment: null,
       settings: {
@@ -87,6 +72,20 @@ export default function Home() {
     });
     setChats(updatedChats);
   }, [chats, accessToken, refreshToken]);
+
+  useEffect(() => {
+    if (accessToken && refreshToken && chats.length === 0) {
+      createChat();
+    }
+    setLoading(false);
+  }, [accessToken, refreshToken]);
+
+  useEffect(() => {
+    if (loading) return;
+    if (chats.length === 0) {
+      createChat();
+    }
+  }, [loading]);
 
   const handleDeploymentSelect = useCallback(
     (chat: ChatType, endpoint: Endpoint) => {

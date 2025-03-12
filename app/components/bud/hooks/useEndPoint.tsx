@@ -19,8 +19,7 @@ export function useEndPoints() {
           },
           {
             headers: {
-              // "authorization": `Bearer ${localStorage.getItem("access_token") ? localStorage.getItem("access_token") : `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkMmUxZDYyYi1iYTk1LTQzODktOGYxZi00MGQ2ZjE4Y2Q1NDgiLCJ0eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQxMjUyODgxfQ.vFFHemLsLdou1XKA5L2JCzJ0_krmK5BPtXV_vAyOapA`}`,
-              authorization: chat?.token ? `Bearer ${chat?.token}` : "",
+              Authorization: chat?.accessToken ? `Bearer ${chat?.accessToken}` : "",
               "api-key": chat?.apiKey ? chat?.apiKey : "",
             },
           }

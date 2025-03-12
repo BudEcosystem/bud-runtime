@@ -32,14 +32,16 @@ export function useMessages() {
           .post(`/api/messages`, body, {
             params: {},
             headers: {
-              Authorization: `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkMmUxZDYyYi1iYTk1LTQzODktOGYxZi00MGQ2ZjE4Y2Q1NDgiLCJ0eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQxNjkxNjAxfQ.-W1JatgUZ1zkQOjhCrSVcK_8oojWN0GOcN5_X9uhAfY`,
+              Authorization: chat?.accessToken
+                ? `Bearer ${chat?.accessToken}`
+                : "",
               "api-key": apiKey,
             },
           })
           .then((res) => {
             return res.data;
           });
-  
+
         console.log(result);
         return result;
       } else if (apiKey && id) {
@@ -55,7 +57,7 @@ export function useMessages() {
       }
     } catch (error) {
       console.error(error);
-    } 
+    }
   }
 
   async function getSessions() {
@@ -65,7 +67,7 @@ export function useMessages() {
       .get(`/api/sessions`, {
         params: {},
         headers: {
-          Authorization: `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkMmUxZDYyYi1iYTk1LTQzODktOGYxZi00MGQ2ZjE4Y2Q1NDgiLCJ0eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQxNjg5NzU5fQ.NXvJtLl6U9ckW_wQjHRrNJ9DtRjC1laBFfgpsnRo_Ts`,
+          Authorization: chat?.accessToken ? `Bearer ${chat?.accessToken}` : "",
           "api-key": apiKey,
         },
       })

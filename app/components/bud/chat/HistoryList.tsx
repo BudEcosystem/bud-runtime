@@ -33,6 +33,13 @@ function HistoryList({ data }: HistoryListProps) {
       {data?.map((item, index) => (
         <HistoryListItem key={index} />
       ))}
+      {data?.length === 0 && (
+        <div className="flex flex-row items-center justify-center w-full h-[2.5rem] bg-[#101010] rounded-[8px] border-[1px] border-[#1F1F1F] backdrop-blur-[10px]">
+          <span className="Open-Sans text-[#757575] text-[.625rem] font-[400]">
+            No chat history
+          </span>
+        </div>
+      )}
     </div>
   );
 }

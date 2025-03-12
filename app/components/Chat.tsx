@@ -32,7 +32,7 @@ export function Chat() {
     setToggleRight(!toggleRight);
   };
 
-  const { chat, messages: historyMessages } = useContext(ChatContext);
+  const { chat, messages: historyMessages, sessions } = useContext(ChatContext);
   const { createMessage } = useMessages();
 
   const handleFinish = (message: Message, { usage, finishReason }: any) => {
@@ -90,9 +90,7 @@ export function Chat() {
     chat?.settings.context_overflow,
     chat?.selectedDeployment?.model,
   ]);
-
-  const useOpenAI = Boolean(!chat?.apiKey) && Boolean(!chat?.token);
-
+  
   const {
     error,
     input,
@@ -157,7 +155,7 @@ export function Chat() {
             </div>
           </div>
           <div className="h-[calc(100vh-3.625rem)]">
-            <HistoryList data={[1, 2, 3]} />
+            <HistoryList data={sessions} />
           </div>
         </div>
       </Sider>
