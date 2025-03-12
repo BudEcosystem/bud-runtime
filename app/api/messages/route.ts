@@ -13,10 +13,11 @@ export async function POST(req: Request, res: Response) {
       },
     })
     .then((response) => {
-      return response.data.chat_sessions;
+      return response.data;
     })
-    .catch(() => {
-      return []
+    .catch((err) => {
+      console.error(err.response);
+      return err?.response?.data;
     })
 
   return NextResponse.json(result);

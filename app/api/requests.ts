@@ -7,7 +7,6 @@ function errorToast(message: string) {
 }
 
 export const axiosInstance = axios.create({
-  baseURL: apiBaseUrl,
 });
 
 let Token: any = null;
@@ -27,15 +26,10 @@ axiosInstance.interceptors.request.use(
       Token = localStorage.getItem("access_token");
     }
     const accessToken = Token ? Token : "";
-    // if (accessToken) {
-    //   if (config.headers) {
-    //     config.headers.Authorization = `Bearer ${accessToken}`;
-    //   }
-    // } else {
-      // if (config.headers) {
-      //   config.headers['api-key'] = apiKey;
-      // }
-    // }
+    const apiKey = localStorage.getItem("api_key");
+    if (config.headers) {
+      config.headers.Authorization = accessToken ? `Bearer ${accessToken}` : apiKey ? `Bearer ${apiKey}` : "";
+    }
     return config;
   },
   (error) => {

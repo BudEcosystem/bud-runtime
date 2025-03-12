@@ -32,7 +32,7 @@ export function Chat() {
     setToggleRight(!toggleRight);
   };
 
-  const { chat, messages: historyMessages, sessions } = useContext(ChatContext);
+  const { chat, messages: historyMessages, sessions, token } = useContext(ChatContext);
   const { createMessage } = useMessages();
 
   const handleFinish = (message: Message, { usage, finishReason }: any) => {
@@ -101,6 +101,9 @@ export function Chat() {
     reload,
     stop,
   } = useChat({
+    headers:{
+      Authorization: token ? `Bearer ${token}` : chat?.apiKey ? `Bearer ${chat?.apiKey}` : ""
+    },
     onFinish(message, { usage, finishReason }) {
       console.log("message", message);
       console.log("Usage", usage);

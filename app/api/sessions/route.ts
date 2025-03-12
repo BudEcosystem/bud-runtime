@@ -19,7 +19,7 @@ export async function GET(req: Request, res: Response) {
       return response.data.chat_sessions;
     })
     .catch((err) => {
-      console.error(err.response.data);
+      console.error(err.response);
       return []
     })
 

@@ -1,8 +1,7 @@
 "use client";
-import { tempApiBaseUrl } from "../environment";
-import axios from "axios";
 import { useContext, useEffect } from "react";
 import ChatContext from "@/app/context/ChatContext";
+import { AppRequest } from "@/app/api/requests";
 
 export type PostMessage = {
   prompt: string;
@@ -24,21 +23,15 @@ export function useMessages() {
   const { chat, setMessages, token } = useContext(ChatContext);
   const apiKey = chat?.apiKey;
   const id = chat?.id;
-  
+
   async function createMessage(body: PostMessage) {
     try {
       if (apiKey) {
-        const result = await axios
-          .post(`/api/messages`, body, {
-            params: {},
-            headers: {
-              Authorization: token ? `Bearer ${token}` : "",
-              "api-key": apiKey,
-            },
-          })
-          .then((res) => {
+        const result = await AppRequest.Post(`/api/messages`, body).then(
+          (res) => {
             return res.data;
-          });
+          }
+        );
 
         console.log(result);
         return result;
@@ -61,17 +54,9 @@ export function useMessages() {
   async function getSessions() {
     // /playground/chat-sessions
 
-    return await axios
-      .get(`/api/sessions`, {
-        params: {},
-        headers: {
-          Authorization: token ? `Bearer ${token}` : "",
-          "api-key": apiKey,
-        },
-      })
-      .then((res) => {
-        return res.data;
-      });
+    return await AppRequest.Get(`/api/sessions`).then((res) => {
+      return res.data;
+    });
   }
 
   useEffect(() => {

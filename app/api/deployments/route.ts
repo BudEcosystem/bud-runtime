@@ -26,7 +26,7 @@ export async function POST(req: Request, res: Response) {
       return response.data.endpoints;
     })
     .catch((err) => {
-      console.error(err.response.data);
+      console.error(err.response);
       return []
     })
     console.log('result', result);
