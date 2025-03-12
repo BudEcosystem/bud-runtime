@@ -51,27 +51,34 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    const apiKey = window?.location.href
-      ?.split("api_key=")?.[1]
-      ?.split("&")?.[0];
-    if (apiKey) {
-      _setApiKey(apiKey);
-    }
+    const init = () => {
+      if (typeof window === "undefined") return null;
+      const apiKey = window?.location.href
+        ?.split("api_key=")?.[1]
+        ?.split("&")?.[0];
+      if (apiKey) {
+        _setApiKey(apiKey);
+      }
+    };
+    init();
   }, []);
 
   useEffect(() => {
-    if (!token) return;
+    const init = () => {
+      if (!token) return;
 
-    localStorage.setItem("token", token);
-    return getEndPoints({ page: 1, limit: 25 })
-      .then(() => {
-        return getSessions();
-      })
-      .then((res) => {
-        if (chats.length === 0) {
-          createChat();
-        }
-      });
+      localStorage.setItem("token", token);
+      return getEndPoints({ page: 1, limit: 25 })
+        .then(() => {
+          return getSessions();
+        })
+        .then((res) => {
+          if (chats.length === 0) {
+            createChat();
+          }
+        });
+    };
+    init();
   }, [token]);
 
   const handleDeploymentSelect = useCallback(

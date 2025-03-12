@@ -67,7 +67,7 @@ export function Chat() {
         : undefined,
       temperature: chat?.settings?.temperature,
       metadata: {
-        project_id: `${chat?.selectedDeployment?.project.id}`,
+        project_id: chat?.selectedDeployment?.project.id,
       },
       // top_k: chat?.settings.tool_k_sampling,
       // top_p: chat?.settings.top_p_sampling,
@@ -76,7 +76,7 @@ export function Chat() {
       // stop: chat?.settings.stop_strings,
       // context: chat?.settings.context_overflow,
     };
-  }, [chat]);
+  }, [chat, chat?.selectedDeployment, chat?.settings])
 
   const {
     error,

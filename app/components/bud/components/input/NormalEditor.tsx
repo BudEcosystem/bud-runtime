@@ -98,9 +98,9 @@ function NormalEditor({
           </div>
           <div className="pb-[.95rem]">
             <button
-              className="Open-Sans cursor-pointer text-[400]z-[999] text-[.75rem] text-[#EEEEEE] border-[#757575] border-[1px] rounded-[6px] p-[.2rem] hover:bg-[#1F1F1F4D] hover:text-[#FFFFFF]  flex items-center gap-[.5rem] px-[.8rem] py-[.15rem] bg-[#1F1F1F] hover:bg-[#965CDE] hover:text-[#FFFFFF]"
+              className="Open-Sans cursor-pointer text-[400] z-[999] text-[.75rem] text-[#EEEEEE] border-[#757575] border-[1px] rounded-[6px] p-[.2rem] hover:bg-[#1F1F1F4D] hover:text-[#FFFFFF]  flex items-center gap-[.5rem] px-[.8rem] py-[.15rem] bg-[#1F1F1F] hover:bg-[#965CDE] hover:text-[#FFFFFF] z-[99] absolute right-[.5rem] bottom-[1rem] "
               style={{
-                cursor: disabled ? "not-allowed" : "auto",
+                cursor: disabled ? "not-allowed" : "pointer",
               }}
               type="submit"
               onMouseEnter={() => setIsHovered(true)}
