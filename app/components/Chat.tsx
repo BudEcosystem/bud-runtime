@@ -104,6 +104,7 @@ export function Chat() {
     headers:{
       Authorization: token ? `Bearer ${token}` : chat?.apiKey ? `Bearer ${chat?.apiKey}` : ""
     },
+    body,
     onFinish(message, { usage, finishReason }) {
       console.log("message", message);
       console.log("Usage", usage);
