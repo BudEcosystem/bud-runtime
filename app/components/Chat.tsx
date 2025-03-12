@@ -217,7 +217,7 @@ export function Chat() {
         </Content>
         <Footer className="sticky bottom-0 !px-[2.6875rem]">
           <NormalEditor
-            isLoading={status === "streaming"}
+            isLoading={status === "submitted" || status === "streaming"}
             error={error}
             stop={stop}
             handleInputChange={handleInputChange}
