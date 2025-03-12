@@ -10,7 +10,7 @@ import { copyCodeApiBaseUrl } from "./bud/environment";
 import { Message, useChat } from "@ai-sdk/react";
 import { useEndPoints } from "./bud/hooks/useEndPoint";
 import { useMessages } from "./bud/hooks/useMessages";
-import HistoryList from "./bud/chat/HistoryList";
+import HistoryList, { Session } from "./bud/chat/HistoryList";
 import SettingsList from "./bud/chat/SettingsList";
 import NormalEditor from "./bud/components/input/NormalEditor";
 import {
@@ -219,6 +219,7 @@ export function Chat() {
           <NormalEditor
             isLoading={status === "submitted" || status === "streaming"}
             error={error}
+            disabled={!chat?.selectedDeployment?.id}
             stop={stop}
             handleInputChange={handleInputChange}
             handleSubmit={(e) => {
@@ -304,7 +305,7 @@ function ChatWithStore(props: { chat: ChatType }) {
   const { getSessions } = useMessages();
   const [endpoints, setEndpoints] = useState<Endpoint[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
-  const [sessions, setSessions] = useState<any[]>([]);
+  const [sessions, setSessions] = useState<Session[]>([]);
   const [token, setToken] = useState<string>("");
 
   useEffect(() => {

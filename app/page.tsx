@@ -41,6 +41,7 @@ const chatSessionIds = ["1", "2", "3", "4", "5", "6"];
 export default function Home() {
   const searchParams = useSearchParams();
   const accessToken = searchParams.get("access_token");
+  const apiKey = searchParams.get("api_key");
   const refreshToken = searchParams.get("refresh_token");
   const [loading, setLoading] = useState(true);
 
@@ -77,11 +78,18 @@ export default function Home() {
   }, [accessToken, refreshToken]);
 
   useEffect(() => {
-    if (loading) return;
-    if (chats.length === 0) {
+    if (apiKey && chats.length === 0) {
       createChat();
     }
-  }, [loading]);
+    setLoading(false);
+  }, [apiKey]);
+
+  // useEffect(() => {
+  //   if (loading) return;
+  //   if (chats.length === 0) {
+  //     createChat();
+  //   }
+  // }, [loading]);
 
   const handleDeploymentSelect = useCallback(
     (chat: ChatType, endpoint: Endpoint) => {

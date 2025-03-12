@@ -1,6 +1,7 @@
 import { createContext } from "react";
 import { PostMessage } from "../components/bud/hooks/useMessages";
 import { ChatType } from "../page";
+import { Session } from "../components/bud/chat/HistoryList";
 
 
 
@@ -56,7 +57,7 @@ type ChatContextType = {
   messages: PostMessage[];
   // set messages history
   setMessages: (messages: PostMessage[]) => void;
-  sessions: any[];
+  sessions: Session[];
   setSessions: (sessions: any[]) => void;
 };
 
