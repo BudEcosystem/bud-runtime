@@ -9,3 +9,9 @@ export const copyCodeApiBaseUrl = process.env.NEXT_PUBLIC_COPY_CODE_API_BASE_URL
 export const OpenAiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY;
 
 export const apiKey = 'budserve_NgMnHOzyQjCXGgmoFZrYNwS7LgqZU2VMcmz3bz4U';
+
+
+console.log('apiBaseUrl', apiBaseUrl);
+console.log('tempApiBaseUrl', tempApiBaseUrl);
+console.log('assetBaseUrl', assetBaseUrl);
+console.log('copyCodeApiBaseUrl', copyCodeApiBaseUrl);
