@@ -23,7 +23,7 @@ function APIKey() {
     router.replace(`?api_key=${apiKey}`);
     setTimeout(() => {
       window.location.reload();
-    }, 1000);
+    }, 100);
   };
 
   return (

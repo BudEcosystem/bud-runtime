@@ -35,10 +35,11 @@ export function Chat() {
   const { createMessage } = useMessages();
 
   const handleFinish = (message: Message, { usage, finishReason }: any) => {
+    if (!chat?.selectedDeployment) return;
     // console.log("Message", message);
     // console.log("FinishReason", finishReason);
     createMessage({
-      deployment_id: chat?.selectedDeployment?.id || "",
+      deployment_id: chat?.selectedDeployment?.id,
       e2e_latency: usage.e2e_latency,
       input_tokens: usage.input_tokens,
       is_cache: false,
@@ -49,7 +50,7 @@ export function Chat() {
       total_tokens: usage.total_tokens,
       tpot: usage.tpot,
       ttft: usage.ttft,
-      request_id: chat?.selectedDeployment?.id || "",
+      request_id: chat?.selectedDeployment?.id,
     });
     // console.log("Usage", usage);
   };
@@ -76,7 +77,7 @@ export function Chat() {
       // stop: chat?.settings.stop_strings,
       // context: chat?.settings.context_overflow,
     };
-  }, [chat, chat?.selectedDeployment, chat?.settings])
+  }, [chat, chat?.selectedDeployment, chat?.settings]);
 
   const {
     error,

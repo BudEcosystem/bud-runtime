@@ -19,7 +19,7 @@ export type PostMessage = {
   e2e_latency: number;
   is_cache: boolean;
   chat_session_id?: string;
-  request_id?: string;
+  request_id: string;
 };
 
 export function useMessages() {
@@ -53,12 +53,12 @@ export function useMessages() {
     }
   }
 
-  async function createSession() {
+  async function createSession(deploymentId: string) {
     try {
       const body: PostMessage = {
         prompt: NEW_SESSION,
-        response: "Session created",
-        deployment_id: "",
+        response: {},
+        deployment_id: deploymentId,
         input_tokens: 0,
         output_tokens: 0,
         total_tokens: 0,
@@ -67,8 +67,9 @@ export function useMessages() {
         tpot: 0,
         e2e_latency: 0,
         is_cache: false,
+        request_id: deploymentId,
       };
-      const result = await AppRequest.Post(`/api/sessions`).then((res) => {
+      const result = await AppRequest.Post(`/api/sessions`, body).then((res) => {
         return res.data;
       });
       const id = result.id;

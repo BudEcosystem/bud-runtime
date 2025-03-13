@@ -23,7 +23,6 @@ export async function POST(req: Request) {
         },
       })
       .then((response) => {
-        console.log("response", response);
         return response.data.endpoints;
       })
     return NextResponse.json(result);

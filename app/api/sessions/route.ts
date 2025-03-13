@@ -7,32 +7,68 @@ export async function GET(req: Request) {
   console.log('GET /api/sessions');
   const authorization = req.headers.get('authorization');
   const apiKey = req.headers.get('api-key');
+  if (authorization) {
 
-  try {
+    try {
 
-    const result = await axios
-      .get(`${tempApiBaseUrl}/playground/chat-sessions`, {
-        headers: {
-          authorization: authorization,
-          'api-key': apiKey,
-        },
-      })
-      .then((response) => {
-        return response.data.chat_sessions;
-      })
-    return NextResponse.json(result);
+      const result = await axios
+        .get(`${tempApiBaseUrl}/playground/chat-sessions`, {
+          headers: {
+            authorization: authorization,
+            'api-key': apiKey,
+          },
+        })
+        .then((response) => {
+          return response.data.chat_sessions;
+        })
+      return NextResponse.json(result);
 
-  } catch (error: any) {
-    return new NextResponse(error, { status: error.response?.status || 500 });
+    } catch (error: any) {
+      return new NextResponse(error, { status: error.response?.status || 500 });
+    }
   }
+  return NextResponse.json([]);
 
 }
 
 
 export async function POST(req: Request) {
+  const body = await req.json();
+  const authorization = req.headers.get('authorization');
+
+  if (authorization) {
+    try {
+      console.log('POST /api/sessions', body);
+      const result = await axios
+        .post(`${tempApiBaseUrl}/playground/messages`,
+          body,
+          {
+            headers: {
+              authorization: authorization,
+            },
+          })
+        .then((response) => {
+          return response.data?.chat_message
+        })
+
+      console.log(result);
+
+      return NextResponse.json({
+        id: result?.chat_session_id,
+        name: "server session",
+        created_at: result?.created_at,
+        modified_at: result?.modified_at
+      });
+
+    } catch (error: any) {
+      console.error(JSON.stringify(error?.response?.data, null, 2));
+      return new NextResponse(error, { status: error.response?.status || 500 });
+    }
+  }
+
   return NextResponse.json({
     id: randomUUID(),
-    name: "session",
+    name: body?.prompt || "local session",
     created_at: new Date().toISOString(),
     modified_at: new Date().toISOString()
   });

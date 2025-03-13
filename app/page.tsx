@@ -21,16 +21,16 @@ export default function Home() {
   const [chats, setChats] = useState<ActiveSession[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
 
-  const createChat = useCallback(async () => {
+  const createChat = useCallback(async (deploymentId?: string) => {
     console.log("Creating chat");
     const updatedChats = [...chats];
-    const result =  await createSession();
+    const result = await createSession(deploymentId || endpoints?.[0]?.id);
     updatedChats.push({
       id: result.id,
       name: `Chat ${updatedChats.length + 1}`,
     });
     setChats(updatedChats);
-  }, [chats]);
+  }, [chats, endpoints]);
 
   useEffect(() => {
     const init = () => {
@@ -73,9 +73,12 @@ export default function Home() {
           return getEndPoints({ page: 1, limit: 25 });
         })
         .then((res) => {
-          if (chats.length === 0 && res) {
-            createChat();
-          }
+          console.log("endpoints", res, chats);
+          setTimeout(() => {
+            if (chats.length === 0 && res) {
+              createChat(res[0].id);
+            }
+          }, 100);
         });
     };
     init();
