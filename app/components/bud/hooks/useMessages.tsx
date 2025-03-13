@@ -72,6 +72,7 @@ export function useMessages() {
       const result = await AppRequest.Post(`/api/sessions`, body).then((res) => {
         return res.data;
       });
+      console.log(result);
       const id = result.id;
       if (id) {
         // store to local storage

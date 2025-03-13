@@ -16,6 +16,10 @@ export async function POST(req: Request) {
   const authorization = req.headers.get('authorization');
   const apiKey = req.headers.get('api-key');
 
+  if (!authorization) {
+    return new Response('Unauthorized', { status: 401 });
+  }
+
   console.log('chat id', id); // can be used for persisting the chat
   console.log('x', x); // can be used for persisting the chat
   const proxyOpenAI = createOpenAI({
@@ -23,7 +27,7 @@ export async function POST(req: Request) {
     baseURL: copyCodeApiBaseUrl,
     // apiKey: "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",
     headers: {
-      'Authorization': apiKey ? `Bearer ${apiKey}` : authorization ? authorization : "",
+      'Authorization': authorization,
       // 'Authorization': 'Bearer budserve_NgMnHOzyQjCXGgmoFZrYNwS7LgqZU2VMcmz3bz4U',
       'project-id': metadata.project_id,
     },
@@ -47,7 +51,7 @@ export async function POST(req: Request) {
       console.log('chunk', chunk);
     },
     onError({ error }) {
-      console.error('error', error);
+      console.error('error', JSON.stringify(error, null, 2));
     },
     onStepFinish({ text, toolCalls, toolResults, usage }) {
       console.log('text', text);
