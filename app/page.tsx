@@ -69,7 +69,8 @@ export default function Home() {
 
       localStorage.setItem("token", token);
       return getSessions()
-        .then(() => {
+        .then((result) => {
+          setSessions(result);
           return getEndPoints({ page: 1, limit: 25 });
         })
         .then((res) => {

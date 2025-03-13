@@ -23,7 +23,6 @@ export type PostMessage = {
 };
 
 export function useMessages() {
-  const { setSessions } = useContext(RootContext);
   const { chat, setMessages } = useContext(ChatContext);
 
   async function createMessage(body: PostMessage) {
@@ -97,10 +96,6 @@ export function useMessages() {
       .then((res) => {
         return res.data;
       })
-      .then((res) => {
-        console.log(res);
-        setSessions(res);
-      });
   }
 
   useEffect(() => {

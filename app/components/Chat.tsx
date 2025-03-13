@@ -1,14 +1,14 @@
 import { Image, Layout } from "antd";
 import { useContext, useEffect, useMemo, useState } from "react";
 import RootContext from "../context/RootContext";
-import ChatContext, { Endpoint } from "../context/ChatContext";
+import ChatContext from "../context/ChatContext";
 import NavBar from "./bud/components/navigation/NavBar";
 import { HistoryMessages, Messages } from "./bud/chat/Messages";
 import MessageLoading from "./bud/chat/MessageLoading";
 import { Message, useChat } from "@ai-sdk/react";
 import { useEndPoints } from "./bud/hooks/useEndPoint";
 import { NEW_SESSION, useMessages } from "./bud/hooks/useMessages";
-import HistoryList, { ActiveSession, Session } from "./bud/chat/HistoryList";
+import HistoryList, { ActiveSession } from "./bud/chat/HistoryList";
 import SettingsList from "./bud/chat/SettingsList";
 import NormalEditor from "./bud/components/input/NormalEditor";
 import {

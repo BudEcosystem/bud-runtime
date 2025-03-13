@@ -38,7 +38,10 @@ export async function POST(req: Request) {
 
   if (authorization) {
     try {
-      console.log('POST /api/sessions', body);
+      console.log('POST /api/sessions', {
+        ...body,
+        request_id: randomUUID(),
+      });
       const result = await axios
         .post(`${tempApiBaseUrl}/playground/messages`,
           body,
