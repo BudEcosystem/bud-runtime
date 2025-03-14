@@ -3,9 +3,7 @@ name: Admin_Dashboard
 on:
   push:
     branches:
-      - dev
-    paths:
-      - 'dashboard/**'  
+      - main
 
 jobs:
   deploy:
