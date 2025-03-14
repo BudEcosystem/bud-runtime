@@ -15,6 +15,5 @@ jobs:
 
       - name: update_app
         run: |
-          sshpass -p ${{ secrets.SSH_PASSWORD }} ssh -o StrictHostKeyChecking=no ${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_HOST }} "
-          cd /home/budadmin/bud-serve-playground &&  \
-          ./home/budadmin/bud-serve-playground/deploy.sh" 
+          sshpass -p ${{ secrets.SSH_PASSWORD }} ssh -o StrictHostKeyChecking=no ${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_HOST }} " 
+          bash ./home/budadmin/bud-serve-playground/deploy.sh" 
