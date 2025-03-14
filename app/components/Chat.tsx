@@ -1,5 +1,5 @@
 import { Image, Layout } from "antd";
-import { useContext, useEffect, useMemo, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import RootContext from "../context/RootContext";
 import ChatContext from "../context/ChatContext";
 import NavBar from "./bud/components/navigation/NavBar";
@@ -19,8 +19,10 @@ import {
 const { Header, Footer, Sider, Content } = Layout;
 
 export function Chat() {
+  const [lastMessage, setLastMessage] = useState<string>("");
   const [toggleLeft, setToggleLeft] = useState<boolean>(false);
   const [toggleRight, setToggleRight] = useState<boolean>(false);
+  console.log("Chat", lastMessage);
 
   const onToggleLeftSidebar = () => {
     setToggleLeft(!toggleLeft);
@@ -34,26 +36,34 @@ export function Chat() {
   const { chat, messages: historyMessages } = useContext(ChatContext);
   const { createMessage } = useMessages();
 
-  const handleFinish = (message: Message, { usage, finishReason }: any) => {
-    if (!chat?.selectedDeployment) return;
-    // console.log("Message", message);
-    // console.log("FinishReason", finishReason);
-    createMessage({
-      deployment_id: chat?.selectedDeployment?.id,
-      e2e_latency: usage.e2e_latency,
-      input_tokens: usage.input_tokens,
-      is_cache: false,
-      output_tokens: usage.output_tokens,
-      prompt: message.content,
-      response: message,
-      token_per_sec: usage.token_per_sec,
-      total_tokens: usage.total_tokens,
-      tpot: usage.tpot,
-      ttft: usage.ttft,
-      request_id: chat?.selectedDeployment?.id,
-    }, chat.id);
-    // console.log("Usage", usage);
-  };
+  const handleFinish = useCallback(
+    async (message: Message, { usage, finishReason }: any) => {
+      if (!chat?.selectedDeployment) return;
+      // console.log("Message", message);
+      // console.log("FinishReason", finishReason);
+      await createMessage(
+        {
+          deployment_id: chat?.selectedDeployment?.id,
+          e2e_latency: usage.e2e_latency,
+          input_tokens: usage.input_tokens,
+          is_cache: false,
+          output_tokens: usage.output_tokens,
+          chat_session_id: chat?.id === NEW_SESSION ? undefined : chat?.id,
+          prompt: lastMessage,
+          response: message,
+          token_per_sec: usage.token_per_sec,
+          total_tokens: usage.total_tokens,
+          tpot: usage.tpot,
+          ttft: usage.ttft,
+          request_id: chat?.selectedDeployment?.id,
+        },
+        chat.id
+      );
+      setLastMessage("");
+      // console.log("Usage", usage);
+    },
+    [chat, createMessage, lastMessage]
+  );
 
   const body = useMemo(() => {
     if (!chat) {
@@ -106,6 +116,13 @@ export function Chat() {
       console.log("Received HTTP response from server:", response);
     },
   });
+
+  useEffect(() => {
+    if (input !== "") {
+      setLastMessage(input);
+    }
+  }, [input]);
+
   const handleChange = (value: string) => {
     console.log(`selected ${value}`);
   };

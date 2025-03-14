@@ -6,24 +6,8 @@ function APIKey() {
   const [apiKey, setApiKey] = useState<string>("");
   const router = useRouter();
 
-  useEffect(() => {
-    const init = () => {
-      if (typeof window === "undefined") return null;
-      const _apiKey = window?.location.href
-        ?.split("api_key=")?.[1]
-        ?.split("&")?.[0];
-      if (_apiKey) {
-        setApiKey(_apiKey);
-      }
-    };
-    init();
-  }, []);
-
   const handleAdd = () => {
     router.replace(`?api_key=${apiKey}`);
-    setTimeout(() => {
-      window.location.reload();
-    }, 100);
   };
 
   return (

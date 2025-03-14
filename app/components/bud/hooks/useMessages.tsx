@@ -24,10 +24,11 @@ export type PostMessage = {
 };
 
 export function useMessages() {
-  const { setChats, chats } = useContext(RootContext);
+  const { setChats, chats, sessions, setSessions } = useContext(RootContext);
   const { chat, setMessages } = useContext(ChatContext);
 
   async function createMessage(body: PostMessage, chatId: string) {
+    console.log("Creating message", body, chatId);
     try {
       const result = await AppRequest.Post(`/api/messages`, body).then(
         (res) => {
@@ -47,12 +48,25 @@ export function useMessages() {
           localStorage.setItem(id, JSON.stringify(data));
         } else {
           localStorage.setItem(id, JSON.stringify([body]));
+          const updatedSessions = [...sessions]?.filter(
+            (session) => session.id !== NEW_SESSION
+          );
+          updatedSessions.push({
+            id: id,
+            created_at: new Date().toISOString(),
+            modified_at: new Date().toISOString(),
+            name: body.prompt,
+            total_tokens: body.total_tokens,
+          });
+          setSessions(updatedSessions);
         }
 
         if (chatId === NEW_SESSION) {
-          // allocate new session with the id 
+          // allocate new session with the id
           const updatedChats = [...chats]?.map((chat) => {
             if (chat.id === NEW_SESSION) {
+              // remove the new session
+              localStorage.removeItem(NEW_SESSION);
               chat.id = result.id;
             }
             return chat;

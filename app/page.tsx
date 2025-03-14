@@ -12,7 +12,7 @@ export default function Home() {
   const [_accessToken, _setAccessToken] = useState<string | null>(null);
   const [_refreshToken, _setRefreshToken] = useState<string | null>(null);
   const [_apiKey, _setApiKey] = useState<string | null>(null);
-  const { getSessions, createMessage } = useMessages();
+  const { getSessions } = useMessages();
   const { getEndPoints } = useEndPoints();
   const [endpoints, setEndpoints] = useState<Endpoint[]>([]);
 
@@ -21,47 +21,61 @@ export default function Home() {
   const [chats, setChats] = useState<ActiveSession[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
 
-  const createChat = useCallback(async (deploymentId?: string) => {
-    console.log("Creating chat");
-    const updatedChats = [...chats];
-    if(updatedChats.find((chat)=> chat.id === NEW_SESSION)) return;
-    updatedChats.push({
-      id: NEW_SESSION,
-      name: `Chat ${updatedChats.length + 1}`,
-    });
-    setChats(updatedChats);
-  }, [chats, endpoints]);
+
+
+  useEffect(() => {
+      const existing = localStorage.getItem('sessions');
+      if (existing) {
+        const data = JSON.parse(existing);
+        setSessions(data);
+      }
+  }, []);
+
+  // save to local storage
+  useEffect(() => {
+    if(sessions.length === 0) return;
+    localStorage.setItem('sessions', JSON.stringify(sessions));
+  }, [sessions]);
+
 
   useEffect(() => {
     const init = () => {
+      console.log("init", window?.location.href);
       if (typeof window === "undefined") return null;
-
       const accessToken = window?.location.href
         ?.split("access_token=")?.[1]
         ?.split("&")[0];
       const refreshToken = window?.location.href
         ?.split("refresh_token=")?.[1]
         ?.split("&")?.[0];
-
-      if (!accessToken || !refreshToken) return;
-      _setAccessToken(accessToken);
-      _setRefreshToken(refreshToken);
-    };
-    init();
-  }, []);
-
-  useEffect(() => {
-    const init = () => {
-      if (typeof window === "undefined") return null;
-      const apiKey = window?.location.href
+      const _apiKey = window?.location.href
         ?.split("api_key=")?.[1]
         ?.split("&")?.[0];
-      if (apiKey) {
-        _setApiKey(apiKey);
+      if (_apiKey) {
+        _setApiKey(_apiKey);
+      }
+
+      if (accessToken && refreshToken) {
+        _setAccessToken(accessToken);
+        _setRefreshToken(refreshToken);
       }
     };
     init();
-  }, []);
+  }, [window?.location.href]);
+
+  const createChat = useCallback(
+    async () => {
+      console.log("Creating chat");
+      const updatedChats = [...chats];
+      if (updatedChats.find((chat) => chat.id === NEW_SESSION)) return;
+      updatedChats.push({
+        id: NEW_SESSION,
+        name: `Chat ${updatedChats.length + 1}`,
+      });
+      setChats(updatedChats);
+    },
+    [chats, endpoints, sessions]
+  );
 
   useEffect(() => {
     const init = () => {
@@ -77,7 +91,7 @@ export default function Home() {
           console.log("endpoints", res, chats);
           setTimeout(() => {
             if (chats.length === 0 && res) {
-              createChat(res[0].id);
+              createChat();
             }
           }, 100);
         });
