@@ -7,6 +7,7 @@ import { ActiveSession, Session } from "./components/bud/chat/HistoryList";
 import { NEW_SESSION, useMessages } from "./components/bud/hooks/useMessages";
 import APIKey from "./components/APIKey";
 import { useEndPoints } from "./components/bud/hooks/useEndPoint";
+import { notification } from "antd";
 
 export default function Home() {
   const [_accessToken, _setAccessToken] = useState<string | null>(null);
@@ -67,27 +68,43 @@ export default function Home() {
     init();
   }, []);
 
+  const newChatPayload = {
+    id: NEW_SESSION,
+    name: `New Chat`,
+    settings: {
+      temperature: 0.5,
+      context_overflow: [],
+      limit_response_length: true,
+      min_p_sampling: 0.0,
+      repeat_penalty: 1.0,
+      sequence_length: 400,
+      stop_strings: "",
+      tool_k_sampling: 0.0,
+      top_p_sampling: 0.0,
+    },
+  };
+
+  const closeChat = useCallback(
+    async (chat: ActiveSession) => {
+      const updatedChats = chats.filter((c) => c.id !== chat.id);
+      if (updatedChats.length === 0) {
+        updatedChats.push(newChatPayload);
+      }
+      setChats(updatedChats);
+    },
+    [chats, newChatPayload]
+  );
+
   const createChat = useCallback(
     async (sessionId?: string) => {
       console.log("Creating chat");
       const updatedChats = [...chats];
       if (!sessionId) {
-        if (updatedChats.find((chat) => chat.id === NEW_SESSION)) return;
-        updatedChats.push({
-          id: NEW_SESSION,
-          name: `Chat ${updatedChats.length + 1}`,
-          settings: {
-            temperature: 0.5,
-            context_overflow: [],
-            limit_response_length: true,
-            min_p_sampling: 0.0,
-            repeat_penalty: 1.0,
-            sequence_length: 400,
-            stop_strings: "",
-            tool_k_sampling: 0.0,
-            top_p_sampling: 0.0,
-          },
-        });
+        if (updatedChats.find((chat) => chat.id === NEW_SESSION)) {
+          alert("You can only have one new chat at a time");
+          return;
+        };
+        updatedChats.push(newChatPayload);
       } else {
         const session = sessions.find((s) => s.id === sessionId);
         if (!session) return;
@@ -95,7 +112,7 @@ export default function Home() {
       }
       setChats(updatedChats);
     },
-    [chats, endpoints, sessions]
+    [chats, endpoints, sessions, newChatPayload]
   );
 
   useEffect(() => {
@@ -168,6 +185,7 @@ export default function Home() {
           chats,
           setChats,
           createChat,
+          closeChat,
           handleDeploymentSelect,
           handleSettingsChange,
           token,
