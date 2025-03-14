@@ -105,8 +105,7 @@ export function Chat() {
     onError: (error) => {
       console.error("An error occurred:", error);
     },
-    onResponse: (response) => {
-    },
+    onResponse: (response) => {},
   });
 
   useEffect(() => {
@@ -284,7 +283,7 @@ export function Chat() {
 }
 
 function ChatWithStore(props: { chat: ActiveSession }) {
-  const {getSessionMessages} = useMessages();
+  const { getSessionMessages } = useMessages();
   const [messages, setMessages] = useState<any[]>([]);
 
   useEffect(() => {
@@ -292,7 +291,13 @@ function ChatWithStore(props: { chat: ActiveSession }) {
       const id = props.chat?.id;
       if (id !== NEW_SESSION) {
         const result = await getSessionMessages(id);
+        if (result.length > 0) {
+          console.log("Loading from server");
+          setMessages(result);
+          return;
+        }
       }
+      console.log("Loading from local storage");
       const existing = localStorage.getItem(id);
       if (existing) {
         const data = JSON.parse(existing);

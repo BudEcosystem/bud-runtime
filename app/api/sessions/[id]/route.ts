@@ -10,13 +10,14 @@ export async function GET(req: Request) {
   if (authorization) {
     try {
       const result = await axios
-        .get(`${tempApiBaseUrl}/playground/chat-sessions/${sessionId}`, {
+        .get(`${tempApiBaseUrl}/playground/chat-sessions/${sessionId}/messages`, {
           headers: {
             authorization: authorization,
           },
         })
         .then((response) => {
-          return response.data.chat_sessions;
+          console.log('GET /api/sessions', response.data);
+          return response.data.chat_messages;
         })
       return NextResponse.json(result);
 
