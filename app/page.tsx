@@ -65,7 +65,7 @@ export default function Home() {
       }
     };
     init();
-  }, [window?.location.href]);
+  }, []);
 
   const createChat = useCallback(
     async (sessionId?: string) => {
