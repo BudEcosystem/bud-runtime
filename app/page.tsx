@@ -37,7 +37,7 @@ export default function Home() {
 
   // save to local storage
   useEffect(() => {
-    console.log('syncing chats', chats);
+    console.log("syncing chats", chats);
     const validChats = chats.filter((chat) => chat.id !== NEW_SESSION);
     if (validChats?.length === 0) return;
     localStorage.setItem("chats", JSON.stringify(validChats));
@@ -76,8 +76,19 @@ export default function Home() {
         updatedChats.push({
           id: NEW_SESSION,
           name: `Chat ${updatedChats.length + 1}`,
+          settings: {
+            temperature: 0.5,
+            context_overflow: [],
+            limit_response_length: true,
+            min_p_sampling: 0.0,
+            repeat_penalty: 1.0,
+            sequence_length: 400,
+            stop_strings: "",
+            tool_k_sampling: 0.0,
+            top_p_sampling: 0.0,
+          },
         });
-      }else{
+      } else {
         const session = sessions.find((s) => s.id === sessionId);
         if (!session) return;
         updatedChats.push(session);

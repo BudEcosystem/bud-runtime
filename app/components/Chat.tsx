@@ -76,14 +76,9 @@ export function Chat() {
       metadata: {
         project_id: chat?.selectedDeployment?.project.id,
       },
-      // top_k: chat?.settings.tool_k_sampling,
-      // top_p: chat?.settings.top_p_sampling,
-      // frequency_penalty: chat?.settings.repeat_penalty,
-      // presence_penalty: chat?.settings.min_p_sampling,
-      // stop: chat?.settings.stop_strings,
-      // context: chat?.settings.context_overflow,
+      settings: chat?.settings,
     };
-  }, [chat, chat?.selectedDeployment, chat?.settings]);
+  }, [chat, chat?.selectedDeployment, JSON.stringify(chat?.settings)]);
 
   const {
     error,

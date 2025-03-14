@@ -12,7 +12,7 @@ export const maxDuration = 30;
 export async function POST(req: Request) {
   // Extract the `messages` from the body of the request
   const x = await req.json()
-  const { messages, id, model, metadata } = x
+  const { messages, id, model, metadata, settings = {} } = x
   const authorization = req.headers.get('authorization');
   const apiKey = req.headers.get('api-key');
 
@@ -37,7 +37,8 @@ export async function POST(req: Request) {
           messages,
           model,
           "max_tokens": 3000,
-          "stream": true
+          "stream": true,
+          // ...settings,
         }) : undefined
       });
     }
