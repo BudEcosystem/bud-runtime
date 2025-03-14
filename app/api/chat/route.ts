@@ -22,7 +22,7 @@ export async function POST(req: Request) {
 
   console.log('chat id', id); // can be used for persisting the chat
   console.log('x', x); // can be used for persisting the chat
-  const proxyOpenAI = createOpenAI({
+  const payload = {
     // custom settings, e.g.
     baseURL: copyCodeApiBaseUrl,
     // apiKey: "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",
@@ -31,12 +31,14 @@ export async function POST(req: Request) {
       // 'Authorization': 'Bearer budserve_NgMnHOzyQjCXGgmoFZrYNwS7LgqZU2VMcmz3bz4U',
       'project-id': metadata.project_id,
     },
-    compatibility: "strict"
-  });
+  };
+  console.log('apiKey', apiKey);
+  console.log('payload', payload);
+  const proxyOpenAI = createOpenAI(payload);
 
   // Call the language model
   const result = streamText({
-    model: proxyOpenAI("dontdelete"),
+    model: proxyOpenAI(model),
     messages,
     async onFinish({ text, toolCalls, toolResults, usage, finishReason }) {
       console.log('text', text);

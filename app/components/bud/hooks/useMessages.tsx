@@ -3,6 +3,7 @@ import { useContext, useEffect } from "react";
 import ChatContext from "@/app/context/ChatContext";
 import { AppRequest } from "@/app/api/requests";
 import RootContext from "@/app/context/RootContext";
+import { ActiveSession } from "../chat/HistoryList";
 
 export const NEW_SESSION = "NEW_SESSION";
 
@@ -23,9 +24,10 @@ export type PostMessage = {
 };
 
 export function useMessages() {
+  const { setChats, chats } = useContext(RootContext);
   const { chat, setMessages } = useContext(ChatContext);
 
-  async function createMessage(body: PostMessage) {
+  async function createMessage(body: PostMessage, chatId: string) {
     try {
       const result = await AppRequest.Post(`/api/messages`, body).then(
         (res) => {
@@ -46,45 +48,18 @@ export function useMessages() {
         } else {
           localStorage.setItem(id, JSON.stringify([body]));
         }
-      }
-    } catch (error) {
-      console.error(error);
-    }
-  }
 
-  async function createSession(deploymentId: string) {
-    try {
-      const body: PostMessage = {
-        prompt: NEW_SESSION,
-        response: {},
-        deployment_id: deploymentId,
-        input_tokens: 0,
-        output_tokens: 0,
-        total_tokens: 0,
-        token_per_sec: 0,
-        ttft: 0,
-        tpot: 0,
-        e2e_latency: 0,
-        is_cache: false,
-        request_id: deploymentId,
-      };
-      const result = await AppRequest.Post(`/api/sessions`, body).then((res) => {
-        return res.data;
-      });
-      console.log(result);
-      const id = result.id;
-      if (id) {
-        // store to local storage
-        const existing = localStorage.getItem(id);
-        if (existing) {
-          const data = JSON.parse(existing);
-          data.push(body);
-          localStorage.setItem(id, JSON.stringify(data));
-        } else {
-          localStorage.setItem(id, JSON.stringify([body]));
+        if (chatId === NEW_SESSION) {
+          // allocate new session with the id 
+          const updatedChats = [...chats]?.map((chat) => {
+            if (chat.id === NEW_SESSION) {
+              chat.id = result.id;
+            }
+            return chat;
+          });
+          setChats(updatedChats);
         }
       }
-      return result;
     } catch (error) {
       console.error(error);
     }
@@ -92,10 +67,9 @@ export function useMessages() {
 
   async function getSessions() {
     // /playground/chat-sessions
-    return await AppRequest.Get(`/api/sessions`)
-      .then((res) => {
-        return res.data;
-      })
+    return await AppRequest.Get(`/api/sessions`).then((res) => {
+      return res.data;
+    });
   }
 
   useEffect(() => {
@@ -109,5 +83,5 @@ export function useMessages() {
     }
   }, [chat]);
 
-  return { createMessage, getSessions, createSession };
+  return { createMessage, getSessions };
 }

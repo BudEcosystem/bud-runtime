@@ -4,7 +4,7 @@ import Chat from "./components/Chat";
 import { Endpoint } from "./context/ChatContext";
 import RootContext from "./context/RootContext";
 import { ActiveSession, Session } from "./components/bud/chat/HistoryList";
-import { useMessages } from "./components/bud/hooks/useMessages";
+import { NEW_SESSION, useMessages } from "./components/bud/hooks/useMessages";
 import APIKey from "./components/APIKey";
 import { useEndPoints } from "./components/bud/hooks/useEndPoint";
 
@@ -12,7 +12,7 @@ export default function Home() {
   const [_accessToken, _setAccessToken] = useState<string | null>(null);
   const [_refreshToken, _setRefreshToken] = useState<string | null>(null);
   const [_apiKey, _setApiKey] = useState<string | null>(null);
-  const { getSessions, createSession } = useMessages();
+  const { getSessions, createMessage } = useMessages();
   const { getEndPoints } = useEndPoints();
   const [endpoints, setEndpoints] = useState<Endpoint[]>([]);
 
@@ -24,9 +24,9 @@ export default function Home() {
   const createChat = useCallback(async (deploymentId?: string) => {
     console.log("Creating chat");
     const updatedChats = [...chats];
-    const result = await createSession(deploymentId || endpoints?.[0]?.id);
+    if(updatedChats.find((chat)=> chat.id === NEW_SESSION)) return;
     updatedChats.push({
-      id: result.id,
+      id: NEW_SESSION,
       name: `Chat ${updatedChats.length + 1}`,
     });
     setChats(updatedChats);

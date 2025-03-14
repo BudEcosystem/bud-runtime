@@ -45,13 +45,13 @@ export function Chat() {
       is_cache: false,
       output_tokens: usage.output_tokens,
       prompt: message.content,
-      response: {},
+      response: message,
       token_per_sec: usage.token_per_sec,
       total_tokens: usage.total_tokens,
       tpot: usage.tpot,
       ttft: usage.ttft,
       request_id: chat?.selectedDeployment?.id,
-    });
+    }, chat.id);
     // console.log("Usage", usage);
   };
 
@@ -211,20 +211,6 @@ export function Chat() {
             stop={stop}
             handleInputChange={handleInputChange}
             handleSubmit={(e) => {
-              createMessage({
-                deployment_id: chat?.selectedDeployment?.id || "",
-                request_id: chat?.selectedDeployment?.id || "",
-                e2e_latency: 0,
-                input_tokens: 0,
-                is_cache: false,
-                output_tokens: 0,
-                prompt: input,
-                response: {},
-                token_per_sec: 0,
-                total_tokens: 0,
-                tpot: 0,
-                ttft: 0,
-              });
               handleSubmit(e);
             }}
             input={input}
