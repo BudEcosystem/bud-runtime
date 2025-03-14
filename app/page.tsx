@@ -21,22 +21,26 @@ export default function Home() {
   const [chats, setChats] = useState<ActiveSession[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
 
-
-
   useEffect(() => {
-      const existing = localStorage.getItem('sessions');
-      if (existing) {
-        const data = JSON.parse(existing);
-        setSessions(data);
-      }
+    const existing = localStorage.getItem("sessions");
+    if (existing) {
+      const data = JSON.parse(existing);
+      setSessions(data);
+    }
   }, []);
 
   // save to local storage
   useEffect(() => {
-    if(sessions.length === 0) return;
-    localStorage.setItem('sessions', JSON.stringify(sessions));
+    if (sessions.length === 0) return;
+    localStorage.setItem("sessions", JSON.stringify(sessions));
   }, [sessions]);
 
+  // save to local storage
+  useEffect(() => {
+    const validChats = chats.filter((chat) => chat.id !== NEW_SESSION);
+    if (validChats?.length === 0) return;
+    localStorage.setItem("chats", JSON.stringify(validChats));
+  }, [chats]);
 
   useEffect(() => {
     const init = () => {
@@ -63,19 +67,16 @@ export default function Home() {
     init();
   }, [window?.location.href]);
 
-  const createChat = useCallback(
-    async () => {
-      console.log("Creating chat");
-      const updatedChats = [...chats];
-      if (updatedChats.find((chat) => chat.id === NEW_SESSION)) return;
-      updatedChats.push({
-        id: NEW_SESSION,
-        name: `Chat ${updatedChats.length + 1}`,
-      });
-      setChats(updatedChats);
-    },
-    [chats, endpoints, sessions]
-  );
+  const createChat = useCallback(async () => {
+    console.log("Creating chat");
+    const updatedChats = [...chats];
+    if (updatedChats.find((chat) => chat.id === NEW_SESSION)) return;
+    updatedChats.push({
+      id: NEW_SESSION,
+      name: `Chat ${updatedChats.length + 1}`,
+    });
+    setChats(updatedChats);
+  }, [chats, endpoints, sessions]);
 
   useEffect(() => {
     const init = () => {
@@ -90,7 +91,11 @@ export default function Home() {
         .then((res) => {
           console.log("endpoints", res, chats);
           setTimeout(() => {
-            if (chats.length === 0 && res) {
+            const existing = localStorage.getItem("chats");
+            if (existing) {
+              const data = JSON.parse(existing);
+              setChats(data);
+            } else if (chats.length === 0 && res) {
               createChat();
             }
           }, 100);
@@ -137,6 +142,8 @@ export default function Home() {
     });
     setChats(updatedChats);
   };
+
+  console.log("chats", chats);
 
   return (
     <main className="flex flex-col gap-8 row-start-2 items-center w-full h-[100vh] p-4">
