@@ -14,3 +14,4 @@ console.log('apiBaseUrl', apiBaseUrl);
 console.log('tempApiBaseUrl', tempApiBaseUrl);
 console.log('assetBaseUrl', assetBaseUrl);
 console.log('copyCodeApiBaseUrl', copyCodeApiBaseUrl);
+console.log('OPENAI_API_KEY', process.env.OPENAI_API_KEY);
