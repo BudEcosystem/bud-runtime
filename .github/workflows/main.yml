@@ -17,4 +17,4 @@ jobs:
         run: |
           sshpass -p ${{ secrets.SSH_PASSWORD }} ssh -o StrictHostKeyChecking=no ${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_HOST }} "\
           cd /home/budadmin/bud-serve-playground &&  \
-          bash /home/budadmin/bud-serve-playground/deploy.sh" 
+          ./home/budadmin/bud-serve-playground/deploy.sh" 
