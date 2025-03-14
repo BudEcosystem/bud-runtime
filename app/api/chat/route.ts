@@ -20,17 +20,28 @@ export async function POST(req: Request) {
     return new Response('Unauthorized', { status: 401 });
   }
 
-  const payload = {
+  const proxyOpenAI = createOpenAI({
     // custom settings, e.g.
     baseURL: copyCodeApiBaseUrl,
     // apiKey: "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",
-    headers: {
-      'Authorization': authorization,
-      // 'Authorization': 'Bearer budserve_NgMnHOzyQjCXGgmoFZrYNwS7LgqZU2VMcmz3bz4U',
-      'project-id': metadata.project_id,
-    },
-  };
-  const proxyOpenAI = createOpenAI(payload);
+    fetch: (input, init) => {
+      return fetch(input, {
+        ...init,
+        headers: {
+          ...init?.headers,
+          'project-id': metadata.project_id,
+          'Authorization': authorization
+        },
+        body: init?.body ? JSON.stringify({
+          id,
+          messages,
+          model,
+          "max_tokens": 3000,
+          "stream": true
+        }) : undefined
+      });
+    }
+  });
 
   // Call the language model
   const result = streamText({

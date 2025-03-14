@@ -195,7 +195,7 @@ export function Chat() {
                   </div>
                 </div>
               )}
-            {status === "streaming" && <MessageLoading />}
+            {status === "submitted" || status === "streaming" && <MessageLoading />}
             {error && (
               <div className="mt-4">
                 <div className="text-red-500">An error occurred.</div>
