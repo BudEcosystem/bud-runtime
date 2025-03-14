@@ -3,7 +3,9 @@ name: Admin_Dashboard
 on:
   push:
     branches:
-      - main
+      - dev
+    paths:
+      - 'dashboard/**'  
 
 jobs:
   deploy:
@@ -15,6 +17,16 @@ jobs:
 
       - name: update_app
         run: |
-          sshpass -p ${{ secrets.SSH_PASSWORD }} ssh -o StrictHostKeyChecking=no ${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_HOST }} "
+          sshpass -p ${{ secrets.SSH_PASSWORD }} ssh -o StrictHostKeyChecking=no ${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_HOST }} "\
           cd /home/budadmin/bud-serve-playground &&  \
-          git pull && npm i && npm run build && pm2 restart pm2.config.js" 
+          bash /home/budadmin/bud-serve-playground/deploy.sh" > deploy_output.log 2>&1 && cat deploy_output.log
+        continue-on-error: true
+
+      - name: Display deployment log
+        run: cat deploy_output.log
+
+      - name: Upload deployment log as an artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-log
+          path: deploy_output.log
