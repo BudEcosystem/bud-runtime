@@ -27,7 +27,7 @@ export async function POST(req: Request) {
     fetch: (input, init) => {
       return fetch(input, {
         ...init,
-        credentials: 'omit',
+        method: "POST",
         headers: {
           ...init?.headers,
           'project-id': metadata.project_id,
