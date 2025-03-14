@@ -4,7 +4,6 @@ import { randomUUID } from 'crypto';
 import { NextResponse } from 'next/server';
 
 export async function GET(req: Request) {
-  console.log('GET /api/sessions');
   const sessionId = req.url.split('/').pop();
   const authorization = req.headers.get('authorization');
   if (authorization) {
@@ -16,7 +15,6 @@ export async function GET(req: Request) {
           },
         })
         .then((response) => {
-          console.log('GET /api/sessions', response.data);
           return response.data.chat_messages;
         })
       return NextResponse.json(result);
