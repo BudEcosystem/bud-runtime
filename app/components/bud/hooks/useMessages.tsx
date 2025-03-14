@@ -36,22 +36,23 @@ export function useMessages() {
         }
       );
 
-      console.log(result);
+      console.log(`Message created: ${result.chat_session_id}`); 
+      const sessionId = result?.chat_session_id;
 
-      if (result.id) {
+      if (sessionId) {
         // store to local storage
-        const existing = localStorage.getItem(result.id);
+        const existing = localStorage.getItem(sessionId);
         if (existing) {
           const data = JSON.parse(existing);
           data.push(body);
-          localStorage.setItem(result.id, JSON.stringify(data));
+          localStorage.setItem(sessionId, JSON.stringify(data));
         } else {
-          localStorage.setItem(result.id, JSON.stringify([body]));
+          localStorage.setItem(sessionId, JSON.stringify([body]));
           const updatedSessions = [...sessions]?.filter(
             (session) => session.id !== NEW_SESSION
           );
           updatedSessions.push({
-            id: result.id,
+            id: sessionId,
             created_at: new Date().toISOString(),
             modified_at: new Date().toISOString(),
             name: body.prompt,
@@ -66,7 +67,7 @@ export function useMessages() {
             if (chat.id === NEW_SESSION) {
               // remove the new session
               localStorage.removeItem(NEW_SESSION);
-              chat.id = result.id;
+              chat.id = sessionId;
             }
             return chat;
           });
@@ -85,16 +86,12 @@ export function useMessages() {
     });
   }
 
-  useEffect(() => {
-    const id = chat?.id;
-    if (id) {
-      const existing = localStorage.getItem(id);
-      if (existing) {
-        const data = JSON.parse(existing);
-        setMessages(data);
-      }
-    }
-  }, [chat]);
+  async function getSessionMessages(id: string) {
+    // /playground/chat-sessions
+    return await AppRequest.Get(`/api/sessions/${id}`).then((res) => {
+      return res.data;
+    });
+  }
 
-  return { createMessage, getSessions };
+  return { createMessage, getSessions, getSessionMessages };
 }

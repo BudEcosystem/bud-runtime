@@ -20,8 +20,6 @@ export async function POST(req: Request) {
     return new Response('Unauthorized', { status: 401 });
   }
 
-  console.log('chat id', id); // can be used for persisting the chat
-  console.log('x', x); // can be used for persisting the chat
   const payload = {
     // custom settings, e.g.
     baseURL: copyCodeApiBaseUrl,
@@ -32,8 +30,6 @@ export async function POST(req: Request) {
       'project-id': metadata.project_id,
     },
   };
-  console.log('apiKey', apiKey);
-  console.log('payload', payload);
   const proxyOpenAI = createOpenAI(payload);
 
   // Call the language model
@@ -41,25 +37,15 @@ export async function POST(req: Request) {
     model: proxyOpenAI(model),
     messages,
     async onFinish({ text, toolCalls, toolResults, usage, finishReason }) {
-      console.log('text', text);
-      console.log('toolCalls', toolCalls);
-      console.log('toolResults', toolResults);
-      console.log('usage', usage);
-      console.log('finishReason', finishReason);
       // implement your own logic here, e.g. for storing messages
       // or recording token usage
     },
     onChunk({ chunk }) {
-      console.log('chunk', chunk);
     },
     onError({ error }) {
       console.error('error', JSON.stringify(error, null, 2));
     },
     onStepFinish({ text, toolCalls, toolResults, usage }) {
-      console.log('text', text);
-      console.log('toolCalls', toolCalls);
-      console.log('toolResults', toolResults);
-      console.log('usage', usage);
     }
   });
 

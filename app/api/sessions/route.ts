@@ -4,18 +4,13 @@ import { randomUUID } from 'crypto';
 import { NextResponse } from 'next/server';
 
 export async function GET(req: Request) {
-  console.log('GET /api/sessions');
   const authorization = req.headers.get('authorization');
-  const apiKey = req.headers.get('api-key');
   if (authorization) {
-
     try {
-
       const result = await axios
         .get(`${tempApiBaseUrl}/playground/chat-sessions`, {
           headers: {
             authorization: authorization,
-            'api-key': apiKey,
           },
         })
         .then((response) => {
@@ -38,10 +33,6 @@ export async function POST(req: Request) {
 
   if (authorization) {
     try {
-      console.log('POST /api/sessions', {
-        ...body,
-        request_id: randomUUID(),
-      });
       const result = await axios
         .post(`${tempApiBaseUrl}/playground/messages`,
           body,
@@ -54,7 +45,6 @@ export async function POST(req: Request) {
           return response.data?.chat_message
         })
 
-      console.log(result);
 
       return NextResponse.json({
         id: result?.chat_session_id,

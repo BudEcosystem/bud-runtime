@@ -22,7 +22,6 @@ export function Chat() {
   const [lastMessage, setLastMessage] = useState<string>("");
   const [toggleLeft, setToggleLeft] = useState<boolean>(false);
   const [toggleRight, setToggleRight] = useState<boolean>(false);
-  console.log("Chat", lastMessage);
 
   const onToggleLeftSidebar = () => {
     setToggleLeft(!toggleLeft);
@@ -39,8 +38,6 @@ export function Chat() {
   const handleFinish = useCallback(
     async (message: Message, { usage, finishReason }: any) => {
       if (!chat?.selectedDeployment) return;
-      // console.log("Message", message);
-      // console.log("FinishReason", finishReason);
       await createMessage(
         {
           deployment_id: chat?.selectedDeployment?.id,
@@ -60,7 +57,6 @@ export function Chat() {
         chat.id
       );
       setLastMessage("");
-      // console.log("Usage", usage);
     },
     [chat, createMessage, lastMessage]
   );
@@ -104,16 +100,12 @@ export function Chat() {
     },
     body,
     onFinish(message, { usage, finishReason }) {
-      console.log("message", message);
-      console.log("Usage", usage);
-      console.log("FinishReason", finishReason);
       handleFinish(message, { usage, finishReason });
     },
     onError: (error) => {
       console.error("An error occurred:", error);
     },
     onResponse: (response) => {
-      console.log("Received HTTP response from server:", response);
     },
   });
 
@@ -130,7 +122,6 @@ export function Chat() {
   const { getEndPoints } = useEndPoints();
 
   useEffect(() => {
-    console.log("getEndPoints");
     if (chat) {
       getEndPoints({ page: 1, limit: 10 });
     }
@@ -293,7 +284,23 @@ export function Chat() {
 }
 
 function ChatWithStore(props: { chat: ActiveSession }) {
+  const {getSessionMessages} = useMessages();
   const [messages, setMessages] = useState<any[]>([]);
+
+  useEffect(() => {
+    const init = async () => {
+      const id = props.chat?.id;
+      if (id !== NEW_SESSION) {
+        const result = await getSessionMessages(id);
+      }
+      const existing = localStorage.getItem(id);
+      if (existing) {
+        const data = JSON.parse(existing);
+        setMessages(data);
+      }
+    };
+    init();
+  }, [props.chat]);
 
   return (
     <>

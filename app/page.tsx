@@ -37,6 +37,7 @@ export default function Home() {
 
   // save to local storage
   useEffect(() => {
+    console.log('syncing chats', chats);
     const validChats = chats.filter((chat) => chat.id !== NEW_SESSION);
     if (validChats?.length === 0) return;
     localStorage.setItem("chats", JSON.stringify(validChats));
@@ -44,7 +45,6 @@ export default function Home() {
 
   useEffect(() => {
     const init = () => {
-      console.log("init", window?.location.href);
       if (typeof window === "undefined") return null;
       const accessToken = window?.location.href
         ?.split("access_token=")?.[1]
@@ -100,7 +100,6 @@ export default function Home() {
           return getEndPoints({ page: 1, limit: 25 });
         })
         .then((res) => {
-          console.log("endpoints", res, chats);
           setTimeout(() => {
             const existing = localStorage.getItem("chats");
             if (existing) {
@@ -119,15 +118,12 @@ export default function Home() {
     (chat: ActiveSession, endpoint: Endpoint) => {
       if (!chat) return;
       let updatedChats = [...chats];
-      console.log("updatedChats", updatedChats);
       updatedChats = updatedChats.map((_chat) => {
         if (_chat.id === chat.id) {
-          console.log("Selected", _chat, chat);
           _chat.selectedDeployment = endpoint;
         }
         return _chat;
       });
-      console.log("Selected", updatedChats);
       setChats(updatedChats);
     },
     [chats]
@@ -153,8 +149,6 @@ export default function Home() {
     });
     setChats(updatedChats);
   };
-
-  console.log("sessions", sessions);
 
   return (
     <main className="flex flex-col gap-8 row-start-2 items-center w-full h-[100vh] p-4">

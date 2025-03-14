@@ -20,7 +20,6 @@ export function useEndPoints() {
         return res.data;
       });
 
-      console.log(result);
       return result;
     } catch (error) {
       return error;
