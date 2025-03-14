@@ -51,13 +51,23 @@ export async function POST(req: Request) {
     async onFinish({ text, toolCalls, toolResults, usage, finishReason }) {
       // implement your own logic here, e.g. for storing messages
       // or recording token usage
+      console.log('onFinish', text);
+      console.log('toolCalls', toolCalls);
+      console.log('toolResults', toolResults);
+      console.log('usage', usage);
+      console.log('finishReason', finishReason);
     },
     onChunk({ chunk }) {
+      console.log('chunk', chunk);
     },
     onError({ error }) {
       console.error('error', JSON.stringify(error, null, 2));
     },
     onStepFinish({ text, toolCalls, toolResults, usage }) {
+      console.log('onStepFinish', text);
+      console.log('toolCalls', toolCalls);
+      console.log('toolResults', toolResults);
+      console.log('usage', usage);
     }
   });
 
