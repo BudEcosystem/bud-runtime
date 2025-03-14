@@ -37,22 +37,21 @@ export function useMessages() {
       );
 
       console.log(result);
-      const id = chat?.id;
 
-      if (id) {
+      if (result.id) {
         // store to local storage
-        const existing = localStorage.getItem(id);
+        const existing = localStorage.getItem(result.id);
         if (existing) {
           const data = JSON.parse(existing);
           data.push(body);
-          localStorage.setItem(id, JSON.stringify(data));
+          localStorage.setItem(result.id, JSON.stringify(data));
         } else {
-          localStorage.setItem(id, JSON.stringify([body]));
+          localStorage.setItem(result.id, JSON.stringify([body]));
           const updatedSessions = [...sessions]?.filter(
             (session) => session.id !== NEW_SESSION
           );
           updatedSessions.push({
-            id: id,
+            id: result.id,
             created_at: new Date().toISOString(),
             modified_at: new Date().toISOString(),
             name: body.prompt,
