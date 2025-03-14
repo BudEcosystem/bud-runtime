@@ -67,16 +67,25 @@ export default function Home() {
     init();
   }, [window?.location.href]);
 
-  const createChat = useCallback(async () => {
-    console.log("Creating chat");
-    const updatedChats = [...chats];
-    if (updatedChats.find((chat) => chat.id === NEW_SESSION)) return;
-    updatedChats.push({
-      id: NEW_SESSION,
-      name: `Chat ${updatedChats.length + 1}`,
-    });
-    setChats(updatedChats);
-  }, [chats, endpoints, sessions]);
+  const createChat = useCallback(
+    async (sessionId?: string) => {
+      console.log("Creating chat");
+      const updatedChats = [...chats];
+      if (!sessionId) {
+        if (updatedChats.find((chat) => chat.id === NEW_SESSION)) return;
+        updatedChats.push({
+          id: NEW_SESSION,
+          name: `Chat ${updatedChats.length + 1}`,
+        });
+      }else{
+        const session = sessions.find((s) => s.id === sessionId);
+        if (!session) return;
+        updatedChats.push(session);
+      }
+      setChats(updatedChats);
+    },
+    [chats, endpoints, sessions]
+  );
 
   useEffect(() => {
     const init = () => {
@@ -85,7 +94,9 @@ export default function Home() {
       localStorage.setItem("token", token);
       return getSessions()
         .then((result) => {
-          setSessions(result);
+          if (result?.length > 0) {
+            setSessions(result);
+          }
           return getEndPoints({ page: 1, limit: 25 });
         })
         .then((res) => {
@@ -143,7 +154,7 @@ export default function Home() {
     setChats(updatedChats);
   };
 
-  console.log("chats", chats);
+  console.log("sessions", sessions);
 
   return (
     <main className="flex flex-col gap-8 row-start-2 items-center w-full h-[100vh] p-4">

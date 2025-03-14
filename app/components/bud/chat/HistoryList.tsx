@@ -1,6 +1,7 @@
 import { Endpoint } from "@/app/context/ChatContext";
+import RootContext from "@/app/context/RootContext";
 import { Image } from "antd";
-import React from "react";
+import React, { useContext } from "react";
 
 export type ChatSettings = {
   temperature: number;
@@ -30,8 +31,18 @@ export type Session = {
 };
 
 function HistoryListItem({ data }: { data: Session }) {
+  const { createChat, chats } = useContext(RootContext);
   return (
-    <div className="flex flex-row items-center gap-[1rem] p-[.45rem] px-[.65rem] justify-between border-[1px] border-[#1F1F1F] rounded-[8px] backdrop-blur-[10px]">
+    <div
+      onClick={() => {
+        // check if chat already exists
+        if (chats.find((chat) => chat.id === data.id)) {
+          return;
+        }
+        createChat(data.id);
+      }}
+      className="flex flex-row items-center gap-[1rem] p-[.45rem] px-[.65rem] justify-between border-[1px] border-[#1F1F1F] rounded-[8px] backdrop-blur-[10px]"
+    >
       <div className="flex flex-row items-center gap-[.6rem] px-[.27rem]">
         <Image
           src="icons/list-item.svg"
