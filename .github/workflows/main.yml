@@ -1,0 +1,20 @@
+name: Admin_Dashboard
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Install sshpass
+        run: sudo apt-get install -y sshpass
+
+      - name: update_app
+        run: |
+          sshpass -p ${{ secrets.SSH_PASSWORD }} ssh -o StrictHostKeyChecking=no ${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_HOST }} "\
+          cd /home/budadmin/bud-serve-playground &&  \
+          git pull && npm i && npm run build && pm2 restart pm2.config.js" > deploy_output.log 2>&1 && cat deploy_output.log
