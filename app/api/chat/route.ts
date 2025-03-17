@@ -41,7 +41,7 @@ export async function POST(req: Request) {
           model,
           "stream": true,
           // ...settings,
-          max_tokens: settings?.sequence_length ? settings.sequence_length : 300,
+          max_tokens: settings.limit_response_length ? settings?.sequence_length ? settings.sequence_length : 300 : undefined,
           frequency_penalty: settings?.repeat_penalty ? settings.repeat_penalty : undefined,
           stop: settings?.stop_strings ? settings.stop_strings : undefined,
           temperature: settings?.temperature ? settings.temperature : undefined,

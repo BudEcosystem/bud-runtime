@@ -176,6 +176,8 @@ function SettingsList({ data }: SettingsListProps) {
             title="Tool K Sampling"
             value={`${chat?.settings?.tool_k_sampling || 0}`}
             defaultValue={`${chat?.settings?.tool_k_sampling || 0}`}
+            min={0}
+            max={1}
             type="number"
             onChange={(value) => handleChange(chat, "tool_k_sampling", value)}
           />
@@ -183,23 +185,25 @@ function SettingsList({ data }: SettingsListProps) {
             title="Repeat Penalty"
             value={`${chat?.settings?.repeat_penalty || 0}`}
             defaultValue={`${chat?.settings?.repeat_penalty || 0}`}
+            min={0}
+            max={1}
             type="number"
             onChange={(value) => handleChange(chat, "repeat_penalty", value)}
           />
           <SliderInput
             title="Top P Sampling"
-            min={0}
-            max={100}
-            step={.1}
+            min={.01}
+            max={1}
+            step={.01}
             defaultValue={chat?.settings?.top_p_sampling || 0}
             value={chat?.settings?.top_p_sampling || 0}
             onChange={(value) => handleChange(chat, "top_p_sampling", value)}
           />
           <SliderInput
             title="Min P Sampling"
-            min={0}
-            max={100}
-            step={.1}
+            min={.01}
+            max={1}
+            step={.01}
             defaultValue={chat?.settings?.min_p_sampling || 0}
             value={chat?.settings?.min_p_sampling || 0}
             onChange={(value) => handleChange(chat, "min_p_sampling", value)}

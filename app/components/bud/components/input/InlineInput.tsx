@@ -7,6 +7,8 @@ interface InlineInputProps {
   defaultValue: string;
   type: string;
   placeholder?: string;
+  min?: number;
+  max?: number;
   onChange: (value: string) => void;
 }
 
@@ -21,6 +23,8 @@ export default function InlineInput(props: InlineInputProps) {
           type={props.type}
           placeholder={props.placeholder}
           value={props.value}
+          min={props.min}
+          max={props.max}
           defaultValue={props.defaultValue}
           onChange={(e) => props.onChange(e.target.value)}
           className="bg-[#101010] text-[#EEEEEE] border-[1px] border-[#1F1F1F] rounded-[0.5rem] p-[.5rem] w-full"
