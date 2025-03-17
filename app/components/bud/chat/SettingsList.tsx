@@ -77,9 +77,9 @@ function SettingsList({ data }: SettingsListProps) {
         <div className="flex flex-col w-full gap-[.5rem] py-[.375rem]">
           <SliderInput
             title="Temperature"
-            min={.1}
+            min={0.1}
             max={1}
-            step={.1}
+            step={0.1}
             defaultValue={chat?.settings?.temperature || 0}
             value={chat?.settings?.temperature || 0}
             onChange={(value) => handleChange(chat, "temperature", value)}
@@ -124,7 +124,7 @@ function SettingsList({ data }: SettingsListProps) {
                 tagRender={(props) => (
                   <Tag
                     closable
-                    className=" !text-[.625rem] font-[400]  rounded-[0.5rem] !p-[.25rem]"
+                    className=" !text-[.625rem] font-[400]  rounded-[0.5rem] !p-[.25rem] ml-[.25rem]"
                     style={{
                       background: getChromeColor("#D1B854"),
                       borderColor: getChromeColor("#D1B854"),
@@ -154,12 +154,33 @@ function SettingsList({ data }: SettingsListProps) {
             </span>
             <div className="flex flex-row items-center gap-[.5rem] w-full">
               <Select
+                mode="tags"
                 defaultValue={chat?.settings?.stop_strings || []}
                 value={chat?.settings?.stop_strings || []}
                 onChange={(value) => handleChange(chat, "stop_strings", value)}
                 className="w-full"
+                tagRender={(props) => (
+                  <Tag
+                    closable
+                    className=" !text-[.625rem] font-[400]  rounded-[0.5rem] !p-[.25rem]  ml-[.25rem]"
+                    style={{
+                      background: getChromeColor("#D1B854"),
+                      borderColor: getChromeColor("#D1B854"),
+                      color: "#D1B854",
+                    }}
+                    closeIcon={
+                      <Image
+                        src="icons/close.svg"
+                        preview={false}
+                        className="!w-[.625rem] !h-[.625rem]"
+                      />
+                    }
+                  >
+                    {props.label}
+                  </Tag>
+                )}
               >
-                <Select.Option value="Select">Select</Select.Option>
+                <Select.Option value="Stop">Stop</Select.Option>
               </Select>
             </div>
           </div>
@@ -192,18 +213,18 @@ function SettingsList({ data }: SettingsListProps) {
           />
           <SliderInput
             title="Top P Sampling"
-            min={.01}
+            min={0.01}
             max={1}
-            step={.01}
+            step={0.01}
             defaultValue={chat?.settings?.top_p_sampling || 0}
             value={chat?.settings?.top_p_sampling || 0}
             onChange={(value) => handleChange(chat, "top_p_sampling", value)}
           />
           <SliderInput
             title="Min P Sampling"
-            min={.01}
+            min={0.01}
             max={1}
-            step={.01}
+            step={0.01}
             defaultValue={chat?.settings?.min_p_sampling || 0}
             value={chat?.settings?.min_p_sampling || 0}
             onChange={(value) => handleChange(chat, "min_p_sampling", value)}

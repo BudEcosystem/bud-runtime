@@ -4,7 +4,7 @@ import SearchHeaderInput from "../components/input/SearchHeaderInput";
 import { ModelListCard } from "../components/ModelListCard";
 import BlurModal from "../components/modal/BlurModal";
 import { useEndPoints } from "../hooks/useEndPoint";
-import { ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import ChatContext from "@/app/context/ChatContext";
 import RootContext from "@/app/context/RootContext";
 import { assetBaseUrl } from "../environment";
@@ -18,12 +18,28 @@ function LoadModel(props: LoadModelProps) {
   const { endpoints } = useEndPoints();
   const [searchValue, setSearchValue] = React.useState("");
   const { chat } = useContext(ChatContext);
-  const { handleDeploymentSelect } = useContext(RootContext);
+  const { handleDeploymentSelect, chats } = useContext(RootContext);
+  const [sortBy, setSortBy] = React.useState("recency");
+  const [sortOrder, setSortOrder] = React.useState("desc");
 
   React.useEffect(() => {
     document.documentElement.scrollTop = document.documentElement.clientHeight;
     document.documentElement.scrollLeft = document.documentElement.clientWidth;
   }, []);
+
+  const currentlyLoaded = endpoints?.filter((endpoint) =>
+    chats.find((chat) => chat.selectedDeployment?.id === endpoint.id)
+  );
+  const availableModels = endpoints?.filter((endpoint) =>
+    chats.find((chat) => chat.selectedDeployment?.id !== endpoint.id)
+  )?.sort((a, b) => {
+    if (sortOrder === "asc") {
+      return a.name.localeCompare(b.name);
+    } else {
+      return b.name.localeCompare(a.name);
+    }
+  }
+  );
 
   return (
     <div>
@@ -48,7 +64,7 @@ function LoadModel(props: LoadModelProps) {
               <div className="text-[#757575] text-[0.75rem] font-[400]">
                 Currently Loaded
                 <span className="text-[#FFF] text-[0.75rem] font-[400] ml-[0.25rem]">
-                  {endpoints?.length}
+                  {currentlyLoaded?.length}
                 </span>
               </div>
               <div className="text-[#757575] text-[0.625rem] font-[400]">
@@ -58,11 +74,11 @@ function LoadModel(props: LoadModelProps) {
                 </span>
               </div>
             </div>
-            {endpoints?.map((endpoint) => (
+            {currentlyLoaded?.map((endpoint) => (
               <ModelListCard
                 key={endpoint.id}
                 data={endpoint}
-                selectable
+                selectable={chat?.selectedDeployment?.id === endpoint.id}
                 selected={chat?.selectedDeployment?.id === endpoint.id}
                 handleClick={() => {
                   if (chat) {
@@ -78,35 +94,57 @@ function LoadModel(props: LoadModelProps) {
               <div className="text-[#757575] text-[0.75rem] font-[400]">
                 Models Available
                 <span className="text-[#FFF] text-[0.75rem] font-[400] ml-[0.25rem]">
-                  {endpoints?.length}
+                  {availableModels?.length}
                 </span>
               </div>
-              <div className="flex items-center gap-x-[0.25rem] justify-between">
-                <div className="text-[#B3B3B3] text-[0.5rem] font-[400] flex items-center gap-x-[0.25rem] bg-[#1E1E1E] rounded-[6px] px-[0.5rem] py-[0.25rem]">
-                  Recency
-                  <ChevronUp
-                    width={9}
-                    height={9}
-                    className="text-[#B3B3B3] cursor-pointer text-[0.6rem]"
-                  />
+              <div className="flex items-center gap-x-[0.25rem] justify-between hover:text-[#FFF] cursor-pointer">
+                <div
+                  className="text-[#B3B3B3] text-[0.5rem] font-[400] flex items-center gap-x-[0.25rem] bg-[#1E1E1E] rounded-[6px] px-[0.5rem] py-[0.25rem] capitalize"
+                  onClick={() =>
+                    setSortOrder(sortOrder === "asc" ? "desc" : "asc")
+                  }
+                >
+                  {sortBy}
+                  {sortOrder === "asc" ? (
+                    <ChevronUp
+                      width={9}
+                      height={9}
+                      className="text-[#B3B3B3] cursor-pointer text-[0.6rem]"
+                    />
+                  ) : (
+                    <ChevronDown
+                      width={9}
+                      height={9}
+                      className="text-[#B3B3B3] cursor-pointer text-[0.6rem]"
+                    />
+                  )}
                 </div>
                 <span className="text-[#FFF] text-[0.5rem] font-[400] ml-[0.25rem]">
                   Size
                 </span>
               </div>
             </div>
-            {endpoints?.map((endpoint) => (
-              <ModelListCard
-                key={endpoint.id}
-                data={endpoint}
-                handleClick={() => {
-                  if (chat) {
-                    handleDeploymentSelect(chat, endpoint);
-                    props.setOpen(false);
-                  }
-                }}
-              />
-            ))}
+            {availableModels
+              ?.filter(
+                (endpoint) =>
+                  !chat?.selectedDeployment ||
+                  endpoint.id !== chat.selectedDeployment.id
+              )
+              ?.filter((endpoint) =>
+                endpoint.name.toLowerCase().includes(searchValue.toLowerCase())
+              )
+              ?.map((endpoint) => (
+                <ModelListCard
+                  key={endpoint.id}
+                  data={endpoint}
+                  handleClick={() => {
+                    if (chat) {
+                      handleDeploymentSelect(chat, endpoint);
+                      props.setOpen(false);
+                    }
+                  }}
+                />
+              ))}
           </div>
         </div>
       </BlurModal>

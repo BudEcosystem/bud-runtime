@@ -27,7 +27,7 @@ export default function InlineInput(props: InlineInputProps) {
           max={props.max}
           defaultValue={props.defaultValue}
           onChange={(e) => props.onChange(e.target.value)}
-          className="bg-[#101010] text-[#EEEEEE] border-[1px] border-[#1F1F1F] rounded-[0.5rem] p-[.5rem] w-full"
+          className="bg-[#101010] text-[#EEEEEE] border-[1px] border-[#1F1F1F] rounded-[0.5rem] p-[.5rem] w-full min-w-[5rem]"
         />
       </div>
     </div>

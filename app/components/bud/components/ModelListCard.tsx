@@ -35,7 +35,8 @@ export function ModelListCard({
 
   const { name, model } = data;
 
-  const imageUrl = assetBaseUrl + (data?.model?.provider?.icon || data?.model.uri);
+  const imageUrl =
+    assetBaseUrl + (data?.model?.provider?.icon || data?.model.uri);
   const fallbackImageUrl = assetBaseUrl + "/icons/providers/openai.png";
 
   return (
@@ -50,7 +51,7 @@ export function ModelListCard({
         hover:border-[#757575] h-[80px] flex-row flex border-box 
         hover:bg-[#FFFFFF08] 
           items-center justify-center ${
-            selectable ? selected ? "bg-[#FFFFFF08]" : "bg-[#1F1F1F]" : ""
+            selectable ? (selected ? "bg-[#FFFFFF08]" : "bg-[#1F1F1F]") : ""
           }`}
     >
       <div className="bg-[#1F1F1F] rounded-[0.515625rem] w-[2.6875rem] h-[2.6875rem] flex justify-center items-center mr-[1rem] shrink-0 grow-0">
@@ -102,7 +103,7 @@ export function ModelListCard({
             </div>
           </div>
         </div>
-        <div className="text-[#757575] w-full overflow-hidden text-ellipsis text-xs mt-[0.25rem]">
+        <div className="text-[#757575] w-full overflow-hidden text-ellipsis text-xs mt-[0.25rem] flex">
           {model?.tags.map((tag) => (
             <Tag
               key={tag.name}
