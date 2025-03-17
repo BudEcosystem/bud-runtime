@@ -96,19 +96,28 @@ export default function Home() {
   );
 
   const createChat = useCallback(
-    async (sessionId?: string) => {
+    async (sessionId?: string, replaceChatId?: string) => {
       console.log("Creating chat");
-      const updatedChats = [...chats];
+      let updatedChats = [...chats];
       if (!sessionId) {
         if (updatedChats.find((chat) => chat.id === NEW_SESSION)) {
           alert("You can only have one new chat at a time");
           return;
-        };
+        }
         updatedChats.push(newChatPayload);
       } else {
         const session = sessions.find((s) => s.id === sessionId);
         if (!session) return;
-        updatedChats.push(session);
+        if (replaceChatId) {
+          updatedChats = updatedChats.map((chat) => {
+            if (chat.id === replaceChatId) {
+              return session;
+            }
+            return chat;
+          });
+        } else {
+          updatedChats.push(session);
+        }
       }
       setChats(updatedChats);
     },

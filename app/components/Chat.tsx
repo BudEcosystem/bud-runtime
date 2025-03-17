@@ -124,13 +124,13 @@ export function Chat() {
   return (
     <Layout className="chat-container ">
       <Sider
-        width="20.8%"
-        className={`leftSider rounded-l-[1rem] border-[1px] border-[#1F1F1F] border-r-[0px] overflow-hidden ml-[-20.8%] ease-in-out ${
-          toggleLeft ? "visible ml-[0]" : "invisible ml-[-20.8%]"
+        width="250px"
+        className={`leftSider rounded-l-[1rem] border-[1px] border-[#1F1F1F] border-r-[0px] overflow-hidden ml-[-250px] ease-in-out ${
+          toggleLeft ? "visible ml-[0]" : "invisible ml-[-250px]"
         }`}
         // style={{ display: toggleLeft ? "block" : "none" }}
       >
-        <div className="leftBg w-full h-full">
+        <div className="leftBg w-full h-full min-w-[200px]">
           <div className="flex flex-row py-[1rem] px-[1.5rem] bg-[#101010] border-b-[1px] border-[#1F1F1F] h-[3.625rem]">
             <div
               className="flex flex-row items-center gap-[.85rem] p-[.5rem] bg-[#101010] cursor-pointer"
@@ -190,7 +190,8 @@ export function Chat() {
                   </div>
                 </div>
               )}
-            {status === "submitted" || status === "streaming" && <MessageLoading />}
+            {status === "submitted" ||
+              (status === "streaming" && <MessageLoading />)}
             {error && (
               <div className="mt-4">
                 <div className="text-red-500">An error occurred.</div>

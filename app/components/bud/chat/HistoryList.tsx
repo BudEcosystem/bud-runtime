@@ -1,4 +1,4 @@
-import { Endpoint } from "@/app/context/ChatContext";
+import ChatContext, { Endpoint } from "@/app/context/ChatContext";
 import RootContext from "@/app/context/RootContext";
 import { Image } from "antd";
 import React, { useContext } from "react";
@@ -32,6 +32,7 @@ export type Session = {
 
 function HistoryListItem({ data }: { data: Session }) {
   const { createChat, chats } = useContext(RootContext);
+  const { chat } = useContext(ChatContext);
   return (
     <div
       onClick={() => {
@@ -39,7 +40,7 @@ function HistoryListItem({ data }: { data: Session }) {
         if (chats.find((chat) => chat.id === data.id)) {
           return;
         }
-        createChat(data.id);
+        createChat(data.id, chat?.id);
       }}
       className="flex flex-row items-center gap-[1rem] p-[.45rem] px-[.65rem] justify-between border-[1px] border-[#1F1F1F] rounded-[8px] backdrop-blur-[10px]"
     >

@@ -5,7 +5,7 @@ import { ActiveSession, Session } from "../components/bud/chat/HistoryList";
 type RootContextType = {
   chats: ActiveSession[];
   setChats: (chats: ActiveSession[]) => void;
-  createChat: (sessionId?: string) => void;
+  createChat: (sessionId?: string, replaceChatId?: string) => void;
   closeChat: (chat: ActiveSession) => void;
   handleDeploymentSelect: (chat: ActiveSession, endpoint: Endpoint) => void;
   handleSettingsChange: (chat: ActiveSession, prop: string, value: any) => void;
@@ -21,7 +21,8 @@ type RootContextType = {
 const RootContext = createContext<RootContextType>({
   chats: [],
   setChats: () => {},
-  createChat: (sessionId?: string) => {},
+  createChat: (sessionId?: string, replaceChatId?: string) =>
+    console.error("createChat not implemented", sessionId, replaceChatId),
   closeChat: (chat: ActiveSession) =>
     console.error("closeChat not implemented", chat),
   handleDeploymentSelect: (chat: ActiveSession, endpoint: Endpoint) => {},
