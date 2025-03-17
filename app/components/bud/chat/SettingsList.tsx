@@ -77,8 +77,8 @@ function SettingsList({ data }: SettingsListProps) {
         <div className="flex flex-col w-full gap-[.5rem] py-[.375rem]">
           <SliderInput
             title="Temperature"
-            min={0}
-            max={100}
+            min={.1}
+            max={1}
             step={.1}
             defaultValue={chat?.settings?.temperature || 0}
             value={chat?.settings?.temperature || 0}

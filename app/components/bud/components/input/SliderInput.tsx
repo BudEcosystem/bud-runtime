@@ -47,7 +47,7 @@ function SliderInput(props: SliderInputProps) {
           max={props.max}
           value={props.value}
           onChange={props.onChange}
-          step={1}
+          step={props.step}
           tooltip={{
             open: true,
             getPopupContainer: (trigger) =>
