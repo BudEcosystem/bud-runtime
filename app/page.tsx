@@ -72,15 +72,15 @@ export default function Home() {
     id: NEW_SESSION,
     name: `New Chat`,
     settings: {
-      temperature: 0.5,
+      temperature: 1,
       context_overflow: [],
       limit_response_length: true,
-      min_p_sampling: 0.0,
-      repeat_penalty: 1.0,
-      sequence_length: 400,
+      min_p_sampling: 0.05,
+      repeat_penalty: 0,
+      sequence_length: 1000,
       stop_strings: "",
-      tool_k_sampling: 0.0,
-      top_p_sampling: 0.0,
+      tool_k_sampling: 40,
+      top_p_sampling: 1,
     },
   };
 
