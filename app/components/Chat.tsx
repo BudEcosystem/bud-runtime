@@ -221,9 +221,9 @@ export function Chat() {
         </Footer>
       </Layout>
       <Sider
-        width="20.8%"
-        className={`rightSider rounded-r-[1rem] border-[1px] border-[#1F1F1F] border-l-[0px] overflow-hidden Open-Sans mr-[-20.8%] ease-in-out ${
-          toggleRight ? "visible mr-[0]" : "invisible mr-[-20.8%]"
+        width="250px"
+        className={`rightSider rounded-r-[1rem] border-[1px] border-[#1F1F1F] border-l-[0px] overflow-hidden Open-Sans mr-[-250px] ease-in-out ${
+          toggleRight ? "visible mr-[0]" : "invisible mr-[-250px]"
         }`}
         // style={{ display: toggleRight ? "block" : "none" }}
       >
