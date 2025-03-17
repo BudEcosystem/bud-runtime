@@ -2,6 +2,7 @@
 import { streamText } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { copyCodeApiBaseUrl } from '@/app/components/bud/environment';
+import { ChatSettings } from '@/app/components/bud/chat/HistoryList';
 
 
 
@@ -12,7 +13,8 @@ export const maxDuration = 30;
 export async function POST(req: Request) {
   // Extract the `messages` from the body of the request
   const x = await req.json()
-  const { messages, id, model, metadata, settings = {} } = x
+  const { messages, id, model, metadata } = x
+  const settings: ChatSettings = x.settings;
   const authorization = req.headers.get('authorization');
   const apiKey = req.headers.get('api-key');
 
@@ -37,9 +39,13 @@ export async function POST(req: Request) {
           id,
           messages,
           model,
-          "max_tokens": 3000,
           "stream": true,
           // ...settings,
+          max_tokens: settings?.sequence_length ? settings.sequence_length : 300,
+          frequency_penalty: settings?.repeat_penalty ? settings.repeat_penalty : undefined,
+          stop: settings?.stop_strings ? settings.stop_strings : undefined,
+          temperature: settings?.temperature ? settings.temperature : undefined,
+          top_p: settings?.top_p_sampling ? settings.top_p_sampling : undefined,
         }) : undefined
       });
     }
