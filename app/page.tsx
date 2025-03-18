@@ -33,7 +33,7 @@ export default function Home() {
 
   // save to local storage
   useEffect(() => {
-    if (sessions.length === 0) return;
+    if (!sessions || sessions?.length === 0) return;
     localStorage.setItem("sessions", JSON.stringify(sessions));
   }, [sessions]);
 
@@ -135,6 +135,7 @@ export default function Home() {
         setLocalMode(true);
       }
       if (!localMode) {
+        console.log("Getting sessions");
         const sessionsResult = await getSessions();
         setSessions(sessionsResult);
       }
