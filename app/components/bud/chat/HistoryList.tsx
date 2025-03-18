@@ -47,6 +47,7 @@ function HistoryListItem({ data }: { data: Session }) {
       <div className="flex flex-row items-center gap-[.6rem] px-[.27rem]">
         <Image
           src="icons/list-item.svg"
+                    preview={false}
           alt="bud"
           width={".875rem"}
           height={".875rem"}

@@ -36,7 +36,8 @@ function LoadModelConfig(props: LoadModelConfigProps) {
             <Image
               src={`${assetBaseUrl}${props.data?.model?.provider?.icon}`}
               alt={props.data?.name}
-              width={".875rem"}
+                    preview={false}
+                    width={".875rem"}
               height={".875rem"}
             />
             <span className="text-[#EEEEEE] text-[.875rem] font-[400] ">
