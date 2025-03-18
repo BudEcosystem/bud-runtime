@@ -287,11 +287,9 @@ function ChatWithStore(props: { chat: ActiveSession }) {
       const id = props.chat?.id;
       if (id !== NEW_SESSION) {
         const result = await getSessionMessages(id);
-        if (result.length > 0) {
-          console.log("Loading from server");
-          setMessages(result);
-          return;
-        }
+        console.log("Loading from server");
+        setMessages(result);
+        return;
       }
       console.log("Loading from local storage");
       const existing = localStorage.getItem(id);
