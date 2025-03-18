@@ -279,23 +279,27 @@ export function Chat() {
 }
 
 function ChatWithStore(props: { chat: ActiveSession }) {
+  const { localMode } = useContext(RootContext);
   const { getSessionMessages } = useMessages();
   const [messages, setMessages] = useState<any[]>([]);
 
   useEffect(() => {
     const init = async () => {
       const id = props.chat?.id;
-      if (id !== NEW_SESSION) {
-        const result = await getSessionMessages(id);
-        console.log("Loading from server");
-        setMessages(result);
-        return;
-      }
-      console.log("Loading from local storage");
-      const existing = localStorage.getItem(id);
-      if (existing) {
-        const data = JSON.parse(existing);
-        setMessages(data);
+      if (localMode) {
+        console.log("Loading from local storage");
+        const existing = localStorage.getItem(id);
+        if (existing) {
+          const data = JSON.parse(existing);
+          setMessages(data);
+        }
+      } else {
+        if (id !== NEW_SESSION) {
+          const result = await getSessionMessages(id);
+          console.log("Loading from server");
+          setMessages(result);
+          return;
+        }
       }
     };
     init();

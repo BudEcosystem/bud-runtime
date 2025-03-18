@@ -23,6 +23,5 @@ export async function GET(req: Request) {
       return new NextResponse(error, { status: error.response?.status || 500 });
     }
   }
-  return NextResponse.json([]);
-
+  return new NextResponse(null, { status: 401 });
 }

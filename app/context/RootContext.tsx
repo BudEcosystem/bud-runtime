@@ -16,9 +16,11 @@ type RootContextType = {
   endpoints: Endpoint[];
   // set endpoints
   setEndpoints: (endpoints: Endpoint[]) => void;
+  localMode: boolean;
 };
 
 const RootContext = createContext<RootContextType>({
+  localMode: false,
   chats: [],
   setChats: () => {},
   createChat: (sessionId?: string, replaceChatId?: string) =>

@@ -10,6 +10,7 @@ import { useEndPoints } from "./components/bud/hooks/useEndPoint";
 import { notification } from "antd";
 
 export default function Home() {
+  const [localMode, setLocalMode] = useState(false);
   const [_accessToken, _setAccessToken] = useState<string | null>(null);
   const [_refreshToken, _setRefreshToken] = useState<string | null>(null);
   const [_apiKey, _setApiKey] = useState<string | null>(null);
@@ -125,28 +126,28 @@ export default function Home() {
   );
 
   useEffect(() => {
-    const init = () => {
+    const init = async () => {
       if (!token) return;
 
       localStorage.setItem("token", token);
-      return getSessions()
-        .then((result) => {
-          if (result?.length > 0) {
-            setSessions(result);
-          }
-          return getEndPoints({ page: 1, limit: 25 });
-        })
-        .then((res) => {
-          setTimeout(() => {
-            const existing = localStorage.getItem("chats");
-            if (existing) {
-              const data = JSON.parse(existing);
-              setChats(data);
-            } else if (chats.length === 0 && res) {
-              createChat();
-            }
-          }, 100);
-        });
+      let localMode = false;
+      if (token?.startsWith("budserve_")) {
+        setLocalMode(true);
+      }
+      if (!localMode) {
+        const sessionsResult = await getSessions();
+        setSessions(sessionsResult);
+      }
+      const endpointResult = await getEndPoints({ page: 1, limit: 25 });
+      setTimeout(() => {
+        const existing = localStorage.getItem("chats");
+        if (existing) {
+          const data = JSON.parse(existing);
+          setChats(data);
+        } else if (chats.length === 0 && endpointResult) {
+          createChat();
+        }
+      }, 100);
     };
     init();
   }, [token]);
@@ -202,6 +203,7 @@ export default function Home() {
           setSessions,
           endpoints,
           setEndpoints,
+          localMode,
         }}
       >
         {chats?.length === 0 && <APIKey />}
