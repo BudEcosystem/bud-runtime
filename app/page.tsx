@@ -8,6 +8,7 @@ import { NEW_SESSION, useMessages } from "./components/bud/hooks/useMessages";
 import APIKey from "./components/APIKey";
 import { useEndPoints } from "./components/bud/hooks/useEndPoint";
 import { notification } from "antd";
+import { AuthNavigationProvider, LoaderProvider } from "./context/appContext";
 
 export default function Home() {
   const [localMode, setLocalMode] = useState(false);
@@ -207,7 +208,12 @@ export default function Home() {
           localMode,
         }}
       >
-        {chats?.length === 0 ? <APIKey /> : <Chat />}
+        <AuthNavigationProvider>
+          <LoaderProvider>
+            {chats?.length === 0 ? <APIKey /> : <Chat />}
+          </LoaderProvider>
+        </AuthNavigationProvider>
+
       </RootContext.Provider>
     </main>
   );
