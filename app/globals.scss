@@ -1095,3 +1095,52 @@ textarea
 {
    resize: none;
 }
+
+
+.logginBg {
+  background-image: url(./../public/images/login-bg-1.png);
+  background-size: 100%;
+  background-repeat: no-repeat;
+  overflow-y: auto;
+  background-position: right;
+  background-size: cover;
+}
+
+.login-left-bg {
+  background-image: url(./../public/images/login-left-bg.png);
+  background-size: 100%;
+  background-repeat: no-repeat;
+  overflow-y: auto;
+  background-position: bottom;
+  background-size: cover;
+}
+.loginRight {
+  height: 100vh;
+
+  .leftLogo {
+    padding: 0 7% 15%;
+    width: 100%;
+  }
+
+  .menuWrap {
+    width: 100%;
+    min-height: 45%;
+    padding: 2% 4%;
+  }
+
+  ul {
+    li {
+      padding: 20px 0;
+    }
+  }
+
+  .linkLink {
+    display: flex;
+    width: 100%;
+  }
+
+  .LinkDiv {
+    width: 100%;
+    margin-bottom: 5px;
+  }
+}

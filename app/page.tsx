@@ -190,7 +190,7 @@ export default function Home() {
   };
 
   return (
-    <main className="flex flex-col gap-8 row-start-2 items-center w-full h-[100vh] p-4">
+    <main className="flex flex-col gap-8 row-start-2 items-center w-full h-[100vh]">
       <RootContext.Provider
         value={{
           chats,
@@ -207,8 +207,7 @@ export default function Home() {
           localMode,
         }}
       >
-        {chats?.length === 0 && <APIKey />}
-        <Chat />
+        {chats?.length === 0 ? <APIKey /> : <Chat />}
       </RootContext.Provider>
     </main>
   );
