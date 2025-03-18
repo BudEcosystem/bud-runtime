@@ -80,7 +80,7 @@ export default function Home() {
       repeat_penalty: 0,
       sequence_length: 1000,
       stop_strings: "",
-      tool_k_sampling: 40,
+      top_k_sampling: 40,
       top_p_sampling: 1,
     },
   };

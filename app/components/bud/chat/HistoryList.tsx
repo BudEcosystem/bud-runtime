@@ -9,7 +9,7 @@ export type ChatSettings = {
   sequence_length: number;
   context_overflow: string[];
   stop_strings: string;
-  tool_k_sampling: number;
+  top_k_sampling: number;
   repeat_penalty: number;
   top_p_sampling: number;
   min_p_sampling: number;

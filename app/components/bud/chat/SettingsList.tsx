@@ -194,13 +194,13 @@ function SettingsList({ data }: SettingsListProps) {
       children: (
         <div className="flex flex-col w-full gap-[.5rem] py-[.375rem]">
           <InlineInput
-            title="Tool K Sampling"
-            value={`${chat?.settings?.tool_k_sampling || 0}`}
-            defaultValue={`${chat?.settings?.tool_k_sampling || 0}`}
+            title="Top K Sampling"
+            value={`${chat?.settings?.top_k_sampling || 0}`}
+            defaultValue={`${chat?.settings?.top_k_sampling || 0}`}
             min={0}
             max={1}
             type="number"
-            onChange={(value) => handleChange(chat, "tool_k_sampling", value)}
+            onChange={(value) => handleChange(chat, "top_k_sampling", value)}
           />
           <InlineInput
             title="Repeat Penalty"
