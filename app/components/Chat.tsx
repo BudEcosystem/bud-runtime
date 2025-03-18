@@ -22,6 +22,7 @@ export function Chat() {
   const [lastMessage, setLastMessage] = useState<string>("");
   const [toggleLeft, setToggleLeft] = useState<boolean>(false);
   const [toggleRight, setToggleRight] = useState<boolean>(false);
+  const { getEndPoints } = useEndPoints();
 
   const onToggleLeftSidebar = () => {
     setToggleLeft(!toggleLeft);
@@ -113,13 +114,12 @@ export function Chat() {
     console.log(`selected ${value}`);
   };
 
-  const { getEndPoints } = useEndPoints();
 
   useEffect(() => {
     if (chat) {
       getEndPoints({ page: 1, limit: 10 });
     }
-  }, []);
+  }, [toggleLeft, toggleRight]);
 
   return (
     <Layout className="chat-container ">
