@@ -43,9 +43,6 @@ export function useMessages() {
   async function createMessage(body: PostMessage, chatId: string) {
     console.log("Creating message", body, chatId);
     try {
-      if(!body.chat_session_id ) {
-        body['name'] = body.prompt;
-      }
       const result = await AppRequest.Post(`/api/messages`, body).then(
         (res) => {
           return res.data;
