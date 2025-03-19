@@ -130,9 +130,9 @@ export function Chat() {
   return (
     <Layout className="chat-container ">
       <Sider
-        width="250px"
+        width="280px"
         className={`leftSider rounded-l-[1rem] border-[1px] border-[#1F1F1F] border-r-[0px] overflow-hidden ml-[-250px] ease-in-out ${
-          toggleLeft ? "visible ml-[0]" : "invisible ml-[-250px]"
+          toggleLeft ? "visible ml-[0]" : "invisible ml-[-280px]"
         }`}
         // style={{ display: toggleLeft ? "block" : "none" }}
       >
@@ -188,10 +188,10 @@ export function Chat() {
                     width={"330px"}
                     height={"130px"}
                   />
-                  <div className="mt-[.75rem] text-[1.375rem]">
+                  <div className="Open-Sans mt-[.75rem] text-[1.375rem]">
                     Hello there 👋
                   </div>
-                  <div className="text-[1.375rem]">
+                  <div className="Open-Sans text-[1.375rem]">
                     Select a model to get started
                   </div>
                 </div>
@@ -232,9 +232,9 @@ export function Chat() {
         </Footer>
       </Layout>
       <Sider
-        width="300px"
-        className={`rightSider rounded-r-[1rem] border-[1px] border-[#1F1F1F] border-l-[0px] overflow-hidden Open-Sans mr-[-300px] ease-in-out ${
-          toggleRight ? "visible mr-[0]" : "invisible mr-[-300px]"
+        width="280px"
+        className={`rightSider rounded-r-[1rem] border-[1px] border-[#1F1F1F] border-l-[0px] overflow-hidden Open-Sans mr-[-280px] ease-in-out ${
+          toggleRight ? "visible mr-[0]" : "invisible mr-[-280px]"
         }`}
         // style={{ display: toggleRight ? "block" : "none" }}
       >

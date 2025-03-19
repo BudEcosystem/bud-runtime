@@ -18,7 +18,7 @@ export default function InlineInput(props: InlineInputProps) {
       <span className="text-[#EEEEEE] text-[.75rem] font-[400] text-nowrap w-full">
         {props.title}
       </span>
-      <div className="flex flex-row items-center gap-[.5rem]">
+      <div className="flex flex-row items-center min-w-[7.69rem] max-h-[2rem]">
         <Input
           type={props.type}
           placeholder={props.placeholder}
@@ -27,7 +27,7 @@ export default function InlineInput(props: InlineInputProps) {
           max={props.max}
           defaultValue={props.defaultValue}
           onChange={(e) => props.onChange(e.target.value)}
-          className="bg-[#101010] text-[#EEEEEE] border-[1px] border-[#1F1F1F] rounded-[0.5rem] p-[.5rem] w-full min-w-[5rem]"
+          className="bg-[#101010] text-[#EEEEEE] border-[1px] border-[#1F1F1F] rounded-[0.5rem] p-[.5rem] w-full h-full max-h-[2rem]"
         />
       </div>
     </div>

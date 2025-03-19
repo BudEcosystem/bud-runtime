@@ -8,6 +8,7 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import ChatContext from "@/app/context/ChatContext";
 import RootContext from "@/app/context/RootContext";
 import { assetBaseUrl } from "../environment";
+import { Text_12_400_EEEEEE } from "@/lib/text";
 
 interface LoadModelProps {
   open: boolean;
@@ -49,7 +50,7 @@ function LoadModel(props: LoadModelProps) {
         open={props.open}
         onClose={() => props.setOpen(false)}
       >
-        <div>
+        <div className="BlurModal shadow-[0px_6px_10px_0px_#1F1F1F66] border-[1px] border-[#1F1F1FB3] rounded-[10px] overflow-hidden">
           <div className="p-[1.25rem]">
             <SearchHeaderInput
               searchValue={searchValue}
@@ -151,25 +152,27 @@ function LoadModel(props: LoadModelProps) {
       {chat?.selectedDeployment ? (
         <Button
           type="default"
-          className="text-[#FFF] w-[196px] h-[32px]"
+          className="w-[12.25rem] 2rem border-[1px] border-[#1F1F1F]"
           onClick={() => props.setOpen(!props.open)}
         >
           <Image
             src={`${assetBaseUrl}/${chat.selectedDeployment?.model?.provider?.icon}`}
             preview={false}
             alt="bud"
-            width={"0.625rem"}
-            height={"0.625rem"}
+            style={{
+              width: ".875rem",
+              height: ".875rem",
+            }}
           />
-          {chat.selectedDeployment.name}
+          <Text_12_400_EEEEEE>{chat.selectedDeployment.name}</Text_12_400_EEEEEE>
         </Button>
       ) : (
         <Button
           type="primary"
-          className="text-[#FFF] w-[196px] h-[32px]"
+          className=" w-[12.25rem] 2rem"
           onClick={() => props.setOpen(!props.open)}
         >
-          Load Model
+          <Text_12_400_EEEEEE>Load Model</Text_12_400_EEEEEE>
         </Button>
       )}
     </div>

@@ -29,7 +29,7 @@ function UserMessage(props: { content: string; role: string }) {
     <div className="flex flex-row items-center gap-[.5rem]">
       <div className="flex items-center justify-end gap-[.5rem] ">
         <button>
-          <div className="w-[1rem] h-[1rem] flex justify-center items-center cursor-pointer group text-[#B3B3B3] hover:text-white">
+          <div className="w-[1rem] h-[1rem] flex justify-center items-center cursor-pointer group text-[#B3B3B3] hover:text-[#FFFFFF]">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="12"
@@ -46,7 +46,7 @@ function UserMessage(props: { content: string; role: string }) {
           </div>
         </button>
         <button>
-          <div className="w-[1rem] h-[1rem] flex justify-center items-center cursor-pointer group text-[#B3B3B3] hover:text-white">
+          <div className="w-[1rem] h-[1rem] flex justify-center items-center cursor-pointer group text-[#B3B3B3] hover:text-[#FFFFFF]">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="12"
@@ -86,7 +86,7 @@ function AIMessage(props: { content: string; role: string }) {
         <Markdown>{props.content}</Markdown>
         <div className="w-[100%] h-[40px] tempClass mt-[1rem] rounded-[6px] z-[10] relative overflow-hiden">
           <div className="bg !bg-[#101010] rounded-[6px]"></div>
-          <div className="fg flex justify-between items-center pl-[.6rem] pr-[.5rem]">
+          <div className="fg flex justify-between items-center pl-[.6rem] pr-[.5rem] gap-[.5rem]">
             <div className="flex justify-start items-center gap-x-[.7rem]">
               <div className="text-[#B3B3B3] text-[.625rem] font-[400]">
                 tokens/sec : 23
@@ -102,7 +102,7 @@ function AIMessage(props: { content: string; role: string }) {
               </div>
             </div>
             <div className="flex justify-end items-center gap-x-[.4rem]">
-              <div className="w-[1rem] h-[1rem] flex justify-center items-center cursor-pointer group text-[#B3B3B3] hover:text-white">
+              <div className="w-[1rem] h-[1rem] flex justify-center items-center cursor-pointer group text-[#B3B3B3] hover:text-[#FFFFFF]">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   width="12"
@@ -117,7 +117,7 @@ function AIMessage(props: { content: string; role: string }) {
                   />
                 </svg>
               </div>
-              <div className="w-[1rem] h-[1rem] flex justify-center items-center cursor-pointer group text-[#B3B3B3] hover:text-white">
+              <div className="w-[1rem] h-[1rem] flex justify-center items-center cursor-pointer group text-[#B3B3B3] hover:text-[#FFFFFF]">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   width="14"
@@ -132,7 +132,7 @@ function AIMessage(props: { content: string; role: string }) {
                   />
                 </svg>
               </div>
-              <div className="w-[1rem] h-[1rem] flex justify-center items-center cursor-pointer group text-[#B3B3B3] hover:text-white">
+              <div className="w-[1rem] h-[1rem] flex justify-center items-center cursor-pointer group text-[#B3B3B3] hover:text-[#FFFFFF]">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   width="14"
@@ -147,7 +147,7 @@ function AIMessage(props: { content: string; role: string }) {
                   />
                 </svg>
               </div>
-              <div className="w-[1rem] h-[1rem] flex justify-center items-center cursor-pointer group text-[#B3B3B3] hover:text-white">
+              <div className="w-[1rem] h-[1rem] flex justify-center items-center cursor-pointer group text-[#B3B3B3] hover:text-[#FFFFFF]">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   width="14"
@@ -170,7 +170,7 @@ function AIMessage(props: { content: string; role: string }) {
                   />
                 </svg>
               </div>
-              <div className="w-[1rem] h-[1rem] flex justify-center items-center cursor-pointer group text-[#B3B3B3] hover:text-white">
+              <div className="w-[1rem] h-[1rem] flex justify-center items-center cursor-pointer group text-[#B3B3B3] hover:text-[#FFFFFF]">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   width="14"
@@ -193,7 +193,7 @@ function AIMessage(props: { content: string; role: string }) {
                   />
                 </svg>
               </div>
-              <div className="w-[1rem] h-[1rem] flex justify-center items-center cursor-pointer group text-[#B3B3B3] hover:text-white">
+              <div className="w-[1rem] h-[1rem] flex justify-center items-center cursor-pointer group text-[#B3B3B3] hover:text-[#FFFFFF]">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   width="14"

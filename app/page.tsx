@@ -8,6 +8,7 @@ import { NEW_SESSION, useMessages } from "./components/bud/hooks/useMessages";
 import APIKey from "./components/APIKey";
 import { useEndPoints } from "./components/bud/hooks/useEndPoint";
 import { notification } from "antd";
+import { AuthNavigationProvider, LoaderProvider } from "./context/appContext";
 
 export default function Home() {
   const [localMode, setLocalMode] = useState(false);
@@ -190,7 +191,7 @@ export default function Home() {
   };
 
   return (
-    <main className="flex flex-col gap-8 row-start-2 items-center w-full h-[100vh] p-4">
+    <main className="flex flex-col gap-8 row-start-2 items-center w-full h-[100vh]">
       <RootContext.Provider
         value={{
           chats,
@@ -207,8 +208,12 @@ export default function Home() {
           localMode,
         }}
       >
-        {chats?.length === 0 && <APIKey />}
-        <Chat />
+        <AuthNavigationProvider>
+          <LoaderProvider>
+            {chats?.length === 0 ? <APIKey /> : <Chat />}
+          </LoaderProvider>
+        </AuthNavigationProvider>
+
       </RootContext.Provider>
     </main>
   );

@@ -214,6 +214,7 @@ body {
   border-radius: 0.875rem !important;
   padding: 0.7rem !important;
   height: 100vh;
+  max-width: 100%;
   overflow: hidden;
   .layoutWrap {
     border: 1px solid #1F1F1F;
@@ -286,9 +287,9 @@ body {
 }
 
 .ant-btn-default {
-  background-color: #1f1f1f !important;
-  border: 1px solid #757575 !important;
-  color: #eeeeee !important;
+  background-color: #1f1f1f ;
+  border: 1px solid #757575 ;
+  color: #eeeeee ;
   font-size: 0.75rem;
   font-weight: 400;
   margin-right: 1rem;
@@ -782,6 +783,20 @@ i.toggle-editor {
   }
 }
 
+.ant-switch {
+  width: 1.5rem !important;
+  min-width: 1.5rem !important;
+  height: .75rem !important;
+  .ant-switch-handle {
+    width: .75rem !important;
+    height: .75rem !important;
+    top: 0;
+  }
+  &ant-switch-checked .ant-switch-handle {
+    inset-inline-start: calc(100% - .75rem);
+  }
+}
+
 .ant-switch-checked {
   background: #965cde !important;
 }
@@ -1016,16 +1031,16 @@ input.ant-input:-webkit-autofill {
 
 
 .ant-btn-default {
-  background-color: #1F1F1F !important;
-  border: 1px solid #757575 !important;
-  color: #EEEEEE !important;
+  background: #FFFFFF08;
+  border: 1px solid #1F1F1F ;
+  color: #EEEEEE ;
   font-size: .75rem;
   font-weight: 400;
   margin-right: 1rem;
 
   &:hover {
     background-color: #1F1F1F !important;
-    border: 1px solid #B3B3B3 !important;
+    border: 1px solid #757575 !important;
   }
 }
 
@@ -1094,4 +1109,61 @@ input.ant-input:-webkit-autofill {
 textarea
 {
    resize: none;
+}
+
+
+.logginBg {
+  background-image: url(./../public/images/login-bg-1.png);
+  background-size: 100%;
+  background-repeat: no-repeat;
+  overflow-y: auto;
+  background-position: right;
+  background-size: cover;
+}
+
+.login-left-bg {
+  background-image: url(./../public/images/login-left-bg.png);
+  background-size: 100%;
+  background-repeat: no-repeat;
+  overflow-y: auto;
+  background-position: bottom;
+  background-size: cover;
+}
+.loginRight {
+  height: 100vh;
+  max-width: 100%;
+
+  .leftLogo {
+    padding: 0 7% 15%;
+    width: 100%;
+  }
+
+  .menuWrap {
+    width: 100%;
+    min-height: 45%;
+    padding: 2% 4%;
+  }
+
+  ul {
+    li {
+      padding: 20px 0;
+    }
+  }
+
+  .linkLink {
+    display: flex;
+    width: 100%;
+  }
+
+  .LinkDiv {
+    width: 100%;
+    margin-bottom: 5px;
+  }
+}
+.customSelect {
+  .ant-select-selector {
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 100% !important;
+  }
 }

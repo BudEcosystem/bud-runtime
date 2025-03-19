@@ -112,14 +112,14 @@ function SettingsList({ data }: SettingsListProps) {
             <span className="text-[#EEEEEE] text-[.75rem] font-[400] text-nowrap w-full">
               Context Overflow
             </span>
-            <div className="flex flex-row items-center gap-[.5rem] w-full">
+            <div className="flex flex-row items-center gap-[.5rem] w-full  min-w-[7.69rem] max-w-[7.69rem] max-h-[2rem]">
               <Select
                 defaultValue={chat?.settings?.context_overflow || []}
                 value={chat?.settings?.context_overflow || []}
                 onChange={(value) =>
                   handleChange(chat, "context_overflow", value)
                 }
-                className="w-full"
+                className="customSelect w-full h-full !h-[2rem]"
                 mode="tags"
                 tagRender={(props) => (
                   <Tag
@@ -152,13 +152,13 @@ function SettingsList({ data }: SettingsListProps) {
             <span className="text-[#EEEEEE] text-[.75rem] font-[400] text-nowrap w-full">
               Stop Strings
             </span>
-            <div className="flex flex-row items-center gap-[.5rem] w-full">
+            <div className="flex flex-row items-center gap-[.5rem] w-full min-w-[7.69rem] max-w-[7.69rem] max-h-[2rem]">
               <Select
                 mode="tags"
                 defaultValue={chat?.settings?.stop_strings || []}
                 value={chat?.settings?.stop_strings || []}
                 onChange={(value) => handleChange(chat, "stop_strings", value)}
-                className="w-full"
+                className="customSelect w-full h-full !h-[2rem]"
                 tagRender={(props) => (
                   <Tag
                     closable

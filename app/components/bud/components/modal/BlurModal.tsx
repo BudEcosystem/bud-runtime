@@ -12,7 +12,7 @@ interface BlurModalProps {
 export default function BlurModal(props: BlurModalProps) {
   return (
     <Modal
-      rootClassName="!mt-[-3.25rem]"
+      rootClassName=""
       open={props.open}
       onClose={props.onClose}
       classNames={{
@@ -25,12 +25,16 @@ export default function BlurModal(props: BlurModalProps) {
       style={{
         width: props.width,
         height: props.height,
+        top: '1.5rem'
       }}
     >
       <div className="w-full h-full bg-[#1E1E1E25] rounded-[.625rem] relative shadow-2xl">
-        <div className="blur  absolute top-0 left-0 w-full h-full bg-[#1E1E1E25] rounded-[.625rem] z-[-9] backdrop-filter backdrop-blur-[4px]" />
+        <div className= "blur  absolute top-0 left-0 w-full h-full bg-[#1E1E1E25] rounded-[.625rem] z-[-9] backdrop-filter backdrop-blur-[4px]" />
         {props.children}
       </div>
     </Modal>
   );
 }
+
+
+
