@@ -1,13 +1,18 @@
 "use client";
 import React, { useEffect, useState } from "react";
 
-import { motion } from "framer-motion";
 import { Checkbox, Form, Image, Input } from "antd";
 import { useAuthNavigation } from "../context/appContext";
-import { Text_12_300_EEEEEE, Text_12_400_808080, Text_12_400_B3B3B3, Text_12_400_EEEEEE, Text_32_500_FFFFFF } from "@/lib/text";
-import { Icon } from "@iconify/react/dist/iconify.js";
+import {
+  Text_12_300_EEEEEE,
+  Text_12_400_808080,
+  Text_12_400_B3B3B3,
+  Text_12_400_EEEEEE,
+  Text_32_500_FFFFFF,
+} from "@/lib/text";
 import { PrimaryButton } from "../components/uiComponents/inputs";
 import { getChromeColor } from "@/lib/utils";
+import { EyeClosedIcon, EyeIcon } from "lucide-react";
 
 type LoginPageModalProps = {
   onSubmit: (formData: { [key: string]: string }) => void;
@@ -82,13 +87,22 @@ const LoginPage = ({ onSubmit }: LoginPageModalProps) => {
         feedbackIcons={({ status, errors, warnings }) => {
           // return <FeedbackIcons status={status} errors={errors} warnings={warnings} />
           return {
-            error: <Image preview={false} src="/icons/warning.svg" alt="error" style={{ width: '1rem', height: '1rem' }} />,
+            error: (
+              <Image
+                preview={false}
+                src="/icons/warning.svg"
+                alt="error"
+                style={{ width: "1rem", height: "1rem" }}
+              />
+            ),
             success: <div />,
             warning: <div />,
             "": <div />,
-          }
+          };
         }}
-        className="w-[76.6%] mt-[1.6em]" form={form}>
+        className="w-[76.6%] mt-[1.6em]"
+        form={form}
+      >
         <Form.Item
           hasFeedback
           className="mb-[1.8rem]"
@@ -117,11 +131,11 @@ const LoginPage = ({ onSubmit }: LoginPageModalProps) => {
                 form.setFieldsValue({ email: e.target.value });
                 form.validateFields(["email"]);
                 if (!e.target.value) {
-                  setAuthError('')
+                  setAuthError("");
                 }
               }}
               onBlur={() => {
-                form.validateFields(['email']);
+                form.validateFields(["email"]);
               }}
             />
           </div>
@@ -142,7 +156,9 @@ const LoginPage = ({ onSubmit }: LoginPageModalProps) => {
             },
           ]}
         >
-          <div className={`flex items-center border rounded-[6px] relative !bg-[transparent]`}>
+          <div
+            className={`flex items-center border rounded-[6px] relative !bg-[transparent]`}
+          >
             <div className="">
               <Text_12_300_EEEEEE className="absolute px-1.5 bg-black -top-1.5 left-1.5 inline-block tracking-[.035rem] z-10">
                 Password
@@ -158,15 +174,21 @@ const LoginPage = ({ onSubmit }: LoginPageModalProps) => {
               autoComplete="no-fill"
               variant="borderless"
               suffix={
-                <Icon
-                  icon={isShow ? "ph:eye" : "clarity:eye-hide-line"}
-                  className="text-[#808080] cursor-pointer"
-                  onClick={() => setIsShow(!isShow)}
-                />
+                isShow ? (
+                  <EyeIcon
+                    onClick={() => setIsShow(!isShow)}
+                    className="text-[#808080] cursor-pointer"
+                  />
+                ) : (
+                  <EyeClosedIcon
+                    onClick={() => setIsShow(!isShow)}
+                    className="text-[#808080] cursor-pointer"
+                  />
+                )
               }
               onChange={(e) => {
                 if (!e.target.value) {
-                  setAuthError('')
+                  setAuthError("");
                 }
               }}
             />
@@ -207,9 +229,7 @@ const LoginPage = ({ onSubmit }: LoginPageModalProps) => {
             setActivePage(4);
           }}
         >
-          <Text_12_400_EEEEEE>
-            Forgot password?
-          </Text_12_400_EEEEEE>
+          <Text_12_400_EEEEEE>Forgot password?</Text_12_400_EEEEEE>
         </div>
         {/* <Text_12_400_EEEEEE
           className="cursor-pointer"
@@ -221,17 +241,16 @@ const LoginPage = ({ onSubmit }: LoginPageModalProps) => {
         </Text_12_400_EEEEEE> */}
       </div>
       {authError && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }} // Start slightly above and transparent
-          animate={{ opacity: 1, y: 0 }}   // Move down and appear
-          transition={{ duration: 0.5, ease: "easeIn" }} // Smooth transition
+        <div
           className="border-[1px] border-[#EC7575] rounded-[6px] px-[.5rem] py-[1rem] flex justify-center items-center w-[76.6%] mt-[1.5rem]"
           style={{
             backgroundColor: getChromeColor("#EC7575"),
           }}
         >
-          <Text_12_400_EEEEEE className="text-[#EC7575]">{authError}</Text_12_400_EEEEEE>
-        </motion.div>
+          <Text_12_400_EEEEEE className="text-[#EC7575]">
+            {authError}
+          </Text_12_400_EEEEEE>
+        </div>
       )}
     </>
   );
