@@ -4,12 +4,24 @@ import ChatContext from "@/app/context/ChatContext";
 import { AppRequest } from "@/app/api/requests";
 import RootContext from "@/app/context/RootContext";
 import { ActiveSession } from "../chat/HistoryList";
+import { Message, useChat } from "@ai-sdk/react";
 
 export const NEW_SESSION = "NEW_SESSION";
 
+export type Usage = {
+completionTokens: number;
+promptTokens: number;
+totalTokens: number;
+}
+
+export type Response = {
+  message: Message
+  usage: Usage
+}
+
 export type PostMessage = {
   prompt: string;
-  response: any;
+  response: Response;
   deployment_id: string;
   input_tokens: number;
   output_tokens: number;
@@ -21,6 +33,7 @@ export type PostMessage = {
   is_cache: boolean;
   chat_session_id?: string;
   request_id: string;
+  name?: string;
 };
 
 export function useMessages() {
@@ -30,6 +43,9 @@ export function useMessages() {
   async function createMessage(body: PostMessage, chatId: string) {
     console.log("Creating message", body, chatId);
     try {
+      if(!body.chat_session_id ) {
+        body['name'] = body.prompt;
+      }
       const result = await AppRequest.Post(`/api/messages`, body).then(
         (res) => {
           return res.data;

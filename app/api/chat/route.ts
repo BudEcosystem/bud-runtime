@@ -3,11 +3,6 @@ import { streamText } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { copyCodeApiBaseUrl, tempApiBaseUrl } from '@/app/components/bud/environment';
 import { ChatSettings } from '@/app/components/bud/chat/HistoryList';
-import { NEW_SESSION } from '@/app/components/bud/hooks/useMessages';
-import axios from 'axios';
-
-
-
 
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 30;
@@ -24,11 +19,16 @@ export async function POST(req: Request) {
     return new Response('Unauthorized', { status: 401 });
   }
 
+
+  console.log('metadata', metadata);
+  console.log('authorization', authorization);
+
   const proxyOpenAI = createOpenAI({
     // custom settings, e.g.
     baseURL: copyCodeApiBaseUrl,
     // apiKey: "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",
     fetch: (input, init) => {
+      console.log('fetch', input, init);
       return fetch(input, {
         ...init,
         method: "POST",
@@ -37,10 +37,13 @@ export async function POST(req: Request) {
           'project-id': metadata.project_id,
           'Authorization': authorization
         },
-        body: init?.body ? JSON.stringify({
+        body: JSON.stringify({
           id,
           messages,
           model,
+          "stream_options": {
+            "include_usage": true
+          },
           "stream": true,
           // ...settings,
           max_tokens: 3000,
@@ -49,7 +52,7 @@ export async function POST(req: Request) {
           stop: settings?.stop_strings ? settings.stop_strings : undefined,
           temperature: settings?.temperature ? settings.temperature : undefined,
           top_p: settings?.top_p_sampling ? settings.top_p_sampling : undefined,
-        }) : undefined
+        })
       });
     }
   });
@@ -62,7 +65,7 @@ export async function POST(req: Request) {
       // implement your own logic here, e.g. for storing messages
       // or recording token usage
       try {
-        console.log('onFinish', response);
+        console.log('onFinish', JSON.stringify(response, null, 2));
         // const messageCreatePayload = {
         //   deployment_id: chat?.selectedDeployment?.id,
         //   e2e_latency: 0,

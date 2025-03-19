@@ -243,7 +243,7 @@ export function Messages({ messages }: MessagesProps) {
 export function HistoryMessages({ messages }: HistoryMessagesProps) {
   return (
     <>
-      {messages.map((m, index) => (
+      {messages?.map((m, index) => (
         <>
           <Message
             content={m.prompt}
@@ -251,7 +251,7 @@ export function HistoryMessages({ messages }: HistoryMessagesProps) {
             key={`${m.chat_session_id}-${index}-prompt`}
           />
           <Message
-            content={m.response?.[0]?.text || m.response?.content}
+            content={m.response?.message?.content}
             role={"ai"}
             key={`${m.chat_session_id}-${index}-response`}
           />
