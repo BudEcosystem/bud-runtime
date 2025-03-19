@@ -30,13 +30,13 @@ export const errorToast = (
   // toast.clearWaitingQueue();
 };
 
-export const successToast = (message: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | ((props: ToastContentProps<unknown>) => React.ReactNode) | null | undefined) => {
+export const successToast = (message: string) => {
   toast.success(message, {
     icon: ({theme, type}) =>  <Image alt="" height='20' width='20' src={`${toastIcn.src}`}/>, // Custom icon component
   });
   // toast.clearWaitingQueue();
 };
-export const infoToast = (message: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | ((props: ToastContentProps<unknown>) => React.ReactNode) | null | undefined) => toast.warning(message, {
+export const infoToast = (message: string) => toast.warning(message, {
   icon: ({theme, type}) =>  <Image alt="" height='20' width='20' src={`${toastIcn.src}`}/>, // Custom icon component
 });
 

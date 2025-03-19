@@ -1,9 +1,14 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Form, Image, Input } from 'antd';
-import { Text_12_300_EEEEEE, Text_12_400_B3B3B3, Text_12_400_EEEEEE, Text_32_500_FFFFFF } from "@/lib/text";
-import { Icon } from "@iconify/react";
+import { Form, Image, Input } from "antd";
+import {
+  Text_12_300_EEEEEE,
+  Text_12_400_B3B3B3,
+  Text_12_400_EEEEEE,
+  Text_32_500_FFFFFF,
+} from "@/lib/text";
 import { PrimaryButton } from "../components/uiComponents/inputs";
+import { EyeClosedIcon, EyeIcon } from "lucide-react";
 
 function ApiKey() {
   const [apiKey, setApiKey] = useState<string>("");
@@ -39,14 +44,22 @@ function ApiKey() {
         feedbackIcons={({ status, errors, warnings }) => {
           // return <FeedbackIcons status={status} errors={errors} warnings={warnings} />
           return {
-            error: <Image src="/icons/warning.svg" alt="error" width={"1rem"} height={"1rem"} />,
+            error: (
+              <Image
+                src="/icons/warning.svg"
+                alt="error"
+                width={"1rem"}
+                height={"1rem"}
+              />
+            ),
             success: <div />,
             warning: <div />,
             "": <div />,
-          }
+          };
         }}
-        className="mt-[1.6em]" form={form}>
-
+        className="mt-[1.6em]"
+        form={form}
+      >
         <Form.Item
           hasFeedback
           name="password"
@@ -62,7 +75,9 @@ function ApiKey() {
             },
           ]}
         >
-          <div className={`flex items-center border rounded-[6px] relative !bg-[transparent]`}>
+          <div
+            className={`flex items-center border rounded-[6px] relative !bg-[transparent]`}
+          >
             <div className="">
               <Text_12_300_EEEEEE className="absolute px-1.5 bg-black -top-1.5 left-1.5 inline-block tracking-[.035rem] z-10">
                 API Key
@@ -78,11 +93,17 @@ function ApiKey() {
               autoComplete="no-fill"
               variant="borderless"
               suffix={
-                <Icon
-                  icon={isShow ? "ph:eye" : "clarity:eye-hide-line"}
-                  className="text-[#808080] cursor-pointer"
-                  onClick={() => setIsShow(!isShow)}
-                />
+                isShow ? (
+                  <EyeIcon
+                    onClick={() => setIsShow(!isShow)}
+                    className="text-[#808080] cursor-pointer"
+                  />
+                ) : (
+                  <EyeClosedIcon
+                    onClick={() => setIsShow(!isShow)}
+                    className="text-[#808080] cursor-pointer"
+                  />
+                )
               }
               title="API Key"
               name="apiKey"
@@ -100,10 +121,24 @@ function ApiKey() {
         </PrimaryButton>
       </Form>
       <div className="flex justify-center items-center mt-[2rem] cursor-pointer group">
-        <Text_12_400_EEEEEE className="transition-transform duration-300 ease-out group-hover:-translate-x-1">Skip</Text_12_400_EEEEEE>
+        <Text_12_400_EEEEEE className="transition-transform duration-300 ease-out group-hover:-translate-x-1">
+          Skip
+        </Text_12_400_EEEEEE>
         <div className="w-[1.375rem] h-[1.375rem] flex justify-center items-center bg-[#18191B] rounded-full ml-[.5rem] transition-transform duration-300 ease-out group-hover:translate-x-1">
-          <svg xmlns="http://www.w3.org/2000/svg" width="6" height="10" viewBox="0 0 6 10" fill="none">
-            <path d="M0.888572 0.922852L4.85742 4.8917L0.888572 8.86055" stroke="white" strokeWidth="1.35823" strokeLinecap="round" strokeLinejoin="round" />
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="6"
+            height="10"
+            viewBox="0 0 6 10"
+            fill="none"
+          >
+            <path
+              d="M0.888572 0.922852L4.85742 4.8917L0.888572 8.86055"
+              stroke="white"
+              strokeWidth="1.35823"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
         </div>
       </div>

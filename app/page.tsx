@@ -7,7 +7,6 @@ import { ActiveSession, Session } from "./components/bud/chat/HistoryList";
 import { NEW_SESSION, useMessages } from "./components/bud/hooks/useMessages";
 import APIKey from "./components/APIKey";
 import { useEndPoints } from "./components/bud/hooks/useEndPoint";
-import { notification } from "antd";
 import { AuthNavigationProvider, LoaderProvider } from "./context/appContext";
 
 export default function Home() {
@@ -24,14 +23,8 @@ export default function Home() {
   const [chats, setChats] = useState<ActiveSession[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
 
-  useEffect(() => {
-    const existing = localStorage.getItem("sessions");
-    if (existing) {
-      const data = JSON.parse(existing);
-      setSessions(data);
-    }
-  }, []);
 
+  console.log('sessions, ', sessions)
   // save to local storage
   useEffect(() => {
     if (!sessions || sessions?.length === 0) return;
@@ -70,20 +63,29 @@ export default function Home() {
     init();
   }, []);
 
-  const newChatPayload = {
+  const newChatPayload: ActiveSession = {
     id: NEW_SESSION,
     name: `New Chat`,
-    settings: {
+    chat_setting: {
       temperature: 1,
-      context_overflow: [],
       limit_response_length: true,
       min_p_sampling: 0.05,
       repeat_penalty: 0,
       sequence_length: 1000,
-      stop_strings: "",
+      stop_strings: [],
+      structured_json_schema: {},
+      system_prompt: "",
       top_k_sampling: 40,
       top_p_sampling: 1,
+      context_overflow_policy: "auto",
+      created_at: new Date().toISOString(),
+      id: "new",
+      modified_at: new Date().toISOString(),
+      name: "new",
     },
+    created_at: new Date().toISOString(),
+    modified_at: new Date().toISOString(),
+    total_tokens: 0,
   };
 
   const closeChat = useCallback(
@@ -133,9 +135,19 @@ export default function Home() {
       localStorage.setItem("token", token);
       let localMode = false;
       if (token?.startsWith("budserve_")) {
-        setLocalMode(true);
+        localMode = true;
       }
-      if (!localMode) {
+      setLocalMode(localMode);
+
+      if(localMode){
+        const existing = localStorage.getItem("sessions");
+        if (existing) {
+          console.log("Getting sessions from local storage");
+          const data = JSON.parse(existing);
+          setSessions(data);
+        }
+      }
+      else {
         console.log("Getting sessions");
         const sessionsResult = await getSessions();
         setSessions(sessionsResult);
@@ -179,8 +191,8 @@ export default function Home() {
       if (item.id === chat?.id) {
         return {
           ...item,
-          settings: {
-            ...item.settings,
+          chat_setting: {
+            ...item.chat_setting,
             [prop]: value,
           } as any,
         };

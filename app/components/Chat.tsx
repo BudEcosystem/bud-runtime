@@ -7,7 +7,7 @@ import { HistoryMessages, Messages } from "./bud/chat/Messages";
 import MessageLoading from "./bud/chat/MessageLoading";
 import { Message, useChat } from "@ai-sdk/react";
 import { useEndPoints } from "./bud/hooks/useEndPoint";
-import { NEW_SESSION, useMessages } from "./bud/hooks/useMessages";
+import { NEW_SESSION, Usage, useMessages } from "./bud/hooks/useMessages";
 import HistoryList, { ActiveSession } from "./bud/chat/HistoryList";
 import SettingsList from "./bud/chat/SettingsList";
 import NormalEditor from "./bud/components/input/NormalEditor";
@@ -37,22 +37,30 @@ export function Chat() {
   const { createMessage } = useMessages();
 
   const handleFinish = useCallback(
-    async (message: Message, { usage, finishReason }: any) => {
+    async (message: Message, response: {
+      usage: Usage
+      finishReason: string;
+    }) => {
+      const { usage, finishReason } = response;
+      console.log("Finish", message, usage, finishReason);
       if (!chat?.selectedDeployment) return;
       await createMessage(
         {
           deployment_id: chat?.selectedDeployment?.id,
-          e2e_latency: usage.e2e_latency,
-          input_tokens: usage.input_tokens,
+          e2e_latency: 0,
           is_cache: false,
-          output_tokens: usage.output_tokens,
           chat_session_id: chat?.id === NEW_SESSION ? undefined : chat?.id,
           prompt: lastMessage,
-          response: message,
-          token_per_sec: usage.token_per_sec,
-          total_tokens: usage.total_tokens,
-          tpot: usage.tpot,
-          ttft: usage.ttft,
+          response: {
+            message,
+            usage,
+          },
+          output_tokens: usage.completionTokens,
+          input_tokens: usage.promptTokens,
+          token_per_sec: 0,
+          total_tokens: usage.totalTokens,
+          tpot: 0,
+          ttft: 0,
           request_id: chat?.selectedDeployment?.id,
         },
         chat.id
@@ -73,9 +81,9 @@ export function Chat() {
       metadata: {
         project_id: chat?.selectedDeployment?.project.id,
       },
-      settings: chat?.settings,
+      settings: chat?.chat_setting,
     };
-  }, [chat, chat?.selectedDeployment, JSON.stringify(chat?.settings)]);
+  }, [chat, chat?.selectedDeployment, JSON.stringify(chat?.chat_setting)]);
 
   const {
     error,
@@ -119,7 +127,6 @@ export function Chat() {
   const handleChange = (value: string) => {
     console.log(`selected ${value}`);
   };
-
 
   useEffect(() => {
     if (chat) {
@@ -174,11 +181,14 @@ export function Chat() {
           />
         </Header>
         <Content className="overflow-hidden overflow-y-auto hide-scrollbar">
-          <div className="flex flex-col w-full py-24 mx-auto stretch px-[.5rem] max-w-2xl " id="chat-container">
+          <div
+            className="flex flex-col w-full py-24 mx-auto stretch px-[.5rem] max-w-2xl "
+            id="chat-container"
+          >
             <HistoryMessages messages={historyMessages} />
             <Messages messages={messages} />
             {!error &&
-              historyMessages.length === 0 &&
+              historyMessages?.length === 0 &&
               messages.length === 0 && (
                 <div className="mt-4 text-[#EEEEEE] text-center">
                   <Image

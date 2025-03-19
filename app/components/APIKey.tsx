@@ -1,10 +1,9 @@
-import React, { useEffect, useState } from "react";
-import LabelInput from "./bud/components/input/LabelInput";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Form, Image, Input } from 'antd';
 import { Text_12_300_EEEEEE, Text_12_400_B3B3B3, Text_12_400_EEEEEE, Text_32_500_FFFFFF } from "@/lib/text";
 import { PrimaryButton } from "./uiComponents/inputs";
-import { Icon } from "@iconify/react";
+import { EyeClosedIcon, EyeIcon } from "lucide-react";
 
 function APIKey() {
   const [apiKey, setApiKey] = useState<string>("");
@@ -99,11 +98,17 @@ function APIKey() {
                     autoComplete="no-fill"
                     variant="borderless"
                     suffix={
-                      <Icon
-                        icon={isShow ? "ph:eye" : "clarity:eye-hide-line"}
-                        className="text-[#808080] cursor-pointer"
-                        onClick={() => setIsShow(!isShow)}
-                      />
+                      isShow ? (
+                        <EyeIcon
+                          onClick={() => setIsShow(!isShow)}
+                          className="text-[#808080] cursor-pointer"
+                        />
+                      ) : (
+                        <EyeClosedIcon
+                          onClick={() => setIsShow(!isShow)}
+                          className="text-[#808080] cursor-pointer"
+                        />
+                      )
                     }
                     title="API Key"
                     name="apiKey"

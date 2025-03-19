@@ -1,11 +1,8 @@
 // import { openai } from '@ai-sdk/openai';
 import { streamText } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
-import { copyCodeApiBaseUrl } from '@/app/components/bud/environment';
+import { copyCodeApiBaseUrl, tempApiBaseUrl } from '@/app/components/bud/environment';
 import { ChatSettings } from '@/app/components/bud/chat/HistoryList';
-
-
-
 
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 30;
@@ -13,7 +10,7 @@ export const maxDuration = 30;
 export async function POST(req: Request) {
   // Extract the `messages` from the body of the request
   const x = await req.json()
-  const { messages, id, model, metadata } = x
+  const { messages, id, model, metadata, chat } = x
   const settings: ChatSettings = x.settings;
   const authorization = req.headers.get('authorization');
   const apiKey = req.headers.get('api-key');
@@ -22,11 +19,16 @@ export async function POST(req: Request) {
     return new Response('Unauthorized', { status: 401 });
   }
 
+
+  console.log('metadata', metadata);
+  console.log('authorization', authorization);
+
   const proxyOpenAI = createOpenAI({
     // custom settings, e.g.
     baseURL: copyCodeApiBaseUrl,
     // apiKey: "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",
     fetch: (input, init) => {
+      console.log('fetch', input, init);
       return fetch(input, {
         ...init,
         method: "POST",
@@ -35,10 +37,13 @@ export async function POST(req: Request) {
           'project-id': metadata.project_id,
           'Authorization': authorization
         },
-        body: init?.body ? JSON.stringify({
+        body: JSON.stringify({
           id,
           messages,
           model,
+          "stream_options": {
+            "include_usage": true
+          },
           "stream": true,
           // ...settings,
           max_tokens: 3000,
@@ -47,7 +52,7 @@ export async function POST(req: Request) {
           stop: settings?.stop_strings ? settings.stop_strings : undefined,
           temperature: settings?.temperature ? settings.temperature : undefined,
           top_p: settings?.top_p_sampling ? settings.top_p_sampling : undefined,
-        }) : undefined
+        })
       });
     }
   });
@@ -56,14 +61,40 @@ export async function POST(req: Request) {
   const result = streamText({
     model: proxyOpenAI(model),
     messages,
-    async onFinish({ text, toolCalls, toolResults, usage, finishReason }) {
+    async onFinish(response) {
       // implement your own logic here, e.g. for storing messages
       // or recording token usage
-      console.log('onFinish', text);
-      console.log('toolCalls', toolCalls);
-      console.log('toolResults', toolResults);
-      console.log('usage', usage);
-      console.log('finishReason', finishReason);
+      try {
+        console.log('onFinish', JSON.stringify(response, null, 2));
+        // const messageCreatePayload = {
+        //   deployment_id: chat?.selectedDeployment?.id,
+        //   e2e_latency: 0,
+        //   input_tokens: 0,
+        //   is_cache: false,
+        //   output_tokens: 0,
+        //   chat_session_id: chat?.id === NEW_SESSION ? undefined : chat?.id,
+        //   prompt: messages[messages.length - 1].content,
+        //   response: response,
+        //   token_per_sec: 0,
+        //   total_tokens: response?.usage.totalTokens,
+        //   tpot: 0,
+        //   ttft: 0,
+        //   request_id: chat?.selectedDeployment?.id,
+        // };
+        // const result = await axios
+        //   .post(`${tempApiBaseUrl}/playground/messages`,
+        //     messageCreatePayload, {
+        //     headers: {
+        //       authorization: authorization,
+        //     },
+        //   })
+        //   .then((response) => {
+        //     return response.data?.chat_message;
+        //   })
+        console.log(`Saved message: ${result}`);
+      } catch (error) {
+        console.error('failed to save message');
+      }
     },
     onChunk({ chunk }) {
       console.log('chunk', chunk);
@@ -71,11 +102,8 @@ export async function POST(req: Request) {
     onError({ error }) {
       console.error('error', JSON.stringify(error, null, 2));
     },
-    onStepFinish({ text, toolCalls, toolResults, usage }) {
-      console.log('onStepFinish', text);
-      console.log('toolCalls', toolCalls);
-      console.log('toolResults', toolResults);
-      console.log('usage', usage);
+    onStepFinish(response) {
+      console.log('onStepFinish', JSON.stringify(response, null, 2));
     }
   });
 
