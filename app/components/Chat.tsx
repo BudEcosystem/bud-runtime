@@ -70,10 +70,6 @@ export function Chat() {
     return {
       // model: 'gpt-4o',
       model: chat.selectedDeployment?.name,
-      max_tokens: chat?.settings?.limit_response_length
-        ? chat?.settings.sequence_length
-        : undefined,
-      temperature: chat?.settings?.temperature,
       metadata: {
         project_id: chat?.selectedDeployment?.project.id,
       },
@@ -97,9 +93,19 @@ export function Chat() {
     body,
     onFinish(message, { usage, finishReason }) {
       handleFinish(message, { usage, finishReason });
+      document.getElementById("chat-container")?.scrollIntoView({
+        behavior: "smooth",
+        block: "end",
+        inline: "nearest",
+      });
     },
     onError: (error) => {
       console.error("An error occurred:", error);
+      document.getElementById("chat-container")?.scrollIntoView({
+        behavior: "smooth",
+        block: "end",
+        inline: "nearest",
+      });
     },
     onResponse: (response) => {},
   });
@@ -168,7 +174,7 @@ export function Chat() {
           />
         </Header>
         <Content className="overflow-hidden overflow-y-auto hide-scrollbar">
-          <div className="flex flex-col w-full py-24 mx-auto stretch px-[.5rem] max-w-2xl ">
+          <div className="flex flex-col w-full py-24 mx-auto stretch px-[.5rem] max-w-2xl " id="chat-container">
             <HistoryMessages messages={historyMessages} />
             <Messages messages={messages} />
             {!error &&
@@ -215,6 +221,11 @@ export function Chat() {
             handleInputChange={handleInputChange}
             handleSubmit={(e) => {
               handleSubmit(e);
+              document.getElementById("chat-container")?.scrollIntoView({
+                behavior: "smooth",
+                block: "end",
+                inline: "nearest",
+              });
             }}
             input={input}
           />
