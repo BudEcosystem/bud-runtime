@@ -13,7 +13,7 @@ type MessageProps = {
 function Message(props: MessageProps) {
   return (
     <div
-      className="text-[#FFFFFF] relative mb-[1.5rem] text-[.75rem]  rounded-[.625rem] py-[.75rem] "
+      className="text-[#FFFFFF] relative text-[.75rem]  rounded-[.625rem] "
       style={{
         right: props.role === "user" ? 0 : 0,
       }}
@@ -233,14 +233,16 @@ interface HistoryMessagesProps {
 }
 
 export function Messages({ messages }: MessagesProps) {
-  return messages.map((m) => <Message {...m} key={m.id} />);
+  return <div className="flex flex-col gap-[1rem]">
+    {messages.map((m) => <Message {...m} key={m.id} />)}
+  </div>;
 }
 
 export function HistoryMessages({ messages }: HistoryMessagesProps) {
   return (
     <>
       {messages?.map((m, index) => (
-        <>
+        <div className="flex flex-col gap-[1rem]" key={`${m.chat_session_id}-${index}`}>
           <Message
             content={m.prompt}
             role={"user"}
@@ -253,7 +255,7 @@ export function HistoryMessages({ messages }: HistoryMessagesProps) {
             data={m}
             key={`${m.chat_session_id}-${index}-response`}
           />
-        </>
+        </div>
       ))}
     </>
   );

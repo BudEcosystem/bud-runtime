@@ -109,7 +109,7 @@ function NavBar({
         </button>
         <DropdownMenu open={openDropdown} onOpenChange={(isOpen) => setOpenDropdown(isOpen)}>
           <DropdownMenuTrigger>
-            <button className="mr-[.4rem] w-[1.475rem] height-[1.475rem] p-[.2rem] rounded-[6px] flex justify-center items-center  cursor-pointer">
+            <div className="mr-[.4rem] w-[1.475rem] height-[1.475rem] p-[.2rem] rounded-[6px] flex justify-center items-center  cursor-pointer">
               <div className="w-[1.125rem] h-[1.125rem] flex justify-center items-center cursor-pointer group text-[#B3B3B3] hover:text-white">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -125,7 +125,7 @@ function NavBar({
                   />
                 </svg>
               </div>
-            </button>
+            </div>
           </DropdownMenuTrigger>
           <DropdownMenuContent>
             {chat && (

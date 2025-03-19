@@ -219,7 +219,7 @@ export default function Home() {
   };
 
   return (
-    <main className="flex flex-col gap-8 row-start-2 items-center w-full h-[100vh]">
+    <main className="flex flex-col row-start-2 items-center w-full h-[100vh]">
       <RootContext.Provider
         value={{
           chats,

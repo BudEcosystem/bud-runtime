@@ -185,7 +185,7 @@ export function Chat() {
         </Header>
         <Content className="overflow-hidden overflow-y-auto hide-scrollbar">
           <div
-            className="flex flex-col w-full py-24 mx-auto stretch px-[.5rem] max-w-2xl "
+            className="flex flex-col w-full py-24 mx-auto stretch px-[.5rem] max-w-2xl  gap-[1rem]"
             id="chat-container"
           >
             <HistoryMessages messages={historyMessages} />
