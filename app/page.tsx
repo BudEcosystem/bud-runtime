@@ -7,7 +7,6 @@ import { ActiveSession, Session } from "./components/bud/chat/HistoryList";
 import { NEW_SESSION, useMessages } from "./components/bud/hooks/useMessages";
 import APIKey from "./components/APIKey";
 import { useEndPoints } from "./components/bud/hooks/useEndPoint";
-import { notification } from "antd";
 import { AuthNavigationProvider, LoaderProvider } from "./context/appContext";
 
 export default function Home() {
