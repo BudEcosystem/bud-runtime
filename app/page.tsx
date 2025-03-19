@@ -24,14 +24,8 @@ export default function Home() {
   const [chats, setChats] = useState<ActiveSession[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
 
-  useEffect(() => {
-    const existing = localStorage.getItem("sessions");
-    if (existing) {
-      const data = JSON.parse(existing);
-      setSessions(data);
-    }
-  }, []);
 
+  console.log('sessions, ', sessions)
   // save to local storage
   useEffect(() => {
     if (!sessions || sessions?.length === 0) return;
@@ -142,9 +136,19 @@ export default function Home() {
       localStorage.setItem("token", token);
       let localMode = false;
       if (token?.startsWith("budserve_")) {
-        setLocalMode(true);
+        localMode = true;
       }
-      if (!localMode) {
+      setLocalMode(localMode);
+
+      if(localMode){
+        const existing = localStorage.getItem("sessions");
+        if (existing) {
+          console.log("Getting sessions from local storage");
+          const data = JSON.parse(existing);
+          setSessions(data);
+        }
+      }
+      else {
         console.log("Getting sessions");
         const sessionsResult = await getSessions();
         setSessions(sessionsResult);
