@@ -73,9 +73,9 @@ export function Chat() {
       metadata: {
         project_id: chat?.selectedDeployment?.project.id,
       },
-      settings: chat?.settings,
+      settings: chat?.chat_setting,
     };
-  }, [chat, chat?.selectedDeployment, JSON.stringify(chat?.settings)]);
+  }, [chat, chat?.selectedDeployment, JSON.stringify(chat?.chat_setting)]);
 
   const {
     error,

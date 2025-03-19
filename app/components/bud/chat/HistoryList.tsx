@@ -4,22 +4,21 @@ import { Image } from "antd";
 import React, { useContext } from "react";
 
 export type ChatSettings = {
+  id: string;
+  name: string;
+  system_prompt: string;
   temperature: number;
   limit_response_length: boolean;
   sequence_length: number;
-  context_overflow: string[];
-  stop_strings: string;
+  context_overflow_policy: string;
+  stop_strings: string[];
   top_k_sampling: number;
   repeat_penalty: number;
   top_p_sampling: number;
   min_p_sampling: number;
-};
-
-export type ActiveSession = {
-  id: string;
-  name: string;
-  settings?: ChatSettings;
-  selectedDeployment?: Endpoint;
+  structured_json_schema: any;
+  created_at: string;
+  modified_at: string;
 };
 
 export type Session = {
@@ -28,6 +27,11 @@ export type Session = {
   total_tokens: number;
   created_at: string;
   modified_at: string;
+  chat_setting?: ChatSettings;
+};
+
+export type ActiveSession = Session & {
+  selectedDeployment?: Endpoint;
 };
 
 function HistoryListItem({ data }: { data: Session }) {

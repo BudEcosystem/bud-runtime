@@ -1,8 +1,10 @@
 // import { openai } from '@ai-sdk/openai';
 import { streamText } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
-import { copyCodeApiBaseUrl } from '@/app/components/bud/environment';
+import { copyCodeApiBaseUrl, tempApiBaseUrl } from '@/app/components/bud/environment';
 import { ChatSettings } from '@/app/components/bud/chat/HistoryList';
+import { NEW_SESSION } from '@/app/components/bud/hooks/useMessages';
+import axios from 'axios';
 
 
 
@@ -13,7 +15,7 @@ export const maxDuration = 30;
 export async function POST(req: Request) {
   // Extract the `messages` from the body of the request
   const x = await req.json()
-  const { messages, id, model, metadata } = x
+  const { messages, id, model, metadata, chat } = x
   const settings: ChatSettings = x.settings;
   const authorization = req.headers.get('authorization');
   const apiKey = req.headers.get('api-key');
@@ -56,14 +58,40 @@ export async function POST(req: Request) {
   const result = streamText({
     model: proxyOpenAI(model),
     messages,
-    async onFinish({ text, toolCalls, toolResults, usage, finishReason }) {
+    async onFinish(response) {
       // implement your own logic here, e.g. for storing messages
       // or recording token usage
-      console.log('onFinish', text);
-      console.log('toolCalls', toolCalls);
-      console.log('toolResults', toolResults);
-      console.log('usage', usage);
-      console.log('finishReason', finishReason);
+      try {
+        console.log('onFinish', response);
+        // const messageCreatePayload = {
+        //   deployment_id: chat?.selectedDeployment?.id,
+        //   e2e_latency: 0,
+        //   input_tokens: 0,
+        //   is_cache: false,
+        //   output_tokens: 0,
+        //   chat_session_id: chat?.id === NEW_SESSION ? undefined : chat?.id,
+        //   prompt: messages[messages.length - 1].content,
+        //   response: response,
+        //   token_per_sec: 0,
+        //   total_tokens: response?.usage.totalTokens,
+        //   tpot: 0,
+        //   ttft: 0,
+        //   request_id: chat?.selectedDeployment?.id,
+        // };
+        // const result = await axios
+        //   .post(`${tempApiBaseUrl}/playground/messages`,
+        //     messageCreatePayload, {
+        //     headers: {
+        //       authorization: authorization,
+        //     },
+        //   })
+        //   .then((response) => {
+        //     return response.data?.chat_message;
+        //   })
+        console.log(`Saved message: ${result}`);
+      } catch (error) {
+        console.error('failed to save message');
+      }
     },
     onChunk({ chunk }) {
       console.log('chunk', chunk);
@@ -71,11 +99,8 @@ export async function POST(req: Request) {
     onError({ error }) {
       console.error('error', JSON.stringify(error, null, 2));
     },
-    onStepFinish({ text, toolCalls, toolResults, usage }) {
-      console.log('onStepFinish', text);
-      console.log('toolCalls', toolCalls);
-      console.log('toolResults', toolResults);
-      console.log('usage', usage);
+    onStepFinish(response) {
+      console.log('onStepFinish', JSON.stringify(response, null, 2));
     }
   });
 

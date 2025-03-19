@@ -36,8 +36,14 @@ export function useMessages() {
         }
       );
 
-      console.log(`Message created: ${result.chat_session_id}`); 
+      console.log(`Message created: ${result.chat_session_id}`);
       const sessionId = result?.chat_session_id;
+
+      // save settings to local storage
+      localStorage.setItem(
+        `settings-${sessionId}`,
+        JSON.stringify(chat?.chat_setting)
+      );
 
       if (sessionId) {
         // store to local storage

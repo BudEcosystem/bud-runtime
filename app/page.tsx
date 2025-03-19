@@ -70,20 +70,29 @@ export default function Home() {
     init();
   }, []);
 
-  const newChatPayload = {
+  const newChatPayload: ActiveSession = {
     id: NEW_SESSION,
     name: `New Chat`,
-    settings: {
+    chat_setting: {
       temperature: 1,
-      context_overflow: [],
       limit_response_length: true,
       min_p_sampling: 0.05,
       repeat_penalty: 0,
       sequence_length: 1000,
-      stop_strings: "",
+      stop_strings: [],
+      structured_json_schema: {},
+      system_prompt: "",
       top_k_sampling: 40,
       top_p_sampling: 1,
+      context_overflow_policy: "auto",
+      created_at: new Date().toISOString(),
+      id: "new",
+      modified_at: new Date().toISOString(),
+      name: "new",
     },
+    created_at: new Date().toISOString(),
+    modified_at: new Date().toISOString(),
+    total_tokens: 0,
   };
 
   const closeChat = useCallback(
@@ -179,8 +188,8 @@ export default function Home() {
       if (item.id === chat?.id) {
         return {
           ...item,
-          settings: {
-            ...item.settings,
+          chat_setting: {
+            ...item.chat_setting,
             [prop]: value,
           } as any,
         };
