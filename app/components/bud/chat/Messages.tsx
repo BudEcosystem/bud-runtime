@@ -2,8 +2,15 @@ import { Image } from "antd";
 import React from "react";
 import Markdown from "react-markdown";
 import { PostMessage } from "../hooks/useMessages";
+import { format } from "date-fns";
 
-function Message(props: { content: string; role: string }) {
+type MessageProps = {
+  content: string;
+  role: "user" | "ai";
+  data: PostMessage;
+};
+
+function Message(props: MessageProps) {
   return (
     <div
       className="text-[#FFFFFF] relative mb-[1.5rem] text-[.75rem]  rounded-[.625rem] py-[.75rem] "
@@ -24,7 +31,7 @@ function Message(props: { content: string; role: string }) {
   );
 }
 
-function UserMessage(props: { content: string; role: string }) {
+function UserMessage(props: MessageProps) {
   return (
     <div className="flex flex-row items-center gap-[.5rem]">
       <div className="flex items-center justify-end gap-[.5rem] ">
@@ -70,7 +77,7 @@ function UserMessage(props: { content: string; role: string }) {
   );
 }
 
-function AIMessage(props: { content: string; role: string }) {
+function AIMessage(props: MessageProps) {
   return (
     <div className="flex flex-row items-top gap-[.5rem]">
       <div className="mr-[.5rem] mt-[.2rem]">
@@ -89,16 +96,16 @@ function AIMessage(props: { content: string; role: string }) {
           <div className="fg flex justify-between items-center pl-[.6rem] pr-[.5rem] gap-[.5rem]">
             <div className="flex justify-start items-center gap-x-[.7rem]">
               <div className="text-[#B3B3B3] text-[.625rem] font-[400]">
-                tokens/sec : 23
+                tokens/sec : 0
               </div>
               <div className="text-[#B3B3B3] text-[.625rem] font-[400]">
-                TTFT : 23
+                TTFT : 0
               </div>
               <div className="text-[#B3B3B3] text-[.625rem] font-[400]">
-                TPOT : 23
+                TPOT : 0
               </div>
               <div className="text-[#B3B3B3] text-[.625rem] font-[400]">
-                End to End latency : 23
+                End to End latency : 0
               </div>
             </div>
             <div className="flex justify-end items-center gap-x-[.4rem]">
@@ -207,7 +214,7 @@ function AIMessage(props: { content: string; role: string }) {
                 </svg>
               </div>
               <div className="pl-[.75rem] text-[#757575] text-[.75rem] font-[400]">
-                06:32
+                {props.data.response.message.createdAt && format(new Date(props.data.response.message.createdAt), "HH:mm")}
               </div>
             </div>
           </div>
@@ -229,17 +236,6 @@ export function Messages({ messages }: MessagesProps) {
   return messages.map((m) => <Message {...m} key={m.id} />);
 }
 
-// export function HistoryMessages({ messages }: HistoryMessagesProps) {
-//   return messages.map((m, index) => (
-//     <>
-//       <Message
-//         content={m.response?.[0]?.text || m.prompt }
-//         role={m.response?.[0]?.text ? "ai" : "user"}
-//         key={m.chat_session_id + index}
-//       />
-//     </>
-//   ));
-// }
 export function HistoryMessages({ messages }: HistoryMessagesProps) {
   return (
     <>
@@ -248,11 +244,13 @@ export function HistoryMessages({ messages }: HistoryMessagesProps) {
           <Message
             content={m.prompt}
             role={"user"}
+            data={m}
             key={`${m.chat_session_id}-${index}-prompt`}
           />
           <Message
             content={m.response?.message?.content}
             role={"ai"}
+            data={m}
             key={`${m.chat_session_id}-${index}-response`}
           />
         </>

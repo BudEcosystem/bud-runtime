@@ -47,7 +47,7 @@ export const useAuthNavigation = () => {
 export const LoaderProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const showLoader = useCallback(() => setIsLoading(true), []);
   const hideLoader = useCallback(() => setIsLoading(false), []);

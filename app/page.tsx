@@ -18,6 +18,7 @@ const LoaderWrapper = () => {
       {/* <Spinner size="3" className="z-[1000] relative w-[20px] h-[20px] block" /> */}
       <Image
         width={80}
+        preview={false}
         className="w-[80px] h-[80px]"
         src={'/loading-bud.gif'}
         alt="Logo"
