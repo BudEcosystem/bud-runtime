@@ -29,6 +29,6 @@ export async function POST(req: Request) {
   }
   return NextResponse.json({
     ...body,
-    chat_session_id: body.id || randomUUID(),
+    chat_session_id: body.chat_session_id || randomUUID(),
   });
 }
