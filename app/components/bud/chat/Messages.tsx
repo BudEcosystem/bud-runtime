@@ -214,7 +214,7 @@ function AIMessage(props: MessageProps) {
                 </svg>
               </div>
               <div className="pl-[.75rem] text-[#757575] text-[.75rem] font-[400]">
-                {props.data.response.message.createdAt && format(new Date(props.data.response.message.createdAt), "HH:mm")}
+                {props.data?.response?.message?.createdAt && format(new Date(props.data.response.message.createdAt), "HH:mm")}
               </div>
             </div>
           </div>
