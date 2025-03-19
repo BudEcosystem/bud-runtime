@@ -1,18 +1,46 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Form, Image, Input } from 'antd';
-import { Text_12_300_EEEEEE, Text_12_400_B3B3B3, Text_12_400_EEEEEE, Text_32_500_FFFFFF } from "@/lib/text";
+import { Form, Image, Input } from "antd";
+import {
+  Text_12_300_EEEEEE,
+  Text_12_400_B3B3B3,
+  Text_12_400_EEEEEE,
+  Text_32_500_FFFFFF,
+} from "@/lib/text";
 import { PrimaryButton } from "./uiComponents/inputs";
 import { EyeClosedIcon, EyeIcon } from "lucide-react";
+import { useLoader } from "../context/appContext";
 
-function APIKey() {
-  const [apiKey, setApiKey] = useState<string>("");
+function APIKey({
+  apiKey,
+  setApiKey,
+}: {
+  apiKey?: string;
+  setApiKey: (apiKey: string) => void;
+}) {
+  const { showLoader, hideLoader, isLoading } = useLoader();
   const router = useRouter();
   const [isShow, setIsShow] = useState(false);
   const [form] = Form.useForm();
   const handleAdd = () => {
     router.replace(`?api_key=${apiKey}`);
   };
+
+  useEffect(() => {
+    if(typeof window === "undefined") return;
+    showLoader();
+    const apiKey = new URLSearchParams(window.location.search).get("api_key");
+    if (apiKey) {
+      setApiKey(apiKey);
+    }
+    setTimeout(() => {
+      hideLoader();
+    }, 2000);
+  }, []);
+
+  if (isLoading) {
+    return null;
+  }
 
   return (
     <div className="w-full h-screen logginBg box-border relative">
@@ -24,10 +52,14 @@ function APIKey() {
             src="/images/purple-shadow.png"
             className="absolute bottom-[-28em] left-[-29em] rotate-[14deg] opacity-[.3]"
           /> */}
-          <div
-            className="flex flex-col justify-between w-[100%] 2xl:max-w-[500px] 1680px:max-w-[650px] h-full px-[3.5rem] pt-[3rem] pb-[2.9rem]"
-          >
-            <Image alt="" src="/images/BudLogo.png" preview={false} style={{width: '6.6em'}} className="w-[6.6em] h-auto" />
+          <div className="flex flex-col justify-between w-[100%] 2xl:max-w-[500px] 1680px:max-w-[650px] h-full px-[3.5rem] pt-[3rem] pb-[2.9rem]">
+            <Image
+              alt=""
+              src="/images/BudLogo.png"
+              preview={false}
+              style={{ width: "6.6em" }}
+              className="w-[6.6em] h-auto"
+            />
             <div className="logo-text text-[2.25em] 2xl:text-[2.5rem] 1680px:text-[2.4rem] text-white open-sans tracking-[.0rem] leading-[3.1rem] w-[400px] 1680px:w-[500px] 2560px:w-[700px]">
               Useful. Private. Real time. Offline. Safe Intelligence in your
               Pocket.
@@ -59,14 +91,22 @@ function APIKey() {
               feedbackIcons={({ status, errors, warnings }) => {
                 // return <FeedbackIcons status={status} errors={errors} warnings={warnings} />
                 return {
-                  error: <Image src="/icons/warning.svg" alt="error" width={"1rem"} height={"1rem"} />,
+                  error: (
+                    <Image
+                      src="/icons/warning.svg"
+                      alt="error"
+                      width={"1rem"}
+                      height={"1rem"}
+                    />
+                  ),
                   success: <div />,
                   warning: <div />,
                   "": <div />,
-                }
+                };
               }}
-              className="mt-[1.6em]" form={form}>
-
+              className="mt-[1.6em]"
+              form={form}
+            >
               <Form.Item
                 hasFeedback
                 name="password"
@@ -82,7 +122,9 @@ function APIKey() {
                   },
                 ]}
               >
-                <div className={`flex items-center border rounded-[6px] relative !bg-[transparent]`}>
+                <div
+                  className={`flex items-center border rounded-[6px] relative !bg-[transparent]`}
+                >
                   <div className="">
                     <Text_12_300_EEEEEE className="absolute px-1.5 bg-black -top-1.5 left-1.5 inline-block tracking-[.035rem] z-10">
                       API Key
@@ -126,14 +168,27 @@ function APIKey() {
               </PrimaryButton>
             </Form>
             <div className="flex justify-center items-center mt-[2rem] cursor-pointer group">
-              <Text_12_400_EEEEEE className="transition-transform duration-300 ease-out group-hover:-translate-x-1">Skip</Text_12_400_EEEEEE>
+              <Text_12_400_EEEEEE className="transition-transform duration-300 ease-out group-hover:-translate-x-1">
+                Skip
+              </Text_12_400_EEEEEE>
               <div className="w-[1.375rem] h-[1.375rem] flex justify-center items-center bg-[#18191B] rounded-full ml-[.5rem] transition-transform duration-300 ease-out group-hover:translate-x-1">
-                <svg xmlns="http://www.w3.org/2000/svg" width="6" height="10" viewBox="0 0 6 10" fill="none">
-                  <path d="M0.888572 0.922852L4.85742 4.8917L0.888572 8.86055" stroke="white" strokeWidth="1.35823" strokeLinecap="round" strokeLinejoin="round" />
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="6"
+                  height="10"
+                  viewBox="0 0 6 10"
+                  fill="none"
+                >
+                  <path
+                    d="M0.888572 0.922852L4.85742 4.8917L0.888572 8.86055"
+                    stroke="white"
+                    strokeWidth="1.35823"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
                 </svg>
               </div>
             </div>
-
           </div>
         </div>
       </div>

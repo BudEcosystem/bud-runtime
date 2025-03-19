@@ -37,10 +37,13 @@ export function Chat() {
   const { createMessage } = useMessages();
 
   const handleFinish = useCallback(
-    async (message: Message, response: {
-      usage: Usage
-      finishReason: string;
-    }) => {
+    async (
+      message: Message,
+      response: {
+        usage: Usage;
+        finishReason: string;
+      }
+    ) => {
       const { usage, finishReason } = response;
       console.log("Finish", message, usage, finishReason);
       if (!chat?.selectedDeployment) return;
@@ -348,7 +351,19 @@ export default function ChatWindowWithStore() {
   const { chats } = useContext(RootContext);
 
   return (
-    <div className="!grid w-full h-full">
+    <div
+      className="!grid w-full h-full transition-all duration-300"
+      style={
+        chats?.length > 0
+          ? {}
+          : {
+              position: "absolute",
+              top: 0,
+              left: -5000,
+              zIndex: -1,
+            }
+      }
+    >
       <ResizablePanelGroup direction="horizontal" className="h-full w-full">
         {chats.map((chat, index) => (
           <ChatWithStore key={index} chat={chat} />

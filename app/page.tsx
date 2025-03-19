@@ -7,13 +7,30 @@ import { ActiveSession, Session } from "./components/bud/chat/HistoryList";
 import { NEW_SESSION, useMessages } from "./components/bud/hooks/useMessages";
 import APIKey from "./components/APIKey";
 import { useEndPoints } from "./components/bud/hooks/useEndPoint";
-import { AuthNavigationProvider, LoaderProvider } from "./context/appContext";
+import { AuthNavigationProvider, LoaderProvider, useLoader } from "./context/appContext";
+import { Image } from "antd";
+
+const LoaderWrapper = () => {
+  const { isLoading } = useLoader();
+
+  return isLoading ? (
+    <div className="z-[1000] fixed top-0 left-0 w-screen h-screen flex justify-center items-center	backdrop-blur-[2px]">
+      {/* <Spinner size="3" className="z-[1000] relative w-[20px] h-[20px] block" /> */}
+      <Image
+        width={80}
+        className="w-[80px] h-[80px]"
+        src={'/loading-bud.gif'}
+        alt="Logo"
+      />
+    </div>
+  ) : null;
+};
 
 export default function Home() {
   const [localMode, setLocalMode] = useState(false);
   const [_accessToken, _setAccessToken] = useState<string | null>(null);
   const [_refreshToken, _setRefreshToken] = useState<string | null>(null);
-  const [_apiKey, _setApiKey] = useState<string | null>(null);
+  const [_apiKey, _setApiKey] = useState<string>();
   const { getSessions } = useMessages();
   const { getEndPoints } = useEndPoints();
   const [endpoints, setEndpoints] = useState<Endpoint[]>([]);
@@ -23,8 +40,7 @@ export default function Home() {
   const [chats, setChats] = useState<ActiveSession[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
 
-
-  console.log('sessions, ', sessions)
+  console.log("sessions, ", sessions);
   // save to local storage
   useEffect(() => {
     if (!sessions || sessions?.length === 0) return;
@@ -139,15 +155,14 @@ export default function Home() {
       }
       setLocalMode(localMode);
 
-      if(localMode){
+      if (localMode) {
         const existing = localStorage.getItem("sessions");
         if (existing) {
           console.log("Getting sessions from local storage");
           const data = JSON.parse(existing);
           setSessions(data);
         }
-      }
-      else {
+      } else {
         console.log("Getting sessions");
         const sessionsResult = await getSessions();
         setSessions(sessionsResult);
@@ -222,10 +237,11 @@ export default function Home() {
       >
         <AuthNavigationProvider>
           <LoaderProvider>
-            {chats?.length === 0 ? <APIKey /> : <Chat />}
+            <APIKey setApiKey={_setApiKey} apiKey={_apiKey} />
+            <Chat />
+            <LoaderWrapper />
           </LoaderProvider>
         </AuthNavigationProvider>
-
       </RootContext.Provider>
     </main>
   );
