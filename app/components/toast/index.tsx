@@ -30,13 +30,13 @@ export const errorToast = (
   // toast.clearWaitingQueue();
 };
 
-export const successToast = (message) => {
+export const successToast = (message: string) => {
   toast.success(message, {
     icon: ({theme, type}) =>  <Image alt="" height='20' width='20' src={`${toastIcn.src}`}/>, // Custom icon component
   });
   // toast.clearWaitingQueue();
 };
-export const infoToast = (message) => toast.warning(message, {
+export const infoToast = (message: string) => toast.warning(message, {
   icon: ({theme, type}) =>  <Image alt="" height='20' width='20' src={`${toastIcn.src}`}/>, // Custom icon component
 });
 
