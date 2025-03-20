@@ -213,10 +213,13 @@ export function Chat() {
             )}
             {error && (
               <div className="mt-4">
-                <div className="text-red-500">{error.message}</div>
+                <div className="text-[#FF0000] text-[.75rem] font-[400] 
+                
+                ">{error.message}</div>
                 <button
                   type="button"
-                  className="px-4 py-2 mt-4 text-blue-500 border border-blue-500 rounded-md"
+                  className="px-[.5rem] p-[.25rem] mt-4 text-[#fff] border border-[#757575] rounded-sm bg-[#965cde] text-[.75rem] font-[400] hover:bg-[#965cde] hover:text-[
+                  #fff] focus:outline-none cursor-pointer"
                   onClick={() => reload()}
                 >
                   Retry
