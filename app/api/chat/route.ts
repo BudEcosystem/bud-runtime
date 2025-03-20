@@ -28,8 +28,7 @@ export async function POST(req: Request) {
     baseURL: copyCodeApiBaseUrl,
     // apiKey: "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",
     fetch: (input, init) => {
-      console.log('fetch', input, init);
-      return fetch(input, {
+      const request = {
         ...init,
         method: "POST",
         headers: {
@@ -53,7 +52,9 @@ export async function POST(req: Request) {
           temperature: settings?.temperature ? settings.temperature : undefined,
           top_p: settings?.top_p_sampling ? settings.top_p_sampling : undefined,
         })
-      });
+      }
+      console.log('fetch', request);
+      return fetch(input, request);
     }
   });
 

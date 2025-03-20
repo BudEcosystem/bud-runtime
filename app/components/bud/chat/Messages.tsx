@@ -3,10 +3,11 @@ import React from "react";
 import Markdown from "react-markdown";
 import { PostMessage } from "../hooks/useMessages";
 import { format } from "date-fns";
+import { UIMessage } from "ai";
 
 type MessageProps = {
   content: string;
-  role: "user" | "ai";
+  role: "system" | "user" | "assistant" | "data" | "ai";
   data: PostMessage;
 };
 
@@ -214,7 +215,11 @@ function AIMessage(props: MessageProps) {
                 </svg>
               </div>
               <div className="pl-[.75rem] text-[#757575] text-[.75rem] font-[400]">
-                {props.data?.response?.message?.createdAt && format(new Date(props.data.response.message.createdAt), "HH:mm")}
+                {props.data?.response?.message?.createdAt &&
+                  format(
+                    new Date(props.data.response.message.createdAt),
+                    "HH:mm"
+                  )}
               </div>
             </div>
           </div>
@@ -225,7 +230,7 @@ function AIMessage(props: MessageProps) {
 }
 
 interface MessagesProps {
-  messages: any[];
+  messages: UIMessage[];
 }
 
 interface HistoryMessagesProps {
@@ -233,16 +238,23 @@ interface HistoryMessagesProps {
 }
 
 export function Messages({ messages }: MessagesProps) {
-  return <div className="flex flex-col gap-[1rem]">
-    {messages.map((m) => <Message {...m} key={m.id} />)}
-  </div>;
+  return (
+    <div className="flex flex-col gap-[1rem]">
+      {messages.map((m) => (
+        <Message {...m} key={m.id} content={m.content} role={m.role} data={m as any} />
+      ))}
+    </div>
+  );
 }
 
 export function HistoryMessages({ messages }: HistoryMessagesProps) {
   return (
     <>
       {messages?.map((m, index) => (
-        <div className="flex flex-col gap-[1rem]" key={`${m.chat_session_id}-${index}`}>
+        <div
+          className="flex flex-col gap-[1rem]"
+          key={`${m.chat_session_id}-${index}`}
+        >
           <Message
             content={m.prompt}
             role={"user"}
