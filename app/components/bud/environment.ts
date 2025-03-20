@@ -8,10 +8,3 @@ export const novuAppId = process.env.NEXT_PUBLIC_NOVU_APP_ID;
 export const copyCodeApiBaseUrl = process.env.NEXT_PUBLIC_COPY_CODE_API_BASE_URL;
 
 export const apiKey = 'budserve_NgMnHOzyQjCXGgmoFZrYNwS7LgqZU2VMcmz3bz4U';
-
-
-console.log('apiBaseUrl', apiBaseUrl);
-console.log('tempApiBaseUrl', tempApiBaseUrl);
-console.log('assetBaseUrl', assetBaseUrl);
-console.log('copyCodeApiBaseUrl', copyCodeApiBaseUrl);
-console.log('OPENAI_API_KEY', process.env.OPENAI_API_KEY);

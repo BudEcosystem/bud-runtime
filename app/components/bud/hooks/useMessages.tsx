@@ -3,21 +3,22 @@ import { useContext, useEffect } from "react";
 import ChatContext from "@/app/context/ChatContext";
 import { AppRequest } from "@/app/api/requests";
 import RootContext from "@/app/context/RootContext";
-import { ActiveSession } from "../chat/HistoryList";
+import { ActiveSession, ChatSettings } from "../chat/HistoryList";
 import { Message, useChat } from "@ai-sdk/react";
+import { tempApiBaseUrl } from "../environment";
 
 export const NEW_SESSION = "NEW_SESSION";
 
 export type Usage = {
-completionTokens: number;
-promptTokens: number;
-totalTokens: number;
-}
+  completionTokens: number;
+  promptTokens: number;
+  totalTokens: number;
+};
 
 export type Response = {
-  message: Message
-  usage: Usage
-}
+  message: Message;
+  usage: Usage;
+};
 
 export type PostMessage = {
   prompt: string;
@@ -37,8 +38,41 @@ export type PostMessage = {
 };
 
 export function useMessages() {
-  const { setChats, chats, sessions, setSessions } = useContext(RootContext);
+  const { setChats, chats, sessions, setSessions, localMode } =
+    useContext(RootContext);
   const { chat, setMessages } = useContext(ChatContext);
+
+  async function createSetting(settings: ChatSettings) {
+    try {
+      const result = await AppRequest.Post(
+        `${tempApiBaseUrl}/playground/chat-settings`,
+        settings
+      ).then((res) => {
+        return res.data?.chat_setting;
+      });
+
+      console.log(`Setting created: ${result.id}`);
+      return result.id;
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  async function updateSetting(settings: ChatSettings) {
+    try {
+      const result = await AppRequest.Patch(
+        `${tempApiBaseUrl}/playground/chat-settings/${settings.id}`,
+        settings
+      ).then((res) => {
+        return res.data?.chat_setting;
+      });
+
+      console.log(`Setting updated: ${result.id}`);
+      return result.id;
+    } catch (error) {
+      console.error(error);
+    }
+  }
 
   async function createMessage(body: PostMessage, chatId: string) {
     console.log("Creating message", body, chatId);
@@ -53,10 +87,21 @@ export function useMessages() {
       const sessionId = result?.chat_session_id;
 
       // save settings to local storage
-      localStorage.setItem(
-        `settings-${sessionId}`,
-        JSON.stringify(chat?.chat_setting)
-      );
+
+      if (chat?.chat_setting) {
+        if (localMode) {
+          localStorage.setItem(
+            `settings-${sessionId}`,
+            JSON.stringify(chat?.chat_setting)
+          );
+        } else if (!body.chat_session_id) {
+          const settings = await createSetting(chat?.chat_setting);
+          console.log(`Setting created: ${settings}`);
+        } else {
+          const settings = await updateSetting(chat?.chat_setting);
+          console.log(`Setting updated: ${settings}`);
+        }
+      }
 
       if (sessionId) {
         // store to local storage

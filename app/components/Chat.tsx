@@ -190,9 +190,8 @@ export function Chat() {
           >
             <HistoryMessages messages={historyMessages} />
             <Messages messages={messages} />
-            {!error &&
-              historyMessages?.length === 0 &&
-              messages.length === 0 && (
+            {(!historyMessages || historyMessages.length === 0) &&
+              (!messages || messages.length === 0) && (
                 <div className="mt-4 text-[#EEEEEE] text-center">
                   <Image
                     preview={false}
@@ -209,11 +208,12 @@ export function Chat() {
                   </div>
                 </div>
               )}
-            {status === "submitted" ||
-              (status === "streaming" && <MessageLoading />)}
+            {(status === "submitted" || status === "streaming") && (
+              <MessageLoading />
+            )}
             {error && (
               <div className="mt-4">
-                <div className="text-red-500">An error occurred.</div>
+                <div className="text-red-500">{error.message}</div>
                 <button
                   type="button"
                   className="px-4 py-2 mt-4 text-blue-500 border border-blue-500 rounded-md"
