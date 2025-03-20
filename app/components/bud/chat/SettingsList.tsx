@@ -86,7 +86,6 @@ function SettingsList({ data }: SettingsListProps) {
           />
           <InlineSwitch
             title="Limit Response Length"
-            value={chat?.chat_setting?.limit_response_length || true}
             defaultValue={chat?.chat_setting?.limit_response_length || true}
             onChange={(value) =>
               handleChange(chat, "limit_response_length", value)

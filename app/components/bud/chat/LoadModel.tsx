@@ -164,7 +164,7 @@ function LoadModel(props: LoadModelProps) {
               height: ".875rem",
             }}
           />
-          <Text_12_400_EEEEEE>{chat.selectedDeployment.name}</Text_12_400_EEEEEE>
+          <Text_12_400_EEEEEE className="Open-Sans">{chat.selectedDeployment.name}</Text_12_400_EEEEEE>
         </Button>
       ) : (
         <Button
@@ -172,7 +172,7 @@ function LoadModel(props: LoadModelProps) {
           className=" w-[12.25rem] 2rem"
           onClick={() => props.setOpen(!props.open)}
         >
-          <Text_12_400_EEEEEE>Load Model</Text_12_400_EEEEEE>
+          <Text_12_400_EEEEEE className="Open-Sans">Load Model</Text_12_400_EEEEEE>
         </Button>
       )}
     </div>

@@ -784,16 +784,20 @@ i.toggle-editor {
 }
 
 .ant-switch {
+  border: 1px solid #6f46ab !important;
   width: 1.5rem !important;
   min-width: 1.5rem !important;
   height: .75rem !important;
   .ant-switch-handle {
-    width: .75rem !important;
-    height: .75rem !important;
+    width: .65rem !important;
+    height: .65rem !important;
     top: 0;
   }
-  &ant-switch-checked .ant-switch-handle {
-    inset-inline-start: calc(100% - .75rem);
+  &.ant-switch .ant-switch-handle {
+    inset-inline-start: 0px;
+  }
+  &.ant-switch-checked .ant-switch-handle {
+    inset-inline-start: calc(100% - .65rem) !important;
   }
 }
 

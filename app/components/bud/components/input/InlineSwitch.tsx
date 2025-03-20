@@ -3,7 +3,7 @@ import React from "react";
 
 interface InlineSwitchProps {
   title: string;
-  value: boolean;
+  value?: boolean;
   defaultValue: boolean;
   onChange: (value: boolean) => void;
 }
@@ -16,7 +16,6 @@ export default function InlineSwitch(props: InlineSwitchProps) {
       </span>
       <Switch
         defaultChecked={props.defaultValue}
-        checked={props.value}
         onChange={(e) => props.onChange(e)}
       />
     </div>
