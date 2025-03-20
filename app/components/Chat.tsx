@@ -137,6 +137,9 @@ export function Chat() {
     }
   }, [toggleLeft, toggleRight]);
 
+  console.log(`historyMessages`, historyMessages);
+  console.log(`messages`, messages);
+
   return (
     <Layout className="chat-container ">
       <Sider
@@ -213,9 +216,13 @@ export function Chat() {
             )}
             {error && (
               <div className="mt-4">
-                <div className="text-[#FF0000] text-[.75rem] font-[400] 
+                <div
+                  className="text-[#FF0000] text-[.75rem] font-[400] 
                 
-                ">{error.message}</div>
+                "
+                >
+                  {error.message}
+                </div>
                 <button
                   type="button"
                   className="px-[.5rem] p-[.25rem] mt-4 text-[#fff] border border-[#757575] rounded-sm bg-[#965cde] text-[.75rem] font-[400] hover:bg-[#965cde] hover:text-[
@@ -309,6 +316,9 @@ function ChatWithStore(props: { chat: ActiveSession }) {
   const { localMode } = useContext(RootContext);
   const { getSessionMessages } = useMessages();
   const [messages, setMessages] = useState<any[]>([]);
+  const [loadedChatID, setLoadedChatID] = useState<string | undefined>(
+    undefined
+  );
 
   useEffect(() => {
     const init = async () => {
@@ -318,13 +328,19 @@ function ChatWithStore(props: { chat: ActiveSession }) {
         const existing = localStorage.getItem(id);
         if (existing) {
           const data = JSON.parse(existing);
-          setMessages(data);
+          if (loadedChatID !== id) {
+            setLoadedChatID(id);
+            setMessages(data);
+          }
         }
       } else {
         if (id !== NEW_SESSION) {
-          const result = await getSessionMessages(id);
-          console.log("Loading from server");
-          setMessages(result);
+          if (loadedChatID !== id) {
+            const result = await getSessionMessages(id);
+            console.log("Loading from server");
+            setLoadedChatID(id);
+            setMessages(result);
+          }
           return;
         }
       }
