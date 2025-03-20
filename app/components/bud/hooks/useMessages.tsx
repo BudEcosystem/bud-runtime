@@ -52,7 +52,7 @@ export function useMessages() {
       });
 
       console.log(`Setting created: ${result.id}`);
-      return result.id;
+      return result;
     } catch (error) {
       console.error(error);
     }
@@ -76,6 +76,7 @@ export function useMessages() {
 
   async function createMessage(body: PostMessage, chatId: string) {
     console.log("Creating message", body, chatId);
+    let updatedChats = [...chats];
     try {
       const result = await AppRequest.Post(`/api/messages`, body).then(
         (res) => {
@@ -97,6 +98,12 @@ export function useMessages() {
         } else if (!body.chat_session_id) {
           const settings = await createSetting(chat?.chat_setting);
           console.log(`Setting created: ${settings}`);
+          updatedChats = [...chats]?.map((chat) => {
+            if (chat.id === NEW_SESSION) {
+              chat.chat_setting = settings;
+            }
+            return chat;
+          });
         } else {
           const settings = await updateSetting(chat?.chat_setting);
           console.log(`Setting updated: ${settings}`);
@@ -127,7 +134,7 @@ export function useMessages() {
 
         if (chatId === NEW_SESSION) {
           // allocate new session with the id
-          const updatedChats = [...chats]?.map((chat) => {
+          updatedChats = [...chats]?.map((chat) => {
             if (chat.id === NEW_SESSION) {
               // remove the new session
               localStorage.removeItem(NEW_SESSION);
