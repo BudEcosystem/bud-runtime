@@ -1,5 +1,4 @@
 import type { Config } from "tailwindcss"
-import lineClamp from '@tailwindcss/line-clamp';
 import { transform } from "next/dist/build/swc";
 import { Scale } from "lucide-react";
 
@@ -99,7 +98,6 @@ const config = {
   },
   plugins: [
     require("tailwindcss-animate"),
-     lineClamp,
      function ({ addUtilities }: { addUtilities: (utilities: Record<string, any>) => void }) {
       addUtilities({
         '.display-webkit-box': {
