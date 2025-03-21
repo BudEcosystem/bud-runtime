@@ -1,5 +1,4 @@
 import { tempApiBaseUrl } from '@/app/components/bud/environment';
-import { NEW_SESSION } from '@/app/components/bud/hooks/useMessages';
 import axios from 'axios';
 import { randomUUID } from 'crypto';
 import { NextResponse } from 'next/server';

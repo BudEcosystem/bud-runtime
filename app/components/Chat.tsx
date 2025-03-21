@@ -354,7 +354,9 @@ function ChatWithStore(props: { chat: ActiveSession }) {
         <ChatContext.Provider
           value={{
             chat: props.chat,
-            messages: messages?.filter((m) => m.prompt !== NEW_SESSION),
+            messages: messages
+            // ?.filter((m) => m.prompt !== NEW_SESSION)
+            ,
             setMessages,
           }}
         >

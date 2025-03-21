@@ -79,6 +79,10 @@ function UserMessage(props: MessageProps) {
 }
 
 function AIMessage(props: MessageProps) {
+  if(!props.content){
+    console.log('props', props);
+    return null;
+  }
   return (
     <div className="flex flex-row items-top gap-[.5rem]">
       <div className="mr-[.5rem] mt-[.2rem]">
