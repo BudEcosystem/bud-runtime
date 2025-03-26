@@ -1,4 +1,5 @@
 import axios from "axios";
+import { apiBaseUrl } from "../components/bud/environment";
 
 export const axiosInstance = axios.create({
 });
@@ -29,12 +30,64 @@ axiosInstance.interceptors.request.use(
   }
 );
 
+const onRrefreshed = (token: string) => {
+  refreshSubscribers.map((callback: any) => callback(token));
+};
+
+const subscribeTokenRefresh = (callback: any) => {
+  refreshSubscribers.push(callback);
+};
+
+const refreshToken = async () => {
+  try {
+    const response = await axiosInstance.post(`${apiBaseUrl}/token/refresh`, {
+      refresh_token: localStorage.getItem("refresh_token"),
+    });
+    const data = response.data;
+    if (!data?.result) {
+      localStorage.clear();
+      return Promise.reject(data);
+    }
+    localStorage.setItem("access_token", data.result.access_token);
+    localStorage.setItem("refresh_token", data.result.refresh_token);
+    return data.result.access_token;
+  } catch (error) {
+    // errorToast(error?.response?.data?.error?.message || "Unauthorized Access");
+    localStorage.clear();
+    return Promise.reject(error);
+  }
+};
+
+
 // Response interceptor
 axiosInstance.interceptors.response.use(
   (response) => {
     return response;
   },
   (err) => {
+    const status = err?.response?.status;
+    if (status === 401 && !isRefreshing) {
+      isRefreshing = true;
+      return refreshToken()
+        .then((newToken) => {
+          isRefreshing = false;
+          onRrefreshed(newToken);
+          refreshSubscribers = [];
+          return axiosInstance(err.config);
+        })
+        .catch((error) => {
+          isRefreshing = false;
+          refreshSubscribers = [];
+          return Promise.reject(error);
+        });
+    } else if (status === 401 && isRefreshing) {
+      return new Promise((resolve) => {
+        subscribeTokenRefresh((newToken: string) => {
+          err.config.headers.Authorization = `Bearer ${newToken}`;
+          resolve(axiosInstance(err.config));
+        });
+      });
+    }
     return handleErrorResponse(err);
   }
 );
