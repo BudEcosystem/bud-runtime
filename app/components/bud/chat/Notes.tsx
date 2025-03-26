@@ -39,12 +39,11 @@ function Notes() {
 
   return (
     <div
-      className="max-h-[20rem] overflow-y-auto"
       id={chatNotes}
       onScroll={handleScroll}
     >
       {notes?.map((note) => (
-        <div className="flex flex-col w-full gap-[.5rem] py-[.375rem]">
+        <div className="flex flex-col w-full gap-[.5rem] py-[.375rem] max-h-[20rem] overflow-y-auto">
           <LabelTextArea
             title="Notes"
             placeholder="Type your notes here"
