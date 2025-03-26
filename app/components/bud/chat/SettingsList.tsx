@@ -262,7 +262,11 @@ function SettingsList({ data }: SettingsListProps) {
                       n.id === note.id ? { ...n, note: value } : n
                     )
                   );
-                  updateNote(note.id, value);
+                  // debounce
+                  const timeout = setTimeout(() => {
+                    updateNote(note.id, value);
+                    clearTimeout(timeout);
+                  }, 1000);
                 }}
               />
             </div>
