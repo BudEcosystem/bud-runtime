@@ -38,10 +38,7 @@ function Notes() {
   };
 
   return (
-    <div
-      id={chatNotes}
-      onScroll={handleScroll}
-    >
+    <div id={chatNotes} onScroll={handleScroll}>
       {notes?.map((note) => (
         <div className="flex flex-col w-full gap-[.5rem] py-[.375rem] max-h-[20rem] overflow-y-auto">
           <LabelTextArea
@@ -56,7 +53,11 @@ function Notes() {
               );
             }}
             onBlur={() => {
-              updateNote(note.id, note.note);
+              if (note.note === "") {
+                deleteNote(note.id);
+              } else {
+                updateNote(note.id, note.note);
+              }
             }}
           />
         </div>
