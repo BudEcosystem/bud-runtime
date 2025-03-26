@@ -49,6 +49,7 @@ const refreshToken = async () => {
       return Promise.reject(data);
     }
     localStorage.setItem("access_token", data.result.access_token);
+    localStorage.setItem("token", data.result.access_token);
     localStorage.setItem("refresh_token", data.result.refresh_token);
     return data.result.access_token;
   } catch (error) {
