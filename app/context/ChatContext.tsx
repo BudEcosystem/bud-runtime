@@ -43,6 +43,13 @@ export type Endpoint = {
   created_at: string;
 };
 
+export type Note = {
+  id: string;
+  note: string;
+  created_at: string;
+  modified_at: string;
+}
+
 type ChatContextType = {
   // api key
   chat?: ActiveSession;
@@ -52,6 +59,8 @@ type ChatContextType = {
   // set messages history
   setMessages: (messages: PostMessage[]) => void;
 
+  notes: Note[];
+  setNotes: (notes: Note[]) => void;
 };
 
 const ChatContext = createContext<ChatContextType>({
@@ -59,6 +68,8 @@ const ChatContext = createContext<ChatContextType>({
   chat: undefined,
   messages: [],
   setMessages: (_: any[]) => {},
+  notes: [],
+  setNotes: (_: Note[]) => {},
 });
 
 export default ChatContext;

@@ -1,5 +1,5 @@
-import { Image, Select, Tag } from "antd";
-import React, { useContext } from "react";
+import { Button, Image, Select, Tag } from "antd";
+import React, { useContext, useEffect } from "react";
 import { getChromeColor } from "../utils/color";
 import SliderInput from "../components/input/SliderInput";
 import InlineInput from "../components/input/InlineInput";
@@ -7,6 +7,7 @@ import InlineSwitch from "../components/input/InlineSwitch";
 import ChatContext from "@/app/context/ChatContext";
 import RootContext from "@/app/context/RootContext";
 import LabelTextArea from "../components/input/LabelTextArea";
+import { useNotes } from "../hooks/useNotes";
 
 interface SettingsListItemProps {
   title: string;
@@ -62,12 +63,19 @@ interface SettingsListProps {
 }
 
 function SettingsList({ data }: SettingsListProps) {
+  const { getNotes, createNote, deleteNote, updateNote } = useNotes();
   const { handleSettingsChange } = useContext(RootContext);
-  const { chat } = useContext(ChatContext);
+  const { chat, notes, setNotes } = useContext(ChatContext);
 
   const handleChange = (chat: any, key: string, value: any) => {
     handleSettingsChange(chat, key, value);
   };
+
+  useEffect(() => {
+    getNotes();
+  }, []);
+
+  console.log("chat notes", notes);
 
   const components = [
     {
@@ -239,15 +247,36 @@ function SettingsList({ data }: SettingsListProps) {
       description: "Conversation Notes",
       icon: "icons/circle-settings.svg",
       children: (
-        <div className="flex flex-col w-full gap-[.5rem] py-[.375rem]">
-          <LabelTextArea
-            title="Notes"
-            placeholder="Type your notes here"
-            description="Conversation Notes"
-            value={`${chat?.chat_setting?.top_k_sampling || 0}`}
-            defaultValue={`${chat?.chat_setting?.top_k_sampling || 0}`}
-            onChange={(value) => handleChange(chat, "notes", value)}
-          />
+        <div>
+          {notes?.map((note) => (
+            <div className="flex flex-col w-full gap-[.5rem] py-[.375rem]">
+              <LabelTextArea
+                title="Notes"
+                placeholder="Type your notes here"
+                description="Conversation Notes"
+                value={note.note}
+                defaultValue={note.note}
+                onChange={(value) => {
+                  setNotes(
+                    notes.map((n) =>
+                      n.id === note.id ? { ...n, note: value } : n
+                    )
+                  );
+                  updateNote(note.id, value);
+                }}
+              />
+            </div>
+          ))}
+          <Button
+            onClick={() => {
+              createNote("New Note");
+            }}
+            icon={<Image src="icons/plus.svg" preview={false} />}
+            className="flex items-center justify-center w-full h-[2rem] bg-[#D1B854] text-[#101010] text-[.75rem] font-[400] rounded-[6px]"
+            type="primary"
+          >
+            {notes?.length > 0 ? "Add Note" : "Add another note"}
+          </Button>
         </div>
       ),
     },

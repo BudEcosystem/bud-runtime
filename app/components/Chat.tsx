@@ -1,7 +1,7 @@
 import { Image, Layout } from "antd";
 import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import RootContext from "../context/RootContext";
-import ChatContext from "../context/ChatContext";
+import ChatContext, { Note } from "../context/ChatContext";
 import NavBar from "./bud/components/navigation/NavBar";
 import { HistoryMessages, Messages } from "./bud/chat/Messages";
 import MessageLoading from "./bud/chat/MessageLoading";
@@ -315,6 +315,7 @@ export function Chat() {
 function ChatWithStore(props: { chat: ActiveSession }) {
   const { localMode } = useContext(RootContext);
   const { getSessionMessages } = useMessages();
+  const [notes, setNotes] = useState<Note[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
   const [loadedChatID, setLoadedChatID] = useState<string | undefined>(
     undefined
@@ -354,10 +355,11 @@ function ChatWithStore(props: { chat: ActiveSession }) {
         <ChatContext.Provider
           value={{
             chat: props.chat,
-            messages: messages
+            messages: messages,
             // ?.filter((m) => m.prompt !== NEW_SESSION)
-            ,
             setMessages,
+            notes,
+            setNotes,
           }}
         >
           <Chat />
