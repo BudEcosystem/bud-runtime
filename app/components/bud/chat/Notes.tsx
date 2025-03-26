@@ -3,8 +3,10 @@ import LabelTextArea from "../components/input/LabelTextArea";
 import { useNotes } from "../hooks/useNotes";
 import ChatContext from "@/app/context/ChatContext";
 import { Button, Image } from "antd";
+import RootContext from "@/app/context/RootContext";
 
 function Notes() {
+  const { localMode } = useContext(RootContext);
   const {
     getNotes,
     createNote,
@@ -21,7 +23,18 @@ function Notes() {
   const chatNotes = `chat-${chat?.id}-notes`;
 
   useEffect(() => {
-    getNotes();
+    localStorage.setItem(chatNotes, JSON.stringify(notes));
+  }, [notes]);
+
+  useEffect(() => {
+    if (localMode) {
+      const localNotes = localStorage.getItem(chatNotes);
+      if (localNotes) {
+        setNotes(JSON.parse(localNotes));
+      }
+    } else {
+      getNotes();
+    }
   }, [currentPage]);
 
   const handleScroll = () => {
