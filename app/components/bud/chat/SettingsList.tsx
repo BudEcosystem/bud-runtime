@@ -6,6 +6,7 @@ import InlineInput from "../components/input/InlineInput";
 import InlineSwitch from "../components/input/InlineSwitch";
 import ChatContext from "@/app/context/ChatContext";
 import RootContext from "@/app/context/RootContext";
+import LabelTextArea from "../components/input/LabelTextArea";
 
 interface SettingsListItemProps {
   title: string;
@@ -229,6 +230,23 @@ function SettingsList({ data }: SettingsListProps) {
             defaultValue={chat?.chat_setting?.min_p_sampling || 0}
             value={chat?.chat_setting?.min_p_sampling || 0}
             onChange={(value) => handleChange(chat, "min_p_sampling", value)}
+          />
+        </div>
+      ),
+    },
+    {
+      title: "Conversation Notes",
+      description: "Conversation Notes",
+      icon: "icons/circle-settings.svg",
+      children: (
+        <div className="flex flex-col w-full gap-[.5rem] py-[.375rem]">
+          <LabelTextArea
+            title="Notes"
+            placeholder="Type your notes here"
+            description="Conversation Notes"
+            value={`${chat?.chat_setting?.top_k_sampling || 0}`}
+            defaultValue={`${chat?.chat_setting?.top_k_sampling || 0}`}
+            onChange={(value) => handleChange(chat, "notes", value)}
           />
         </div>
       ),
