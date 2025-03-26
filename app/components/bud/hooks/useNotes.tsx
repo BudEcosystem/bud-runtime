@@ -1,21 +1,27 @@
 import { AppRequest } from "@/app/api/requests";
 import ChatContext from "@/app/context/ChatContext";
-import { useContext } from "react";
+import { useContext, useState } from "react";
 import { tempApiBaseUrl } from "../environment";
 
 export function useNotes() {
+  const [loading, setLoading] = useState(false);
   const { chat, setNotes, notes } = useContext(ChatContext);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalNotes, setTotalNotes] = useState(0);
 
   const createNote = async (note: string) => {
     try {
       const result = await AppRequest.Post(
         `${tempApiBaseUrl}/playground/chat-sessions/notes`,
         { note, chat_session_id: chat?.id }
-      ).then((res) => {
-        return res.data?.note;
-      })?.finally(() => {
-        getNotes();
-      });
+      )
+        .then((res) => {
+          return res.data?.note;
+        })
+        ?.finally(() => {
+          getNotes();
+        });
 
       console.log(`Note created: ${result.id}`);
       return result;
@@ -26,14 +32,24 @@ export function useNotes() {
 
   const getNotes = async () => {
     try {
+      setLoading(true);
       const result = await AppRequest.Get(
-        `${tempApiBaseUrl}/playground/chat-sessions/${chat?.id}/notes`
+        `${tempApiBaseUrl}/playground/chat-sessions/${chat?.id}/notes`,
+        {
+          params: { page: currentPage, limit: 10 },
+        }
       ).then((res) => {
         console.log(res.data?.notes, notes);
-        setNotes(res.data?.notes);
+        setTotalPages(res.data?.total_pages);
+        setTotalNotes(res.data?.total_record);
+        if (currentPage === 1) {
+          setNotes(res.data?.notes);
+        } else {
+          setNotes([...notes, ...res.data?.notes]);
+        }
         return res.data?.notes;
       });
-
+      setLoading(false);
       console.log(`Notes retrieved: ${result}`);
       return result;
     } catch (error) {
@@ -41,7 +57,7 @@ export function useNotes() {
     }
   };
 
-  const updateNote = async (noteId: string, note: string, ) => {
+  const updateNote = async (noteId: string, note: string) => {
     try {
       const result = await AppRequest.Patch(
         `${tempApiBaseUrl}/playground/chat-sessions/notes/${noteId}`,
@@ -60,11 +76,13 @@ export function useNotes() {
     try {
       const result = await AppRequest.Delete(
         `${tempApiBaseUrl}/playground/chat-sessions/notes/${noteId}`
-      ).then((res) => {
-        return res.data;
-      })?.finally(() => {
-        getNotes();
-      });
+      )
+        .then((res) => {
+          return res.data;
+        })
+        ?.finally(() => {
+          getNotes();
+        });
 
       console.log(`Note deleted: ${result}`);
       return result;
@@ -73,5 +91,5 @@ export function useNotes() {
     }
   };
 
-  return { createNote, getNotes, updateNote, deleteNote };
+  return { createNote, getNotes, updateNote, deleteNote, loading, notes, totalPages, totalNotes, setNotes, chat, currentPage, setCurrentPage};
 }

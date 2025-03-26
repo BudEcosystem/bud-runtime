@@ -10,6 +10,7 @@ interface LabelTextAreaProps {
   onChange: (value: string) => void;
   className?: string;
   defaultValue?: string;
+  onBlur?: () => void;
 }
 
 export default function LabelTextArea(props: LabelTextAreaProps) {
@@ -20,7 +21,10 @@ export default function LabelTextArea(props: LabelTextAreaProps) {
       <div className="w-full">
         <div className="absolute !bg-[#101010] px-[.25rem] rounded -top-2 left-[.5rem] tracking-[.035rem] z-10 flex items-center gap-1 text-[.75rem] text-[#EEEEEE] font-[300] text-nowrap">
           {props.title}
-          <CustomPopover title={props.description} classNames="flex items-center">
+          <CustomPopover
+            title={props.description}
+            classNames="flex items-center"
+          >
             <Image
               preview={false}
               src="/icons/info.svg"
@@ -30,6 +34,7 @@ export default function LabelTextArea(props: LabelTextAreaProps) {
           </CustomPopover>
         </div>
         <Input.TextArea
+          onBlur={props.onBlur}
           defaultValue={props.defaultValue}
           placeholder={props.placeholder}
           style={{
