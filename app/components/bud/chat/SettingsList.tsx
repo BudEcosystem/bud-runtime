@@ -244,9 +244,9 @@ function SettingsList({ data }: SettingsListProps) {
       children: (
         <div className="flex flex-col w-full gap-[.5rem] py-[.375rem]">
           <LabelJSONInput
-            title="Structured Output"
+            title="JSON Schema"
             description="Structured Output"
-            placeholder="Type your structured output here"
+            placeholder="Enter JSON Schema"
             value={chat?.chat_setting?.structured_json_schema || ""}
             onChange={(value) => handleChange(chat, "structured_json_schema", value)}
           />
