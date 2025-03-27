@@ -1171,3 +1171,18 @@ textarea
     min-height: 100% !important;
   }
 }
+
+.mantine-JsonInput-wrapper{
+  textarea{
+  outline: none;
+  width: 100%;
+  }
+}
+
+.mantine-JsonInput-error{
+  position: absolute;
+  top: .5rem;
+  right: .5rem;
+  color: red;
+  font-weight: 500;
+}

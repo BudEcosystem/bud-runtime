@@ -9,6 +9,7 @@ import RootContext from "@/app/context/RootContext";
 import LabelTextArea from "../components/input/LabelTextArea";
 import { useNotes } from "../hooks/useNotes";
 import Notes from "./Notes";
+import LabelJSONInput from "../components/input/LabelJSONInput";
 
 interface SettingsListItemProps {
   title: string;
@@ -70,7 +71,6 @@ function SettingsList({ data }: SettingsListProps) {
   const handleChange = (chat: any, key: string, value: any) => {
     handleSettingsChange(chat, key, value);
   };
-
 
   const components = [
     {
@@ -238,12 +238,26 @@ function SettingsList({ data }: SettingsListProps) {
       ),
     },
     {
+      title: "Structured Output",
+      description: "JSON settings",
+      icon: "icons/circle-settings.svg",
+      children: (
+        <div className="flex flex-col w-full gap-[.5rem] py-[.375rem]">
+          <LabelJSONInput
+            title="Structured Output"
+            description="Structured Output"
+            placeholder="Type your structured output here"
+            value={chat?.chat_setting?.structured_json_schema || ""}
+            onChange={(value) => handleChange(chat, "structured_json_schema", value)}
+          />
+        </div>
+      ),
+    },
+    {
       title: "Conversation Notes",
       description: "Conversation Notes",
       icon: "icons/circle-settings.svg",
-      children: (
-        <Notes />
-      ),
+      children: <Notes />,
     },
   ];
 

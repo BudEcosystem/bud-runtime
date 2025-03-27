@@ -90,7 +90,7 @@ export default function Home() {
       repeat_penalty: 0,
       sequence_length: 1000,
       stop_strings: [],
-      structured_json_schema: {},
+      structured_json_schema: "",
       system_prompt: "",
       top_k_sampling: 40,
       top_p_sampling: 1,

@@ -16,7 +16,7 @@ export type ChatSettings = {
   repeat_penalty: number;
   top_p_sampling: number;
   min_p_sampling: number;
-  structured_json_schema: any;
+  structured_json_schema: string;
   created_at: string;
   modified_at: string;
 };

@@ -16,6 +16,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
+import { MantineProvider } from "@mantine/core";
 const { Header, Footer, Sider, Content } = Layout;
 
 export function Chat() {
@@ -362,7 +363,9 @@ function ChatWithStore(props: { chat: ActiveSession }) {
             setNotes,
           }}
         >
-          <Chat />
+          <MantineProvider>
+            <Chat />
+          </MantineProvider>
         </ChatContext.Provider>
       </ResizablePanel>
       <ResizableHandle />
