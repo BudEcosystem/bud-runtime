@@ -12,6 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useMessages } from "../../hooks/useMessages";
 
 interface NavBarProps {
   onToggleLeftSidebar: () => void;
@@ -30,6 +31,7 @@ function NavBar({
   const { createChat, closeChat } = useContext(RootContext);
   const { chat } = useContext(ChatContext);
   const [open, setOpen] = React.useState(false);
+  const { deleteSession } = useMessages();
 
   return (
     <div className="topBg text-[#FFF] p-[1rem] flex justify-between items-center h-[3.625rem] relative sticky top-0  z-10 bg-[#101010] border-b-[1px] border-b-[#1F1F1F]">
@@ -107,7 +109,10 @@ function NavBar({
             </svg>
           </div>
         </button>
-        <DropdownMenu open={openDropdown} onOpenChange={(isOpen) => setOpenDropdown(isOpen)}>
+        <DropdownMenu
+          open={openDropdown}
+          onOpenChange={(isOpen) => setOpenDropdown(isOpen)}
+        >
           <DropdownMenuTrigger>
             <div className="mr-[.4rem] w-[1.475rem] height-[1.475rem] p-[.2rem] rounded-[6px] flex justify-center items-center  cursor-pointer">
               <div className="w-[1.125rem] h-[1.125rem] flex justify-center items-center cursor-pointer group text-[#B3B3B3] hover:text-white">
@@ -127,10 +132,10 @@ function NavBar({
               </div>
             </div>
           </DropdownMenuTrigger>
-          <DropdownMenuContent>
+          <DropdownMenuContent className="bg-[#101010] border-[1px] border-[#1F1F1F]">
             {chat && (
               <DropdownMenuLabel
-                className="cursor-pointer"
+                className="cursor-pointer text-[#B3B3B3] hover:text-white"
                 onClick={() => {
                   setOpenDropdown(false);
                   closeChat(chat);
@@ -139,10 +144,22 @@ function NavBar({
                 Close
               </DropdownMenuLabel>
             )}
-            <DropdownMenuSeparator />
+            <DropdownMenuItem className="cursor-pointer text-[#B3B3B3] hover:text-white">
+              Clear History
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={async () => {
+                if (chat) {
+                  await deleteSession(chat?.id);
+                  closeChat(chat);
+                }
+              }}
+              className="cursor-pointer text-[#B3B3B3] hover:text-white"
+            >
+              Delete
+            </DropdownMenuItem>
             {/* <DropdownMenuItem>Profile</DropdownMenuItem>
-            <DropdownMenuItem>Billing</DropdownMenuItem>
-            <DropdownMenuItem>Team</DropdownMenuItem>
+           
             <DropdownMenuItem>Subscription</DropdownMenuItem> */}
           </DropdownMenuContent>
         </DropdownMenu>

@@ -164,5 +164,11 @@ export function useMessages() {
     });
   }
 
-  return { createMessage, getSessions, getSessionMessages };
+  async function deleteSession(id: string) {
+    return await AppRequest.Delete(`${tempApiBaseUrl}/playground/chat-sessions/${id}`).then((res) => {
+      return res.data;
+    });
+  }
+
+  return { createMessage, getSessions, getSessionMessages, deleteSession };
 }
