@@ -2,8 +2,6 @@ import { createContext } from "react";
 import { PostMessage } from "../components/bud/hooks/useMessages";
 import { ActiveSession, Session } from "../components/bud/chat/HistoryList";
 
-
-
 type Provider = {
   id: string;
   name: string;
@@ -37,7 +35,7 @@ type Project = {
 export type Endpoint = {
   id: string;
   name: string;
-  status: string;
+  status: "unhealthy" | "running";
   model: Model;
   project: Project;
   created_at: string;
@@ -48,7 +46,7 @@ export type Note = {
   note: string;
   created_at: string;
   modified_at: string;
-}
+};
 
 type ChatContextType = {
   // api key

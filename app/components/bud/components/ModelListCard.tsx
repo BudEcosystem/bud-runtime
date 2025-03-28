@@ -1,8 +1,9 @@
-import { Image, Tag } from "antd";
+import { Image, notification, Tag } from "antd";
 import React from "react";
 import { assetBaseUrl } from "../environment";
 import { getChromeColor } from "../utils/color";
 import { Endpoint } from "@/app/context/ChatContext";
+import { toast } from "react-toastify";
 
 type Model = {
   id: string;
@@ -43,6 +44,9 @@ export function ModelListCard({
     <div
       onMouseEnter={() => setHover(true)}
       onClick={() => {
+        if(data.status === "unhealthy") {
+          return toast.error("Model is unhealthy");
+        }
         handleClick?.();
       }}
       onMouseLeave={() => setHover(false)}
