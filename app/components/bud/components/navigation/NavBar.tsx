@@ -19,6 +19,7 @@ interface NavBarProps {
   onToggleRightSidebar: () => void;
   isLeftSidebarOpen: boolean;
   isRightSidebarOpen: boolean;
+  setChatData: (data: any) => void;
 }
 
 function NavBar({
@@ -26,10 +27,11 @@ function NavBar({
   onToggleRightSidebar,
   isLeftSidebarOpen,
   isRightSidebarOpen,
+  setChatData,
 }: NavBarProps) {
   const [openDropdown, setOpenDropdown] = React.useState(false);
   const { createChat, closeChat } = useContext(RootContext);
-  const { chat } = useContext(ChatContext);
+  const { chat, setMessages } = useContext(ChatContext);
   const [open, setOpen] = React.useState(false);
   const { deleteSession } = useMessages();
 
@@ -138,19 +140,32 @@ function NavBar({
                 className="cursor-pointer text-[#B3B3B3] hover:text-white"
                 onClick={() => {
                   setOpenDropdown(false);
+                  setMessages([]);
                   closeChat(chat);
+                  setChatData([]);
                 }}
               >
                 Close
               </DropdownMenuItem>
             )}
-            <DropdownMenuItem className="cursor-pointer text-[#B3B3B3] hover:text-white">
+            <DropdownMenuItem
+              onClick={async () => {
+                if (chat) {
+                  localStorage.removeItem(chat?.id);
+                  setChatData([]);
+                  setMessages([]);
+                }
+              }}
+              className="cursor-pointer text-[#B3B3B3] hover:text-white"
+            >
               Clear History
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={async () => {
                 if (chat) {
                   await deleteSession(chat?.id);
+                  setMessages([]);
+                  setChatData([]);
                   closeChat(chat);
                 }
               }}

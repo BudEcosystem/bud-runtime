@@ -9,6 +9,7 @@ import APIKey from "./components/APIKey";
 import { useEndPoints } from "./components/bud/hooks/useEndPoint";
 import { AuthNavigationProvider, LoaderProvider, useLoader } from "./context/appContext";
 import { Image } from "antd";
+import { toast } from "react-toastify";
 
 const LoaderWrapper = () => {
   const { isLoading } = useLoader();
@@ -122,7 +123,7 @@ export default function Home() {
       let updatedChats = [...chats];
       if (!sessionId) {
         if (updatedChats.find((chat) => chat.id === NEW_SESSION)) {
-          alert("You can only have one new chat at a time");
+          toast.warn("You can only have one new chat at a time");
           return;
         }
         updatedChats.push(newChatPayload);

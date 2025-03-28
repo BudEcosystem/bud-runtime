@@ -98,6 +98,7 @@ export function Chat() {
     messages,
     reload,
     stop,
+    setData
   } = useChat({
     headers: {
       Authorization: token ? `Bearer ${token}` : "",
@@ -185,6 +186,7 @@ export function Chat() {
             isRightSidebarOpen={toggleRight}
             onToggleLeftSidebar={() => setToggleLeft(!toggleLeft)}
             onToggleRightSidebar={() => setToggleRight(!toggleRight)}
+            setChatData={setData}
           />
         </Header>
         <Content className="overflow-hidden overflow-y-auto hide-scrollbar">
