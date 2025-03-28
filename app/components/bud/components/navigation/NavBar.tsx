@@ -134,7 +134,7 @@ function NavBar({
           </DropdownMenuTrigger>
           <DropdownMenuContent className="bg-[#101010] border-[1px] border-[#1F1F1F]">
             {chat && (
-              <DropdownMenuLabel
+              <DropdownMenuItem
                 className="cursor-pointer text-[#B3B3B3] hover:text-white"
                 onClick={() => {
                   setOpenDropdown(false);
@@ -142,7 +142,7 @@ function NavBar({
                 }}
               >
                 Close
-              </DropdownMenuLabel>
+              </DropdownMenuItem>
             )}
             <DropdownMenuItem className="cursor-pointer text-[#B3B3B3] hover:text-white">
               Clear History
