@@ -16,10 +16,10 @@ interface LabelJSONInputProps {
 export default function LabelJSONInput(props: LabelJSONInputProps) {
   return (
     <div
-      className={`flex items-start rounded-[6px] relative !bg-[transparent]  w-full mb-[0] ${props.className}`}
+      className={`flex items-start rounded-[6px] relative !bg-[transparent] p-[.5rem]  w-full mb-[0] ${props.className}`}
     >
       <div className="w-full">
-        <div className="absolute !bg-[#101010] px-[.25rem] rounded -top-2 left-[.5rem] tracking-[.035rem] z-10 flex items-center gap-1 text-[.75rem] text-[#EEEEEE] font-[300] text-nowrap">
+        <div className="absolute !bg-[#101010] px-[.25rem] rounded -top-1 left-[.5rem] tracking-[.035rem] z-10 flex items-center gap-1 text-[.75rem] text-[#EEEEEE] font-[300] text-nowrap">
           {props.title}
           <CustomPopover
             title={props.description}

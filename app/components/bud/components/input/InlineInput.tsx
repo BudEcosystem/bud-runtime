@@ -18,7 +18,7 @@ export default function InlineInput(props: InlineInputProps) {
       <span className="text-[#EEEEEE] text-[.75rem] font-[400] text-nowrap w-full">
         {props.title}
       </span>
-      <div className="flex flex-row items-center min-w-[7.69rem] max-h-[2rem]">
+      <div className="flex flex-row items-center w-full max-h-[2rem]">
         <Input
           type={props.type}
           placeholder={props.placeholder}

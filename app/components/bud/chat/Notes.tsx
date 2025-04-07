@@ -51,7 +51,7 @@ function Notes() {
   };
 
   return (
-    <div id={chatNotes} onScroll={handleScroll}>
+    <div id={chatNotes} onScroll={handleScroll} className="px-[.5rem]">
       {notes?.map((note) => (
         <div className="flex flex-col w-full gap-[.5rem] py-[.375rem] max-h-[20rem] overflow-y-auto">
           <LabelTextArea

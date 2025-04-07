@@ -19,10 +19,10 @@ interface SettingsListItemProps {
 }
 
 function SettingsListItem(props: SettingsListItemProps) {
-  const [open, setOpen] = React.useState(false);
+  const [open, setOpen] = React.useState(true);
 
   return (
-    <div className="flex flex-col w-full  bg-[#101010] px-[.4rem] py-[.5rem] border-[0px] border-b-[1px] border-[#1F1F1F] ">
+    <div className="flex flex-col w-full  bg-[#ffffff08] px-[.4rem] py-[.5rem] border-[1px] border-[#1F1F1F] mb-[1rem] rounded-[.5rem]">
       <div
         className="flex flex-row items-center gap-[1rem] px-[.3rem] justify-between"
         onClick={() => setOpen(!open)}
@@ -90,7 +90,7 @@ function SettingsList({ data }: SettingsListProps) {
           />
           <InlineSwitch
             title="Limit Response Length"
-            defaultValue={chat?.chat_setting?.limit_response_length || true}
+            defaultValue={chat?.chat_setting?.limit_response_length || false}
             onChange={(value) =>
               handleChange(chat, "limit_response_length", value)
             }
@@ -115,7 +115,7 @@ function SettingsList({ data }: SettingsListProps) {
             <span className="text-[#EEEEEE] text-[.75rem] font-[400] text-nowrap w-full">
               Context Overflow
             </span>
-            <div className="flex flex-row items-center gap-[.5rem] w-full  min-w-[7.69rem] max-w-[7.69rem] max-h-[2rem]">
+            <div className="flex flex-row items-center gap-[.5rem] w-full max-h-[2rem]">
               <Select
                 defaultValue={chat?.chat_setting?.context_overflow_policy?.split(
                   ","
@@ -129,7 +129,7 @@ function SettingsList({ data }: SettingsListProps) {
                 tagRender={(props) => (
                   <Tag
                     closable
-                    className=" !text-[.625rem] font-[400]  rounded-[0.5rem] !p-[.25rem] ml-[.25rem]"
+                    className=" !text-[.625rem] font-[400]  rounded-[0.5rem] !px-[.25rem] !py-[0rem] ml-[.25rem]"
                     style={{
                       background: getChromeColor("#D1B854"),
                       borderColor: getChromeColor("#D1B854"),
@@ -139,7 +139,7 @@ function SettingsList({ data }: SettingsListProps) {
                       <Image
                         src="icons/close.svg"
                         preview={false}
-                        className="!w-[.625rem] !h-[.625rem]"
+                        className="!w-[.625rem] !h-[.425rem]"
                       />
                     }
                   >
@@ -262,7 +262,7 @@ function SettingsList({ data }: SettingsListProps) {
   ];
 
   return (
-    <div className="flex flex-col w-full h-full bg-[#101010]  overflow-y-auto pb-[5rem]">
+    <div className="relative flex flex-col w-full h-full overflow-y-auto pb-[5rem] pt-[1rem] px-[1rem]">
       {components?.map((item, index) => (
         <SettingsListItem key={index} {...item} />
       ))}

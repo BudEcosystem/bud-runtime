@@ -193,6 +193,10 @@ export function Chat() {
         // style={{ display: toggleLeft ? "block" : "none" }}
       >
         <div className="leftBg w-full h-full min-w-[200px]">
+        <div className="absolute z-0 top-0 left-0 bottom-0 right-0 w-full h-full">
+          <div className="absolute top-0 left-0 bottom-0 right-0 opacity-5 bg-gradient-to-b from-[#965CDE] via-[#101010] to-[#965CDE] overflow-y-auto pb-[5rem] pt-[1rem] px-[1rem]"></div>
+          {/* <div className="absolute top-0 right-0 w-[200px] h-[200px] blur-xl opacity-7 bg-gradient-to-b from-[#A737EC] to-[#A737EC] overflow-y-auto pb-[5rem] pt-[1rem] px-[1rem]"></div> */}
+        </div>
           <div className="flex flex-row py-[1rem] px-[1.5rem] bg-[#101010] border-b-[1px] border-[#1F1F1F] h-[3.625rem]">
             <div
               className="flex flex-row items-center gap-[.85rem] p-[.5rem] bg-[#101010] cursor-pointer"
@@ -308,7 +312,11 @@ export function Chat() {
         // style={{ display: toggleRight ? "block" : "none" }}
       >
         <div className="rightBg w-full h-full">
-          <div className="flex flex-row pt-[.7rem] pb-[.4rem] px-[.9rem] bg-[#101010] border-b-[1px] border-[#1F1F1F] h-[3.625rem] justify-between items-center">
+          <div className="absolute z-0 top-0 left-0 bottom-0 right-0 w-full h-full">
+            <div className="absolute top-0 left-0 bottom-0 right-0 opacity-2 bg-gradient-to-b from-[#A737EC] via-[#72AFD3] to-[#A737EC] overflow-y-auto pb-[5rem] pt-[1rem] px-[1rem]"></div>
+            <div className="absolute top-0 right-0 w-[200px] h-[200px] blur-xl opacity-7 bg-gradient-to-b from-[#A737EC] to-[#A737EC] overflow-y-auto pb-[5rem] pt-[1rem] px-[1rem]"></div>
+          </div>
+          <div className="relative z-10 flex flex-row pt-[.7rem] pb-[.4rem] px-[.9rem]  border-b-[1px] border-[#1F1F1F] h-[3.625rem] justify-between items-center">
             <div
               className="flex flex-row items-center gap-[.65rem] bg-[#101010] pl-[.15rem] cursor-pointer"
               onClick={onToggleRightSidebar}

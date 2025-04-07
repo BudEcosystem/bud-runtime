@@ -46,7 +46,7 @@ function HistoryListItem({ data }: { data: Session }) {
         }
         createChat(data.id, chat?.id);
       }}
-      className="flex flex-row items-center gap-[1rem] p-[.45rem] px-[.65rem] justify-between border-[1px] border-[#1F1F1F] rounded-[8px] backdrop-blur-[10px] hover:bg-[#1F1F1F] cursor-pointer"
+      className="flex flex-row items-center gap-[1rem] p-[.45rem] px-[.65rem] justify-between border-[1px] border-[#1F1F1F00] hover:border-[#1F1F1F] rounded-[8px] backdrop-blur-[10px] hover:bg-[#FFFFFF08] cursor-pointer"
     >
       <div className="flex flex-row items-center gap-[.6rem] px-[.27rem]">
         <Image
