@@ -5,6 +5,9 @@ import {
   Text_12_300_EEEEEE,
   Text_12_400_B3B3B3,
   Text_12_400_EEEEEE,
+  Text_14_300_EEEEEE,
+  Text_18_500_EEEEEE,
+  Text_26_400_EEEEEE,
   Text_32_500_FFFFFF,
 } from "@/lib/text";
 import { PrimaryButton } from "./uiComponents/inputs";
@@ -57,22 +60,21 @@ function APIKey({
               alt=""
               src="/images/BudLogo.png"
               preview={false}
-              style={{ width: "6.6em" }}
+              style={{ width: "8em" }}
               className="w-[6.6em] h-auto"
             />
-            <div className="logo-text text-[2.25em] 2xl:text-[2.5rem] 1680px:text-[2.4rem] text-white open-sans tracking-[.0rem] leading-[3.1rem] w-[400px] 1680px:w-[500px] 2560px:w-[700px]">
-              Useful. Private. Real time. Offline. Safe Intelligence in your
-              Pocket.
+            <div className="logo-text text-[2.25em] 2xl:text-[2.5rem] 1680px:text-[2.4rem] text-white open-sans tracking-[.0rem] leading-[3.1rem] w-[700px] 1680px:w-[700px] 2560px:w-[900px]">
+            Bud Studio. <br /> Any Model in Any Cloud, with Any hardware.<br />  One Platform.
             </div>
           </div>
         </div>
         <div className="loginRight  w-[43.6%] h-full flex justify-center items-center">
           <div className="w-[51.5%]">
-            <div className="mb-[3.25]">
+            <div className="mb-[4rem]">
               <div className="flex justify-center items-center mb-[1.12rem]">
-                <Text_32_500_FFFFFF className="tracking-[.01em] leading-[100%] text-center">
+                <div className="text-[#FFFFFF] text-[2.5rem] font-bold leading-[24px] tracking-[.01em] leading-[100%] text-center">
                   Hey, hello 👇
-                </Text_32_500_FFFFFF>
+                </div>
                 {/* <video
                   src="/webm/wave.webm"
                   autoPlay
@@ -82,9 +84,9 @@ function APIKey({
                   className="w-[45px] h-auto mb-1 2xl:w-12"
                 /> */}
               </div>
-              <Text_12_400_B3B3B3 className="text-center">
+              <Text_14_300_EEEEEE className="text-center">
                 Please enter the Bud API key to access the playground
-              </Text_12_400_B3B3B3>
+              </Text_14_300_EEEEEE>
             </div>
 
             <Form
@@ -164,7 +166,7 @@ function APIKey({
                 classNames="w-[100%] mt-[1.6rem]"
                 onClick={handleAdd}
               >
-                Add
+                Login
               </PrimaryButton>
             </Form>
             {/* <div className="flex justify-center items-center mt-[2rem] cursor-pointer group">

@@ -1119,12 +1119,39 @@ textarea
 
 
 .logginBg {
-  background-image: url(./../public/images/login-bg-1.png);
-  background-size: 100%;
-  background-repeat: no-repeat;
-  overflow-y: auto;
-  background-position: right;
-  background-size: cover;
+  // background-image: url(./../public/images/login-bg-1.png);
+  // background-size: 100%;
+  // background-repeat: no-repeat;
+  // overflow-y: auto;
+  // background-position: right;
+  // background-size: cover;
+}
+
+.logginBg:after{
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 150px;
+  height: 300px;
+  background: #3F344B;
+  filter: blur(50px);
+  opacity: 0.2;
+  transform: rotate(45deg);
+  z-index: -1;
+}
+.logginBg::before{
+  content: '';
+  position: absolute;
+  bottom: 0;
+  right: 300px;
+  width: 150px;
+  height: 300px;
+  background: #3F344B;
+  filter: blur(50px);
+  opacity: 0.2;
+  transform: rotate(45deg);
+  z-index: -1;
 }
 
 .login-left-bg {
