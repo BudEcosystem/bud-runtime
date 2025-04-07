@@ -22,6 +22,9 @@ type Model = {
   tags: Tag[];
   provider: Provider;
   is_present_in_model: boolean;
+  strengths: string[];
+  limitations: string[];
+  icon: string;
 };
 
 type Project = {

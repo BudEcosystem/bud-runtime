@@ -23,6 +23,7 @@
     "date-fns": "^4.1.0",
     "framer-motion": "^12.5.0",
     "lucide-react": "^0.479.0",
+    "marked": "^15.0.7",
     "next": "15.2.1",
     "openai": "4.52.6",
     "react": "^19.0.0",
