@@ -245,7 +245,7 @@ export default function Home() {
       >
         <AuthNavigationProvider>
           <LoaderProvider>
-            <APIKey setApiKey={_setApiKey} apiKey={_apiKey} />
+            {!_apiKey ? <APIKey onLoginSuccess={(apiKey: string) => _setApiKey(apiKey)} /> : null}
             <Chat />
             <LoaderWrapper />
           </LoaderProvider>

@@ -9,17 +9,22 @@ import RootContext from "@/app/context/RootContext";
 
 export function useEndPoints() {
   const { endpoints, setEndpoints } = useContext(RootContext);
-  async function getEndPoints({ page = 1, limit = 25 }) {
+  async function getEndPoints({ page = 1, limit = 25, apiKey = "" }) {
+    const headers: any = {
+      'Content-Type': 'application/json'
+    };
+    if (apiKey) {
+      headers["api-key"] = apiKey;
+    }
     try {
       const result = await AppRequest.Post(`api/deployments`, {
         page: page,
         limit: limit,
         search: false,
-      }).then((res) => {
+      }, {}, headers).then((res) => {
         setEndpoints(res.data);
         return res.data;
       });
-
       return result;
     } catch (error) {
       return error;

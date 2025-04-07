@@ -115,7 +115,7 @@ const Get = (
   return axiosInstance.get(endPoint, payload);
 };
 
-const Post = (endPoint: string, payload?: any, params?: any) => {
+const Post = (endPoint: string, payload?: any, params?: any, headers?: any) => {
   const config: any = {
     params: params,
   };
@@ -123,6 +123,13 @@ const Post = (endPoint: string, payload?: any, params?: any) => {
   if (payload instanceof FormData) {
     config["headers"] = {
       Accept: "multipart/form-data",
+    };
+  }
+
+  if (headers) {
+    config["headers"] = {
+      ...config["headers"],
+      ...headers
     };
   }
 

@@ -13,25 +13,40 @@ import {
 import { PrimaryButton } from "./uiComponents/inputs";
 import { EyeClosedIcon, EyeIcon } from "lucide-react";
 import { useLoader } from "../context/appContext";
+import { useEndPoints } from "./bud/hooks/useEndPoint";
 
 function APIKey({
-  apiKey,
-  setApiKey,
+  onLoginSuccess,
 }: {
-  apiKey?: string;
-  setApiKey: (apiKey: string) => void;
+  onLoginSuccess: (apiKey: string) => void;
 }) {
   const { showLoader, hideLoader, isLoading } = useLoader();
+  const { getEndPoints } = useEndPoints();
   const router = useRouter();
   const [isShow, setIsShow] = useState(false);
   const [form] = Form.useForm();
-  const handleAdd = () => {
-    router.replace(`?api_key=${apiKey}`);
-  };
+  const [isInvalidApiKey, setIsInvalidApiKey] = useState(false);
+  const [apiKey, setApiKey] = useState("");
+
+  const handleAdd = async () => {
+    form.submit();
+    if (!apiKey) {
+      return;
+    }
+    showLoader();
+    const endpointResult = await getEndPoints({ page: 1, limit: 25, apiKey });
+    if(!Array.isArray(endpointResult)){
+      setIsInvalidApiKey(true);
+    } else {
+      onLoginSuccess(apiKey);
+      router.replace(`?api_key=${apiKey}`);
+    }
+    setTimeout(() => {
+      hideLoader();
+    }, 2000);
+  }
 
   useEffect(() => {
-    if(typeof window === "undefined") return;
-    showLoader();
     const apiKey = new URLSearchParams(window.location.search).get("api_key");
     if (apiKey) {
       setApiKey(apiKey);
@@ -157,6 +172,7 @@ function APIKey({
                     title="API Key"
                     name="apiKey"
                     value={apiKey}
+                    onPressEnter={handleAdd}
                     onChange={(e) => setApiKey(e.target.value)}
                   />
                 </div>
@@ -169,6 +185,9 @@ function APIKey({
                 Login
               </PrimaryButton>
             </Form>
+            {isInvalidApiKey && <div className="text-center text-[#ec7575] text-[0.75rem] bg-[#ec75751a] border border-[#ec7575] rounded-[6px] p-[.5rem] mt-[3rem]">
+              Invalid API Key
+            </div>}
             {/* <div className="flex justify-center items-center mt-[2rem] cursor-pointer group">
               <Text_12_400_EEEEEE className="transition-transform duration-300 ease-out group-hover:-translate-x-1">
                 Skip
