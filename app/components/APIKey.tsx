@@ -83,7 +83,7 @@ function APIKey({
                 /> */}
               </div>
               <Text_12_400_B3B3B3 className="text-center">
-                Please enter API key
+                Please enter the Bud API key to access the playground
               </Text_12_400_B3B3B3>
             </div>
 
@@ -132,7 +132,7 @@ function APIKey({
                   </div>
                   <Input
                     placeholder="Enter key"
-                    className={`passwordField h-auto leading-[100%] w-full placeholder:text-xs text-xs text-[#EEEEEE]  placeholder:text-[#808080] font-light outline-none !bg-[transparent] border rounded-[6px] pt-[.8rem] pb-[.53rem]`}
+                    className={`passwordField h-auto leading-[100%] w-full placeholder:text-xs text-xs text-[#EEEEEE]  placeholder:text-[#808080] font-light outline-none !bg-[transparent] border rounded-[6px] pt-[.6rem] pb-[.6rem]`}
                     type={isShow ? "text" : "password"}
                     classNames={{
                       input: "rounded-l-[5px] border-none!",
@@ -167,7 +167,7 @@ function APIKey({
                 Add
               </PrimaryButton>
             </Form>
-            <div className="flex justify-center items-center mt-[2rem] cursor-pointer group">
+            {/* <div className="flex justify-center items-center mt-[2rem] cursor-pointer group">
               <Text_12_400_EEEEEE className="transition-transform duration-300 ease-out group-hover:-translate-x-1">
                 Skip
               </Text_12_400_EEEEEE>
@@ -188,7 +188,7 @@ function APIKey({
                   />
                 </svg>
               </div>
-            </div>
+            </div> */}
           </div>
         </div>
       </div>

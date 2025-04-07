@@ -18,7 +18,7 @@ export function PrimaryButton({
   return (
     <Button
       {...props}
-      className={`flex justify-center items-center h-[1.75rem] !border-[.5px] !border-[#965CDE] font-normal !bg-[#1E0C34] hover:bg-[#965CDE] ${classNames} 
+      className={`flex justify-center items-center h-[2.3rem] !border-[.5px] !border-[#965CDE] font-normal !bg-[#1E0C34] hover:bg-[#965CDE] ${classNames} 
       ${disabled ? '!bg-[#1E0C34] hover:!bg-[#1E0C34] border-[#965CDE] text-[#888888] cursor-not-allowed' : '!bg-[#1E0C34] hover:!bg-[#965CDE]'} `}
       disabled={disabled} // Ensures that the button is actually disabled
       style={{
