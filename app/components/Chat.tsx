@@ -3,7 +3,7 @@ import { ChangeEvent, useCallback, useContext, useEffect, useMemo, useState } fr
 import RootContext from "../context/RootContext";
 import ChatContext, { Note } from "../context/ChatContext";
 import NavBar from "./bud/components/navigation/NavBar";
-import { HistoryMessages, Messages } from "./bud/chat/Messages";
+import { Messages } from "./bud/chat/Messages";
 import MessageLoading from "./bud/chat/MessageLoading";
 import { Message, useChat } from "@ai-sdk/react";
 import { useEndPoints } from "./bud/hooks/useEndPoint";

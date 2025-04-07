@@ -75,25 +75,13 @@ function NormalEditor({
             >
               <i className="format attachment" />
             </button>
-            <button
+            {/* <button
               type="button"
               onClick={() => {}}
               className={"toolbar-item spaced " + (false ? "active" : "")}
               aria-label="Format smiley"
             >
               <i className="format smiley" />
-            </button>
-            {/* <button
-              type="button"
-              onClick={() => {
-                setToggleFormat(!toggleFormat);
-              }}
-              className={
-                "toolbar-item spaced " + (toggleFormat ? "active" : "")
-              }
-              aria-label="Format Editor"
-            >
-              <i className="format toggle-editor" />
             </button> */}
           </div>
           <div className="pb-[.95rem]">
