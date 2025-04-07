@@ -104,6 +104,7 @@ export function Chat() {
     handleInputChange,
     handleSubmit,
     messages,
+    setMessages,
     reload,
     stop,
     setData,
@@ -165,6 +166,22 @@ export function Chat() {
     }
   }, [submitInput]);
 
+  useEffect(() => {
+    console.log('historyMessages', historyMessages);
+    const messages = []
+
+    for (let item of historyMessages) {
+      messages.push({
+        id: item.id,
+        content: item.prompt,
+        role: 'user',
+      });
+      messages.push(item.response.message);
+    }
+
+    setMessages(messages as Message[]);
+  }, [historyMessages]);
+
 
   return (
     <Layout className="chat-container ">
@@ -220,7 +237,6 @@ export function Chat() {
             id="chat-container"
           >
             {(chat?.selectedDeployment?.name && messages.length < 1) && <ModelInfo deployment={chat?.selectedDeployment} />}
-            {/* <HistoryMessages messages={historyMessages} /> */}
             <Messages messages={messages} reload={reload} onEdit={(message)=> appendClientMessage({messages, message})} />
             {(!chat?.selectedDeployment?.name) &&
               (!messages || messages.length === 0) && (

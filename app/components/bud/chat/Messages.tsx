@@ -248,10 +248,6 @@ interface MessagesProps {
   onEdit: (message: UIMessage) => void;
 }
 
-interface HistoryMessagesProps {
-  messages: PostMessage[];
-  reload: () => void;
-}
 
 export function Messages({ messages, reload, onEdit }: MessagesProps) {
   return (
@@ -260,35 +256,5 @@ export function Messages({ messages, reload, onEdit }: MessagesProps) {
         <Message {...m} key={m.id} content={m.content} role={m.role} data={m as any} reload={reload} onEdit={()=> onEdit(m)} />
       ))}
     </div>
-  );
-}
-
-export function HistoryMessages({ messages, reload }: HistoryMessagesProps) {
-  return (
-    <>
-      {messages?.map((m, index) => (
-        <div
-          className="flex flex-col gap-[1rem]"
-          key={`${m.chat_session_id}-${index}`}
-        >
-          <Message
-            content={m.prompt}
-            role={"user"}
-            data={m}
-            key={`${m.chat_session_id}-${index}-prompt`}
-            reload={reload}
-            onEdit={()=> {}}
-          />
-          <Message
-            content={m.response?.message?.content}
-            role={"ai"}
-            data={m}
-            key={`${m.chat_session_id}-${index}-response`}
-            reload={reload}
-            onEdit={()=> {}}
-          />
-        </div>
-      ))}
-    </>
   );
 }
