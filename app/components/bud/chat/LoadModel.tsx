@@ -68,12 +68,12 @@ function LoadModel(props: LoadModelProps) {
                   {currentlyLoaded?.length}
                 </span>
               </div>
-              <div className="text-[#757575] text-[0.625rem] font-[400]">
+              {/* <div className="text-[#757575] text-[0.625rem] font-[400]">
                 Memory Consumption:
                 <span className="text-[#FFF] text-[0.625rem] font-[400] ml-[0.25rem]">
                   4.59/16 GB
                 </span>
-              </div>
+              </div> */}
             </div>
             {currentlyLoaded?.map((endpoint) => (
               <ModelListCard
@@ -157,6 +157,7 @@ function LoadModel(props: LoadModelProps) {
         >
           <Image
             src={`${assetBaseUrl}${chat.selectedDeployment?.model?.icon || chat.selectedDeployment?.model?.provider?.icon}`}
+            fallback={"/icons/modelRepoWhite.png"}
             preview={false}
             alt="bud"
             style={{

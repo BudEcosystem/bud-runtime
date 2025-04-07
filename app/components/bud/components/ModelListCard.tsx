@@ -38,7 +38,7 @@ export function ModelListCard({
 
   const imageUrl =
     assetBaseUrl + (data?.model?.icon || data?.model?.provider?.icon);
-  const fallbackImageUrl = assetBaseUrl + "/icons/providers/openai.png";
+  const fallbackImageUrl = "/icons/modelRepoWhite.png";
 
   return (
     <div

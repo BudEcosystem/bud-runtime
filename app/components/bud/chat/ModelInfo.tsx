@@ -42,7 +42,7 @@ export default function ModelInfo({deployment}: any){
                             <Image
                                 preview={false}
                                 src={imageUrl}
-                                // fallback={assetBaseUrl + "/icons/providers/openai.png"}
+                                fallback={"/icons/modelRepoWhite.png"}
                                 alt="info"
                                 style={{ width: '1.625rem', height: '1.625rem' }}
                             />
