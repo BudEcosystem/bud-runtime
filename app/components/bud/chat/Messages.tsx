@@ -5,6 +5,7 @@ import { Metrics, PostMessage } from "../hooks/useMessages";
 import { format } from "date-fns";
 import { UIMessage } from "ai";
 import { MemoizedMarkdown } from "./MenorizedMarkdown";
+import { CopyText } from "../components/display/CopyText";
 
 type MessageProps = {
   content: string;
@@ -13,6 +14,7 @@ type MessageProps = {
 };
 
 function Message(props: MessageProps & { reload: () => void, onEdit: () => void }) {
+
   return (
     <div
       className="text-[#FFFFFF] relative text-[.75rem]  rounded-[.625rem] "
@@ -38,21 +40,7 @@ function UserMessage(props: MessageProps & { onEdit: () => void }) {
     <div className="flex flex-row items-center gap-[.5rem]">
       <div className="flex items-center justify-end gap-[.5rem] ">
         <button>
-          <div className="w-[1rem] h-[1rem] flex justify-center items-center cursor-pointer group text-[#B3B3B3] hover:text-[#FFFFFF]">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="12"
-              height="15"
-              fill="none"
-            >
-              <path
-                fill="currentColor"
-                fillRule="evenodd"
-                d="M.8 9.498a1.2 1.2 0 0 0 1.2 1.2h1.2v1.595a1.2 1.2 0 0 0 1.2 1.2H10a1.2 1.2 0 0 0 1.2-1.2v-6.8a1.2 1.2 0 0 0-1.2-1.2H4.4a1.2 1.2 0 0 0-1.2 1.2v4.405H2a.4.4 0 0 1-.4-.4v-6.8c0-.22.18-.4.4-.4h5.6c.221 0 .4.18.4.4v1.534h.8V2.698a1.2 1.2 0 0 0-1.2-1.2H2a1.2 1.2 0 0 0-1.2 1.2v6.8ZM4 5.493c0-.221.18-.4.4-.4H10c.221 0 .4.179.4.4v6.8a.4.4 0 0 1-.4.4H4.4a.4.4 0 0 1-.4-.4v-6.8Z"
-                clipRule="evenodd"
-              />
-            </svg>
-          </div>
+          <CopyText text={props.content} />
         </button>
         <button>
           <div className="w-[1rem] h-[1rem] flex justify-center items-center cursor-pointer group text-[#B3B3B3] hover:text-[#FFFFFF]" onClick={()=> props.onEdit()}>
@@ -123,21 +111,7 @@ function AIMessage(props: MessageProps & { reload: () => void }) {
               </div>
             </div>
             <div className="flex justify-end items-center gap-x-[.4rem]">
-              <div className="w-[1rem] h-[1rem] flex justify-center items-center cursor-pointer group text-[#B3B3B3] hover:text-[#FFFFFF]">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="12"
-                  height="15"
-                  fill="none"
-                >
-                  <path
-                    fill="currentColor"
-                    fillRule="evenodd"
-                    d="M.8 9.498a1.2 1.2 0 0 0 1.2 1.2h1.2v1.595a1.2 1.2 0 0 0 1.2 1.2H10a1.2 1.2 0 0 0 1.2-1.2v-6.8a1.2 1.2 0 0 0-1.2-1.2H4.4a1.2 1.2 0 0 0-1.2 1.2v4.405H2a.4.4 0 0 1-.4-.4v-6.8c0-.22.18-.4.4-.4h5.6c.221 0 .4.18.4.4v1.534h.8V2.698a1.2 1.2 0 0 0-1.2-1.2H2a1.2 1.2 0 0 0-1.2 1.2v6.8ZM4 5.493c0-.221.18-.4.4-.4H10c.221 0 .4.179.4.4v6.8a.4.4 0 0 1-.4.4H4.4a.4.4 0 0 1-.4-.4v-6.8Z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              </div>
+              <CopyText text={props.content} />
               <div className="w-[1rem] h-[1rem] flex justify-center items-center cursor-pointer group text-[#B3B3B3] hover:text-[#FFFFFF]">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
