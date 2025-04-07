@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useMemo, ChangeEvent, FormEvent } from "react";
 import Chat from "./components/Chat";
 import { Endpoint } from "./context/ChatContext";
 import RootContext from "./context/RootContext";
@@ -37,12 +37,14 @@ export default function Home() {
   const { getEndPoints } = useEndPoints();
   const [endpoints, setEndpoints] = useState<Endpoint[]>([]);
 
+  const [sharedChatInput, setSharedChatInput] = useState<ChangeEvent<HTMLInputElement>>({} as ChangeEvent<HTMLInputElement>); 
+  const [submitInput, setSubmitInput] = useState<FormEvent<Element>>({} as FormEvent<Element>);
+
   const token = _apiKey || _accessToken || "";
 
   const [chats, setChats] = useState<ActiveSession[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
 
-  console.log("sessions, ", sessions);
   // save to local storage
   useEffect(() => {
     if (!sessions || sessions?.length === 0) return;
@@ -81,7 +83,7 @@ export default function Home() {
     init();
   }, []);
 
-  const newChatPayload: ActiveSession = {
+  const newChatPayload = useMemo<ActiveSession>(() => ({
     id: NEW_SESSION,
     name: `New Chat`,
     chat_setting: {
@@ -104,7 +106,7 @@ export default function Home() {
     created_at: new Date().toISOString(),
     modified_at: new Date().toISOString(),
     total_tokens: 0,
-  };
+  }), []);
 
   const closeChat = useCallback(
     async (chat: ActiveSession) => {
@@ -235,6 +237,10 @@ export default function Home() {
           endpoints,
           setEndpoints,
           localMode,
+          sharedChatInput,
+          setSharedChatInput,
+          submitInput,
+          setSubmitInput,
         }}
       >
         <AuthNavigationProvider>

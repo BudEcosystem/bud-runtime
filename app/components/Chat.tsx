@@ -1,5 +1,5 @@
 import { Image, Layout } from "antd";
-import { useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import RootContext from "../context/RootContext";
 import ChatContext, { Note } from "../context/ChatContext";
 import NavBar from "./bud/components/navigation/NavBar";
@@ -7,7 +7,7 @@ import { HistoryMessages, Messages } from "./bud/chat/Messages";
 import MessageLoading from "./bud/chat/MessageLoading";
 import { Message, useChat } from "@ai-sdk/react";
 import { useEndPoints } from "./bud/hooks/useEndPoint";
-import { NEW_SESSION, Usage, useMessages } from "./bud/hooks/useMessages";
+import { Metrics, NEW_SESSION, Usage, useMessages } from "./bud/hooks/useMessages";
 import HistoryList, { ActiveSession } from "./bud/chat/HistoryList";
 import SettingsList from "./bud/chat/SettingsList";
 import NormalEditor from "./bud/components/input/NormalEditor";
@@ -17,7 +17,10 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import { MantineProvider } from "@mantine/core";
+import { appendClientMessage, JSONValue } from "ai";
+import ModelInfo from "./bud/chat/ModelInfo";
 const { Header, Footer, Sider, Content } = Layout;
+
 
 export function Chat() {
   const [lastMessage, setLastMessage] = useState<string>("");
@@ -33,7 +36,14 @@ export function Chat() {
     setToggleRight(!toggleRight);
   };
 
-  const { sessions, token } = useContext(RootContext);
+  const { 
+    sessions, 
+    token, 
+    sharedChatInput, 
+    setSharedChatInput,
+    submitInput,
+    setSubmitInput
+  } = useContext(RootContext);
   const { chat, messages: historyMessages } = useContext(ChatContext);
   const { createMessage } = useMessages();
 
@@ -46,12 +56,11 @@ export function Chat() {
       }
     ) => {
       const { usage, finishReason } = response;
-      console.log("Finish", message, usage, finishReason);
       if (!chat?.selectedDeployment) return;
+      const metrics: Metrics | JSONValue | undefined = message.annotations?.find((item: any) => item.type == 'metrics')
       await createMessage(
         {
           deployment_id: chat?.selectedDeployment?.id,
-          e2e_latency: 0,
           is_cache: false,
           chat_session_id: chat?.id === NEW_SESSION ? undefined : chat?.id,
           prompt: lastMessage,
@@ -61,11 +70,10 @@ export function Chat() {
           },
           output_tokens: usage.completionTokens,
           input_tokens: usage.promptTokens,
-          token_per_sec: 0,
           total_tokens: usage.totalTokens,
-          tpot: 0,
-          ttft: 0,
           request_id: chat?.selectedDeployment?.id,
+          metrics: metrics as Metrics,
+          id: chat.id
         },
         chat.id
       );
@@ -98,7 +106,8 @@ export function Chat() {
     messages,
     reload,
     stop,
-    setData
+    setData,
+    setInput
   } = useChat({
     headers: {
       Authorization: token ? `Bearer ${token}` : "",
@@ -129,8 +138,9 @@ export function Chat() {
     }
   }, [input]);
 
-  const handleChange = (value: string) => {
-    console.log(`selected ${value}`);
+  const handleChange = (value: ChangeEvent<HTMLInputElement>) => {
+    setSharedChatInput(value);
+    handleInputChange(value);
   };
 
   useEffect(() => {
@@ -139,8 +149,22 @@ export function Chat() {
     }
   }, [toggleLeft, toggleRight]);
 
-  console.log(`historyMessages`, historyMessages);
-  console.log(`messages`, messages);
+  useEffect(() => {
+    if(!sharedChatInput?.target?.value) {
+      return;
+    }
+    if(input !== sharedChatInput.target.value) {
+      setInput(sharedChatInput.target.value);
+    }
+  }, [sharedChatInput]);
+
+  useEffect(() => {
+    if(submitInput) {
+      handleSubmit(submitInput);
+      handleSubmit(undefined);
+    }
+  }, [submitInput]);
+
 
   return (
     <Layout className="chat-container ">
@@ -190,13 +214,15 @@ export function Chat() {
           />
         </Header>
         <Content className="overflow-hidden overflow-y-auto hide-scrollbar">
+          
           <div
             className="flex flex-col w-full py-24 mx-auto stretch px-[.5rem] max-w-2xl  gap-[1rem]"
             id="chat-container"
           >
-            <HistoryMessages messages={historyMessages} />
-            <Messages messages={messages} />
-            {(!historyMessages || historyMessages.length === 0) &&
+            {(chat?.selectedDeployment?.name && messages.length < 1) && <ModelInfo deployment={chat?.selectedDeployment} />}
+            {/* <HistoryMessages messages={historyMessages} /> */}
+            <Messages messages={messages} reload={reload} onEdit={(message)=> appendClientMessage({messages, message})} />
+            {(!chat?.selectedDeployment?.name) &&
               (!messages || messages.length === 0) && (
                 <div className="mt-4 text-[#EEEEEE] text-center">
                   <Image
@@ -244,9 +270,10 @@ export function Chat() {
             error={error}
             disabled={!chat?.selectedDeployment?.id}
             stop={stop}
-            handleInputChange={handleInputChange}
+            handleInputChange={handleChange}
             handleSubmit={(e) => {
-              handleSubmit(e);
+              setSubmitInput(e);
+              // handleSubmit(e);
               document.getElementById("chat-container")?.scrollIntoView({
                 behavior: "smooth",
                 block: "end",

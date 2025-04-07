@@ -1,4 +1,4 @@
-import { createContext } from "react";
+import { ChangeEvent, createContext, FormEvent } from "react";
 import { Endpoint } from "./ChatContext";
 import { ActiveSession, Session } from "../components/bud/chat/HistoryList";
 
@@ -17,6 +17,11 @@ type RootContextType = {
   // set endpoints
   setEndpoints: (endpoints: Endpoint[]) => void;
   localMode: boolean;
+  // Add a shared input field for synced input across chats
+  sharedChatInput: ChangeEvent<HTMLInputElement>;
+  setSharedChatInput: (input: ChangeEvent<HTMLInputElement>) => void;
+  submitInput: FormEvent<Element>;
+  setSubmitInput: (input: FormEvent<Element>) => void;
 };
 
 const RootContext = createContext<RootContextType>({
@@ -34,6 +39,10 @@ const RootContext = createContext<RootContextType>({
   setSessions: (_: Session[]) => {},
   endpoints: [],
   setEndpoints: (_: Endpoint[]) => {},
+  sharedChatInput: {} as ChangeEvent<HTMLInputElement>,
+  setSharedChatInput: (_: ChangeEvent<HTMLInputElement>) => {},
+  submitInput: {} as FormEvent<Element>,
+  setSubmitInput: (_: FormEvent<Element>) => {},
 });
 
 export default RootContext;

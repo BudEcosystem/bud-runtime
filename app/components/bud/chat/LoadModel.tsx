@@ -156,7 +156,7 @@ function LoadModel(props: LoadModelProps) {
           onClick={() => props.setOpen(!props.open)}
         >
           <Image
-            src={`${assetBaseUrl}/${chat.selectedDeployment?.model?.provider?.icon}`}
+            src={`${assetBaseUrl}${chat.selectedDeployment?.model?.icon || chat.selectedDeployment?.model?.provider?.icon}`}
             preview={false}
             alt="bud"
             style={{

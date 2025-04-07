@@ -95,13 +95,13 @@ function SettingsList({ data }: SettingsListProps) {
               handleChange(chat, "limit_response_length", value)
             }
           />
-          <InlineInput
+          {chat?.chat_setting?.limit_response_length &&<InlineInput
             title="Sequence Length"
             value={`${chat?.chat_setting?.sequence_length || 0}`}
             defaultValue={`${chat?.chat_setting?.sequence_length || 0}`}
             type="number"
             onChange={(value) => handleChange(chat, "sequence_length", value)}
-          />
+          />}
         </div>
       ),
     },

@@ -1,9 +1,10 @@
 import { Image } from "antd";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import Markdown from "react-markdown";
-import { PostMessage } from "../hooks/useMessages";
+import { Metrics, PostMessage } from "../hooks/useMessages";
 import { format } from "date-fns";
 import { UIMessage } from "ai";
+import { MemoizedMarkdown } from "./MenorizedMarkdown";
 
 type MessageProps = {
   content: string;
@@ -11,7 +12,7 @@ type MessageProps = {
   data: PostMessage;
 };
 
-function Message(props: MessageProps) {
+function Message(props: MessageProps & { reload: () => void, onEdit: () => void }) {
   return (
     <div
       className="text-[#FFFFFF] relative text-[.75rem]  rounded-[.625rem] "
@@ -21,18 +22,18 @@ function Message(props: MessageProps) {
     >
       {props.role === "user" ? (
         <div className="flex justify-end">
-          <UserMessage {...props} />
+          <UserMessage {...props} onEdit={props.onEdit} />
         </div>
       ) : (
         <div className="flex justify-start ">
-          <AIMessage {...props} />
+          <AIMessage {...props} reload={props.reload} />
         </div>
       )}
     </div>
   );
 }
 
-function UserMessage(props: MessageProps) {
+function UserMessage(props: MessageProps & { onEdit: () => void }) {
   return (
     <div className="flex flex-row items-center gap-[.5rem]">
       <div className="flex items-center justify-end gap-[.5rem] ">
@@ -54,7 +55,7 @@ function UserMessage(props: MessageProps) {
           </div>
         </button>
         <button>
-          <div className="w-[1rem] h-[1rem] flex justify-center items-center cursor-pointer group text-[#B3B3B3] hover:text-[#FFFFFF]">
+          <div className="w-[1rem] h-[1rem] flex justify-center items-center cursor-pointer group text-[#B3B3B3] hover:text-[#FFFFFF]" onClick={()=> props.onEdit()}>
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="12"
@@ -78,11 +79,19 @@ function UserMessage(props: MessageProps) {
   );
 }
 
-function AIMessage(props: MessageProps) {
-  if(!props.content){
-    console.log('props', props);
-    return null;
-  }
+function AIMessage(props: MessageProps & { reload: () => void }) {
+  const [metrics, setMetrics] = useState<Metrics | undefined>(undefined);
+  
+  useEffect(() => {
+    if(!props.data?.annotations  ){
+      return;
+    }
+    const metrics = props.data.annotations?.find((item: any) => item.type == 'metrics')
+    if(metrics){
+      setMetrics(metrics as Metrics);
+    }
+  }, [props]);
+
   return (
     <div className="flex flex-row items-top gap-[.5rem]">
       <div className="mr-[.5rem] mt-[.2rem]">
@@ -95,22 +104,22 @@ function AIMessage(props: MessageProps) {
         />
       </div>
       <div className="message-text ai-message">
-        <Markdown>{props.content}</Markdown>
-        <div className="w-[100%] h-[40px] tempClass mt-[1rem] rounded-[6px] z-[10] relative overflow-hiden">
+        <MemoizedMarkdown content={props.content} id={props.data.id} />
+        {metrics && <div className="w-[100%] h-[40px] tempClass mt-[1rem] rounded-[6px] z-[10] relative overflow-hiden">
           <div className="bg !bg-[#101010] rounded-[6px]"></div>
           <div className="fg flex justify-between items-center pl-[.6rem] pr-[.5rem] gap-[.5rem]">
             <div className="flex justify-start items-center gap-x-[.7rem]">
               <div className="text-[#B3B3B3] text-[.625rem] font-[400]">
-                tokens/sec : 0
+                Tokens/sec : {metrics?.throughput}
               </div>
               <div className="text-[#B3B3B3] text-[.625rem] font-[400]">
-                TTFT : 0
+                TTFT : {metrics?.ttft} ms
               </div>
               <div className="text-[#B3B3B3] text-[.625rem] font-[400]">
-                TPOT : 0
+                ITL : {metrics?.itl} ms
               </div>
               <div className="text-[#B3B3B3] text-[.625rem] font-[400]">
-                End to End latency : 0
+                E2E Latency : {metrics?.e2e_latency} s
               </div>
             </div>
             <div className="flex justify-end items-center gap-x-[.4rem]">
@@ -159,7 +168,7 @@ function AIMessage(props: MessageProps) {
                   />
                 </svg>
               </div>
-              <div className="w-[1rem] h-[1rem] flex justify-center items-center cursor-pointer group text-[#B3B3B3] hover:text-[#FFFFFF]">
+              {/* <div className="w-[1rem] h-[1rem] flex justify-center items-center cursor-pointer group text-[#B3B3B3] hover:text-[#FFFFFF]">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   width="14"
@@ -204,8 +213,8 @@ function AIMessage(props: MessageProps) {
                     d="M10.632 3.87c.626.766 1.034 1.875 1.034 3.13s-.408 2.364-1.034 3.13a.583.583 0 0 0 .903.74c.811-.994 1.299-2.37 1.299-3.87s-.488-2.876-1.299-3.87a.583.583 0 0 0-.903.739Z"
                   />
                 </svg>
-              </div>
-              <div className="w-[1rem] h-[1rem] flex justify-center items-center cursor-pointer group text-[#B3B3B3] hover:text-[#FFFFFF]">
+              </div> */}
+              <div className="w-[1rem] h-[1rem] flex justify-center items-center cursor-pointer group text-[#B3B3B3] hover:text-[#FFFFFF]" onClick={()=> props.reload()}>
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   width="14"
@@ -227,7 +236,7 @@ function AIMessage(props: MessageProps) {
               </div>
             </div>
           </div>
-        </div>
+        </div>}
       </div>
     </div>
   );
@@ -235,23 +244,26 @@ function AIMessage(props: MessageProps) {
 
 interface MessagesProps {
   messages: UIMessage[];
+  reload: () => void;
+  onEdit: (message: UIMessage) => void;
 }
 
 interface HistoryMessagesProps {
   messages: PostMessage[];
+  reload: () => void;
 }
 
-export function Messages({ messages }: MessagesProps) {
+export function Messages({ messages, reload, onEdit }: MessagesProps) {
   return (
     <div className="flex flex-col gap-[1rem]">
       {messages.map((m) => (
-        <Message {...m} key={m.id} content={m.content} role={m.role} data={m as any} />
+        <Message {...m} key={m.id} content={m.content} role={m.role} data={m as any} reload={reload} onEdit={()=> onEdit(m)} />
       ))}
     </div>
   );
 }
 
-export function HistoryMessages({ messages }: HistoryMessagesProps) {
+export function HistoryMessages({ messages, reload }: HistoryMessagesProps) {
   return (
     <>
       {messages?.map((m, index) => (
@@ -264,12 +276,14 @@ export function HistoryMessages({ messages }: HistoryMessagesProps) {
             role={"user"}
             data={m}
             key={`${m.chat_session_id}-${index}-prompt`}
+            reload={reload}
           />
           <Message
             content={m.response?.message?.content}
             role={"ai"}
             data={m}
             key={`${m.chat_session_id}-${index}-response`}
+            reload={reload}
           />
         </div>
       ))}

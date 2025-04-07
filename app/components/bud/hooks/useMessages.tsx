@@ -20,6 +20,13 @@ export type Response = {
   usage: Usage;
 };
 
+export type Metrics = {
+  e2e_latency: number;
+  throughput: number;
+  ttft: number;
+  itl: number;
+}
+
 export type PostMessage = {
   prompt: string;
   response: Response;
@@ -27,14 +34,13 @@ export type PostMessage = {
   input_tokens: number;
   output_tokens: number;
   total_tokens: number;
-  token_per_sec: number;
-  ttft: number;
-  tpot: number;
-  e2e_latency: number;
   is_cache: boolean;
   chat_session_id?: string;
   request_id: string;
   name?: string;
+  metrics?: Metrics;
+  annotations?: any;
+  id: string;
 };
 
 export function useMessages() {
