@@ -277,6 +277,7 @@ export function HistoryMessages({ messages, reload }: HistoryMessagesProps) {
             data={m}
             key={`${m.chat_session_id}-${index}-prompt`}
             reload={reload}
+            onEdit={()=> {}}
           />
           <Message
             content={m.response?.message?.content}
@@ -284,6 +285,7 @@ export function HistoryMessages({ messages, reload }: HistoryMessagesProps) {
             data={m}
             key={`${m.chat_session_id}-${index}-response`}
             reload={reload}
+            onEdit={()=> {}}
           />
         </div>
       ))}
