@@ -31,7 +31,7 @@ function NormalEditor({
     }}
     >
       <form
-        className="chat-message-form   w-full  flex items-center justify-center  border-t-2 rounded-[0.625rem] bg-[#101010] relative z-10 overflow-hidden max-w-2xl px-[1rem]"
+        className="chat-message-form   w-full  flex items-center justify-center  border-t-2 hover:border-[#333333] rounded-[0.625rem] bg-[#101010] relative z-10 overflow-hidden max-w-3xl px-[1rem]"
         onSubmit={handleSubmit}
       >
         <div className="blur-[0.5rem] absolute top-0 left-0 right-0 bottom-0 bg-[#FFFFFF03] rounded-[0.5rem] " />
@@ -42,7 +42,7 @@ function NormalEditor({
             src="icons/budrect.svg"
             alt="attachment"
             width={"1.25rem"}
-            className="absolute left-0 top-[-.5rem] m-auto"
+            className="absolute left-0 top-[-0.75rem] m-auto"
             preview={false}
             height={"1.25rem"}
           />
@@ -50,7 +50,7 @@ function NormalEditor({
              style={{
               cursor: disabled ? "not-allowed" : "auto",
             }}
-            className=" w-full  p-2 border border-gray-300 rounded shadow-xl placeholder-[#757575] placeholder-[.625rem] text-[.75rem] bg-transparent  border-[#e5e5e5] outline-none border-none text-[#757575] z-10"
+            className=" w-full  p-2 border border-gray-300 rounded shadow-xl placeholder-[#757575] placeholder-[.625rem] text-[1rem] bg-transparent  border-[#e5e5e5] outline-none border-none text-[#757575] z-10"
             value={input}
             rows={2}
             placeholder={disabled ? "Select a deployment to chat"

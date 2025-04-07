@@ -249,13 +249,13 @@ export function Chat() {
                     preview={false}
                     src="icons/load.png"
                     alt="bud"
-                    width={"330px"}
-                    height={"130px"}
+                    width={"450px"}
+                    // height={"150px"}
                   />
-                  <div className="Open-Sans mt-[.75rem] text-[1.375rem]">
+                  <div className="Open-Sans mt-[.75rem] text-[1.575rem]">
                     Hello there 👋
                   </div>
-                  <div className="Open-Sans text-[1.375rem]">
+                  <div className="Open-Sans text-[1.575rem]">
                     Select a model to get started
                   </div>
                 </div>
