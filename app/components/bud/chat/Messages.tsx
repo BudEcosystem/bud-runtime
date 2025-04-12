@@ -10,7 +10,7 @@ import { CopyText } from "../components/display/CopyText";
 type MessageProps = {
   content: string;
   role: "system" | "user" | "assistant" | "data" | "ai";
-  data: SavedMessage;
+  data: UIMessage;
 };
 
 function Message(props: MessageProps & { reload: () => void, onEdit: () => void }) {
@@ -71,10 +71,10 @@ function AIMessage(props: MessageProps & { reload: () => void }) {
   const [metrics, setMetrics] = useState<Metrics | undefined>(undefined);
   
   useEffect(() => {
-    if(!props.data?.message?.annotations  ){
+    if(!props.data?.annotations  ){
       return;
     }
-    const metrics = props.data.message.annotations?.find((item: any) => item.type == 'metrics')
+    const metrics = props.data.annotations?.find((item: any) => item.type == 'metrics')
     if(metrics){
       setMetrics(metrics as Metrics);
     }
@@ -92,7 +92,7 @@ function AIMessage(props: MessageProps & { reload: () => void }) {
         />
       </div>
       <div className="message-text ai-message">
-        <MemoizedMarkdown content={props.content} id={props.data.message.id} />
+        <MemoizedMarkdown content={props.content} id={props.data?.id} />
         {metrics && <div className="w-[100%] h-[40px] tempClass mt-[1rem] rounded-[6px] z-[10] relative overflow-hiden">
           <div className="bg !bg-[#101010] rounded-[6px]"></div>
           <div className="fg flex justify-between items-center pl-[1rem] pr-[.5rem] gap-[.5rem]">
@@ -202,9 +202,9 @@ function AIMessage(props: MessageProps & { reload: () => void }) {
                 </svg>
               </div>
               <div className="pl-[.75rem] text-[#757575] text-[.75rem] font-[400]">
-                {props.data?.message?.createdAt &&
+                {props.data?.createdAt &&
                   format(
-                    new Date(props.data.message.createdAt),
+                    new Date(props.data.createdAt),
                     "HH:mm"
                   )}
               </div>
