@@ -12,9 +12,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useMessages } from "../../hooks/useMessages";
+import { useChat } from "../../hooks/useChat";
 
 interface NavBarProps {
+  chatId: string;
   onToggleLeftSidebar: () => void;
   onToggleRightSidebar: () => void;
   isLeftSidebarOpen: boolean;
@@ -23,6 +24,7 @@ interface NavBarProps {
 }
 
 function NavBar({
+  chatId,
   onToggleLeftSidebar,
   onToggleRightSidebar,
   isLeftSidebarOpen,
@@ -30,10 +32,10 @@ function NavBar({
   setChatData,
 }: NavBarProps) {
   const [openDropdown, setOpenDropdown] = React.useState(false);
-  const { createChat, closeChat } = useContext(RootContext);
-  const { chat, setMessages } = useContext(ChatContext);
+  const { chats, setChats } = useContext(RootContext);
+  const { createChat, closeChat } = useChat();
+  const { chat } = useContext(ChatContext);
   const [open, setOpen] = React.useState(false);
-  const { deleteSession } = useMessages();
 
   return (
     <div className="topBg text-[#FFF] p-[1rem] flex justify-between items-center h-[3.625rem] relative sticky top-0  z-10 bg-[#101010] border-b-[1px] border-b-[#1F1F1F]">
@@ -96,9 +98,7 @@ function NavBar({
           </div>
         </button>
         <button
-          onClick={() => {
-            createChat();
-          }}
+          onClick={createChat}
           className="w-[1.475rem] height-[1.475rem] p-[.2rem] rounded-[6px] flex justify-center items-center cursor-pointer"
         >
           <div className="w-[1.125rem] h-[1.125rem] flex justify-center items-center cursor-pointer group text-[#B3B3B3] hover:text-[#FFFFFF]">
@@ -143,25 +143,24 @@ function NavBar({
             </div>
           </DropdownMenuTrigger>
           <DropdownMenuContent className="bg-[#101010] border-[1px] border-[#1F1F1F]">
-            {chat && (
-              <DropdownMenuItem
+            <DropdownMenuItem
                 className="cursor-pointer text-[#B3B3B3] hover:text-white"
                 onClick={() => {
                   setOpenDropdown(false);
-                  setMessages([]);
-                  closeChat(chat);
+                  // setMessages([]);
+                  closeChat(chatId);
                   setChatData([]);
                 }}
               >
                 Close
               </DropdownMenuItem>
-            )}
+            
             <DropdownMenuItem
               onClick={async () => {
                 if (chat) {
                   localStorage.removeItem(chat?.id);
                   setChatData([]);
-                  setMessages([]);
+                  // setMessages([]);
                 }
               }}
               className="cursor-pointer text-[#B3B3B3] hover:text-white"
@@ -171,10 +170,10 @@ function NavBar({
             <DropdownMenuItem
               onClick={async () => {
                 if (chat) {
-                  await deleteSession(chat?.id);
-                  setMessages([]);
+                  // await deleteSession(chat?.id);
+                  // setMessages([]);
                   setChatData([]);
-                  closeChat(chat);
+                  closeChat(chatId);
                 }
               }}
               className="cursor-pointer text-[#B3B3B3] hover:text-white"

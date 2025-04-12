@@ -1,5 +1,5 @@
 import { Button, Image } from "antd";
-import React, { useContext } from "react";
+import React, { useContext, useEffect } from "react";
 import SearchHeaderInput from "../components/input/SearchHeaderInput";
 import { ModelListCard } from "../components/ModelListCard";
 import BlurModal from "../components/modal/BlurModal";
@@ -9,6 +9,7 @@ import ChatContext from "@/app/context/ChatContext";
 import RootContext from "@/app/context/RootContext";
 import { assetBaseUrl } from "../environment";
 import { Text_12_400_EEEEEE } from "@/lib/text";
+import { useChat } from "../hooks/useChat";
 
 interface LoadModelProps {
   open: boolean;
@@ -16,31 +17,36 @@ interface LoadModelProps {
 }
 
 function LoadModel(props: LoadModelProps) {
-  const { endpoints } = useEndPoints();
-  const [searchValue, setSearchValue] = React.useState("");
+  
   const { chat } = useContext(ChatContext);
-  const { handleDeploymentSelect, chats } = useContext(RootContext);
+  const { chats, endpoints } = useContext(RootContext);
+  const { setDeployment } = useChat()
+
   const [sortBy, setSortBy] = React.useState("recency");
   const [sortOrder, setSortOrder] = React.useState("desc");
+  const [currentlyLoaded, setCurrentlyLoaded] = React.useState<any[]>([]);
+  const [availableModels, setAvailableModels] = React.useState<any[]>([]);
+  const [searchValue, setSearchValue] = React.useState("");
 
   React.useEffect(() => {
     document.documentElement.scrollTop = document.documentElement.clientHeight;
     document.documentElement.scrollLeft = document.documentElement.clientWidth;
   }, []);
 
-  const currentlyLoaded = endpoints?.filter((endpoint) =>
-    chats.find((chat) => chat.selectedDeployment?.id === endpoint.id)
-  );
-  const availableModels = endpoints?.filter((endpoint) =>
-    chats.find((chat) => chat.selectedDeployment?.id !== endpoint.id)
-  )?.sort((a, b) => {
-    if (sortOrder === "asc") {
-      return a.name.localeCompare(b.name);
-    } else {
-      return b.name.localeCompare(a.name);
-    }
-  }
-  );
+  useEffect(() => {
+
+    setCurrentlyLoaded(endpoints?.filter((endpoint) => chat?.selectedDeployment?.id === endpoint.id));
+    setAvailableModels(endpoints?.filter((endpoint) =>
+      chat?.selectedDeployment?.id !== endpoint.id
+    )?.sort((a, b) => {
+        if (sortOrder === "asc") {
+          return a.name.localeCompare(b.name);
+        } else {
+          return b.name.localeCompare(a.name);
+        }
+      }
+    ));
+  }, [endpoints, chat]);
 
   return (
     <div>
@@ -83,7 +89,7 @@ function LoadModel(props: LoadModelProps) {
                 selected={chat?.selectedDeployment?.id === endpoint.id}
                 handleClick={() => {
                   if (chat) {
-                    handleDeploymentSelect(chat, endpoint);
+                    setDeployment(chat.id, endpoint);
                     props.setOpen(false);
                   }
                 }}
@@ -140,7 +146,7 @@ function LoadModel(props: LoadModelProps) {
                   data={endpoint}
                   handleClick={() => {
                     if (chat) {
-                      handleDeploymentSelect(chat, endpoint);
+                      setDeployment(chat.id, endpoint);
                       props.setOpen(false);
                     }
                   }}

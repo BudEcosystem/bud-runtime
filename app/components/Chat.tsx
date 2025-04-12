@@ -1,86 +1,40 @@
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import { ChangeEvent, useContext, useEffect, useMemo, useState } from "react";
 import { Image, Layout } from "antd";
-import { ChangeEvent, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { v4 as uuidv4 } from 'uuid';
 import RootContext from "../context/RootContext";
-import ChatContext, { Note } from "../context/ChatContext";
-import NavBar from "./bud/components/navigation/NavBar";
-import { Messages } from "./bud/chat/Messages";
-import MessageLoading from "./bud/chat/MessageLoading";
-import { Message, useChat } from "@ai-sdk/react";
-import { useEndPoints } from "./bud/hooks/useEndPoint";
-import { Metrics, NEW_SESSION, Usage, useMessages } from "./bud/hooks/useMessages";
 import HistoryList, { ActiveSession } from "./bud/chat/HistoryList";
 import SettingsList from "./bud/chat/SettingsList";
-import NormalEditor from "./bud/components/input/NormalEditor";
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/components/ui/resizable";
-import { MantineProvider } from "@mantine/core";
-import { appendClientMessage, JSONValue } from "ai";
+import NavBar from "./bud/components/navigation/NavBar";
+import { appendClientMessage, JSONValue, Message } from "ai";
+import MessageLoading from "./bud/chat/MessageLoading";
+import { Messages } from "./bud/chat/Messages";
 import ModelInfo from "./bud/chat/ModelInfo";
+import NormalEditor from "./bud/components/input/NormalEditor";
+import { useChat } from "@ai-sdk/react";
+import { Metrics, Usage, useSession } from "./bud/hooks/useSession";
+import { useChat as useChatHook } from "./bud/hooks/useChat";
+import { useEndPoints } from "./bud/hooks/useEndPoint";
+import ChatContext, { ChatProvider } from "../context/ChatContext";
+import { useAuth } from "../context/AuthContext";
+import React from "react";
 const { Header, Footer, Sider, Content } = Layout;
 
 
-export function Chat() {
-  const [lastMessage, setLastMessage] = useState<string>("");
+function Chat({chatId}: {chatId: string}){
+
+  const { sharedChatInput, setSharedChatInput, submitInput, setSubmitInput } = useContext(RootContext);
+  const { chat } = useContext(ChatContext);
+  const { apiKey } = useAuth();
+  const { saveMessage, chatHistory, loadChatHistory } = useSession(chatId);
+  const { getEndPoints } = useEndPoints();
+  
+
   const [toggleLeft, setToggleLeft] = useState<boolean>(false);
   const [toggleRight, setToggleRight] = useState<boolean>(false);
-  const { getEndPoints } = useEndPoints();
+  const [lastMessage, setLastMessage] = useState<string>("");
 
-  const onToggleLeftSidebar = () => {
-    setToggleLeft(!toggleLeft);
-  };
-
-  const onToggleRightSidebar = () => {
-    setToggleRight(!toggleRight);
-  };
-
-  const { 
-    sessions, 
-    token, 
-    sharedChatInput, 
-    setSharedChatInput,
-    submitInput,
-    setSubmitInput
-  } = useContext(RootContext);
-  const { chat, messages: historyMessages } = useContext(ChatContext);
-  const { createMessage } = useMessages();
-
-  const handleFinish = useCallback(
-    async (
-      message: Message,
-      response: {
-        usage: Usage;
-        finishReason: string;
-      }
-    ) => {
-      const { usage, finishReason } = response;
-      if (!chat?.selectedDeployment) return;
-      const metrics: Metrics | JSONValue | undefined = message.annotations?.find((item: any) => item.type == 'metrics')
-      await createMessage(
-        {
-          deployment_id: chat?.selectedDeployment?.id,
-          is_cache: false,
-          chat_session_id: chat?.id === NEW_SESSION ? undefined : chat?.id,
-          prompt: lastMessage,
-          response: {
-            message,
-            usage,
-          },
-          output_tokens: usage.completionTokens,
-          input_tokens: usage.promptTokens,
-          total_tokens: usage.totalTokens,
-          request_id: chat?.selectedDeployment?.id,
-          metrics: metrics as Metrics,
-          id: chat.id
-        },
-        chat.id
-      );
-      setLastMessage("");
-    },
-    [chat, createMessage, lastMessage]
-  );
+  console.log(apiKey);
 
   const body = useMemo(() => {
     if (!chat) {
@@ -97,23 +51,11 @@ export function Chat() {
     };
   }, [chat, chat?.selectedDeployment, JSON.stringify(chat?.chat_setting)]);
 
-  const {
-    error,
-    input,
-    status,
-    handleInputChange,
-    handleSubmit,
-    messages,
-    setMessages,
-    reload,
-    stop,
-    setData,
-    setInput
-  } = useChat({
+  const { messages, setMessages, reload, stop, setInput, input, status, error, setData, handleInputChange, handleSubmit } = useChat({
     headers: {
-      Authorization: token ? `Bearer ${token}` : "",
+      Authorization: apiKey ? `Bearer ${apiKey}` : "",
     },
-    body,
+    body: body,
     onFinish(message, { usage, finishReason }) {
       handleFinish(message, { usage, finishReason });
       document.getElementById("chat-container")?.scrollIntoView({
@@ -134,21 +76,26 @@ export function Chat() {
   });
 
   useEffect(() => {
-    if (input !== "") {
-      setLastMessage(input);
-    }
-  }, [input]);
-
-  const handleChange = (value: ChangeEvent<HTMLInputElement>) => {
-    setSharedChatInput(value);
-    handleInputChange(value);
-  };
+    getEndPoints({});
+    loadChatHistory();
+  }, [chatId]);
 
   useEffect(() => {
-    if (chat) {
-      getEndPoints({ page: 1, limit: 10 });
+    const messagesList = []
+
+    for (let item of chatHistory) {
+      messagesList.push({
+        id: uuidv4(),
+        content: item.prompt,
+        role: 'user',
+      });
+      messagesList.push(item.message);
     }
-  }, [toggleLeft, toggleRight]);
+
+    console.log('messagesList', messagesList);
+
+    setMessages(messages as Message[]);
+  }, [chatHistory]);
 
   useEffect(() => {
     if(!sharedChatInput?.target?.value) {
@@ -162,27 +109,41 @@ export function Chat() {
   useEffect(() => {
     if(submitInput) {
       handleSubmit(submitInput);
+      const target = submitInput.target as HTMLInputElement;
+      console.log("target", target?.value);
+      setLastMessage(target?.value);
       handleSubmit(undefined);
     }
   }, [submitInput]);
 
-  useEffect(() => {
-    console.log('historyMessages', historyMessages);
-    const messages = []
+  const onToggleLeftSidebar = () => {
+    setToggleLeft(!toggleLeft);
+  };
 
-    for (let item of historyMessages) {
-      messages.push({
-        id: item.id,
-        content: item.prompt,
-        role: 'user',
-      });
-      messages.push(item.response.message);
-    }
+  const onToggleRightSidebar = () => {
+    setToggleRight(!toggleRight);
+  };
 
-    setMessages(messages as Message[]);
-  }, [historyMessages]);
+  const handleChange = (value: ChangeEvent<HTMLInputElement>) => {
+    setSharedChatInput(value);
+    handleInputChange(value);
+  };
 
-
+  const handleFinish = (message: Message, { usage, finishReason }: { usage: Usage; finishReason: string }) => {
+    console.log("handleFinish", message, lastMessage);
+    
+    const metrics: Metrics | JSONValue | undefined = message.annotations?.find((item: any) => item.type == 'metrics')
+    saveMessage({
+      deployment_id: chat?.selectedDeployment?.id || '',
+      prompt: input,
+      usage,
+      message,
+      metrics: metrics as Metrics,
+    })
+    setLastMessage("");
+    
+  };
+  
   return (
     <Layout className="chat-container ">
       <Sider
@@ -215,7 +176,7 @@ export function Chat() {
             </div>
           </div>
           <div className="h-[calc(100vh-3.625rem)]">
-            <HistoryList data={sessions} />
+            <HistoryList />
           </div>
         </div>
       </Sider>
@@ -224,9 +185,9 @@ export function Chat() {
           !toggleLeft && "!rounded-l-[0.875rem] overflow-hidden"
         } ${!toggleRight && "!rounded-r-[0.875rem] overflow-hidden"}`}
       >
-        {/* <Layout className="border-[1px] border-[#1F1F1F] border-l-0 border-r-0"> */}
         <Header>
           <NavBar
+            chatId={chatId}
             isLeftSidebarOpen={toggleLeft}
             isRightSidebarOpen={toggleRight}
             onToggleLeftSidebar={() => setToggleLeft(!toggleLeft)}
@@ -244,18 +205,18 @@ export function Chat() {
             <Messages messages={messages} reload={reload} onEdit={(message)=> appendClientMessage({messages, message})} />
             {(!chat?.selectedDeployment?.name) &&
               (!messages || messages.length === 0) && (
-                <div className="mt-4 text-[#EEEEEE] text-center">
+                <div className="mt-[-1.75rem] text-[#EEEEEE] text-center">
                   <Image
                     preview={false}
-                    src="icons/load.png"
+                    src="images/looking.gif"
                     alt="bud"
                     width={"450px"}
                     // height={"150px"}
                   />
-                  <div className="Open-Sans mt-[.75rem] text-[1.575rem]">
+                  <div className="relative Open-Sans mt-[-5.75rem] text-[1.575rem]">
                     Hello there 👋
                   </div>
-                  <div className="Open-Sans text-[1.575rem]">
+                  <div className="relative Open-Sans text-[1.575rem]">
                     Select a model to get started
                   </div>
                 </div>
@@ -292,8 +253,8 @@ export function Chat() {
             stop={stop}
             handleInputChange={handleChange}
             handleSubmit={(e) => {
-              setSubmitInput(e);
-              // handleSubmit(e);
+              // setSubmitInput(e);
+              handleSubmit(e);
               document.getElementById("chat-container")?.scrollIntoView({
                 behavior: "smooth",
                 block: "end",
@@ -366,88 +327,60 @@ export function Chat() {
   );
 }
 
+const MemoizedChat = React.memo(Chat, (prevProps, nextProps) => {
+  // Add console log to see when comparison happens
+  console.log('MemoizedChat comparison:', {
+    prev: prevProps.chatId,
+    next: nextProps.chatId,
+    areEqual: prevProps.chatId === nextProps.chatId
+  });
+  return prevProps.chatId === nextProps.chatId;
+});
+
 function ChatWithStore(props: { chat: ActiveSession }) {
-  const { localMode } = useContext(RootContext);
-  const { getSessionMessages } = useMessages();
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [messages, setMessages] = useState<any[]>([]);
-  const [loadedChatID, setLoadedChatID] = useState<string | undefined>(
-    undefined
-  );
+    const { setChat } = useContext(ChatContext);
 
-  useEffect(() => {
-    const init = async () => {
-      const id = props.chat?.id;
-      if (localMode) {
-        console.log("Loading from local storage");
-        const existing = localStorage.getItem(id);
-        if (existing) {
-          const data = JSON.parse(existing);
-          if (loadedChatID !== id) {
-            setLoadedChatID(id);
-            setMessages(data);
-          }
-        }
-      } else {
-        if (id !== NEW_SESSION) {
-          if (loadedChatID !== id) {
-            const result = await getSessionMessages(id);
-            console.log("Loading from server");
-            setLoadedChatID(id);
-            setMessages(result);
-          }
-          return;
-        }
-      }
-    };
-    init();
-  }, [props.chat]);
+    // Memoize the initialChat function
+    const initialChat = React.useCallback(async () => {
+        setChat(props.chat);
+    }, [props.chat, setChat]);
 
-  return (
-    <>
-      <ResizablePanel defaultSize={100}>
-        <ChatContext.Provider
-          value={{
-            chat: props.chat,
-            messages: messages,
-            // ?.filter((m) => m.prompt !== NEW_SESSION)
-            setMessages,
-            notes,
-            setNotes,
-          }}
-        >
-          <MantineProvider>
-            <Chat />
-          </MantineProvider>
-        </ChatContext.Provider>
-      </ResizablePanel>
-      <ResizableHandle />
-    </>
-  );
+    useEffect(() => {
+        initialChat();
+    }, [initialChat]);
+    
+    // Memoize the child components to prevent unnecessary re-renders
+    const chatComponent = React.useMemo(() => (
+      <MemoizedChat chatId={props.chat.id} />
+    ), [props.chat.id]);
+    
+    return chatComponent;
 }
+
+
 
 export default function ChatWindowWithStore() {
-  const { chats } = useContext(RootContext);
+    const { activeChatList } = useContext(RootContext);
 
-  return (
-    <div
-      className="!grid w-full h-full transition-all duration-300"
-      style={
-        chats?.length > 0
-          ? {}
-          : {
-              position: "absolute",
-              top: 0,
-              left: -5000,
-              zIndex: -1,
-            }
-      }
-    >
-      <ResizablePanelGroup direction="horizontal" className="h-full w-full">
-        {chats.map((chat, index) => (
-          <ChatWithStore key={index} chat={chat} />
-        ))}
-      </ResizablePanelGroup>
-    </div>
-  );
-}
+    return (
+      <div
+        className="w-full h-full transition-all duration-300 flex size-full overflow-x-auto snap-x snap-mandatory md:snap-none md:overflow-y-hidden"
+        style={
+          activeChatList?.length > 0
+            ? {}
+            : {
+                position: "absolute",
+                top: 0,
+                left: -5000,
+                zIndex: -1,
+              }
+        }
+      >
+        {activeChatList.map((chat: ActiveSession, index: number) => (
+            <ChatProvider key={index}>
+              <ChatWithStore key={index} chat={chat} />
+            </ChatProvider>
+          ))}
+      </div>
+    );
+  }

@@ -6,7 +6,8 @@ import { Button, Image } from "antd";
 import RootContext from "@/app/context/RootContext";
 
 function Notes() {
-  const { localMode } = useContext(RootContext);
+  // const { localMode } = useContext(RootContext);
+  const localMode = true;
   const {
     getNotes,
     createNote,
@@ -29,13 +30,20 @@ function Notes() {
   useEffect(() => {
     if (localMode) {
       const localNotes = localStorage.getItem(chatNotes);
+
+      console.log("localNotes", localNotes);
       if (localNotes) {
-        setNotes(JSON.parse(localNotes));
+        try {
+          setNotes(JSON.parse(localNotes));
+        } catch (error) {
+          console.error("Error parsing localNotes JSON", error);
+        }
       }
     } else {
       getNotes();
     }
   }, [currentPage]);
+
 
   const handleScroll = () => {
     console.log("scrolling");
@@ -52,7 +60,7 @@ function Notes() {
 
   return (
     <div id={chatNotes} onScroll={handleScroll} className="px-[.5rem]">
-      {notes?.map((note) => (
+      {notes?.map((note: any) => (
         <div className="flex flex-col w-full gap-[.5rem] py-[.375rem] max-h-[20rem] overflow-y-auto">
           <LabelTextArea
             title="Notes"
@@ -62,7 +70,7 @@ function Notes() {
             defaultValue={note.note}
             onChange={(value) => {
               setNotes(
-                notes.map((n) => (n.id === note.id ? { ...n, note: value } : n))
+                notes.map((n: any) => (n.id === note.id ? { ...n, note: value } : n))
               );
             }}
             onBlur={() => {

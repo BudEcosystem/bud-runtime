@@ -1,23 +1,17 @@
-import { ChangeEvent, createContext, FormEvent } from "react";
+"use client";
+
+import { ChangeEvent, createContext, FormEvent, ReactNode, useState } from "react";
+import { ActiveSession } from "../components/bud/chat/HistoryList";
 import { Endpoint } from "./ChatContext";
-import { ActiveSession, Session } from "../components/bud/chat/HistoryList";
+import { SavedMessage } from "../components/bud/hooks/useSession";
 
 type RootContextType = {
   chats: ActiveSession[];
   setChats: (chats: ActiveSession[]) => void;
-  createChat: (sessionId?: string, replaceChatId?: string) => void;
-  closeChat: (chat: ActiveSession) => void;
-  handleDeploymentSelect: (chat: ActiveSession, endpoint: Endpoint) => void;
-  handleSettingsChange: (chat: ActiveSession, prop: string, value: any) => void;
-  token: string;
-  sessions: Session[];
-  setSessions: (sessions: Session[]) => void;
-  // endpoints
+  activeChatList: ActiveSession[];
+  setActiveChatList: (activeChatList: ActiveSession[]) => void;
   endpoints: Endpoint[];
-  // set endpoints
   setEndpoints: (endpoints: Endpoint[]) => void;
-  localMode: boolean;
-  // Add a shared input field for synced input across chats
   sharedChatInput: ChangeEvent<HTMLInputElement>;
   setSharedChatInput: (input: ChangeEvent<HTMLInputElement>) => void;
   submitInput: FormEvent<Element>;
@@ -25,18 +19,10 @@ type RootContextType = {
 };
 
 const RootContext = createContext<RootContextType>({
-  localMode: false,
   chats: [],
   setChats: () => {},
-  createChat: (sessionId?: string, replaceChatId?: string) =>
-    console.error("createChat not implemented", sessionId, replaceChatId),
-  closeChat: (chat: ActiveSession) =>
-    console.error("closeChat not implemented", chat),
-  handleDeploymentSelect: (chat: ActiveSession, endpoint: Endpoint) => {},
-  handleSettingsChange: (chat: ActiveSession, prop: string, value: any) => {},
-  token: "",
-  sessions: [],
-  setSessions: (_: Session[]) => {},
+  activeChatList: [],
+  setActiveChatList: () => {},
   endpoints: [],
   setEndpoints: (_: Endpoint[]) => {},
   sharedChatInput: {} as ChangeEvent<HTMLInputElement>,
@@ -44,5 +30,17 @@ const RootContext = createContext<RootContextType>({
   submitInput: {} as FormEvent<Element>,
   setSubmitInput: (_: FormEvent<Element>) => {},
 });
+
+export const RootProvider = ({ children }: { children: ReactNode }) => {
+  const [chats, setChats] = useState<ActiveSession[]>([]);
+  const [sharedChatInput, setSharedChatInput] = useState<ChangeEvent<HTMLInputElement>>({} as ChangeEvent<HTMLInputElement>);
+  const [submitInput, setSubmitInput] = useState<FormEvent<Element>>({} as FormEvent<Element>);
+  const [endpoints, setEndpoints] = useState<Endpoint[]>([]);
+  const [activeChatList, setActiveChatList] = useState<ActiveSession[]>([]);
+  return <RootContext.Provider value={{ 
+    chats, setChats, sharedChatInput, setSharedChatInput, submitInput, setSubmitInput,
+    endpoints, setEndpoints, activeChatList, setActiveChatList
+  }}>{children}</RootContext.Provider>;
+};
 
 export default RootContext;

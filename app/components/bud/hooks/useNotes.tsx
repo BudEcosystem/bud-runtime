@@ -5,7 +5,8 @@ import { tempApiBaseUrl } from "../environment";
 
 export function useNotes() {
   const [loading, setLoading] = useState(false);
-  const { chat, setNotes, notes } = useContext(ChatContext);
+  const { chat } = useContext(ChatContext);
+  const [notes, setNotes] = useState([] as any);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalNotes, setTotalNotes] = useState(0);

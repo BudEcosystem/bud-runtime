@@ -1,7 +1,7 @@
 import ChatContext, { Endpoint } from "@/app/context/ChatContext";
 import RootContext from "@/app/context/RootContext";
 import { Image } from "antd";
-import React, { useContext } from "react";
+import React, { useContext, useEffect, useState } from "react";
 
 export type ChatSettings = {
   id: string;
@@ -28,6 +28,8 @@ export type Session = {
   created_at: string;
   modified_at: string;
   chat_setting?: ChatSettings;
+  chat_setting_id?: string;
+  active?: boolean;
 };
 
 export type ActiveSession = Session & {
@@ -35,8 +37,7 @@ export type ActiveSession = Session & {
 };
 
 function HistoryListItem({ data }: { data: Session }) {
-  const { createChat, chats } = useContext(RootContext);
-  const { chat } = useContext(ChatContext);
+  const { chats } = useContext(RootContext);
   return (
     <div
       onClick={() => {
@@ -44,7 +45,7 @@ function HistoryListItem({ data }: { data: Session }) {
         if (chats.find((chat) => chat.id === data.id)) {
           return;
         }
-        createChat(data.id, chat?.id);
+        // createChat(data.id, chat?.id);
       }}
       className="flex flex-row items-center gap-[1rem] p-[.45rem] px-[.65rem] justify-between border-[1px] border-[#1F1F1F00] hover:border-[#1F1F1F] rounded-[8px] backdrop-blur-[10px] hover:bg-[#FFFFFF08] cursor-pointer"
     >
@@ -68,17 +69,22 @@ function HistoryListItem({ data }: { data: Session }) {
   );
 }
 
-interface HistoryListProps {
-  data: Session[];
-}
+function HistoryList() {
+  const { chats } = useContext(RootContext);
 
-function HistoryList({ data }: HistoryListProps) {
+  const [chatHistory, setChatHistory] = useState<Session[]>([]);
+
+  useEffect(() => {
+    console.log("chats", chats);
+    setChatHistory(chats);
+  }, [chats]);
+
   return (
     <div className="flex flex-col w-full h-[41%] bg-[#101010] px-[.9rem] py-[.95rem] gap-y-[.6rem]">
-      {data?.map((item, index) => (
+      {chatHistory?.map((item, index) => (
         <HistoryListItem key={index} data={item} />
       ))}
-      {data?.length === 0 && (
+      {chatHistory?.length === 0 && (
         <div className="flex flex-row items-center justify-center w-full h-[2.5rem] bg-[#101010] rounded-[8px] border-[1px] border-[#1F1F1F] backdrop-blur-[10px]">
           <span className="Open-Sans text-[#757575] text-[.625rem] font-[400]">
             No chat history

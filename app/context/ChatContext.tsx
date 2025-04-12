@@ -1,5 +1,4 @@
-import { createContext } from "react";
-import { PostMessage } from "../components/bud/hooks/useMessages";
+import { createContext, ReactNode, useState } from "react";
 import { ActiveSession, Session } from "../components/bud/chat/HistoryList";
 
 type Provider = {
@@ -54,23 +53,19 @@ export type Note = {
 type ChatContextType = {
   // api key
   chat?: ActiveSession;
+  setChat: (chat: ActiveSession | undefined) => void;
 
-  // messages history
-  messages: PostMessage[];
-  // set messages history
-  setMessages: (messages: PostMessage[]) => void;
-
-  notes: Note[];
-  setNotes: (notes: Note[]) => void;
 };
 
 const ChatContext = createContext<ChatContextType>({
   // default values
   chat: undefined,
-  messages: [],
-  setMessages: (_: any[]) => {},
-  notes: [],
-  setNotes: (_: Note[]) => {},
+  setChat: (_: ActiveSession | undefined) => {},
 });
 
 export default ChatContext;
+
+export const ChatProvider = ({ children }: { children: ReactNode }) => {
+  const [chat, setChat] = useState<ActiveSession | undefined>(undefined);
+  return <ChatContext.Provider value={{ chat, setChat }}>{children}</ChatContext.Provider>;
+};

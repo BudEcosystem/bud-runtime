@@ -19,23 +19,10 @@ export default function ModelInfo({deployment}: any){
         }
     }, [])
 
-    const strengths = [
-        "Supports 128k token context length, enabling handling of lengthy documents and complex tasks requiring extensive context.",
-        "Achieves strong performance on benchmarks such as MMLU (69.4 for 8B Instruct), GSM8K (84.5 for 8B Instruct), and HumanEval (72.6 for 8B Instruct), demonstrating robust reasoning and coding capabilities.",
-        "Multilingual support for 8 languages (e.g., English, German, French) with instruction-tuned versions optimized for dialogue and tool use cases.",
-        "Uses Grouped-Query Attention (GQA) for improved inference scalability and efficiency.",
-        "Includes safety tools like Llama Guard 3 and Prompt Guard to mitigate risks in deployment."
-      ]
-    const limitations = [
-        "Requires significant computational resources, with the 405B version needing 30.84M GPU hours and H100-80GB GPUs for training.",
-        "Commercial users with >700M monthly active users must obtain a separate license from Meta.",
-        "Limited official support for languages beyond the 8 listed; fine-tuning for other languages requires careful safety considerations.",
-        "Some benchmarks show moderate performance, such as the Gorilla Benchmark API Bench (35.3 for 405B Instruct) and Multilingual MGSM (68.9 for 8B Instruct)."
-      ]
 
     return(
-        <div className="flex flex-col gap-[.5rem] w-full mx-auto max-w-2xl h-full justify-center items-center">
-            <div className="text-[#B3B3B3] text-[.625rem] font-[400] w-[500px] bg-[#FFFFFF08] border-[1px] border-[#1F1F1F] rounded-[10px] max-h-[500px] overflow-auto ">
+        <div className="flex flex-col gap-[.5rem] w-full mx-auto max-w-xl h-full justify-center items-center">
+            <div className="text-[#B3B3B3] text-[.625rem] font-[400] max-w-[700px] bg-[#FFFFFF08] border-[1px] border-[#1F1F1F] rounded-[10px] max-h-[500px] lg:max-h-[700px] overflow-auto ">
                 <div className="p-[1.3rem]">
                     <div className="flex flex-row gap-[.5rem]">
                         <div className=" w-[2.68rem] h-[2.68rem] flex justify-center items-center shrink-0 grow-0 bg-[#1F1F1F] rounded-[6px] p-[.25rem] mt-[.25rem]">
@@ -67,7 +54,7 @@ export default function ModelInfo({deployment}: any){
                         </div>
                     </div>
                     <div className="flex flex-col gap-[.5rem] mt-[1rem]">
-                        <div className="text-[#757575] text-[0.8rem] font-[400]">
+                        <div className="text-[#757575] text-[0.8rem] font-[400] leading-[1.3rem]">
                             {deployment?.model?.description}
                         </div>
                     </div>
@@ -76,7 +63,7 @@ export default function ModelInfo({deployment}: any){
                     <div className="flex flex-row gap-[.5rem]">
                         <div className="text-[#EEEEEE] text-[0.8rem] font-[400] w-[150px]">Context</div>
                         <div className="text-[#EEEEEE] text-[0.8rem] font-[400]">
-                            {deployment?.context_length}
+                            {deployment?.context_length?.toLocaleString()}
                         </div>
                     </div>
                 </div>
@@ -96,7 +83,7 @@ export default function ModelInfo({deployment}: any){
                         </div>
                     </div>
                 </div>}
-                {strengths.length > 0 && (
+                {deployment?.model?.strengths?.length > 0 && (
                 <>
                     <div className="pt-[1.5rem] mb-[1.4rem] px-[1.3rem]">
                     <div>
@@ -104,7 +91,7 @@ export default function ModelInfo({deployment}: any){
                         <div className="block text-[0.75rem] font-normal text-[#757575]">Following is the list of things model is really good at doing</div>
                     </div>
                     <ul className="custom-bullet-list mt-[.9rem]">
-                        {strengths?.map((item, index) => (
+                        {deployment?.model?.strengths?.map((item: any, index: any) => (
                         <li key={index}>
                             <div className="block text-[0.875rem] font-[400] text-[#EEEEEE]">{item}</div>
                         </li>
@@ -114,7 +101,7 @@ export default function ModelInfo({deployment}: any){
                     <div className="hR"></div>
                 </>
                 )}
-                {limitations.length > 0 && (
+                {deployment?.model?.limitations?.length > 0 && (
                 <>
                     <div className="pt-[1.5rem] mb-[1.4rem] px-[1.3rem]">
                     <div>
@@ -122,7 +109,7 @@ export default function ModelInfo({deployment}: any){
                         <div className="block text-[0.75rem] font-normal text-[#757575]">Following is the list of things model is not great at</div>
                     </div>
                     <ul className="custom-bullet-list mt-[.9rem]">
-                        {limitations?.map((item, index) => (
+                        {deployment?.model?.limitations?.map((item: any, index: any) => (
                         <li key={index}>
                             <div className="block text-[0.875rem] font-[400] text-[#EEEEEE]">{item}</div>
                         </li>
