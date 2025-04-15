@@ -62,6 +62,8 @@ export default function SettingsList() {
 
     const { settingPresets, setSettingPresets, addSettingPreset } = useChatStore();
     const [settings, setSettings] = useState<Settings>();
+    const [components, setComponents] = useState<SettingsListItemProps[]>([]);
+
     useEffect(() => {
         if (settingPresets.length === 0) {
             const defaultSettings: Settings = {
@@ -82,8 +84,15 @@ export default function SettingsList() {
                 modified_at: new Date().toISOString(),
             };
             setSettingPresets([defaultSettings]);
+            // initComponents(defaultSettings);
         }
     }, []);
+
+    useEffect(() => {
+        if (settingPresets.length > 0) {
+            initComponents();
+        }
+    }, [settingPresets]);
 
     const handleAddPreset = (name: string) => {
         console.log(name);
@@ -113,213 +122,217 @@ export default function SettingsList() {
         //     [key]: value,
         // }));
     };
+
+
+    const initComponents = () => {
+        const components = [
+            {
+                title: "Presets",
+                description: "Presets",
+                icon: "icons/circle-settings.svg",
+                children: (
+                    <div className="flex flex-col w-full gap-[.5rem] py-[.375rem] px-[.5rem]">
+                        <SelectWithAdd
+                            options={settingPresets.map((preset) => preset.name)}
+                            defaultValue={settingPresets[0].name}
+                            onChange={(value) => {
+                                console.log(value);
+                            }}
+                            onAdd={handleAddPreset}
+                        />
+                    </div>
+                ),
+            },
+            {
+                title: "Basic",
+                description: "General settings",
+                icon: "icons/circle-settings.svg",
+                children: (
+                    <div className="flex flex-col w-full gap-[.5rem] py-[.375rem]">
+                        <SliderInput
+                            title="Temperature"
+                            min={0.1}
+                            max={1}
+                            step={0.1}
+                            defaultValue={settings?.temperature || 0}
+                            value={settings?.temperature || 0}
+                            onChange={(value) => handleChange(settings, "temperature", value)}
+                        />
+                        <InlineSwitch
+                            title="Limit Response Length"
+                            defaultValue={settings?.limit_response_length || false}
+                            onChange={(value) =>
+                                handleChange(settings, "limit_response_length", value)
+                            }
+                        />
+                        {settings?.limit_response_length && <InlineInput
+                            title="Sequence Length"
+                            value={`${settings?.sequence_length || 0}`}
+                            defaultValue={`${settings?.sequence_length || 0}`}
+                            type="number"
+                            onChange={(value) => handleChange(settings, "sequence_length", value)}
+                        />}
+                    </div>
+                ),
+            },
+            {
+                title: "Advanced",
+                description: "Notification settings",
+                icon: "icons/circle-settings.svg",
+                children: (
+                    <div className="flex flex-col w-full gap-[.5rem] py-[.375rem]">
+                        <div className="flex flex-row items-center gap-[.625rem] p-[.5rem] w-full">
+                            <span className="text-[#EEEEEE] text-[.75rem] font-[400] text-nowrap w-full">
+                                Context Overflow
+                            </span>
+                            <div className="flex flex-row items-center gap-[.5rem] w-full max-h-[2rem]">
+                                <Select
+                                    defaultValue={settings?.context_overflow_policy?.split(
+                                        ","
+                                    )}
+                                    value={settings?.context_overflow_policy?.split(",")}
+                                    onChange={(value) =>
+                                        handleChange(settings, "context_overflow", value)
+                                    }
+                                    className="customSelect w-full h-full !h-[2rem]"
+                                    mode="tags"
+                                    tagRender={(props) => (
+                                        <Tag
+                                            closable
+                                            className=" !text-[.625rem] font-[400]  rounded-[0.5rem] !px-[.25rem] !py-[0rem] ml-[.25rem]"
+                                            style={{
+                                                background: getChromeColor("#D1B854"),
+                                                borderColor: getChromeColor("#D1B854"),
+                                                color: "#D1B854",
+                                            }}
+                                            closeIcon={
+                                                <Image
+                                                    src="icons/close.svg"
+                                                    preview={false}
+                                                    className="!w-[.625rem] !h-[.425rem]"
+                                                />
+                                            }
+                                        >
+                                            {props.label}
+                                        </Tag>
+                                    )}
+                                >
+                                    <Select.Option value="allow">Allow</Select.Option>
+                                    <Select.Option value="deny">Deny</Select.Option>
+                                </Select>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-row items-center gap-[.625rem] p-[.5rem] w-full">
+                            <span className="text-[#EEEEEE] text-[.75rem] font-[400] text-nowrap w-full">
+                                Stop Strings
+                            </span>
+                            <div className="flex flex-row items-center gap-[.5rem] w-full min-w-[7.69rem] max-w-[7.69rem] max-h-[2rem]">
+                                <Select
+                                    mode="tags"
+                                    defaultValue={settings?.stop_strings || []}
+                                    value={settings?.stop_strings || []}
+                                    onChange={(value) => handleChange(settings, "stop_strings", value)}
+                                    className="customSelect w-full h-full !h-[2rem]"
+                                    tagRender={(props) => (
+                                        <Tag
+                                            closable
+                                            className=" !text-[.625rem] font-[400]  rounded-[0.5rem] !p-[.25rem]  ml-[.25rem]"
+                                            style={{
+                                                background: getChromeColor("#D1B854"),
+                                                borderColor: getChromeColor("#D1B854"),
+                                                color: "#D1B854",
+                                            }}
+                                            closeIcon={
+                                                <Image
+                                                    src="icons/close.svg"
+                                                    preview={false}
+                                                    className="!w-[.625rem] !h-[.625rem]"
+                                                />
+                                            }
+                                        >
+                                            {props.label}
+                                        </Tag>
+                                    )}
+                                >
+                                    <Select.Option value="Stop">Stop</Select.Option>
+                                </Select>
+                            </div>
+                        </div>
+                    </div>
+                ),
+            },
+            {
+                title: "Sampling",
+                description: "Notification settings",
+                icon: "icons/circle-settings.svg",
+                children: (
+                    <div className="flex flex-col w-full gap-[.5rem] py-[.375rem]">
+                        <InlineInput
+                            title="Top K Sampling"
+                            value={`${settings?.top_k_sampling || 0}`}
+                            defaultValue={`${settings?.top_k_sampling || 0}`}
+                            min={0}
+                            max={1}
+                            type="number"
+                            onChange={(value) => handleChange(settings, "top_k_sampling", value)}
+                        />
+                        <InlineInput
+                            title="Repeat Penalty"
+                            value={`${settings?.repeat_penalty || 0}`}
+                            defaultValue={`${settings?.repeat_penalty || 0}`}
+                            min={0}
+                            max={1}
+                            type="number"
+                            onChange={(value) => handleChange(settings, "repeat_penalty", value)}
+                        />
+                        <SliderInput
+                            title="Top P Sampling"
+                            min={0.01}
+                            max={1}
+                            step={0.01}
+                            defaultValue={settings?.top_p_sampling || 0}
+                            value={settings?.top_p_sampling || 0}
+                            onChange={(value) => handleChange(settings, "top_p_sampling", value)}
+                        />
+                        <SliderInput
+                            title="Min P Sampling"
+                            min={0.01}
+                            max={1}
+                            step={0.01}
+                            defaultValue={settings?.min_p_sampling || 0}
+                            value={settings?.min_p_sampling || 0}
+                            onChange={(value) => handleChange(settings, "min_p_sampling", value)}
+                        />
+                    </div>
+                ),
+            },
+            // {
+            //   title: "Structured Output",
+            //   description: "JSON settings",
+            //   icon: "icons/circle-settings.svg",
+            //   children: (
+            //     <div className="flex flex-col w-full gap-[.5rem] py-[.375rem]">
+            //       <LabelJSONInput
+            //         title="JSON Schema"
+            //         description="Structured Output"
+            //         placeholder="Enter JSON Schema"
+            //         value={chat?.chat_setting?.structured_json_schema || ""}
+            //         onChange={(value) => handleChange(chat, "structured_json_schema", value)}
+            //       />
+            //     </div>
+            //   ),
+            // },
+            // {
+            //     title: "Conversation Notes",
+            //     description: "Conversation Notes",
+            //     icon: "icons/circle-settings.svg",
+            //     children: <Notes />,
+            // },
+        ];
+        setComponents(components);
+    }
     
-
-    const components = [
-        {
-            title: "Presets",
-            description: "Presets",
-            icon: "icons/circle-settings.svg",
-            children: (
-                <div className="flex flex-col w-full gap-[.5rem] py-[.375rem] px-[.5rem]">
-                    <SelectWithAdd
-                        options={settingPresets.map((preset) => preset.name)}
-                        defaultValue={settingPresets[0].name}
-                        onChange={(value) => {
-                            console.log(value);
-                        }}
-                        onAdd={handleAddPreset}
-                    />
-                </div>
-            ),
-        },
-        {
-            title: "Basic",
-            description: "General settings",
-            icon: "icons/circle-settings.svg",
-            children: (
-                <div className="flex flex-col w-full gap-[.5rem] py-[.375rem]">
-                    <SliderInput
-                        title="Temperature"
-                        min={0.1}
-                        max={1}
-                        step={0.1}
-                        defaultValue={settings?.temperature || 0}
-                        value={settings?.temperature || 0}
-                        onChange={(value) => handleChange(settings, "temperature", value)}
-                    />
-                    <InlineSwitch
-                        title="Limit Response Length"
-                        defaultValue={settings?.limit_response_length || false}
-                        onChange={(value) =>
-                            handleChange(settings, "limit_response_length", value)
-                        }
-                    />
-                    {settings?.limit_response_length && <InlineInput
-                        title="Sequence Length"
-                        value={`${settings?.sequence_length || 0}`}
-                        defaultValue={`${settings?.sequence_length || 0}`}
-                        type="number"
-                        onChange={(value) => handleChange(settings, "sequence_length", value)}
-                    />}
-                </div>
-            ),
-        },
-        {
-            title: "Advanced",
-            description: "Notification settings",
-            icon: "icons/circle-settings.svg",
-            children: (
-                <div className="flex flex-col w-full gap-[.5rem] py-[.375rem]">
-                    <div className="flex flex-row items-center gap-[.625rem] p-[.5rem] w-full">
-                        <span className="text-[#EEEEEE] text-[.75rem] font-[400] text-nowrap w-full">
-                            Context Overflow
-                        </span>
-                        <div className="flex flex-row items-center gap-[.5rem] w-full max-h-[2rem]">
-                            <Select
-                                defaultValue={settings?.context_overflow_policy?.split(
-                                    ","
-                                )}
-                                value={settings?.context_overflow_policy?.split(",")}
-                                onChange={(value) =>
-                                    handleChange(settings, "context_overflow", value)
-                                }
-                                className="customSelect w-full h-full !h-[2rem]"
-                                mode="tags"
-                                tagRender={(props) => (
-                                    <Tag
-                                        closable
-                                        className=" !text-[.625rem] font-[400]  rounded-[0.5rem] !px-[.25rem] !py-[0rem] ml-[.25rem]"
-                                        style={{
-                                            background: getChromeColor("#D1B854"),
-                                            borderColor: getChromeColor("#D1B854"),
-                                            color: "#D1B854",
-                                        }}
-                                        closeIcon={
-                                            <Image
-                                                src="icons/close.svg"
-                                                preview={false}
-                                                className="!w-[.625rem] !h-[.425rem]"
-                                            />
-                                        }
-                                    >
-                                        {props.label}
-                                    </Tag>
-                                )}
-                            >
-                                <Select.Option value="allow">Allow</Select.Option>
-                                <Select.Option value="deny">Deny</Select.Option>
-                            </Select>
-                        </div>
-                    </div>
-
-                    <div className="flex flex-row items-center gap-[.625rem] p-[.5rem] w-full">
-                        <span className="text-[#EEEEEE] text-[.75rem] font-[400] text-nowrap w-full">
-                            Stop Strings
-                        </span>
-                        <div className="flex flex-row items-center gap-[.5rem] w-full min-w-[7.69rem] max-w-[7.69rem] max-h-[2rem]">
-                            <Select
-                                mode="tags"
-                                defaultValue={settings?.stop_strings || []}
-                                value={settings?.stop_strings || []}
-                                onChange={(value) => handleChange(settings, "stop_strings", value)}
-                                className="customSelect w-full h-full !h-[2rem]"
-                                tagRender={(props) => (
-                                    <Tag
-                                        closable
-                                        className=" !text-[.625rem] font-[400]  rounded-[0.5rem] !p-[.25rem]  ml-[.25rem]"
-                                        style={{
-                                            background: getChromeColor("#D1B854"),
-                                            borderColor: getChromeColor("#D1B854"),
-                                            color: "#D1B854",
-                                        }}
-                                        closeIcon={
-                                            <Image
-                                                src="icons/close.svg"
-                                                preview={false}
-                                                className="!w-[.625rem] !h-[.625rem]"
-                                            />
-                                        }
-                                    >
-                                        {props.label}
-                                    </Tag>
-                                )}
-                            >
-                                <Select.Option value="Stop">Stop</Select.Option>
-                            </Select>
-                        </div>
-                    </div>
-                </div>
-            ),
-        },
-        {
-            title: "Sampling",
-            description: "Notification settings",
-            icon: "icons/circle-settings.svg",
-            children: (
-                <div className="flex flex-col w-full gap-[.5rem] py-[.375rem]">
-                    <InlineInput
-                        title="Top K Sampling"
-                        value={`${settings?.top_k_sampling || 0}`}
-                        defaultValue={`${settings?.top_k_sampling || 0}`}
-                        min={0}
-                        max={1}
-                        type="number"
-                        onChange={(value) => handleChange(settings, "top_k_sampling", value)}
-                    />
-                    <InlineInput
-                        title="Repeat Penalty"
-                        value={`${settings?.repeat_penalty || 0}`}
-                        defaultValue={`${settings?.repeat_penalty || 0}`}
-                        min={0}
-                        max={1}
-                        type="number"
-                        onChange={(value) => handleChange(settings, "repeat_penalty", value)}
-                    />
-                    <SliderInput
-                        title="Top P Sampling"
-                        min={0.01}
-                        max={1}
-                        step={0.01}
-                        defaultValue={settings?.top_p_sampling || 0}
-                        value={settings?.top_p_sampling || 0}
-                        onChange={(value) => handleChange(settings, "top_p_sampling", value)}
-                    />
-                    <SliderInput
-                        title="Min P Sampling"
-                        min={0.01}
-                        max={1}
-                        step={0.01}
-                        defaultValue={settings?.min_p_sampling || 0}
-                        value={settings?.min_p_sampling || 0}
-                        onChange={(value) => handleChange(settings, "min_p_sampling", value)}
-                    />
-                </div>
-            ),
-        },
-        // {
-        //   title: "Structured Output",
-        //   description: "JSON settings",
-        //   icon: "icons/circle-settings.svg",
-        //   children: (
-        //     <div className="flex flex-col w-full gap-[.5rem] py-[.375rem]">
-        //       <LabelJSONInput
-        //         title="JSON Schema"
-        //         description="Structured Output"
-        //         placeholder="Enter JSON Schema"
-        //         value={chat?.chat_setting?.structured_json_schema || ""}
-        //         onChange={(value) => handleChange(chat, "structured_json_schema", value)}
-        //       />
-        //     </div>
-        //   ),
-        // },
-        // {
-        //     title: "Conversation Notes",
-        //     description: "Conversation Notes",
-        //     icon: "icons/circle-settings.svg",
-        //     children: <Notes />,
-        // },
-    ];
 
     return (
         <div className="relative flex flex-col w-full h-full overflow-y-auto pb-[5rem] pt-[1rem] px-[1rem]">
