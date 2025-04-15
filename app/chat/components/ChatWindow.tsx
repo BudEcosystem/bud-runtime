@@ -278,7 +278,7 @@ export default function ChatWindow({ chat }: { chat: Session }) {
               </span>
             </div>
           </div>
-          <SettingsList />
+          <SettingsList chatId={chat.id} />
         </div>
       </Sider>
     </Layout>

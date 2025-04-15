@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { Session, Settings } from '../types/chat';
+import { Note, Session, Settings } from '../types/chat';
 import { Endpoint } from '../types/deployment';
 import { Message } from 'ai';
 
@@ -28,6 +28,13 @@ interface ChatStore {
   setSettingPresets: (settings: Settings[]) => void;
   addSettingPreset: (settings: Settings) => void;
   updateSettingPreset: (settings: Settings) => void;
+
+  notes: Note[];
+  setNotes: (notes: Note[]) => void;
+  addNote: (note: Note) => void;
+  updateNote: (note: Note) => void;
+  deleteNote: (noteId: string) => void;
+  getNotes: (chatId: string) => Note[];
 }
 
 export const useChatStore = create<ChatStore>()(
@@ -132,6 +139,29 @@ export const useChatStore = create<ChatStore>()(
           preset.id === settings.id ? settings : preset
         )
       })),
+      
+      notes: [],
+      setNotes: (notes: Note[]) => set((state) => ({
+        notes: notes
+      })),
+
+      addNote: (note: Note) => set((state) => ({
+        notes: [...(state.notes || []), note]
+      })),
+
+      updateNote: (note: Note) => set((state) => ({
+        notes: state.notes.map((n: Note) => 
+          n.id === note.id ? note : n
+        )
+      })),
+
+      deleteNote: (noteId: string) => set((state) => ({
+        notes: state.notes.filter((n: Note) => n.id !== noteId)
+      })),
+
+      getNotes: (chatId: string) => {
+        return get().notes.filter((n: Note) => n.chat_session_id === chatId);
+      },
     }),
     {
       name: 'chat-storage',
@@ -140,6 +170,7 @@ export const useChatStore = create<ChatStore>()(
         messages: state.messages,
         settingPresets: state.settingPresets,
         currentSettingPreset: state.currentSettingPreset,
+        notes: state.notes,
       }),
     }
   )

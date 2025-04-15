@@ -45,3 +45,11 @@ export type Settings = {
     created_at: string;
     modified_at: string;
 }
+
+export type Note = {
+    id: string;
+    note: string;
+    created_at: string;
+    modified_at: string;
+    chat_session_id: string;
+}

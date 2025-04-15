@@ -10,6 +10,7 @@ import LabelJSONInput from "@/app/components/bud/components/input/LabelJSONInput
 import { useChatStore } from "@/app/store/chat";
 
 import { Settings } from "@/app/types/chat";
+import Notes from './Notes';
 
 interface SettingsListItemProps {
     title: string;
@@ -59,7 +60,7 @@ function SettingsListItem(props: SettingsListItemProps) {
     );
 }
 
-export default function SettingsList() {
+export default function SettingsList({chatId}: {chatId: string}) {
 
     const { settingPresets, addSettingPreset, updateSettingPreset, currentSettingPreset, setCurrentSettingPreset } = useChatStore();
     const [settings, setSettings] = useState<Settings>();
@@ -363,12 +364,12 @@ export default function SettingsList() {
                 </div>
               ),
             },
-            // {
-            //     title: "Conversation Notes",
-            //     description: "Conversation Notes",
-            //     icon: "icons/circle-settings.svg",
-            //     children: <Notes />,
-            // },
+            {
+                title: "Conversation Notes",
+                description: "Conversation Notes",
+                icon: "icons/circle-settings.svg",
+                children: <Notes chatId={chatId} />,
+            },
         ];
         setComponents(components);
     }
