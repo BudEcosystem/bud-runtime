@@ -1,11 +1,10 @@
 import { AppRequest } from "@/app/api/requests";
-import ChatContext from "@/app/context/ChatContext";
-import { useContext, useState } from "react";
-import { tempApiBaseUrl } from "../environment";
+import { useState } from "react";
+import { tempApiBaseUrl } from "../../../lib/environment";
 
 export function useNotes() {
   const [loading, setLoading] = useState(false);
-  const { chat } = useContext(ChatContext);
+  const chatId = "chat?.id";
   const [notes, setNotes] = useState([] as any);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -15,7 +14,7 @@ export function useNotes() {
     try {
       const result = await AppRequest.Post(
         `${tempApiBaseUrl}/playground/chat-sessions/notes`,
-        { note, chat_session_id: chat?.id }
+        { note, chat_session_id: chatId }
       )
         .then((res) => {
           return res.data?.note;
@@ -35,7 +34,7 @@ export function useNotes() {
     try {
       setLoading(true);
       const result = await AppRequest.Get(
-        `${tempApiBaseUrl}/playground/chat-sessions/${chat?.id}/notes`,
+        `${tempApiBaseUrl}/playground/chat-sessions/${chatId}/notes`,
         {
           params: { page: currentPage, limit: 10 },
         }
@@ -92,5 +91,5 @@ export function useNotes() {
     }
   };
 
-  return { createNote, getNotes, updateNote, deleteNote, loading, notes, totalPages, totalNotes, setNotes, chat, currentPage, setCurrentPage};
+  return { createNote, getNotes, updateNote, deleteNote, loading, notes, totalPages, totalNotes, setNotes, currentPage, setCurrentPage};
 }

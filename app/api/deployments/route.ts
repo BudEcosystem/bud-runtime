@@ -1,4 +1,4 @@
-import { tempApiBaseUrl } from '@/app/components/bud/environment';
+import { tempApiBaseUrl } from '@/app/lib/environment';
 import axios from 'axios';
 import { NextResponse } from 'next/server';
 

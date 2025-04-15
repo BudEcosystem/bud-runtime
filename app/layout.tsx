@@ -5,7 +5,6 @@ import "./globals.scss";
 import Toast from "./components/toast";
 import { AuthProvider } from "./context/AuthContext";
 import { LoaderProvider, LoaderWrapper } from "./context/LoaderContext";
-import { RootProvider } from "./context/RootContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -34,9 +33,7 @@ export default function RootLayout({
       >
         <AuthProvider>
           <LoaderProvider>
-            <RootProvider>
               {children}
-            </RootProvider>
             <Toast />
             <LoaderWrapper />
           </LoaderProvider>

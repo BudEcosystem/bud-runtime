@@ -1,8 +1,8 @@
 import { Image, notification, Tag } from "antd";
 import React from "react";
-import { assetBaseUrl } from "../environment";
+import { assetBaseUrl } from "../../../lib/environment";
 import { getChromeColor } from "../utils/color";
-import { Endpoint } from "@/app/context/ChatContext";
+import { Endpoint } from "@/app/types/deployment";
 import { toast } from "react-toastify";
 
 type Model = {

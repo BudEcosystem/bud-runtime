@@ -1,5 +1,5 @@
 import axios from "axios";
-import { apiBaseUrl } from "../components/bud/environment";
+import { apiBaseUrl } from "../lib/environment";
 
 export const axiosInstance = axios.create({
 });

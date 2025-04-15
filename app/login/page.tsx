@@ -29,7 +29,7 @@ export default function Login() {
         showLoader();
         const isLoginSuccessful = await login(key);
         if(isLoginSuccessful) {
-            router.replace(`/?api_key=${key}`);
+            router.replace(`chat/?api_key=${key}`);
         } else {
             setIsInvalidApiKey(true);
         }

@@ -1,7 +1,7 @@
 import {Image, Tag } from "antd";
-import { assetBaseUrl } from "../environment";
+import { assetBaseUrl } from "../../lib/environment";
 import { useEffect, useState } from "react";
-import { getChromeColor } from "../utils/color";
+import { getChromeColor } from "../../components/bud/utils/color";
 import { Text_14_400_EEEEEE } from "@/lib/text";
 import { Text_12_400_757575 } from "@/lib/text";
 

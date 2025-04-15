@@ -1,9 +1,7 @@
 import React, { useContext, useEffect } from "react";
 import LabelTextArea from "../components/input/LabelTextArea";
 import { useNotes } from "../hooks/useNotes";
-import ChatContext from "@/app/context/ChatContext";
 import { Button, Image } from "antd";
-import RootContext from "@/app/context/RootContext";
 
 function Notes() {
   // const { localMode } = useContext(RootContext);
@@ -15,13 +13,13 @@ function Notes() {
     currentPage,
     setCurrentPage,
     updateNote,
-    chat,
     notes,
     totalNotes,
     totalPages,
     setNotes,
   } = useNotes();
-  const chatNotes = `chat-${chat?.id}-notes`;
+  const chatId = "chat?.id";
+  const chatNotes = `chat-${chatId}-notes`;
 
   useEffect(() => {
     localStorage.setItem(chatNotes, JSON.stringify(notes));

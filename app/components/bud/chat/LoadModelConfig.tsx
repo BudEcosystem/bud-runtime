@@ -4,8 +4,8 @@ import SliderInput from "../components/input/SliderInput";
 import LabelInput from "../components/input/LabelInput";
 import { Button, Checkbox, Image } from "antd";
 import { ChevronLeft } from "lucide-react";
-import { assetBaseUrl } from "../environment";
-import { Endpoint } from "@/app/context/ChatContext";
+import { assetBaseUrl } from "../../../lib/environment";
+import { Endpoint } from "@/app/types/deployment";
 
 interface LoadModelConfigProps {
   data: Endpoint | null;

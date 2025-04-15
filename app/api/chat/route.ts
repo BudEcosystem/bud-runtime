@@ -1,8 +1,8 @@
 // import { openai } from '@ai-sdk/openai';
 import { smoothStream, streamText, createDataStreamResponse, generateId } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
-import { copyCodeApiBaseUrl, tempApiBaseUrl } from '@/app/components/bud/environment';
-import { ChatSettings } from '@/app/components/bud/chat/HistoryList';
+import { copyCodeApiBaseUrl, tempApiBaseUrl } from '@/app/lib/environment';
+import { Settings } from '@/app/types/chat';
 
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 30;
@@ -11,7 +11,7 @@ export async function POST(req: Request) {
   // Extract the `messages` from the body of the request
   const x = await req.json()
   const { messages, id, model, metadata, chat } = x
-  const settings: ChatSettings = x.settings;
+  const settings: Settings = x.settings;
   const authorization = req.headers.get('authorization');
   const apiKey = req.headers.get('api-key');
 
@@ -64,7 +64,7 @@ export async function POST(req: Request) {
       const result = streamText({
         model: proxyOpenAI(model),
         messages,
-        // experimental_transform: smoothStream({delayInMs: 100}),
+        experimental_transform: smoothStream({delayInMs: 50}),
         onChunk({ chunk }) {
           // dataStream.writeMessageAnnotation({ chunk });
           const current_time = Date.now()

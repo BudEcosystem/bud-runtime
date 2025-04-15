@@ -1,11 +1,10 @@
 import { Image } from "antd";
 import React, { useEffect, useState } from "react";
-import Markdown from "react-markdown";
-import { Metrics, SavedMessage } from "../hooks/useSession";
 import { format } from "date-fns";
 import { UIMessage } from "ai";
 import { MemoizedMarkdown } from "./MenorizedMarkdown";
 import { CopyText } from "../components/display/CopyText";
+import { Metrics } from "../../../types/chat";
 
 type MessageProps = {
   content: string;
@@ -201,7 +200,7 @@ function AIMessage(props: MessageProps & { reload: () => void }) {
                   />
                 </svg>
               </div>
-              <div className="pl-[.75rem] text-[#757575] text-[.75rem] font-[400]">
+              <div className="pl-[.25rem] text-[#757575] text-[.75rem] font-[400]">
                 {props.data?.createdAt &&
                   format(
                     new Date(props.data.createdAt),
