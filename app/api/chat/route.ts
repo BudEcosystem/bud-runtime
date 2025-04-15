@@ -47,6 +47,9 @@ export async function POST(req: Request) {
           stop: settings?.stop_strings ? settings.stop_strings : undefined,
           temperature: settings?.temperature ? settings.temperature : undefined,
           top_p: settings?.top_p_sampling ? settings.top_p_sampling : undefined,
+          extra_body:{
+            "guided_json": settings?.is_valid_json_schema ? settings?.structured_json_schema : undefined,
+          }
         })
       }
       console.log('fetch', request);

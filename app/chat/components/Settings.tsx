@@ -6,6 +6,7 @@ import SliderInput from "@/app/components/bud/components/input/SliderInput";
 import InlineInput from "@/app/components/bud/components/input/InlineInput";
 import InlineSwitch from "@/app/components/bud/components/input/InlineSwitch";
 import SelectWithAdd from "@/app/components/bud/components/input/SelectWithAdd";
+import LabelJSONInput from "@/app/components/bud/components/input/LabelJSONInput";
 import { useChatStore } from "@/app/store/chat";
 
 import { Settings } from "@/app/types/chat";
@@ -27,7 +28,7 @@ function SettingsListItem(props: SettingsListItemProps) {
                 className="flex flex-row items-center gap-[1rem] px-[.3rem] justify-between"
                 onClick={() => setOpen(!open)}
             >
-                <div className="flex flex-row items-center gap-[.4rem] p-[.5rem]">
+                <div className="flex flex-row items-center gap-[.4rem] py-[.5rem]">
                     <Image
                         src="icons/circle-settings.svg"
                         className={`transform transition-transform ${open ? "rotate-180" : ""
@@ -63,33 +64,45 @@ export default function SettingsList() {
     const { settingPresets, addSettingPreset, updateSettingPreset, currentSettingPreset, setCurrentSettingPreset } = useChatStore();
     const [settings, setSettings] = useState<Settings>();
     const [components, setComponents] = useState<SettingsListItemProps[]>([]);
+    const [hasHydrated, setHasHydrated] = useState(false);
 
     useEffect(() => {
-        if (currentSettingPreset) {
+        if (typeof window !== "undefined") {
+          // Access persisted store only on client
+          const hydrated = useChatStore.persist?.hasHydrated?.() ?? false;
+          setHasHydrated(hydrated);
+        }
+      }, []);
+
+    useEffect(() => {
+        if (settingPresets.length === 0) {
             const defaultSettings: Settings = {
                 id: uuidv4(),
                 name: "Default",
                 system_prompt: "",
-                temperature: 0.5,
+                temperature: 1,
                 limit_response_length: false,
                 sequence_length: 0,
                 context_overflow_policy: "",
                 stop_strings: [],
                 top_k_sampling: 0,
                 repeat_penalty: 0,
-                top_p_sampling: 0,
+                top_p_sampling: 1,
                 min_p_sampling: 0,
+                enable_structured_json_schema: false,
+                is_valid_json_schema: false,
                 structured_json_schema: "",
                 created_at: new Date().toISOString(),
                 modified_at: new Date().toISOString(),
             };
             addSettingPreset(defaultSettings);
             setSettings(defaultSettings);
+            setCurrentSettingPreset(defaultSettings);
         } else {
             setSettings(currentSettingPreset);
         }
 
-    }, []);
+    }, [hasHydrated]);
 
     useEffect(() => {
         if (settingPresets.length > 0) {
@@ -98,7 +111,6 @@ export default function SettingsList() {
     }, [settings]);
 
     const handleAddPreset = (name: string) => {
-        console.log(name);
         if (!name) return;
         const newPreset = {
             id: uuidv4(),
@@ -114,6 +126,8 @@ export default function SettingsList() {
             top_p_sampling: settings?.top_p_sampling || 0,
             min_p_sampling: settings?.min_p_sampling || 0,
             structured_json_schema: settings?.structured_json_schema || "",
+            enable_structured_json_schema: settings?.enable_structured_json_schema || false,
+            is_valid_json_schema: settings?.is_valid_json_schema || false,
             created_at: new Date().toISOString(),
             modified_at: new Date().toISOString(),
         };
@@ -123,25 +137,20 @@ export default function SettingsList() {
 
     const changePreset = (id: string) => {
         const preset = settingPresets.find((preset) => preset.id === id);
-        console.log(preset);
         if (preset) {
-            console.log("updating");
             setSettings(preset);
             setCurrentSettingPreset(preset);
         }
     }
 
-    const handleChange = (key: string, value: any) => {
-        console.log(key, value);
+    const handleChange = (params: any) => {
         const newSettings = {
             ...settings,
-            [key]: value,
+            ...params,
         } as Settings;
         setSettings(newSettings);
         updateSettingPreset(newSettings);
         setCurrentSettingPreset(newSettings);
-
-        console.log(settings);
     };
 
 
@@ -175,13 +184,14 @@ export default function SettingsList() {
                             step={0.1}
                             defaultValue={settings?.temperature || 0}
                             value={settings?.temperature || 0}
-                            onChange={(value) => handleChange("temperature", value)}
+                            onChange={(value) => handleChange({temperature: value})}
                         />
                         <InlineSwitch
                             title="Limit Response Length"
+                            value={settings?.limit_response_length || false}
                             defaultValue={settings?.limit_response_length || false}
                             onChange={(value) =>
-                                handleChange("limit_response_length", value)
+                                handleChange({limit_response_length: value})
                             }
                         />
                         {settings?.limit_response_length && <InlineInput
@@ -189,7 +199,7 @@ export default function SettingsList() {
                             value={`${settings?.sequence_length || 0}`}
                             defaultValue={`${settings?.sequence_length || 0}`}
                             type="number"
-                            onChange={(value) => handleChange("sequence_length", value)}
+                            onChange={(value) => handleChange({sequence_length: value})}
                         />}
                     </div>
                 ),
@@ -216,7 +226,7 @@ export default function SettingsList() {
                             min={0}
                             max={1}
                             type="number"
-                            onChange={(value) => handleChange("repeat_penalty", value)}
+                            onChange={(value) => handleChange({repeat_penalty: value})}
                         />
                         <SliderInput
                             title="Top P Sampling"
@@ -225,7 +235,7 @@ export default function SettingsList() {
                             step={0.01}
                             defaultValue={settings?.top_p_sampling || 0}
                             value={settings?.top_p_sampling || 0}
-                            onChange={(value) => handleChange("top_p_sampling", value)}
+                            onChange={(value) => handleChange({top_p_sampling: value})}
                         />
                         {/* <SliderInput
                             title="Min P Sampling"
@@ -296,7 +306,7 @@ export default function SettingsList() {
                                     mode="tags"
                                     defaultValue={settings?.stop_strings || []}
                                     value={settings?.stop_strings || []}
-                                    onChange={(value) => handleChange("stop_strings", value)}
+                                    onChange={(value) => handleChange({stop_strings: value})}
                                     className="customSelect w-full h-full !h-[2rem]"
                                     tagRender={(props) => (
                                         <Tag
@@ -319,7 +329,7 @@ export default function SettingsList() {
                                         </Tag>
                                     )}
                                 >
-                                    <Select.Option value="Stop">Stop</Select.Option>
+                                    {/* <Select.Option value="Stop">Stop</Select.Option> */}
                                 </Select>
                             </div>
                         </div>
@@ -327,22 +337,32 @@ export default function SettingsList() {
                 ),
             },
             
-            // {
-            //   title: "Structured Output",
-            //   description: "JSON settings",
-            //   icon: "icons/circle-settings.svg",
-            //   children: (
-            //     <div className="flex flex-col w-full gap-[.5rem] py-[.375rem]">
-            //       <LabelJSONInput
-            //         title="JSON Schema"
-            //         description="Structured Output"
-            //         placeholder="Enter JSON Schema"
-            //         value={chat?.chat_setting?.structured_json_schema || ""}
-            //         onChange={(value) => handleChange(chat, "structured_json_schema", value)}
-            //       />
-            //     </div>
-            //   ),
-            // },
+            {
+              title: "Structured Output",
+              description: "JSON settings",
+              icon: "icons/circle-settings.svg",
+              children: (
+                <div className="flex flex-col w-full gap-[.5rem] py-[.375rem]">
+                    <InlineSwitch
+                            title="Enable Structured Output"
+                            value={settings?.enable_structured_json_schema || false}
+                            defaultValue={settings?.enable_structured_json_schema || false}
+                            onChange={(value) =>
+                                handleChange({enable_structured_json_schema: value})
+                            }
+                        />
+                  {settings?.enable_structured_json_schema && <LabelJSONInput
+                    title="JSON Schema"
+                    description="Structured Output"
+                    placeholder="Enter JSON Schema"
+                    value={settings?.structured_json_schema || ""}
+                    onChange={(value, valid) => {
+                        handleChange({structured_json_schema: value, is_valid_json_schema: valid});
+                    }}
+                  />}
+                </div>
+              ),
+            },
             // {
             //     title: "Conversation Notes",
             //     description: "Conversation Notes",

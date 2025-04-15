@@ -84,7 +84,6 @@ export default function ChatWindow({ chat }: { chat: Session }) {
   };
 
   const handleFinish = (message: Message, { usage, finishReason }: { usage: Usage; finishReason: string }) => {
-    console.log("handleFinish", chat.total_tokens + usage.totalTokens, chat.total_tokens, usage.totalTokens);
 
     const msgHistory = getMessages(chat.id);
     const updatedChat = {

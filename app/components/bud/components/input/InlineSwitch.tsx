@@ -15,7 +15,8 @@ export default function InlineSwitch(props: InlineSwitchProps) {
         {props.title}
       </span>
       <Switch
-        defaultChecked={props.defaultValue}
+        value={props.value}
+        defaultValue={props.defaultValue}
         onChange={(e) => props.onChange(e)}
       />
     </div>

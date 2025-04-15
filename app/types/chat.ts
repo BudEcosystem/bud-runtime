@@ -39,7 +39,9 @@ export type Settings = {
     repeat_penalty: number;
     top_p_sampling: number;
     min_p_sampling: number;
+    enable_structured_json_schema: boolean;
     structured_json_schema: string;
+    is_valid_json_schema: boolean;
     created_at: string;
     modified_at: string;
 }
