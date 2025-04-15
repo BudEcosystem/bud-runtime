@@ -61,6 +61,14 @@ export default function ModelInfo({deployment}: any){
                 </div>
                 <div className="py-[0.9rem] px-[1.3rem] border-b-[1px] border-[#1F1F1F]">
                     <div className="flex flex-row gap-[.5rem]">
+                        <div className="text-[#EEEEEE] text-[0.8rem] font-[400] w-[150px]">License</div>
+                        <div className="text-[#EEEEEE] text-[0.8rem] font-[400]">
+                            {deployment?.model?.model_licenses?.license_type}
+                        </div>
+                    </div>
+                </div>
+                <div className="py-[0.9rem] px-[1.3rem] border-b-[1px] border-[#1F1F1F]">
+                    <div className="flex flex-row gap-[.5rem]">
                         <div className="text-[#EEEEEE] text-[0.8rem] font-[400] w-[150px]">Context</div>
                         <div className="text-[#EEEEEE] text-[0.8rem] font-[400]">
                             {deployment?.context_length?.toLocaleString()}

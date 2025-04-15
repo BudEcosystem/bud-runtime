@@ -60,12 +60,12 @@ function SettingsListItem(props: SettingsListItemProps) {
 
 export default function SettingsList() {
 
-    const { settingPresets, setSettingPresets, addSettingPreset } = useChatStore();
+    const { settingPresets, addSettingPreset, updateSettingPreset, currentSettingPreset, setCurrentSettingPreset } = useChatStore();
     const [settings, setSettings] = useState<Settings>();
     const [components, setComponents] = useState<SettingsListItemProps[]>([]);
 
     useEffect(() => {
-        if (settingPresets.length === 0) {
+        if (currentSettingPreset) {
             const defaultSettings: Settings = {
                 id: uuidv4(),
                 name: "Default",
@@ -83,21 +83,24 @@ export default function SettingsList() {
                 created_at: new Date().toISOString(),
                 modified_at: new Date().toISOString(),
             };
-            setSettingPresets([defaultSettings]);
-            // initComponents(defaultSettings);
+            addSettingPreset(defaultSettings);
+            setSettings(defaultSettings);
+        } else {
+            setSettings(currentSettingPreset);
         }
+
     }, []);
 
     useEffect(() => {
         if (settingPresets.length > 0) {
             initComponents();
         }
-    }, [settingPresets]);
+    }, [settings]);
 
     const handleAddPreset = (name: string) => {
         console.log(name);
         if (!name) return;
-        addSettingPreset({
+        const newPreset = {
             id: uuidv4(),
             name: name,
             system_prompt: settings?.system_prompt || "",
@@ -113,14 +116,32 @@ export default function SettingsList() {
             structured_json_schema: settings?.structured_json_schema || "",
             created_at: new Date().toISOString(),
             modified_at: new Date().toISOString(),
-        });
+        };
+        addSettingPreset(newPreset);
+        setSettings(newPreset);
     };
 
-    const handleChange = (chat: any, key: string, value: any) => {
-        // setSettings((prevSettings) => ({
-        //     ...prevSettings,
-        //     [key]: value,
-        // }));
+    const changePreset = (id: string) => {
+        const preset = settingPresets.find((preset) => preset.id === id);
+        console.log(preset);
+        if (preset) {
+            console.log("updating");
+            setSettings(preset);
+            setCurrentSettingPreset(preset);
+        }
+    }
+
+    const handleChange = (key: string, value: any) => {
+        console.log(key, value);
+        const newSettings = {
+            ...settings,
+            [key]: value,
+        } as Settings;
+        setSettings(newSettings);
+        updateSettingPreset(newSettings);
+        setCurrentSettingPreset(newSettings);
+
+        console.log(settings);
     };
 
 
@@ -133,11 +154,9 @@ export default function SettingsList() {
                 children: (
                     <div className="flex flex-col w-full gap-[.5rem] py-[.375rem] px-[.5rem]">
                         <SelectWithAdd
-                            options={settingPresets.map((preset) => preset.name)}
+                            options={settingPresets}
                             defaultValue={settingPresets[0].name}
-                            onChange={(value) => {
-                                console.log(value);
-                            }}
+                            onChange={changePreset}
                             onAdd={handleAddPreset}
                         />
                     </div>
@@ -156,13 +175,13 @@ export default function SettingsList() {
                             step={0.1}
                             defaultValue={settings?.temperature || 0}
                             value={settings?.temperature || 0}
-                            onChange={(value) => handleChange(settings, "temperature", value)}
+                            onChange={(value) => handleChange("temperature", value)}
                         />
                         <InlineSwitch
                             title="Limit Response Length"
                             defaultValue={settings?.limit_response_length || false}
                             onChange={(value) =>
-                                handleChange(settings, "limit_response_length", value)
+                                handleChange("limit_response_length", value)
                             }
                         />
                         {settings?.limit_response_length && <InlineInput
@@ -170,8 +189,53 @@ export default function SettingsList() {
                             value={`${settings?.sequence_length || 0}`}
                             defaultValue={`${settings?.sequence_length || 0}`}
                             type="number"
-                            onChange={(value) => handleChange(settings, "sequence_length", value)}
+                            onChange={(value) => handleChange("sequence_length", value)}
                         />}
+                    </div>
+                ),
+            },
+            {
+                title: "Sampling",
+                description: "Notification settings",
+                icon: "icons/circle-settings.svg",
+                children: (
+                    <div className="flex flex-col w-full gap-[.5rem] py-[.375rem]">
+                        {/* <InlineInput
+                            title="Top K Sampling"
+                            value={`${settings?.top_k_sampling || 0}`}
+                            defaultValue={`${settings?.top_k_sampling || 0}`}
+                            min={0}
+                            max={1}
+                            type="number"
+                            onChange={(value) => handleChange("top_k_sampling", value)}
+                        /> */}
+                        <InlineInput
+                            title="Repeat Penalty"
+                            value={`${settings?.repeat_penalty || 0}`}
+                            defaultValue={`${settings?.repeat_penalty || 0}`}
+                            min={0}
+                            max={1}
+                            type="number"
+                            onChange={(value) => handleChange("repeat_penalty", value)}
+                        />
+                        <SliderInput
+                            title="Top P Sampling"
+                            min={0.01}
+                            max={1}
+                            step={0.01}
+                            defaultValue={settings?.top_p_sampling || 0}
+                            value={settings?.top_p_sampling || 0}
+                            onChange={(value) => handleChange("top_p_sampling", value)}
+                        />
+                        {/* <SliderInput
+                            title="Min P Sampling"
+                            min={0.01}
+                            max={1}
+                            step={0.01}
+                            defaultValue={settings?.min_p_sampling || 0}
+                            value={settings?.min_p_sampling || 0}
+                            onChange={(value) => handleChange("min_p_sampling", value)}
+                        /> */}
                     </div>
                 ),
             },
@@ -181,7 +245,7 @@ export default function SettingsList() {
                 icon: "icons/circle-settings.svg",
                 children: (
                     <div className="flex flex-col w-full gap-[.5rem] py-[.375rem]">
-                        <div className="flex flex-row items-center gap-[.625rem] p-[.5rem] w-full">
+                        {/* <div className="flex flex-row items-center gap-[.625rem] p-[.5rem] w-full">
                             <span className="text-[#EEEEEE] text-[.75rem] font-[400] text-nowrap w-full">
                                 Context Overflow
                             </span>
@@ -192,7 +256,7 @@ export default function SettingsList() {
                                     )}
                                     value={settings?.context_overflow_policy?.split(",")}
                                     onChange={(value) =>
-                                        handleChange(settings, "context_overflow", value)
+                                        handleChange("context_overflow", value)
                                     }
                                     className="customSelect w-full h-full !h-[2rem]"
                                     mode="tags"
@@ -221,7 +285,7 @@ export default function SettingsList() {
                                     <Select.Option value="deny">Deny</Select.Option>
                                 </Select>
                             </div>
-                        </div>
+                        </div> */}
 
                         <div className="flex flex-row items-center gap-[.625rem] p-[.5rem] w-full">
                             <span className="text-[#EEEEEE] text-[.75rem] font-[400] text-nowrap w-full">
@@ -232,7 +296,7 @@ export default function SettingsList() {
                                     mode="tags"
                                     defaultValue={settings?.stop_strings || []}
                                     value={settings?.stop_strings || []}
-                                    onChange={(value) => handleChange(settings, "stop_strings", value)}
+                                    onChange={(value) => handleChange("stop_strings", value)}
                                     className="customSelect w-full h-full !h-[2rem]"
                                     tagRender={(props) => (
                                         <Tag
@@ -262,51 +326,7 @@ export default function SettingsList() {
                     </div>
                 ),
             },
-            {
-                title: "Sampling",
-                description: "Notification settings",
-                icon: "icons/circle-settings.svg",
-                children: (
-                    <div className="flex flex-col w-full gap-[.5rem] py-[.375rem]">
-                        <InlineInput
-                            title="Top K Sampling"
-                            value={`${settings?.top_k_sampling || 0}`}
-                            defaultValue={`${settings?.top_k_sampling || 0}`}
-                            min={0}
-                            max={1}
-                            type="number"
-                            onChange={(value) => handleChange(settings, "top_k_sampling", value)}
-                        />
-                        <InlineInput
-                            title="Repeat Penalty"
-                            value={`${settings?.repeat_penalty || 0}`}
-                            defaultValue={`${settings?.repeat_penalty || 0}`}
-                            min={0}
-                            max={1}
-                            type="number"
-                            onChange={(value) => handleChange(settings, "repeat_penalty", value)}
-                        />
-                        <SliderInput
-                            title="Top P Sampling"
-                            min={0.01}
-                            max={1}
-                            step={0.01}
-                            defaultValue={settings?.top_p_sampling || 0}
-                            value={settings?.top_p_sampling || 0}
-                            onChange={(value) => handleChange(settings, "top_p_sampling", value)}
-                        />
-                        <SliderInput
-                            title="Min P Sampling"
-                            min={0.01}
-                            max={1}
-                            step={0.01}
-                            defaultValue={settings?.min_p_sampling || 0}
-                            value={settings?.min_p_sampling || 0}
-                            onChange={(value) => handleChange(settings, "min_p_sampling", value)}
-                        />
-                    </div>
-                ),
-            },
+            
             // {
             //   title: "Structured Output",
             //   description: "JSON settings",

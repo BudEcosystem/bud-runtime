@@ -3,7 +3,7 @@ import { useChat } from '@ai-sdk/react';
 import { Messages } from "../../components/bud/chat/Messages";
 import { Metrics, Session, Usage } from "../../types/chat";
 import { useAuth } from '@/app/context/AuthContext';
-import { ChangeEvent, useState } from 'react';
+import { ChangeEvent, useMemo, useState } from 'react';
 import { Image, Layout, Tooltip } from "antd";
 
 import { appendClientMessage, JSONValue, Message } from "ai";
@@ -22,27 +22,38 @@ const { Header, Footer, Sider, Content } = Layout;
 
 export default function ChatWindow({ chat }: { chat: Session }) {
 
-  const { addMessage, getMessages, updateChat, createChat, disableChat } = useChatStore();
+  const { addMessage, getMessages, updateChat, createChat, disableChat, currentSettingPreset } = useChatStore();
   const { apiKey } = useAuth();
 
   const [toggleLeft, setToggleLeft] = useState<boolean>(false);
   const [toggleRight, setToggleRight] = useState<boolean>(false);
 
+  const body = useMemo(() => {
+    if (!chat) {
+      return;
+    }
+
+    return {
+      model: chat?.selectedDeployment?.name,
+      metadata: {
+        project_id: chat?.selectedDeployment?.project.id,
+      },
+      settings: currentSettingPreset,
+    };
+  }, [chat?.selectedDeployment, currentSettingPreset]);
+
   const { messages, input, handleInputChange, handleSubmit, reload, error, stop, status } = useChat({
     headers: {
       Authorization: `Bearer ${apiKey}`,
     },
-    body: {
-      model: chat?.selectedDeployment?.name,
-      metadata: {
-        project_id: '123',
-      },
-    },
+    body: body,
     initialMessages: getMessages(chat.id),
     onFinish: (message, { usage, finishReason }) => {
       handleFinish(message, { usage, finishReason });
     },
   });
+
+  
 
   const createNewChat = () => {
     const newChatPayload = {

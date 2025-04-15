@@ -4,21 +4,24 @@ import { Button, Divider, Input, Select, Space } from 'antd';
 import type { InputRef } from 'antd';
 
 interface SelectWithAddProps {
-    options: string[];
-    defaultValue: string;
-    onChange: (value: string) => void;
-    onAdd: (value: string) => void;
+    options: any[];
+    defaultValue: any;
+    onChange: (value: any) => void;
+    onAdd: (value: any) => void;
 }
 
 export default function SelectWithAdd(props: SelectWithAddProps) {
     const [options, setOptions] = useState(props.options);
-    const [selected, setSelected] = useState('');
+    const [selected, setSelected] = useState("");
     const inputRef = useRef<InputRef>(null);
 
     useEffect(() => {
         setOptions(props.options);
     }, [props.options]);
 
+    const onChange = (value: any) => {
+        props.onChange(value);
+    }
 
     return (
         <Select
@@ -44,7 +47,8 @@ export default function SelectWithAdd(props: SelectWithAddProps) {
                     </Space>
                 </>
             )}
-            options={options.map((item) => ({ label: item, value: item }))}
+            options={options.map((item) => ({ label: item.name, value: item.id }))}
+            onChange={onChange}
         />
     );
 }

@@ -24,7 +24,7 @@ interface NavBarProps {
 
 export default function NavBar({chatId, onToggleLeftSidebar, onToggleRightSidebar, isLeftSidebarOpen, isRightSidebarOpen}: NavBarProps){
 
-    const { disableChat, createChat, deleteChat } = useChatStore();
+    const { disableChat, createChat, deleteChat, activeChatList } = useChatStore();
     const [openDropdown, setOpenDropdown] = React.useState(false);
     const [open, setOpen] = React.useState(false);
 
@@ -40,6 +40,18 @@ export default function NavBar({chatId, onToggleLeftSidebar, onToggleRightSideba
       };
       createChat(newChatPayload);
   
+    }
+
+    const handleCloseChat = (action: string) => {
+      const chat = activeChatList.filter((chat) => chat.active === true);
+      if (chat.length < 2 ) {
+        createNewChat();
+      }
+      if (action === "close") {
+        disableChat(chatId);
+      } else if (action === "delete") {
+        deleteChat(chatId);
+      }
     }
 
     return (
@@ -151,7 +163,7 @@ export default function NavBar({chatId, onToggleLeftSidebar, onToggleRightSideba
                     className="cursor-pointer text-[#B3B3B3] hover:text-white"
                     onClick={() => {
                       setOpenDropdown(false);
-                      disableChat(chatId);
+                      handleCloseChat("close");
                     }}
                   >
                     Close
@@ -159,7 +171,7 @@ export default function NavBar({chatId, onToggleLeftSidebar, onToggleRightSideba
                 
                 <DropdownMenuItem
                   onClick={async () => {
-                    deleteChat(chatId);
+                    handleCloseChat("delete");
                   }}
                   className="cursor-pointer text-[#B3B3B3] hover:text-white"
                 >

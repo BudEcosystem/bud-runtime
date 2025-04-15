@@ -23,8 +23,11 @@ interface ChatStore {
   setMessages: (chatId: string, messages: Message[]) => void;
 
   settingPresets: Settings[];
+  currentSettingPreset: Settings;
+  setCurrentSettingPreset: (settings: Settings) => void;
   setSettingPresets: (settings: Settings[]) => void;
   addSettingPreset: (settings: Settings) => void;
+  updateSettingPreset: (settings: Settings) => void;
 }
 
 export const useChatStore = create<ChatStore>()(
@@ -114,8 +117,20 @@ export const useChatStore = create<ChatStore>()(
         settingPresets: settings
       })),
 
+      currentSettingPreset: {} as Settings,
+
+      setCurrentSettingPreset: (settings: Settings) => set((state) => ({
+        currentSettingPreset: settings
+      })),
+
       addSettingPreset: (settings: Settings) => set((state) => ({
         settingPresets: [...(state.settingPresets || []), settings]
+      })),
+
+      updateSettingPreset: (settings: Settings) => set((state) => ({
+        settingPresets: state.settingPresets.map((preset: Settings) => 
+          preset.id === settings.id ? settings : preset
+        )
       })),
     }),
     {
@@ -124,6 +139,7 @@ export const useChatStore = create<ChatStore>()(
         activeChatList: state.activeChatList,
         messages: state.messages,
         settingPresets: state.settingPresets,
+        currentSettingPreset: state.currentSettingPreset,
       }),
     }
   )
