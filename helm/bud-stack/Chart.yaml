@@ -1,0 +1,15 @@
+apiVersion: v2
+name: bud-stack
+description: A Helm chart for deploying Bud services
+version: 0.1.0
+appVersion: "0.24.0"
+dependencies:
+  - name: minio
+    version: 5.0.10 # Replace with the desired MinIO version
+    repository: https://charts.min.io/
+  - name: kube-prometheus-stack
+    version: 68.3.2
+    repository: https://prometheus-community.github.io/helm-charts
+  - name: dapr
+    version: 1.14  # Use the desired Dapr chart version
+    repository: https://dapr.github.io/helm-charts/

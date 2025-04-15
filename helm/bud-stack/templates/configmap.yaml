@@ -1,0 +1,10 @@
+# chart-bud/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bud-global-config
+  namespace: {{ .Values.namespace }}
+data:
+  {{- range $key, $value := .Values.globalEnv.data }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}

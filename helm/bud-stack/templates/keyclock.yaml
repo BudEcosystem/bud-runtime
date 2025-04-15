@@ -1,0 +1,108 @@
+{{- /*
+  This single template includes:
+  - ConfigMap for realm
+  - Keycloak Deployment and Service
+  - Optional PostgreSQL Deployment and Service
+*/ -}}
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-realm-config
+data:
+  keycloak-realm.json: |
+    {{ .Values.keycloak.realm | nindent 4 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+spec:
+  selector:
+    app: keycloak
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+spec:
+  replicas: {{ .Values.keycloak.replicas }}
+  selector:
+    matchLabels:
+      app: keycloak
+  template:
+    metadata:
+      labels:
+        app: keycloak
+    spec:
+      containers:
+        - name: keycloak
+          image: {{ .Values.keycloak.image }}
+          args: ["start-dev", "--import-realm"]
+          ports:
+            - containerPort: 8080
+          env:
+            - name: KEYCLOAK_ADMIN
+              value: {{ .Values.keycloak.adminUser }}
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              value: {{ .Values.keycloak.adminPassword }}
+            - name: KC_DB
+              value: postgres
+            - name: KC_DB_URL
+              value: {{ .Values.keycloak.database.url }}
+            - name: KC_DB_USERNAME
+              value: {{ .Values.keycloak.database.username }}
+            - name: KC_DB_PASSWORD
+              value: {{ .Values.keycloak.database.password }}
+          volumeMounts:
+            - name: realm-config
+              mountPath: /opt/keycloak/data/import
+      volumes:
+        - name: realm-config
+          configMap:
+            name: keycloak-realm-config
+---
+{{- if .Values.keycloak.postgres.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+spec:
+  ports:
+    - port: 5432
+  selector:
+    app: postgres
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: {{ .Values.keycloak.postgres.image }}
+          env:
+            - name: POSTGRES_DB
+              value: {{ .Values.keycloak.postgres.db }}
+            - name: POSTGRES_USER
+              value: {{ .Values.keycloak.postgres.username }}
+            - name: POSTGRES_PASSWORD
+              value: {{ .Values.keycloak.postgres.password }}
+          ports:
+            - containerPort: 5432
+{{- end }}
