@@ -1,3 +1,4 @@
+import { Message } from "ai";
 import { Endpoint } from "./deployment";
 
 
@@ -52,4 +53,8 @@ export type Note = {
     created_at: string;
     modified_at: string;
     chat_session_id: string;
+}
+
+export type SavedMessage = Message & {
+    feedback: string;
 }

@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { useChat } from '@ai-sdk/react';
 import { Messages } from "../../components/bud/chat/Messages";
-import { Metrics, Session, Usage } from "../../types/chat";
+import { Metrics, SavedMessage, Session, Usage } from "../../types/chat";
 import { useAuth } from '@/app/context/AuthContext';
 import { ChangeEvent, useMemo, useState } from 'react';
 import { Image, Layout, Tooltip } from "antd";
@@ -95,14 +95,19 @@ export default function ChatWindow({ chat }: { chat: Session }) {
     }
     updateChat(updatedChat);
 
-    const promptMessage: Message = {
+    const promptMessage: SavedMessage = {
       id: uuidv4(),
       content: input,
       createdAt: new Date(),
       role: 'user',
+      feedback: "",
+    }
+    const responseMessage: SavedMessage = {
+      ...message,
+      feedback: "",
     }
     addMessage(chat.id, promptMessage);
-    addMessage(chat.id, message);
+    addMessage(chat.id, responseMessage);
   };
 
   return (
@@ -179,7 +184,7 @@ export default function ChatWindow({ chat }: { chat: Session }) {
             id="chat-container"
           >
             {(chat?.selectedDeployment?.name && messages.length < 1) && <ModelInfo deployment={chat?.selectedDeployment} />}
-            <Messages messages={messages} reload={reload} onEdit={(message) => appendClientMessage({ messages, message })} />
+            <Messages chatId={chat.id} messages={messages} reload={reload} onEdit={(message) => appendClientMessage({ messages, message })} />
             {(!chat?.selectedDeployment?.name) &&
               (!messages || messages.length === 0) && (
                 <div className="mt-[-1.75rem] text-[#EEEEEE] text-center">

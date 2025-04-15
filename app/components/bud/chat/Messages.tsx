@@ -4,12 +4,14 @@ import { format } from "date-fns";
 import { UIMessage } from "ai";
 import { MemoizedMarkdown } from "./MenorizedMarkdown";
 import { CopyText } from "../components/display/CopyText";
-import { Metrics } from "../../../types/chat";
+import { Metrics, SavedMessage } from "../../../types/chat";
+import { useChatStore } from "@/app/store/chat";
 
 type MessageProps = {
   content: string;
   role: "system" | "user" | "assistant" | "data" | "ai";
-  data: UIMessage;
+  data: any;
+  chatId: string;
 };
 
 function Message(props: MessageProps & { reload: () => void, onEdit: () => void }) {
@@ -67,7 +69,10 @@ function UserMessage(props: MessageProps & { onEdit: () => void }) {
 }
 
 function AIMessage(props: MessageProps & { reload: () => void }) {
+  const { setFeedback, getFeedback } = useChatStore();
   const [metrics, setMetrics] = useState<Metrics | undefined>(undefined);
+
+  const feedback = getFeedback(props.chatId, props.data.id);
   
   useEffect(() => {
     if(!props.data?.annotations  ){
@@ -111,7 +116,7 @@ function AIMessage(props: MessageProps & { reload: () => void }) {
             </div>
             <div className="flex justify-end items-center gap-x-[.4rem]">
               <CopyText text={props.content} />
-              <div className="w-[1rem] h-[1rem] flex justify-center items-center cursor-pointer group text-[#B3B3B3] hover:text-[#FFFFFF]">
+              <div className={`w-[1rem] h-[1rem] flex justify-center items-center cursor-pointer group ${feedback === "positive" ? "text-[#4caf50]" : "text-[#B3B3B3] hover:text-[#FFFFFF]"} `} onClick={()=> setFeedback(props.chatId, props.data.id, "positive")}>
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   width="14"
@@ -126,7 +131,7 @@ function AIMessage(props: MessageProps & { reload: () => void }) {
                   />
                 </svg>
               </div>
-              <div className="w-[1rem] h-[1rem] flex justify-center items-center cursor-pointer group text-[#B3B3B3] hover:text-[#FFFFFF]">
+              <div className={`w-[1rem] h-[1rem] flex justify-center items-center cursor-pointer group ${feedback === "negative" ? "text-[#ff4d4f]" : "text-[#B3B3B3] hover:text-[#FFFFFF]"} `} onClick={()=> setFeedback(props.chatId, props.data.id, "negative")}>
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   width="14"
@@ -216,17 +221,18 @@ function AIMessage(props: MessageProps & { reload: () => void }) {
 }
 
 interface MessagesProps {
+  chatId: string;
   messages: UIMessage[];
   reload: () => void;
   onEdit: (message: UIMessage) => void;
 }
 
 
-export function Messages({ messages, reload, onEdit }: MessagesProps) {
+export function Messages({ chatId, messages, reload, onEdit }: MessagesProps) {
   return (
     <div className="flex flex-col gap-[1rem]">
       {messages.map((m) => (
-        <Message {...m} key={m.id} content={m.content} role={m.role} data={m as any} reload={reload} onEdit={()=> onEdit(m)} />
+        <Message {...m} key={m.id} content={m.content} role={m.role} data={m as any} reload={reload} onEdit={()=> onEdit(m)} chatId={chatId} />
       ))}
     </div>
   );

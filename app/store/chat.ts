@@ -2,8 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Note, Session, Settings } from '../types/chat';
 import { Endpoint } from '../types/deployment';
-import { Message } from 'ai';
-
+import { SavedMessage } from '../types/chat';
 interface ChatStore {
   activeChatList: Session[];
   setActiveChatList: (chatList: Session[]) => void;
@@ -17,10 +16,13 @@ interface ChatStore {
   deleteChat: (chatId: string) => void;
   syncWithServer: () => Promise<void>;
 
-  messages: Record<string, Message[]>;
-  addMessage: (chatId: string, message: Message) => void;
-  getMessages: (chatId: string) => Message[];
-  setMessages: (chatId: string, messages: Message[]) => void;
+  messages: Record<string, SavedMessage[]>;
+  addMessage: (chatId: string, message: SavedMessage) => void;
+  getMessages: (chatId: string) => SavedMessage[];
+  setMessages: (chatId: string, messages: SavedMessage[]) => void;
+
+  setFeedback: (chatId: string, messageId: string, feedback: string) => void;
+  getFeedback: (chatId: string, messageId: string) => string | undefined;
 
   settingPresets: Settings[];
   currentSettingPreset: Settings;
@@ -101,7 +103,7 @@ export const useChatStore = create<ChatStore>()(
       },
       messages: {},
       
-      addMessage: (chatId: string, message: Message) => set((state) => ({
+      addMessage: (chatId: string, message: SavedMessage) => set((state) => ({
         messages: {
           ...state.messages,
           [chatId]: [...(state.messages[chatId] || []), message]
@@ -112,12 +114,25 @@ export const useChatStore = create<ChatStore>()(
         return get().messages[chatId] || [];
       },
 
-      setMessages: (chatId: string, messages: Message[]) => set((state) => ({
+      setMessages: (chatId: string, messages: SavedMessage[]) => set((state) => ({
         messages: {
           ...state.messages,
           [chatId]: messages
         }
       })),
+
+      setFeedback: (chatId: string, messageId: string, feedback: string) => set((state) => ({
+        messages: {
+          ...state.messages,
+          [chatId]: state.messages[chatId].map((message: SavedMessage) => 
+            message.id === messageId ? { ...message, feedback: feedback } : message
+          )
+        }
+      })),
+
+      getFeedback: (chatId: string, messageId: string) => {
+        return get().messages[chatId].find((message: SavedMessage) => message.id === messageId)?.feedback;
+      },
 
       settingPresets: [],
       setSettingPresets: (settings: Settings[]) => set((state) => ({
