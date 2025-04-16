@@ -1,16 +1,18 @@
-This is a [Next.js](https://nextjs.org) project for playground
+# Bud Serve Playground
 
-## Server Setup
+A playground for experimenting with GenAI models, enabling users to test inference, compare models, and adjust various settings.
 
-For linux this code required two libraries to be installed
-
-```
-npm i -g @tailwindcss/oxide-linux-x64-gnu lightningcss-linux-x64-gnu
-```
 
 ## Getting Started
 
-First, run the development server:
+Run with docker
+
+```bash
+docker build -t bud-serve-playground:latest .
+docker run -p 3000:3000 bud-serve-playground:latest
+```
+
+Run with npm
 
 ```bash
 npm run dev
