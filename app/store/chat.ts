@@ -20,6 +20,7 @@ interface ChatStore {
   addMessage: (chatId: string, message: SavedMessage) => void;
   getMessages: (chatId: string) => SavedMessage[];
   setMessages: (chatId: string, messages: SavedMessage[]) => void;
+  deleteMessageAfter: (chatId: string, messageId: string) => void;
 
   setFeedback: (chatId: string, messageId: string, feedback: string) => void;
   getFeedback: (chatId: string, messageId: string) => string | undefined;
@@ -121,6 +122,16 @@ export const useChatStore = create<ChatStore>()(
         }
       })),
 
+      deleteMessageAfter: (chatId: string, messageId: string) => set((state) => ({
+        messages: {
+          ...state.messages,
+          [chatId]: state.messages[chatId].filter((message: SavedMessage, index, arr) => {
+            const messageIndex = arr.findIndex((msg) => msg.id === messageId);
+            return index <= messageIndex-1;
+          })
+        }
+      })),
+
       setFeedback: (chatId: string, messageId: string, feedback: string) => set((state) => ({
         messages: {
           ...state.messages,
@@ -131,7 +142,11 @@ export const useChatStore = create<ChatStore>()(
       })),
 
       getFeedback: (chatId: string, messageId: string) => {
-        return get().messages[chatId].find((message: SavedMessage) => message.id === messageId)?.feedback;
+        const chatMessages = get().messages[chatId];
+        if (!chatMessages) {
+          return undefined;
+        }
+        return chatMessages.find((message: SavedMessage) => message.id === messageId)?.feedback;
       },
 
       settingPresets: [],
