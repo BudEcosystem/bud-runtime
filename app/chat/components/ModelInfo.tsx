@@ -21,8 +21,8 @@ export default function ModelInfo({deployment}: any){
 
 
     return(
-        <div className="flex flex-col gap-[.5rem] w-full mx-auto max-w-xl h-full justify-center items-center">
-            <div className="text-[#B3B3B3] text-[.625rem] font-[400] max-w-[700px] bg-[#FFFFFF08] border-[1px] border-[#1F1F1F] rounded-[10px] max-h-[500px] lg:max-h-[700px] overflow-auto ">
+        <div className="flex flex-col gap-[.5rem] w-full mx-auto max-full h-full justify-center items-center">
+            <div className="text-[#B3B3B3] text-[.625rem] font-[400] bg-[#FFFFFF08] border-[1px] border-[#191919] rounded-[10px] md:max-h-[400px] lg:max-h-[500px] xl:max-h-[700px] overflow-auto ">
                 <div className="p-[1.3rem]">
                     <div className="flex flex-row gap-[.5rem]">
                         <div className=" w-[2.68rem] h-[2.68rem] flex justify-center items-center shrink-0 grow-0 bg-[#1F1F1F] rounded-[6px] p-[.25rem] mt-[.25rem]">
@@ -53,20 +53,20 @@ export default function ModelInfo({deployment}: any){
                             </div>
                         </div>
                     </div>
-                    <div className="flex flex-col gap-[.5rem] mt-[1rem]">
-                        <div className="text-[#757575] text-[0.8rem] font-[400] leading-[1.3rem]">
+                    <div className="flex flex-col gap-[.5rem] mt-[1.5rem]">
+                        <div className="text-[#757575] text-[0.9rem] font-[400] leading-[1.5rem]">
                             {deployment?.model?.description}
                         </div>
                     </div>
                 </div>
-                <div className="py-[0.9rem] px-[1.3rem] border-b-[1px] border-[#1F1F1F]">
+                {deployment?.model?.model_licenses?.license_type && <div className="py-[0.9rem] px-[1.3rem] border-b-[1px] border-[#1F1F1F]">
                     <div className="flex flex-row gap-[.5rem]">
                         <div className="text-[#EEEEEE] text-[0.8rem] font-[400] w-[150px]">License</div>
                         <div className="text-[#EEEEEE] text-[0.8rem] font-[400]">
                             {deployment?.model?.model_licenses?.license_type}
                         </div>
                     </div>
-                </div>
+                </div>}
                 <div className="py-[0.9rem] px-[1.3rem] border-b-[1px] border-[#1F1F1F]">
                     <div className="flex flex-row gap-[.5rem]">
                         <div className="text-[#EEEEEE] text-[0.8rem] font-[400] w-[150px]">Context</div>
@@ -95,7 +95,7 @@ export default function ModelInfo({deployment}: any){
                 <>
                     <div className="pt-[1.5rem] mb-[1.4rem] px-[1.3rem]">
                     <div>
-                        <div className="block text-[0.875rem] font-[400] text-[#EEEEEE]">Model is Great at</div>
+                        <div className="block text-[0.875rem] font-[400] text-[#EEEEEE] mb-[.5rem]">Model is Great at</div>
                         <div className="block text-[0.75rem] font-normal text-[#757575]">Following is the list of things model is really good at doing</div>
                     </div>
                     <ul className="custom-bullet-list mt-[.9rem]">
@@ -113,7 +113,7 @@ export default function ModelInfo({deployment}: any){
                 <>
                     <div className="pt-[1.5rem] mb-[1.4rem] px-[1.3rem]">
                     <div>
-                        <div className="block text-[0.875rem] font-[400] text-[#EEEEEE]">Model is Not Good With</div>
+                        <div className="block text-[0.875rem] font-[400] text-[#EEEEEE] mb-[.5rem]">Model is Not Good With</div>
                         <div className="block text-[0.75rem] font-normal text-[#757575]">Following is the list of things model is not great at</div>
                     </div>
                     <ul className="custom-bullet-list mt-[.9rem]">

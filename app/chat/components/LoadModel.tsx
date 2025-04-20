@@ -70,12 +70,12 @@ export default function LoadModel(props: LoadModelProps) {
                     </div>
                     <div className="w-full  overflow-y-auto scrollbar-thin scrollbar-thumb-[#757575] scrollbar-track-[#1E1E1E] scrollbar-thumb-rounded-full scrollbar-track-rounded-full">
                         <div className="flex justify-between items-center px-[1.25rem] py-[0.625rem]">
-                            <div className="text-[#757575] text-[0.75rem] font-[400]">
+                            {/* <div className="text-[#757575] text-[0.75rem] font-[400]">
                                 Currently Loaded
                                 <span className="text-[#FFF] text-[0.75rem] font-[400] ml-[0.25rem]">
                                     {currentlyLoaded?.length}
                                 </span>
-                            </div>
+                            </div> */}
                             {/* <div className="text-[#757575] text-[0.625rem] font-[400]">
                     Memory Consumption:
                     <span className="text-[#FFF] text-[0.625rem] font-[400] ml-[0.25rem]">

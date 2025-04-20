@@ -29,7 +29,7 @@ export default function BlurModal(props: BlurModalProps) {
       }}
     >
       <div className="w-full h-full bg-[#1E1E1E25] rounded-[.625rem] relative shadow-2xl">
-        <div className= "blur  absolute top-0 left-0 w-full h-full bg-[#1E1E1E25] rounded-[.625rem] z-[-9] backdrop-filter backdrop-blur-[4px]" />
+        <div className= "blur  absolute top-0 left-0 w-full h-full bg-[#1E1E1E66] rounded-[.625rem] z-[-9] backdrop-filter backdrop-blur-[4px]" />
         {props.children}
       </div>
     </Modal>
