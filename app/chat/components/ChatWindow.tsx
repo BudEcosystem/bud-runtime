@@ -3,17 +3,16 @@ import { useChat } from '@ai-sdk/react';
 import { Messages } from "../../components/bud/chat/Messages";
 import { Metrics, SavedMessage, Session, Usage } from "../../types/chat";
 import { useAuth } from '@/app/context/AuthContext';
-import { ChangeEvent, useMemo, useState } from 'react';
+import { ChangeEvent, useEffect, useMemo, useState, useRef } from 'react';
 import { Image, Layout, Tooltip } from "antd";
 
-import { appendClientMessage, JSONValue, Message } from "ai";
+import { Message } from "ai";
 import NavBar from './NavBar';
 import HistoryList from './HistoryList';
 import ModelInfo from './ModelInfo';
 import MessageLoading from './MessageLoading';
 import NormalEditor from '@/app/components/bud/components/input/NormalEditor';
 import { useChatStore } from '@/app/store/chat';
-import Settings from './Settings';
 import SettingsList from './Settings';
 
 
@@ -22,11 +21,14 @@ const { Header, Footer, Sider, Content } = Layout;
 
 export default function ChatWindow({ chat }: { chat: Session }) {
 
-  const { addMessage, getMessages, updateChat, createChat, disableChat, currentSettingPreset } = useChatStore();
+  const { addMessage, getMessages, updateChat, createChat, disableChat, currentSettingPreset, deleteMessageAfter } = useChatStore();
   const { apiKey } = useAuth();
 
   const [toggleLeft, setToggleLeft] = useState<boolean>(false);
   const [toggleRight, setToggleRight] = useState<boolean>(false);
+
+  const promptRef = useRef("");
+  const lastMessageRef = useRef<string>("");
 
   const body = useMemo(() => {
     if (!chat) {
@@ -42,16 +44,30 @@ export default function ChatWindow({ chat }: { chat: Session }) {
     };
   }, [chat?.selectedDeployment, currentSettingPreset]);
 
-  const { messages, input, handleInputChange, handleSubmit, reload, error, stop, status } = useChat({
+
+  const { messages, input, handleInputChange, handleSubmit, reload, error, stop, status, setMessages, append } = useChat({
+    id: chat.id,
     headers: {
       Authorization: `Bearer ${apiKey}`,
     },
     body: body,
+    generateId: uuidv4,
     initialMessages: getMessages(chat.id),
     onFinish: (message, { usage, finishReason }) => {
       handleFinish(message, { usage, finishReason });
     },
   });
+
+  
+  
+  useEffect(() => {
+    if (messages.length > 0) {
+      const currentLastMessage = messages.length > 1 ? messages[messages.length - 2] : messages[messages.length - 1];
+      if (currentLastMessage?.id !== lastMessageRef.current) {
+        lastMessageRef.current = currentLastMessage.id;
+      }
+    }
+  }, [messages]);
 
   
 
@@ -83,7 +99,10 @@ export default function ChatWindow({ chat }: { chat: Session }) {
     handleInputChange(value);
   };
 
-  const handleFinish = (message: Message, { usage, finishReason }: { usage: Usage; finishReason: string }) => {
+  const handleFinish = (
+    message: Message, 
+    { usage, finishReason }: { usage: Usage; finishReason: string },
+  ) => {
 
     const msgHistory = getMessages(chat.id);
     const updatedChat = {
@@ -94,10 +113,10 @@ export default function ChatWindow({ chat }: { chat: Session }) {
       updatedChat.name = input;
     }
     updateChat(updatedChat);
-
+    
     const promptMessage: SavedMessage = {
-      id: uuidv4(),
-      content: input,
+      id: lastMessageRef.current,
+      content: promptRef.current || input,
       createdAt: new Date(),
       role: 'user',
       feedback: "",
@@ -109,6 +128,19 @@ export default function ChatWindow({ chat }: { chat: Session }) {
     addMessage(chat.id, promptMessage);
     addMessage(chat.id, responseMessage);
   };
+
+  const handleEdit = (content: string, message: Message) => {
+    console.log('handleEdit - setting prompt to:', message);
+    message.content = content;
+    
+    promptRef.current = content;
+    deleteMessageAfter(chat.id, message.id)
+
+    const list = getMessages(chat.id)
+    
+    setMessages(list)
+    append(message)
+  }
 
   return (
     <Layout className="chat-container ">
@@ -184,21 +216,23 @@ export default function ChatWindow({ chat }: { chat: Session }) {
             id="chat-container"
           >
             {(chat?.selectedDeployment?.name && messages.length < 1) && <ModelInfo deployment={chat?.selectedDeployment} />}
-            <Messages chatId={chat.id} messages={messages} reload={reload} onEdit={(message) => appendClientMessage({ messages, message })} />
+            <Messages chatId={chat.id} messages={messages} reload={reload} onEdit={handleEdit} />
             {(!chat?.selectedDeployment?.name) &&
               (!messages || messages.length === 0) && (
-                <div className="mt-[-1.75rem] text-[#EEEEEE] text-center">
+                <div className="mt-[-4.75rem] text-[#EEEEEE] text-center">
+                  <div className="relative z-10 Open-Sans mt-[4.75rem] text-[1.575rem]">
+                    Hello there 👋
+                  </div>
                   <Image
                     preview={false}
                     src="images/looking.gif"
                     alt="bud"
-                    width={"450px"}
+                    width={"550px"} // 750px
                   // height={"150px"}
+                  className="relative z-9 mt-[-6.5rem]"
                   />
-                  <div className="relative Open-Sans mt-[-5.75rem] text-[1.575rem]">
-                    Hello there 👋
-                  </div>
-                  <div className="relative Open-Sans text-[1.575rem]">
+                  
+                  <div className="relative z-10 Open-Sans text-[1.575rem] mt-[-7.5rem]">
                     Select a model to get started
                   </div>
                 </div>

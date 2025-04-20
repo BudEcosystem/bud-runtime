@@ -4,7 +4,7 @@ import { format } from "date-fns";
 import { UIMessage } from "ai";
 import { MemoizedMarkdown } from "./MenorizedMarkdown";
 import { CopyText } from "../components/display/CopyText";
-import { Metrics, SavedMessage } from "../../../types/chat";
+import { Metrics } from "../../../types/chat";
 import { useChatStore } from "@/app/store/chat";
 
 type MessageProps = {
@@ -14,7 +14,7 @@ type MessageProps = {
   chatId: string;
 };
 
-function Message(props: MessageProps & { reload: () => void, onEdit: () => void }) {
+function Message(props: MessageProps & { reload: () => void, onEdit: (message: string) => void }) {
 
   return (
     <div
@@ -36,15 +36,19 @@ function Message(props: MessageProps & { reload: () => void, onEdit: () => void 
   );
 }
 
-function UserMessage(props: MessageProps & { onEdit: () => void }) {
+function UserMessage(props: MessageProps & { onEdit: (message: string) => void }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [value, setValue] = useState(props.content);
+
   return (
-    <div className="flex flex-row items-center gap-[.5rem]">
+    <div className="w-[100%]">
+      {!isEditing && <div className="flex flex-row items-center justify-end gap-[.5rem]">
       <div className="flex items-center justify-end gap-[.5rem] ">
         <button>
           <CopyText text={props.content} />
         </button>
         <button>
-          <div className="w-[1rem] h-[1rem] flex justify-center items-center cursor-pointer group text-[#B3B3B3] hover:text-[#FFFFFF]" onClick={()=> props.onEdit()}>
+          <div className="w-[1rem] h-[1rem] flex justify-center items-center cursor-pointer group text-[#B3B3B3] hover:text-[#FFFFFF]" onClick={()=> setIsEditing(true)}>
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="12"
@@ -62,8 +66,38 @@ function UserMessage(props: MessageProps & { onEdit: () => void }) {
       {/* #0d0d0d */}
       <span className="message-text user-message relative  p-[.8rem] py-[1rem] rounded-[0.5rem] border-[#1F1F1F4D] border-[1px] text-[#EEEEEE] font-[400] text-[.85rem] text-right Open-Sans z-[2]">
         <div className="absolute z-[1] w-[100%] h-[100%] top-0 left-0 right-0 bottom-0 !bg-[#0d0d0d] rounded-[0.5rem] border-[1px] border-[#1F1F1F]" />
+        
         <div className="relative z-[2]">{props.content}</div>
       </span>
+      </div>}
+      {isEditing && <div className="relative w-[100%] bg-[#101010] rounded-[0.5rem] border-[1px] border-[#1F1F1F] hover:border-[#333333] p-[1rem]">
+        <textarea 
+        defaultValue={props.content}
+        value={value} 
+        onChange={(e) => setValue(e.target.value)} 
+        // size="large"
+        className="w-[100%] h-[100%] bg-transparent text-[#EEEEEE] border-none focus:border-none outline-none"
+        />
+        <div className="flex justify-end items-center gap-[.5rem]">
+          <button
+              className="Open-Sans cursor-pointer text-[400] z-[999] text-[.75rem] text-[#EEEEEE] border-[#757575] border-[1px] rounded-[6px] p-[.2rem] hover:bg-[#1F1F1F4D] hover:text-[#FFFFFF]  flex items-center gap-[.5rem] px-[.8rem] py-[.15rem] bg-[#1F1F1F] hover:bg-[#965CDE] hover:text-[#FFFFFF]"
+              type="submit"
+              onClick={() => setIsEditing(false)}
+          >
+            Cancel
+          </button>
+          <button
+              className="Open-Sans cursor-pointer text-[400] text-[.75rem] text-[#EEEEEE] border-[#757575] border-[1px] rounded-[6px] p-[.2rem] bg-[#965CDE] hover:bg-[#1F1F1F4D] hover:text-[#FFFFFF]  flex items-center gap-[.5rem] px-[.8rem] py-[.15rem] bg-[#1F1F1F] hover:bg-[#1F1F1F4D] hover:text-[#FFFFFF]"
+              type="submit"
+              onClick={() => {
+                props.onEdit(value);
+                setIsEditing(false);
+              }}
+          >
+            Send
+          </button>
+        </div>
+      </div>}
     </div>
   );
 }
@@ -97,21 +131,22 @@ function AIMessage(props: MessageProps & { reload: () => void }) {
       </div>
       <div className="message-text ai-message">
         <MemoizedMarkdown content={props.content} id={props.data?.id} />
+        {/* <TipTapMarkdown content={props.content} id={props.data?.id} /> */}
         {metrics && <div className="w-[100%] h-[40px] tempClass mt-[1rem] rounded-[6px] z-[10] relative overflow-hiden">
           <div className="bg !bg-[#101010] rounded-[6px]"></div>
           <div className="fg flex justify-between items-center pl-[1rem] pr-[.5rem] gap-[.5rem]">
             <div className="flex justify-start items-center gap-x-[.7rem]">
               <div className="text-[#B3B3B3] text-[.75rem] font-[400]">
-                Tokens/sec : {metrics?.throughput}
+                <strong>Tokens/sec :</strong> {metrics?.throughput}
               </div>
               <div className="text-[#B3B3B3] text-[.75rem] font-[400]">
-                TTFT : {metrics?.ttft} ms
+                <strong>TTFT :</strong> {metrics?.ttft} ms
               </div>
               <div className="text-[#B3B3B3] text-[.75rem] font-[400]">
-                ITL : {metrics?.itl} ms
+                <strong>ITL :</strong> {metrics?.itl} ms
               </div>
               <div className="text-[#B3B3B3] text-[.75rem] font-[400]">
-                E2E Latency : {metrics?.e2e_latency} s
+                <strong>E2E Latency :</strong> {metrics?.e2e_latency} s
               </div>
             </div>
             <div className="flex justify-end items-center gap-x-[.4rem]">
@@ -224,7 +259,7 @@ interface MessagesProps {
   chatId: string;
   messages: UIMessage[];
   reload: () => void;
-  onEdit: (message: UIMessage) => void;
+  onEdit: (content: string, message: UIMessage) => void;
 }
 
 
@@ -232,7 +267,7 @@ export function Messages({ chatId, messages, reload, onEdit }: MessagesProps) {
   return (
     <div className="flex flex-col gap-[1rem]">
       {messages.map((m) => (
-        <Message {...m} key={m.id} content={m.content} role={m.role} data={m as any} reload={reload} onEdit={()=> onEdit(m)} chatId={chatId} />
+        <Message {...m} key={m.id} content={m.content} role={m.role} data={m as any} reload={reload} onEdit={(content)=> onEdit(content, m)} chatId={chatId} />
       ))}
     </div>
   );
