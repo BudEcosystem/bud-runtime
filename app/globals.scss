@@ -1095,8 +1095,28 @@ input.ant-input:-webkit-autofill {
 .ai-message ol,
 .ai-message ul {
   list-style: auto;
-  padding-left: 1rem;
+  padding-left: 3rem;
 }
+
+.ai-message table {
+  border-collapse: collapse;
+  width: 100%;
+  margin-bottom: 1.5rem;
+  // border: 1px solid #666666;
+}
+
+.ai-message table td {
+  border-bottom: 1px solid #333333;
+  padding: 0.5rem 1rem;
+}
+
+.ai-message table th {
+  border-bottom: 1px solid #999999;
+  padding: 0.5rem 1rem;
+  // background: #101010;
+  text-align: left;
+}
+
 
 .tempClass {
   // background-image: url(./../public/images/d.png) !important;

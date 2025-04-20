@@ -1,6 +1,10 @@
 import { marked } from 'marked';
 import { memo, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
+import rehypeHighlight from 'rehype-highlight';
+import remarkGfm from 'remark-gfm';
+
+import 'highlight.js/styles/atom-one-dark.css'; // or any other style you prefer
 
 function parseMarkdownIntoBlocks(markdown: string): string[] {
   const tokens = marked.lexer(markdown);
@@ -9,7 +13,15 @@ function parseMarkdownIntoBlocks(markdown: string): string[] {
 
 const MemoizedMarkdownBlock = memo(
   ({ content }: { content: string }) => {
-    return <ReactMarkdown>{content}</ReactMarkdown>;
+
+    return (
+      <ReactMarkdown
+        rehypePlugins={[rehypeHighlight]}
+        remarkPlugins={[remarkGfm]}
+      >
+        {content}
+      </ReactMarkdown>
+    );
   },
   (prevProps, nextProps) => {
     if (prevProps.content !== nextProps.content) return false;
