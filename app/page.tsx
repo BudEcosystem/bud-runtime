@@ -16,7 +16,6 @@ export default function Home() {
     
 
     useEffect(() => {
-        console.log(apiKey);
         if (!apiKey && !isLoading) {
             router.push('/login');
         } else {
