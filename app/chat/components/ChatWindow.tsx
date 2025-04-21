@@ -22,7 +22,7 @@ const { Header, Footer, Sider, Content } = Layout;
 export default function ChatWindow({ chat }: { chat: Session }) {
 
   const { addMessage, getMessages, updateChat, createChat, disableChat, currentSettingPreset, deleteMessageAfter } = useChatStore();
-  const { apiKey } = useAuth();
+  const { apiKey, accessKey } = useAuth();
 
   const [toggleLeft, setToggleLeft] = useState<boolean>(false);
   const [toggleRight, setToggleRight] = useState<boolean>(false);
@@ -48,7 +48,7 @@ export default function ChatWindow({ chat }: { chat: Session }) {
   const { messages, input, handleInputChange, handleSubmit, reload, error, stop, status, setMessages, append } = useChat({
     id: chat.id,
     headers: {
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: `Bearer ${apiKey ? apiKey : accessKey}`,
     },
     body: body,
     generateId: uuidv4,
