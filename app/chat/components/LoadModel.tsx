@@ -47,7 +47,7 @@ export default function LoadModel(props: LoadModelProps) {
             }
           }
         ));
-      }, [endpoints, chat]);
+      }, [endpoints, chat, sortOrder]);
 
 
     return (
@@ -128,9 +128,9 @@ export default function LoadModel(props: LoadModelProps) {
                                         />
                                     )}
                                 </div>
-                                <span className="text-[#FFF] text-[0.5rem] font-[400] ml-[0.25rem]">
+                                {/* <span className="text-[#FFF] text-[0.5rem] font-[400] ml-[0.25rem]">
                                     Size
-                                </span>
+                                </span> */}
                             </div>
                         </div>
                         {availableModels

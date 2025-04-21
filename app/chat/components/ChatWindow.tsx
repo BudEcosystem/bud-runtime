@@ -220,14 +220,14 @@ export default function ChatWindow({ chat }: { chat: Session }) {
             {(!chat?.selectedDeployment?.name) &&
               (!messages || messages.length === 0) && (
                 <div className="mt-[-4.75rem] text-[#EEEEEE] text-center">
-                  <div className="relative z-10 Open-Sans mt-[4.75rem] text-[1.575rem]">
+                  {/* <div className="relative z-10 Open-Sans mt-[4.75rem] text-[1.575rem]">
                     Hello there 👋
-                  </div>
+                  </div> */}
                   <Image
                     preview={false}
                     src="images/looking.gif"
                     alt="bud"
-                    width={"550px"} // 750px
+                    width={"750px"} // 750px
                   // height={"150px"}
                   className="relative z-9 mt-[-6.5rem]"
                   />
