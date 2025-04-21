@@ -48,7 +48,8 @@ export async function POST(req: Request) {
           temperature: settings?.temperature ? settings.temperature : undefined,
           top_p: settings?.top_p_sampling ? settings.top_p_sampling : undefined,
           extra_body:{
-            "guided_json": settings?.is_valid_json_schema ? settings?.structured_json_schema : undefined,
+            "guided_json": settings?.enable_structured_json_schema && settings?.is_valid_json_schema ? settings?.structured_json_schema : undefined,
+            "guided_decoding_backend": "outlines"
           }
         })
       }

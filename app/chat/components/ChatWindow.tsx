@@ -212,13 +212,14 @@ export default function ChatWindow({ chat }: { chat: Session }) {
         <Content className="overflow-hidden overflow-y-auto hide-scrollbar">
 
           <div
-            className="flex flex-col w-full py-24 mx-auto stretch px-[1rem] max-w-3xl  gap-[1rem]"
+            className="flex flex-col h-full w-full py-24 mx-auto stretch px-[1rem] max-w-5xl  gap-[1rem]"
             id="chat-container"
           >
             {(chat?.selectedDeployment?.name && messages.length < 1) && <ModelInfo deployment={chat?.selectedDeployment} />}
             <Messages chatId={chat.id} messages={messages} reload={reload} onEdit={handleEdit} />
             {(!chat?.selectedDeployment?.name) &&
               (!messages || messages.length === 0) && (
+                <div className="h-full flex flex-col items-center justify-center">
                 <div className="mt-[-4.75rem] text-[#EEEEEE] text-center">
                   {/* <div className="relative z-10 Open-Sans mt-[4.75rem] text-[1.575rem]">
                     Hello there 👋
@@ -227,14 +228,15 @@ export default function ChatWindow({ chat }: { chat: Session }) {
                     preview={false}
                     src="images/looking.gif"
                     alt="bud"
-                    width={"750px"} // 750px
+                    width={"1150px"} // 750px
                   // height={"150px"}
-                  className="relative z-9 mt-[-6.5rem]"
+                  className="relative z-9 mt-[-8.5rem]"
                   />
                   
-                  <div className="relative z-10 Open-Sans text-[1.575rem] mt-[-7.5rem]">
+                  <div className="relative z-10 Open-Sans text-[1.575rem] mt-[-18.5rem]">
                     Select a model to get started
                   </div>
+                </div>
                 </div>
               )}
             {(status === "submitted" || status === "streaming") && (

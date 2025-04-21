@@ -1,5 +1,5 @@
 import { Button, Image } from "antd";
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { assetBaseUrl } from "@/app/lib/environment";
 import SearchHeaderInput from "../../components/bud/components/input/SearchHeaderInput";
@@ -27,6 +27,8 @@ export default function LoadModel(props: LoadModelProps) {
     const [availableModels, setAvailableModels] = React.useState<any[]>([]);
     const [searchValue, setSearchValue] = React.useState("");
 
+    const containerRef = useRef<HTMLDivElement>(null);
+
     React.useEffect(() => {
         document.documentElement.scrollTop = document.documentElement.clientHeight;
         document.documentElement.scrollLeft = document.documentElement.clientWidth;
@@ -51,12 +53,13 @@ export default function LoadModel(props: LoadModelProps) {
 
 
     return (
-        <div>
+        <div ref={containerRef}>
             <BlurModal
                 width="520px"
                 height="400px"
                 open={props.open}
                 onClose={() => props.setOpen(false)}
+                ref={containerRef}
             >
                 <div className="BlurModal shadow-[0px_6px_10px_0px_#1F1F1F66] border-[1px] border-[#1F1F1FB3] rounded-[10px] overflow-hidden">
                     <div className="p-[1.25rem]">

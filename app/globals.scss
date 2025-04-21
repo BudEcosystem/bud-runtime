@@ -1068,12 +1068,20 @@ input.ant-input:-webkit-autofill {
 //     letter-spacing: .04rem;
 //   }
 // }
-.ai-message {
-  font-size: 0.85rem !important;
+.user-message {
+  font-size: 1rem !important;
   font-weight: 400 !important;
   color: #EEEEEE !important;
   font-family: "Open-Sans", sans-serif !important;
-  line-height: 1.5rem !important;
+  line-height: 1.85rem !important;
+  letter-spacing: 0.04rem !important;
+}
+.ai-message {
+  font-size: 1rem !important;
+  font-weight: 400 !important;
+  color: #EEEEEE !important;
+  font-family: "Open-Sans", sans-serif !important;
+  line-height: 1.85rem !important;
   letter-spacing: 0.04rem !important;
 }
 
@@ -1163,7 +1171,7 @@ textarea {
   width: 150px;
   height: 300px;
   background: #3F344B;
-  filter: blur(50px);
+  filter: blur(40px);
   opacity: 0.2;
   transform: rotate(45deg);
   z-index: -1;
@@ -1172,15 +1180,19 @@ textarea {
 .logginBg::before {
   content: '';
   position: absolute;
-  bottom: 0;
-  right: 300px;
-  width: 150px;
-  height: 300px;
-  background: #3F344B;
-  filter: blur(50px);
+  bottom: -150px;
+  right: -150px;
+  width: 350px;
+  height: 350px;
+  background:  #1a1a1a;
+  // background: linear-gradient(135deg, rgba(245, 237, 254, 0.1), rgba(150, 92, 222, 0.9));
+  background: radial-gradient(circle, #965cdee6 0%, #f5edfe1a 28%, #101010 60%);
+
+  filter: blur(20px);
   opacity: 0.2;
   transform: rotate(45deg);
   z-index: -1;
+  // mix-blend-mode: overlay;
 }
 
 .login-left-bg {

@@ -65,7 +65,7 @@ function UserMessage(props: MessageProps & { onEdit: (message: string) => void }
       </div>
       {/* #0d0d0d */}
       <span className="message-text user-message relative  p-[.8rem] py-[1rem] rounded-[0.5rem] border-[#1F1F1F4D] border-[1px] text-[#EEEEEE] font-[400] text-[.85rem] text-right Open-Sans z-[2]">
-        <div className="absolute z-[1] w-[100%] h-[100%] top-0 left-0 right-0 bottom-0 !bg-[#0d0d0d] rounded-[0.5rem] border-[1px] border-[#1F1F1F]" />
+        <div className="absolute z-[1] w-[100%] h-[100%] top-0 left-0 right-0 bottom-0 !bg-[#1C1C1C] rounded-[0.5rem] border-[1px] border-[#1F1F1F]" />
         
         <div className="relative z-[2]">{props.content}</div>
       </span>
@@ -119,7 +119,7 @@ function AIMessage(props: MessageProps & { reload: () => void }) {
   }, [props]);
 
   return (
-    <div className="flex flex-row items-start gap-[.5rem]">
+    <div className="flex flex-row items-start gap-[.5rem] w-full">
       <div className="mr-[.5rem] mt-[.2rem] p-[.2rem] bg-[#aa65ff42] rounded-[6px] leading-[0]">
         <Image
           preview={false}
@@ -129,11 +129,11 @@ function AIMessage(props: MessageProps & { reload: () => void }) {
           height={"1.5rem"}
         />
       </div>
-      <div className="message-text ai-message">
+      <div className="message-text ai-message w-full">
         <MemoizedMarkdown content={props.content} id={props.data?.id} />
         {/* <TipTapMarkdown content={props.content} id={props.data?.id} /> */}
         {metrics && <div className="w-[100%] h-[40px] tempClass mt-[1rem] rounded-[6px] z-[10] relative overflow-hiden">
-          <div className="bg !bg-[#101010] rounded-[6px]"></div>
+          <div className="bg !bg-[#1C1C1C] rounded-[6px]"></div>
           <div className="fg flex justify-between items-center pl-[1rem] pr-[.5rem] gap-[.5rem]">
             <div className="flex justify-start items-center gap-x-[.7rem]">
               <div className="text-[#B3B3B3] text-[.75rem] font-[400]">

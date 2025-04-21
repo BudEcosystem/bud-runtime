@@ -20,6 +20,7 @@ interface LabelJSONInputProps {
 export default function LabelJSONInput(props: LabelJSONInputProps) {
 
   const [valid, setValid] = React.useState(true);
+  const [localValue, setLocalValue] = React.useState(props.value || '');
   
   const validateJSON = (value: string) => {
     try {
@@ -30,10 +31,14 @@ export default function LabelJSONInput(props: LabelJSONInputProps) {
     }
   };
 
-  const handleChange = (value: string) => {
-    const valid = validateJSON(value);
+  const handleBlur = () => {
+    const valid = validateJSON(localValue);
     setValid(valid);
-    props.onChange(value, valid);
+    props.onChange(localValue, valid);
+  };
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setLocalValue(e.target.value);
+    setValid(validateJSON(e.target.value)); // Optional: live validation
   };
   return (
     <div
@@ -56,8 +61,9 @@ export default function LabelJSONInput(props: LabelJSONInputProps) {
         </div>
         <TextArea
         className="py-[.65rem]"
-        value={props.value}
-        onChange={(e) => handleChange(e.target.value)}
+        value={localValue}
+        onChange={handleChange}
+        onBlur={handleBlur}
         placeholder={props.placeholder}
         autoSize={{ minRows: 3, maxRows: 5 }}
       />
