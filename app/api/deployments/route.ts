@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {
   const body = await req.json();
-  const authorization = req.headers.get('authorization');
+  const authorization = req.headers.get('access-key');
   const apiKey = req.headers.get('api-key');
 
   try {
@@ -16,7 +16,7 @@ export async function POST(req: Request) {
           search: false,
         },
         headers: {
-          authorization: authorization,
+          authorization: authorization ? "Bearer " + authorization : "",
           'api-key': apiKey,
         },
       })
@@ -25,6 +25,6 @@ export async function POST(req: Request) {
       })
     return NextResponse.json(result);
   } catch (error: any) {
-    return NextResponse.json({ status: error.status || 500 });
+        return NextResponse.json({ status: error.status || 500 });
   }
 }

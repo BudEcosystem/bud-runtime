@@ -18,18 +18,30 @@ export default function Login() {
     const [isInvalidApiKey, setIsInvalidApiKey] = useState(false);
     const [key, setKey] = useState("");
 
-
     useEffect(() => {
-        hideLoader();
+        // Get access_key from URL parameters
+        const params = new URLSearchParams(window.location.search);
+        const accessKey = params.get('access_token');
+        
+        if (accessKey) {
+            // setKey(accessKey);
+            // Automatically validate the access key
+            handleAdd(accessKey);
+        } else {
+          hideLoader();
+        }
     }, []);
 
-    const handleAdd = async () => {
-        form.submit();
-        if(!key) return;
+    const handleAdd = async (accessKey?: string) => {
+        if(!accessKey) {
+          form.submit();
+        }
+        const keyToValidate = accessKey || key;
+        if(!keyToValidate) return;
         showLoader();
-        const isLoginSuccessful = await login(key);
+        const isLoginSuccessful = await login(key, accessKey);
         if(isLoginSuccessful) {
-            router.replace(`chat/?api_key=${key}`);
+            router.replace(`chat`);
         } else {
             setIsInvalidApiKey(true);
         }
@@ -133,7 +145,7 @@ export default function Login() {
                     title="API Key"
                     name="apiKey"
                     value={key}
-                    onPressEnter={handleAdd}
+                    onPressEnter={() => handleAdd()}
                     onChange={(e) => setKey(e.target.value)}
                   />
                 </div>
@@ -141,7 +153,7 @@ export default function Login() {
               <PrimaryButton
                 type="click"
                 classNames="w-[100%] mt-[1.6rem]"
-                onClick={handleAdd}
+                onClick={() => handleAdd()}
               >
                 Login
               </PrimaryButton>
