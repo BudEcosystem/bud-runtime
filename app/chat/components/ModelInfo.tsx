@@ -79,7 +79,7 @@ export default function ModelInfo({deployment}: any){
                     <div className="flex flex-row gap-[.5rem]">
                         <div className="text-[#EEEEEE] text-[0.8rem] font-[400] w-[150px]">Input Pricing</div>
                         <div className="text-[#EEEEEE] text-[0.8rem] font-[400]">
-                            ${deployment?.input_cost} / million tokens
+                            ${(deployment?.input_cost?.input_cost_per_token * 1000000).toFixed(2)} per million tokens
                         </div>
                     </div>
                 </div>}
@@ -87,7 +87,7 @@ export default function ModelInfo({deployment}: any){
                     <div className="flex flex-row gap-[.5rem]">
                         <div className="text-[#EEEEEE] text-[0.8rem] font-[400] w-[150px]">Output Pricing</div>
                         <div className="text-[#EEEEEE] text-[0.8rem] font-[400]">
-                            ${deployment?.output_cost} / million tokens
+                            ${(deployment?.output_cost?.output_cost_per_token * 1000000).toFixed(2)} per million tokens
                         </div>
                     </div>
                 </div>}
