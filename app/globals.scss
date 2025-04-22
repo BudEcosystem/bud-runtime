@@ -1196,7 +1196,7 @@ textarea {
 }
 
 .login-left-bg {
-  background-image: url(./../public/images/login-left-bg.png);
+  // background-image: url(./../public/images/login-left-bg.png);
   background-size: 100%;
   background-repeat: no-repeat;
   overflow-y: auto;
@@ -1282,4 +1282,50 @@ textarea {
   height: 0.5rem;
   background-color: #965CDE;
   border-radius: 50%;
+}
+
+.gol-bg::after {
+  content: "";
+  position: absolute;
+  bottom: -350px;
+  left: -150px;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, #51169a 0%, #0a0411 100%);
+  filter: blur(48.8px);
+  transform: rotate(318deg);
+  z-index: 1;
+  animation: moveDown 8s ease-in-out infinite alternate;
+}
+.gol-bg::before {
+  content: '';
+  position: absolute;
+  bottom: -470px;
+  right: -200px;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, #2011CB 0%, #472A9B 100%);
+  mix-blend-mode: screen;
+  filter: blur(48.80000305175781px);
+  transform: rotate(145deg);
+  z-index: 2;
+  animation: moveUp 8s ease-in-out infinite alternate;
+}
+
+@keyframes moveUp {
+  0% {
+    transform: rotate(145deg) translateY(0);
+  }
+  100% {
+    transform: rotate(145deg) translateY(-200px);
+  }
+}
+
+@keyframes moveDown {
+  0% {
+    transform: rotate(145deg) translateX(100px);
+  }
+  100% {
+    transform: rotate(145deg) translateX(300px);
+  }
 }

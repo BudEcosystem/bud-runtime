@@ -8,6 +8,7 @@ import { EyeClosedIcon, EyeIcon } from "lucide-react";
 import { PrimaryButton } from "../components/uiComponents/inputs";
 import { useRouter } from "next/navigation";
 import { useLoader } from "../context/LoaderContext";
+import GameOfLifeBackground from "../components/bud/components/GameOfLifeBg";
 
 export default function Login() {
     const { apiKey, login } = useAuth();
@@ -53,14 +54,16 @@ export default function Login() {
       <div className="loginWrap w-full h-full loginBg-glass flex justify-between box-border ">
         <div className="loginLeft relative login-left-bg overflow-hidden rounded-[15px] w-[56.4%] m-[.8rem] p-[.8rem] overflow-hidden">
           <div className="flex flex-col justify-between w-[100%] max-w-[800px] 1680px:max-w-[900px] 2560px:max-w-[900px] h-full px-[3.5rem] pt-[3rem] pb-[2.9rem]">
+            <GameOfLifeBackground />
             <Image
               alt=""
               src="/images/BudLogo.png"
               preview={false}
               style={{ width: "8em" }}
-              className="w-[6.6em] h-auto"
+              className="w-[6.6em] h-auto relative z-10"
             />
-            <div className="logo-text line-clamp-2 text-[2.25em] 2xl:text-[2.5rem] 1680px:text-[2.4rem] text-white open-sans tracking-[.0rem] leading-[4rem]">
+            
+            <div className="relative z-10 logo-text line-clamp-2 text-[2.25em] 2xl:text-[2.5rem] 1680px:text-[2.4rem] text-white open-sans tracking-[.0rem] leading-[4rem]">
             <strong>Bud Studio.</strong> <br /> Any Model in Any Cloud, with Any hardware.
             </div>
           </div>
