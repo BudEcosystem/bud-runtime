@@ -35,14 +35,12 @@ const GameOfLifeBackground = () => {
       Array.from({ length: GRID_WIDTH }, () => MAX_OPACITY)  // Initialize with max opacity 0.7
     );
 
-    let isTransitioning = false;
     let lastGenerationTime = Date.now();
 
     const draw = () => {
       const grid = gridRef.current;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       
-      let stillTransitioning = false;
       // Draw cells
       for (let y = 0; y < GRID_HEIGHT; y++) {
         for (let x = 0; x < GRID_WIDTH; x++) {
@@ -50,12 +48,10 @@ const GameOfLifeBackground = () => {
           if (grid[y][x]) {
             if (opacityGrid[y][x] < MAX_OPACITY) {  // Max opacity is 0.7
               opacityGrid[y][x] = Math.min(MAX_OPACITY, opacityGrid[y][x] + 0.1);
-              stillTransitioning = true;
             }
           } else {
             if (opacityGrid[y][x] > 0) {
               opacityGrid[y][x] = Math.max(0, opacityGrid[y][x] - 0.1);
-              stillTransitioning = true;
             }
           }
 
@@ -74,8 +70,6 @@ const GameOfLifeBackground = () => {
           }
         }
       }
-      
-      isTransitioning = stillTransitioning;
       
       // Draw grid lines
       ctx.strokeStyle = '#333333';
