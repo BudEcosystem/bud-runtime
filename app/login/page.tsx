@@ -59,7 +59,7 @@ export default function Login() {
               alt=""
               src="/images/BudLogo.png"
               preview={false}
-              style={{ width: "8em" }}
+              style={{ width: "10em" }}
               className="w-[6.6em] h-auto relative z-10"
             />
             

@@ -536,7 +536,7 @@ const Text_14_600_FFFFFF: React.FC<{ children: React.ReactNode; className?: stri
 );
 const Text_14_300_EEEEEE: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = "", ...props }) => (
   <div
-    className={`text-[#EEEEEE] text-[0.875rem] font-[300]  leading-[100%] ${className}`}
+    className={`text-[#EEEEEE] text-[0.875rem] font-[300]  leading-[150%] ${className}`}
     {...props}
   >
     {children}
