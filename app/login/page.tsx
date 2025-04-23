@@ -73,7 +73,8 @@ export default function Login() {
             <div className="mb-[4rem]">
               <div className="flex justify-center items-center mb-[1.12rem]">
                 <div className="text-[#FFFFFF] text-[2.5rem] font-bold leading-[24px] tracking-[.01em] leading-[100%] text-center">
-                  Hey, hello 👇
+                  Hello there!
+                  <Image src="/images/hand-waving-hand.gif" alt="bud-logo" width={35} height={35} className="ml-[1rem]" />
                 </div>
               </div>
               <Text_14_300_EEEEEE className="text-center">

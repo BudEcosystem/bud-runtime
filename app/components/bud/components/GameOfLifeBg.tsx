@@ -9,6 +9,10 @@ const GameOfLifeBackground = () => {
   const gridRef = useRef<number[][]>([]);
 
   useEffect(() => {
+    const GENERATION_INTERVAL = 1000; // 2 seconds between generations
+    const FRAME_RATE = 75; // 50ms between frames for smooth animation
+    const MAX_OPACITY = 0.2;
+    
     // Use innerWidth/innerHeight for viewport dimensions
     const CELL_SIZE = Math.min(window.innerWidth, window.innerHeight) / DESIRED_CELL_COUNT;
     const GRID_WIDTH = Math.ceil(window.innerWidth / CELL_SIZE);
@@ -27,41 +31,51 @@ const GameOfLifeBackground = () => {
       Array.from({ length: GRID_WIDTH }, () => Math.random() > 0.8 ? 1 : 0)
     );
 
-    const getGradientColor = (x: number, y: number) => {
-      // Create gradient based on position
-      const gradientX = x / GRID_WIDTH;
-      const gradientY = y / GRID_HEIGHT;
-      
-      // RGB values for gradient
-      const r = Math.round(0);   // No red
-      const g = Math.round(255 * (1 - gradientY));  // Green decreases from top to bottom
-      const b = Math.round(255 * gradientX);        // Blue increases from left to right
-      
-      return `rgb(${r}, ${g}, ${b})`;
-    };
+    const opacityGrid = Array.from({ length: GRID_HEIGHT }, () =>
+      Array.from({ length: GRID_WIDTH }, () => MAX_OPACITY)  // Initialize with max opacity 0.7
+    );
+
+    let isTransitioning = false;
+    let lastGenerationTime = Date.now();
 
     const draw = () => {
       const grid = gridRef.current;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       
+      let stillTransitioning = false;
       // Draw cells
       for (let y = 0; y < GRID_HEIGHT; y++) {
         for (let x = 0; x < GRID_WIDTH; x++) {
+          // Update opacity with transition
           if (grid[y][x]) {
-            // Create gradient for each cell
+            if (opacityGrid[y][x] < MAX_OPACITY) {  // Max opacity is 0.7
+              opacityGrid[y][x] = Math.min(MAX_OPACITY, opacityGrid[y][x] + 0.1);
+              stillTransitioning = true;
+            }
+          } else {
+            if (opacityGrid[y][x] > 0) {
+              opacityGrid[y][x] = Math.max(0, opacityGrid[y][x] - 0.1);
+              stillTransitioning = true;
+            }
+          }
+
+          if (opacityGrid[y][x] > 0) {
             const gradient = ctx.createLinearGradient(
               x * CELL_SIZE, y * CELL_SIZE,           // Start point (top)
               x * CELL_SIZE, (y + 1) * CELL_SIZE      // End point (bottom)
             );
-            gradient.addColorStop(0, '#FFFFFF11');    // Green at start
-            gradient.addColorStop(1, '#00000011');    // Blue at end
+            gradient.addColorStop(0, `rgba(255, 255, 255, ${opacityGrid[y][x]})`);
+            gradient.addColorStop(1, `rgba(0, 0, 0, ${opacityGrid[y][x]})`);
             ctx.fillStyle = gradient;
+            ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
           } else {
             ctx.fillStyle = DEAD_COLOR;
+            ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
           }
-          ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
         }
       }
+      
+      isTransitioning = stillTransitioning;
       
       // Draw grid lines
       ctx.strokeStyle = '#333333';
@@ -115,15 +129,22 @@ const GameOfLifeBackground = () => {
 
     const animate = () => {
       draw();
-      nextGeneration();
-      setTimeout(() => requestAnimationFrame(animate), 500);
+      
+      // Check if it's time for next generation
+      const currentTime = Date.now();
+      if (currentTime - lastGenerationTime >= GENERATION_INTERVAL) {
+        nextGeneration();
+        lastGenerationTime = currentTime;
+      }
+      
+      setTimeout(() => requestAnimationFrame(animate), FRAME_RATE);
     };
 
     animate();
   }, []);
 
   return (
-    <div className='absolute top-0 left-0 w-full h-full'>
+    <div className='absolute top-0 left-0 w-full h-full overflow-hidden'>
         <div className='absolute z-10 top-0 left-0 w-full h-full bg-black opacity-50 gol-bg'></div>
     <canvas
       ref={canvasRef}
