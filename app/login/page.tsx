@@ -57,9 +57,9 @@ export default function Login() {
             <GameOfLifeBackground />
             <Image
               alt=""
-              src="/images/BudLogo.png"
+              src="/images/logo-white.png"
               preview={false}
-              style={{ width: "10em" }}
+              style={{ width: "8em" }}
               className="w-[6.6em] h-auto relative z-10"
             />
             
