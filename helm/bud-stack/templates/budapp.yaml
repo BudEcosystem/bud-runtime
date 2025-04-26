@@ -53,13 +53,29 @@ spec:
         - name: {{ .name }}
           mountPath: {{ .mountPath }}
         {{- end }}
+        livenessProbe:
+          httpGet:
+            path: {{ default "/" .livenessProbe.path }}
+            port: {{ .containerPort }}
+          initialDelaySeconds: {{ default 10 .livenessProbe.initialDelaySeconds }}
+          periodSeconds: {{ default 10 .livenessProbe.periodSeconds }}
+          timeoutSeconds: {{ default 5 .livenessProbe.timeoutSeconds }}
+          failureThreshold: {{ default 3 .livenessProbe.failureThreshold }}
+        readinessProbe:
+          httpGet:
+            path: {{ default "/" .readinessProbe.path }}
+            port: {{ .containerPort }}
+          initialDelaySeconds: {{ default 5 .readinessProbe.initialDelaySeconds }}
+          periodSeconds: {{ default 10 .readinessProbe.periodSeconds }}
+          timeoutSeconds: {{ default 5 .readinessProbe.timeoutSeconds }}
+          failureThreshold: {{ default 3 .readinessProbe.failureThreshold }}
       volumes:
       {{- range .volumes }}
       - name: {{ .name }}
         persistentVolumeClaim:
           claimName: {{ .name }}-pvc
       {{- end }}
-      
+
 ---
 apiVersion: v1
 kind: Service
