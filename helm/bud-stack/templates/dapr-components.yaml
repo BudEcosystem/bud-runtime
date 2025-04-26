@@ -140,6 +140,12 @@ spec:
     {{- end }}
   pubsubname: pubsub-redis
   deadLetterTopic: poisonMessages
+  {{- if eq .name "budmetrics" }}
+  bulkSubscribe:
+    enabled: true
+    maxMessagesCount: 1
+    maxAwaitDurationMs: 50
+  {{- end }}
 scopes:
   - {{.name}}
 

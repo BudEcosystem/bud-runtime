@@ -1,26 +1,42 @@
 {{- /*
-  This single template includes:
-  - ConfigMap for realm
-  - Keycloak Deployment and Service
-  - Optional PostgreSQL Deployment and Service
+This Helm template includes:
+- ConfigMap for Keycloak realm
+- Keycloak Deployment and Service
+- Keycloak PVC
+- Optional Postgres Deployment, Service and PVC
 */ -}}
 
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: keycloak-realm-config
+  name: {{ include "keycloak.fullname" . }}-realm-config
+  labels:
+    app: {{ include "keycloak.name" . }}
 data:
   keycloak-realm.json: |
     {{ .Values.keycloak.realm | nindent 4 }}
 ---
 apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "keycloak.fullname" . }}-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.keycloak.persistence.size }}
+---
+apiVersion: v1
 kind: Service
 metadata:
-  name: keycloak
+  name: {{ include "keycloak.fullname" . }}
+  labels:
+    app: {{ include "keycloak.name" . }}
 spec:
   selector:
-    app: keycloak
+    app: {{ include "keycloak.name" . }}
   ports:
     - protocol: TCP
       port: 80
@@ -30,21 +46,26 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: keycloak
+  name: {{ include "keycloak.fullname" . }}
+  labels:
+    app: {{ include "keycloak.name" . }}
 spec:
   replicas: {{ .Values.keycloak.replicas }}
   selector:
     matchLabels:
-      app: keycloak
+      app: {{ include "keycloak.name" . }}
   template:
     metadata:
       labels:
-        app: keycloak
+        app: {{ include "keycloak.name" . }}
     spec:
       containers:
         - name: keycloak
-          image: {{ .Values.keycloak.image }}
-          args: ["start-dev", "--import-realm"]
+          image: {{ .Values.keycloak.image | default "quay.io/keycloak/keycloak:26.1.4" }}
+          args:
+            - "start"
+            - "--hostname=https://{{ .Values.keycloak.hostname }}"
+            - "--spi-sticky-session-encoder-infinispan-should-attach-route=false"
           ports:
             - containerPort: 8080
           env:
@@ -60,38 +81,72 @@ spec:
               value: {{ .Values.keycloak.database.username }}
             - name: KC_DB_PASSWORD
               value: {{ .Values.keycloak.database.password }}
+            - name: KC_PROXY_HEADERS
+              value: "forwarded"
+            - name: jgroups.dns.query
+              value: {{ include "keycloak.fullname" . }}
+            - name: PROXY_ADDRESS_FORWARDING
+              value: "true"
+            - name: KC_HEALTH_ENABLED
+              value: "true"
+            - name: KC_METRICS_ENABLED
+              value: "true"
+            - name: KC_HTTP_ENABLED
+              value: "true"
           volumeMounts:
             - name: realm-config
               mountPath: /opt/keycloak/data/import
+            - name: keycloak-data
+              mountPath: /opt/keycloak/data
       volumes:
         - name: realm-config
           configMap:
-            name: keycloak-realm-config
+            name: {{ include "keycloak.fullname" . }}-realm-config
+        - name: keycloak-data
+          persistentVolumeClaim:
+            claimName: {{ include "keycloak.fullname" . }}-data
 ---
 {{- if .Values.keycloak.postgres.enabled }}
 apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "keycloak.fullname" . }}-postgres-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.keycloak.postgres.persistence.size }}
+---
+apiVersion: v1
 kind: Service
 metadata:
-  name: postgres
+  name: {{ include "keycloak.fullname" . }}-postgres
+  labels:
+    app: {{ include "keycloak.name" . }}-postgres
 spec:
+  selector:
+    app: {{ include "keycloak.name" . }}-postgres
   ports:
     - port: 5432
-  selector:
-    app: postgres
+      targetPort: 5432
+  type: ClusterIP
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: postgres
+  name: {{ include "keycloak.fullname" . }}-postgres
+  labels:
+    app: {{ include "keycloak.name" . }}-postgres
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: postgres
+      app: {{ include "keycloak.name" . }}-postgres
   template:
     metadata:
       labels:
-        app: postgres
+        app: {{ include "keycloak.name" . }}-postgres
     spec:
       containers:
         - name: postgres
@@ -105,4 +160,11 @@ spec:
               value: {{ .Values.keycloak.postgres.password }}
           ports:
             - containerPort: 5432
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: postgres-data
+          persistentVolumeClaim:
+            claimName: {{ include "keycloak.fullname" . }}-postgres-data
 {{- end }}
