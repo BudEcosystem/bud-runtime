@@ -1,0 +1,99 @@
+{{- define "mongodb.name" -}}
+mongodb
+{{- end -}}
+
+{{- define "mongodb.containerPort" -}}
+27017
+{{- end -}}
+
+{{- define "mongodb.storageSize" -}}
+{{ .Values.mongodb.storage.size | quote }}
+{{- end -}}
+
+{{- define "mongodb.storageClassName" -}}
+{{ .Values.mongodb.storage.storageClassName | quote }}
+{{- end -}}
+
+{{- define "mongodb.initdbRootUsername" -}}
+{{ .Values.mongodb.initdbRootUsername | quote }}
+{{- end -}}
+
+{{- define "mongodb.initdbRootPassword" -}}
+{{ .Values.mongodb.initdbRootPassword | quote }}
+{{- end -}}
+
+{{- $namespace := .Values.namespace | quote }}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mongodb.name" . }}
+  namespace: {{ $namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ include "mongodb.name" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "mongodb.name" . }}
+    spec:
+      containers:
+      - name: {{ include "mongodb.name" . }}
+        image: "mongo"
+        ports:
+        - containerPort: {{ include "mongodb.containerPort" . }}
+        env:
+        - name: MONGO_INITDB_ROOT_USERNAME
+          value: {{ include "mongodb.initdbRootUsername" . }}
+        - name: MONGO_INITDB_ROOT_PASSWORD
+          value: {{ include "mongodb.initdbRootPassword" . }}
+        volumeMounts:
+        - mountPath: /data/db
+          name: "mongodb-storage"
+      volumes:
+      - name: "mongodb-storage"
+        persistentVolumeClaim:
+          claimName: "mongodb-pvc"
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: "mongodb-pv"
+  namespace: {{ $namespace }}
+spec:
+  capacity:
+    storage: {{ include "mongodb.storageSize" . }}
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ include "mongodb.storageClassName" . }}
+  hostPath:
+    path: {{ .Values.mongodb.storage.hostPath | quote }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: "mongodb-pvc"
+  namespace: {{ $namespace }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ include "mongodb.storageSize" . }}
+  storageClassName: {{ include "mongodb.storageClassName" . }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "mongodb.name" . }}-service
+  namespace: {{ $namespace }}
+spec:
+  ports:
+  - port: {{ include "mongodb.containerPort" . }}
+    targetPort: {{ include "mongodb.containerPort" . }}
+  selector:
+    app: {{ include "mongodb.name" . }}
+  type: ClusterIP
