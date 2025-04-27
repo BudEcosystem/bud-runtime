@@ -41,6 +41,8 @@ spec:
         envFrom:
           - configMapRef:
               name: {{ .envFrom }}
+        {{- if .Disableresources }}
+        {{- else }}
         resources:
           limits:
             memory: {{ .resources.limits.memory }}
@@ -48,11 +50,13 @@ spec:
           requests:
             memory: {{ .resources.requests.memory }}
             cpu: {{ .resources.requests.cpu }}
+        {{- end }}
         volumeMounts:
         {{- range .volumes }}
         - name: {{ .name }}
           mountPath: {{ .mountPath }}
         {{- end }}
+        {{- if .livenessProbe }}
         livenessProbe:
           httpGet:
             path: {{ default "/" .livenessProbe.path }}
@@ -61,6 +65,8 @@ spec:
           periodSeconds: {{ default 10 .livenessProbe.periodSeconds }}
           timeoutSeconds: {{ default 5 .livenessProbe.timeoutSeconds }}
           failureThreshold: {{ default 3 .livenessProbe.failureThreshold }}
+        {{- end }}
+        {{- if .readinessProbe }}
         readinessProbe:
           httpGet:
             path: {{ default "/" .readinessProbe.path }}
@@ -69,6 +75,7 @@ spec:
           periodSeconds: {{ default 10 .readinessProbe.periodSeconds }}
           timeoutSeconds: {{ default 5 .readinessProbe.timeoutSeconds }}
           failureThreshold: {{ default 3 .readinessProbe.failureThreshold }}
+        {{- end }}
       volumes:
       {{- range .volumes }}
       - name: {{ .name }}
