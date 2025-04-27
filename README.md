@@ -51,6 +51,7 @@ This chart uses the following sub-charts:
     helm repo add minio https://charts.min.io/
     helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
     helm repo add dapr https://dapr.github.io/helm-charts/
+    helm repo add jetstack https://charts.jetstack.io
     helm repo update
     ```
 2.  **Update your Helm dependencies:**
@@ -65,6 +66,8 @@ This chart uses the following sub-charts:
 3.  **Install the chart using Helm:**
 
     ```bash
+    helm install cert-manager --force jetstack/cert-manager --namespace bud-system --create-namespace --set installCRDs=true
+    kubectl get CustomResourceDefinition -o name | xargs -I{} kubectl annotate {} meta.helm.sh/release-name=<Stack-Name> --overwrite
     helm install <release-name> chart-bud --namespace <target-namespace> -f values.yaml
     ```
 

@@ -18,7 +18,7 @@ spec:
         dapr.io/enabled: "true"
         dapr.io/app-id: "{{ .daprAppId }}"
         dapr.io/app-port: "{{ .containerPort }}"
-        dapr.io/placement-host-address: "dapr-placement-server.dapr-system:50005"
+        dapr.io/placement-host-address: "dapr-placement-server.{{ $.Values.namespace }}:50005"
         {{- if .enableCrypto }}
         dapr.io/volume-mounts: "crypto-keys:/mnt/crypto-keys"
         {{- end }}
@@ -30,7 +30,7 @@ spec:
       containers:
       - name: {{ .name }}
         image: {{ .image }}
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         {{- if .DisableShell }}
         {{- else }}
         command: ["sh", "-c", "{{ .command }} {{ .containerPort }}"]
