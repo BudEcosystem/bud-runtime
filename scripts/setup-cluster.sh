@@ -61,6 +61,12 @@ echo "Updating system packages..."
 sudo apt-get update -y
 sudo apt-get upgrade -y
 
+echo "Setting up Helm..."
+curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+chmod 700 get_helm.sh
+./get_helm.sh
+
+
 # Update system settings
 
 # Define the entries to check/add
@@ -85,8 +91,6 @@ done
 
 # Function to determine maximum values based on system capabilities
 calculate_max_values() {
-    # fs.file-max: Typically, it's recommended to set this to a high value.
-    file_max=$(( $(ulimit -n) * 2 ))  # For example, double the maximum number of open file descriptors
     
     # net.core.somaxconn: Maximum number of connections that can be queued for acceptance.
     somaxconn=65535  # Common maximum value
@@ -121,7 +125,6 @@ calculate_max_values
 
 # Define the entries to check/add with dynamic max values
 entries=(
-"fs.file-max = $file_max"
 "net.core.somaxconn = $somaxconn"
 "net.core.netdev_max_backlog = $netdev_max_backlog"
 "net.core.rmem_max = $rmem_max"
