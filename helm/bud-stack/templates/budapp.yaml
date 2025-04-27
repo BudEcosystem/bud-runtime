@@ -23,7 +23,7 @@ spec:
         dapr.io/volume-mounts: "crypto-keys:/mnt/crypto-keys"
         {{- end }}
     spec:
-      {{- if {{ $.Values.imagePullSecret }}}}
+      {{- if $.Values.imagePullSecret }}
       imagePullSecrets:
         - name: {{ $.Values.imagePullSecret.name }}
       {{- end }}
