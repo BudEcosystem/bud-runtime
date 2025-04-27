@@ -3,7 +3,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: redis
-  namespace: {{ .Values.namespace }}
+  namespace: {{ $.Values.namespace }}
 spec:
   replicas: 1
   selector:
@@ -34,7 +34,7 @@ apiVersion: v1
 kind: PersistentVolume
 metadata:
   name: redis-pv
-  namespace: {{ .Values.namespace }}
+  namespace: {{ $.Values.namespace }}
 spec:
   capacity:
     storage: {{ .Values.services.cache.redis.storage.size }}
@@ -50,7 +50,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: redis-pvc
-  namespace: {{ .Values.namespace }}
+  namespace: {{ $.Values.namespace }}
 spec:
   accessModes:
     - ReadWriteOnce
@@ -65,7 +65,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: redis-service
-  namespace: {{ .Values.namespace }}
+  namespace: {{ $.Values.namespace }}
 spec:
   ports:
     - port: 6379

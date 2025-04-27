@@ -2,7 +2,7 @@ apiVersion: dapr.io/v1alpha1
 kind: Component
 metadata:
   name: {{ .Values.dapr.secretStoreName }}
-  namespace: dapr-system
+  namespace: {{ .Values.namespace }}
 spec:
   type: secretstores.kubernetes
   version: v1
@@ -45,7 +45,7 @@ apiVersion: dapr.io/v1alpha1
 kind: Component
 metadata:
   name: pubsub-redis
-  namespace: dapr-system
+  namespace: {{ .Values.namespace }}
 spec:
   type: pubsub.redis
   version: v1
@@ -82,7 +82,7 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: default
-    namespace: dapr-system
+    namespace: {{ .Values.namespace }}
 roleRef:
   kind: ClusterRole
   name: secret-reader-full
@@ -156,7 +156,7 @@ apiVersion: dapr.io/v1alpha1
 kind: Component
 metadata:
   name: actorbackend
-  namespace: dapr-system
+  namespace: {{ .Values.namespace }}
 spec:
   type: workflowbackend.actor
   version: v1

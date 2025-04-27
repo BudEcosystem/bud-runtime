@@ -93,18 +93,6 @@ spec:
               value: "true"
             - name: KC_HTTP_ENABLED
               value: "true"
-          volumeMounts:
-            - name: realm-config
-              mountPath: /opt/keycloak/data/import
-            - name: keycloak-data
-              mountPath: /opt/keycloak/data
-      volumes:
-        - name: realm-config
-          configMap:
-            name: {{ include "keycloak.fullname" . }}-realm-config
-        - name: keycloak-data
-          persistentVolumeClaim:
-            claimName: {{ include "keycloak.fullname" . }}-data
 ---
 {{- if .Values.keycloak.postgres.enabled }}
 apiVersion: v1
