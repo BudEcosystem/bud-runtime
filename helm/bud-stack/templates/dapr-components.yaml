@@ -1,0 +1,205 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: {{ .Values.dapr.secretStoreName }}
+  namespace: {{ .Values.namespace }}
+spec:
+  type: secretstores.kubernetes
+  version: v1
+  metadata: []
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dapr-sidecar-service
+  namespace: {{ .Values.namespace }}
+spec:
+  selector:
+    app: budsim
+  ports:
+    - protocol: TCP
+      port: 3500          # Expose port 3500 on the cluster
+      targetPort: 3500    # Map it to the Dapr sidecar HTTP port
+  type: ClusterIP
+---
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: crypto-store
+  namespace: {{ .Values.namespace }}
+spec:
+  type: crypto.dapr.localstorage
+  version: v1
+  metadata:
+  - name: path
+    value: /mnt/crypto-keys
+scopes:
+  {{- range .Values.apps }}
+  {{- if .enableCrypto }}
+  - {{ .daprAppId }}
+  {{- end }}
+  {{- end }}
+
+---
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: pubsub-redis
+  namespace: {{ .Values.namespace }}
+spec:
+  type: pubsub.redis
+  version: v1
+  metadata:
+    - name: redisHost
+      secretKeyRef:
+        name: {{ .Values.dapr.secretName }}
+        key: REDIS_URI
+    - name: redisPassword
+      secretKeyRef:
+        name: {{ .Values.dapr.secretName }}
+        key: REDIS_PASSWORD
+    - name: consumerID
+      value: "{appID}"
+    - name: concurrency
+      value: "10"
+auth:
+  secretStore: {{ .Values.dapr.secretStoreName }}
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: secret-reader-full
+rules:
+  - apiGroups: ["*"]
+    resources: ["*"]
+    verbs: ["*"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: dapr-secret-access
+subjects:
+  - kind: ServiceAccount
+    name: default
+    namespace: {{ .Values.namespace }}
+roleRef:
+  kind: ClusterRole
+  name: secret-reader-full
+  apiGroup: rbac.authorization.k8s.io
+
+---
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: statestore
+  namespace: {{ .Values.namespace }}  # Use the namespace from values
+spec:
+  type: state.redis
+  version: v1
+  metadata:
+    - name: redisHost
+      secretKeyRef:
+        name: {{ .Values.dapr.secretName }}
+        key: REDIS_URI
+    - name: redisPassword
+      secretKeyRef:
+        name: {{ .Values.dapr.secretName }}
+        key: REDIS_PASSWORD
+    - name: actorStateStore
+      value: "true"
+    - name: keyPrefix
+      value: none
+auth:
+  secretStore: {{ .Values.dapr.secretStoreName }}
+---
+{{- range .Values.apps }}
+---
+apiVersion: dapr.io/v2alpha1
+kind: Subscription
+metadata:
+  name: {{ .name }}-pubsub-subscription
+  namespace: {{ $.Values.namespace }}
+spec:
+  topic: {{.appTopic}}
+  routes:
+    {{- if eq .name "budapp" }}
+    rules:
+      - match: event.type == "credential_update"
+        path: /credentials/update
+    {{ end }}
+    default: {{.appTopicRoute}}
+    {{- if eq .name "budmetrics" }}
+    rules:
+    - match: event.type == "add_request_metrics"
+      path: /metrics/add
+    - match: event.type == "update_request_metrics"
+      path: /metrics/update
+    - match: event.type == "add_request_scores"
+      path: /metrics/scores
+    {{- end }}
+  pubsubname: pubsub-redis
+  deadLetterTopic: poisonMessages
+  {{- if eq .name "budmetrics" }}
+  bulkSubscribe:
+    enabled: true
+    maxMessagesCount: 1
+    maxAwaitDurationMs: 50
+  {{- end }}
+scopes:
+  - {{.name}}
+
+{{end}}
+
+---
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: actorbackend
+  namespace: {{ .Values.namespace }}
+spec:
+  type: workflowbackend.actor
+  version: v1
+  metadata:
+    - name: actorbackend
+      value: "true"
+---
+{{- if .Values.services.cache.enabled }}
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: configstore
+  namespace: {{ .Values.namespace }}
+spec:
+  type: configuration.redis
+  version: v1
+  metadata:
+    - name: redisHost
+      secretKeyRef:
+        name: {{ .Values.dapr.secretName }}
+        key: REDIS_URI
+    - name: redisPassword
+      secretKeyRef:
+        name: {{ .Values.dapr.secretName }}
+        key: REDIS_PASSWORD
+    - name: PSQL_HOST
+      secretKeyRef:
+        name: {{ .Values.dapr.secretName }}
+        key: PSQL_HOST
+    - name: PSQL_USER
+      secretKeyRef:
+        name: {{ .Values.dapr.secretName }}
+        key: PSQL_USER
+    - name: PSQL_PASSWORD
+      secretKeyRef:
+        name: {{ .Values.dapr.secretName }}
+        key: PSQL_PASSWORD
+    - name: PSQL_DB_NAME
+      secretKeyRef:
+        name: {{ .Values.dapr.secretName }}
+        key: PSQL_DB
+    - name: PSQL_PORT
+      value: "5432"  # Default PostgreSQL port
+auth:
+  secretStore: {{ .Values.dapr.secretStoreName }}
+{{- end }}

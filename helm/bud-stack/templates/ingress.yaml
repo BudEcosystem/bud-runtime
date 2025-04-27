@@ -1,0 +1,58 @@
+{{- define "ingress.annotations" -}}
+  traefik.ingress.kubernetes.io/router.entrypoints: "websecure"
+{{- if and $.Values.tls.enabled $.Values.certManager.enabled (not $.Values.tls.customCertificate.enabled) }}
+  
+  cert-manager.io/issuer: "letsencrypt-issuer"
+{{- end }}
+{{- end }}
+
+{{- $namespace := .Values.namespace | quote }}
+
+{{- if and .Values.certManager.enabled (not .Values.tls.customCertificate.enabled) }}
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: letsencrypt-issuer
+  namespace: {{ $namespace }}
+spec:
+  acme:
+    email: {{ .Values.certManager.email | quote }}
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-account-key
+    solvers:
+    - http01:
+        ingress:
+          class: traefik
+{{- end }}
+
+{{- range .Values.ingresses }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .name | quote }}
+  namespace: {{ $namespace }}
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: "websecure"
+    cert-manager.io/issuer: "letsencrypt-issuer"
+spec:
+  {{- if $.Values.tls.enabled }}
+  tls:
+  - hosts:
+    - {{ .host | quote }}
+    secretName: {{- if $.Values.tls.customCertificate.enabled }} {{ $.Values.tls.customCertificate.secretName | quote }} {{- else }} {{ .name }}-tls {{- end }}
+  {{- end }}
+  rules:
+  - host: {{ .host | quote }}
+    http:
+      paths:
+      - path: "/"
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ .serviceName | quote }}
+            port:
+              number: {{ .servicePort }}
+{{- end }}
