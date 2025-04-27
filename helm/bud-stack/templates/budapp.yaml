@@ -23,6 +23,10 @@ spec:
         dapr.io/volume-mounts: "crypto-keys:/mnt/crypto-keys"
         {{- end }}
     spec:
+      {{- if {{ $.Values.imagePullSecret }}}}
+      imagePullSecrets:
+        - name: {{ $.Values.imagePullSecret.name }}
+      {{- end }}
       containers:
       - name: {{ .name }}
         image: {{ .image }}
@@ -96,4 +100,15 @@ spec:
   selector:
     app: {{ .name }}
   type: ClusterIP
+{{- end }}
+{{- if .Values.imagePullSecret }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Values.imagePullSecret.name }}
+  namespace: {{ .Values.namespace }}
+type: kubernetes.io/dockerconfigjson
+data:
+  .dockerconfigjson: {{ .Values.imagePullSecret.dockerConfigJson | quote }}
 {{- end }}
