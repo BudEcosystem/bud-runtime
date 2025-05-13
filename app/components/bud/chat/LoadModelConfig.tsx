@@ -34,7 +34,7 @@ function LoadModelConfig(props: LoadModelConfigProps) {
           </div>
           <div className="flex items-center gap-x-[.5rem]">
             <Image
-              src={`${assetBaseUrl}${props.data?.model?.provider?.icon}`}
+              src={`${assetBaseUrl}${typeof props.data?.model === 'object' && props.data?.model?.provider?.icon}`}
               alt={props.data?.name}
                     preview={false}
                     width={".875rem"}

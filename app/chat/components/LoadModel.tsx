@@ -167,7 +167,9 @@ export default function LoadModel(props: LoadModelProps) {
                     onClick={() => props.setOpen(!props.open)}
                 >
                     <Image
-                        src={`${assetBaseUrl}${chat.selectedDeployment?.model?.icon || chat.selectedDeployment?.model?.provider?.icon}`}
+                        src={typeof chat.selectedDeployment.model === 'string' 
+                            ? "/icons/modelRepoWhite.png" 
+                            : `${assetBaseUrl}${chat.selectedDeployment.model?.icon || chat.selectedDeployment.model?.provider?.icon}`}
                         fallback={"/icons/modelRepoWhite.png"}
                         preview={false}
                         alt="bud"

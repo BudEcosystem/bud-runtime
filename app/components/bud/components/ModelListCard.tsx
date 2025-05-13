@@ -37,7 +37,9 @@ export function ModelListCard({
   const { name, model } = data;
 
   const imageUrl =
-    assetBaseUrl + (data?.model?.icon || data?.model?.provider?.icon);
+    assetBaseUrl + (typeof data.model === 'object' && data.model ? 
+      (data.model.icon || (data.model.provider && data.model.provider.icon)) : 
+      '/icons/modelRepoWhite.png');
   const fallbackImageUrl = "/icons/modelRepoWhite.png";
 
   return (
@@ -108,7 +110,7 @@ export function ModelListCard({
           </div>
         </div>
         <div className="text-[#757575] w-full overflow-hidden text-ellipsis text-xs mt-[0.25rem] flex">
-          {model?.tags.map((tag) => (
+          {typeof model === 'object' && model?.tags.map((tag) => (
             <Tag
               key={tag.name}
               className=" !text-[.625rem] font-[400] rounded-[0.5rem] !px-[.375rem] !h-[1.25rem] flex items-center justify-center leading-[1.25rem]"
