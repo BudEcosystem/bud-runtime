@@ -37,7 +37,7 @@ export type Endpoint = {
     id: string;
     name: string;
     status: "unhealthy" | "running";
-    model: Model;
-    project: Project;
+    model: Model | string;
+    project: Project | null;
     created_at: string;
 };

@@ -19,7 +19,7 @@ import SettingsList from './Settings';
 
 const { Header, Footer, Sider, Content } = Layout;
 
-export default function ChatWindow({ chat }: { chat: Session }) {
+export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSingleChat: boolean }) {
 
   const { addMessage, getMessages, updateChat, createChat, disableChat, currentSettingPreset, deleteMessageAfter } = useChatStore();
   const { apiKey, accessKey } = useAuth();
@@ -34,11 +34,13 @@ export default function ChatWindow({ chat }: { chat: Session }) {
     if (!chat) {
       return;
     }
-
+    const params = new URLSearchParams(window.location.search);
+    const baseUrl = params.get('base_url');
     return {
       model: chat?.selectedDeployment?.name,
       metadata: {
-        project_id: chat?.selectedDeployment?.project.id,
+        project_id: chat?.selectedDeployment?.project?.id,
+        base_url: baseUrl,
       },
       settings: currentSettingPreset,
     };
@@ -143,7 +145,7 @@ export default function ChatWindow({ chat }: { chat: Session }) {
   }
 
   return (
-    <Layout className="chat-container ">
+    <Layout className={`chat-container ${isSingleChat ? 'single-chat' : ''}`}>
       <Sider
         width="280px"
         className={`leftSider rounded-l-[1rem] border-[1px] border-[#1F1F1F] border-r-[0px] overflow-hidden ml-[-250px] ease-in-out ${toggleLeft ? "visible ml-[0]" : "invisible ml-[-280px]"
@@ -207,6 +209,7 @@ export default function ChatWindow({ chat }: { chat: Session }) {
             isRightSidebarOpen={toggleRight}
             onToggleLeftSidebar={() => setToggleLeft(!toggleLeft)}
             onToggleRightSidebar={() => setToggleRight(!toggleRight)}
+            isSingleChat={isSingleChat}
           />
         </Header>
         <Content className="overflow-hidden overflow-y-auto hide-scrollbar">
@@ -215,7 +218,7 @@ export default function ChatWindow({ chat }: { chat: Session }) {
             className="flex flex-col h-full w-full py-24 mx-auto stretch px-[1rem] max-w-5xl  gap-[1rem]"
             id="chat-container"
           >
-            {(chat?.selectedDeployment?.name && messages.length < 1) && <ModelInfo deployment={chat?.selectedDeployment} />}
+            {(chat?.selectedDeployment?.name && messages.length < 1 && (typeof chat?.selectedDeployment?.model === 'object' && chat?.selectedDeployment?.model?.id)) && <ModelInfo deployment={chat?.selectedDeployment} />}
             <Messages chatId={chat.id} messages={messages} reload={reload} onEdit={handleEdit} />
             {(!chat?.selectedDeployment?.name) &&
               (!messages || messages.length === 0) && (
@@ -267,7 +270,7 @@ export default function ChatWindow({ chat }: { chat: Session }) {
           <NormalEditor
             isLoading={status === "submitted" || status === "streaming"}
             error={error}
-            disabled={!chat?.selectedDeployment?.id}
+            disabled={!chat?.selectedDeployment?.name}
             stop={stop}
             handleInputChange={handleChange}
             handleSubmit={(e) => {

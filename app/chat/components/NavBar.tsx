@@ -20,9 +20,10 @@ interface NavBarProps {
     onToggleRightSidebar: () => void;
     isLeftSidebarOpen: boolean;
     isRightSidebarOpen: boolean;
+    isSingleChat: boolean;
   }
 
-export default function NavBar({chatId, onToggleLeftSidebar, onToggleRightSidebar, isLeftSidebarOpen, isRightSidebarOpen}: NavBarProps){
+export default function NavBar({chatId, onToggleLeftSidebar, onToggleRightSidebar, isLeftSidebarOpen, isRightSidebarOpen, isSingleChat}: NavBarProps){
 
     const { disableChat, createChat, deleteChat, activeChatList } = useChatStore();
     const [openDropdown, setOpenDropdown] = React.useState(false);
@@ -88,9 +89,9 @@ export default function NavBar({chatId, onToggleLeftSidebar, onToggleRightSideba
               display: isLeftSidebarOpen ? "block" : "none",
             }}
           />
-          <LoadModel open={open} setOpen={setOpen} chatId={chatId} />
+          {!isSingleChat && <LoadModel open={open} setOpen={setOpen} chatId={chatId} />}
           <div className="flex items-center gap-[.5rem]">
-            <button
+          {!isSingleChat && <button
               style={{
                 display: isRightSidebarOpen ? "none" : "block",
               }}
@@ -112,8 +113,8 @@ export default function NavBar({chatId, onToggleLeftSidebar, onToggleRightSideba
                 </svg>
                 </Tooltip>
               </div>
-            </button>
-            <button
+            </button>}
+            {!isSingleChat && <button
               onClick={createNewChat}
               className="w-[1.475rem] height-[1.475rem] p-[.2rem] rounded-[6px] flex justify-center items-center cursor-pointer"
             >
@@ -132,8 +133,8 @@ export default function NavBar({chatId, onToggleLeftSidebar, onToggleRightSideba
                 </svg>
               </Tooltip>
               </div>
-            </button>
-            <DropdownMenu
+            </button>}
+            {!isSingleChat && <DropdownMenu
               open={openDropdown}
               onOpenChange={(isOpen) => setOpenDropdown(isOpen)}
             >
@@ -178,7 +179,7 @@ export default function NavBar({chatId, onToggleLeftSidebar, onToggleRightSideba
                   Delete Chat
                 </DropdownMenuItem>
               </DropdownMenuContent>
-            </DropdownMenu>
+            </DropdownMenu>}
           </div>
         </div>
       );

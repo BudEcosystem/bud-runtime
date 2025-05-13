@@ -21,7 +21,7 @@ export async function POST(req: Request) {
 
   const proxyOpenAI = createOpenAI({
     // custom settings, e.g.
-    baseURL: copyCodeApiBaseUrl,
+    baseURL: metadata.base_url || copyCodeApiBaseUrl,
     // apiKey: "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",
     fetch: (input, init) => {
       const request = {
