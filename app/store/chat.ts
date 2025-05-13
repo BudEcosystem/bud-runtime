@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { Note, Session, Settings } from '../types/chat';
 import { Endpoint } from '../types/deployment';
 import { SavedMessage } from '../types/chat';
+
 interface ChatStore {
   activeChatList: Session[];
   setActiveChatList: (chatList: Session[]) => void;
@@ -39,6 +40,19 @@ interface ChatStore {
   deleteNote: (noteId: string) => void;
   getNotes: (chatId: string) => Note[];
 }
+
+// Get a unique storage name from env or URL params
+const getStorageName = () => {
+  // Check for URL parameters
+  const urlParams = new URLSearchParams(window.location.search);
+  const storageParam = urlParams.get('storage');
+  
+  // Check for environment variable (assuming it's exposed to the client)
+  const envStorage = process.env.NEXT_PUBLIC_STORAGE_NAME;
+  
+  // Use the param or env variable if available, otherwise fall back to default
+  return storageParam || envStorage || 'chat-storage';
+};
 
 export const useChatStore = create<ChatStore>()(
   persist(
@@ -194,7 +208,7 @@ export const useChatStore = create<ChatStore>()(
       },
     }),
     {
-      name: 'chat-storage',
+      name: getStorageName(),
       partialize: (state) => ({
         activeChatList: state.activeChatList,
         messages: state.messages,
