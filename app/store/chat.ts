@@ -43,15 +43,22 @@ interface ChatStore {
 
 // Get a unique storage name from env or URL params
 const getStorageName = () => {
-  // Check for URL parameters
-  const urlParams = new URLSearchParams(window.location.search);
-  const storageParam = urlParams.get('storage');
+  // Check if window is defined (client-side)
+  if (typeof window !== 'undefined') {
+    // Check for URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const storageParam = urlParams.get('storage');
+    
+    if (storageParam) {
+      return storageParam;
+    }
+  }
   
-  // Check for environment variable (assuming it's exposed to the client)
+  // Check for environment variable (works on both server and client)
   const envStorage = process.env.NEXT_PUBLIC_STORAGE_NAME;
   
-  // Use the param or env variable if available, otherwise fall back to default
-  return storageParam || envStorage || 'chat-storage';
+  // Use the env variable if available, otherwise fall back to default
+  return envStorage || 'chat-storage';
 };
 
 export const useChatStore = create<ChatStore>()(
