@@ -51,7 +51,7 @@ export default function ChatPage() {
     } else {
       hideLoader();
     }
-    if(isSingleChat) {
+    if(isSingleChat == "true") {
       setIsSingleChat(true);
     }
     if(model) {
