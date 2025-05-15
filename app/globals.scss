@@ -1091,13 +1091,13 @@ input.ant-input:-webkit-autofill {
 }
 
 .ai-message code {
-  background: #1f1f1f;
-  color: #eeeeee;
-  padding: 0.5rem 1rem;
-  border-radius: 0.2rem;
-  display: block;
-  border-radius: 5px;
-  margin: 0.5rem 0;
+  // background: #1f1f1f;
+  // color: #eeeeee;
+  // padding: 0.5rem 1rem;
+  // border-radius: 0.2rem;
+  // display: block;
+  // border-radius: 5px;
+  // margin: 0.5rem 0;
   text-wrap: wrap;
 }
 
@@ -1128,6 +1128,11 @@ input.ant-input:-webkit-autofill {
   padding: 0.5rem 1rem;
   // background: #101010;
   text-align: left;
+}
+
+.ai-message hr{
+  border: 1px solid #333333;
+  margin: 0.5rem 0;
 }
 
 
