@@ -12,7 +12,7 @@ import GameOfLifeBackground from "../components/bud/components/GameOfLifeBg";
 
 export default function Login() {
     const { apiKey, login } = useAuth();
-    const { showLoader, hideLoader } = useLoader();
+    const { showLoader, hideLoader, isLoading } = useLoader();
     const router = useRouter();
     const [form] = Form.useForm();
     const [isShow, setIsShow] = useState(false);
@@ -48,13 +48,12 @@ export default function Login() {
         }
         hideLoader();
     }
-
     return (
-      <div className="w-full h-screen logginBg box-border relative overflow-hidden">
-      <div className="loginWrap w-full h-full loginBg-glass flex justify-between box-border ">
-        <div className="loginLeft relative login-left-bg overflow-hidden rounded-[15px] w-[56.4%] m-[.8rem] p-[.8rem] overflow-hidden">
-          <div className="flex flex-col justify-between w-[100%] max-w-[800px] 1680px:max-w-[900px] 2560px:max-w-[900px] h-full px-[3.5rem] pt-[3rem] pb-[2.9rem]">
-            <GameOfLifeBackground />
+      <div className={`w-full h-screen logginBg box-border relative overflow-hidden ${isLoading ? 'opacity-0' : 'opacity-100'}`}>
+        <div className="loginWrap w-full h-full loginBg-glass flex justify-between box-border ">
+          <div className="loginLeft relative login-left-bg overflow-hidden rounded-[15px] w-[56.4%] m-[.8rem] p-[.8rem] overflow-hidden">
+            <div className="flex flex-col justify-between w-[100%] max-w-[800px] 1680px:max-w-[900px] 2560px:max-w-[900px] h-full px-[3.5rem] pt-[3rem] pb-[2.9rem]">
+              <GameOfLifeBackground />
             <Image
               alt=""
               src="/images/logo-white.png"
