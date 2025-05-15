@@ -136,9 +136,9 @@ function AIMessage(props: MessageProps & { reload: () => void }) {
           <div className="bg !bg-[#1C1C1C] rounded-[6px]"></div>
           <div className="fg flex justify-between items-center pl-[1rem] pr-[.5rem] gap-[.5rem]">
             <div className="flex justify-start items-center gap-x-[.7rem]">
-              <div className="text-[#B3B3B3] text-[.75rem] font-[400]">
+              {metrics?.throughput && <div className="text-[#B3B3B3] text-[.75rem] font-[400]">
                 <strong>Tokens/sec :</strong> {metrics?.throughput}
-              </div>
+              </div>}
               <div className="text-[#B3B3B3] text-[.75rem] font-[400]">
                 <strong>TTFT :</strong> {metrics?.ttft} ms
               </div>

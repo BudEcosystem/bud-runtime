@@ -29,6 +29,7 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
 
   const promptRef = useRef("");
   const lastMessageRef = useRef<string>("");
+  const contentRef = useRef<HTMLDivElement>(null);
 
   const body = useMemo(() => {
     if (!chat) {
@@ -129,6 +130,16 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
     }
     addMessage(chat.id, promptMessage);
     addMessage(chat.id, responseMessage);
+
+    // Use smooth scrolling with scrollTo
+    setTimeout(() => {
+      if (contentRef.current) {
+        contentRef.current.scrollTo({
+          top: contentRef.current.scrollHeight,
+          behavior: 'smooth'
+        });
+      }
+    }, 100);
   };
 
   const handleEdit = (content: string, message: Message) => {
@@ -212,7 +223,10 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
             isSingleChat={isSingleChat}
           />
         </Header>
-        <Content className="overflow-hidden overflow-y-auto hide-scrollbar">
+        <Content 
+          className="overflow-hidden overflow-y-auto hide-scrollbar"
+          ref={contentRef}
+        >
 
           <div
             className="flex flex-col h-full w-full py-24 mx-auto stretch px-[1rem] max-w-5xl  gap-[1rem]"
@@ -276,11 +290,16 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
             handleSubmit={(e) => {
               // setSubmitInput(e);
               handleSubmit(e);
-              document.getElementById("chat-container")?.scrollIntoView({
-                behavior: "smooth",
-                block: "end",
-                inline: "nearest",
-              });
+              
+              // Use smooth scrolling with scrollTo
+              setTimeout(() => {
+                if (contentRef.current) {
+                  contentRef.current.scrollTo({
+                    top: contentRef.current.scrollHeight,
+                    behavior: 'smooth'
+                  });
+                }
+              }, 100);
             }}
             input={input}
           />

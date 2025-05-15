@@ -36,6 +36,7 @@ export async function POST(req: Request) {
           id,
           messages,
           model,
+          session_id: id,
           "stream_options": {
             "include_usage": true
           },
