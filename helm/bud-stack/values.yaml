@@ -1,816 +1,885 @@
-namespace: dapr-system
-
+# Global settings
+namespace: "dapr-system" # Consider making this configurable: {{ .Release.Namespace }}
 replicaCount: 1
 
 globalEnv:
-  configMapName: bud-global-config
-  data:
-    # Base config
-    PORT: "3000"
-    REDIS_CACHE_SERVICE_HOST: ""
-    S3_BUCKET_NAME: "novu-local"
-    JWT_SECRET: "a173a1378b1089d2a24a76502bdce4905fe69b71efdfe95d9f1fdfc5110f78f3"
-    SENTRY_DSN: ""
-    REDIS_PASSWORD: "budpassword"
-    MONGO_MIN_POOL_SIZE: "100"
-    API_CONTEXT_PATH: ""
-    WEB_CONTEXT_PATH: ""
-    MONGO_MAX_POOL_SIZE: "200"
-    WIDGET_URL: "http://web.dapr-system:4200"
-    S3_REGION: "us-east-1"
-    GLOBAL_CONTEXT_PATH: ""
-    AWS_ACCESS_KEY_ID: "test"
-    STORE_ENCRYPTION_KEY: "050c6a4e1ee59527f68729ce87f06562"
-    AWS_SECRET_ACCESS_KEY: "test"
-    REDIS_HOST: "redis-service.dapr-system"
-    REDIS_PORT: "6379"
-    WIDGET_EMBED_PATH: "http://embed:4701/embed.umd.min.js"
-    FRONT_BASE_URL: "http://web.dapr-system:4200"
-    REDIS_DB_INDEX: "2"
-    DOCKER_REDIS_SERVICE_PORT: "6379"
-    NODE_ENV: "production"
-    MONGO_URL: "mongodb://root:secret@mongodb-service:27017/novu-db?authSource=admin"
-    WS_CONTEXT_PATH: ""
-    IS_TOPIC_NOTIFICATION_ENABLED: "true"
-    DISABLE_USER_REGISTRATION: "false"
-    WS_PORT: "3000"
-    IS_MULTI_TENANCY_ENABLED: "true"
-    S3_LOCAL_STACK: "http://localhost:4566"
-    API_ROOT_URL: "http://api.dapr-system:3000"
-    NEW_RELIC_LICENSE_KEY: "47d729d903a431e73598eb03eda7322eFFFFNRAL"
-    HOST_NAME: "http://web.dapr-system:4200"
-    REDIS_CACHE_SERVICE_PORT: "6379"
-    REACT_APP_WS_URL: "http://ws.dapr-system:3000"
-    NODE_VERSION: "20.11.1"
-    YARN_VERSION: "1.22.19"
-    NX_DAEMON: "false"
-    CI: "true"
-    NEW_RELIC_NO_CONFIG_FILE: "true"
-    NEW_RELIC_APP_NAME: "notify"
-    LITELLM_MASTER_KEY: "sk-BudLiteLLMMasterKey_123"
-    OPENAI_API_KEY: "sk-proj-1234"
-    PERPLEXITY_API_KEY: ""
-    BUD_LLM_BASE_URL: "http://172.184.137.177:8000/v1/"
-    MINIO_ACCESS_KEY: "" # TODO: get from secret
-    MINIO_SECRET_KEY: "" # TODO: get from secret
-    ADD_MODEL_DIR: "/datadisk/add_model_dir"
-    # App specific envs (removed prefixes and merged common envs)
-    APP_CONFIG: "{}"
-    API_BASE_URL: "http://chart-bud-api.dapr-system:3000"  # Merged
-    CONFIGSTORE_NAME: "configstore" # Merged
-    SECRETSTORE_NAME: "secretstore" # Merged
-    SECRETSTORE_SECRET_NAME: "app-secrets" # Merged
-    LOG_LEVEL: "DEBUG" # Merged , overriden by budsim
-    NOTIFY_SERVICE_NAME: "notify" # Merged
-    NOTIFY_SERVICE_TOPIC: "notificationMessages" # Merged
-    NOVU_API_BASE_URL: "http://chart-bud-api.dapr-system:3000"
-    PSQL_HOST: "postgresql-service.dapr-system" # Merged
-    SECRETS_PSQL_USER: "myuser"  # Merged
-    SECRETS_PSQL_PASSWORD: "" # TODO: get from secret # Merged
-    PSQL_USER: "myuser" # Merged
-    PSQL_PASSWORD: "" # TODO: get from secret # Merged
-    PSQL_PORT: "5432" # Merged
-    PSQL_POOL_SIZE: "100" # Merged
-    
-    PSQL_DB_NAME_BUDSIM: "budsim"
-    POPULATION_SIZE: "5"
-    GENERATION_COUNT: "10"
-    VLLM_HPU_IMAGE: "budimages.azurecr.io/budecosystem/bud-runtime-hpu:latest"
-    VLLM_CUDA_IMAGE: "aibrix/vllm-openai:v0.7.3.self.post1"
-    VLLM_CPU_IMAGE: "budimages.azurecr.io/budecosystem/bud-runtime-cpu:0.09"
-    MODEL_REGISTRY_DIR: "/data/models-registry"
+    configMapName: "<YOUR_GLOBAL_CONFIGMAP_NAME>" # Name of the ConfigMap to create/use for global environment variables
+    data:
+        # Base config - review and adjust defaults as needed
+        PORT: "3000"
+        REDIS_CACHE_SERVICE_HOST: "<REDIS_CACHE_SERVICE_HOST>" # e.g., redis-cache-service or leave "" if not used
+        S3_BUCKET_NAME: "<YOUR_S3_BUCKET_NAME>"
+        JWT_SECRET: "<YOUR_JWT_SECRET>"
+        SENTRY_DSN: "" # Optional: Your Sentry DSN
+        REDIS_PASSWORD: "<YOUR_REDIS_PASSWORD>"
+        MONGO_MIN_POOL_SIZE: "100"
+        API_CONTEXT_PATH: ""
+        WEB_CONTEXT_PATH: ""
+        MONGO_MAX_POOL_SIZE: "200"
+        WIDGET_URL: "http://<WEB_SERVICE_NAME>.<NAMESPACE>:<WEB_SERVICE_PORT>" # e.g., http://web.dapr-system:4200
+        POSTGRES_PORT_BUDAPP: "5432"
+        S3_REGION: "<YOUR_S3_REGION>"
+        GLOBAL_CONTEXT_PATH: ""
+        AWS_ACCESS_KEY_ID: "<YOUR_AWS_ACCESS_KEY_ID>" # Or "" if using IAM roles
+        STORE_ENCRYPTION_KEY: "<YOUR_STORE_ENCRYPTION_KEY>"
+        AWS_SECRET_ACCESS_KEY: "<YOUR_AWS_SECRET_ACCESS_KEY>" # Or "" if using IAM roles
+        REDIS_HOST: "<REDIS_SERVICE_HOST>.<NAMESPACE>" # e.g., redis-service.dapr-system
+        REDIS_PORT: "6379"
+        WIDGET_EMBED_PATH: "http://<EMBED_SERVICE_HOST>:<EMBED_SERVICE_PORT>/embed.umd.min.js" # e.g., http://embed:4701/embed.umd.min.js
+        FRONT_BASE_URL: "http://<WEB_SERVICE_NAME>.<NAMESPACE>:<WEB_SERVICE_PORT>" # e.g., http://web.dapr-system:4200
+        REDIS_DB_INDEX: "2"
+        DOCKER_REDIS_SERVICE_PORT: "6379" # Likely relevant for local dev, review for K8s
+        NODE_ENV: "production" # or "development"
+        MONGO_URL: "mongodb://<MONGO_USER>:<MONGO_PASSWORD>@<MONGO_SERVICE_HOST>:<MONGO_SERVICE_PORT>/<MONGO_DB_NAME>?authSource=admin"
+        WS_CONTEXT_PATH: ""
+        IS_TOPIC_NOTIFICATION_ENABLED: "true"
+        DISABLE_USER_REGISTRATION: "false"
+        WS_PORT: "3000"
+        IS_MULTI_TENANCY_ENABLED: "true"
+        S3_LOCAL_STACK: "" # Your S3-compatible endpoint if not AWS S3, e.g., http://minio.minio-ns.svc.cluster.local:9000
+        API_ROOT_URL: "http://<API_SERVICE_NAME>.<NAMESPACE>:<API_SERVICE_PORT>" # e.g., http://api.dapr-system:3000
+        NEW_RELIC_LICENSE_KEY: "<YOUR_NEW_RELIC_LICENSE_KEY>"
+        HOST_NAME: "http://<WEB_SERVICE_NAME>.<NAMESPACE>:<WEB_SERVICE_PORT>" # External hostname for web
+        REDIS_CACHE_SERVICE_PORT: "6379"
+        REACT_APP_WS_URL: "http://<WS_SERVICE_NAME>.<NAMESPACE>:<WS_SERVICE_PORT>" # e.g., http://ws.dapr-system:3000
+        NODE_VERSION: "<YOUR_NODE_VERSION>" # e.g., "20.11.1"
+        YARN_VERSION: "<YOUR_YARN_VERSION>" # e.g., "1.22.19"
+        NX_DAEMON: "false"
+        CI: "true" # Or "false" depending on environment
+        NEW_RELIC_NO_CONFIG_FILE: "true"
+        NEW_RELIC_APP_NAME: "<YOUR_APP_NAME_FOR_NEW_RELIC>" # e.g., "notify-prod"
+        LITELLM_PROXY_MASTER_KEY: "<YOUR_LITELLM_PROXY_MASTER_KEY>"
+        OPENAI_API_KEY: "<YOUR_OPENAI_API_KEY>"
+        PERPLEXITY_API_KEY: "<YOUR_PERPLEXITY_API_KEY>" # Optional
+        BUD_LLM_BASE_URL: "<YOUR_BUD_LLM_BASE_URL>" # e.g., http://llm-service.namespace:8000/v1/
+        MINIO_ACCESS_KEY: "<YOUR_MINIO_ACCESS_KEY_ENV_VAR>" # Note: minio chart has its own creds
+        MINIO_SECRET_KEY: "<YOUR_MINIO_SECRET_KEY_ENV_VAR>" # Note: minio chart has its own creds
+        ADD_MODEL_DIR: "/app/models/additional" # Path inside container for additional models
+        APP_CONFIG: "{}" # Usually populated by Dapr config store
+        API_BASE_URL: "http://<API_SERVICE_NAME_DAPR_INVOKE>.<NAMESPACE>:<API_SERVICE_PORT>" # e.g., http://chart-bud-api.dapr-system:3000
+        CONFIGSTORE_NAME: "configstore"
+        SECRETSTORE_NAME: "secretstore"
+        SECRETSTORE_SECRET_NAME: "app-secrets" # K8s secret name for Dapr secret store items
+        LOG_LEVEL: "INFO" # "DEBUG", "INFO", "WARN", "ERROR"
+        NOTIFY_SERVICE_NAME: "notify" # Dapr app ID for notify service
+        NOTIFY_SERVICE_TOPIC: "notificationMessages"
+        NOVU_API_BASE_URL: "http://<API_SERVICE_NAME_DAPR_INVOKE>.<NAMESPACE>:<API_SERVICE_PORT>" # e.g., http://chart-bud-api.dapr-system:3000
+        PSQL_HOST: "<POSTGRES_SERVICE_HOST>.<NAMESPACE>" # e.g., postgresql-service.dapr-system
+        SECRETS_PSQL_USER: "<YOUR_POSTGRES_USER_SECRET_KEY_REF>" # Key in K8s secret for PSQL user
+        SECRETS_PSQL_PASSWORD: "<YOUR_POSTGRES_PASSWORD_SECRET_KEY_REF>" # Key in K8s secret for PSQL pass
+        PSQL_USER: "<YOUR_POSTGRES_USER>" # Direct value, or use above secrets mechanism
+        PSQL_PASSWORD: "<YOUR_POSTGRES_PASSWORD>" # Direct value, or use above secrets mechanism
+        PSQL_PORT: "5432"
+        PSQL_POOL_SIZE: "100"
 
-      
-    APP_NAME: 'budapp' # Merged
-    POSTGRES_HOST: "172.24.0.1"
-    SECRETS_PSQL_USER_BUDAPP: "buduser"
-    SECRETS_PSQL_PASSWORD_BUDAPP: "" # TODO: get from secret
-    POSTGRES_USER: "buduser"
-    POSTGRES_PASSWORD: "" # TODO: get from secret
-    SECRETS_POSTGRES_USER: "buduser"
-    SECRETS_POSTGRES_PASSWORD: "" # TODO: get from secret
-    POSTGRES_DB: "budserve_dev"
-    POSTGRES_PORT_BUDAPP: "5432"
-    POSTGRES_DB_NAME_BUDAPP: "budserve_dev"
-    PGADMIN_DEFAULT_EMAIL: "user@bud.studio"
-    PGADMIN_DEFAULT_PASSWORD: "" # TODO: get from secret
-    PGADMIN_PORT: "8888"
-    SUPER_USER_EMAIL: "admin@bud.studio"
-    SUPER_USER_PASSWORD: "admin@budserve"
-    PASSWORD_SALT: "" # TODO: get from secret
-    JWT_SECRET_KEY: "" # TODO: get from secret
-    CORS_ORIGINS: "https://localhost:3000"
-    APP_PORT_BUDAPP: 9082
-    DAPR_BASE_URL: "http://localhost:3500"
-    DAPR_HOST_IP: "127.0.0.1"
-    BUD_METRICS_APP_ID: "budmetrics"
-    BUD_NOTIFY_APP_ID: "notify"
-    MODEL_DOWNLOAD_DIR: "/data/models-registry"
-    REDIS_URI: "redis-service.dapr-system:6379"
-    REDIS_PASSWORD_BUDAPP: "" # TODO: get from secret
-    BUD_SIMULATOR_APP_ID: "budsim"
-    PROMETHEUS_URL: "" # TODO: get from secret
+        PSQL_DB_NAME_BUDSIM: "budsim_db"
+        POPULATION_SIZE: "50"
+        GENERATION_COUNT: "10"
+        VLLM_HPU_IMAGE: "<YOUR_REGISTRY>/<VLLM_HPU_IMAGE_NAME>:<TAG>"
+        VLLM_CUDA_IMAGE: "<YOUR_REGISTRY>/<VLLM_CUDA_IMAGE_NAME>:<TAG>"
+        VLLM_CPU_IMAGE: "<YOUR_REGISTRY>/<VLLM_CPU_IMAGE_NAME>:<TAG>"
+        MODEL_REGISTRY_DIR: "/app/models/registry" # Path inside container for model registry
 
-      
-    BUD_CLUSTER_APP_ID: "budcluster"
-    BUD_MODEL_APP_ID: "budmodel"
-    PSQL_DB_NAME_BUDCLUSTER: "budcluster"
-    VALIDATE_CERTS: "false"
-    NODE_INFO_COLLECTOR_IMAGE_CPU: "budimages.azurecr.io/budecosystem/node-info-collector-cpu:latest"
-    NODE_INFO_COLLECTOR_IMAGE_CUDA: "budimages.azurecr.io/budecosystem/node-info-collector-cuda:latest"
-    NODE_INFO_COLLECTOR_IMAGE_HPU: "budimages.azurecr.io/budecosystem/node-info-collector-hpu:latest"
-    NODE_INFO_LABELER_IMAGE: "budimages.azurecr.io/budecosystem/node-device-labeler:latest"
-    ENGINE_CONTAINER_PORT: "8000"
-    REGISTRY_SERVER: "" # TODO: get from secret
-    REGISTRY_USERNAME: "" # TODO: get from secret
-    REGISTRY_PASSWORD: "" # TODO: get from secret
-    LITELLM_PROXY_SERVER_IMAGE: "ghcr.io/berriai/litellm:main-latest"
-    BUD_SERVE_URL: "" # TODO: get from secret
-    RSA_KEY_NAME: "rsa-private-key.pem"
-    MINIO_BUCKET: "models-registry"
-    MINIO_ENDPOINT: "" # TODO: get from secret
-    MINIO_SECURE: "true"
+        BUD_CONNECT_URL: "https://connect.<YOUR_DOMAIN>"
 
-    
-    PSQL_DB_NAME_BUDMODEL: "budmodel"
+        APP_NAME: "budapp" # General app name, might be specific to context
+        # POSTGRES_HOST: "<POSTGRES_SERVICE_HOST>.<NAMESPACE>" # Duplicate of PSQL_HOST
+        SECRETS_PSQL_USER_BUDAPP: "<YOUR_BUDAPP_PSQL_USER_SECRET_KEY_REF>"
+        SECRETS_PSQL_PASSWORD_BUDAPP: "<YOUR_BUDAPP_PSQL_PASSWORD_SECRET_KEY_REF>"
+        # POSTGRES_USER: "<YOUR_POSTGRES_USER>" # Duplicate
+        # POSTGRES_PASSWORD: "<YOUR_POSTGRES_PASSWORD>" # Duplicate
+        # SECRETS_POSTGRES_USER: "<YOUR_POSTGRES_USER_SECRET_KEY_REF>" # Duplicate
+        # SECRETS_POSTGRES_PASSWORD: "<YOUR_POSTGRES_PASSWORD_SECRET_KEY_REF>" # Duplicate
+        POSTGRES_DB: "budapp_main_db" # DB name for budapp
+        # POSTGRES_PORT_BUDAPP: "5432" # Duplicate
+        POSTGRES_DB_NAME_BUDAPP: "budapp_main_db" # Duplicate
 
-    PSQL_PORT_BUDMETRICS: "5431"
-    PSQL_DB_NAME_BUDMETRICS: "budmetrics"
-      
-    LITELLM_LOG: "INFO"
-    LITELLM_SALT_KEY: "litellm_salt_key"
-    DATABASE_URL: "postgresql://myuser:mypassword@postgresql-service.dapr-system:5432/budproxy"
-    STORE_MODEL_IN_DB: "true"
-    BUDSERVE_APP_BASEURL: "http://localhost:3500/v1.0/invoke/budapp/method"
-    ENABLE_CACHE: "true"
-    ENABLE_CACHE_METRIC: "true"
-    CACHE_EVICTION_POLICY: "LRU"
-    CACHE_MAX_SIZE: "1000"
-    CACHE_TTL: "3600"
-    CACHE_SCORE_THRESHOLD: "0.8"
-    CACHE_EMBEDDING_MODEL: "sentence-transformers/all-MiniLM-L6-v2"
-    REDIS_USERNAME: ""
-    REDIS_DB: "0"
-    NAMESPACE: "DEVELOPMENT"
-    APP_PORT_BUDPROXY: "4000"
-    SECRETS_REDIS_URI: "redis-service.dapr-system:6379"
-    CACHE_REDIS_HOST: "bud-litellm-redis-stack.dapr-system"
-    CACHE_REDIS_PORT: "6379"
-    CACHE_REDIS_PASSWORD: "" # TODO: get from secret
-    SECRETS_CACHE_REDIS_PASSWORD: "" # TODO: get from secret
+        PGADMIN_DEFAULT_EMAIL: "admin@example.com"
+        PGADMIN_DEFAULT_PASSWORD: "<YOUR_PGADMIN_DEFAULT_PASSWORD>"
+        PGADMIN_PORT: "8888"
+        SUPER_USER_EMAIL: "superadmin@example.com"
+        SUPER_USER_PASSWORD: "<YOUR_SUPER_USER_PASSWORD>"
+        PASSWORD_SALT: "<YOUR_PASSWORD_SALT>"
+        JWT_SECRET_KEY: "<YOUR_JWT_SECRET_KEY>" # Different from JWT_SECRET? Consolidate if possible.
+        CORS_ORIGINS: "http://localhost:3001,https://app.<YOUR_DOMAIN>,http://localhost:5858" # Comma-separated list
+        APP_PORT_BUDAPP: "9082"
+        DAPR_BASE_URL: "http://localhost:3500" # Dapr sidecar URL, usually fixed
+        DAPR_HOST_IP: "127.0.0.1" # Dapr sidecar IP, usually fixed
+        BUD_METRICS_APP_ID: "budmetrics" # Dapr app ID for budmetrics
+        BUD_NOTIFY_APP_ID: "notify" # Dapr app ID for notify (duplicate of NOTIFY_SERVICE_NAME?)
+        MODEL_DOWNLOAD_DIR: "/app/models/downloads" # Path inside container
+        REDIS_URI: "<REDIS_SERVICE_HOST>.<NAMESPACE>:<REDIS_PORT>" # e.g., redis-service.dapr-system:6379
+        REDIS_PASSWORD_BUDAPP: "<YOUR_BUDAPP_SPECIFIC_REDIS_PASSWORD>" # If different from global
+        BUD_SIMULATOR_APP_ID: "budsim" # Dapr app ID for budsim
+        PROMETHEUS_URL: "https://prometheus.<YOUR_DOMAIN>"
+
+        BUD_CLUSTER_APP_ID: "budcluster" # Dapr app ID for budcluster
+        BUD_MODEL_APP_ID: "budmodel"   # Dapr app ID for budmodel
+        PSQL_DB_NAME_BUDCLUSTER: "budcluster_db"
+        VALIDATE_CERTS: "false" # Or "true" in production with valid certs
+        NODE_INFO_COLLECTOR_IMAGE_CPU: "<YOUR_REGISTRY>/<NODE_INFO_COLLECTOR_CPU_IMAGE>:<TAG>"
+        NODE_INFO_COLLECTOR_IMAGE_CUDA: "<YOUR_REGISTRY>/<NODE_INFO_COLLECTOR_CUDA_IMAGE>:<TAG>"
+        NODE_INFO_COLLECTOR_IMAGE_HPU: "<YOUR_REGISTRY>/<NODE_INFO_COLLECTOR_HPU_IMAGE>:<TAG>"
+        NODE_INFO_LABELER_IMAGE: "<YOUR_REGISTRY>/<NODE_INFO_LABELER_IMAGE>:<TAG>"
+        ENGINE_CONTAINER_PORT: "8000"
+        REGISTRY_SERVER: "<YOUR_CONTAINER_REGISTRY_SERVER_URL>" # e.g., docker.io or private registry
+        REGISTRY_USERNAME: "<YOUR_REGISTRY_USERNAME>"
+        REGISTRY_PASSWORD: "<YOUR_REGISTRY_PASSWORD>"
+        LITELLM_PROXY_SERVER_IMAGE: "<YOUR_REGISTRY>/<LITELLM_PROXY_IMAGE>:<TAG>" # e.g., ghcr.io/berriai/litellm:main-latest
+        BUD_SERVE_URL: "https://api-app.<YOUR_DOMAIN>" # External URL for bud-serve
+        RSA_KEY_NAME: "rsa-private-key.pem" # Filename for RSA key if used/mounted
+        MINIO_BUCKET: "models-registry-bucket" # Minio bucket name (ensure matches minio chart config)
+        MINIO_ENDPOINT: "minio.<MINIO_NAMESPACE>.svc.cluster.local:9000" # Internal Minio endpoint
+        MINIO_SECURE: "false" # Or "true" if Minio internal traffic is over HTTPS
+
+        PSQL_DB_NAME_BUDMODEL: "budmodel_db"
+
+        PSQL_PORT_BUDMETRICS: "5431" # If metrics DB runs on a different port
+        PSQL_DB_NAME_BUDMETRICS: "budmetrics_db"
+
+        LITELLM_LOG: "INFO"
+        LITELLM_SALT_KEY: "<YOUR_LITELLM_SALT_KEY>"
+        DATABASE_URL: "postgresql://<DB_USER>:<DB_PASSWORD>@<DB_HOST>:<DB_PORT>/<DB_NAME_BUDPROXY>" # For budproxy
+        STORE_MODEL_IN_DB: "true"
+        BUDSERVE_APP_BASEURL: "http://localhost:3500/v1.0/invoke/<BUDAPP_DAPR_ID>/method" # Dapr invoke URL
+        ENABLE_CACHE: "true"
+        ENABLE_CACHE_METRIC: "true"
+        CACHE_EVICTION_POLICY: "LRU"
+        CACHE_MAX_SIZE: "1000"
+        CACHE_TTL: "3600"
+        CACHE_SCORE_THRESHOLD: "0.8"
+        CACHE_EMBEDDING_MODEL: "sentence-transformers/all-MiniLM-L6-v2" # Or your preferred model
+        REDIS_USERNAME: "" # If Redis requires a username
+        REDIS_DB: "0" # Default Redis DB
+        NAMESPACE: "<YOUR_KUBERNETES_NAMESPACE>" # e.g., "development", "production"
+        APP_PORT_BUDPROXY: "4000"
+        SECRETS_REDIS_URI: "<REDIS_SERVICE_HOST>.<NAMESPACE>:<REDIS_PORT>" # For Dapr secret store if Redis backend
+        CACHE_REDIS_HOST: "<CACHE_REDIS_HOST>.<NAMESPACE>" # Specific Redis for LiteLLM cache
+        CACHE_REDIS_PORT: "6379"
+        CACHE_REDIS_PASSWORD: "<YOUR_LITELLM_CACHE_REDIS_PASSWORD>"
+        SECRETS_CACHE_REDIS_PASSWORD: "<YOUR_LITELLM_CACHE_REDIS_PASSWORD_SECRET_KEY_REF>"
 
 minio:
-  replicas: 3
-  rootUser: "" # TODO: get from secret
-  rootPassword: "" # TODO: get from secret
-  buckets:
-    - name: budstore
-      policy: none
-      purge: false
-      versioning: false
-      objectlocking: false
-  persistence:
-    size: 20Gi
+    enabled: true # Set to false if using external Minio/S3
+    replicas: 1 # For HA, consider 3 or more with distributed mode
+    rootUser: "<YOUR_MINIO_ROOT_USER>" # Choose a strong user
+    rootPassword: "<YOUR_MINIO_ROOT_PASSWORD>" # Choose a strong password
+    buckets:
+        - name: "default-bucket" # Example bucket
+          policy: none
+          purge: false
+          versioning: false
+          objectlocking: false
+    persistence:
+        size: 20Gi
+        storageClassName: "" # Optional: your preferred storage class, e.g., "standard", "gp2"
 
-Image:
-  repository: "ghcr.io/novuhq/novu"
-  tag: "0.24.0"
-  
+Image: # Default image for Novu components if not overridden per app
+    repository: "ghcr.io/novuhq/novu"
+    tag: "<DEFAULT_NOVU_IMAGE_TAG>" # e.g., "0.24.0"
+
 mongodb:
-  initdbRootUsername: "" # TODO: get from secret
-  initdbRootPassword: "" # TODO: get from secret
-  storage:
-    size: 5Gi
-    storageClassName: local-path
-    hostPath: "/datadisk/pvc/mongodb-data"
+    enabled: true # Set to false if using external MongoDB
+    initdbRootUsername: "<YOUR_MONGO_ROOT_USER>"
+    initdbRootPassword: "<YOUR_MONGO_ROOT_PASSWORD>"
+    storage:
+        size: 5Gi
+        storageClassName: "" # Optional: your preferred storage class
+        # hostPath: "" # Avoid hostPath for production, use storageClassName
+
+tls:
+  enabled: false # Enable if you want the chart to manage basic TLS for ingresses (requires cert-manager usually)
+  customCertificate:
+    enabled: false # true if you want to use your own TLS secret for ingresses
+    secretName: "<YOUR_CUSTOM_TLS_SECRET_NAME>" # K8s secret containing your TLS cert
 
 dapr:
-  logLevel: DEBUG
-  configStoreName: configstore
-  secretStoreName: secretstore
-  secretName: app-secrets
-  apiToken: "" # TODO: get from secret
-  novuApiBaseUrl: "http://chart-bud-api.dapr-system:3000"
+    enabled: true # Assumes Dapr is installed in the cluster
+    logLevel: "info" # "debug", "info", "warn", "error"
+    configStoreName: "configstore" # Name of Dapr config store component
+    secretStoreName: "secretstore" # Name of Dapr secret store component
+    secretName: "app-secrets" # Default K8s secret name for Dapr app secrets
+    apiToken: "<YOUR_DAPR_API_TOKEN>" # If Dapr API authentication is enabled
+    novuApiBaseUrl: "http://<API_SERVICE_NAME>.<NAMESPACE>:<API_SERVICE_PORT>" # Internal URL to Novu API
 
 apps:
-  - name: "notify"
-    namespace: "dapr-system"
-    image: "docker.io/budecosystem/budnotify:latest"
-    containerPort: 3000
-    daprAppId: "notify"
-    pvcName: "bud-notify-1"
-    pvcPath: "/datadisk/pvc/bud-notify-pv"
-    appTopic: "notificationMessages"
-    appTopicRoute: "/notifications"
-    envFrom: bud-global-config
-    resources:
-      limits:
-        memory: "512Mi"
-        cpu: "500m"
-      requests:
-        memory: "256Mi"
-        cpu: "250m"
-    command: "uvicorn notify.main:app --host 0.0.0.0 --port"
-  - name: "budsim"
-    namespace: "dapr-system"
-    image: "docker.io/budecosystem/budsim:latest"
-    containerPort: 3002
-    daprAppId: "budsim"
-    pvcName: "bud-budsim-1"
-    pvcPath: "/datadisk/pvc/bud-budsim-pv"
-    appTopic: "budSimMessages"
-    appTopicRoute: "/notifications"
-    env:
-    - name: LOG_LEVEL
-      value: "INFO" #overriding the global one
-    - name: PSQL_DB_NAME
-      value: "budsim" #overriding the global one
-    - name: DAPR_HOST_IP
-      value: "127.0.0.1"
-    envFrom: bud-global-config
-    resources:
-      limits:
-        memory: "32768Mi"
-        cpu: "2"
-      requests:
-        memory: "256Mi"
-        cpu: "250m"
-    command: "apt update -y && apt install socat -y && (socat TCP-LISTEN:3600,fork TCP:127.0.0.1:50001 &) && alembic upgrade head && uvicorn budsim.main:app --host 0.0.0.0 --port"
-    volumes:
-      - name: models-registry
-        mountPath: "/data/models-registry"
-  - name: "budapp"
-    namespace: "dapr-system"
-    image: "docker.io/budecosystem/budapp:latest"
-    containerPort: 9082
-    daprAppId: "budapp"
-    pvcName: "bud-budserve-app-1"
-    pvcPath: "/datadisk/pvc/bud-budserve-app-pv"
-    appTopic: "budAppMessages"
-    appTopicRoute: "/notifications"
-    envFrom: bud-global-config
-    env:
-    - name: APP_CONFIG
-      value: "{}"  # Dapr will inject the configuration values
-    - name: PSQL_HOST
-      value: "172.24.0.1"
-    - name: SECRETS_PSQL_USER
-      value: "buduser"
-    - name: SECRETS_PSQL_PASSWORD
-      value: "" # TODO: get from secret
-    - name: PSQL_USER
-      value: "buduser"
-    - name: PSQL_PASSWORD
-      value: "" # TODO: get from secret
-    - name: SECRETS_POSTGRES_USER
-      value: "buduser"
-    - name: SECRETS_POSTGRES_PASSWORD
-      value: "" # TODO: get from secret
-    - name: POSTGRES_USER
-      value: "buduser"
-    - name: POSTGRES_PASSWORD
-      value: "" # TODO: get from secret
-    - name: PSQL_PORT
-      value: "5432"
-    - name: PSQL_DB_NAME
-      value: "budserve_dev"
-    - name: HF_TOKEN
-      value: "" # TODO: get from secret
-    - name: SECRETS_HF_TOKEN
-      value: "" # TODO: get from secret
-    - name: AES_KEY_HEX
-      value: "" # TODO: get from secret
-    - name: PRIVATE_KEY_PASSWORD
-      value: "" # TODO: get from secret
-    - name: STATIC_DIR
-      value: "/data/static-dir"
-    resources:
-      limits:
-        memory: "32768Mi"
-        cpu: "2"
-      requests:
-        memory: "256Mi"
-        cpu: "250m"
-    command: "uvicorn budapp.main:app --host 0.0.0.0 --port"
-    volumes:
-      - name: add-dir-budmo
-        mountPath: "/datadisk/add_model_dir"
-      - name: static-dir
-        mountPath: "/data/static-dir"
-  - name: "budcluster"
-    namespace: "dapr-system"
-    image: "docker.io/budecosystem/budcluster:latest"
-    containerPort: 3003
-    daprAppId: "budcluster"
-    pvcName: "budcluster-1"
-    pvcPath: "/datadisk/pvc/budcluster-pv"
-    appTopic: "budClusterMessages"
-    appTopicRoute: "/notifications"
-    enableCrypto: true
-    envFrom: bud-global-config
-    resources:
-      limits:
-        memory: "32768Mi"
-        cpu: "1"
-      requests:
-        memory: "256Mi"
-        cpu: "250m"
-    command: "alembic -c ./budcluster/alembic.ini upgrade head && uvicorn budcluster.main:app --host 0.0.0.0 --port"
-    volumes:
-      - name: crypto-keys
-        mountPath: "/root/.cache/budserve/keys"
-      - name: models-registry
-        mountPath: "/data/models-registry"
-    env:
-    - name: APP_CONFIG
-      value: "{}"  # Dapr will inject the configuration values
-    - name: NOTIFY_SERVICE_NAME
-      value: "notify"
-    - name: NOTIFY_SERVICE_TOPIC
-      value: "notificationMessages"
-    - name: CONFIGSTORE_NAME
-      value: "configstore"
-    - name: SECRETSTORE_SECRET_NAME
-      value: "app-secrets"
-    - name: LOG_LEVEL
-      value: "DEBUG"
-    - name: PSQL_HOST
-      value: "postgresql-service.dapr-system"
-    - name: SECRETS_PSQL_USER
-      value: "myuser"
-    - name: SECRETS_PSQL_PASSWORD
-      value: "" # TODO: get from secret
-    - name: PSQL_USER
-      value: "myuser"
-    - name: PSQL_PASSWORD
-      value: "" # TODO: get from secret
-    - name: PSQL_PORT
-      value: "5432"
-    - name: PSQL_DB_NAME
-      value: "budcluster"
-    - name: VALIDATE_CERTS
-      value: "false"
-    - name: NODE_INFO_COLLECTOR_IMAGE_CPU
-      value: "budimages.azurecr.io/budecosystem/node-info-collector-cpu:latest"
-    - name: NODE_INFO_COLLECTOR_IMAGE_CUDA
-      value: "budimages.azurecr.io/budecosystem/node-info-collector-cuda:latest"
-    - name: NODE_INFO_COLLECTOR_IMAGE_HPU
-      value: "budimages.azurecr.io/budecosystem/node-info-collector-hpu:latest"
-    - name: NODE_INFO_LABELER_IMAGE
-      value: "budimages.azurecr.io/budecosystem/node-device-labeler:latest"
-    - name: ENGINE_CONTAINER_PORT
-      value: "8000"
-    - name: REGISTRY_SERVER
-      value: "" # TODO: get from secret
-    - name: REGISTRY_USERNAME
-      value: "" # TODO: get from secret
-    - name: REGISTRY_PASSWORD
-      value: "" # TODO: get from secret
-    - name: LITELLM_PROXY_SERVER_IMAGE
-      value: "ghcr.io/berriai/litellm:main-latest"
-    # - name: SECRETS_LITELLM_MASTER_KEY
-    #   value: "sk-BudLiteLLMMasterKey_123"
-    - name: BUD_SERVE_URL
-      value: "" # TODO: get from secret
-    - name: RSA_KEY_NAME
-      value: "rsa-private-key.pem"
-    - name: MINIO_BUCKET
-      value: "models-registry"
-    - name: MINIO_ENDPOINT
-      value: "" # TODO: get from secret
-    - name: MINIO_SECURE
-      value: "true"
-    - name: PROMETHEUS_URL
-      value: "" # TODO: get from secret
-    - name: VOLUME_TYPE
-      value: "nfs"
-    - name: QUANTIZATION_JOB_IMAGE
-      value: "budimages.azurecr.io/budecosystem/bud-quantization-cpu:0.02"
+    - name: "notify"
+      # namespace: "{{ .Values.namespace }}" # Use global namespace
+      image: "<YOUR_REGISTRY>/<NOTIFY_IMAGE_NAME>:<TAG>"
+      containerPort: 3000
+      daprAppId: "notify"
+      # pvcName: "bud-notify-pvc" # Optional: if PVC is needed
+      # pvcPath: "/app/data" # Mount path for PVC
+      appTopic: "notificationMessages"
+      appTopicRoute: "/notifications"
+      envFrom: "{{ .Values.globalEnv.configMapName }}" # Reference the global configmap
+      resources:
+          limits:
+              memory: "512Mi"
+              cpu: "500m"
+          requests:
+              memory: "256Mi"
+              cpu: "250m"
+      command: ["uvicorn", "notify.main:app", "--host", "0.0.0.0", "--port", "3000"] # Example command
 
-  - name: "budmodel"
-    namespace: "dapr-system"
-    image: "docker.io/budecosystem/budmodel:latest"
-    containerPort: 3004
-    daprAppId: "budmodel"
-    pvcName: "budmodel-1"
-    pvcPath: "/datadisk/pvc/budmodel-pv"
-    appTopic: "budModelMessages"
-    appTopicRoute: "/notifications"
-    envFrom: bud-global-config
-    env:
-    - name: PSQL_HOST
-      value: "postgresql-service.dapr-system"
-    - name: PSQL_USER
-      value: "myuser"
-    - name: PSQL_PASSWORD
-      value: "" # TODO: get from secret
-    - name: PSQL_PORT
-      value: "5432"
-    - name: PSQL_DB_NAME
-      value: "budmodel"
-    - name: LOG_LEVEL
-      value: "DEBUG"
-    resources:
-      limits:
-        memory: "32768Mi"
-        cpu: "1"
-      requests:
-        memory: "256Mi"
-        cpu: "250m"
-    command: "apt install clamav clamav-daemon -y && freshclam && sed -i 's|^LocalSocket .*|LocalSocket /tmp/clamd.ctl|' /etc/clamav/clamd.conf && nohup clamd -c /etc/clamav/clamd.conf && nohup aria2c --enable-rpc --rpc-listen-all --rpc-listen-port 6800 --dir /data/models-registry --max-concurrent-downloads 5 > aria2.log 2>&1 & sleep 2 && alembic -c ./alembic.ini upgrade head && uvicorn budmodel.main:app --host 0.0.0.0 --port"
-    volumes:
-      - name: models-registry
-        mountPath: "/data/models-registry"
-      - name: add-dir-budmo
-        mountPath: "/datadisk/add_model_dir"
+    - name: "budsim"
+      image: "<YOUR_REGISTRY>/<BUDSIM_IMAGE_NAME>:<TAG>"
+      containerPort: 3002
+      daprAppId: "budsim"
+      # pvcName: "bud-budsim-pvc"
+      # pvcPath: "/app/data"
+      appTopic: "budSimMessages"
+      appTopicRoute: "/notifications"
+      env: # App-specific environment variables (can override global)
+          - name: LOG_LEVEL
+            value: "INFO"
+          - name: PSQL_DB_NAME # This will override global PSQL_DB_NAME for this app if it were global
+            value: "{{ .Values.globalEnv.data.PSQL_DB_NAME_BUDSIM }}" # Or a specific value like "budsim_db_override"
+          - name: DAPR_HOST_IP
+            value: "127.0.0.1"
+      envFrom: "{{ .Values.globalEnv.configMapName }}"
+      resources:
+          limits:
+              memory: "32Gi" # Example, adjust based on needs
+              cpu: "2"
+          requests:
+              memory: "256Mi"
+              cpu: "250m"
+      # command: ["sh", "-c", "apt update -y && apt install -y socat && (socat TCP-LISTEN:3600,fork TCP:127.0.0.1:50001 &) && alembic upgrade head && uvicorn budsim.main:app --host 0.0.0.0 --port 3002"] # Review command for generalization
+      volumes: # Example volume mount, ensure volume definition exists
+          - name: "models-registry-pv" # This should match a volume name in .Values.volumes
+            mountPath: "{{ .Values.globalEnv.data.MODEL_REGISTRY_DIR }}"
 
-  - name: "budhardware"
-    namespace: "dapr-system"
-    image: "docker.io/budecosystem/hardware_usecase_sim:latest"
-    containerPort: 8000
-    envFrom: bud-global-config
-    daprAppId: "budhardware"
-    appTopic: "budhardware"
-    DisableShell: True
-    appTopicRoute: "/notifications" 
-    resources:
-      limits:
-        memory: "512Mi"
-        cpu: "1"
-      requests:
-        memory: "256Mi"
-        cpu: "250m"
-    command: '"uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"'
-  - name: "budmetrics"
-    namespace: "dapr-system"
-    image: "docker.io/budecosystem/budmetrics:latest"
-    containerPort: 3005
-    daprAppId: "budmetrics"
-    pvcName: "bud-budmetrics-1"
-    pvcPath: "/datadisk/pvc/bud-budmetrics-pv"
-    appTopic: "budMetricsMessages"
-    appTopicRoute: "/notifications"
-    envFrom: bud-global-config
-    env:
-    - name: PSQL_PORT
-      value: 5431 #overriding the global one
-    - name: PSQL_DB_NAME
-      value: budmetrics #overriding the global one
-    - name: PSQL_HOST
-      value: postgresql-metrics-service.dapr-system #overriding the global one
-    resources:
-      limits:
-        memory: "32768Mi"
-        cpu: "2"
-      requests:
-        memory: "256Mi"
-        cpu: "250m"
-    command: "alembic -c ./alembic.ini upgrade head && uvicorn budmetrics.main:app --host 0.0.0.0 --port"
-  - name: "budproxy"
-    namespace: "dapr-system"
-    image: "docker.io/budecosystem/budlitellm:development"
-    containerPort: 4000
-    daprAppId: "budproxy"
-    pvcName: "bud-proxy"
-    pvcPath: "/datadisk/pvc/bud-budproxy-pv"
-    appTopic: "budProxyMessages"
-    appTopicRoute: "/notifications"
-    envFrom: bud-global-config
-    env:
-      - name: PSQL_HOST
-        value: "postgresql-service.dapr-system"
-      - name: PSQL_PORT
-        value: "5432"
-      - name: PSQL_DB_NAME
-        value: "template0"
-      - name: LITELLM_LOG
-        value: "INFO"
-      - name: LOG_LEVEL
-        value: "INFO"
-    resources:
-      limits:
-        memory: "20480Mi"
-        cpu: "2"
-      requests:
-        memory: "1024Mi"
-        cpu: "2"
-    command: "cd litellm/proxy && litellm --config /app/litellm_config.yaml --port"
-ingresses:
-  - name: dapr-ingress
-    host: "" # TODO: get from secret
-    serviceName: dapr-dashboard
-    servicePort: 8080
-  - name: novu-ingress
-    host: "" # TODO: get from secret
-    serviceName: chart-bud-web
-    servicePort: 4200
-  - name: novu-api-ingress
-    host: "" # TODO: get from secret
-    serviceName: chart-bud-api
-    servicePort: 3000
-  - name: novu-ws-ingress
-    host: "" # TODO: get from secret
-    serviceName: chart-bud-ws
-    servicePort: 3000
-  - name: bud-notify-ingress
-    host: "" # TODO: get from secret
-    serviceName: notify-service
-    servicePort: 3000
-  - name: bud-app-ingress
-    host: "" # TODO: get from secret
-    serviceName: budapp-service
-    servicePort: 9082
-  - name: bud-sim-ingress
-    host: "" # TODO: get from secret
-    serviceName: bud-dapr-sim-service
-    servicePort: 9082
-  - name: bud-proxy-ingress
-    host: "" # TODO: get from secret
-    serviceName: budproxy-service
-    servicePort: 4000
-  - name: store-ingress
-    host: "" # TODO: get from secret
-    serviceName: chart-bud-minio
-    servicePort: 9000
-  - name: budhardware-ingress
-    host: "" # TODO: get from secret
-    serviceName: budhardware-service
-    servicePort: 8000
-  - name: keycloak-ingress
-    host: "" # TODO: get from secret
-    serviceName: keycloak
-    servicePort: 80
+    - name: "budapp"
+      image: "<YOUR_REGISTRY>/<BUDAPP_IMAGE_NAME>:<TAG>"
+      containerPort: "{{ .Values.globalEnv.data.APP_PORT_BUDAPP }}"
+      daprAppId: "budapp"
+      # pvcName: "bud-budserve-app-pvc"
+      # pvcPath: "/app/data"
+      appTopic: "budAppMessages"
+      appTopicRoute: "/notifications"
+      envFrom: "{{ .Values.globalEnv.configMapName }}"
+      env:
+          # APP_CONFIG is already in globalEnv, Dapr usually injects this from config store
+          - name: PSQL_HOST
+            value: "{{ .Values.globalEnv.data.PSQL_HOST }}"
+          - name: PSQL_USER # Example of direct value, or use secret refs from globalEnv
+            value: "<YOUR_BUDAPP_PSQL_USER>"
+          - name: PSQL_PASSWORD
+            value: "<YOUR_BUDAPP_PSQL_PASSWORD>"
+          - name: PSQL_PORT
+            value: "{{ .Values.globalEnv.data.PSQL_PORT }}"
+          - name: PSQL_DB_NAME
+            value: "{{ .Values.globalEnv.data.POSTGRES_DB_NAME_BUDAPP }}"
+          - name: HF_TOKEN
+            value: "<YOUR_HUGGINGFACE_TOKEN>"
+          - name: SECRETS_HF_TOKEN # If token is in a K8s secret
+            valueFrom:
+              secretKeyRef:
+                name: "<YOUR_APP_SECRETS_K8S_NAME>"
+                key: "hf-token"
+          - name: AES_KEY_HEX
+            value: "<YOUR_AES_ENCRYPTION_KEY_HEX>"
+          - name: PRIVATE_KEY_PASSWORD # Password for an encrypted private key
+            value: "<YOUR_PRIVATE_KEY_PASSWORD>"
+          - name: STATIC_DIR
+            value: "/app/static" # Path inside container for static files
+          # Grafana related envs - ensure Grafana is accessible
+          - name: GRAFANA_SCHEME
+            value: "https"
+          - name: GRAFANA_URL
+            value: "grafana.<YOUR_DOMAIN>"
+          - name: GRAFANA_USERNAME
+            value: "admin" # Default Grafana admin or a specific user
+          - name: GRAFANA_PASSWORD
+            value: "<YOUR_GRAFANA_PASSWORD_FOR_BUDAPP>"
+          # Keycloak related envs
+          - name: KEYCLOAK_SERVER_URL
+            value: "https://keycloak.<YOUR_DOMAIN>/"
+          - name: KEYCLOAK_REALM_NAME
+            value: "master" # Or your specific realm
+          - name: KEYCLOAK_ADMIN_USERNAME
+            value: "<YOUR_KEYCLOAK_ADMIN_USER>"
+          - name: KEYCLOAK_ADMIN_PASSWORD
+            value: "<YOUR_KEYCLOAK_ADMIN_PASSWORD_FOR_BUDAPP>"
+          - name: KEYCLOAK_VERIFY_SSL
+            value: "false" # Set to true in production if KC has valid SSL
+          - name: DEFAULT_REALM_NAME
+            value: "<YOUR_DEFAULT_KEYCLOAK_REALM_FOR_BUDAPP>"
+      resources:
+          limits:
+              memory: "32Gi"
+              cpu: "2"
+          requests:
+              memory: "256Mi"
+              cpu: "250m"
+      # command: ["uvicorn", "budapp.main:app", "--host", "0.0.0.0", "--port", "{{ .Values.globalEnv.data.APP_PORT_BUDAPP }}"]
+      volumes:
+          - name: "add-model-dir-pv" # This should match a volume name in .Values.volumes
+            mountPath: "{{ .Values.globalEnv.data.ADD_MODEL_DIR }}"
+          - name: "static-dir-pv"
+            mountPath: "/app/static" # Matches STATIC_DIR env
 
-services:
-  database:
-    enabled: true
-    postgres:
-      host: "postgresql-service.dapr-system"
-      user: "myuser"
-      password: "" # TODO: get from secret
-      db: "mydatabase"
-      additionalDbs:
-        - "budcluster"
-        - "budsim"
-        - "budproxy"
-    storage:
+    - name: "budcluster"
+      image: "<YOUR_REGISTRY>/<BUDCLUSTER_IMAGE_NAME>:<TAG>"
+      containerPort: 3003
+      daprAppId: "budcluster"
+      # pvcName: "budcluster-pvc"
+      # pvcPath: "/app/data"
+      appTopic: "budClusterMessages"
+      appTopicRoute: "/notifications"
+      enableCrypto: true # App-specific flag
+      envFrom: "{{ .Values.globalEnv.configMapName }}"
+      env:
+          # Many envs here are already in globalEnv, list only overrides or critical ones for clarity
+          - name: PSQL_DB_NAME
+            value: "{{ .Values.globalEnv.data.PSQL_DB_NAME_BUDCLUSTER }}"
+          - name: QUANTIZATION_JOB_IMAGE
+            value: "<YOUR_REGISTRY>/<QUANTIZATION_IMAGE_NAME>:<TAG>"
+          - name: VOLUME_TYPE # Example app-specific config
+            value: "pvc" # or "nfs", "hostpath" (not recommended for hostpath)
+      resources:
+          limits:
+              memory: "32Gi"
+              cpu: "1"
+          requests:
+              memory: "256Mi"
+              cpu: "250m"
+      # command: ["sh", "-c", "alembic -c ./budcluster/alembic.ini upgrade head && uvicorn budcluster.main:app --host 0.0.0.0 --port 3003"]
+      volumes:
+          - name: "crypto-keys-pv" # This should match a volume name in .Values.volumes
+            mountPath: "/root/.cache/budserve/keys" # Path for crypto keys
+          - name: "models-registry-pv"
+            mountPath: "{{ .Values.globalEnv.data.MODEL_REGISTRY_DIR }}"
+
+    - name: "budmodel"
+      image: "<YOUR_REGISTRY>/<BUDMODEL_IMAGE_NAME>:<TAG>"
+      containerPort: 3004
+      daprAppId: "budmodel"
+      # pvcName: "budmodel-pvc"
+      # pvcPath: "/app/data"
+      appTopic: "budModelMessages"
+      appTopicRoute: "/notifications"
+      envFrom: "{{ .Values.globalEnv.configMapName }}"
+      env:
+          - name: PSQL_DB_NAME
+            value: "{{ .Values.globalEnv.data.PSQL_DB_NAME_BUDMODEL }}"
+          - name: LOG_LEVEL
+            value: "DEBUG" # Example override
+      resources:
+          limits:
+              memory: "32Gi"
+              cpu: "1"
+          requests:
+              memory: "256Mi"
+              cpu: "250m"
+      # command: ["sh", "-c", "apt install -y clamav clamav-daemon && freshclam && sed -i 's|^LocalSocket .*|LocalSocket /tmp/clamd.ctl|' /etc/clamav/clamd.conf && nohup clamd -c /etc/clamav/clamd.conf & nohup aria2c --enable-rpc --rpc-listen-all --rpc-listen-port 6800 --dir {{ .Values.globalEnv.data.MODEL_DOWNLOAD_DIR }} --max-concurrent-downloads 5 > aria2.log 2>&1 & sleep 2 && alembic -c ./alembic.ini upgrade head && uvicorn budmodel.main:app --host 0.0.0.0 --port 3004"]
+      volumes:
+          - name: "models-registry-pv"
+            mountPath: "{{ .Values.globalEnv.data.MODEL_REGISTRY_DIR }}"
+          - name: "add-model-dir-pv"
+            mountPath: "{{ .Values.globalEnv.data.ADD_MODEL_DIR }}"
+
+    - name: "budui" # Second instance of budui from original, assuming this is the primary one
+      image: "<YOUR_REGISTRY>/<BUDUI_IMAGE_NAME>:<TAG>"
+      containerPort: 3000
+      daprAppId: "budui"
+      DisableShell: "True" # App-specific flag
+      appTopic: "notificationMessages" # Or a specific topic for UI
+      appTopicRoute: "/notifications"
+      envFrom: "{{ .Values.globalEnv.configMapName }}"
+      env:
+          # Frontend env
+          - name: BASE_URL
+            value: "https://app.<YOUR_DOMAIN>/"
+          - name: NEXT_PUBLIC_BASE_URL
+            value: "https://app.<YOUR_DOMAIN>/"
+          - name: NEXT_PUBLIC_VERCEL_ENV
+            value: "preview" # Or "production", "development"
+          - name: NEXT_PUBLIC_PASSWORD
+            value: "<YOUR_NEXT_PUBLIC_PASSWORD_FOR_FRONTEND>" # If frontend has a static password
+          - name: NEXT_PUBLIC_PRIVATE_KEY
+            value: "<YOUR_NEXT_PUBLIC_ENCRYPTED_PRIVATE_KEY_FOR_FRONTEND>" # Keep as one line or use K8s secret
+          - name: NEXT_PUBLIC_NOVU_SOCKET_URL
+            value: "https://ws-novu.<YOUR_DOMAIN>"
+          - name: NEXT_PUBLIC_NOVU_BASE_URL
+            value: "https://api-novu.<YOUR_DOMAIN>"
+          - name: NEXT_PUBLIC_NOVU_APP_ID
+            value: "<YOUR_NOVU_FRONTEND_APP_ID>"
+          - name: NEXT_PUBLIC_TEMP_API_BASE_URL
+            value: "https://app.<YOUR_DOMAIN>" # Or specific temp API URL
+          - name: NEXT_PUBLIC_COPY_CODE_API_BASE_URL
+            value: "https://proxy.<YOUR_DOMAIN>/" # URL for copy code feature
+          - name: NEXT_PUBLIC_PLAYGROUND_URL
+            value: "https://playground.<YOUR_DOMAIN>"
+          - name: NEXT_PUBLIC_ASK_BUD_URL # URL for "Ask Bud" feature
+            value: "http://askbud.<YOUR_DOMAIN>/v1" # e.g., LLM service
+          - name: NEXT_PUBLIC_ASK_BUD_MODEL # Default model for "Ask Bud"
+            value: "<DEFAULT_ASK_BUD_MODEL_NAME>" # e.g., "gpt-3.5-turbo"
+      resources:
+          limits:
+              memory: "512Mi"
+              cpu: "1"
+          requests:
+              memory: "256Mi"
+              cpu: "250m"
+      livenessProbe: # Example probe, adjust paths and timings
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+      readinessProbe: # Example probe
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 50
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+    
+    - name: "askbud"
+      image: "<YOUR_REGISTRY>/<ASKBUD_IMAGE_NAME>:<TAG>"
+      containerPort: 3000
+      daprAppId: "askbud"
+      appTopic: "askbud"
+      appTopicRoute: "/notifications"
+      envFrom: "{{ .Values.globalEnv.configMapName }}"
+      enableCrypto: true # App-specific flag
+      env:
+        - name: INFERENCE_MODEL
+          value: "Qwen/Qwen3-32B"
+      resources:
+          limits:
+              memory: "512Mi"
+              cpu: "1"
+          requests:
+              memory: "256Mi"
+              cpu: "250m"
+      livenessProbe: # Example probe, adjust paths and timings
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+      readinessProbe: # Example probe
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+      command: "uvicorn askbud.main:app --host 0.0.0.0 --port 3000"
+      volumes:
+          - name: crypto-keys
+            mountPath: "/root/.cache/budserve/keys"
+
+    - name: "budhardware"
+      image: "<YOUR_REGISTRY>/<BUDHARDWARE_SIM_IMAGE_NAME>:<TAG>"
+      containerPort: 8472
+      envFrom: "{{ .Values.globalEnv.configMapName }}"
+      daprAppId: "budhardware"
+      appTopic: "budhardware"
+      DisableShell: "True"
+      appTopicRoute: "/notifications"
+      resources:
+          limits:
+              memory: "512Mi"
+              cpu: "1"
+          requests:
+              memory: "256Mi"
+              cpu: "250m"
+      # command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8472"]
+
+    - name: "budmetrics"
+      image: "<YOUR_REGISTRY>/<BUDMETRICS_IMAGE_NAME>:<TAG>"
+      containerPort: 3005
+      daprAppId: "budmetrics"
+      # pvcName: "bud-budmetrics-pvc"
+      # pvcPath: "/app/data"
+      appTopic: "budMetricsMessages"
+      appTopicRoute: "/notifications"
+      envFrom: "{{ .Values.globalEnv.configMapName }}"
+      env:
+          - name: PSQL_PORT
+            value: "{{ .Values.globalEnv.data.PSQL_PORT_BUDMETRICS }}" # Override global
+          - name: PSQL_DB_NAME
+            value: "{{ .Values.globalEnv.data.PSQL_DB_NAME_BUDMETRICS }}" # Override global
+          - name: PSQL_HOST # Override global
+            value: "<METRICS_POSTGRES_SERVICE_HOST>.<NAMESPACE>" # e.g., postgresql-metrics.dapr-system
+          - name: INFERENCE_URL
+            value: "http://<INFERENCE_SERVICE_HOST>:<PORT>/classify"
+      resources:
+          limits:
+              memory: "32Gi"
+              cpu: "2"
+          requests:
+              memory: "256Mi"
+              cpu: "250m"
+      # command: ["sh", "-c", "alembic -c ./alembic.ini upgrade head && uvicorn budmetrics.main:app --host 0.0.0.0 --port 3005"]
+
+    - name: "budproxy"
+      image: "<YOUR_REGISTRY>/<BUDLITELLM_IMAGE_NAME>:<TAG>" # e.g., :development or a version
+      containerPort: "{{ .Values.globalEnv.data.APP_PORT_BUDPROXY }}"
+      daprAppId: "budproxy"
+      # pvcName: "bud-proxy-pvc"
+      # pvcPath: "/app/data"
+      appTopic: "budProxyMessages"
+      appTopicRoute: "/notifications"
+      envFrom: "{{ .Values.globalEnv.configMapName }}"
+      env:
+          - name: PSQL_HOST
+            value: "{{ .Values.globalEnv.data.PSQL_HOST }}"
+          - name: PSQL_PORT
+            value: "{{ .Values.globalEnv.data.PSQL_PORT }}"
+          - name: PSQL_DB_NAME # DB for LiteLLM proxy, often 'template0' or a specific one
+            value: "budproxy_db" # Or "{{ .Values.globalEnv.data.DATABASE_URL }}" parts
+          - name: LITELLM_LOG
+            value: "INFO"
+          - name: LOG_LEVEL # App specific log level
+            value: "INFO"
+          # Ensure litellm_config.yaml is available, e.g. via ConfigMap and volumeMount
+      resources:
+          limits:
+              memory: "20Gi"
+              cpu: "2"
+          requests:
+              memory: "1Gi"
+              cpu: "2" # High CPU request, review
+      # command: ["sh", "-c", "cd litellm/proxy && litellm --config /app/config/litellm_config.yaml --port {{ .Values.globalEnv.data.APP_PORT_BUDPROXY }}"] # Config path example
+
+ingresses: # Define ingress resources for external access
+    - name: "dapr-dashboard-ingress"
+      enabled: true
+      host: "dapr.<YOUR_DOMAIN>"
+      serviceName: "dapr-dashboard" # Assumes Dapr dashboard service exists
+      servicePort: 8080
+      # annotations:
+      #   kubernetes.io/ingress.class: "nginx"
+      #   cert-manager.io/cluster-issuer: "letsencrypt-prod" # If using cert-manager
+
+    - name: "novu-web-ingress"
+      enabled: true
+      host: "novu.<YOUR_DOMAIN>"
+      serviceName: "chart-bud-web" # Placeholder, update with actual Novu web service name
+      servicePort: 4200
+
+    - name: "novu-api-ingress"
+      enabled: true
+      host: "api-novu.<YOUR_DOMAIN>"
+      serviceName: "chart-bud-api" # Placeholder, update with actual Novu API service name
+      servicePort: 3000
+
+    - name: "novu-ws-ingress"
+      enabled: true
+      host: "ws-novu.<YOUR_DOMAIN>"
+      serviceName: "chart-bud-ws" # Placeholder, update with actual Novu WS service name
+      servicePort: 3000
+      # annotations: # For WebSocket support with Nginx ingress
+      #   nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+      #   nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+
+    - name: "bud-notify-ingress"
+      enabled: true
+      host: "notify.<YOUR_DOMAIN>"
+      serviceName: "notify-service" # Assumes 'notify' app creates 'notify-service'
+      servicePort: 3000
+
+    - name: "bud-app-ingress"
+      enabled: true
+      host: "app.<YOUR_DOMAIN>" # Main application ingress
+      serviceName: "budapp-service" # Assumes 'budapp' app creates 'budapp-service'
+      servicePort: "{{ .Values.globalEnv.data.APP_PORT_BUDAPP }}"
+
+    # - name: "bud-sim-ingress" # Example if bud-sim needs external access
+    #   enabled: false
+    #   host: "sim.<YOUR_DOMAIN>"
+    #   serviceName: "budsim-service"
+    #   servicePort: 3002
+
+    - name: "bud-proxy-ingress"
+      enabled: true
+      host: "proxy.<YOUR_DOMAIN>" # For LiteLLM proxy
+      serviceName: "budproxy-service" # Assumes 'budproxy' app creates 'budproxy-service'
+      servicePort: "{{ .Values.globalEnv.data.APP_PORT_BUDPROXY }}"
+
+    - name: "minio-ingress" # If Minio is deployed by this chart
+      enabled: "{{ .Values.minio.enabled }}"
+      host: "minio.<YOUR_DOMAIN>"
+      serviceName: "{{ .Release.Name }}-minio" # Default Minio service name pattern
+      servicePort: 9000 # Minio API port
+      # servicePortGui: 9001 # Minio Console/UI port, if different service or port exposed by Minio chart
+
+    - name: "budhardware-ingress"
+      enabled: true
+      host: "hardware.<YOUR_DOMAIN>"
+      serviceName: "budhardware-service"
+      servicePort: 8472
+
+    - name: "keycloak-ingress" # If Keycloak is deployed by this chart
+      enabled: "{{ .Values.keycloak.enabled }}"
+      host: "{{ .Values.keycloak.hostname }}" # Uses keycloak.hostname
+      serviceName: "{{ .Values.keycloak.fullnameOverride }}-http" # Default Keycloak service name pattern
+      servicePort: 80 # Or 8080 depending on Keycloak chart
+
+    - name: "budui-ingress"
+      enabled: true
+      host: "admin.<YOUR_DOMAIN>" # Admin UI
+      serviceName: "budui-service" # Assumes 'budui' app creates 'budui-service'
+      servicePort: 3000
+
+services: # Configurations for dependent services (Postgres, Redis)
+    database: # Main PostgreSQL instance
+        enabled: true # Deploy a PostgreSQL instance as part of this chart
+        # External DB example:
+        # external:
+        #   host: "<YOUR_EXTERNAL_POSTGRES_HOST>"
+        #   port: 5432
+        #   user: "<YOUR_EXTERNAL_POSTGRES_USER>"
+        #   password: "<YOUR_EXTERNAL_POSTGRES_PASSWORD>"
+        #   db: "<YOUR_EXTERNAL_POSTGRES_DEFAULT_DB>"
+        #   sslmode: "require"
+        postgres: # Settings for the embedded PostgreSQL chart (if enabled)
+            # host: # Auto-generated if deployed by this chart
+            user: "<YOUR_CHART_POSTGRES_USER>"
+            password: "<YOUR_CHART_POSTGRES_PASSWORD>"
+            db: "default_app_db"
+            additionalDbs: # List of DBs to create
+                - "{{ .Values.globalEnv.data.PSQL_DB_NAME_BUDCLUSTER }}"
+                - "{{ .Values.globalEnv.data.PSQL_DB_NAME_BUDSIM }}"
+                - "budproxy_db" # From DATABASE_URL or define in globalEnv
+                - "{{ .Values.globalEnv.data.POSTGRES_DB_NAME_BUDAPP }}"
+                - "{{ .Values.globalEnv.data.PSQL_DB_NAME_BUDMODEL }}"
+        storage:
+            size: 10Gi
+            storageClassName: "" # Optional
+            # hostPath: "" # Avoid
+
+    metrics_database: # Separate PostgreSQL for metrics
+        enabled: true
+        postgres:
+            # host:
+            user: "<YOUR_METRICS_POSTGRES_USER>"
+            password: "<YOUR_METRICS_POSTGRES_PASSWORD>"
+            db: "{{ .Values.globalEnv.data.PSQL_DB_NAME_BUDMETRICS }}"
+        storage:
+            size: 10Gi
+            storageClassName: "" # Optional
+            # hostPath: "" # Avoid
+
+    cache: # Main Redis instance
+        enabled: true # Deploy a Redis instance as part of this chart
+        # External Redis example:
+        # external:
+        #   host: "<YOUR_EXTERNAL_REDIS_HOST>"
+        #   port: 6379
+        #   password: "<YOUR_EXTERNAL_REDIS_PASSWORD>"
+        redis: # Settings for the embedded Redis chart (if enabled)
+            # host: # Auto-generated
+            password: "{{ .Values.globalEnv.data.REDIS_PASSWORD }}"
+        storage:
+            size: 5Gi
+            storageClassName: "" # Optional
+            # hostPath: "" # Avoid
+
+novu: # Novu specific configurations (if deploying Novu components directly)
+    enabled: false # Set to true if this chart deploys Novu core services
+    credentials:
+        email: "admin@example.com"
+        password: "<YOUR_NOVU_SETUP_ADMIN_PASSWORD>"
+
+volumes: # Define PVCs to be created and used by apps
+    - name: "crypto-keys-pv"
+      size: 1Gi
+      storageClassName: "" # Optional
+      # hostPath: "" # Avoid
+      accessMode: ReadWriteOnce
+    - name: "models-registry-pv"
+      size: 50Gi # Large for models
+      storageClassName: "" # Optional
+      accessMode: ReadWriteOnce # Or ReadWriteMany if supported and needed
+    - name: "add-model-dir-pv"
+      size: 20Gi
+      storageClassName: "" # Optional
+      accessMode: ReadWriteOnce
+    - name: "static-dir-pv"
       size: 5Gi
-      storageClassName: local-path
-      hostPath: "/datadisk/pvc/postgresql-data"
-  metrics:
-    enabled: true
-    postgres:
-      host: "postgresql-metrics-service.dapr-system"
-      user: "myuser"
-      password: "" # TODO: get from secret
-      db: "budmetrics"
-    storage:
-      size: 5Gi
-      storageClassName: local-path
-      hostPath: "/datadisk/pvc/postgresql-metrics-data"
-  cache:
-    enabled: true
-    redis:
-      host: "redis-service.dapr-system:6379"
-      password: "" # TODO: get from secret
-      storage:
-        size: 5Gi
-        storageClassName: local-path
-        hostPath: "/datadisk/pvc/redis-data"
+      storageClassName: "" # Optional
+      accessMode: ReadWriteOnce
+    # Define other PVCs needed by apps if not covered by service persistence
 
-novu:
-  credentials:
-    email: "" # TODO: get from secret
-    password: "" # TODO: get from secret
-
-volumes:
-  - name: crypto-keys
-    size: 1Gi
-    storageClassName: local-path
-    hostPath: "/datadisk/pvc/crypto-keys"
-  - name: models-registry
-    size: 20Gi
-    storageClassName: local-path
-    hostPath: "/datadisk/pvc/models-registry"
-  - name: add-dir-budmo
-    size: 20Gi
-    storageClassName: local-path
-    hostPath: "/datadisk/add_model_dir"
-  - name: static-dir
-    size: 20Gi
-    storageClassName: local-path
-    hostPath: "/datadisk/pvc/static-dir"
-
+# Monitoring stack (Prometheus, Grafana, etc.) - often deployed as a separate chart
 prometheus-node-exporter:
-  service:
-    type: ClusterIP
-    port: 9231
-    targetPort: 9100
+    enabled: false # Usually part of a dedicated monitoring stack deployment
+    # service:
+    #     type: ClusterIP
+    #     port: 9231
+    #     targetPort: 9100
 
-traefik:
-  additionalMiddleware:
-    prometheus-basic-auth:
-      basicAuth:
-        secret: prometheus-basic-auth
-        headerField: "X-Auth"
+traefik: # Assuming Traefik is the ingress controller
+    enabled: false # If Traefik is managed outside this chart
+    # additionalMiddleware:
+    #     prometheus-basic-auth: # Example basic auth middleware for Prometheus
+    #         basicAuth:
+    #             secret: "prometheus-basic-auth-secret" # K8s secret containing user:pass hash
+    #             headerField: "X-Auth"
 
 prometheus:
-  enabled: true
-  service:
-    type: NodePort
-    nodePort: 30090
-  ingress:
-    enabled: true
-    hosts:
-     - "" # TODO: get from secret
-    annotations:
-     traefik.ingress.kubernetes.io/router.middlewares: monitoring-prometheus-basic-auth@kubernetescrd
-  extraSecret:
-    name: prometheus-basic-auth
-    data:
-     auth: |
-       admin:$apr1$fbU3o12u$WgueOb4gP/Dfld7IOk7Sa1
-  prometheusSpec:
-    retention: 7d
-    enableRemoteWriteReceiver: true
-    externalLabels:
-      cluster: "main-cluster"
-    thanosService:
-      enabled: true
-    thanosSidecarSpec:
-      image: quay.io/thanos/thanos:v0.31.0
-      objectStorageConfig:
-        key: thanos.yaml
-        name: thanos-objstore-config
-    resources:
-      requests:
-        memory: "2Gi"
-        cpu: "500m"
-      limits:
-        memory: "4Gi"
-        cpu: "1000m"
-    storageSpec:
-      volumeClaimTemplate:
-        spec:
-          accessModes: ["ReadWriteOnce"]
-          resources:
-            requests:
-              storage: 50Gi
-    # serviceMonitorSelector: {}
-    # remoteWriteAuthenticationSecret:
-    #   name: remote-write-auth
+    enabled: false # Deploy Prometheus as part of this chart
+    # service:
+    #     type: NodePort
+    #     nodePort: 30090
+    # ingress:
+    #     enabled: true
+    #     hosts:
+    #         - "prometheus.<YOUR_DOMAIN>"
+    #     annotations:
+    #         traefik.ingress.kubernetes.io/router.middlewares: "monitoring-prometheus-basic-auth@kubernetescrd" # Example Traefik middleware
+    # extraSecret: # For basic auth credentials
+    #     name: "prometheus-basic-auth-secret"
+    #     data:
+    #         auth: | # htpasswd generated string: admin:<PASSWORD_HASH>
+    #             "<YOUR_PROMETHEUS_AUTH_STRING>"
+    # prometheusSpec:
+    #     retention: "7d"
+    #     enableRemoteWriteReceiver: true # If using Thanos or other remote write
+    #     externalLabels:
+    #         cluster: "<YOUR_CLUSTER_NAME>"
+    #     thanosService: # Thanos sidecar config
+    #         enabled: false # Enable if using Thanos
+    #     thanosSidecarSpec:
+    #         image: "quay.io/thanos/thanos:<THANOS_VERSION>" # e.g., v0.31.0
+    #         objectStorageConfig: # Secret containing Thanos S3 config
+    #             key: "thanos.yaml"
+    #             name: "thanos-objstore-config-secret"
+    #     resources:
+    #         requests:
+    #             memory: "2Gi"
+    #             cpu: "500m"
+    #         limits:
+    #             memory: "4Gi"
+    #             cpu: "1"
+    #     storageSpec:
+    #         volumeClaimTemplate:
+    #             spec:
+    #                 accessModes: ["ReadWriteOnce"]
+    #                 resources:
+    #                     requests:
+    #                         storage: 50Gi
+    #                 storageClassName: "" # Optional
 
 alertmanager:
-  enabled: true
-  alertmanagerSpec:
-    resources:
-      requests:
-        memory: "64Mi"
-        cpu: "100m"
-      limits:
-        memory: "128Mi"
-        cpu: "200m"
+    enabled: false # Deploy Alertmanager
+    # alertmanagerSpec:
+    #     resources: # ...
 
 grafana:
-  enabled: true
-  adminPassword: "" # TODO: get from secret
-  ingress:
-    enabled: true
-    hosts:
-     - "" # TODO: get from secret
-  service:
-    type: NodePort
-    nodePort: 30080
-  resources:
-    requests:
-      memory: "128Mi"
-      cpu: "100m"
-    limits:
-      memory: "256Mi"
-      cpu: "200m"
-  persistence:
-    enabled: true
-    size: 5Gi
+    enabled: false # Deploy Grafana
+    # grafana.ini:
+    #     auth.anonymous:
+    #         enabled: true
+    #         org_role: Viewer
+    #     security:
+    #         allow_embedding: true
+    #     server:
+    #         serve_from_sub_path: true # If Grafana is served under a subpath
+    # adminPassword: "<YOUR_GRAFANA_ADMIN_PASSWORD>"
+    # ingress:
+    #     enabled: true
+    #     hosts:
+    #         - "grafana.<YOUR_DOMAIN>"
+    # service:
+    #     type: NodePort
+    #     nodePort: 30080
+    # resources: # ...
+    # persistence:
+    #     enabled: true
+    #     size: 5Gi
+    #     storageClassName: "" # Optional
 
+# Thanos components (if used for long-term Prometheus storage)
 thanosRuler:
-  enabled: true
-  service:
-    type: NodePort
-    nodePort: 30903
-  resources:
-    requests:
-      memory: "128Mi"
-      cpu: "100m"
-    limits:
-      memory: "256Mi"
-      cpu: "200m"
-
+    enabled: false
 thanosQueryFrontend:
-  enabled: true
-  service:
-    type: NodePort
-    nodePort: 30902
-  resources:
-    requests:
-      memory: "128Mi"
-      cpu: "100m"
-    limits:
-      memory: "256Mi"
-      cpu: "200m"
-
+    enabled: false
 thanosStore:
-  enabled: true
-  resources:
-    requests:
-      memory: "256Mi"
-      cpu: "100m"
-    limits:
-      memory: "512Mi"
-      cpu: "200m"
-
+    enabled: false
 thanosCompactor:
-  enabled: true
-  resources:
-    requests:
-      memory: "256Mi"
-      cpu: "100m"
-    limits:
-      memory: "512Mi"
-      cpu: "200m"
-  retentionResolution5m: 30d
+    enabled: false
 
 networkPolicy:
-  enabled: true
+    enabled: false # Enable to create default NetworkPolicies (deny-all, allow Dapr, etc.)
 
-
-redisStack:
-  enabled: true
-  replicaCount: 1
-
-  image:
-    repository: redis/redis-stack
-    tag: latest
-    pullPolicy: IfNotPresent
-
-  auth:
-    password: "" # TODO: get from secret
-
-  persistence:
-    enabled: true
-    storageClass: "standard"
-    accessMode: ReadWriteOnce
-    size: 1Gi
-  
-  service:
-    type: ClusterIP
-    port: 6379
-
-  resources:
-    requests:
-      memory: "256Mi"
-      cpu: "250m"
-    limits:
-      memory: "512Mi"
-      cpu: "500m"
-
-  command:
-    - /bin/sh
-    - -c
-    - redis-server --requirepass "${REDIS_PASSWORD}" --port 6379 --loadmodule /opt/redis-stack/lib/redisearch.so --loadmodule /opt/redis-stack/lib/rejson.so
-
-  sysctls:
-    net.core.somaxconn: 1024
-
-  healthcheck:
-    test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
+redisStack: # For LiteLLM cache or other uses needing Redis Stack features
+    enabled: true # Deploy Redis Stack
+    replicaCount: 1
+    image:
+        repository: "redis/redis-stack"
+        tag: "latest" # Or a specific version
+        pullPolicy: IfNotPresent
+    auth:
+        password: "{{ .Values.globalEnv.data.CACHE_REDIS_PASSWORD }}" # Or a dedicated password
+    persistence:
+        enabled: true
+        storageClass: "" # Optional
+        accessMode: ReadWriteOnce
+        size: 1Gi
+    service:
+        type: ClusterIP
+        port: 6379
+    resources:
+        requests:
+            memory: "256Mi"
+            cpu: "250m"
+        limits:
+            memory: "512Mi"
+            cpu: "500m"
+    # command: # Default command should be fine, override if needed
+    # sysctls:
+    #     net.core.somaxconn: 1024
+    # healthcheck:
+    #     test: ["CMD", "redis-cli", "-a", "{{ .Values.redisStack.auth.password }}", "--raw", "incr", "ping"]
 
 keycloak:
-  image: quay.io/keycloak/keycloak:24.0.1
-  replicas: 1
-  adminUser: admin
-  adminPassword: "" # TODO: get from secret
-  realm: |
-    {
-      "realm": "myrealm",
-      "enabled": true,
-      "id": "myrealm",
-      "users": [],
-      "clients": []
-    }
-  proxy: edge
-  hostname: "" # TODO: get from secret
-  extraEnvVars:
-    - name: KC_HOSTNAME_STRICT_HTTPS
-      value: "true"
-    - name: KC_HTTP_ENABLED
-      value: "true"
-  database:
-    url: jdbc:postgresql://postgres:5432/keycloak
-    username: keycloak
-    password: "" # TODO: get from secret
-  postgres:
-    enabled: true
-    image: postgres:15
-    username: keycloak
-    password: "" # TODO: get from secret
-    db: keycloak
+    enabled: false # Deploy Keycloak
+    fullnameOverride: "keycloak" # Helm release name for Keycloak
+    # replicas: 1
+    hostname: "keycloak.<YOUR_DOMAIN>"
+    adminUser: "<YOUR_KEYCLOAK_ADMIN_USER>"
+    adminPassword: "<YOUR_KEYCLOAK_ADMIN_PASSWORD>"
+    image: "quay.io/keycloak/keycloak:<KEYCLOAK_VERSION>" # e.g., 26.1.4
+    # realm: | # Example realm import, or manage via UI/API
+    #     {
+    #       "realm": "{{ .Values.globalEnv.data.DEFAULT_REALM_NAME }}",
+    #       "enabled": true
+    #     }
+    # persistence:
+    #     size: 1Gi
+    #     storageClassName: "" # Optional
+    # database: # Configure Keycloak to use its own bundled Postgres or an external one
+    #     vendor: postgres
+    #     url: "jdbc:postgresql://{{ .Release.Name }}-keycloak-postgresql:5432/keycloak" # If using bundled postgres
+    #     username: "<YOUR_KEYCLOAK_DB_USER>"
+    #     password: "<YOUR_KEYCLOAK_DB_PASSWORD>"
+    # postgres: # If deploying Postgres for Keycloak with its chart
+    #     enabled: true
+    #     image: "postgres:<POSTGRES_VERSION_FOR_KEYCLOAK>" # e.g., 15
+    #     db: "keycloak_db"
+    #     username: "<YOUR_KEYCLOAK_DB_USER>"
+    #     password: "<YOUR_KEYCLOAK_DB_PASSWORD>"
+    #     persistence:
+    #         size: 1Gi
+    #         storageClassName: "" # Optional
+
+certManager: # Settings for cert-manager itself (installation)
+  enabled: false # True if this chart should install cert-manager CRDs and components
+  # installCRDs: true # Usually true if certManager.enabled is true
+
+# Note: The original file had 'cert-manager' as a separate key from 'certManager'.
+# Assuming 'certManager' is the primary key for controlling its installation.
+# If 'cert-manager' (with hyphen) is for a sub-chart, its structure would be different.
