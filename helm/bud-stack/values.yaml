@@ -2,6 +2,12 @@
 namespace: "dapr-system" # Consider making this configurable: {{ .Release.Namespace }}
 replicaCount: 1
 
+imagePullSecret:
+    name: 
+    dockerConfigJson: 
+
+imagePullPolicy: IfNotPresent
+
 globalEnv:
     configMapName: "<YOUR_GLOBAL_CONFIGMAP_NAME>" # Name of the ConfigMap to create/use for global environment variables
     data:
@@ -559,6 +565,7 @@ ingresses: # Define ingress resources for external access
       host: "dapr.<YOUR_DOMAIN>"
       serviceName: "dapr-dashboard" # Assumes Dapr dashboard service exists
       servicePort: 8080
+      protocol: web # Use web or websecure
       # annotations:
       #   kubernetes.io/ingress.class: "nginx"
       #   cert-manager.io/cluster-issuer: "letsencrypt-prod" # If using cert-manager
@@ -568,18 +575,21 @@ ingresses: # Define ingress resources for external access
       host: "novu.<YOUR_DOMAIN>"
       serviceName: "chart-bud-web" # Placeholder, update with actual Novu web service name
       servicePort: 4200
+      protocol: web # Use web or websecure
 
     - name: "novu-api-ingress"
       enabled: true
       host: "api-novu.<YOUR_DOMAIN>"
       serviceName: "chart-bud-api" # Placeholder, update with actual Novu API service name
       servicePort: 3000
+      protocol: web # Use web or websecure
 
     - name: "novu-ws-ingress"
       enabled: true
       host: "ws-novu.<YOUR_DOMAIN>"
       serviceName: "chart-bud-ws" # Placeholder, update with actual Novu WS service name
       servicePort: 3000
+      protocol: web # Use web or websecure
       # annotations: # For WebSocket support with Nginx ingress
       #   nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
       #   nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
@@ -589,12 +599,14 @@ ingresses: # Define ingress resources for external access
       host: "notify.<YOUR_DOMAIN>"
       serviceName: "notify-service" # Assumes 'notify' app creates 'notify-service'
       servicePort: 3000
+      protocol: web # Use web or websecure
 
     - name: "bud-app-ingress"
       enabled: true
       host: "app.<YOUR_DOMAIN>" # Main application ingress
       serviceName: "budapp-service" # Assumes 'budapp' app creates 'budapp-service'
       servicePort: "{{ .Values.globalEnv.data.APP_PORT_BUDAPP }}"
+      protocol: web # Use web or websecure
 
     # - name: "bud-sim-ingress" # Example if bud-sim needs external access
     #   enabled: false
@@ -607,12 +619,14 @@ ingresses: # Define ingress resources for external access
       host: "proxy.<YOUR_DOMAIN>" # For LiteLLM proxy
       serviceName: "budproxy-service" # Assumes 'budproxy' app creates 'budproxy-service'
       servicePort: "{{ .Values.globalEnv.data.APP_PORT_BUDPROXY }}"
+      protocol: web # Use web or websecure
 
     - name: "minio-ingress" # If Minio is deployed by this chart
       enabled: "{{ .Values.minio.enabled }}"
       host: "minio.<YOUR_DOMAIN>"
       serviceName: "{{ .Release.Name }}-minio" # Default Minio service name pattern
       servicePort: 9000 # Minio API port
+      protocol: web # Use web or websecure
       # servicePortGui: 9001 # Minio Console/UI port, if different service or port exposed by Minio chart
 
     - name: "budhardware-ingress"
@@ -620,18 +634,21 @@ ingresses: # Define ingress resources for external access
       host: "hardware.<YOUR_DOMAIN>"
       serviceName: "budhardware-service"
       servicePort: 8472
+      protocol: web # Use web or websecure
 
     - name: "keycloak-ingress" # If Keycloak is deployed by this chart
       enabled: "{{ .Values.keycloak.enabled }}"
       host: "{{ .Values.keycloak.hostname }}" # Uses keycloak.hostname
       serviceName: "{{ .Values.keycloak.fullnameOverride }}-http" # Default Keycloak service name pattern
       servicePort: 80 # Or 8080 depending on Keycloak chart
+      protocol: web # Use web or websecure
 
     - name: "budui-ingress"
       enabled: true
       host: "admin.<YOUR_DOMAIN>" # Admin UI
       serviceName: "budui-service" # Assumes 'budui' app creates 'budui-service'
       servicePort: 3000
+      protocol: web # Use web or websecure
 
 services: # Configurations for dependent services (Postgres, Redis)
     database: # Main PostgreSQL instance
