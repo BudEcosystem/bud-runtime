@@ -35,7 +35,7 @@ metadata:
   name: {{ .name | quote }}
   namespace: {{ $namespace }}
   annotations:
-    traefik.ingress.kubernetes.io/router.entrypoints: "websecure"
+    traefik.ingress.kubernetes.io/router.entrypoints: "web"
     cert-manager.io/issuer: "letsencrypt-issuer"
 spec:
   {{- if $.Values.tls.enabled }}
