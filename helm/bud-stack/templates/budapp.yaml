@@ -30,7 +30,7 @@ spec:
       containers:
       - name: {{ .name }}
         image: {{ .image }}
-        imagePullPolicy: Always
+        imagePullPolicy: {{ $.Values.imagePullPolicy }}
         {{- if .DisableShell }}
         {{- else }}
         command: ["sh", "-c", "{{ .command }} {{ .containerPort }}"]
