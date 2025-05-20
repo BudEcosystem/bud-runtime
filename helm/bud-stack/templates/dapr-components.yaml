@@ -151,18 +151,18 @@ scopes:
 
 {{end}}
 
----
-apiVersion: dapr.io/v1alpha1
-kind: Component
-metadata:
-  name: actorbackend
-  namespace: {{ .Values.namespace }}
-spec:
-  type: workflowbackend.actor
-  version: v1
-  metadata:
-    - name: actorbackend
-      value: "true"
+# ---
+# apiVersion: dapr.io/v1alpha1
+# kind: Component
+# metadata:
+#   name: actorbackend
+#   namespace: {{ .Values.namespace }}
+# spec:
+#   type: workflowbackend.actor
+#   version: v1
+#   metadata:
+#     - name: actorbackend
+#       value: "true"
 ---
 {{- if .Values.services.cache.enabled }}
 apiVersion: dapr.io/v1alpha1
