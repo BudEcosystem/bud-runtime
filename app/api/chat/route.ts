@@ -5,7 +5,7 @@ import { copyCodeApiBaseUrl, tempApiBaseUrl } from '@/app/lib/environment';
 import { Settings } from '@/app/types/chat';
 
 // Allow streaming responses up to 30 seconds
-export const maxDuration = 30;
+export const maxDuration = 300;
 
 export async function POST(req: Request) {
   // Extract the `messages` from the body of the request
