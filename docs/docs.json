@@ -1,29 +1,97 @@
 {
+    "$schema": "https://mintlify.com/docs.json",
+    "theme": "maple",
     "name": "Bud Runtime Docs",
-    "logo": "/logo.png",
-    "links": {
-      "GitHub": "https://github.com/BudEcosystem/bud-runtime"
-    },
-    "theme": "mint",
     "colors": {
-      "primary": "#ff0000"
+      "primary": "#965CDE",
+      "light": "#965CDE",
+      "dark": "#965CDE"
     },
+    "favicon": "/images/favicon.ico",
     "navigation": {
       "tabs": [
-        {
-          "tab": "Overview",
-          "pages": ["introduction"]
-        },
         {
           "tab": "Guides",
           "groups": [
             {
-              "group": "Getting Started",
-              "pages": ["installation", "quickstart"]
+              "group": "Get Started",
+              "pages": [
+                "getstarted/quickstart"
+              ]
+            },
+            {
+              "group": "Essentials",
+              "pages": [
+                "essentials/markdown",
+                "essentials/code",
+                "essentials/images",
+                "essentials/settings",
+                "essentials/navigation",
+                "essentials/reusable-snippets"
+              ]
+            }
+          ]
+        },
+        {
+          "tab": "API Reference",
+          "groups": [
+            {
+              "group": "API Documentation",
+              "pages": [
+                "api-reference/introduction"
+              ]
+            },
+            {
+              "group": "Endpoint Examples",
+              "pages": [
+                "api-reference/endpoint/get",
+                "api-reference/endpoint/create",
+                "api-reference/endpoint/delete",
+                "api-reference/endpoint/webhook"
+              ]
             }
           ]
         }
-      ]
+      ],
+      "global": {
+        "anchors": [
+          {
+            "anchor": "Documentation",
+            "href": "https://mintlify.com/docs",
+            "icon": "book-open-cover"
+          },
+          {
+            "anchor": "Community",
+            "href": "https://mintlify.com/community",
+            "icon": "slack"
+          },
+          {
+            "anchor": "Blog",
+            "href": "https://mintlify.com/blog",
+            "icon": "newspaper"
+          }
+        ]
+      }
+    },
+    "logo": "/images/bud-icon.png",
+    "navbar": {
+      "links": [
+        {
+          "label": "Support",
+          "href": "mailto:contact@bud.studio"
+        }
+      ],
+      "primary": {
+        "type": "button",
+        "label": "Dashboard",
+        "href": "https://dashboard.mintlify.com"
+      }
+    },
+    "footer": {
+      "socials": {
+        "x": "https://x.com/BudEcosystem",
+        "github": "https://github.com/BudEcosystem/bud-runtime",
+        "linkedin": "https://www.linkedin.com/company/bud-ecosystem"
+      }
     }
   }
-  
