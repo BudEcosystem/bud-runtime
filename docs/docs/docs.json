@@ -1,10 +1,9 @@
 {
-    // Site-level metadata
+
     "name": "Bud Runtime Docs",
     "logo": "/logo.png",
     "links": { "GitHub": "https://github.com/BudEcosystem/bud-runtime" },
   
-    // Navigation – tabs → (optional) groups → pages
     "tabs": [
       {
         "name": "Overview",
@@ -20,11 +19,5 @@
         ]
       }
     ]
-  
-    /* Optional extras:
-       "openapi": "openapi.yaml",
-       "theme": "light",
-       "favicon": "/favicon.ico"
-    */
   }
   
