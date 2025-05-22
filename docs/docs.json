@@ -1,0 +1,29 @@
+{
+    "name": "Bud Runtime Docs",
+    "logo": "/logo.png",
+    "links": {
+      "GitHub": "https://github.com/BudEcosystem/bud-runtime"
+    },
+    "theme": "mint",
+    "colors": {
+      "primary": "#ff0000"
+    },
+    "navigation": {
+      "tabs": [
+        {
+          "tab": "Overview",
+          "pages": ["introduction"]
+        },
+        {
+          "tab": "Guides",
+          "groups": [
+            {
+              "group": "Getting Started",
+              "pages": ["installation", "quickstart"]
+            }
+          ]
+        }
+      ]
+    }
+  }
+  
