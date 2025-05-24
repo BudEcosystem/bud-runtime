@@ -15,25 +15,35 @@
           "groups": [
             {
               "group": "Get Started",
+              "icon": "book-open",
               "pages": [
-                "getstarted/quickstart"
+                "getstarted/quickstart",
+                "getstarted/installation"
               ]
             },
             {
-              "group": "Essentials",
+              "group": "Features",
               "pages": [
-                "essentials/markdown",
-                "essentials/code",
-                "essentials/images",
-                "essentials/settings",
-                "essentials/navigation",
-                "essentials/reusable-snippets"
+                "features/multi-lora-support",
+                "features/code",
+                "features/images",
+                "features/settings",
+                "features/navigation",
+                "features/reusable-snippets"
+              ]
+            },
+            {
+              "group": "Development",
+              "icon": "code",
+              "pages": [
+                "development/guidelines",
+                "development/architecture"
               ]
             }
           ]
         },
         {
-          "tab": "API Reference",
+          "tab": "Enterprise",
           "groups": [
             {
               "group": "API Documentation",
@@ -55,19 +65,10 @@
       ],
       "global": {
         "anchors": [
-          {
-            "anchor": "Documentation",
-            "href": "https://mintlify.com/docs",
-            "icon": "book-open-cover"
-          },
-          {
-            "anchor": "Community",
-            "href": "https://mintlify.com/community",
-            "icon": "slack"
-          },
+          
           {
             "anchor": "Blog",
-            "href": "https://mintlify.com/blog",
+            "href": "https://bud.studio/content/blog",
             "icon": "newspaper"
           }
         ]
@@ -80,12 +81,7 @@
           "label": "Support",
           "href": "mailto:contact@bud.studio"
         }
-      ],
-      "primary": {
-        "type": "button",
-        "label": "Dashboard",
-        "href": "https://dashboard.mintlify.com"
-      }
+      ]
     },
     "footer": {
       "socials": {
