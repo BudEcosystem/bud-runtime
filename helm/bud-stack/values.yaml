@@ -114,6 +114,7 @@ globalEnv:
         BUD_METRICS_APP_ID: "budmetrics" # Dapr app ID for budmetrics
         BUD_NOTIFY_APP_ID: "notify" # Dapr app ID for notify (duplicate of NOTIFY_SERVICE_NAME?)
         MODEL_DOWNLOAD_DIR: "/app/models/downloads" # Path inside container
+        MODEL_DOWNLOAD_DIR_MAX_SIZE: "500"
         REDIS_URI: "<REDIS_SERVICE_HOST>.<NAMESPACE>:<REDIS_PORT>" # e.g., redis-service.dapr-system:6379
         REDIS_PASSWORD_BUDAPP: "<YOUR_BUDAPP_SPECIFIC_REDIS_PASSWORD>" # If different from global
         BUD_SIMULATOR_APP_ID: "budsim" # Dapr app ID for budsim
