@@ -313,6 +313,10 @@ apps:
             value: "false" # Set to true in production if KC has valid SSL
           - name: DEFAULT_REALM_NAME
             value: "<YOUR_DEFAULT_KEYCLOAK_REALM_FOR_BUDAPP>"
+          - name: CLOUD_MODEL_SEEDER_ENGINE
+            value: "litellm"
+          - name: BUD_CONNECT_BASE_URL
+            value: "https://connect.<YOUR_DOMAIN>"
       resources:
           limits:
               memory: "32Gi"
