@@ -124,7 +124,7 @@ globalEnv:
         BUD_MODEL_APP_ID: "budmodel"   # Dapr app ID for budmodel
         PSQL_DB_NAME_BUDCLUSTER: "budcluster_db"
         VALIDATE_CERTS: "false" # Or "true" in production with valid certs
-        NODE_INFO_COLLECTOR_IMAGE_CPU: "<YOUR_REGISTRY>/<NODE_INFO_COLLECTOR_CPU_IMAGE>:<TAG>"
+        NODE_INFO_COLLECTOR_IMAGE_CPU: "budstudio/node-info-collector-cpu:0.1.0"
         NODE_INFO_COLLECTOR_IMAGE_CUDA: "<YOUR_REGISTRY>/<NODE_INFO_COLLECTOR_CUDA_IMAGE>:<TAG>"
         NODE_INFO_COLLECTOR_IMAGE_HPU: "<YOUR_REGISTRY>/<NODE_INFO_COLLECTOR_HPU_IMAGE>:<TAG>"
         NODE_INFO_LABELER_IMAGE: "<YOUR_REGISTRY>/<NODE_INFO_LABELER_IMAGE>:<TAG>"
@@ -230,7 +230,7 @@ apps:
       command: ["uvicorn", "notify.main:app", "--host", "0.0.0.0", "--port", "3000"] # Example command
 
     - name: "budsim"
-      image: "<YOUR_REGISTRY>/<BUDSIM_IMAGE_NAME>:<TAG>"
+      image: "budstudio/budsim:0.01
       containerPort: 3002
       daprAppId: "budsim"
       # pvcName: "bud-budsim-pvc"
@@ -258,7 +258,7 @@ apps:
             mountPath: "{{ .Values.globalEnv.data.MODEL_REGISTRY_DIR }}"
 
     - name: "budapp"
-      image: "<YOUR_REGISTRY>/<BUDAPP_IMAGE_NAME>:<TAG>"
+      image: "budstudio/budapp:0.3.0"
       containerPort: "{{ .Values.globalEnv.data.APP_PORT_BUDAPP }}"
       daprAppId: "budapp"
       # pvcName: "bud-budserve-app-pvc"
@@ -392,7 +392,7 @@ apps:
             mountPath: "{{ .Values.globalEnv.data.ADD_MODEL_DIR }}"
 
     - name: "budui" # Second instance of budui from original, assuming this is the primary one
-      image: "<YOUR_REGISTRY>/<BUDUI_IMAGE_NAME>:<TAG>"
+      image: "budstudio/bud-dashboard:0.3.0"
       containerPort: 3000
       daprAppId: "budui"
       DisableShell: "True" # App-specific flag
@@ -452,7 +452,7 @@ apps:
           failureThreshold: 3
     
     - name: "askbud"
-      image: "<YOUR_REGISTRY>/<ASKBUD_IMAGE_NAME>:<TAG>"
+      image: "budstudio/askbud0.1.0"
       containerPort: 3000
       daprAppId: "askbud"
       appTopic: "askbud"
@@ -508,7 +508,7 @@ apps:
       # command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8472"]
 
     - name: "budmetrics"
-      image: "<YOUR_REGISTRY>/<BUDMETRICS_IMAGE_NAME>:<TAG>"
+      image: "budstudio/budmetrics0.1.0"
       containerPort: 3005
       daprAppId: "budmetrics"
       # pvcName: "bud-budmetrics-pvc"
@@ -535,7 +535,7 @@ apps:
       # command: ["sh", "-c", "alembic -c ./alembic.ini upgrade head && uvicorn budmetrics.main:app --host 0.0.0.0 --port 3005"]
 
     - name: "budproxy"
-      image: "<YOUR_REGISTRY>/<BUDLITELLM_IMAGE_NAME>:<TAG>" # e.g., :development or a version
+      image: "budstudio/budproxy:0.1.0" # e.g., :development or a version
       containerPort: "{{ .Values.globalEnv.data.APP_PORT_BUDPROXY }}"
       daprAppId: "budproxy"
       # pvcName: "bud-proxy-pvc"
