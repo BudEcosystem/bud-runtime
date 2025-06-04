@@ -230,7 +230,7 @@ apps:
       command: ["uvicorn", "notify.main:app", "--host", "0.0.0.0", "--port", "3000"] # Example command
 
     - name: "budsim"
-      image: "budstudio/budsim:0.01
+      image: "budstudio/budsim:0.01"
       containerPort: 3002
       daprAppId: "budsim"
       # pvcName: "bud-budsim-pvc"
