@@ -52,7 +52,11 @@ This chart uses the following sub-charts:
     helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
     helm repo add dapr https://dapr.github.io/helm-charts/
     helm repo add jetstack https://charts.jetstack.io
+    helm repo add altinity https://helm.altinity.com
+    helm repo add clickhouse-operator https://docs.altinity.com/clickhouse-operator
     helm repo update
+    helm install altinity-clickhouse-operator altinity-clickhouse-operator/altinity-clickhouse-operato
+r --namespace clickhouse-operator --create-namespace
     ```
 2.  **Update your Helm dependencies:**
 
