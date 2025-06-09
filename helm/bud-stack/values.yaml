@@ -144,27 +144,9 @@ globalEnv:
         PSQL_PORT_BUDMETRICS: "5431" # If metrics DB runs on a different port
         PSQL_DB_NAME_BUDMETRICS: "budmetrics_db"
 
-        LITELLM_LOG: "INFO"
-        LITELLM_SALT_KEY: "<YOUR_LITELLM_SALT_KEY>"
-        DATABASE_URL: "postgresql://<DB_USER>:<DB_PASSWORD>@<DB_HOST>:<DB_PORT>/<DB_NAME_BUDPROXY>" # For budproxy
-        STORE_MODEL_IN_DB: "true"
-        BUDSERVE_APP_BASEURL: "http://localhost:3500/v1.0/invoke/<BUDAPP_DAPR_ID>/method" # Dapr invoke URL
-        ENABLE_CACHE: "true"
-        ENABLE_CACHE_METRIC: "true"
-        CACHE_EVICTION_POLICY: "LRU"
-        CACHE_MAX_SIZE: "1000"
-        CACHE_TTL: "3600"
-        CACHE_SCORE_THRESHOLD: "0.8"
-        CACHE_EMBEDDING_MODEL: "sentence-transformers/all-MiniLM-L6-v2" # Or your preferred model
-        REDIS_USERNAME: "" # If Redis requires a username
-        REDIS_DB: "0" # Default Redis DB
-        NAMESPACE: "<YOUR_KUBERNETES_NAMESPACE>" # e.g., "development", "production"
-        APP_PORT_BUDPROXY: "4000"
-        SECRETS_REDIS_URI: "<REDIS_SERVICE_HOST>.<NAMESPACE>:<REDIS_PORT>" # For Dapr secret store if Redis backend
-        CACHE_REDIS_HOST: "<CACHE_REDIS_HOST>.<NAMESPACE>" # Specific Redis for LiteLLM cache
-        CACHE_REDIS_PORT: "6379"
-        CACHE_REDIS_PASSWORD: "<YOUR_LITELLM_CACHE_REDIS_PASSWORD>"
-        SECRETS_CACHE_REDIS_PASSWORD: "<YOUR_LITELLM_CACHE_REDIS_PASSWORD_SECRET_KEY_REF>"
+
+        TENSORZERO_REDIS_URL: "redis://gateway-redis:6379"
+        APP_PORT_BUDPROXY: "3000"
 
 minio:
     enabled: true # Set to false if using external Minio/S3
@@ -534,36 +516,6 @@ apps:
               cpu: "250m"
       # command: ["sh", "-c", "alembic -c ./alembic.ini upgrade head && uvicorn budmetrics.main:app --host 0.0.0.0 --port 3005"]
 
-    - name: "budproxy"
-      image: "budstudio/budproxy:0.1.0" # e.g., :development or a version
-      containerPort: "{{ .Values.globalEnv.data.APP_PORT_BUDPROXY }}"
-      daprAppId: "budproxy"
-      # pvcName: "bud-proxy-pvc"
-      # pvcPath: "/app/data"
-      appTopic: "budProxyMessages"
-      appTopicRoute: "/notifications"
-      envFrom: "{{ .Values.globalEnv.configMapName }}"
-      env:
-          - name: PSQL_HOST
-            value: "{{ .Values.globalEnv.data.PSQL_HOST }}"
-          - name: PSQL_PORT
-            value: "{{ .Values.globalEnv.data.PSQL_PORT }}"
-          - name: PSQL_DB_NAME # DB for LiteLLM proxy, often 'template0' or a specific one
-            value: "budproxy_db" # Or "{{ .Values.globalEnv.data.DATABASE_URL }}" parts
-          - name: LITELLM_LOG
-            value: "INFO"
-          - name: LOG_LEVEL # App specific log level
-            value: "INFO"
-          # Ensure litellm_config.yaml is available, e.g. via ConfigMap and volumeMount
-      resources:
-          limits:
-              memory: "20Gi"
-              cpu: "2"
-          requests:
-              memory: "1Gi"
-              cpu: "2" # High CPU request, review
-      # command: ["sh", "-c", "cd litellm/proxy && litellm --config /app/config/litellm_config.yaml --port {{ .Values.globalEnv.data.APP_PORT_BUDPROXY }}"] # Config path example
-
 ingresses: # Define ingress resources for external access
     - name: "dapr-dashboard-ingress"
       enabled: true
@@ -905,3 +857,30 @@ certManager: # Settings for cert-manager itself (installation)
 # Note: The original file had 'cert-manager' as a separate key from 'certManager'.
 # Assuming 'certManager' is the primary key for controlling its installation.
 # If 'cert-manager' (with hyphen) is for a sub-chart, its structure would be different.
+
+budproxy:
+  image: "budstudio/budproxy:nightly"
+  resources:
+    limits:
+      cpu: 2000m
+      memory: 4096Mi
+    requests:
+      cpu: 2000m
+      memory: 4096Mi
+  redisUrl: "redis://gateway-redis:6379"
+  clickhouseUrl: "http://test_user:test_password@clickhouse-bootstrap:8123/bud"
+
+  configmap:
+    data:
+      tensorzero.toml: |
+        [gateway]
+        bind_address = "0.0.0.0:3000"
+
+
+clickhouse:
+  defaultUser:
+    password: "qwerty"
+    allowExternalAccess: true
+  image:
+    repository: "altinity/clickhouse-server"
+    tag: "24.8.14.10459.altinitystable"

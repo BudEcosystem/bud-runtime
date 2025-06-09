@@ -24,6 +24,7 @@
             {
               "group": "Features",
               "pages": [
+                "features/gateway",
                 "features/multi-lora-support",
                 "features/code",
                 "features/images",
