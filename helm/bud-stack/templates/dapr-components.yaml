@@ -44,27 +44,28 @@ scopes:
 apiVersion: dapr.io/v1alpha1
 kind: Component
 metadata:
-  name: pubsub-redis
+  name: kafka-pubsub
   namespace: {{ .Values.namespace }}
 spec:
-  type: pubsub.redis
+  type: pubsub.kafka
   version: v1
   metadata:
-    - name: redisHost
-      secretKeyRef:
-        name: {{ .Values.dapr.secretName }}
-        key: REDIS_URI
-    - name: redisPassword
-      secretKeyRef:
-        name: {{ .Values.dapr.secretName }}
-        key: REDIS_PASSWORD
-    - name: consumerID
-      value: "{appID}"
-    - name: concurrency
-      value: "10"
-auth:
-  secretStore: {{ .Values.dapr.secretStoreName }}
-
+  - name: brokers # Required. Kafka broker connection setting
+    value: "{{ .Release.Name }}-kafka.{{ .Values.namespace }}.svc.cluster.local:9092"
+  - name: authType # Required.
+    value: "password"
+  - name: saslUsername # Required if authType is `password`.
+    value: "user1"
+  - name: saslPassword # Required if authType is `password`.
+    secretKeyRef:
+      name: {{ .Release.Name }}-kafka-user-passwords
+      key: client-passwords
+  - name: saslMechanism
+    value: "PLAIN"
+  - name: disableTls
+    value: true
+  - name: securityProtocol
+    value: SASL_PLAINTEXT
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -131,14 +132,10 @@ spec:
     default: {{.appTopicRoute}}
     {{- if eq .name "budmetrics" }}
     rules:
-    - match: event.type == "add_request_metrics"
-      path: /metrics/add
-    - match: event.type == "update_request_metrics"
-      path: /metrics/update
-    - match: event.type == "add_request_scores"
-      path: /metrics/scores
+    - match: event.type == "add_observability_metrics"
+      path: /observability/add
     {{- end }}
-  pubsubname: pubsub-redis
+  pubsubname: kafka-pubsub
   deadLetterTopic: poisonMessages
   {{- if eq .name "budmetrics" }}
   bulkSubscribe:
