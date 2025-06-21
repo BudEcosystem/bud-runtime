@@ -1,0 +1,9 @@
+[submodule "services/budproxy"]
+	path = services/budproxy
+	url = https://github.com/BudEcosystem/tensorzero
+[submodule "services/aibrix"]
+	path = services/aibrix
+	url = https://github.com/BudEcosystem/aibrix
+[submodule "services/vllm"]
+	path = services/vllm
+	url = https://github.com/BudEcosystem/vllm
