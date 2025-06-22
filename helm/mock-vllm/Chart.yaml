@@ -1,0 +1,17 @@
+apiVersion: v2
+name: mock-vllm
+description: Mock vLLM service for integration testing
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - vllm
+  - mock
+  - testing
+  - llm
+  - api
+maintainers:
+  - name: Bud Runtime Team
+home: https://github.com/your-org/bud-runtime
+sources:
+  - https://github.com/your-org/bud-runtime/tree/main/services/mock-vllm

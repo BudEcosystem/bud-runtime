@@ -1,0 +1,376 @@
+# Default values for inference-stack
+# This is designed for the testing environment with AIBrix and VLLM
+
+# Global settings
+global:
+  namespace: inference-system
+  domain: localhost
+  storageClass: local-path
+  
+# AIBrix - Cloud-native AI platform for managing LLM infrastructure
+aibrix:
+  enabled: true
+  name: aibrix
+  image:
+    repository: budruntime/aibrix
+    tag: latest
+    pullPolicy: IfNotPresent
+  
+  # Deployment configuration
+  replicas: 2
+  
+  # Service ports
+  ports:
+    http: 8080
+    metrics: 9090
+    webhook: 9443
+  
+  # Service configuration
+  service:
+    type: ClusterIP
+    port: 8080
+  
+  # Resource allocation
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+  
+  # Node selection
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  
+  # Configuration
+  config:
+    # Model registry settings
+    modelRegistry:
+      type: s3
+      endpoint: minio-service.bud-system.svc.cluster.local:9000
+      bucket: models
+      region: us-east-1
+    
+    # Controller settings
+    controller:
+      reconcileInterval: 30s
+      maxConcurrentReconciles: 10
+    
+    # Autoscaling defaults
+    autoscaling:
+      enabled: true
+      minReplicas: 1
+      maxReplicas: 10
+      targetGPUUtilization: 80
+      scaleDownDelaySeconds: 300
+    
+    # Resource management
+    resources:
+      defaultGPUPerModel: 1
+      maxGPUPerModel: 4
+      defaultMemoryPerModel: "16Gi"
+    
+    # VLLM integration
+    vllm:
+      defaultImage: vllm/vllm-openai:latest
+      defaultArgs:
+        - "--trust-remote-code"
+        - "--enable-lora"
+      healthCheckInterval: 30s
+      startupTimeout: 10m
+  
+  # RBAC
+  rbac:
+    create: true
+  
+  # Service Account
+  serviceAccount:
+    create: true
+    name: aibrix
+    annotations: {}
+  
+  # Monitoring
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+  
+  # Environment variables
+  env: {}
+
+# VLLM - High-performance inference engine
+vllm:
+  enabled: true
+  
+  # Default image for VLLM instances
+  image:
+    repository: vllm/vllm-openai
+    tag: latest
+    pullPolicy: IfNotPresent
+  
+  # Model downloader image
+  downloaderImage:
+    repository: python
+    tag: 3.10-slim
+    pullPolicy: IfNotPresent
+  
+  # Default configuration for VLLM instances
+  defaults:
+    # Service configuration
+    service:
+      type: ClusterIP
+      port: 8000
+    
+    # Ports
+    ports:
+      http: 8000
+      metrics: 8001
+    
+    # Resources
+    resources:
+      requests:
+        cpu: 4
+        memory: 16Gi
+        nvidia.com/gpu: 1
+      limits:
+        cpu: 8
+        memory: 32Gi
+        nvidia.com/gpu: 1
+    
+    # Storage
+    storage:
+      size: 100Gi
+      className: local-path
+    
+    # Shared memory
+    shmSize: 16Gi
+    
+    # Health probes
+    livenessProbe:
+      initialDelaySeconds: 300
+      periodSeconds: 30
+      timeoutSeconds: 10
+      failureThreshold: 3
+    
+    readinessProbe:
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 5
+      successThreshold: 1
+  
+  # Node selection for GPU workloads
+  nodeSelector:
+    nvidia.com/gpu.present: "true"
+  
+  # Tolerations for GPU nodes
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+  
+  # Service Account
+  serviceAccount:
+    create: true
+    name: vllm
+    annotations: {}
+  
+  # Monitoring
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+  
+  # HuggingFace token secret
+  hfTokenSecret:
+    create: false
+    name: huggingface-token
+    token: ""  # Set this if create is true
+  
+  # Model instances to deploy
+  instances:
+    - name: llama2-7b
+      enabled: true
+      model: meta-llama/Llama-2-7b-chat-hf
+      replicas: 1
+      
+      # Model download
+      downloadModel: true
+      modelPath: /models
+      
+      # Model-specific parameters
+      tensorParallelSize: 1
+      pipelineParallelSize: 1
+      maxModelLen: 4096
+      quantization: null
+      gpuMemoryUtilization: 0.9
+      maxNumSeqs: 256
+      
+      # Instance-specific resources (overrides defaults)
+      resources: {}
+      
+      # Storage size (overrides default)
+      storageSize: 50Gi
+      
+      # Autoscaling
+      autoscaling:
+        enabled: true
+        minReplicas: 1
+        maxReplicas: 3
+        targetGPUUtilizationPercentage: 80
+        targetMemoryUtilizationPercentage: 80
+      
+      # Extra arguments
+      extraArgs: []
+      
+      # Environment variables
+      env: {}
+    
+    - name: mistral-7b
+      enabled: false
+      model: mistralai/Mistral-7B-Instruct-v0.1
+      replicas: 1
+      downloadModel: true
+      tensorParallelSize: 1
+      maxModelLen: 8192
+      gpuMemoryUtilization: 0.9
+      autoscaling:
+        enabled: false
+
+# MinIO configuration (for model storage)
+minio:
+  enabled: true
+  endpoint: minio-service.bud-system.svc.cluster.local:9000
+  accessKey: minioadmin
+  secretKey: minioadmin
+  
+  # Create secrets for MinIO access
+  secrets:
+    create: true
+    name: minio-credentials
+
+# Monitoring stack
+prometheus:
+  enabled: true
+  fullnameOverride: prometheus
+  defaultRules:
+    create: true
+    rules:
+      alertmanager: false
+      etcd: false
+      kubeApiserver: false
+      kubeApiserverAvailability: false
+      kubeApiserverSlos: false
+      kubelet: false
+      kubeProxy: false
+      kubePrometheusGeneral: false
+      kubePrometheusNodeRecording: false
+      kubernetesApps: true
+      kubernetesResources: true
+      kubernetesStorage: false
+      kubernetesSystem: false
+      kubeScheduler: false
+      kubeStateMetrics: false
+      network: false
+      node: false
+      nodeExporterAlerting: false
+      nodeExporterRecording: false
+  
+  prometheus:
+    prometheusSpec:
+      retention: 7d
+      resources:
+        requests:
+          cpu: 500m
+          memory: 2Gi
+        limits:
+          cpu: 2
+          memory: 8Gi
+      storageSpec:
+        volumeClaimTemplate:
+          spec:
+            accessModes: ["ReadWriteOnce"]
+            resources:
+              requests:
+                storage: 20Gi
+
+grafana:
+  enabled: true
+  fullnameOverride: grafana
+  adminPassword: admin
+  persistence:
+    enabled: true
+    size: 5Gi
+  
+  datasources:
+    datasources.yaml:
+      apiVersion: 1
+      datasources:
+        - name: Prometheus
+          type: prometheus
+          url: http://prometheus:9090
+          isDefault: true
+  
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+        - name: 'inference'
+          orgId: 1
+          folder: 'Inference'
+          type: file
+          disableDeletion: false
+          updateIntervalSeconds: 60
+          options:
+            path: /var/lib/grafana/dashboards/inference
+        - name: 'gpu'
+          orgId: 1
+          folder: 'GPU'
+          type: file
+          disableDeletion: false
+          updateIntervalSeconds: 60
+          options:
+            path: /var/lib/grafana/dashboards/gpu
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: traefik
+  
+  # Ingress for AIBrix
+  aibrix:
+    enabled: true
+    host: aibrix.localhost
+    path: /
+    pathType: Prefix
+    tls:
+      enabled: false
+  
+  # Ingress for VLLM instances
+  vllm:
+    enabled: true
+    hosts:
+      - name: llama2
+        host: llama2.localhost
+        instance: llama2-7b
+      - name: mistral
+        host: mistral.localhost
+        instance: mistral-7b
+  
+  # Ingress for monitoring
+  monitoring:
+    enabled: true
+    grafana:
+      host: grafana-inference.localhost
+    prometheus:
+      host: prometheus-inference.localhost
+
+# Network policies
+networkPolicy:
+  enabled: false
+  policyTypes:
+    - Ingress
+    - Egress

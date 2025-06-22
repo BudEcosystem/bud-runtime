@@ -1,0 +1,125 @@
+# Test values for inference-stack deployment
+namespace: inference-system
+
+# AIBrix configuration
+aibrix:
+  enabled: true
+  image:
+    repository: nginx  # Use nginx as a test image
+    tag: latest
+    pullPolicy: IfNotPresent
+  
+  replicaCount: 1
+  
+  service:
+    type: ClusterIP
+    port: 8080
+  
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2
+      memory: 4Gi
+  
+  config:
+    logLevel: info
+    database:
+      type: sqlite
+      path: /data/aibrix.db
+  
+  # Disable metrics
+  metrics:
+    enabled: false
+    serviceMonitor:
+      enabled: false
+    
+    # Model routing configuration
+    models:
+      - name: test-model
+        backend: vllm
+        endpoint: http://vllm-test-model:8000
+        maxTokens: 2048
+        temperature: 0.7
+
+# VLLM configuration
+vllm:
+  enabled: false  # Disable for initial deployment
+  
+  # HuggingFace token secret (optional)
+  hfTokenSecret:
+    create: false
+    name: hf-token
+    token: ""
+  
+  # Disable metrics
+  metrics:
+    enabled: false
+    serviceMonitor:
+      enabled: false
+  
+  # Deploy one test model
+  models:
+    - name: test-model
+      enabled: true
+      
+      image:
+        repository: vllm/vllm-openai
+        tag: latest
+        pullPolicy: IfNotPresent
+      
+      # Use a small model for testing
+      model: "facebook-opt-125m"  # Sanitized for K8s labels
+      modelName: "facebook/opt-125m"  # Actual model name
+      
+      replicaCount: 1
+      
+      service:
+        type: ClusterIP
+        port: 8000
+      
+      resources:
+        requests:
+          cpu: 1
+          memory: 2Gi
+        limits:
+          cpu: 4
+          memory: 8Gi
+      
+      # Disable GPU for testing
+      gpu:
+        enabled: false
+      
+      # VLLM server arguments
+      extraArgs:
+        - "--max-model-len=1024"
+        - "--trust-remote-code"
+
+# Monitoring
+monitoring:
+  enabled: false
+
+# Disable prometheus and grafana
+prometheus:
+  enabled: false
+
+grafana:
+  enabled: false
+
+# RBAC
+rbac:
+  create: true
+
+# Service Account
+serviceAccount:
+  create: true
+  name: inference-stack
+
+# MinIO configuration (for model storage)
+minio:
+  secrets:
+    create: false
+    name: minio-creds
+  accessKey: minioadmin
+  secretKey: minioadmin

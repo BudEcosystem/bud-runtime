@@ -1,0 +1,32 @@
+apiVersion: v2
+name: inference-stack
+description: Helm chart for deploying the inference stack (AIBrix + VLLM) for testing
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+
+keywords:
+  - inference
+  - llm
+  - gpu
+  - aibrix
+  - vllm
+  - testing
+
+maintainers:
+  - name: Bud Runtime Team
+    email: team@budruntime.com
+
+dependencies:
+  - name: prometheus
+    version: "~27.20.1"
+    repository: https://prometheus-community.github.io/helm-charts
+    condition: prometheus.enabled
+  - name: grafana
+    version: "~8.6.2"
+    repository: https://grafana.github.io/helm-charts
+    condition: grafana.enabled
+
+annotations:
+  category: AI/ML
+  license: Apache-2.0

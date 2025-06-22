@@ -1,0 +1,174 @@
+# Test values for bud-stack deployment
+namespace: "bud-system"
+replicaCount: 1
+
+# Dapr configuration
+dapr:
+  enabled: false
+  secretName: "bud-secrets"
+
+globalEnv:
+  configMapName: "bud-global-config"
+  data:
+    PORT: "3000"
+    NODE_ENV: "development"
+    JWT_SECRET: "test-jwt-secret-change-in-production"
+    STORE_ENCRYPTION_KEY: "test-encryption-key-change-in-production"
+    
+    # Database configs
+    POSTGRES_HOST: "postgresql"
+    POSTGRES_PORT: "5432"
+    POSTGRES_DB: "budapp"
+    POSTGRES_USER: "buduser"
+    POSTGRES_PASSWORD: "testpassword123"
+    
+    MONGO_URL: "mongodb://root:testpassword123@mongodb:27017/budapp?authSource=admin"
+    MONGO_MIN_POOL_SIZE: "10"
+    MONGO_MAX_POOL_SIZE: "50"
+    
+    REDIS_HOST: "redis-master"
+    REDIS_PORT: "6379"
+    REDIS_PASSWORD: "testredispassword"
+    REDIS_DB_INDEX: "0"
+    
+    # MinIO S3 config
+    S3_LOCAL_STACK: "http://minio:9000"
+    S3_BUCKET_NAME: "bud-storage"
+    S3_REGION: "us-east-1"
+    AWS_ACCESS_KEY_ID: "minioadmin"
+    AWS_SECRET_ACCESS_KEY: "minioadmin"
+    
+    # Service URLs
+    API_ROOT_URL: "http://budapp:3000"
+    FRONT_BASE_URL: "http://budapp:3000"
+    HOST_NAME: "http://localhost:8080"
+    
+    # Additional required values
+    LITELLM_PROXY_MASTER_KEY: "test-master-key"
+    PERPLEXITY_API_KEY: ""
+    BUD_LLM_BASE_URL: "http://budproxy:8000"
+    OPENAI_API_KEY: ""
+    MINIO_ACCESS_KEY: "minioadmin"
+    MINIO_SECRET_KEY: "minioadmin"
+    TENSORZERO_REDIS_URL: "redis://:testredispassword@redis-master:6379/1"
+
+# Service configurations for secret template
+services:
+  cache:
+    redis:
+      host: "redis-master"
+      password: "testredispassword"
+  database:
+    postgres:
+      host: "postgresql"
+      user: "buduser"
+      password: "testpassword123"
+      db: "budapp"
+
+# Novu configuration
+novu:
+  credentials:
+    email: "admin@example.com"
+    password: "testpassword123"
+
+# Enable core services
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: "testpassword123"
+    username: "buduser"
+    password: "testpassword123"
+    database: "budapp"
+
+mongodb:
+  enabled: true
+  auth:
+    enabled: true
+    rootUser: "root"
+    rootPassword: "testpassword123"
+
+redis:
+  enabled: true
+  auth:
+    enabled: true
+    password: "testredispassword"
+
+minio:
+  enabled: true
+  auth:
+    rootUser: "minioadmin"
+    rootPassword: "minioadmin"
+  defaultBuckets: "bud-storage"
+
+# Disable prometheus for now to save resources
+kube-prometheus-stack:
+  enabled: false
+
+# Disable Dapr since we already installed it
+dapr:
+  enabled: false
+
+# Disable cert-manager since we already installed it
+cert-manager:
+  enabled: false
+
+# Disable ClickHouse for now
+clickhouse:
+  enabled: false
+
+# Core application services
+budapp:
+  enabled: true
+  image:
+    repository: "ghcr.io/budlib/budapp"
+    tag: "latest"
+  service:
+    type: ClusterIP
+    port: 3000
+
+budsim:
+  enabled: true
+  image:
+    repository: "ghcr.io/budlib/budsim"
+    tag: "latest"
+
+budcluster:
+  enabled: true
+  image:
+    repository: "ghcr.io/budlib/budcluster"
+    tag: "latest"
+
+budmodel:
+  enabled: true
+  image:
+    repository: "ghcr.io/budlib/budmodel"
+    tag: "latest"
+
+budmetrics:
+  enabled: true
+  image:
+    repository: "ghcr.io/budlib/budmetrics"
+    tag: "latest"
+
+budproxy:
+  enabled: true
+  image:
+    repository: "ghcr.io/budlib/budproxy"
+    tag: "latest"
+  service:
+    type: ClusterIP
+    port: 8000
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+  hosts:
+    - host: "localhost"
+      paths:
+        - path: /
+          pathType: Prefix
+          serviceName: budproxy
+          servicePort: 8000

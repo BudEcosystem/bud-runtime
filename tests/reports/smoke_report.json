@@ -1,0 +1,12 @@
+{
+  "start_time": "2025-06-21T16:04:50.481289",
+  "duration": 0.5847649574279785,
+  "scenarios": {
+    "smoke": {
+      "total": 6,
+      "passed": 5,
+      "failed": 1,
+      "duration": 5.84
+    }
+  }
+}

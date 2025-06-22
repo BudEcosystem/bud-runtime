@@ -1,0 +1,323 @@
+{{- if .Values.vllm.enabled }}
+{{- range .Values.vllm.instances }}
+{{- if .enabled }}
+---
+# VLLM ConfigMap for {{ .name }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "inference-stack.fullname" $ }}-vllm-{{ .name }}-config
+  namespace: {{ include "inference-stack.namespace" $ }}
+  labels:
+    {{- include "inference-stack.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: vllm
+    app.kubernetes.io/instance: {{ .name }}
+data:
+  startup.sh: |
+    #!/bin/bash
+    set -e
+    
+    echo "Starting VLLM server for model: {{ .model }}"
+    
+    # Wait for model to be available
+    MODEL_PATH="${MODEL_PATH:-{{ .modelPath | default "/models" }}/{{ .model }}}"
+    echo "Waiting for model at $MODEL_PATH..."
+    
+    while [ ! -f "$MODEL_PATH/config.json" ]; do
+      echo "Model not found at $MODEL_PATH, waiting..."
+      sleep 10
+    done
+    
+    echo "Model found, starting VLLM server..."
+    
+    # Start VLLM with configured parameters
+    python -m vllm.entrypoints.openai.api_server \
+      --model "$MODEL_PATH" \
+      --host 0.0.0.0 \
+      --port {{ $.Values.vllm.defaults.ports.http }} \
+      {{- if .tensorParallelSize }}
+      --tensor-parallel-size {{ .tensorParallelSize }} \
+      {{- end }}
+      {{- if .pipelineParallelSize }}
+      --pipeline-parallel-size {{ .pipelineParallelSize }} \
+      {{- end }}
+      {{- if .maxModelLen }}
+      --max-model-len {{ .maxModelLen }} \
+      {{- end }}
+      {{- if .quantization }}
+      --quantization {{ .quantization }} \
+      {{- end }}
+      {{- if .gpuMemoryUtilization }}
+      --gpu-memory-utilization {{ .gpuMemoryUtilization }} \
+      {{- end }}
+      {{- if .maxNumSeqs }}
+      --max-num-seqs {{ .maxNumSeqs }} \
+      {{- end }}
+      {{- range .extraArgs }}
+      {{ . }} \
+      {{- end }}
+---
+# VLLM ServiceAccount for {{ .name }}
+{{- if $.Values.vllm.serviceAccount.create }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "inference-stack.vllm.serviceAccountName" $ }}-{{ .name }}
+  namespace: {{ include "inference-stack.namespace" $ }}
+  labels:
+    {{- include "inference-stack.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: vllm
+    app.kubernetes.io/instance: {{ .name }}
+  {{- with $.Values.vllm.serviceAccount.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}
+---
+# VLLM StatefulSet for {{ .name }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "inference-stack.fullname" $ }}-vllm-{{ .name }}
+  namespace: {{ include "inference-stack.namespace" $ }}
+  labels:
+    {{- include "inference-stack.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: vllm
+    app.kubernetes.io/instance: {{ .name }}
+    app.kubernetes.io/model: {{ .model }}
+spec:
+  serviceName: {{ include "inference-stack.fullname" $ }}-vllm-{{ .name }}
+  replicas: {{ .replicas }}
+  selector:
+    matchLabels:
+      {{- include "inference-stack.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/component: vllm
+      app.kubernetes.io/instance: {{ .name }}
+  template:
+    metadata:
+      labels:
+        {{- include "inference-stack.selectorLabels" $ | nindent 8 }}
+        app.kubernetes.io/component: vllm
+        app.kubernetes.io/instance: {{ .name }}
+        app.kubernetes.io/model: {{ .model }}
+      annotations:
+        checksum/config: {{ $.Values | toYaml | sha256sum }}
+        {{- if $.Values.vllm.metrics.enabled }}
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "{{ $.Values.vllm.defaults.ports.metrics }}"
+        prometheus.io/path: "/metrics"
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "inference-stack.vllm.serviceAccountName" $ }}-{{ .name }}
+      {{- with $.Values.vllm.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $.Values.vllm.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+      {{- if .downloadModel }}
+      - name: model-downloader
+        image: "{{ $.Values.vllm.downloaderImage.repository }}:{{ $.Values.vllm.downloaderImage.tag }}"
+        imagePullPolicy: {{ $.Values.vllm.downloaderImage.pullPolicy }}
+        command: ["/bin/bash", "-c"]
+        args:
+          - |
+            pip install huggingface-hub
+            python -c "
+            from huggingface_hub import snapshot_download
+            import os
+            model_id = '{{ .model }}'
+            local_dir = '{{ .modelPath | default "/models" }}/{{ .model }}'
+            print(f'Downloading model {model_id} to {local_dir}...')
+            try:
+                snapshot_download(repo_id=model_id, local_dir=local_dir, local_dir_use_symlinks=False)
+                print('Model download complete!')
+            except Exception as e:
+                print(f'Warning: Could not download model: {e}')
+                print('Model will need to be provided manually or already exist in the volume.')
+            "
+        env:
+        {{- if $.Values.vllm.hfTokenSecret.create }}
+        - name: HF_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: {{ $.Values.vllm.hfTokenSecret.name }}
+              key: token
+              optional: true
+        {{- end }}
+        volumeMounts:
+        - name: model-storage
+          mountPath: {{ .modelPath | default "/models" }}
+      {{- end }}
+      containers:
+      - name: vllm
+        image: "{{ $.Values.vllm.image.repository }}:{{ $.Values.vllm.image.tag }}"
+        imagePullPolicy: {{ $.Values.vllm.image.pullPolicy }}
+        command: ["/bin/bash", "-c"]
+        args: ["chmod +x /scripts/startup.sh && /scripts/startup.sh"]
+        ports:
+        - name: http
+          containerPort: {{ $.Values.vllm.defaults.ports.http }}
+          protocol: TCP
+        - name: metrics
+          containerPort: {{ $.Values.vllm.defaults.ports.metrics }}
+          protocol: TCP
+        env:
+        - name: MODEL_NAME
+          value: {{ .model }}
+        - name: INSTANCE_NAME
+          value: {{ .name }}
+        - name: MODEL_PATH
+          value: "{{ .modelPath | default "/models" }}/{{ .model }}"
+        {{- range $key, $value := .env }}
+        - name: {{ $key }}
+          value: {{ $value | quote }}
+        {{- end }}
+        volumeMounts:
+        - name: config
+          mountPath: /scripts
+          readOnly: true
+        - name: model-storage
+          mountPath: {{ .modelPath | default "/models" }}
+        - name: shm
+          mountPath: /dev/shm
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: {{ $.Values.vllm.defaults.livenessProbe.initialDelaySeconds }}
+          periodSeconds: {{ $.Values.vllm.defaults.livenessProbe.periodSeconds }}
+          timeoutSeconds: {{ $.Values.vllm.defaults.livenessProbe.timeoutSeconds }}
+          failureThreshold: {{ $.Values.vllm.defaults.livenessProbe.failureThreshold }}
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: {{ $.Values.vllm.defaults.readinessProbe.initialDelaySeconds }}
+          periodSeconds: {{ $.Values.vllm.defaults.readinessProbe.periodSeconds }}
+          timeoutSeconds: {{ $.Values.vllm.defaults.readinessProbe.timeoutSeconds }}
+          successThreshold: {{ $.Values.vllm.defaults.readinessProbe.successThreshold }}
+        resources:
+          {{- if .resources }}
+          {{- toYaml .resources | nindent 10 }}
+          {{- else }}
+          {{- toYaml $.Values.vllm.defaults.resources | nindent 10 }}
+          {{- end }}
+      volumes:
+      - name: config
+        configMap:
+          name: {{ include "inference-stack.fullname" $ }}-vllm-{{ .name }}-config
+          defaultMode: 0755
+      - name: shm
+        emptyDir:
+          medium: Memory
+          sizeLimit: {{ .shmSize | default $.Values.vllm.defaults.shmSize }}
+  volumeClaimTemplates:
+  - metadata:
+      name: model-storage
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: {{ $.Values.vllm.defaults.storage.className }}
+      resources:
+        requests:
+          storage: {{ .storageSize | default $.Values.vllm.defaults.storage.size }}
+---
+# VLLM Service for {{ .name }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "inference-stack.fullname" $ }}-vllm-{{ .name }}
+  namespace: {{ include "inference-stack.namespace" $ }}
+  labels:
+    {{- include "inference-stack.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: vllm
+    app.kubernetes.io/instance: {{ .name }}
+spec:
+  type: {{ $.Values.vllm.defaults.service.type }}
+  ports:
+  - name: http
+    port: {{ $.Values.vllm.defaults.service.port }}
+    targetPort: http
+    protocol: TCP
+  - name: metrics
+    port: {{ $.Values.vllm.defaults.ports.metrics }}
+    targetPort: metrics
+    protocol: TCP
+  selector:
+    {{- include "inference-stack.selectorLabels" $ | nindent 4 }}
+    app.kubernetes.io/component: vllm
+    app.kubernetes.io/instance: {{ .name }}
+---
+# VLLM HorizontalPodAutoscaler for {{ .name }}
+{{- if .autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "inference-stack.fullname" $ }}-vllm-{{ .name }}
+  namespace: {{ include "inference-stack.namespace" $ }}
+  labels:
+    {{- include "inference-stack.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: vllm
+    app.kubernetes.io/instance: {{ .name }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: StatefulSet
+    name: {{ include "inference-stack.fullname" $ }}-vllm-{{ .name }}
+  minReplicas: {{ .autoscaling.minReplicas }}
+  maxReplicas: {{ .autoscaling.maxReplicas }}
+  metrics:
+  {{- if .autoscaling.targetCPUUtilizationPercentage }}
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: {{ .autoscaling.targetCPUUtilizationPercentage }}
+  {{- end }}
+  {{- if .autoscaling.targetMemoryUtilizationPercentage }}
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: {{ .autoscaling.targetMemoryUtilizationPercentage }}
+  {{- end }}
+  {{- if .autoscaling.targetGPUUtilizationPercentage }}
+  - type: Resource
+    resource:
+      name: nvidia.com/gpu
+      target:
+        type: Utilization
+        averageUtilization: {{ .autoscaling.targetGPUUtilizationPercentage }}
+  {{- end }}
+{{- end }}
+---
+# VLLM ServiceMonitor for {{ .name }}
+{{- if and $.Values.vllm.metrics.enabled $.Values.vllm.metrics.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "inference-stack.fullname" $ }}-vllm-{{ .name }}
+  namespace: {{ include "inference-stack.namespace" $ }}
+  labels:
+    {{- include "inference-stack.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: vllm
+    app.kubernetes.io/instance: {{ .name }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "inference-stack.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/component: vllm
+      app.kubernetes.io/instance: {{ .name }}
+  endpoints:
+  - port: metrics
+    interval: {{ $.Values.vllm.metrics.serviceMonitor.interval }}
+    path: /metrics
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Bud Runtime is a Kubernetes-based microservices platform for AI/ML model serving. It uses Helm charts to deploy an ecosystem of applications with comprehensive infrastructure support including databases, observability tools, and service mesh capabilities.
 
+**Important Architecture Note**: The `bud-stack` Helm chart is focused exclusively on the application stack (budapp, budsim, budcluster, etc.) and infrastructure components. Model serving components like vLLM are deployed separately and are NOT part of the bud-stack chart.
+
 ## Common Development Commands
 
 ### Initial Setup

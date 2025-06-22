@@ -1,0 +1,250 @@
+# Example configuration for small models (for testing without GPU)
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: small-models-config
+  namespace: inference-system
+data:
+  # Facebook OPT-125M - Very small model for testing
+  opt-125m-config.json: |
+    {
+      "model_id": "facebook/opt-125m",
+      "model_type": "causal-lm",
+      "task": "text-generation",
+      "requirements": {
+        "gpu_memory": "2GB",
+        "cpu_memory": "4GB",
+        "tensor_parallel_size": 1,
+        "can_run_on_cpu": true
+      },
+      "serving_config": {
+        "max_model_len": 2048,
+        "max_num_seqs": 64,
+        "gpu_memory_utilization": 0.5,
+        "device": "auto",
+        "dtype": "float32"
+      },
+      "endpoints": {
+        "completions": "/v1/completions",
+        "chat": "/v1/chat/completions"
+      }
+    }
+  
+  # GPT-2 Small - Another small model for testing
+  gpt2-config.json: |
+    {
+      "model_id": "gpt2",
+      "model_type": "causal-lm",
+      "task": "text-generation",
+      "requirements": {
+        "gpu_memory": "2GB",
+        "cpu_memory": "4GB",
+        "tensor_parallel_size": 1,
+        "can_run_on_cpu": true
+      },
+      "serving_config": {
+        "max_model_len": 1024,
+        "max_num_seqs": 32,
+        "device": "cpu",
+        "dtype": "float32"
+      }
+    }
+
+---
+# Example deployment for CPU-only testing
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm-test-cpu
+  namespace: inference-system
+  labels:
+    app: vllm
+    model: test-model
+    device: cpu
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vllm
+      model: test-model
+  template:
+    metadata:
+      labels:
+        app: vllm
+        model: test-model
+        device: cpu
+    spec:
+      containers:
+      - name: vllm
+        image: vllm/vllm-openai:latest
+        command: ["python", "-m", "vllm.entrypoints.openai.api_server"]
+        args:
+        - "--model"
+        - "facebook/opt-125m"
+        - "--device"
+        - "cpu"
+        - "--dtype"
+        - "float32"
+        - "--max-model-len"
+        - "2048"
+        - "--max-num-seqs"
+        - "32"
+        env:
+        - name: VLLM_CPU_ONLY
+          value: "1"
+        ports:
+        - containerPort: 8000
+          name: http
+        resources:
+          limits:
+            cpu: 4
+            memory: 8Gi
+          requests:
+            cpu: 2
+            memory: 4Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 60
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 5
+
+---
+# Batch inference job example
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: batch-inference-test
+  namespace: inference-system
+spec:
+  template:
+    spec:
+      containers:
+      - name: batch-inference
+        image: python:3.10-slim
+        command: ["/bin/bash", "-c"]
+        args:
+        - |
+          pip install requests
+          python << 'EOF'
+          import requests
+          import json
+          import time
+          
+          # Test prompts
+          prompts = [
+              "Hello, how are you?",
+              "What is the capital of France?",
+              "Explain quantum computing in simple terms.",
+              "Write a Python function to calculate fibonacci numbers."
+          ]
+          
+          # VLLM endpoint
+          endpoint = "http://vllm-test-cpu:8000/v1/completions"
+          
+          # Run batch inference
+          for i, prompt in enumerate(prompts):
+              print(f"\n--- Test {i+1} ---")
+              print(f"Prompt: {prompt}")
+              
+              try:
+                  response = requests.post(
+                      endpoint,
+                      json={
+                          "model": "facebook/opt-125m",
+                          "prompt": prompt,
+                          "max_tokens": 50,
+                          "temperature": 0.7
+                      },
+                      timeout=30
+                  )
+                  
+                  if response.status_code == 200:
+                      result = response.json()
+                      completion = result['choices'][0]['text']
+                      print(f"Response: {completion}")
+                  else:
+                      print(f"Error: {response.status_code} - {response.text}")
+                      
+              except Exception as e:
+                  print(f"Exception: {e}")
+              
+              time.sleep(1)  # Rate limiting
+          
+          print("\nBatch inference test completed!")
+          EOF
+      restartPolicy: Never
+
+---
+# ConfigMap for testing different model configurations
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: model-test-configs
+  namespace: inference-system
+data:
+  test_models.yaml: |
+    models:
+      # Minimal models for testing
+      - name: opt-125m
+        id: facebook/opt-125m
+        size: 238MB
+        parameters: 125M
+        context_length: 2048
+        device: cpu/gpu
+        
+      - name: gpt2
+        id: gpt2
+        size: 548MB
+        parameters: 124M
+        context_length: 1024
+        device: cpu/gpu
+        
+      - name: opt-350m
+        id: facebook/opt-350m
+        size: 622MB
+        parameters: 350M
+        context_length: 2048
+        device: cpu/gpu
+        
+      # Medium models (need GPU)
+      - name: opt-1.3b
+        id: facebook/opt-1.3b
+        size: 2.4GB
+        parameters: 1.3B
+        context_length: 2048
+        device: gpu
+        
+      - name: pythia-1.4b
+        id: EleutherAI/pythia-1.4b
+        size: 2.8GB
+        parameters: 1.4B
+        context_length: 2048
+        device: gpu
+    
+    test_scenarios:
+      - name: latency_test
+        description: Test inference latency
+        models: [opt-125m, gpt2]
+        prompts: ["Hello", "Test"]
+        max_tokens: 10
+        
+      - name: throughput_test
+        description: Test throughput with concurrent requests
+        models: [opt-125m]
+        concurrent_requests: 10
+        prompts: ["Generate a story about"]
+        max_tokens: 100
+        
+      - name: memory_test
+        description: Test memory usage
+        models: [opt-350m]
+        batch_size: 32
+        max_tokens: 50

@@ -1,0 +1,170 @@
+# E2E Test Configuration
+
+# Cluster configuration
+clusters:
+  application:
+    name: bud-app
+    context: k3d-bud-app
+    namespace: bud-system
+    endpoint: http://localhost:8080
+    
+  inference:
+    name: bud-inference
+    context: k3d-bud-inference
+    namespace: inference-system
+    endpoint: http://localhost:8081
+
+# Service endpoints
+services:
+  budproxy:
+    url: http://localhost:8000
+    health_endpoint: /health
+    inference_endpoint: /v1/completions
+    timeout: 30
+    
+  aibrix:
+    url: http://localhost:8080
+    health_endpoint: /healthz
+    models_endpoint: /v1/models
+    timeout: 10
+    
+  vllm:
+    # Dynamic based on deployed models
+    default_port: 8000
+    health_endpoint: /health
+    models_endpoint: /v1/models
+
+# Test models
+models:
+  - name: test-model
+    id: facebook/opt-125m
+    type: small
+    max_tokens: 512
+    context_length: 2048
+    requires_gpu: false
+    
+  - name: llama2-7b
+    id: meta-llama/Llama-2-7b-chat-hf
+    type: medium
+    max_tokens: 4096
+    context_length: 4096
+    requires_gpu: true
+    
+  - name: mistral-7b
+    id: mistralai/Mistral-7B-Instruct-v0.1
+    type: medium
+    max_tokens: 8192
+    context_length: 8192
+    requires_gpu: true
+
+# Test data
+test_data:
+  # Simple prompts for smoke tests
+  simple_prompts:
+    - "Hello!"
+    - "Hi there"
+    - "Test"
+    
+  # Standard prompts for functional tests
+  standard_prompts:
+    - "What is the capital of France?"
+    - "Explain photosynthesis in simple terms."
+    - "Write a haiku about technology."
+    - "List three benefits of exercise."
+    - "How do you make a peanut butter sandwich?"
+    
+  # Complex prompts for stress tests
+  complex_prompts:
+    - "Explain the theory of relativity in detail, including both special and general relativity."
+    - "Write a comprehensive Python script that implements a binary search tree with all operations."
+    - "Analyze the causes and effects of the Industrial Revolution on modern society."
+    
+  # Code generation prompts
+  code_prompts:
+    - "Write a Python function to check if a number is prime"
+    - "Create a JavaScript class for a shopping cart"
+    - "Implement a SQL query to find duplicate records"
+
+# Test scenarios
+scenarios:
+  smoke:
+    description: "Basic functionality validation"
+    timeout: 60
+    models: ["test-model"]
+    prompts: simple_prompts
+    max_tokens: 50
+    
+  functional:
+    description: "Standard inference tests"
+    timeout: 120
+    models: ["test-model", "llama2-7b"]
+    prompts: standard_prompts
+    max_tokens: 200
+    
+  performance:
+    description: "Performance and latency tests"
+    timeout: 300
+    models: ["llama2-7b", "mistral-7b"]
+    prompts: standard_prompts
+    max_tokens: 500
+    concurrent_requests: 10
+    
+  stress:
+    description: "High load stress tests"
+    timeout: 600
+    models: ["test-model"]
+    prompts: complex_prompts
+    max_tokens: 1000
+    concurrent_requests: 50
+    duration: 300  # seconds
+
+# Performance thresholds
+thresholds:
+  latency:
+    p50: 2000   # ms
+    p95: 5000   # ms
+    p99: 10000  # ms
+  
+  throughput:
+    min_rps: 10  # requests per second
+    
+  error_rate:
+    max_percent: 1.0
+    
+  availability:
+    min_percent: 99.0
+
+# Monitoring
+monitoring:
+  prometheus:
+    app_cluster: http://localhost:9090
+    inference_cluster: http://localhost:9091
+    
+  grafana:
+    app_cluster: http://localhost:3000
+    inference_cluster: http://localhost:3001
+    
+  metrics:
+    - name: inference_request_duration_seconds
+      type: histogram
+    - name: inference_requests_total
+      type: counter
+    - name: model_replicas
+      type: gauge
+    - name: gpu_utilization_percent
+      type: gauge
+
+# Test execution
+execution:
+  parallel: true
+  max_workers: 4
+  retry_failed: true
+  max_retries: 3
+  continue_on_failure: true
+  
+# Reporting
+reporting:
+  html: true
+  json: true
+  junit: true
+  output_dir: test-results

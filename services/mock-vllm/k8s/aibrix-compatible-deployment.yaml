@@ -1,0 +1,252 @@
+# Mock vLLM Deployment compatible with AIBrix discovery
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: aibrix-models
+---
+# Mock Llama 2 7B Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: llama-2-7b-chat
+  namespace: aibrix-models
+  labels:
+    app: llama-2-7b-chat
+    model.aibrix.ai/name: llama-2-7b-chat
+    model.aibrix.ai/port: "8000"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      model.aibrix.ai/name: llama-2-7b-chat
+  template:
+    metadata:
+      labels:
+        app: llama-2-7b-chat
+        model.aibrix.ai/name: llama-2-7b-chat
+        model.aibrix.ai/port: "8000"
+    spec:
+      containers:
+      - name: vllm-openai
+        image: k3d-bud-registry:5111/mock-vllm:latest
+        imagePullPolicy: Always
+        args:
+          - "--host"
+          - "0.0.0.0"
+          - "--port"
+          - "8000"
+          - "--model"
+          - "meta-llama/Llama-2-7b-chat-hf"
+          - "--served-model-name"
+          - "llama-2-7b-chat"  # Must match the service name and model.aibrix.ai/name
+        env:
+        - name: MOCK_PROCESSING_DELAY
+          value: "0.1"
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        ports:
+        - name: http
+          containerPort: 8000
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+---
+# Service for Llama 2 7B
+apiVersion: v1
+kind: Service
+metadata:
+  name: llama-2-7b-chat
+  namespace: aibrix-models
+  labels:
+    model.aibrix.ai/name: llama-2-7b-chat
+spec:
+  type: ClusterIP
+  selector:
+    model.aibrix.ai/name: llama-2-7b-chat
+  ports:
+  - name: serve
+    port: 8000
+    targetPort: 8000
+    protocol: TCP
+---
+# Mock GPT-4 Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gpt-4
+  namespace: aibrix-models
+  labels:
+    app: gpt-4
+    model.aibrix.ai/name: gpt-4
+    model.aibrix.ai/port: "8000"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      model.aibrix.ai/name: gpt-4
+  template:
+    metadata:
+      labels:
+        app: gpt-4
+        model.aibrix.ai/name: gpt-4
+        model.aibrix.ai/port: "8000"
+    spec:
+      containers:
+      - name: vllm-openai
+        image: k3d-bud-registry:5111/mock-vllm:latest
+        imagePullPolicy: Always
+        args:
+          - "--host"
+          - "0.0.0.0"
+          - "--port"
+          - "8000"
+          - "--model"
+          - "openai/gpt-4"
+          - "--served-model-name"
+          - "gpt-4"
+        env:
+        - name: MOCK_PROCESSING_DELAY
+          value: "0.2"  # Slightly slower for "larger" model
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        ports:
+        - name: http
+          containerPort: 8000
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+---
+# Service for GPT-4
+apiVersion: v1
+kind: Service
+metadata:
+  name: gpt-4
+  namespace: aibrix-models
+  labels:
+    model.aibrix.ai/name: gpt-4
+spec:
+  type: ClusterIP
+  selector:
+    model.aibrix.ai/name: gpt-4
+  ports:
+  - name: serve
+    port: 8000
+    targetPort: 8000
+    protocol: TCP
+---
+# Mock Mistral 7B Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mistral-7b-instruct
+  namespace: aibrix-models
+  labels:
+    app: mistral-7b-instruct
+    model.aibrix.ai/name: mistral-7b-instruct
+    model.aibrix.ai/port: "8000"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      model.aibrix.ai/name: mistral-7b-instruct
+  template:
+    metadata:
+      labels:
+        app: mistral-7b-instruct
+        model.aibrix.ai/name: mistral-7b-instruct
+        model.aibrix.ai/port: "8000"
+    spec:
+      containers:
+      - name: vllm-openai
+        image: k3d-bud-registry:5111/mock-vllm:latest
+        imagePullPolicy: Always
+        args:
+          - "--host"
+          - "0.0.0.0"
+          - "--port"
+          - "8000"
+          - "--model"
+          - "mistralai/Mistral-7B-Instruct-v0.2"
+          - "--served-model-name"
+          - "mistral-7b-instruct"
+        env:
+        - name: MOCK_PROCESSING_DELAY
+          value: "0.15"
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        ports:
+        - name: http
+          containerPort: 8000
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+---
+# Service for Mistral 7B
+apiVersion: v1
+kind: Service
+metadata:
+  name: mistral-7b-instruct
+  namespace: aibrix-models
+  labels:
+    model.aibrix.ai/name: mistral-7b-instruct
+spec:
+  type: ClusterIP
+  selector:
+    model.aibrix.ai/name: mistral-7b-instruct
+  ports:
+  - name: serve
+    port: 8000
+    targetPort: 8000
+    protocol: TCP

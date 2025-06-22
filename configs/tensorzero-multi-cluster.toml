@@ -1,0 +1,134 @@
+# TensorZero Configuration for Multi-Cluster Testing
+# This configuration enables BudProxy to route requests to VLLM instances in the inference cluster
+
+[models]
+
+[models.llama2-7b]
+routing = ["llama2-7b-vllm"]
+
+[models.llama2-7b.providers.llama2-7b-vllm]
+type = "openai"
+base_url = "http://inference-stack-vllm-llama2-7b.inference-system.svc.cluster.local:8000/v1"
+api_key_location = { env = "OPENAI_API_KEY" }
+model_name = "meta-llama/Llama-2-7b-chat-hf"
+
+[models.mistral-7b]
+routing = ["mistral-7b-vllm"]
+
+[models.mistral-7b.providers.mistral-7b-vllm]
+type = "openai"
+base_url = "http://inference-stack-vllm-mistral-7b.inference-system.svc.cluster.local:8000/v1"
+api_key_location = { env = "OPENAI_API_KEY" }
+model_name = "mistralai/Mistral-7B-Instruct-v0.1"
+
+# For testing with a small model
+[models.test-model]
+routing = ["test-model-vllm"]
+
+[models.test-model.providers.test-model-vllm]
+type = "openai"  
+base_url = "http://inference-stack-vllm-test-model.inference-system.svc.cluster.local:8000/v1"
+api_key_location = { env = "OPENAI_API_KEY" }
+model_name = "facebook/opt-125m"
+
+# Fallback configuration for high availability
+[models.primary-llm]
+routing = ["primary", "fallback"]
+
+[models.primary-llm.providers.primary]
+type = "openai"
+base_url = "http://inference-stack-vllm-llama2-7b.inference-system.svc.cluster.local:8000/v1"
+api_key_location = { env = "OPENAI_API_KEY" }
+model_name = "meta-llama/Llama-2-7b-chat-hf"
+
+[models.primary-llm.providers.fallback]
+type = "openai"
+base_url = "http://inference-stack-vllm-mistral-7b.inference-system.svc.cluster.local:8000/v1"
+api_key_location = { env = "OPENAI_API_KEY" }
+model_name = "mistralai/Mistral-7B-Instruct-v0.1"
+
+# Functions (chat templates)
+[functions]
+
+[functions.chat_completion]
+type = "chat"
+system_schema = "static"
+system_prompt = "You are a helpful AI assistant."
+user_schema = "static" 
+assistant_schema = "static"
+
+[functions.code_generation]
+type = "chat"
+system_schema = "static"
+system_prompt = "You are an expert programmer. Generate clean, well-documented code based on the user's requirements."
+user_schema = "static"
+assistant_schema = "static"
+
+[functions.summarization]
+type = "chat"
+system_schema = "static"
+system_prompt = "You are a summarization expert. Provide concise, accurate summaries of the given text."
+user_schema = "static"
+assistant_schema = "static"
+
+# Metrics configuration
+[metrics]
+
+[metrics.provider]
+type = "clickhouse"
+host = "clickhouse-service.bud-system.svc.cluster.local"
+port = 9000
+database = "tensorzero"
+username = "default"
+password = ""
+
+[metrics.config]
+batch_size = 1000
+flush_interval_ms = 5000
+max_retries = 3
+
+# Gateway configuration
+[gateway]
+bind_address = "0.0.0.0:8000"
+
+# Request timeouts
+inference_timeout_ms = 300000  # 5 minutes for large models
+health_check_timeout_ms = 5000
+
+# Rate limiting
+[rate_limiting]
+enabled = true
+requests_per_minute = 100
+burst_size = 20
+
+# Authentication (optional)
+[authentication]
+enabled = false
+# api_key_header = "X-API-Key"
+# valid_api_keys = ["test-key-1", "test-key-2"]
+
+# Observability
+[observability]
+trace_sampling_rate = 1.0  # Sample all requests for testing
+metrics_enabled = true
+logging_level = "info"
+
+# Model-specific configurations
+[model_config]
+
+[model_config.llama2-7b]
+max_tokens = 4096
+temperature = 0.7
+top_p = 0.9
+timeout_ms = 120000
+
+[model_config.mistral-7b]
+max_tokens = 8192
+temperature = 0.7
+top_p = 0.9
+timeout_ms = 120000
+
+[model_config.test-model]
+max_tokens = 512
+temperature = 0.7
+timeout_ms = 30000

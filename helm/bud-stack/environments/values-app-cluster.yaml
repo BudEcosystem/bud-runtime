@@ -1,0 +1,144 @@
+# Application Cluster Values
+# This file contains overrides for deploying to the application cluster
+
+namespace: bud-system
+
+# Disable inference-specific services
+aibrix:
+  enabled: false
+
+vllm:
+  enabled: false
+
+# Enable application services
+gateway:
+  enabled: true
+  name: budproxy
+  image: budruntime/budproxy:latest
+  replicas: 2
+  service:
+    type: LoadBalancer
+    port: 8000
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+
+# Application microservices with increased resources
+apps:
+  - name: budapp
+    image: budruntime/budapp:latest
+    containerPort: 8080
+    daprAppId: budapp
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+    
+  - name: budmodel
+    image: budruntime/budmodel:latest
+    containerPort: 8080
+    daprAppId: budmodel
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+    
+  - name: budmetrics
+    image: budruntime/budmetrics:latest
+    containerPort: 8080
+    daprAppId: budmetrics
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+
+# Infrastructure services for app cluster
+postgres:
+  enabled: true
+  persistence:
+    size: 20Gi
+
+mongoDb:
+  enabled: true
+  persistence:
+    size: 20Gi
+
+cache:
+  enabled: true
+  persistence:
+    size: 10Gi
+
+minio:
+  enabled: true
+  persistence:
+    size: 50Gi
+
+clickhouse:
+  enabled: true
+  persistence:
+    size: 50Gi
+
+# Monitoring
+prometheus:
+  enabled: true
+  retention: 7d
+  persistence:
+    size: 20Gi
+
+grafana:
+  enabled: true
+  adminPassword: admin
+  persistence:
+    size: 5Gi
+
+# Ingress configuration for app cluster
+ingresses:
+  - name: budproxy-ingress
+    ingressClassName: traefik
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+      traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    hosts:
+      - host: api.{{ .Values.domain | default "localhost" }}
+        paths:
+          - path: /
+            pathType: Prefix
+            serviceName: budproxy-service
+            servicePort: 8000
+    tls:
+      enabled: true
+      secretName: budproxy-tls
+
+  - name: monitoring-ingress
+    ingressClassName: traefik
+    hosts:
+      - host: grafana.{{ .Values.domain | default "localhost" }}
+        paths:
+          - path: /
+            pathType: Prefix
+            serviceName: grafana
+            servicePort: 80
+      - host: prometheus.{{ .Values.domain | default "localhost" }}
+        paths:
+          - path: /
+            pathType: Prefix
+            serviceName: prometheus-kube-prometheus-prometheus
+            servicePort: 9090
+
+# Cluster-specific labels
+commonLabels:
+  cluster: app-cluster
+  environment: testing

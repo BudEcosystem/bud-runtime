@@ -1,0 +1,165 @@
+# Example configuration for deploying Llama 2 7B model with VLLM
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: llama2-7b-config
+  namespace: inference-system
+data:
+  model_config.json: |
+    {
+      "model_id": "meta-llama/Llama-2-7b-chat-hf",
+      "model_type": "causal-lm",
+      "task": "text-generation",
+      "requirements": {
+        "gpu_memory": "16GB",
+        "tensor_parallel_size": 1,
+        "compute_capability": "7.0"
+      },
+      "serving_config": {
+        "max_model_len": 4096,
+        "max_num_seqs": 256,
+        "gpu_memory_utilization": 0.9,
+        "enforce_eager": false,
+        "trust_remote_code": true,
+        "download_dir": "/models",
+        "tokenizer_mode": "auto"
+      },
+      "optimization": {
+        "quantization": null,
+        "dtype": "auto",
+        "use_flash_attn": true
+      },
+      "endpoints": {
+        "completions": "/v1/completions",
+        "chat": "/v1/chat/completions",
+        "embeddings": null
+      }
+    }
+
+---
+# Example deployment using the configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: llama2-deployment-example
+  namespace: inference-system
+data:
+  deployment.yaml: |
+    # This would typically be created by AIBrix automatically
+    # Shown here for reference
+    
+    apiVersion: apps/v1
+    kind: StatefulSet
+    metadata:
+      name: vllm-llama2-7b
+      namespace: inference-system
+      labels:
+        app: vllm
+        model: llama2-7b
+    spec:
+      serviceName: vllm-llama2-7b
+      replicas: 1
+      selector:
+        matchLabels:
+          app: vllm
+          model: llama2-7b
+      template:
+        metadata:
+          labels:
+            app: vllm
+            model: llama2-7b
+        spec:
+          nodeSelector:
+            nvidia.com/gpu.present: "true"
+          tolerations:
+          - key: nvidia.com/gpu
+            operator: Exists
+            effect: NoSchedule
+          containers:
+          - name: vllm
+            image: vllm/vllm-openai:latest
+            command: ["python", "-m", "vllm.entrypoints.openai.api_server"]
+            args:
+            - "--model"
+            - "meta-llama/Llama-2-7b-chat-hf"
+            - "--tensor-parallel-size"
+            - "1"
+            - "--max-model-len"
+            - "4096"
+            - "--gpu-memory-utilization"
+            - "0.9"
+            - "--trust-remote-code"
+            ports:
+            - containerPort: 8000
+              name: http
+            - containerPort: 8001
+              name: metrics
+            resources:
+              limits:
+                nvidia.com/gpu: 1
+                memory: 32Gi
+                cpu: 8
+              requests:
+                nvidia.com/gpu: 1
+                memory: 16Gi
+                cpu: 4
+            volumeMounts:
+            - name: model-cache
+              mountPath: /models
+            - name: shm
+              mountPath: /dev/shm
+          volumes:
+          - name: shm
+            emptyDir:
+              medium: Memory
+              sizeLimit: 16Gi
+      volumeClaimTemplates:
+      - metadata:
+          name: model-cache
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 50Gi
+
+---
+# Autoscaling configuration
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: llama2-7b-hpa
+  namespace: inference-system
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: StatefulSet
+    name: vllm-llama2-7b
+  minReplicas: 1
+  maxReplicas: 3
+  metrics:
+  - type: Resource
+    resource:
+      name: nvidia.com/gpu
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60

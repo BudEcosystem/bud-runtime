@@ -1,0 +1,54 @@
+{
+  "timestamp": "2025-06-21T15:54:36+00:00",
+  "summary": {
+    "total_tests": 25,
+    "passed_tests": 23,
+    "failed_tests": 1,
+    "skipped_tests": 1,
+    "total_duration": 284.5,
+    "scenarios": {
+      "smoke": {
+        "total": 4,
+        "passed": 4,
+        "failed": 0,
+        "duration": 5.7
+      },
+      "functional": {
+        "total": 12,
+        "passed": 11,
+        "failed": 1,
+        "duration": 78.3
+      },
+      "integration": {
+        "total": 9,
+        "passed": 8,
+        "failed": 0,
+        "duration": 200.5
+      }
+    },
+    "performance": {
+      "k6": {
+        "smoke": {
+          "avg_response_time": 245,
+          "p95_response_time": 580,
+          "p99_response_time": 920
+        },
+        "load": {
+          "avg_response_time": 380,
+          "p95_response_time": 1200,
+          "p99_response_time": 2100
+        }
+      }
+    },
+    "issues": [
+      {
+        "severity": "high",
+        "message": "1 test failed"
+      },
+      {
+        "severity": "medium",
+        "message": "load: P95 response time > 1s (1200ms)"
+      }
+    ]
+  }
+}

@@ -1,0 +1,129 @@
+{{- if .Values.ingress.enabled }}
+{{- if .Values.ingress.aibrix.enabled }}
+---
+# AIBrix Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "inference-stack.fullname" . }}-aibrix
+  namespace: {{ include "inference-stack.namespace" . }}
+  labels:
+    {{- include "inference-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: aibrix
+  annotations:
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  {{- if .Values.ingress.className }}
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- end }}
+  {{- if .Values.ingress.aibrix.tls.enabled }}
+  tls:
+  - hosts:
+    - {{ .Values.ingress.aibrix.host }}
+    secretName: {{ include "inference-stack.fullname" . }}-aibrix-tls
+  {{- end }}
+  rules:
+  - host: {{ .Values.ingress.aibrix.host }}
+    http:
+      paths:
+      - path: {{ .Values.ingress.aibrix.path }}
+        pathType: {{ .Values.ingress.aibrix.pathType }}
+        backend:
+          service:
+            name: {{ include "inference-stack.fullname" . }}-aibrix
+            port:
+              number: {{ .Values.aibrix.service.port }}
+{{- end }}
+{{- if .Values.ingress.vllm.enabled }}
+{{- range .Values.ingress.vllm.hosts }}
+---
+# VLLM Ingress for {{ .name }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "inference-stack.fullname" $ }}-vllm-{{ .name }}
+  namespace: {{ include "inference-stack.namespace" $ }}
+  labels:
+    {{- include "inference-stack.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: vllm
+    app.kubernetes.io/instance: {{ .instance }}
+  annotations:
+    {{- with $.Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  {{- if $.Values.ingress.className }}
+  ingressClassName: {{ $.Values.ingress.className }}
+  {{- end }}
+  rules:
+  - host: {{ .host }}
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ include "inference-stack.fullname" $ }}-vllm-{{ .instance }}
+            port:
+              number: {{ $.Values.vllm.defaults.service.port }}
+{{- end }}
+{{- end }}
+{{- if .Values.ingress.monitoring.enabled }}
+{{- if .Values.ingress.monitoring.grafana }}
+---
+# Grafana Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "inference-stack.fullname" . }}-grafana
+  namespace: {{ include "inference-stack.namespace" . }}
+  labels:
+    {{- include "inference-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: monitoring
+spec:
+  {{- if .Values.ingress.className }}
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- end }}
+  rules:
+  - host: {{ .Values.ingress.monitoring.grafana.host }}
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ .Values.grafana.fullnameOverride }}
+            port:
+              number: 80
+{{- end }}
+{{- if .Values.ingress.monitoring.prometheus }}
+---
+# Prometheus Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "inference-stack.fullname" . }}-prometheus
+  namespace: {{ include "inference-stack.namespace" . }}
+  labels:
+    {{- include "inference-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: monitoring
+spec:
+  {{- if .Values.ingress.className }}
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- end }}
+  rules:
+  - host: {{ .Values.ingress.monitoring.prometheus.host }}
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ .Values.prometheus.fullnameOverride }}-prometheus
+            port:
+              number: 9090
+{{- end }}
+{{- end }}
+{{- end }}

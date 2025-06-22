@@ -1,0 +1,132 @@
+# BudProxy (TensorZero Gateway) Test Deployment
+# This is a minimal deployment for E2E testing
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: bud-system
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: budproxy-config
+  namespace: bud-system
+data:
+  tensorzero.toml: |-
+    [gateway]
+    bind_address = "0.0.0.0:3000"
+
+    [models.llama_7b]
+    routing = ["vllm"]
+
+    [models.llama_7b.providers.vllm]
+    type = "vllm"
+    model_name = "llama-2-7b-chat"
+    api_base = "http://host.k3d.internal:8081/v1"
+    api_key_location = "none"
+
+    [api_keys."budserve_79m6btrZLSFKC4sbYCyUcQMNZVTSzsd0mNSAcgzQ"]
+    [api_keys."budserve_79m6btrZLSFKC4sbYCyUcQMNZVTSzsd0mNSAcgzQ".llama_7b]
+    endpoint_id = "llama_7b"
+    model_id = "019787c1-3de1-7b50-969b-e0a58514b6a2"
+    project_id = "019787c1-3de1-7b50-969b-e0a58514b6a1"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: budproxy
+  namespace: bud-system
+  labels:
+    app: budproxy
+    component: gateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: budproxy
+  template:
+    metadata:
+      labels:
+        app: budproxy
+        component: gateway
+    spec:
+      containers:
+        - name: budproxy
+          image: k3d-bud-registry:5000/budproxy:nightly
+          imagePullPolicy: Always
+          command: ["gateway"]
+          args:
+            - --config-file
+            - /app/config/tensorzero.toml
+          ports:
+            - containerPort: 3000
+              name: http
+          env: []
+          # Note: In production, would include:
+          # - TENSORZERO_REDIS_URL (if Redis is deployed)
+          # - TENSORZERO_CLICKHOUSE_URL (if ClickHouse is deployed)
+          # - Other configuration environment variables
+          volumeMounts:
+            - name: config-volume
+              mountPath: /app/config
+          resources:
+            limits:
+              cpu: 1000m
+              memory: 2048Mi
+            requests:
+              cpu: 500m
+              memory: 1024Mi
+          livenessProbe:
+            httpGet:
+              path: /status
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /status
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: config-volume
+          configMap:
+            name: budproxy-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: budproxy-service
+  namespace: bud-system
+  labels:
+    app: budproxy
+    component: gateway
+spec:
+  selector:
+    app: budproxy
+  ports:
+    - protocol: TCP
+      port: 3000
+      targetPort: 3000
+      name: http
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: budproxy
+  namespace: bud-system
+  annotations:
+    ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: budproxy-service
+                port:
+                  number: 3000

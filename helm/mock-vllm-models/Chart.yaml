@@ -1,0 +1,12 @@
+apiVersion: v2
+name: mock-vllm-models
+description: Mock vLLM models for AIBrix integration testing
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - vllm
+  - mock
+  - aibrix
+  - models
+  - testing

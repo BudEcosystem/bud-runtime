@@ -1,0 +1,148 @@
+# Default values for mock-vllm-models
+# This chart deploys multiple mock vLLM instances that are discoverable by AIBrix
+
+# Global configuration
+global:
+  namespace: aibrix-models
+  registry: k3d-bud-registry:5111
+  mockVllmImage:
+    repository: mock-vllm
+    tag: latest
+    pullPolicy: Always
+
+# Model configurations
+models:
+  # Llama 2 7B Chat
+  - name: llama-2-7b-chat
+    enabled: true
+    modelPath: meta-llama/Llama-2-7b-chat-hf
+    replicas: 1
+    processingDelay: "0.1"
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    env: []
+    
+  # GPT-4
+  - name: gpt-4
+    enabled: true
+    modelPath: openai/gpt-4
+    replicas: 1
+    processingDelay: "0.2"
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+    env: []
+    
+  # GPT-3.5 Turbo
+  - name: gpt-3.5-turbo
+    enabled: true
+    modelPath: openai/gpt-3.5-turbo
+    replicas: 1
+    processingDelay: "0.1"
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    env: []
+    
+  # Mistral 7B Instruct
+  - name: mistral-7b-instruct
+    enabled: true
+    modelPath: mistralai/Mistral-7B-Instruct-v0.2
+    replicas: 1
+    processingDelay: "0.15"
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    env: []
+    
+  # Deepseek Coder
+  - name: deepseek-coder-6.7b
+    enabled: false
+    modelPath: deepseek-ai/deepseek-coder-6.7b-instruct
+    replicas: 1
+    processingDelay: "0.15"
+    resources:
+      requests:
+        cpu: 150m
+        memory: 384Mi
+      limits:
+        cpu: 750m
+        memory: 768Mi
+    env: []
+    
+  # Qwen 2.5 Coder
+  - name: qwen-coder-1.5b
+    enabled: false
+    modelPath: Qwen/Qwen2.5-Coder-1.5B-Instruct
+    replicas: 1
+    processingDelay: "0.08"
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 400m
+        memory: 512Mi
+    env: []
+
+# Common probe settings
+probes:
+  liveness:
+    httpGet:
+      path: /health
+      port: 8000
+    initialDelaySeconds: 10
+    periodSeconds: 30
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readiness:
+    httpGet:
+      path: /health
+      port: 8000
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 8000
+  targetPort: 8000
+
+# Common environment variables for all models
+commonEnv:
+  - name: PYTHONUNBUFFERED
+    value: "1"
+
+# Node selector for all deployments
+nodeSelector: {}
+
+# Tolerations for all deployments
+tolerations: []
+
+# Affinity rules for all deployments
+affinity: {}
+
+# Pod annotations
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8000"
+  prometheus.io/path: "/metrics"

@@ -1,0 +1,275 @@
+# Inference Cluster Values
+# This file contains overrides for deploying to the inference cluster
+
+namespace: bud-system
+
+# Enable inference services
+aibrix:
+  enabled: true
+  name: aibrix
+  image: budruntime/aibrix:latest
+  replicas: 2
+  containerPort: 8080
+  metricsPort: 9090
+  servicePort: 8080
+  
+  # RBAC and permissions
+  serviceAccount: aibrix
+  
+  # Resource allocation for control plane
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+  
+  # Node selection for control plane
+  nodeSelector:
+    cluster-type: inference
+  
+  # Autoscaling configuration
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 10
+    targetGPUUtilization: 80
+    scaleDownDelaySeconds: 300
+  
+  # Resource management
+  resources:
+    defaultGPUPerModel: 1
+    maxGPUPerModel: 4
+    defaultMemoryPerModel: "16Gi"
+  
+  # VLLM integration
+  vllm:
+    defaultArgs:
+      - "--trust-remote-code"
+      - "--enable-lora"
+    healthCheckInterval: "30s"
+    startupTimeout: "10m"
+  
+  # Model storage
+  modelBucket: models
+  
+  # Observability
+  serviceMonitor:
+    enabled: true
+  tracing:
+    enabled: false
+
+vllm:
+  enabled: true
+  image: vllm/vllm-openai:latest
+  imagePullPolicy: IfNotPresent
+  
+  # Default resources for VLLM instances
+  defaultResources:
+    requests:
+      cpu: 4
+      memory: 16Gi
+      nvidia.com/gpu: 1
+    limits:
+      cpu: 8
+      memory: 32Gi
+      nvidia.com/gpu: 1
+  
+  # Default configuration
+  defaultPort: 8000
+  metricsPort: 8001
+  servicePort: 8000
+  serviceType: ClusterIP
+  
+  # Storage configuration
+  storageClassName: local-path
+  
+  # Node selection for GPU workloads
+  nodeSelector:
+    nvidia.com/gpu.present: "true"
+    workload-type: gpu
+  
+  # GPU-specific tolerations
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+  
+  # Monitoring
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+  
+  # VLLM instances configuration
+  instances:
+    - name: llama2-7b
+      model: meta-llama/Llama-2-7b-chat-hf
+      replicas: 1
+      downloadModel: true
+      storageSize: 50Gi
+      shmSize: 16Gi
+      
+      # Model-specific parameters
+      tensorParallelSize: 1
+      maxModelLen: 4096
+      gpuMemoryUtilization: 0.9
+      maxNumSeqs: 256
+      
+      # Resources
+      resources:
+        requests:
+          cpu: 4
+          memory: 16Gi
+          nvidia.com/gpu: 1
+        limits:
+          cpu: 8
+          memory: 32Gi
+          nvidia.com/gpu: 1
+      
+      # Autoscaling
+      autoscaling:
+        enabled: true
+        minReplicas: 1
+        maxReplicas: 3
+        targetGPUUtilizationPercentage: 80
+        scaleUp:
+          stabilizationWindowSeconds: 60
+          percent: 100
+          periodSeconds: 60
+        scaleDown:
+          stabilizationWindowSeconds: 300
+          percent: 10
+          periodSeconds: 60
+      
+      # Health checks
+      livenessProbe:
+        initialDelaySeconds: 300
+        periodSeconds: 30
+        timeoutSeconds: 10
+        failureThreshold: 3
+      readinessProbe:
+        initialDelaySeconds: 30
+        periodSeconds: 10
+        timeoutSeconds: 5
+        successThreshold: 1
+    
+    - name: mistral-7b
+      model: mistralai/Mistral-7B-Instruct-v0.1
+      replicas: 1
+      downloadModel: true
+      storageSize: 50Gi
+      shmSize: 16Gi
+      
+      tensorParallelSize: 1
+      maxModelLen: 8192
+      gpuMemoryUtilization: 0.9
+      
+      resources:
+        requests:
+          cpu: 4
+          memory: 16Gi
+          nvidia.com/gpu: 1
+        limits:
+          cpu: 8
+          memory: 32Gi
+          nvidia.com/gpu: 1
+      
+      autoscaling:
+        enabled: false
+
+# Disable application-specific services
+gateway:
+  enabled: false
+
+apps: []
+
+# Minimal infrastructure for inference cluster
+postgres:
+  enabled: false
+
+mongoDb:
+  enabled: false
+
+cache:
+  enabled: true
+  persistence:
+    size: 10Gi
+
+minio:
+  enabled: true
+  persistence:
+    size: 200Gi  # Larger for model storage
+
+clickhouse:
+  enabled: false
+
+# Monitoring with GPU metrics
+prometheus:
+  enabled: true
+  retention: 7d
+  persistence:
+    size: 20Gi
+  additionalScrapeConfigs:
+    - job_name: gpu-metrics
+      scrape_interval: 30s
+      kubernetes_sd_configs:
+        - role: endpoints
+          namespaces:
+            names:
+              - gpu-operator
+      relabel_configs:
+        - source_labels: [__meta_kubernetes_service_name]
+          regex: nvidia-dcgm-exporter
+          action: keep
+
+grafana:
+  enabled: true
+  adminPassword: admin
+  persistence:
+    size: 5Gi
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+        - name: 'gpu-dashboards'
+          orgId: 1
+          folder: 'GPU'
+          type: file
+          disableDeletion: false
+          updateIntervalSeconds: 60
+          options:
+            path: /var/lib/grafana/dashboards/gpu-dashboards
+
+# Ingress for inference services
+ingresses:
+  - name: aibrix-ingress
+    ingressClassName: traefik
+    hosts:
+      - host: aibrix.{{ .Values.domain | default "localhost" }}
+        paths:
+          - path: /
+            pathType: Prefix
+            serviceName: aibrix-service
+            servicePort: 8080
+  
+  - name: vllm-ingress
+    ingressClassName: traefik
+    hosts:
+      - host: llama2.{{ .Values.domain | default "localhost" }}
+        paths:
+          - path: /
+            pathType: Prefix
+            serviceName: vllm-llama2-7b
+            servicePort: 8000
+      - host: mistral.{{ .Values.domain | default "localhost" }}
+        paths:
+          - path: /
+            pathType: Prefix
+            serviceName: vllm-mistral-7b
+            servicePort: 8000
+
+# Cluster-specific labels
+commonLabels:
+  cluster: inference-cluster
+  environment: testing

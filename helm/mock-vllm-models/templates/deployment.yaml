@@ -1,0 +1,80 @@
+{{- range .Values.models }}
+{{- if .enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .name }}
+  namespace: {{ $.Values.global.namespace }}
+  labels:
+    app: {{ .name }}
+    model.aibrix.ai/name: {{ .name }}
+    model.aibrix.ai/port: {{ $.Values.service.port | quote }}
+    {{- include "mock-vllm-models.labels" $ | nindent 4 }}
+spec:
+  replicas: {{ .replicas | default 1 }}
+  selector:
+    matchLabels:
+      model.aibrix.ai/name: {{ .name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .name }}
+        model.aibrix.ai/name: {{ .name }}
+        model.aibrix.ai/port: {{ $.Values.service.port | quote }}
+        {{- include "mock-vllm-models.selectorLabels" $ | nindent 8 }}
+      {{- with $.Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      containers:
+      - name: vllm-openai
+        image: "{{ $.Values.global.registry }}/{{ $.Values.global.mockVllmImage.repository }}:{{ $.Values.global.mockVllmImage.tag }}"
+        imagePullPolicy: {{ $.Values.global.mockVllmImage.pullPolicy }}
+        args:
+          - "--host"
+          - "0.0.0.0"
+          - "--port"
+          - {{ $.Values.service.targetPort | quote }}
+          - "--model"
+          - {{ .modelPath | quote }}
+          - "--served-model-name"
+          - {{ .name | quote }}
+        env:
+        - name: MOCK_PROCESSING_DELAY
+          value: {{ .processingDelay | quote }}
+        {{- with $.Values.commonEnv }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- with .env }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        ports:
+        - name: http
+          containerPort: {{ $.Values.service.targetPort }}
+          protocol: TCP
+        {{- with $.Values.probes.liveness }}
+        livenessProbe:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- with $.Values.probes.readiness }}
+        readinessProbe:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        resources:
+          {{- toYaml .resources | nindent 10 }}
+      {{- with $.Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $.Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $.Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}
+{{- end }}

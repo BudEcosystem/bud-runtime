@@ -1,0 +1,117 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mock-vllm.fullname" . }}
+  labels:
+    {{- include "mock-vllm.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "mock-vllm.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "mock-vllm.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: {{ .Chart.Name }}
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 12 }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        args:
+          - "--host"
+          - "0.0.0.0"
+          - "--port"
+          - "{{ .Values.service.targetPort }}"
+          - "--model"
+          - "{{ .Values.config.model }}"
+          {{- if .Values.config.servedModelNames }}
+          - "--served-model-name"
+          {{- range .Values.config.servedModelNames }}
+          - "{{ . }}"
+          {{- end }}
+          {{- end }}
+          - "--uvicorn-log-level"
+          - "{{ .Values.config.logLevel }}"
+          {{- if .Values.config.apiKey }}
+          - "--api-key"
+          - "{{ .Values.config.apiKey }}"
+          {{- end }}
+          {{- if .Values.config.disableFastApiDocs }}
+          - "--disable-fastapi-docs"
+          {{- end }}
+          {{- if .Values.config.disableMetrics }}
+          - "--disable-metrics"
+          {{- end }}
+          {{- if .Values.config.disableRequestLogging }}
+          - "--disable-log-requests"
+          {{- end }}
+          {{- if .Values.config.allowedOrigins }}
+          - "--allowed-origins"
+          {{- range .Values.config.allowedOrigins }}
+          - "{{ . }}"
+          {{- end }}
+          {{- end }}
+          {{- if .Values.config.allowCredentials }}
+          - "--allow-credentials"
+          {{- end }}
+          {{- if .Values.config.allowedMethods }}
+          - "--allowed-methods"
+          {{- range .Values.config.allowedMethods }}
+          - "{{ . }}"
+          {{- end }}
+          {{- end }}
+          {{- if .Values.config.allowedHeaders }}
+          - "--allowed-headers"
+          {{- range .Values.config.allowedHeaders }}
+          - "{{ . }}"
+          {{- end }}
+          {{- end }}
+        env:
+        - name: MOCK_PROCESSING_DELAY
+          value: "{{ .Values.config.processingDelay }}"
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        {{- if .Values.config.apiKey }}
+        - name: VLLM_API_KEY
+          value: "{{ .Values.config.apiKey }}"
+        {{- end }}
+        {{- with .Values.env }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.service.targetPort }}
+          protocol: TCP
+        livenessProbe:
+          {{- toYaml .Values.livenessProbe | nindent 10 }}
+        readinessProbe:
+          {{- toYaml .Values.readinessProbe | nindent 10 }}
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

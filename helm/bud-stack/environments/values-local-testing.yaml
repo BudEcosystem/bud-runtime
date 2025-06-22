@@ -1,0 +1,182 @@
+# Local Testing Values
+# This file contains minimal configuration for local development and testing
+
+namespace: bud-system
+
+# Enable minimal services for testing
+gateway:
+  enabled: true
+  name: budproxy
+  image: budruntime/budproxy:latest
+  replicas: 1
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+
+aibrix:
+  enabled: true
+  name: aibrix
+  image: budruntime/aibrix:latest
+  replicas: 1
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+  
+  # Disable autoscaling for local testing
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 1
+
+vllm:
+  enabled: true
+  image: vllm/vllm-openai:latest
+  
+  # Minimal resources for local testing
+  defaultResources:
+    requests:
+      cpu: 2
+      memory: 8Gi
+    limits:
+      cpu: 4
+      memory: 16Gi
+  
+  # Single test instance
+  instances:
+    - name: test-model
+      model: facebook/opt-125m  # Small model for testing
+      replicas: 1
+      downloadModel: true
+      storageSize: 10Gi
+      shmSize: 4Gi
+      
+      # Disable GPU for local testing
+      resources:
+        requests:
+          cpu: 2
+          memory: 4Gi
+        limits:
+          cpu: 4
+          memory: 8Gi
+      
+      # Disable autoscaling
+      autoscaling:
+        enabled: false
+      
+      # Faster health checks for testing
+      livenessProbe:
+        initialDelaySeconds: 60
+        periodSeconds: 10
+      readinessProbe:
+        initialDelaySeconds: 10
+        periodSeconds: 5
+
+# Minimal app services
+apps:
+  - name: budapp
+    image: budruntime/budapp:latest
+    containerPort: 8080
+    daprAppId: budapp
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+# Use in-memory databases for testing
+postgres:
+  enabled: true
+  persistence:
+    size: 5Gi
+  auth:
+    database: testdb
+    username: testuser
+    password: testpass
+
+mongoDb:
+  enabled: false
+
+cache:
+  enabled: true
+  persistence:
+    enabled: false  # Use memory only
+  auth:
+    enabled: false
+
+minio:
+  enabled: true
+  mode: standalone
+  persistence:
+    size: 10Gi
+  defaultBuckets: "models,artifacts"
+  auth:
+    rootUser: minioadmin
+    rootPassword: minioadmin
+
+clickhouse:
+  enabled: false
+
+# Minimal monitoring
+prometheus:
+  enabled: true
+  retention: 1d
+  persistence:
+    size: 5Gi
+  prometheus:
+    prometheusSpec:
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          cpu: 500m
+          memory: 1Gi
+
+grafana:
+  enabled: true
+  adminPassword: admin
+  persistence:
+    enabled: false
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# No ingress for local testing (use port-forward)
+ingresses: []
+
+# Local testing labels
+commonLabels:
+  cluster: local
+  environment: testing
+  
+# Global environment for local testing
+globalEnv:
+  data:
+    ENVIRONMENT: local
+    LOG_LEVEL: debug
+    DATABASE_HOST: postgres-service
+    DATABASE_PORT: "5432"
+    DATABASE_NAME: testdb
+    DATABASE_USER: testuser
+    DATABASE_PASSWORD: testpass
+    REDIS_HOST: cache-service
+    REDIS_PORT: "6379"
+    MINIO_ENDPOINT: minio-service:9000
+    MINIO_ACCESS_KEY: minioadmin
+    MINIO_SECRET_KEY: minioadmin
+    ENABLE_METRICS: "true"
+    ENABLE_TRACING: "false"

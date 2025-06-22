@@ -1,0 +1,186 @@
+# Example configuration for deploying Mistral 7B model with VLLM
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mistral-7b-config
+  namespace: inference-system
+data:
+  model_config.json: |
+    {
+      "model_id": "mistralai/Mistral-7B-Instruct-v0.1",
+      "model_type": "causal-lm",
+      "task": "text-generation",
+      "requirements": {
+        "gpu_memory": "16GB",
+        "tensor_parallel_size": 1,
+        "compute_capability": "7.0"
+      },
+      "serving_config": {
+        "max_model_len": 8192,
+        "max_num_seqs": 256,
+        "gpu_memory_utilization": 0.9,
+        "enforce_eager": false,
+        "trust_remote_code": true,
+        "download_dir": "/models",
+        "tokenizer_mode": "auto",
+        "sliding_window": 4096
+      },
+      "optimization": {
+        "quantization": null,
+        "dtype": "bfloat16",
+        "use_flash_attn": true
+      },
+      "model_specific": {
+        "rope_theta": 10000.0,
+        "sliding_window": 4096,
+        "attention_dropout": 0.0
+      },
+      "endpoints": {
+        "completions": "/v1/completions",
+        "chat": "/v1/chat/completions",
+        "embeddings": null
+      }
+    }
+
+---
+# Example AIBrix CRD for model deployment
+apiVersion: aibrix.ai/v1alpha1
+kind: ModelDeployment
+metadata:
+  name: mistral-7b
+  namespace: inference-system
+spec:
+  model:
+    name: mistral-7b
+    source:
+      type: huggingface
+      model_id: mistralai/Mistral-7B-Instruct-v0.1
+      revision: main
+  
+  runtime:
+    type: vllm
+    image: vllm/vllm-openai:latest
+    version: latest
+  
+  resources:
+    requests:
+      cpu: 4
+      memory: 16Gi
+      nvidia.com/gpu: 1
+    limits:
+      cpu: 8
+      memory: 32Gi
+      nvidia.com/gpu: 1
+  
+  serving:
+    replicas: 1
+    args:
+      - "--max-model-len=8192"
+      - "--gpu-memory-utilization=0.9"
+      - "--trust-remote-code"
+      - "--dtype=bfloat16"
+      - "--enforce-eager=false"
+    
+    ports:
+      http: 8000
+      metrics: 8001
+    
+    healthCheck:
+      enabled: true
+      path: /health
+      initialDelaySeconds: 300
+      periodSeconds: 30
+    
+    volumes:
+      - name: model-cache
+        size: 50Gi
+        mountPath: /models
+      - name: shm
+        size: 16Gi
+        mountPath: /dev/shm
+        medium: Memory
+  
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 4
+    metrics:
+      - type: gpu
+        targetUtilization: 80
+      - type: memory
+        targetUtilization: 85
+      - type: custom
+        metric: requests_per_second
+        targetValue: 100
+    behavior:
+      scaleUp:
+        stabilizationWindowSeconds: 30
+        policies:
+          - type: Percent
+            value: 100
+            periodSeconds: 30
+      scaleDown:
+        stabilizationWindowSeconds: 300
+        policies:
+          - type: Pods
+            value: 1
+            periodSeconds: 60
+  
+  monitoring:
+    prometheus:
+      enabled: true
+      port: 8001
+      path: /metrics
+    logging:
+      level: info
+      format: json
+  
+  placement:
+    nodeSelector:
+      nvidia.com/gpu.present: "true"
+      node.kubernetes.io/instance-type: "gpu-node"
+    tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                  - key: model
+                    operator: In
+                    values:
+                      - mistral-7b
+              topologyKey: kubernetes.io/hostname
+
+---
+# Service configuration for load balancing
+apiVersion: v1
+kind: Service
+metadata:
+  name: mistral-7b-lb
+  namespace: inference-system
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+spec:
+  type: LoadBalancer
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+      protocol: TCP
+    - name: metrics
+      port: 8001
+      targetPort: 8001
+      protocol: TCP
+  selector:
+    app: vllm
+    model: mistral-7b

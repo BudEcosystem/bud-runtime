@@ -1,0 +1,266 @@
+{{- if .Values.aibrix.enabled }}
+---
+# AIBrix ServiceAccount
+{{- if .Values.aibrix.serviceAccount.create }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "inference-stack.aibrix.serviceAccountName" . }}
+  namespace: {{ include "inference-stack.namespace" . }}
+  labels:
+    {{- include "inference-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: aibrix
+  {{- with .Values.aibrix.serviceAccount.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}
+---
+# AIBrix ClusterRole
+{{- if .Values.aibrix.rbac.create }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "inference-stack.fullname" . }}-aibrix
+  labels:
+    {{- include "inference-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: aibrix
+rules:
+- apiGroups: [""]
+  resources: ["pods", "pods/log", "pods/status", "services", "endpoints", "persistentvolumeclaims", "configmaps", "secrets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "daemonsets", "replicasets", "statefulsets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["batch"]
+  resources: ["jobs", "cronjobs"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["autoscaling"]
+  resources: ["horizontalpodautoscalers"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["ingresses", "networkpolicies"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["metrics.k8s.io"]
+  resources: ["pods", "nodes"]
+  verbs: ["get", "list"]
+- apiGroups: ["aibrix.ai"]
+  resources: ["*"]
+  verbs: ["*"]
+---
+# AIBrix ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "inference-stack.fullname" . }}-aibrix
+  labels:
+    {{- include "inference-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: aibrix
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "inference-stack.fullname" . }}-aibrix
+subjects:
+- kind: ServiceAccount
+  name: {{ include "inference-stack.aibrix.serviceAccountName" . }}
+  namespace: {{ include "inference-stack.namespace" . }}
+{{- end }}
+---
+# AIBrix ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "inference-stack.fullname" . }}-aibrix-config
+  namespace: {{ include "inference-stack.namespace" . }}
+  labels:
+    {{- include "inference-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: aibrix
+data:
+  config.yaml: |
+    # AIBrix Configuration
+    server:
+      port: {{ .Values.aibrix.ports.http }}
+      metricsPort: {{ .Values.aibrix.ports.metrics }}
+    
+    controller:
+      reconcileInterval: {{ .Values.aibrix.config.controller.reconcileInterval }}
+      maxConcurrentReconciles: {{ .Values.aibrix.config.controller.maxConcurrentReconciles }}
+      
+      # Model registry settings
+      modelRegistry:
+        type: {{ .Values.aibrix.config.modelRegistry.type }}
+        endpoint: {{ .Values.aibrix.config.modelRegistry.endpoint }}
+        bucket: {{ .Values.aibrix.config.modelRegistry.bucket }}
+        region: {{ .Values.aibrix.config.modelRegistry.region }}
+        {{- if .Values.minio.enabled }}
+        accessKey: {{ .Values.minio.accessKey }}
+        secretKey: {{ .Values.minio.secretKey }}
+        {{- end }}
+      
+      # Autoscaling configuration
+      autoscaling:
+        enabled: {{ .Values.aibrix.config.autoscaling.enabled }}
+        minReplicas: {{ .Values.aibrix.config.autoscaling.minReplicas }}
+        maxReplicas: {{ .Values.aibrix.config.autoscaling.maxReplicas }}
+        targetGPUUtilization: {{ .Values.aibrix.config.autoscaling.targetGPUUtilization }}
+        scaleDownDelaySeconds: {{ .Values.aibrix.config.autoscaling.scaleDownDelaySeconds }}
+      
+      # Resource management
+      resources:
+        defaultGPUPerModel: {{ .Values.aibrix.config.resources.defaultGPUPerModel }}
+        maxGPUPerModel: {{ .Values.aibrix.config.resources.maxGPUPerModel }}
+        defaultMemoryPerModel: {{ .Values.aibrix.config.resources.defaultMemoryPerModel }}
+      
+      # VLLM integration
+      vllm:
+        defaultImage: {{ .Values.aibrix.config.vllm.defaultImage }}
+        defaultArgs: {{ .Values.aibrix.config.vllm.defaultArgs | toJson }}
+        healthCheckInterval: {{ .Values.aibrix.config.vllm.healthCheckInterval }}
+        startupTimeout: {{ .Values.aibrix.config.vllm.startupTimeout }}
+    
+    # Observability
+    telemetry:
+      prometheus:
+        enabled: {{ .Values.aibrix.metrics.enabled }}
+        path: /metrics
+---
+# AIBrix Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "inference-stack.fullname" . }}-aibrix
+  namespace: {{ include "inference-stack.namespace" . }}
+  labels:
+    {{- include "inference-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: aibrix
+spec:
+  replicas: {{ .Values.aibrix.replicas }}
+  selector:
+    matchLabels:
+      {{- include "inference-stack.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: aibrix
+  template:
+    metadata:
+      labels:
+        {{- include "inference-stack.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: aibrix
+      annotations:
+        checksum/config: {{ .Values | toYaml | sha256sum }}
+        {{- if .Values.aibrix.metrics.enabled }}
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "{{ .Values.aibrix.ports.metrics }}"
+        prometheus.io/path: "/metrics"
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "inference-stack.aibrix.serviceAccountName" . }}
+      {{- with .Values.aibrix.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.aibrix.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.aibrix.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: aibrix
+        image: "{{ .Values.aibrix.image.repository }}:{{ .Values.aibrix.image.tag }}"
+        imagePullPolicy: {{ .Values.aibrix.image.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.aibrix.ports.http }}
+          protocol: TCP
+        - name: metrics
+          containerPort: {{ .Values.aibrix.ports.metrics }}
+          protocol: TCP
+        - name: webhook
+          containerPort: {{ .Values.aibrix.ports.webhook }}
+          protocol: TCP
+        env:
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        {{- range $key, $value := .Values.aibrix.env }}
+        - name: {{ $key }}
+          value: {{ $value | quote }}
+        {{- end }}
+        volumeMounts:
+        - name: config
+          mountPath: /etc/aibrix
+          readOnly: true
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          {{- toYaml .Values.aibrix.resources | nindent 10 }}
+      volumes:
+      - name: config
+        configMap:
+          name: {{ include "inference-stack.fullname" . }}-aibrix-config
+---
+# AIBrix Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "inference-stack.fullname" . }}-aibrix
+  namespace: {{ include "inference-stack.namespace" . }}
+  labels:
+    {{- include "inference-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: aibrix
+spec:
+  type: {{ .Values.aibrix.service.type }}
+  ports:
+  - name: http
+    port: {{ .Values.aibrix.service.port }}
+    targetPort: http
+    protocol: TCP
+  - name: metrics
+    port: {{ .Values.aibrix.ports.metrics }}
+    targetPort: metrics
+    protocol: TCP
+  - name: webhook
+    port: {{ .Values.aibrix.ports.webhook }}
+    targetPort: webhook
+    protocol: TCP
+  selector:
+    {{- include "inference-stack.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: aibrix
+---
+# AIBrix ServiceMonitor
+{{- if and .Values.aibrix.metrics.enabled .Values.aibrix.metrics.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "inference-stack.fullname" . }}-aibrix
+  namespace: {{ include "inference-stack.namespace" . }}
+  labels:
+    {{- include "inference-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: aibrix
+spec:
+  selector:
+    matchLabels:
+      {{- include "inference-stack.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: aibrix
+  endpoints:
+  - port: metrics
+    interval: {{ .Values.aibrix.metrics.serviceMonitor.interval }}
+    path: /metrics
+{{- end }}
+{{- end }}
