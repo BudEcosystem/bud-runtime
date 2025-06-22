@@ -24,3 +24,7 @@ dependencies:
   - name: clickhouse
     version: 0.2.5
     repository: https://helm.altinity.com
+
+  - name: kafka
+    version: 32.2.16  # specify the version of the kafka chart you want to use
+    repository: https://charts.bitnami.com/bitnami

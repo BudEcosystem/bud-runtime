@@ -147,6 +147,8 @@ globalEnv:
 
         TENSORZERO_REDIS_URL: "redis://gateway-redis:6379"
         APP_PORT_BUDPROXY: "3000"
+        CLICKHOUSE_USER: "test_user"
+        CLICKHOUSE_PASSWORD: "test_password"
 
 minio:
     enabled: true # Set to false if using external Minio/S3
@@ -499,14 +501,18 @@ apps:
       appTopicRoute: "/notifications"
       envFrom: "{{ .Values.globalEnv.configMapName }}"
       env:
-          - name: PSQL_PORT
-            value: "{{ .Values.globalEnv.data.PSQL_PORT_BUDMETRICS }}" # Override global
-          - name: PSQL_DB_NAME
-            value: "{{ .Values.globalEnv.data.PSQL_DB_NAME_BUDMETRICS }}" # Override global
-          - name: PSQL_HOST # Override global
-            value: "<METRICS_POSTGRES_SERVICE_HOST>.<NAMESPACE>" # e.g., postgresql-metrics.dapr-system
           - name: INFERENCE_URL
             value: "http://<INFERENCE_SERVICE_HOST>:<PORT>/classify"
+          - name: CLICKHOUSE_HOST
+            value: "clickhouse-bootstrap"
+          - name: CLICKHOUSE_PORT
+            value: "9000"
+          - name: CLICKHOUSE_DB_NAME
+            value: "bud"
+          - name: SECRETS_CLICKHOUSE_USER
+            value: "test_user"
+          - name: SECRETS_CLICKHOUSE_PASSWORD
+            value: "test_password"
       resources:
           limits:
               memory: "32Gi"
@@ -876,6 +882,20 @@ budproxy:
         [gateway]
         bind_address = "0.0.0.0:3000"
 
+        [gateway.observability.kafka]
+        enabled = true
+        brokers = {{ .Release.Name }}-kafka.{{ .Values.namespace }}.svc.cluster.local:9092
+        topic_prefix = "tensorzero"
+        compression_type = "lz4"
+        batch_size = 1000
+        linger_ms = 10
+        security_protocol = "SASL_PLAINTEXT"
+
+        [gateway.observability.kafka.sasl]
+        mechanism = "PLAIN"
+        username = "user1"
+        password = "Htf1v4PW72"
+
 
 clickhouse:
   defaultUser:
@@ -884,3 +904,23 @@ clickhouse:
   image:
     repository: "altinity/clickhouse-server"
     tag: "24.8.14.10459.altinitystable"
+
+
+kafka:
+  persistence:
+    enabled: true
+    existingClaim: kafka-pvc
+  configurationOverrides:
+    - "process.roles=broker,controller"
+    - "node.id=1"
+    - "controller.quorum.voters=1@localhost:9093"
+    - "listeners=PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093"
+    - "advertised.listeners=PLAINTEXT://kafka:9092"
+    - "inter.broker.listener.name=PLAINTEXT"
+    - "listener.security.protocol.map=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT"
+    - "log.dirs=/bitnami/kafka/data"
+    - "log.retention.hours=168"
+    - "log.segment.bytes=1073741824"
+    - "log.retention.check.interval.ms=300000"
+  sasl:
+    interBrokerPassword: "REPLACE_WITH_PASSWORD"
