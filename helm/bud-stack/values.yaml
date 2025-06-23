@@ -412,7 +412,7 @@ apps:
       timeoutSeconds: 5
       failureThreshold: 3
   - name: "askbud"
-    image: "budstudio/askbud0.1.0"
+    image: "budstudio/askbud:0.1.0"
     containerPort: 3000
     daprAppId: "askbud"
     appTopic: "askbud"
