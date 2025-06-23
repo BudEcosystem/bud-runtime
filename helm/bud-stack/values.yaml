@@ -326,7 +326,7 @@ apps:
       - name: "models-registry-pv"
         mountPath: "{{ .Values.globalEnv.data.MODEL_REGISTRY_DIR }}"
   - name: "budmodel"
-    image: "<YOUR_REGISTRY>/<BUDMODEL_IMAGE_NAME>:<TAG>"
+    image: "budstudio/budmodel:0.1.0"
     containerPort: 3004
     daprAppId: "budmodel"
     # pvcName: "budmodel-pvc"
