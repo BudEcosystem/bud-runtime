@@ -61,6 +61,7 @@ jobs:
 
       - name: Update values.yaml with new tag
         run: |
+          git pull origin main
           export APP=${{ matrix.app }}
           export IMAGE=${{ matrix.image }}
           export TAG=${{ steps.get_latest_tag.outputs.tag }}
@@ -70,8 +71,6 @@ jobs:
 
       - name: Commit and push changes
         run: |
-          git stash
-          git pull origin main
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git add ./helm/bud-stack/values.yaml
