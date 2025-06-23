@@ -1,0 +1,103 @@
+name: Update Docker Images in values.yaml (Skip nightly tags)
+
+on:
+  schedule:
+    - cron: '0 * * * *'  # every hour
+  workflow_dispatch:
+
+jobs:
+  update-images:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        include:
+          - app: budapp
+            image: budstudio/budapp
+          - app: budsim
+            image: budstudio/budsim
+          - app: askbud
+            image: budstudio/askbud
+          - app: budmetrics
+            image: budstudio/budmetrics
+          - app: budui
+            image: budstudio/bud-dashboard
+          - app: budmodel
+            image: budstudio/budmodel
+          - app: budproxy
+            image: budstudio/budproxy
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl jq
+          sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq
+          sudo chmod +x /usr/bin/yq
+
+      - name: Get latest non-nightly tag from Docker Hub
+        id: get_latest_tag
+        run: |
+          REPO=${{ matrix.image }}
+          echo "Fetching tags for $REPO ..."
+          TAG=$(curl -s "https://registry.hub.docker.com/v2/repositories/$REPO/tags?page_size=100" \
+            | jq -r '.results[].name' \
+            | grep -v nightly \
+            | sort -V \
+            | tail -1)
+          echo "Latest tag for $REPO (excluding nightly): $TAG"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Fetch image digest
+        id: fetch_digest
+        run: |
+          REPO=${{ matrix.image }}
+          TAG=${{ steps.get_latest_tag.outputs.tag }}
+          # Fetch Docker manifest digest
+          DIGEST=$(curl -s -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
+            "https://registry.hub.docker.com/v2/$REPO/manifests/$TAG" \
+            | jq -r '.config.digest')
+          echo "Digest for $REPO:$TAG is $DIGEST"
+          echo "digest=$DIGEST" >> $GITHUB_OUTPUT
+
+      - name: Cache digest
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: digest.txt
+          key: digest-${{ matrix.app }}
+
+      - name: Compare cached digest with current digest
+        id: compare
+        run: |
+          CURRENT_DIGEST=${{ steps.fetch_digest.outputs.digest }}
+          if [ -f digest.txt ]; then
+            CACHED_DIGEST=$(cat digest.txt)
+            if [ "$CURRENT_DIGEST" = "$CACHED_DIGEST" ]; then
+              echo "changed=false" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+          fi
+          echo "$CURRENT_DIGEST" > digest.txt
+          echo "changed=true" >> $GITHUB_OUTPUT
+
+      - name: Update values.yaml image tag
+        if: steps.compare.outputs.changed == 'true'
+        run: |
+          APP=${{ matrix.app }}
+          IMAGE=${{ matrix.image }}
+          TAG=${{ steps.get_latest_tag.outputs.tag }}
+          echo "Updating values.yaml: app=$APP to $IMAGE:$TAG"
+          yq eval '(.apps[] | select(.name == env.APP)).image = env.IMAGE + ":" + env.TAG' -i values.yaml
+
+      - name: Commit and push changes
+        if: steps.compare.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add values.yaml
+          git commit -m "Update image for ${{ matrix.app }} to ${{ matrix.image }}:${{ steps.get_latest_tag.outputs.tag }}"
+          git push
+
