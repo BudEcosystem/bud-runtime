@@ -26,6 +26,7 @@ jobs:
             image: budstudio/budmodel
           - app: budproxy
             image: budstudio/budproxy
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -37,16 +38,23 @@ jobs:
           sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq
           sudo chmod +x /usr/bin/yq
 
-      - name: Get latest non-nightly tag from Docker Hub
+      - name: Get latest non-nightly tag from Docker Hub (by timestamp)
         id: get_latest_tag
         run: |
           REPO=${{ matrix.image }}
           echo "Fetching tags for $REPO ..."
           TAG=$(curl -s "https://registry.hub.docker.com/v2/repositories/$REPO/tags?page_size=100" \
-            | jq -r '.results[].name' \
-            | grep -v nightly \
-            | sort -V \
-            | tail -1)
+            | jq -r '[.results[] 
+                      | select(.name | test("nightly") | not) 
+                      | {name, updated: .last_updated}] 
+                    | sort_by(.updated) 
+                    | last.name')
+
+          if [ -z "$TAG" ]; then
+            echo "No non-nightly tag found for $REPO."
+            exit 1
+          fi
+
           echo "Latest tag for $REPO (excluding nightly): $TAG"
           echo "tag=$TAG" >> $GITHUB_OUTPUT
 
@@ -55,7 +63,6 @@ jobs:
         run: |
           REPO=${{ matrix.image }}
           TAG=${{ steps.get_latest_tag.outputs.tag }}
-          # Fetch Docker manifest digest
           DIGEST=$(curl -s -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
             "https://registry.hub.docker.com/v2/$REPO/manifests/$TAG" \
             | jq -r '.config.digest')
@@ -76,6 +83,7 @@ jobs:
           if [ -f digest.txt ]; then
             CACHED_DIGEST=$(cat digest.txt)
             if [ "$CURRENT_DIGEST" = "$CACHED_DIGEST" ]; then
+              echo "No change in digest for ${{ matrix.app }}."
               echo "changed=false" >> $GITHUB_OUTPUT
               exit 0
             fi
@@ -97,7 +105,7 @@ jobs:
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-          git add values.yaml
+          git add ./helm/bud-stack/values.yaml
           git commit -m "Update image for ${{ matrix.app }} to ${{ matrix.image }}:${{ steps.get_latest_tag.outputs.tag }}"
           git push
 
