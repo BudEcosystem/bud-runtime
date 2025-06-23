@@ -90,7 +90,7 @@ jobs:
           IMAGE=${{ matrix.image }}
           TAG=${{ steps.get_latest_tag.outputs.tag }}
           echo "Updating values.yaml: app=$APP to $IMAGE:$TAG"
-          yq eval '(.apps[] | select(.name == env.APP)).image = env.IMAGE + ":" + env.TAG' -i values.yaml
+          yq eval '(.apps[] | select(.name == env.APP)).image = env.IMAGE + ":" + env.TAG' -i ../../helm/bud-stack/values.yaml
 
       - name: Commit and push changes
         if: steps.compare.outputs.changed == 'true'
