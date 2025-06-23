@@ -466,7 +466,7 @@ apps:
         cpu: "250m"
         # command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8472"]
   - name: "budmetrics"
-    image: "budstudio/budmetrics0.1.0"
+    image: "budstudio/budmetrics:0.2.0"
     containerPort: 3005
     daprAppId: "budmetrics"
     # pvcName: "bud-budmetrics-pvc"
