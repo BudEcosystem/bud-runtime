@@ -55,57 +55,22 @@ jobs:
             exit 1
           fi
 
-          echo "Latest tag for $REPO (excluding nightly): $TAG"
+          echo "Latest tag for $REPO: $TAG"
           echo "tag=$TAG" >> $GITHUB_OUTPUT
 
-      - name: Fetch image digest
-        id: fetch_digest
-        run: |
-          REPO=${{ matrix.image }}
-          TAG=${{ steps.get_latest_tag.outputs.tag }}
-          DIGEST=$(curl -s -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
-            "https://registry.hub.docker.com/v2/$REPO/manifests/$TAG" \
-            | jq -r '.config.digest')
-          echo "Digest for $REPO:$TAG is $DIGEST"
-          echo "digest=$DIGEST" >> $GITHUB_OUTPUT
-
-      - name: Cache digest
-        id: cache
-        uses: actions/cache@v4
-        with:
-          path: digest.txt
-          key: digest-${{ matrix.app }}
-
-      - name: Compare cached digest with current digest
-        id: compare
-        run: |
-          CURRENT_DIGEST=${{ steps.fetch_digest.outputs.digest }}
-          if [ -f digest.txt ]; then
-            CACHED_DIGEST=$(cat digest.txt)
-            if [ "$CURRENT_DIGEST" = "$CACHED_DIGEST" ]; then
-              echo "No change in digest for ${{ matrix.app }}."
-              echo "changed=false" >> $GITHUB_OUTPUT
-              exit 0
-            fi
-          fi
-          echo "$CURRENT_DIGEST" > digest.txt
-          echo "changed=true" >> $GITHUB_OUTPUT
-
-      - name: Update values.yaml image tag
-        if: steps.compare.outputs.changed == 'true'
+      - name: Update values.yaml with new tag
         run: |
           APP=${{ matrix.app }}
           IMAGE=${{ matrix.image }}
           TAG=${{ steps.get_latest_tag.outputs.tag }}
-          echo "Updating values.yaml: app=$APP to $IMAGE:$TAG"
+          echo "Updating $APP to $IMAGE:$TAG in values.yaml"
           yq eval '(.apps[] | select(.name == env.APP)).image = env.IMAGE + ":" + env.TAG' -i ./helm/bud-stack/values.yaml
 
       - name: Commit and push changes
-        if: steps.compare.outputs.changed == 'true'
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git add ./helm/bud-stack/values.yaml
-          git commit -m "Update image for ${{ matrix.app }} to ${{ matrix.image }}:${{ steps.get_latest_tag.outputs.tag }}"
+          git diff --cached --quiet && echo "No changes to commit" || git commit -m "Update image for ${{ matrix.app }} to ${{ matrix.image }}:${{ steps.get_latest_tag.outputs.tag }}"
           git push
 
