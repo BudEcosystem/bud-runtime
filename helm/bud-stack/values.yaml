@@ -222,7 +222,7 @@ apps:
       - name: "models-registry-pv" # This should match a volume name in .Values.volumes
         mountPath: "{{ .Values.globalEnv.data.MODEL_REGISTRY_DIR }}"
   - name: "budapp"
-    image: "budstudio/budapp:0.3.0"
+    image: "budstudio/budapp:0.6.0"
     containerPort: "{{ .Values.globalEnv.data.APP_PORT_BUDAPP }}"
     daprAppId: "budapp"
     # pvcName: "bud-budserve-app-pvc"
@@ -464,7 +464,7 @@ apps:
       requests:
         memory: "256Mi"
         cpu: "250m"
-    # command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8472"]
+        # command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8472"]
   - name: "budmetrics"
     image: "budstudio/budmetrics0.1.0"
     containerPort: 3005
@@ -494,7 +494,7 @@ apps:
       requests:
         memory: "256Mi"
         cpu: "250m"
-    # command: ["sh", "-c", "alembic -c ./alembic.ini upgrade head && uvicorn budmetrics.main:app --host 0.0.0.0 --port 3005"]
+        # command: ["sh", "-c", "alembic -c ./alembic.ini upgrade head && uvicorn budmetrics.main:app --host 0.0.0.0 --port 3005"]
 ingresses: # Define ingress resources for external access
   - name: "dapr-dashboard-ingress"
     enabled: true
@@ -769,11 +769,11 @@ redisStack: # For LiteLLM cache or other uses needing Redis Stack features
     limits:
       memory: "512Mi"
       cpu: "500m"
-  # command: # Default command should be fine, override if needed
-  # sysctls:
-  #     net.core.somaxconn: 1024
-  # healthcheck:
-  #     test: ["CMD", "redis-cli", "-a", "{{ .Values.redisStack.auth.password }}", "--raw", "incr", "ping"]
+      # command: # Default command should be fine, override if needed
+      # sysctls:
+      #     net.core.somaxconn: 1024
+      # healthcheck:
+      #     test: ["CMD", "redis-cli", "-a", "{{ .Values.redisStack.auth.password }}", "--raw", "incr", "ping"]
 keycloak:
   enabled: false # Deploy Keycloak
   fullnameOverride: "keycloak" # Helm release name for Keycloak
