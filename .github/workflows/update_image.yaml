@@ -60,17 +60,22 @@ jobs:
 
       - name: Update values.yaml with new tag
         run: |
-          APP=${{ matrix.app }}
-          IMAGE=${{ matrix.image }}
-          TAG=${{ steps.get_latest_tag.outputs.tag }}
+          export APP=${{ matrix.app }}
+          export IMAGE=${{ matrix.image }}
+          export TAG=${{ steps.get_latest_tag.outputs.tag }}
           echo "Updating $APP to $IMAGE:$TAG in values.yaml"
-          yq eval '(.apps[] | select(.name == env.APP)).image = env.IMAGE + ":" + env.TAG' -i ./helm/bud-stack/values.yaml
+
+          yq eval '(.apps[] | select(.name == strenv(APP))).image = strenv(IMAGE) + ":" + strenv(TAG)' -i ./helm/bud-stack/values.yaml
 
       - name: Commit and push changes
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git add ./helm/bud-stack/values.yaml
-          git diff --cached --quiet && echo "No changes to commit" || git commit -m "Update image for ${{ matrix.app }} to ${{ matrix.image }}:${{ steps.get_latest_tag.outputs.tag }}"
-          git push
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Update image for ${{ matrix.app }} to ${{ matrix.image }}:${{ steps.get_latest_tag.outputs.tag }}"
+            git push
+          fi
 
