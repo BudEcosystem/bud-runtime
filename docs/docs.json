@@ -26,7 +26,6 @@
               "pages": [
                 "features/gateway",
                 "features/multi-lora-support",
-                "features/openai-compatibility",
                 "features/images",
                 "features/settings",
                 "features/navigation",
