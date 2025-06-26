@@ -1,0 +1,323 @@
+---
+title: 'Development Guidelines'
+description: 'Best practices and guidelines for developing with Bud Runtime'
+---
+
+## Code Standards
+
+### General Principles
+
+1. **Clarity over cleverness**: Write code that is easy to understand
+2. **Consistent naming**: Follow established naming conventions
+3. **Error handling**: Always handle errors appropriately
+4. **Documentation**: Document complex logic and public APIs
+
+### Language-Specific Guidelines
+
+#### Python
+
+```python
+# Good
+def calculate_inference_time(model_name: str, input_size: int) -> float:
+    """Calculate the expected inference time for a model.
+    
+    Args:
+        model_name: The name of the model
+        input_size: Size of the input in tokens
+        
+    Returns:
+        Expected inference time in seconds
+    """
+    base_time = MODEL_BASE_TIMES.get(model_name, 1.0)
+    return base_time * (input_size / 1000)
+
+# Bad
+def calc_time(m, s):
+    return MODEL_TIMES[m] * s / 1000
+```
+
+#### Go
+
+```go
+// Good
+package models
+
+import (
+    "context"
+    "fmt"
+)
+
+// InferenceRequest represents a request for model inference
+type InferenceRequest struct {
+    ModelID   string `json:"model_id"`
+    Input     string `json:"input"`
+    MaxTokens int    `json:"max_tokens"`
+}
+
+// Validate checks if the request is valid
+func (r *InferenceRequest) Validate() error {
+    if r.ModelID == "" {
+        return fmt.Errorf("model_id is required")
+    }
+    if r.MaxTokens <= 0 {
+        return fmt.Errorf("max_tokens must be positive")
+    }
+    return nil
+}
+```
+
+## API Design
+
+### RESTful Principles
+
+Follow REST conventions for API endpoints:
+
+```
+GET    /v1/models              # List models
+GET    /v1/models/{id}         # Get model details
+POST   /v1/models              # Deploy a new model
+PUT    /v1/models/{id}         # Update model configuration
+DELETE /v1/models/{id}         # Remove a model
+```
+
+### Request/Response Format
+
+Always use consistent JSON formatting:
+
+```json
+// Request
+{
+  "model": "llama2-7b",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Hello, how are you?"
+    }
+  ],
+  "temperature": 0.7
+}
+
+// Response
+{
+  "id": "chat-12345",
+  "object": "chat.completion",
+  "created": 1234567890,
+  "model": "llama2-7b",
+  "choices": [
+    {
+      "message": {
+        "role": "assistant",
+        "content": "I'm doing well, thank you!"
+      },
+      "finish_reason": "stop"
+    }
+  ]
+}
+```
+
+## Testing Standards
+
+### Unit Tests
+
+Write comprehensive unit tests:
+
+```python
+import pytest
+from bud_runtime import ModelLoader
+
+class TestModelLoader:
+    def test_load_valid_model(self):
+        loader = ModelLoader()
+        model = loader.load("llama2-7b")
+        assert model is not None
+        assert model.name == "llama2-7b"
+    
+    def test_load_invalid_model(self):
+        loader = ModelLoader()
+        with pytest.raises(ModelNotFoundError):
+            loader.load("nonexistent-model")
+    
+    def test_concurrent_loading(self):
+        # Test that multiple models can be loaded concurrently
+        loader = ModelLoader()
+        models = ["llama2-7b", "stable-diffusion-xl"]
+        results = loader.load_multiple(models)
+        assert len(results) == 2
+```
+
+### Integration Tests
+
+```go
+func TestAPIIntegration(t *testing.T) {
+    // Setup test server
+    server := setupTestServer()
+    defer server.Close()
+    
+    // Test model deployment
+    resp, err := deployModel(server.URL, "test-model")
+    assert.NoError(t, err)
+    assert.Equal(t, 200, resp.StatusCode)
+    
+    // Test inference
+    result, err := runInference(server.URL, "test-model", "Hello")
+    assert.NoError(t, err)
+    assert.NotEmpty(t, result.Output)
+}
+```
+
+## Performance Guidelines
+
+### Optimization Principles
+
+1. **Profile before optimizing**: Use profiling tools to identify bottlenecks
+2. **Cache appropriately**: Cache model weights and frequent computations
+3. **Batch operations**: Process multiple requests together when possible
+
+### Example Optimization
+
+```python
+# Before optimization
+def process_requests(requests):
+    results = []
+    for req in requests:
+        model = load_model(req.model_id)  # Loading model for each request
+        result = model.infer(req.input)
+        results.append(result)
+    return results
+
+# After optimization
+def process_requests(requests):
+    # Group requests by model
+    grouped = defaultdict(list)
+    for req in requests:
+        grouped[req.model_id].append(req)
+    
+    results = []
+    for model_id, model_requests in grouped.items():
+        model = load_model(model_id)  # Load once per model
+        inputs = [req.input for req in model_requests]
+        batch_results = model.batch_infer(inputs)  # Batch inference
+        results.extend(batch_results)
+    
+    return results
+```
+
+## Security Best Practices
+
+### Input Validation
+
+Always validate and sanitize inputs:
+
+```python
+def validate_prompt(prompt: str) -> str:
+    # Check length
+    if len(prompt) > MAX_PROMPT_LENGTH:
+        raise ValueError(f"Prompt exceeds maximum length of {MAX_PROMPT_LENGTH}")
+    
+    # Remove potential injection attempts
+    sanitized = prompt.replace("${", "").replace("}", "")
+    
+    # Check for forbidden patterns
+    if contains_forbidden_patterns(sanitized):
+        raise ValueError("Prompt contains forbidden patterns")
+    
+    return sanitized
+```
+
+### Authentication & Authorization
+
+```go
+func AuthMiddleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        token := r.Header.Get("Authorization")
+        if token == "" {
+            http.Error(w, "Missing authorization token", http.StatusUnauthorized)
+            return
+        }
+        
+        claims, err := validateToken(token)
+        if err != nil {
+            http.Error(w, "Invalid token", http.StatusUnauthorized)
+            return
+        }
+        
+        // Add claims to context
+        ctx := context.WithValue(r.Context(), "claims", claims)
+        next.ServeHTTP(w, r.WithContext(ctx))
+    })
+}
+```
+
+## Documentation Standards
+
+### Code Comments
+
+```python
+class ModelServer:
+    """Manages model serving infrastructure.
+    
+    This class handles the lifecycle of model servers including
+    deployment, scaling, and health monitoring.
+    
+    Attributes:
+        config: Server configuration
+        models: Dictionary of loaded models
+        metrics: Performance metrics collector
+    """
+    
+    def deploy_model(self, model_id: str, replicas: int = 1) -> Deployment:
+        """Deploy a model with specified number of replicas.
+        
+        Args:
+            model_id: Unique identifier for the model
+            replicas: Number of server replicas to deploy
+            
+        Returns:
+            Deployment object containing deployment details
+            
+        Raises:
+            ModelNotFoundError: If model_id doesn't exist
+            InsufficientResourcesError: If resources are unavailable
+        """
+        # Implementation here
+```
+
+### API Documentation
+
+Use OpenAPI/Swagger specifications:
+
+```yaml
+openapi: 3.0.0
+info:
+  title: Bud Runtime API
+  version: 1.0.0
+paths:
+  /v1/chat/completions:
+    post:
+      summary: Create a chat completion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                model:
+                  type: string
+                  example: "llama2-7b"
+                messages:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      role:
+                        type: string
+                        enum: ["user", "assistant", "system"]
+                      content:
+                        type: string
+      responses:
+        200:
+          description: Successful completion
+```
+
+For architecture details, see [Architecture](/development/architecture).
