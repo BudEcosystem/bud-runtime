@@ -1,0 +1,83 @@
+---
+title: 'Image Generation'
+description: 'Generate images using AI models in Bud Runtime'
+---
+
+## Overview
+
+Bud Runtime supports image generation through various AI models, providing a unified API for creating images from text prompts.
+
+## Supported Models
+
+- Stable Diffusion (SD 1.5, SDXL)
+- Custom fine-tuned models
+- LoRA-enhanced models
+
+## Basic Usage
+
+### Generate an Image
+
+```bash
+curl -X POST http://your-gateway/v1/images/generations \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "A serene landscape with mountains and a lake",
+    "n": 1,
+    "size": "1024x1024"
+  }'
+```
+
+### Response Format
+
+```json
+{
+  "created": 1234567890,
+  "data": [
+    {
+      "url": "https://your-storage/image-id.png"
+    }
+  ]
+}
+```
+
+## Advanced Features
+
+### Using LoRA Models
+
+Combine base models with LoRA adapters for specialized image generation:
+
+```json
+{
+  "prompt": "Portrait in anime style",
+  "model": "stable-diffusion-xl",
+  "lora": "anime-style-v2",
+  "lora_weight": 0.8
+}
+```
+
+### Batch Generation
+
+Generate multiple images in a single request:
+
+```json
+{
+  "prompt": "Futuristic cityscape",
+  "n": 4,
+  "size": "512x512",
+  "seed": 42
+}
+```
+
+## Performance Optimization
+
+- Use appropriate image sizes for your use case
+- Enable caching for frequently used prompts
+- Consider batch processing for multiple generations
+
+## Best Practices
+
+1. **Prompt Engineering**: Be specific and descriptive in your prompts
+2. **Resource Management**: Monitor GPU usage when generating large images
+3. **Quality Settings**: Balance between generation speed and image quality
+
+For more details on model configuration, see [Multi-LoRA Support](/features/multi-lora-support).
