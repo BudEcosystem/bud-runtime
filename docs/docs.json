@@ -26,11 +26,17 @@
               "pages": [
                 "features/gateway",
                 "features/multi-lora-support",
-                "features/openai-compatibility",
                 "features/images",
                 "features/settings",
                 "features/navigation",
                 "features/reusable-snippets"
+              ]
+            },
+            {
+              "group": "OpenAI-Compatible API",
+              "pages": [
+                "openai-api/chat",
+                "openai-api/embedding"
               ]
             },
             {
