@@ -34,31 +34,18 @@
               ]
             },
             {
+              "group": "OpenAI-Compatible API",
+              "pages": [
+                "openai-api/chat",
+                "openai-api/embedding"
+              ]
+            },
+            {
               "group": "Development",
               "icon": "code",
               "pages": [
                 "development/guidelines",
                 "development/architecture"
-              ]
-            }
-          ]
-        },
-        {
-          "tab": "Enterprise",
-          "groups": [
-            {
-              "group": "API Documentation",
-              "pages": [
-                "api-reference/introduction"
-              ]
-            },
-            {
-              "group": "Endpoint Examples",
-              "pages": [
-                "api-reference/endpoint/get",
-                "api-reference/endpoint/create",
-                "api-reference/endpoint/delete",
-                "api-reference/endpoint/webhook"
               ]
             }
           ]
