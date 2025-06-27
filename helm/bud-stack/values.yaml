@@ -128,6 +128,7 @@ globalEnv:
     BUD_SERVE_URL: "https://api-app.<YOUR_DOMAIN>" # External URL for bud-serve
     RSA_KEY_NAME: "rsa-private-key.pem" # Filename for RSA key if used/mounted
     MINIO_BUCKET: "models-registry-bucket" # Minio bucket name (ensure matches minio chart config)
+    MINIO_MODEL_BUCKET: "model-info" # Minio model info bucket name (ensure matches minio chart config)
     MINIO_ENDPOINT: "minio.<MINIO_NAMESPACE>.svc.cluster.local:9000" # Internal Minio endpoint
     MINIO_SECURE: "false" # Or "true" if Minio internal traffic is over HTTPS
     PSQL_DB_NAME_BUDMODEL: "budmodel_db"
