@@ -24,6 +24,7 @@ Generate images from text descriptions.
 ### Request Format
 
 **Headers:**
+
 - `Authorization: Bearer YOUR_API_KEY` (required)
 - `Content-Type: application/json` (required)
 
@@ -43,24 +44,26 @@ Generate images from text descriptions.
 
 ### Parameters
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `model` | string | Yes | Model: `dall-e-2` or `dall-e-3` |
-| `prompt` | string | Yes | Text description of the desired image (max 4000 chars for dall-e-3, 1000 for dall-e-2) |
-| `n` | integer | No | Number of images to generate (1-10 for dall-e-2, only 1 for dall-e-3) |
-| `size` | string | No | Image size (see supported sizes below) |
-| `quality` | string | No | `standard` or `hd` (dall-e-3 only) |
-| `response_format` | string | No | `url` or `b64_json` (default: `url`) |
-| `style` | string | No | `vivid` or `natural` (dall-e-3 only) |
+| Field             | Type    | Required | Description                                                                            |
+| ----------------- | ------- | -------- | -------------------------------------------------------------------------------------- |
+| `model`           | string  | Yes      | Model: `dall-e-2` or `dall-e-3`                                                        |
+| `prompt`          | string  | Yes      | Text description of the desired image (max 4000 chars for dall-e-3, 1000 for dall-e-2) |
+| `n`               | integer | No       | Number of images to generate (1-10 for dall-e-2, only 1 for dall-e-3)                  |
+| `size`            | string  | No       | Image size (see supported sizes below)                                                 |
+| `quality`         | string  | No       | `standard` or `hd` (dall-e-3 only)                                                     |
+| `response_format` | string  | No       | `url` or `b64_json` (default: `url`)                                                   |
+| `style`           | string  | No       | `vivid` or `natural` (dall-e-3 only)                                                   |
 
 ### Supported Sizes
 
 **DALL-E-2:**
+
 - `256x256`
 - `512x512`
 - `1024x1024`
 
 **DALL-E-3:**
+
 - `1024x1024`
 - `1024x1792`
 - `1792x1024`
@@ -80,6 +83,7 @@ Generate images from text descriptions.
 ```
 
 When `response_format` is `b64_json`:
+
 ```json
 {
   "created": 1699123456,
@@ -99,20 +103,21 @@ Edit existing images using AI-powered inpainting.
 ### Request Format
 
 **Headers:**
+
 - `Authorization: Bearer YOUR_API_KEY` (required)
 - `Content-Type: multipart/form-data` (required)
 
 **Form Data:**
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `image` | file | Yes | Original image (PNG, less than 4MB, square) |
-| `prompt` | string | Yes | Description of the edit |
-| `mask` | file | No | Mask indicating areas to edit (PNG, transparent = edit area) |
-| `model` | string | Yes | Model identifier (e.g., `dall-e-2`) |
-| `n` | integer | No | Number of images (1-10, default: 1) |
-| `size` | string | No | Output size (default: `1024x1024`) |
-| `response_format` | string | No | `url` or `b64_json` |
+| Field             | Type    | Required | Description                                                  |
+| ----------------- | ------- | -------- | ------------------------------------------------------------ |
+| `image`           | file    | Yes      | Original image (PNG, less than 4MB, square)                  |
+| `prompt`          | string  | Yes      | Description of the edit                                      |
+| `mask`            | file    | No       | Mask indicating areas to edit (PNG, transparent = edit area) |
+| `model`           | string  | Yes      | Model identifier (e.g., `dall-e-2`)                          |
+| `n`               | integer | No       | Number of images (1-10, default: 1)                          |
+| `size`            | string  | No       | Output size (default: `1024x1024`)                           |
+| `response_format` | string  | No       | `url` or `b64_json`                                          |
 
 ### Response Format
 
@@ -125,18 +130,19 @@ Create variations of an existing image.
 ### Request Format
 
 **Headers:**
+
 - `Authorization: Bearer YOUR_API_KEY` (required)
 - `Content-Type: multipart/form-data` (required)
 
 **Form Data:**
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `image` | file | Yes | Source image (PNG, less than 4MB, square) |
-| `model` | string | Yes | Model identifier (e.g., `dall-e-2`) |
-| `n` | integer | No | Number of variations (1-10, default: 1) |
-| `size` | string | No | Output size (default: `1024x1024`) |
-| `response_format` | string | No | `url` or `b64_json` |
+| Field             | Type    | Required | Description                               |
+| ----------------- | ------- | -------- | ----------------------------------------- |
+| `image`           | file    | Yes      | Source image (PNG, less than 4MB, square) |
+| `model`           | string  | Yes      | Model identifier (e.g., `dall-e-2`)       |
+| `n`               | integer | No       | Number of variations (1-10, default: 1)   |
+| `size`            | string  | No       | Output size (default: `1024x1024`)        |
+| `response_format` | string  | No       | `url` or `b64_json`                       |
 
 ### Response Format
 
@@ -386,9 +392,6 @@ const imageBlob = await fetch(`data:image/png;base64,${base64Image}`).then(r => 
   </Card>
   <Card title="xAI">
     Grok-2-image model for advanced AI-powered image creation.
-  </Card>
-  <Card title="Fireworks">
-    ⚠️ Limited support - Returns errors due to async API incompatibility.
   </Card>
 </CardGroup>
 
