@@ -36,7 +36,12 @@
               "group": "OpenAI-Compatible API",
               "pages": [
                 "openai-api/chat",
-                "openai-api/embedding"
+                "openai-api/embedding",
+                "openai-api/audio",
+                "openai-api/images",
+                "openai-api/batch",
+                "openai-api/realtime",
+                "openai-api/responses"
               ]
             },
             {
