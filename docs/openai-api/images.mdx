@@ -106,7 +106,7 @@ Edit existing images using AI-powered inpainting.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `image` | file | Yes | Original image (PNG, <4MB, square) |
+| `image` | file | Yes | Original image (PNG, less than 4MB, square) |
 | `prompt` | string | Yes | Description of the edit |
 | `mask` | file | No | Mask indicating areas to edit (PNG, transparent = edit area) |
 | `model` | string | Yes | Model identifier (e.g., `dall-e-2`) |
@@ -132,7 +132,7 @@ Create variations of an existing image.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `image` | file | Yes | Source image (PNG, <4MB, square) |
+| `image` | file | Yes | Source image (PNG, less than 4MB, square) |
 | `model` | string | Yes | Model identifier (e.g., `dall-e-2`) |
 | `n` | integer | No | Number of variations (1-10, default: 1) |
 | `size` | string | No | Output size (default: `1024x1024`) |
