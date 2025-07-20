@@ -1,12 +1,14 @@
+use std::collections::HashMap;
 use std::future::IntoFuture;
 use std::net::SocketAddr;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use axum::extract::{rejection::JsonRejection, FromRequest, Json, Request};
 use axum::routing::post;
 use axum::Router;
 use reqwest::{Client, Proxy};
+use secrecy::SecretString;
 use serde::de::DeserializeOwned;
 use tokio::sync::oneshot::Sender;
 use tracing::instrument;
@@ -35,6 +37,7 @@ pub struct AppStateData {
     pub clickhouse_connection_info: ClickHouseConnectionInfo,
     pub kafka_connection_info: KafkaConnectionInfo,
     pub authentication_info: AuthenticationInfo,
+    pub model_credential_store: Arc<RwLock<HashMap<String, SecretString>>>,
 }
 pub type AppState = axum::extract::State<AppStateData>;
 
@@ -66,6 +69,7 @@ impl AppStateData {
             clickhouse_connection_info,
             kafka_connection_info,
             authentication_info,
+            model_credential_store: Arc::new(RwLock::new(HashMap::new())),
         })
     }
     pub async fn update_model_table(&self, mut new_models: ModelTable) {
@@ -79,6 +83,12 @@ impl AppStateData {
     pub async fn remove_model_table(&self, model_name: &str) {
         let mut models = self.config.models.write().await;
         models.remove(model_name);
+        
+        // Also remove associated credential if it exists
+        let credential_key = format!("store_{}", model_name);
+        #[expect(clippy::expect_used)]
+        let mut credential_store = self.model_credential_store.write().expect("RwLock poisoned");
+        credential_store.remove(&credential_key);
     }
 }
 
@@ -315,6 +325,7 @@ mod tests {
     use super::*;
     use crate::config_parser::{AuthenticationConfig, GatewayConfig, ObservabilityConfig};
     use std::collections::HashMap;
+    use secrecy::SecretString;
 
     #[tokio::test]
     #[traced_test]
@@ -498,6 +509,88 @@ mod tests {
 
         let auth_info = setup_authentication(&config);
         assert!(matches!(auth_info, AuthenticationInfo::Enabled(_)));
+    }
+
+    #[tokio::test]
+    async fn test_model_credential_store_initialization() {
+        let config = Arc::new(Config::default());
+        let app_state = AppStateData::new(config).await.unwrap();
+        
+        // Verify credential store is initialized empty
+        #[expect(clippy::expect_used)]
+        let store = app_state.model_credential_store.read().expect("RwLock poisoned");
+        assert!(store.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_model_credential_store_operations() {
+        let config = Arc::new(Config::default());
+        let app_state = AppStateData::new(config).await.unwrap();
+        
+        // Add a credential
+        {
+            #[expect(clippy::expect_used)]
+            let mut store = app_state.model_credential_store.write().expect("RwLock poisoned");
+            store.insert(
+                "store_test-model".to_string(),
+                SecretString::from("test-api-key"),
+            );
+        }
+        
+        // Verify credential exists
+        {
+            #[expect(clippy::expect_used)]
+            let store = app_state.model_credential_store.read().expect("RwLock poisoned");
+            assert!(store.contains_key("store_test-model"));
+            assert_eq!(store.len(), 1);
+        }
+        
+        // Remove credential when model is deleted
+        app_state.remove_model_table("test-model").await;
+        
+        // Verify credential was removed
+        {
+            #[expect(clippy::expect_used)]
+            let store = app_state.model_credential_store.read().expect("RwLock poisoned");
+            assert!(!store.contains_key("store_test-model"));
+            assert!(store.is_empty());
+        }
+    }
+
+    #[tokio::test]
+    async fn test_credential_store_thread_safety() {
+        let store = Arc::new(RwLock::new(HashMap::<String, SecretString>::new()));
+        let store_clone1 = Arc::clone(&store);
+        let store_clone2 = Arc::clone(&store);
+        
+        // Spawn multiple tasks to test concurrent access
+        let handle1 = tokio::spawn(async move {
+            for i in 0..10 {
+                #[expect(clippy::expect_used)]
+                let mut s = store_clone1.write().expect("RwLock poisoned");
+                s.insert(format!("key1_{}", i), SecretString::from(format!("value1_{}", i)));
+            }
+        });
+        
+        let handle2 = tokio::spawn(async move {
+            for i in 0..10 {
+                #[expect(clippy::expect_used)]
+                let mut s = store_clone2.write().expect("RwLock poisoned");
+                s.insert(format!("key2_{}", i), SecretString::from(format!("value2_{}", i)));
+            }
+        });
+        
+        handle1.await.unwrap();
+        handle2.await.unwrap();
+        
+        // Verify all keys were inserted
+        #[expect(clippy::expect_used)]
+        let final_store = store.read().expect("RwLock poisoned");
+        assert_eq!(final_store.len(), 20);
+        for i in 0..10 {
+            assert!(final_store.contains_key(&format!("key1_{}", i)));
+            assert!(final_store.contains_key(&format!("key2_{}", i)));
+        }
     }
 
     #[tokio::test]

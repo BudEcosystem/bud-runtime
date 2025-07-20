@@ -21,5 +21,6 @@ pub fn get_unit_test_app_state_data(
         clickhouse_connection_info,
         kafka_connection_info,
         authentication_info: setup_authentication(&config),
+        model_credential_store: std::sync::Arc::new(std::sync::RwLock::new(std::collections::HashMap::new())),
     }
 }
