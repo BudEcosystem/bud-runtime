@@ -8,6 +8,7 @@ pub mod cache;
 pub mod clickhouse;
 pub mod config_parser; // TensorZero config file
 pub mod embeddings; // embedding inference
+pub mod encryption; // RSA encryption/decryption for API keys
 pub mod endpoints; // API endpoints
 pub mod error; // error handling
 pub mod evaluations; // evaluation

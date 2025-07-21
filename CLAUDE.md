@@ -227,6 +227,39 @@ Located in `tensorzero-internal/src/audio.rs`:
 - Provider traits: `AudioTranscriptionProvider`, `AudioTranslationProvider`, `TextToSpeechProvider`
 - Enums: `AudioTranscriptionResponseFormat`, `AudioVoice`, `AudioOutputFormat`, `TimestampGranularity`
 
+## RSA Encryption for API Keys
+
+TensorZero supports RSA decryption for API keys stored in Redis by external services:
+
+### Configuration
+
+Set environment variables to enable RSA decryption:
+```bash
+# Option 1: Private key file path
+TENSORZERO_RSA_PRIVATE_KEY_PATH=/path/to/private_key.pem
+TENSORZERO_RSA_PRIVATE_KEY_PASSWORD=your_password
+
+# Option 2: Inline private key
+TENSORZERO_RSA_PRIVATE_KEY="-----BEGIN ENCRYPTED PRIVATE KEY-----..."
+TENSORZERO_RSA_PRIVATE_KEY_PASSWORD=your_password
+```
+
+### Encryption Details
+
+- **Algorithm**: RSA with OAEP padding (SHA256)
+- **Key Format**: PEM format (PKCS#1 or PKCS#8, with optional password protection)
+- **Encoding**: Encrypted API keys are hex-encoded in Redis
+- **Fallback**: Also supports PKCS#1 v1.5 padding and base64 encoding
+
+### Implementation
+
+The encryption module (`tensorzero-internal/src/encryption.rs`) provides:
+- `load_private_key()`: Loads RSA private key from environment
+- `decrypt_api_key()`: Decrypts hex or base64 encoded API keys
+- `is_decryption_enabled()`: Checks if decryption is configured
+
+When Redis data contains encrypted API keys, they are automatically decrypted before being stored in the credential store.
+
 ### Model Configuration for Audio
 
 ```toml

@@ -9,6 +9,7 @@ use tracing::instrument;
 
 use crate::auth::{APIConfig, Auth};
 use crate::config_parser::ProviderTypesConfig;
+use crate::encryption::{decrypt_api_key, is_decryption_enabled, load_private_key};
 use crate::error::{Error, ErrorDetails};
 use crate::gateway_util::AppStateData;
 use crate::model::{ModelTable, UninitializedModelConfig};
@@ -74,6 +75,13 @@ impl RedisClient {
         let mut models = HashMap::new();
         let mut api_keys_to_store = HashMap::new();
         
+        // Load RSA private key if decryption is enabled
+        let private_key = if is_decryption_enabled() {
+            load_private_key()?
+        } else {
+            None
+        };
+        
         // Process each model
         if let serde_json::Value::Object(ref mut models_map) = json_value {
             // First pass: collect API keys and remove them
@@ -81,11 +89,17 @@ impl RedisClient {
                 // Extract api_key if present
                 if let serde_json::Value::Object(ref mut model_obj) = model_value {
                     if let Some(api_key_value) = model_obj.remove("api_key") {
-                        if let serde_json::Value::String(encrypted_key) = api_key_value {
-                            // TODO: Decrypt the key here if needed
-                            // For now, we'll assume it's already decrypted
+                        if let serde_json::Value::String(key_string) = api_key_value {
+                            let decrypted_key = if let Some(ref pk) = private_key {
+                                // Decrypt the key using RSA
+                                decrypt_api_key(pk, &key_string)?
+                            } else {
+                                // No decryption configured, use the key as-is
+                                SecretString::from(key_string)
+                            };
+                            
                             let credential_key = format!("store_{}", model_name);
-                            api_keys_to_store.insert(credential_key, SecretString::from(encrypted_key));
+                            api_keys_to_store.insert(credential_key, decrypted_key);
                         }
                     }
                 }
@@ -515,5 +529,77 @@ mod tests {
         assert!(store.contains_key("store_model-with-key"));
         assert!(store.contains_key("store_another-model-with-key"));
         assert!(!store.contains_key("store_model-without-key"));
+    }
+
+    #[tokio::test]
+    async fn test_parse_model_with_encrypted_api_key() {
+        use rsa::{RsaPrivateKey, RsaPublicKey, Pkcs1v15Encrypt};
+        use rsa::pkcs1::EncodeRsaPrivateKey;
+        use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+        use secrecy::ExposeSecret;
+        
+        // Generate test RSA key pair
+        use rsa::rand_core::OsRng;
+        let bits = 2048;
+        let private_key = RsaPrivateKey::new(&mut OsRng, bits).expect("failed to generate key");
+        let public_key = RsaPublicKey::from(&private_key);
+        
+        // Convert private key to PEM format
+        let private_key_pem = private_key
+            .to_pkcs1_pem(rsa::pkcs1::LineEnding::LF)
+            .expect("failed to encode PEM")
+            .to_string();
+        
+        // Set the private key in environment variable for the test
+        std::env::set_var("TENSORZERO_RSA_PRIVATE_KEY", private_key_pem);
+        
+        // Create app state
+        let config = Arc::new(Config::default());
+        let app_state = AppStateData::new(config).await.unwrap();
+        
+        // Encrypt test API key
+        let test_api_key = "sk-test-encrypted-key-12345";
+        let encrypted = public_key
+            .encrypt(&mut OsRng, Pkcs1v15Encrypt, test_api_key.as_bytes())
+            .expect("encryption failed");
+        let encrypted_base64 = BASE64.encode(&encrypted);
+        
+        // JSON with encrypted API key
+        let json = format!(r#"{{
+            "model-with-encrypted-key": {{
+                "routing": ["dummy"],
+                "endpoints": ["chat"],
+                "providers": {{
+                    "dummy": {{
+                        "type": "dummy",
+                        "model_name": "gpt-4",
+                        "api_key_location": "dynamic::store_model-with-encrypted-key"
+                    }}
+                }},
+                "api_key": "{}"
+            }}
+        }}"#, encrypted_base64);
+        
+        let provider_types = ProviderTypesConfig::default();
+        
+        // Parse models
+        let result = RedisClient::parse_models(&json, &provider_types, &app_state).await;
+        if let Err(e) = &result {
+            eprintln!("Parse error: {}", e);
+        }
+        assert!(result.is_ok());
+        
+        // Verify decrypted API key was stored correctly
+        #[expect(clippy::expect_used)]
+        let store = app_state.model_credential_store.read().expect("RwLock poisoned");
+        assert_eq!(store.len(), 1);
+        assert!(store.contains_key("store_model-with-encrypted-key"));
+        
+        // Verify the decrypted value matches the original
+        let stored_key = store.get("store_model-with-encrypted-key").expect("Key not found");
+        assert_eq!(stored_key.expose_secret(), test_api_key);
+        
+        // Clean up
+        std::env::remove_var("TENSORZERO_RSA_PRIVATE_KEY");
     }
 }
