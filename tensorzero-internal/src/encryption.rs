@@ -1,7 +1,9 @@
 use crate::error::{Error, ErrorDetails};
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
-use rsa::{pkcs1::DecodeRsaPrivateKey, pkcs8::DecodePrivateKey, Pkcs1v15Encrypt, Oaep, RsaPrivateKey};
 use rsa::sha2::Sha256;
+use rsa::{
+    pkcs1::DecodeRsaPrivateKey, pkcs8::DecodePrivateKey, Oaep, Pkcs1v15Encrypt, RsaPrivateKey,
+};
 use secrecy::SecretString;
 use std::env;
 
@@ -12,45 +14,56 @@ fn parse_private_key_from_pem(pem_content: &str, source: &str) -> Result<RsaPriv
         tracing::debug!("Successfully loaded PKCS#1 private key from {}", source);
         return Ok(key);
     }
-    
+
     // Try PKCS#8 format without password
     if let Ok(key) = RsaPrivateKey::from_pkcs8_pem(pem_content) {
-        tracing::debug!("Successfully loaded unencrypted PKCS#8 private key from {}", source);
+        tracing::debug!(
+            "Successfully loaded unencrypted PKCS#8 private key from {}",
+            source
+        );
         return Ok(key);
     }
-    
+
     // If both fail, check if we have a password for encrypted PKCS#8
     if let Ok(password) = env::var("TENSORZERO_RSA_PRIVATE_KEY_PASSWORD") {
-        tracing::debug!("Attempting to decrypt private key from {} with password", source);
-        
+        tracing::debug!(
+            "Attempting to decrypt private key from {} with password",
+            source
+        );
+
         // Try multiple approaches for encrypted keys
-        
+
         // First, try using the rsa crate's built-in encrypted PEM support
         if let Ok(key) = RsaPrivateKey::from_pkcs8_encrypted_pem(pem_content, password.as_bytes()) {
-            tracing::debug!("Successfully loaded encrypted PKCS#8 private key using RSA crate from {}", source);
+            tracing::debug!(
+                "Successfully loaded encrypted PKCS#8 private key using RSA crate from {}",
+                source
+            );
             return Ok(key);
         }
-        
+
         // If that fails, try manual parsing
-        use pkcs8::EncryptedPrivateKeyInfo;
         use pkcs8::der::Decode;
-        
+        use pkcs8::EncryptedPrivateKeyInfo;
+
         // Check if it's an encrypted private key PEM
         if pem_content.contains("ENCRYPTED PRIVATE KEY") {
             // Parse the PEM manually
             let pem = pem::parse(pem_content).map_err(|e| {
                 Error::new(ErrorDetails::Config {
-                    message: format!("Failed to parse PEM from {}: {}", source, e),
+                    message: format!("Failed to parse PEM from {source}: {e}"),
                 })
             })?;
-            
+
             // Try to parse as encrypted PKCS#8
             match EncryptedPrivateKeyInfo::from_der(pem.contents()) {
                 Ok(enc_info) => {
                     // Log encryption scheme info for debugging
-                    tracing::debug!("Encrypted private key uses encryption scheme: {:?}", 
-                        enc_info.encryption_algorithm);
-                    
+                    tracing::debug!(
+                        "Encrypted private key uses encryption scheme: {:?}",
+                        enc_info.encryption_algorithm
+                    );
+
                     // Decrypt the private key
                     match enc_info.decrypt(password.as_bytes()) {
                         Ok(dec_doc) => {
@@ -61,36 +74,34 @@ fn parse_private_key_from_pem(pem_content: &str, source: &str) -> Result<RsaPriv
                                     Ok(key)
                                 },
                                 Err(e) => Err(Error::new(ErrorDetails::Config {
-                                    message: format!("Failed to parse decrypted RSA private key from {}: {}", source, e),
+                                    message: format!("Failed to parse decrypted RSA private key from {source}: {e}"),
                                 }))
                             }
                         },
                         Err(e) => Err(Error::new(ErrorDetails::Config {
-                            message: format!("Failed to decrypt RSA private key from {} with password: {}. Make sure the password is correct and the key uses a supported encryption algorithm (PBES2 with AES)", source, e),
+                            message: format!("Failed to decrypt RSA private key from {source} with password: {e}. Make sure the password is correct and the key uses a supported encryption algorithm (PBES2 with AES)"),
                         }))
                     }
-                },
+                }
                 Err(e) => Err(Error::new(ErrorDetails::Config {
-                    message: format!("Failed to parse encrypted PKCS#8 from {}: {}", source, e),
-                }))
+                    message: format!("Failed to parse encrypted PKCS#8 from {source}: {e}"),
+                })),
             }
         } else {
             // Try OpenSSL-style encrypted keys
             tracing::debug!("PEM does not contain 'ENCRYPTED PRIVATE KEY', checking for OpenSSL-style encryption");
-            
+
             // Check for OpenSSL encryption headers
             if pem_content.contains("Proc-Type:") && pem_content.contains("DEK-Info:") {
                 Err(Error::new(ErrorDetails::Config {
                     message: format!(
-                        "RSA private key from {} appears to be encrypted with legacy OpenSSL format. Please convert to PKCS#8 format using: openssl pkcs8 -topk8 -in old_key.pem -out new_key.pem",
-                        source
+                        "RSA private key from {source} appears to be encrypted with legacy OpenSSL format. Please convert to PKCS#8 format using: openssl pkcs8 -topk8 -in old_key.pem -out new_key.pem"
                     ),
                 }))
             } else {
                 Err(Error::new(ErrorDetails::Config {
                     message: format!(
-                        "Failed to parse RSA private key from {}: not a valid PKCS#1, PKCS#8, or encrypted PKCS#8 format",
-                        source
+                        "Failed to parse RSA private key from {source}: not a valid PKCS#1, PKCS#8, or encrypted PKCS#8 format"
                     ),
                 }))
             }
@@ -100,15 +111,13 @@ fn parse_private_key_from_pem(pem_content: &str, source: &str) -> Result<RsaPriv
         if pem_header.contains("ENCRYPTED") {
             Err(Error::new(ErrorDetails::Config {
                 message: format!(
-                    "RSA private key from {} appears to be encrypted. Please set TENSORZERO_RSA_PRIVATE_KEY_PASSWORD environment variable",
-                    source
+                    "RSA private key from {source} appears to be encrypted. Please set TENSORZERO_RSA_PRIVATE_KEY_PASSWORD environment variable"
                 ),
             }))
         } else {
             Err(Error::new(ErrorDetails::Config {
                 message: format!(
-                    "Failed to parse RSA private key from {}: not a valid PKCS#1 or PKCS#8 format",
-                    source
+                    "Failed to parse RSA private key from {source}: not a valid PKCS#1 or PKCS#8 format"
                 ),
             }))
         }
@@ -127,11 +136,11 @@ pub fn load_private_key() -> Result<Option<RsaPrivateKey>, Error> {
     if let Ok(key_path) = env::var("TENSORZERO_RSA_PRIVATE_KEY_PATH") {
         let pem_content = std::fs::read_to_string(&key_path).map_err(|e| {
             Error::new(ErrorDetails::Config {
-                message: format!("Failed to read RSA private key from file '{}': {}", key_path, e),
+                message: format!("Failed to read RSA private key from file '{key_path}': {e}"),
             })
         })?;
-        
-        let private_key = parse_private_key_from_pem(&pem_content, &format!("file '{}'", key_path))?;
+
+        let private_key = parse_private_key_from_pem(&pem_content, &format!("file '{key_path}'"))?;
         return Ok(Some(private_key));
     }
 
@@ -150,14 +159,14 @@ pub fn decrypt_api_key(
         // Try hex decoding
         hex::decode(encrypted_data).map_err(|e| {
             Error::new(ErrorDetails::Config {
-                message: format!("Failed to decode hex encrypted data: {}", e),
+                message: format!("Failed to decode hex encrypted data: {e}"),
             })
         })?
     } else {
         // Try base64 decoding
         BASE64.decode(encrypted_data).map_err(|e| {
             Error::new(ErrorDetails::Config {
-                message: format!("Failed to decode base64 encrypted data: {}", e),
+                message: format!("Failed to decode base64 encrypted data: {e}"),
             })
         })?
     };
@@ -176,8 +185,7 @@ pub fn decrypt_api_key(
                 .map_err(|pkcs_err| {
                     Error::new(ErrorDetails::Config {
                         message: format!(
-                            "Failed to decrypt API key with both OAEP and PKCS1v15. OAEP error: {}, PKCS1v15 error: {}",
-                            oaep_err, pkcs_err
+                            "Failed to decrypt API key with both OAEP and PKCS1v15. OAEP error: {oaep_err}, PKCS1v15 error: {pkcs_err}"
                         ),
                     })
                 })?
@@ -187,7 +195,7 @@ pub fn decrypt_api_key(
     // Convert to string
     let decrypted_string = String::from_utf8(decrypted_bytes).map_err(|e| {
         Error::new(ErrorDetails::Config {
-            message: format!("Decrypted data is not valid UTF-8: {}", e),
+            message: format!("Decrypted data is not valid UTF-8: {e}"),
         })
     })?;
 
@@ -196,7 +204,7 @@ pub fn decrypt_api_key(
 
 /// Check if RSA decryption is enabled
 pub fn is_decryption_enabled() -> bool {
-    env::var("TENSORZERO_RSA_PRIVATE_KEY").is_ok() 
+    env::var("TENSORZERO_RSA_PRIVATE_KEY").is_ok()
         || env::var("TENSORZERO_RSA_PRIVATE_KEY_PATH").is_ok()
 }
 
@@ -205,7 +213,7 @@ mod tests {
     use super::*;
     use rsa::{pkcs1::EncodeRsaPrivateKey, pkcs1::EncodeRsaPublicKey, RsaPublicKey};
     use secrecy::ExposeSecret;
-    
+
     // Generate a test RSA key pair
     fn generate_test_keypair() -> (RsaPrivateKey, RsaPublicKey) {
         use rsa::rand_core::OsRng;
@@ -219,58 +227,57 @@ mod tests {
     fn test_decrypt_api_key_pkcs1v15() {
         let (private_key, public_key) = generate_test_keypair();
         let test_api_key = "test-api-key-12345";
-        
+
         // Encrypt the test API key with PKCS1v15
         use rsa::rand_core::OsRng;
         let encrypted = public_key
             .encrypt(&mut OsRng, Pkcs1v15Encrypt, test_api_key.as_bytes())
             .expect("encryption failed");
         let encrypted_base64 = BASE64.encode(&encrypted);
-        
+
         // Decrypt and verify
-        let decrypted = decrypt_api_key(&private_key, &encrypted_base64)
-            .expect("decryption failed");
-        
+        let decrypted =
+            decrypt_api_key(&private_key, &encrypted_base64).expect("decryption failed");
+
         // Compare using expose_secret() for testing
         assert_eq!(decrypted.expose_secret(), test_api_key);
     }
-    
+
     #[test]
     fn test_decrypt_api_key_oaep() {
         let (private_key, public_key) = generate_test_keypair();
         let test_api_key = "test-api-key-12345";
-        
+
         // Encrypt the test API key with OAEP
         use rsa::rand_core::OsRng;
         let encrypted = public_key
             .encrypt(&mut OsRng, Oaep::new::<Sha256>(), test_api_key.as_bytes())
             .expect("encryption failed");
         let encrypted_base64 = BASE64.encode(&encrypted);
-        
+
         // Decrypt and verify
-        let decrypted = decrypt_api_key(&private_key, &encrypted_base64)
-            .expect("decryption failed");
-        
+        let decrypted =
+            decrypt_api_key(&private_key, &encrypted_base64).expect("decryption failed");
+
         // Compare using expose_secret() for testing
         assert_eq!(decrypted.expose_secret(), test_api_key);
     }
-    
+
     #[test]
     fn test_decrypt_api_key_hex() {
         let (private_key, public_key) = generate_test_keypair();
         let test_api_key = "test-api-key-12345";
-        
+
         // Encrypt the test API key with OAEP (like the Python service)
         use rsa::rand_core::OsRng;
         let encrypted = public_key
             .encrypt(&mut OsRng, Oaep::new::<Sha256>(), test_api_key.as_bytes())
             .expect("encryption failed");
         let encrypted_hex = hex::encode(&encrypted);
-        
+
         // Decrypt and verify
-        let decrypted = decrypt_api_key(&private_key, &encrypted_hex)
-            .expect("decryption failed");
-        
+        let decrypted = decrypt_api_key(&private_key, &encrypted_hex).expect("decryption failed");
+
         // Compare using expose_secret() for testing
         assert_eq!(decrypted.expose_secret(), test_api_key);
     }
@@ -290,99 +297,121 @@ mod tests {
             .to_pkcs1_pem(rsa::pkcs1::LineEnding::LF)
             .expect("failed to encode PEM")
             .to_string();
-        
+
         // Test parsing PEM
-        let parsed_key = RsaPrivateKey::from_pkcs1_pem(&pem_string)
-            .expect("failed to parse PEM");
-        
+        let parsed_key = RsaPrivateKey::from_pkcs1_pem(&pem_string).expect("failed to parse PEM");
+
         // Verify the keys are equivalent by comparing their public keys
         let original_public = RsaPublicKey::from(&private_key);
         let parsed_public = RsaPublicKey::from(&parsed_key);
-        
+
         assert_eq!(
-            original_public.to_pkcs1_pem(rsa::pkcs1::LineEnding::LF).unwrap(),
-            parsed_public.to_pkcs1_pem(rsa::pkcs1::LineEnding::LF).unwrap()
+            original_public
+                .to_pkcs1_pem(rsa::pkcs1::LineEnding::LF)
+                .unwrap(),
+            parsed_public
+                .to_pkcs1_pem(rsa::pkcs1::LineEnding::LF)
+                .unwrap()
         );
     }
-    
+
     #[test]
     fn test_parse_pkcs8_private_key() {
         use rsa::pkcs8::EncodePrivateKey;
-        
+
         let (private_key, _) = generate_test_keypair();
-        
+
         // Test PKCS#8 format without password
         let pkcs8_pem = private_key
             .to_pkcs8_pem(rsa::pkcs8::LineEnding::LF)
             .expect("failed to encode PKCS#8 PEM")
             .to_string();
-        
-        let parsed_key = parse_private_key_from_pem(&pkcs8_pem, "test")
-            .expect("failed to parse PKCS#8 PEM");
-        
+
+        let parsed_key =
+            parse_private_key_from_pem(&pkcs8_pem, "test").expect("failed to parse PKCS#8 PEM");
+
         // Verify the keys are equivalent
         let original_public = RsaPublicKey::from(&private_key);
         let parsed_public = RsaPublicKey::from(&parsed_key);
-        
+
         assert_eq!(
-            original_public.to_pkcs1_pem(rsa::pkcs1::LineEnding::LF).unwrap(),
-            parsed_public.to_pkcs1_pem(rsa::pkcs1::LineEnding::LF).unwrap()
+            original_public
+                .to_pkcs1_pem(rsa::pkcs1::LineEnding::LF)
+                .unwrap(),
+            parsed_public
+                .to_pkcs1_pem(rsa::pkcs1::LineEnding::LF)
+                .unwrap()
         );
     }
-    
+
     #[test]
     fn test_parse_mixed_format_keys() {
         let (private_key, _) = generate_test_keypair();
-        
+
         // Test that parse_private_key_from_pem can handle both formats
         let pkcs1_pem = private_key
             .to_pkcs1_pem(rsa::pkcs1::LineEnding::LF)
             .expect("failed to encode PKCS#1 PEM")
             .to_string();
-        
-        let parsed_pkcs1 = parse_private_key_from_pem(&pkcs1_pem, "test PKCS#1")
-            .expect("failed to parse PKCS#1");
-        
+
+        let parsed_pkcs1 =
+            parse_private_key_from_pem(&pkcs1_pem, "test PKCS#1").expect("failed to parse PKCS#1");
+
         use rsa::pkcs8::EncodePrivateKey;
         let pkcs8_pem = private_key
             .to_pkcs8_pem(rsa::pkcs8::LineEnding::LF)
             .expect("failed to encode PKCS#8 PEM")
             .to_string();
-        
-        let parsed_pkcs8 = parse_private_key_from_pem(&pkcs8_pem, "test PKCS#8")
-            .expect("failed to parse PKCS#8");
-        
+
+        let parsed_pkcs8 =
+            parse_private_key_from_pem(&pkcs8_pem, "test PKCS#8").expect("failed to parse PKCS#8");
+
         // Verify both parsed keys are equivalent to the original
         let original_public = RsaPublicKey::from(&private_key);
         let parsed_pkcs1_public = RsaPublicKey::from(&parsed_pkcs1);
         let parsed_pkcs8_public = RsaPublicKey::from(&parsed_pkcs8);
-        
-        let original_pem = original_public.to_pkcs1_pem(rsa::pkcs1::LineEnding::LF).unwrap();
-        assert_eq!(original_pem, parsed_pkcs1_public.to_pkcs1_pem(rsa::pkcs1::LineEnding::LF).unwrap());
-        assert_eq!(original_pem, parsed_pkcs8_public.to_pkcs1_pem(rsa::pkcs1::LineEnding::LF).unwrap());
+
+        let original_pem = original_public
+            .to_pkcs1_pem(rsa::pkcs1::LineEnding::LF)
+            .unwrap();
+        assert_eq!(
+            original_pem,
+            parsed_pkcs1_public
+                .to_pkcs1_pem(rsa::pkcs1::LineEnding::LF)
+                .unwrap()
+        );
+        assert_eq!(
+            original_pem,
+            parsed_pkcs8_public
+                .to_pkcs1_pem(rsa::pkcs1::LineEnding::LF)
+                .unwrap()
+        );
     }
-    
+
     #[test]
     fn test_real_encrypted_key() {
         use rsa::traits::PublicKeyParts;
-        
+
         // Test with the actual encrypted key file if it exists
         let key_path = "/datadisk/ditto/bud-serve-app/private_key.pem";
         if std::path::Path::new(key_path).exists() {
             // Set the password environment variable
             std::env::set_var("TENSORZERO_RSA_PRIVATE_KEY_PASSWORD", "qwerty12345");
-            
-            let pem_content = std::fs::read_to_string(key_path)
-                .expect("Failed to read key file");
-            
+
+            let pem_content = std::fs::read_to_string(key_path).expect("Failed to read key file");
+
             // This should succeed with the correct password
             let result = parse_private_key_from_pem(&pem_content, "real key file");
-            assert!(result.is_ok(), "Failed to parse real encrypted key: {:?}", result.err());
-            
+            assert!(
+                result.is_ok(),
+                "Failed to parse real encrypted key: {:?}",
+                result.err()
+            );
+
             let key = result.unwrap();
             // Verify it's a 2048-bit key
             assert_eq!(key.size() * 8, 2048);
-            
+
             tracing::info!("Successfully loaded and decrypted the real private key!");
         } else {
             tracing::info!("Skipping real key test - file not found");

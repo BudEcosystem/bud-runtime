@@ -294,7 +294,9 @@ impl ClientBuilder {
                                 kafka_connection_info:
                                     tensorzero_internal::kafka::KafkaConnectionInfo::Disabled,
                                 authentication_info: setup_authentication(&config),
-                                model_credential_store: std::sync::Arc::new(std::sync::RwLock::new(std::collections::HashMap::new())),
+                                model_credential_store: std::sync::Arc::new(
+                                    std::sync::RwLock::new(std::collections::HashMap::new()),
+                                ),
                             },
                         },
                         timeout: *timeout,

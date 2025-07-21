@@ -388,7 +388,7 @@ pub async fn inference(
             }
         }
     }
-    
+
     let inference_clients = InferenceClients {
         http_client,
         clickhouse_connection_info: &clickhouse_connection_info,

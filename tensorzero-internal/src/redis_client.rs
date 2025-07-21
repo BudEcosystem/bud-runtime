@@ -71,51 +71,48 @@ impl RedisClient {
                 message: format!("Failed to parse models JSON from redis: {e}"),
             })
         })?;
-        
+
         let mut models = HashMap::new();
         let mut api_keys_to_store = HashMap::new();
-        
+
         // Load RSA private key if decryption is enabled
         let private_key = if is_decryption_enabled() {
             load_private_key()?
         } else {
             None
         };
-        
+
         // Process each model
         if let serde_json::Value::Object(ref mut models_map) = json_value {
             // First pass: collect API keys and remove them
             for (model_name, model_value) in models_map.iter_mut() {
                 // Extract api_key if present
                 if let serde_json::Value::Object(ref mut model_obj) = model_value {
-                    if let Some(api_key_value) = model_obj.remove("api_key") {
-                        if let serde_json::Value::String(key_string) = api_key_value {
-                            let decrypted_key = if let Some(ref pk) = private_key {
-                                // Decrypt the key using RSA
-                                decrypt_api_key(pk, &key_string)?
-                            } else {
-                                // No decryption configured, use the key as-is
-                                SecretString::from(key_string)
-                            };
-                            
-                            let credential_key = format!("store_{}", model_name);
-                            api_keys_to_store.insert(credential_key, decrypted_key);
-                        }
+                    if let Some(serde_json::Value::String(key_string)) = model_obj.remove("api_key")
+                    {
+                        let decrypted_key = if let Some(ref pk) = private_key {
+                            // Decrypt the key using RSA
+                            decrypt_api_key(pk, &key_string)?
+                        } else {
+                            // No decryption configured, use the key as-is
+                            SecretString::from(key_string)
+                        };
+
+                        let credential_key = format!("store_{model_name}");
+                        api_keys_to_store.insert(credential_key, decrypted_key);
                     }
                 }
             }
-            
-            // Clone the models_map to avoid issues with borrowing
-            let models_map_clone = models_map.clone();
-            
-            // Now parse each model individually
-            for (name, model_value) in models_map_clone {
-                let config: UninitializedModelConfig = serde_json::from_value(model_value).map_err(|e| {
-                    Error::new(ErrorDetails::Config {
-                        message: format!("Failed to parse model '{}' from redis: {e}", name),
-                    })
-                })?;
-                
+
+            // Now parse each model individually by taking ownership of each entry
+            for (name, model_value) in std::mem::take(models_map) {
+                let config: UninitializedModelConfig = serde_json::from_value(model_value)
+                    .map_err(|e| {
+                        Error::new(ErrorDetails::Config {
+                            message: format!("Failed to parse model '{name}' from redis: {e}"),
+                        })
+                    })?;
+
                 let loaded_config = config.load(&name, provider_types)?;
                 models.insert(Arc::<str>::from(name), loaded_config);
             }
@@ -124,11 +121,14 @@ impl RedisClient {
                 message: "Expected JSON object for models".to_string(),
             }));
         }
-        
+
         // Store API keys in the credential store
         if !api_keys_to_store.is_empty() {
             #[expect(clippy::expect_used)]
-            let mut credential_store = app_state.model_credential_store.write().expect("RwLock poisoned");
+            let mut credential_store = app_state
+                .model_credential_store
+                .write()
+                .expect("RwLock poisoned");
             for (key, secret) in api_keys_to_store {
                 credential_store.insert(key, secret);
             }
@@ -181,7 +181,8 @@ impl RedisClient {
                     })
                 })?;
 
-                match Self::parse_models(&value, &app_state.config.provider_types, app_state).await {
+                match Self::parse_models(&value, &app_state.config.provider_types, app_state).await
+                {
                     Ok(models) => app_state.update_model_table(models).await,
                     Err(e) => {
                         tracing::error!("Failed to parse models from redis (key: {key}): {e}")
@@ -370,7 +371,7 @@ mod tests {
         // Create a mock AppStateData with credential store
         let config = Arc::new(Config::default());
         let app_state = AppStateData::new(config).await.unwrap();
-        
+
         // JSON with model containing api_key
         let json = r#"{
             "test-model": {
@@ -385,16 +386,19 @@ mod tests {
                 "api_key": "sk-test-key-12345"
             }
         }"#;
-        
+
         let provider_types = ProviderTypesConfig::default();
-        
+
         // Parse models
         let result = RedisClient::parse_models(json, &provider_types, &app_state).await;
         assert!(result.is_ok());
-        
+
         // Verify API key was stored
         #[expect(clippy::expect_used)]
-        let store = app_state.model_credential_store.read().expect("RwLock poisoned");
+        let store = app_state
+            .model_credential_store
+            .read()
+            .expect("RwLock poisoned");
         assert!(store.contains_key("store_test-model"));
         assert_eq!(store.len(), 1);
     }
@@ -404,7 +408,7 @@ mod tests {
         // Test with the exact JSON structure from the error log
         let config = Arc::new(Config::default());
         let app_state = AppStateData::new(config).await.unwrap();
-        
+
         let json = r#"{
             "f5b083f4-c4eb-4fa7-b190-1002a65b1326": {
                 "routing": ["openai"],
@@ -419,19 +423,22 @@ mod tests {
                 "api_key": "sk-test-12345-example-api-key-for-testing-purposes-only"
             }
         }"#;
-        
+
         let provider_types = ProviderTypesConfig::default();
-        
+
         // Parse models
         let result = RedisClient::parse_models(json, &provider_types, &app_state).await;
         if let Err(e) = &result {
             eprintln!("Parse error: {}", e);
         }
         assert!(result.is_ok(), "Failed to parse real-world model JSON");
-        
+
         // Verify API key was stored
         #[expect(clippy::expect_used)]
-        let store = app_state.model_credential_store.read().expect("RwLock poisoned");
+        let store = app_state
+            .model_credential_store
+            .read()
+            .expect("RwLock poisoned");
         assert!(store.contains_key("store_f5b083f4-c4eb-4fa7-b190-1002a65b1326"));
         assert_eq!(store.len(), 1);
     }
@@ -440,7 +447,7 @@ mod tests {
     async fn test_parse_models_without_api_key() {
         let config = Arc::new(Config::default());
         let app_state = AppStateData::new(config).await.unwrap();
-        
+
         // JSON without api_key field
         let json = r#"{
             "test-model": {
@@ -454,27 +461,30 @@ mod tests {
                 }
             }
         }"#;
-        
+
         let provider_types = ProviderTypesConfig::default();
-        
+
         // Parse models
         let result = RedisClient::parse_models(json, &provider_types, &app_state).await;
         if let Err(e) = &result {
             eprintln!("Parse error: {}", e);
         }
         assert!(result.is_ok());
-        
+
         // Verify no API key was stored
         #[expect(clippy::expect_used)]
-        let store = app_state.model_credential_store.read().expect("RwLock poisoned");
+        let store = app_state
+            .model_credential_store
+            .read()
+            .expect("RwLock poisoned");
         assert!(store.is_empty());
     }
-    
+
     #[tokio::test]
     async fn test_parse_multiple_models_with_mixed_api_keys() {
         let config = Arc::new(Config::default());
         let app_state = AppStateData::new(config).await.unwrap();
-        
+
         // JSON with multiple models, some with API keys
         let json = r#"{
             "model-with-key": {
@@ -512,19 +522,25 @@ mod tests {
                 "api_key": "sk-ant-test-67890"
             }
         }"#;
-        
+
         let provider_types = ProviderTypesConfig::default();
-        
+
         // Parse models
         let result = RedisClient::parse_models(json, &provider_types, &app_state).await;
         if let Err(e) = &result {
-            eprintln!("Parse error in test_parse_multiple_models_with_mixed_api_keys: {}", e);
+            eprintln!(
+                "Parse error in test_parse_multiple_models_with_mixed_api_keys: {}",
+                e
+            );
         }
         assert!(result.is_ok());
-        
+
         // Verify correct API keys were stored
         #[expect(clippy::expect_used)]
-        let store = app_state.model_credential_store.read().expect("RwLock poisoned");
+        let store = app_state
+            .model_credential_store
+            .read()
+            .expect("RwLock poisoned");
         assert_eq!(store.len(), 2);
         assert!(store.contains_key("store_model-with-key"));
         assert!(store.contains_key("store_another-model-with-key"));
@@ -533,39 +549,40 @@ mod tests {
 
     #[tokio::test]
     async fn test_parse_model_with_encrypted_api_key() {
-        use rsa::{RsaPrivateKey, RsaPublicKey, Pkcs1v15Encrypt};
+        use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
         use rsa::pkcs1::EncodeRsaPrivateKey;
-        use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+        use rsa::{Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey};
         use secrecy::ExposeSecret;
-        
+
         // Generate test RSA key pair
         use rsa::rand_core::OsRng;
         let bits = 2048;
         let private_key = RsaPrivateKey::new(&mut OsRng, bits).expect("failed to generate key");
         let public_key = RsaPublicKey::from(&private_key);
-        
+
         // Convert private key to PEM format
         let private_key_pem = private_key
             .to_pkcs1_pem(rsa::pkcs1::LineEnding::LF)
             .expect("failed to encode PEM")
             .to_string();
-        
+
         // Set the private key in environment variable for the test
         std::env::set_var("TENSORZERO_RSA_PRIVATE_KEY", private_key_pem);
-        
+
         // Create app state
         let config = Arc::new(Config::default());
         let app_state = AppStateData::new(config).await.unwrap();
-        
+
         // Encrypt test API key
         let test_api_key = "sk-test-encrypted-key-12345";
         let encrypted = public_key
             .encrypt(&mut OsRng, Pkcs1v15Encrypt, test_api_key.as_bytes())
             .expect("encryption failed");
         let encrypted_base64 = BASE64.encode(&encrypted);
-        
+
         // JSON with encrypted API key
-        let json = format!(r#"{{
+        let json = format!(
+            r#"{{
             "model-with-encrypted-key": {{
                 "routing": ["dummy"],
                 "endpoints": ["chat"],
@@ -578,27 +595,34 @@ mod tests {
                 }},
                 "api_key": "{}"
             }}
-        }}"#, encrypted_base64);
-        
+        }}"#,
+            encrypted_base64
+        );
+
         let provider_types = ProviderTypesConfig::default();
-        
+
         // Parse models
         let result = RedisClient::parse_models(&json, &provider_types, &app_state).await;
         if let Err(e) = &result {
             eprintln!("Parse error: {}", e);
         }
         assert!(result.is_ok());
-        
+
         // Verify decrypted API key was stored correctly
         #[expect(clippy::expect_used)]
-        let store = app_state.model_credential_store.read().expect("RwLock poisoned");
+        let store = app_state
+            .model_credential_store
+            .read()
+            .expect("RwLock poisoned");
         assert_eq!(store.len(), 1);
         assert!(store.contains_key("store_model-with-encrypted-key"));
-        
+
         // Verify the decrypted value matches the original
-        let stored_key = store.get("store_model-with-encrypted-key").expect("Key not found");
+        let stored_key = store
+            .get("store_model-with-encrypted-key")
+            .expect("Key not found");
         assert_eq!(stored_key.expose_secret(), test_api_key);
-        
+
         // Clean up
         std::env::remove_var("TENSORZERO_RSA_PRIVATE_KEY");
     }

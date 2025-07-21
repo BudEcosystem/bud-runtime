@@ -65,7 +65,26 @@ use crate::openai_batch::{
     validate_batch_create_request, ListBatchesParams, OpenAIBatchCreateRequest,
 };
 use crate::realtime::{RealtimeSessionRequest, RealtimeTranscriptionRequest};
+use secrecy::SecretString;
 use std::sync::Arc;
+
+/// Helper function to merge credentials from the model credential store
+/// This eliminates code duplication across multiple endpoint handlers
+fn merge_credentials_from_store(
+    model_credential_store: &Arc<std::sync::RwLock<HashMap<String, SecretString>>>,
+) -> InferenceCredentials {
+    let mut credentials = InferenceCredentials::default();
+    {
+        #[expect(clippy::expect_used)]
+        let credential_store = model_credential_store.read().expect("RwLock poisoned");
+        for (key, value) in credential_store.iter() {
+            if !credentials.contains_key(key) {
+                credentials.insert(key.clone(), value.clone());
+            }
+        }
+    }
+    credentials
+}
 
 /// A handler for the OpenAI-compatible inference endpoint
 #[debug_handler(state = AppStateData)]
@@ -1520,15 +1539,7 @@ pub async fn embedding_handler(
         })?;
 
     // Merge credentials from the credential store
-    let mut credentials = InferenceCredentials::default();
-    {
-        let credential_store = model_credential_store.read().expect("RwLock poisoned");
-        for (key, value) in credential_store.iter() {
-            if !credentials.contains_key(key) {
-                credentials.insert(key.clone(), value.clone());
-            }
-        }
-    }
+    let credentials = merge_credentials_from_store(&model_credential_store);
 
     // Create inference clients
     let cache_options: crate::cache::CacheOptions = (
@@ -1684,15 +1695,7 @@ pub async fn moderation_handler(
     }
 
     // Merge credentials from the credential store
-    let mut credentials = InferenceCredentials::default();
-    {
-        let credential_store = model_credential_store.read().expect("RwLock poisoned");
-        for (key, value) in credential_store.iter() {
-            if !credentials.contains_key(key) {
-                credentials.insert(key.clone(), value.clone());
-            }
-        }
-    }
+    let credentials = merge_credentials_from_store(&model_credential_store);
 
     // Create inference clients with no caching for moderation
     let cache_options = crate::cache::CacheOptions {
@@ -2007,15 +2010,7 @@ pub async fn audio_transcription_handler(
     };
 
     // Merge credentials from the credential store
-    let mut credentials = InferenceCredentials::default();
-    {
-        let credential_store = model_credential_store.read().expect("RwLock poisoned");
-        for (key, value) in credential_store.iter() {
-            if !credentials.contains_key(key) {
-                credentials.insert(key.clone(), value.clone());
-            }
-        }
-    }
+    let credentials = merge_credentials_from_store(&model_credential_store);
 
     // Create inference clients with no caching for audio
     let cache_options = crate::cache::CacheOptions {
@@ -2201,15 +2196,7 @@ pub async fn audio_translation_handler(
     };
 
     // Merge credentials from the credential store
-    let mut credentials = InferenceCredentials::default();
-    {
-        let credential_store = model_credential_store.read().expect("RwLock poisoned");
-        for (key, value) in credential_store.iter() {
-            if !credentials.contains_key(key) {
-                credentials.insert(key.clone(), value.clone());
-            }
-        }
-    }
+    let credentials = merge_credentials_from_store(&model_credential_store);
 
     // Create inference clients with no caching for audio
     let cache_options = crate::cache::CacheOptions {
@@ -2386,15 +2373,7 @@ pub async fn text_to_speech_handler(
     };
 
     // Merge credentials from the credential store
-    let mut credentials = InferenceCredentials::default();
-    {
-        let credential_store = model_credential_store.read().expect("RwLock poisoned");
-        for (key, value) in credential_store.iter() {
-            if !credentials.contains_key(key) {
-                credentials.insert(key.clone(), value.clone());
-            }
-        }
-    }
+    let credentials = merge_credentials_from_store(&model_credential_store);
 
     // Create inference clients with no caching for audio
     let cache_options = crate::cache::CacheOptions {
@@ -2450,7 +2429,7 @@ pub async fn realtime_session_handler(
         clickhouse_connection_info,
         kafka_connection_info: _,
         authentication_info: _,
-        model_credential_store,
+        model_credential_store: _,
     }): AppState,
     headers: HeaderMap,
     StructuredJson(params): StructuredJson<RealtimeSessionRequest>,
@@ -2534,7 +2513,7 @@ pub async fn realtime_transcription_session_handler(
         clickhouse_connection_info,
         kafka_connection_info: _,
         authentication_info: _,
-        model_credential_store,
+        model_credential_store: _,
     }): AppState,
     headers: HeaderMap,
     StructuredJson(params): StructuredJson<RealtimeTranscriptionRequest>,
@@ -2880,15 +2859,7 @@ pub async fn image_generation_handler(
     };
 
     // Merge credentials from the credential store
-    let mut credentials = InferenceCredentials::default();
-    {
-        let credential_store = model_credential_store.read().expect("RwLock poisoned");
-        for (key, value) in credential_store.iter() {
-            if !credentials.contains_key(key) {
-                credentials.insert(key.clone(), value.clone());
-            }
-        }
-    }
+    let credentials = merge_credentials_from_store(&model_credential_store);
 
     // Create inference clients with no caching for images
     let cache_options = crate::cache::CacheOptions {
@@ -3038,15 +3009,7 @@ pub async fn image_edit_handler(
     };
 
     // Merge credentials from the credential store
-    let mut credentials = InferenceCredentials::default();
-    {
-        let credential_store = model_credential_store.read().expect("RwLock poisoned");
-        for (key, value) in credential_store.iter() {
-            if !credentials.contains_key(key) {
-                credentials.insert(key.clone(), value.clone());
-            }
-        }
-    }
+    let credentials = merge_credentials_from_store(&model_credential_store);
 
     // Create inference clients with no caching for images
     let cache_options = crate::cache::CacheOptions {
@@ -3172,15 +3135,7 @@ pub async fn image_variation_handler(
     };
 
     // Merge credentials from the credential store
-    let mut credentials = InferenceCredentials::default();
-    {
-        let credential_store = model_credential_store.read().expect("RwLock poisoned");
-        for (key, value) in credential_store.iter() {
-            if !credentials.contains_key(key) {
-                credentials.insert(key.clone(), value.clone());
-            }
-        }
-    }
+    let credentials = merge_credentials_from_store(&model_credential_store);
 
     // Create inference clients with no caching for images
     let cache_options = crate::cache::CacheOptions {
@@ -3568,8 +3523,8 @@ pub async fn response_create_handler(
             })
         })?;
 
-    // Create credentials
-    let credentials = InferenceCredentials::default();
+    // Merge credentials from the credential store
+    let credentials = merge_credentials_from_store(&model_credential_store);
 
     // Create inference clients
     let cache_options = crate::cache::CacheOptions {
@@ -3631,7 +3586,7 @@ pub async fn response_retrieve_handler(
         clickhouse_connection_info,
         kafka_connection_info: _,
         authentication_info: _,
-        model_credential_store,
+        model_credential_store: _,
     }): AppState,
     headers: HeaderMap,
     Path(response_id): Path<String>,
@@ -3715,7 +3670,7 @@ pub async fn response_delete_handler(
         clickhouse_connection_info,
         kafka_connection_info: _,
         authentication_info: _,
-        model_credential_store,
+        model_credential_store: _,
     }): AppState,
     headers: HeaderMap,
     Path(response_id): Path<String>,
@@ -3795,7 +3750,7 @@ pub async fn response_cancel_handler(
         clickhouse_connection_info,
         kafka_connection_info: _,
         authentication_info: _,
-        model_credential_store,
+        model_credential_store: _,
     }): AppState,
     headers: HeaderMap,
     Path(response_id): Path<String>,
@@ -3875,7 +3830,7 @@ pub async fn response_input_items_handler(
         clickhouse_connection_info,
         kafka_connection_info: _,
         authentication_info: _,
-        model_credential_store,
+        model_credential_store: _,
     }): AppState,
     headers: HeaderMap,
     Path(response_id): Path<String>,
@@ -3994,7 +3949,7 @@ pub async fn file_upload_handler(
         clickhouse_connection_info: _,
         kafka_connection_info: _,
         authentication_info: _,
-        model_credential_store,
+        model_credential_store: _,
     }): AppState,
     _headers: HeaderMap,
     mut multipart: Multipart,
@@ -4124,7 +4079,7 @@ pub async fn file_retrieve_handler(
         clickhouse_connection_info: _,
         kafka_connection_info: _,
         authentication_info: _,
-        model_credential_store,
+        model_credential_store: _,
     }): AppState,
     _headers: HeaderMap,
     Path(file_id): Path<String>,
@@ -4169,7 +4124,7 @@ pub async fn file_content_handler(
         clickhouse_connection_info: _,
         kafka_connection_info: _,
         authentication_info: _,
-        model_credential_store,
+        model_credential_store: _,
     }): AppState,
     _headers: HeaderMap,
     Path(file_id): Path<String>,
@@ -4214,7 +4169,7 @@ pub async fn file_delete_handler(
         clickhouse_connection_info: _,
         kafka_connection_info: _,
         authentication_info: _,
-        model_credential_store,
+        model_credential_store: _,
     }): AppState,
     _headers: HeaderMap,
     Path(file_id): Path<String>,
@@ -4247,7 +4202,7 @@ pub async fn batch_create_handler(
         clickhouse_connection_info: _,
         kafka_connection_info: _,
         authentication_info: _,
-        model_credential_store,
+        model_credential_store: _,
     }): AppState,
     _headers: HeaderMap,
     Json(request): Json<OpenAIBatchCreateRequest>,
@@ -4331,7 +4286,7 @@ pub async fn batch_retrieve_handler(
         clickhouse_connection_info: _,
         kafka_connection_info: _,
         authentication_info: _,
-        model_credential_store,
+        model_credential_store: _,
     }): AppState,
     _headers: HeaderMap,
     Path(batch_id): Path<String>,
@@ -4376,7 +4331,7 @@ pub async fn batch_list_handler(
         clickhouse_connection_info: _,
         kafka_connection_info: _,
         authentication_info: _,
-        model_credential_store,
+        model_credential_store: _,
     }): AppState,
     _headers: HeaderMap,
     Query(params): Query<ListBatchesParams>,
@@ -4421,7 +4376,7 @@ pub async fn batch_cancel_handler(
         clickhouse_connection_info: _,
         kafka_connection_info: _,
         authentication_info: _,
-        model_credential_store,
+        model_credential_store: _,
     }): AppState,
     _headers: HeaderMap,
     Path(batch_id): Path<String>,

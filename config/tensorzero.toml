@@ -1,0 +1,46 @@
+[gateway]
+bind_address = "0.0.0.0:3000"
+debug = true
+
+[gateway.authentication]
+enabled = false
+
+# Kafka configuration disabled until new image is deployed
+[gateway.observability.kafka]
+enabled = false
+brokers = "localhost:9092"
+topic_prefix = "tensorzero"
+compression_type = "lz4"
+batch_size = 1000
+linger_ms = 10
+# # Use SASL_PLAINTEXT as the broker seems to require it
+security_protocol = "SASL_PLAINTEXT"
+# 
+# # Try with PLAIN mechanism
+[gateway.observability.kafka.sasl]
+mechanism = "PLAIN"
+username = "user1"
+password = "Htf1v4PW72"
+
+[models."019787c1-3de1-7b50-969b-e0a58514b6a0"]
+# Try the following providers in order:
+# 1. `models.gpt_4o_mini.providers.openai`
+# 2. `models.gpt_4o_mini.providers.azure`
+routing = ["vllm"]
+endpoints = ["embedding"]
+
+[models."019787c1-3de1-7b50-969b-e0a58514b6a0".providers.vllm]
+type = "vllm"
+model_name = "qwen3-4b"
+api_base = "http://20.66.97.208/v1"
+api_key_location = "none"
+
+[api_keys."sk-BudLLMMasterKey_123"]
+[api_keys."sk-BudLLMMasterKey_123".qwen_3_4b]
+endpoint_id = "019787c1-3de1-7b50-969b-e0a58514b6a0"
+model_id = "019787c1-3de1-7b50-969b-e0a58514b6a2"
+project_id = "019787c1-3de1-7b50-969b-e0a58514b6a1"
+
+
+
+
