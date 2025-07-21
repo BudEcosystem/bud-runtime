@@ -89,7 +89,10 @@ impl AppStateData {
         if let Ok(mut credential_store) = self.model_credential_store.write() {
             credential_store.remove(&credential_key);
         } else {
-            tracing::error!("Failed to acquire credential store write lock (poisoned) when removing model {}", model_name);
+            tracing::error!(
+                "Failed to acquire credential store write lock (poisoned) when removing model {}",
+                model_name
+            );
         }
     }
 }
@@ -519,10 +522,7 @@ mod tests {
         let app_state = AppStateData::new(config).await.unwrap();
 
         // Verify credential store is initialized empty
-        let store = app_state
-            .model_credential_store
-            .read()
-            .unwrap(); // Test code can panic
+        let store = app_state.model_credential_store.read().unwrap(); // Test code can panic
         assert!(store.is_empty());
     }
 
@@ -533,10 +533,7 @@ mod tests {
 
         // Add a credential
         {
-            let mut store = app_state
-                .model_credential_store
-                .write()
-                .unwrap(); // Test code can panic
+            let mut store = app_state.model_credential_store.write().unwrap(); // Test code can panic
             store.insert(
                 "store_test-model".to_string(),
                 SecretString::from("test-api-key"),
@@ -545,10 +542,7 @@ mod tests {
 
         // Verify credential exists
         {
-            let store = app_state
-                .model_credential_store
-                .read()
-                .unwrap(); // Test code can panic
+            let store = app_state.model_credential_store.read().unwrap(); // Test code can panic
             assert!(store.contains_key("store_test-model"));
             assert_eq!(store.len(), 1);
         }
@@ -558,10 +552,7 @@ mod tests {
 
         // Verify credential was removed
         {
-            let store = app_state
-                .model_credential_store
-                .read()
-                .unwrap(); // Test code can panic
+            let store = app_state.model_credential_store.read().unwrap(); // Test code can panic
             assert!(!store.contains_key("store_test-model"));
             assert!(store.is_empty());
         }

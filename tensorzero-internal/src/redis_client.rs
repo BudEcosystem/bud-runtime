@@ -26,14 +26,12 @@ pub struct RedisClient {
 
 impl RedisClient {
     pub async fn new(url: &str, app_state: AppStateData, auth: Auth) -> Result<Self, Error> {
-        let (client, conn) = Self::init_conn(url)
-            .await
-            .map_err(|e| {
-                tracing::error!("Failed to connect to Redis: {e}");
-                Error::new(ErrorDetails::InternalError {
-                    message: format!("Redis connection failed: {e}"),
-                })
-            })?;
+        let (client, conn) = Self::init_conn(url).await.map_err(|e| {
+            tracing::error!("Failed to connect to Redis: {e}");
+            Error::new(ErrorDetails::InternalError {
+                message: format!("Redis connection failed: {e}"),
+            })
+        })?;
         Ok(Self {
             client,
             conn,
@@ -396,10 +394,7 @@ mod tests {
         assert!(result.is_ok());
 
         // Verify API key was stored
-        let store = app_state
-            .model_credential_store
-            .read()
-            .unwrap(); // Test code can panic
+        let store = app_state.model_credential_store.read().unwrap(); // Test code can panic
         assert!(store.contains_key("store_test-model"));
         assert_eq!(store.len(), 1);
     }
@@ -435,10 +430,7 @@ mod tests {
         assert!(result.is_ok(), "Failed to parse real-world model JSON");
 
         // Verify API key was stored
-        let store = app_state
-            .model_credential_store
-            .read()
-            .unwrap(); // Test code can panic
+        let store = app_state.model_credential_store.read().unwrap(); // Test code can panic
         assert!(store.contains_key("store_f5b083f4-c4eb-4fa7-b190-1002a65b1326"));
         assert_eq!(store.len(), 1);
     }
@@ -472,10 +464,7 @@ mod tests {
         assert!(result.is_ok());
 
         // Verify no API key was stored
-        let store = app_state
-            .model_credential_store
-            .read()
-            .unwrap(); // Test code can panic
+        let store = app_state.model_credential_store.read().unwrap(); // Test code can panic
         assert!(store.is_empty());
     }
 
@@ -532,10 +521,7 @@ mod tests {
         assert!(result.is_ok());
 
         // Verify correct API keys were stored
-        let store = app_state
-            .model_credential_store
-            .read()
-            .unwrap(); // Test code can panic
+        let store = app_state.model_credential_store.read().unwrap(); // Test code can panic
         assert_eq!(store.len(), 2);
         assert!(store.contains_key("store_model-with-key"));
         assert!(store.contains_key("store_another-model-with-key"));
@@ -603,17 +589,12 @@ mod tests {
         assert!(result.is_ok());
 
         // Verify decrypted API key was stored correctly
-        let store = app_state
-            .model_credential_store
-            .read()
-            .unwrap(); // Test code can panic
+        let store = app_state.model_credential_store.read().unwrap(); // Test code can panic
         assert_eq!(store.len(), 1);
         assert!(store.contains_key("store_model-with-encrypted-key"));
 
         // Verify the decrypted value matches the original
-        let stored_key = store
-            .get("store_model-with-encrypted-key")
-            .unwrap(); // Test code can panic
+        let stored_key = store.get("store_model-with-encrypted-key").unwrap(); // Test code can panic
         assert_eq!(stored_key.expose_secret(), test_api_key);
 
         // Clean up
