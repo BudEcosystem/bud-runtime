@@ -25,21 +25,21 @@ pub struct RedisClient {
 }
 
 impl RedisClient {
-    pub async fn new(url: &str, app_state: AppStateData, auth: Auth) -> Self {
-        #[expect(clippy::expect_used)]
+    pub async fn new(url: &str, app_state: AppStateData, auth: Auth) -> Result<Self, Error> {
         let (client, conn) = Self::init_conn(url)
             .await
             .map_err(|e| {
                 tracing::error!("Failed to connect to Redis: {e}");
-                e
-            })
-            .expect("Redis connection is required for operation");
-        Self {
+                Error::new(ErrorDetails::InternalError {
+                    message: format!("Redis connection failed: {e}"),
+                })
+            })?;
+        Ok(Self {
             client,
             conn,
             app_state,
             auth,
-        }
+        })
     }
 
     async fn init_conn(url: &str) -> Result<(redis::Client, MultiplexedConnection), Error> {
@@ -124,13 +124,15 @@ impl RedisClient {
 
         // Store API keys in the credential store
         if !api_keys_to_store.is_empty() {
-            #[expect(clippy::expect_used)]
-            let mut credential_store = app_state
-                .model_credential_store
-                .write()
-                .expect("RwLock poisoned");
-            for (key, secret) in api_keys_to_store {
-                credential_store.insert(key, secret);
+            if let Ok(mut credential_store) = app_state.model_credential_store.write() {
+                for (key, secret) in api_keys_to_store {
+                    credential_store.insert(key, secret);
+                }
+            } else {
+                tracing::error!("Failed to acquire credential store write lock (poisoned) when storing API keys");
+                return Err(Error::new(ErrorDetails::InternalError {
+                    message: "Credential store lock is poisoned".to_string(),
+                }));
             }
         }
 
@@ -394,11 +396,10 @@ mod tests {
         assert!(result.is_ok());
 
         // Verify API key was stored
-        #[expect(clippy::expect_used)]
         let store = app_state
             .model_credential_store
             .read()
-            .expect("RwLock poisoned");
+            .unwrap(); // Test code can panic
         assert!(store.contains_key("store_test-model"));
         assert_eq!(store.len(), 1);
     }
@@ -429,16 +430,15 @@ mod tests {
         // Parse models
         let result = RedisClient::parse_models(json, &provider_types, &app_state).await;
         if let Err(e) = &result {
-            eprintln!("Parse error: {}", e);
+            tracing::error!("Parse error: {e}");
         }
         assert!(result.is_ok(), "Failed to parse real-world model JSON");
 
         // Verify API key was stored
-        #[expect(clippy::expect_used)]
         let store = app_state
             .model_credential_store
             .read()
-            .expect("RwLock poisoned");
+            .unwrap(); // Test code can panic
         assert!(store.contains_key("store_f5b083f4-c4eb-4fa7-b190-1002a65b1326"));
         assert_eq!(store.len(), 1);
     }
@@ -467,16 +467,15 @@ mod tests {
         // Parse models
         let result = RedisClient::parse_models(json, &provider_types, &app_state).await;
         if let Err(e) = &result {
-            eprintln!("Parse error: {}", e);
+            tracing::error!("Parse error: {e}");
         }
         assert!(result.is_ok());
 
         // Verify no API key was stored
-        #[expect(clippy::expect_used)]
         let store = app_state
             .model_credential_store
             .read()
-            .expect("RwLock poisoned");
+            .unwrap(); // Test code can panic
         assert!(store.is_empty());
     }
 
@@ -528,19 +527,15 @@ mod tests {
         // Parse models
         let result = RedisClient::parse_models(json, &provider_types, &app_state).await;
         if let Err(e) = &result {
-            eprintln!(
-                "Parse error in test_parse_multiple_models_with_mixed_api_keys: {}",
-                e
-            );
+            tracing::error!("Parse error in test_parse_multiple_models_with_mixed_api_keys: {e}");
         }
         assert!(result.is_ok());
 
         // Verify correct API keys were stored
-        #[expect(clippy::expect_used)]
         let store = app_state
             .model_credential_store
             .read()
-            .expect("RwLock poisoned");
+            .unwrap(); // Test code can panic
         assert_eq!(store.len(), 2);
         assert!(store.contains_key("store_model-with-key"));
         assert!(store.contains_key("store_another-model-with-key"));
@@ -593,10 +588,9 @@ mod tests {
                         "api_key_location": "dynamic::store_model-with-encrypted-key"
                     }}
                 }},
-                "api_key": "{}"
+                "api_key": "{encrypted_base64}"
             }}
-        }}"#,
-            encrypted_base64
+        }}"#
         );
 
         let provider_types = ProviderTypesConfig::default();
@@ -604,23 +598,22 @@ mod tests {
         // Parse models
         let result = RedisClient::parse_models(&json, &provider_types, &app_state).await;
         if let Err(e) = &result {
-            eprintln!("Parse error: {}", e);
+            tracing::error!("Parse error: {e}");
         }
         assert!(result.is_ok());
 
         // Verify decrypted API key was stored correctly
-        #[expect(clippy::expect_used)]
         let store = app_state
             .model_credential_store
             .read()
-            .expect("RwLock poisoned");
+            .unwrap(); // Test code can panic
         assert_eq!(store.len(), 1);
         assert!(store.contains_key("store_model-with-encrypted-key"));
 
         // Verify the decrypted value matches the original
         let stored_key = store
             .get("store_model-with-encrypted-key")
-            .expect("Key not found");
+            .unwrap(); // Test code can panic
         assert_eq!(stored_key.expose_secret(), test_api_key);
 
         // Clean up

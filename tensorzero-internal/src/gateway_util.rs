@@ -86,12 +86,11 @@ impl AppStateData {
 
         // Also remove associated credential if it exists
         let credential_key = format!("store_{model_name}");
-        #[expect(clippy::expect_used)]
-        let mut credential_store = self
-            .model_credential_store
-            .write()
-            .expect("RwLock poisoned");
-        credential_store.remove(&credential_key);
+        if let Ok(mut credential_store) = self.model_credential_store.write() {
+            credential_store.remove(&credential_key);
+        } else {
+            tracing::error!("Failed to acquire credential store write lock (poisoned) when removing model {}", model_name);
+        }
     }
 }
 
@@ -520,11 +519,10 @@ mod tests {
         let app_state = AppStateData::new(config).await.unwrap();
 
         // Verify credential store is initialized empty
-        #[expect(clippy::expect_used)]
         let store = app_state
             .model_credential_store
             .read()
-            .expect("RwLock poisoned");
+            .unwrap(); // Test code can panic
         assert!(store.is_empty());
     }
 
@@ -535,11 +533,10 @@ mod tests {
 
         // Add a credential
         {
-            #[expect(clippy::expect_used)]
             let mut store = app_state
                 .model_credential_store
                 .write()
-                .expect("RwLock poisoned");
+                .unwrap(); // Test code can panic
             store.insert(
                 "store_test-model".to_string(),
                 SecretString::from("test-api-key"),
@@ -548,11 +545,10 @@ mod tests {
 
         // Verify credential exists
         {
-            #[expect(clippy::expect_used)]
             let store = app_state
                 .model_credential_store
                 .read()
-                .expect("RwLock poisoned");
+                .unwrap(); // Test code can panic
             assert!(store.contains_key("store_test-model"));
             assert_eq!(store.len(), 1);
         }
@@ -562,11 +558,10 @@ mod tests {
 
         // Verify credential was removed
         {
-            #[expect(clippy::expect_used)]
             let store = app_state
                 .model_credential_store
                 .read()
-                .expect("RwLock poisoned");
+                .unwrap(); // Test code can panic
             assert!(!store.contains_key("store_test-model"));
             assert!(store.is_empty());
         }
@@ -581,22 +576,20 @@ mod tests {
         // Spawn multiple tasks to test concurrent access
         let handle1 = tokio::spawn(async move {
             for i in 0..10 {
-                #[expect(clippy::expect_used)]
-                let mut s = store_clone1.write().expect("RwLock poisoned");
+                let mut s = store_clone1.write().unwrap(); // Test code can panic
                 s.insert(
-                    format!("key1_{}", i),
-                    SecretString::from(format!("value1_{}", i)),
+                    format!("key1_{i}"),
+                    SecretString::from(format!("value1_{i}")),
                 );
             }
         });
 
         let handle2 = tokio::spawn(async move {
             for i in 0..10 {
-                #[expect(clippy::expect_used)]
-                let mut s = store_clone2.write().expect("RwLock poisoned");
+                let mut s = store_clone2.write().unwrap(); // Test code can panic
                 s.insert(
-                    format!("key2_{}", i),
-                    SecretString::from(format!("value2_{}", i)),
+                    format!("key2_{i}"),
+                    SecretString::from(format!("value2_{i}")),
                 );
             }
         });
@@ -605,12 +598,11 @@ mod tests {
         handle2.await.unwrap();
 
         // Verify all keys were inserted
-        #[expect(clippy::expect_used)]
-        let final_store = store.read().expect("RwLock poisoned");
+        let final_store = store.read().unwrap(); // Test code can panic
         assert_eq!(final_store.len(), 20);
         for i in 0..10 {
-            assert!(final_store.contains_key(&format!("key1_{}", i)));
-            assert!(final_store.contains_key(&format!("key2_{}", i)));
+            assert!(final_store.contains_key(&format!("key1_{i}")));
+            assert!(final_store.contains_key(&format!("key2_{i}")));
         }
     }
 

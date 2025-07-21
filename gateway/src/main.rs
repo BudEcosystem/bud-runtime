@@ -177,7 +177,9 @@ async fn main() {
         if let Ok(redis_url) = std::env::var("TENSORZERO_REDIS_URL") {
             if !redis_url.is_empty() {
                 let redis_client =
-                    RedisClient::new(&redis_url, app_state.clone(), auth.clone()).await;
+                    RedisClient::new(&redis_url, app_state.clone(), auth.clone())
+                        .await
+                        .expect_pretty("Failed to create Redis client");
                 redis_client
                     .start()
                     .await
