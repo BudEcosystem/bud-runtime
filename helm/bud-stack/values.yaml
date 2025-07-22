@@ -496,12 +496,12 @@ apps:
     appTopicRoute: "/notifications"
     envFrom: bud-global-config
     resources:
-        limits:
-            memory: "32768Mi"
-            cpu: "2"
-        requests:
-            memory: "256Mi"
-            cpu: "250m"
+      limits:
+        memory: "32768Mi"
+        cpu: "2"
+      requests:
+        memory: "256Mi"
+        cpu: "250m"
     command: "alembic -c ./budeval/alembic.ini upgrade head && uvicorn budeval.main:app --host 0.0.0.0 --port"
 ingresses: # Define ingress resources for external access
   - name: "dapr-dashboard-ingress"
@@ -829,7 +829,6 @@ credential:
       -----END PUBLIC KEY-----
     # Private key password (if using an encrypted private key)
     privateKeyPassword: "YOUR_PRIVATE_KEY_PASSWORD"
-
 budproxy:
   image: "budstudio/budproxy:nightly"
   resources:
