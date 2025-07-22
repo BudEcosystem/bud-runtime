@@ -40,15 +40,29 @@ spec:
               value: {{ .Values.budproxy.redisUrl }}
             - name: TENSORZERO_CLICKHOUSE_URL
               value: {{ .Values.budproxy.clickhouseUrl }}
+            - name: TENSORZERO_RSA_PRIVATE_KEY_PATH
+              value: /app/keys/rsa-private-key.pem
+            - name: TENSORZERO_RSA_PRIVATE_KEY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: credential-rsa-keys
+                  key: private-key-password
           volumeMounts:
             - name: config-volume
               mountPath: /app/config
+            - name: rsa-keys
+              mountPath: /app/keys
+              readOnly: true
           resources:
             {{- toYaml .Values.budproxy.resources | nindent 12 }}
       volumes:
         - name: config-volume
           configMap:
             name: budproxy-config
+        - name: rsa-keys
+          secret:
+            secretName: credential-rsa-keys
+            defaultMode: 0444
 
 ---
 apiVersion: v1
