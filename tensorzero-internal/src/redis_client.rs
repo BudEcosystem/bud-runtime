@@ -361,9 +361,13 @@ impl RedisClient {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "e2e_tests")]
     use super::*;
+    #[cfg(feature = "e2e_tests")]
     use crate::config_parser::{Config, ProviderTypesConfig};
+    #[cfg(feature = "e2e_tests")]
     use crate::gateway_util::AppStateData;
+    #[cfg(feature = "e2e_tests")]
     use std::sync::Arc;
 
     #[tokio::test]
