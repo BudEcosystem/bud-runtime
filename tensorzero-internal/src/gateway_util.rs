@@ -517,6 +517,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(feature = "e2e_tests")]
     async fn test_model_credential_store_initialization() {
         let config = Arc::new(Config::default());
         let app_state = AppStateData::new(config).await.unwrap();
@@ -527,6 +528,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(feature = "e2e_tests")]
     async fn test_model_credential_store_operations() {
         let config = Arc::new(Config::default());
         let app_state = AppStateData::new(config).await.unwrap();

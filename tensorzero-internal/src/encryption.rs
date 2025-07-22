@@ -217,7 +217,8 @@ mod tests {
     // Generate a test RSA key pair
     fn generate_test_keypair() -> (RsaPrivateKey, RsaPublicKey) {
         use rsa::rand_core::OsRng;
-        let bits = 2048;
+        // Use a smaller key size for tests to speed them up
+        let bits = 1024;
         let private_key = RsaPrivateKey::new(&mut OsRng, bits).expect("failed to generate key");
         let public_key = RsaPublicKey::from(&private_key);
         (private_key, public_key)
