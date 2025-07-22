@@ -231,6 +231,7 @@ apps:
     appTopic: "budAppMessages"
     appTopicRoute: "/notifications"
     envFrom: "{{ .Values.globalEnv.configMapName }}"
+    enableRSAKeys: true
     env:
       # APP_CONFIG is already in globalEnv, Dapr usually injects this from config store
       - name: PSQL_HOST
@@ -254,6 +255,10 @@ apps:
         value: "<YOUR_AES_ENCRYPTION_KEY_HEX>"
       - name: PRIVATE_KEY_PASSWORD # Password for an encrypted private key
         value: "<YOUR_PRIVATE_KEY_PASSWORD>"
+      - name: PRIVATE_KEY_PATH
+        value: "/app/keys/rsa-private-key.pem" # Path inside container for private key
+      - name: PUBLIC_KEY_PATH
+        value: "/app/keys/rsa-public-key.pem" # Path inside container for public key
       - name: STATIC_DIR
         value: "/app/static" # Path inside container for static files
       # Grafana related envs - ensure Grafana is accessible
@@ -279,9 +284,9 @@ apps:
       - name: DEFAULT_REALM_NAME
         value: "<YOUR_DEFAULT_KEYCLOAK_REALM_FOR_BUDAPP>"
       - name: CLOUD_MODEL_SEEDER_ENGINE
-        value: "litellm"
+        value: "tensorzero"
       - name: BUD_CONNECT_BASE_URL
-        value: "https://connect.<YOUR_DOMAIN>"
+        value: "https://budconnect.<YOUR_DOMAIN>"
     resources:
       limits:
         memory: "32Gi"
@@ -450,22 +455,6 @@ apps:
     volumes:
       - name: crypto-keys
         mountPath: "/root/.cache/budserve/keys"
-  - name: "budhardware"
-    image: "<YOUR_REGISTRY>/<BUDHARDWARE_SIM_IMAGE_NAME>:<TAG>"
-    containerPort: 8472
-    envFrom: "{{ .Values.globalEnv.configMapName }}"
-    daprAppId: "budhardware"
-    appTopic: "budhardware"
-    DisableShell: "True"
-    appTopicRoute: "/notifications"
-    resources:
-      limits:
-        memory: "512Mi"
-        cpu: "1"
-      requests:
-        memory: "256Mi"
-        cpu: "250m"
-        # command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8472"]
   - name: "budmetrics"
     image: "budstudio/budmetrics:0.2.0"
     containerPort: 3005
@@ -496,6 +485,24 @@ apps:
         memory: "256Mi"
         cpu: "250m"
         # command: ["sh", "-c", "alembic -c ./alembic.ini upgrade head && uvicorn budmetrics.main:app --host 0.0.0.0 --port 3005"]
+  - name: "budeval"
+    namespace: "dapr-system"
+    image: "budstudio/budeval:nightly"
+    containerPort: 3005
+    daprAppId: "budeval"
+    pvcName: "bud-budeval-1"
+    pvcPath: "/datadisk/pvc/bud-budeval-pv"
+    appTopic: "budEvalMessages"
+    appTopicRoute: "/notifications"
+    envFrom: bud-global-config
+    resources:
+        limits:
+            memory: "32768Mi"
+            cpu: "2"
+        requests:
+            memory: "256Mi"
+            cpu: "250m"
+    command: "alembic -c ./budeval/alembic.ini upgrade head && uvicorn budeval.main:app --host 0.0.0.0 --port"
 ingresses: # Define ingress resources for external access
   - name: "dapr-dashboard-ingress"
     enabled: true
@@ -557,12 +564,6 @@ ingresses: # Define ingress resources for external access
     servicePort: 9000 # Minio API port
     protocol: web # Use web or websecure
     # servicePortGui: 9001 # Minio Console/UI port, if different service or port exposed by Minio chart
-  - name: "budhardware-ingress"
-    enabled: true
-    host: "hardware.<YOUR_DOMAIN>"
-    serviceName: "budhardware-service"
-    servicePort: 8472
-    protocol: web # Use web or websecure
   - name: "keycloak-ingress" # If Keycloak is deployed by this chart
     enabled: "{{ .Values.keycloak.enabled }}"
     host: "{{ .Values.keycloak.hostname }}" # Uses keycloak.hostname
@@ -811,6 +812,24 @@ certManager: # Settings for cert-manager itself (installation)
 # Note: The original file had 'cert-manager' as a separate key from 'certManager'.
 # Assuming 'certManager' is the primary key for controlling its installation.
 # If 'cert-manager' (with hyphen) is for a sub-chart, its structure would be different.
+credential:
+  rsa:
+    # Paste your RSA private key content here (INCLUDING BEGIN/END lines)
+    # To generate: openssl genrsa -out private.pem 2048
+    # If you have an encrypted key, decrypt it first: openssl rsa -in encrypted.pem -out private.pem
+    privateKey: |
+      -----BEGIN RSA PRIVATE KEY-----
+      YOUR_RSA_PRIVATE_KEY_CONTENT_HERE
+      -----END RSA PRIVATE KEY-----
+    # Paste your RSA public key content here (INCLUDING BEGIN/END lines)  
+    # To generate from private key: openssl rsa -in private.pem -pubout -out public.pem
+    publicKey: |
+      -----BEGIN PUBLIC KEY-----
+      YOUR_RSA_PUBLIC_KEY_CONTENT_HERE
+      -----END PUBLIC KEY-----
+    # Private key password (if using an encrypted private key)
+    privateKeyPassword: "YOUR_PRIVATE_KEY_PASSWORD"
+
 budproxy:
   image: "budstudio/budproxy:nightly"
   resources:

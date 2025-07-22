@@ -60,6 +60,11 @@ spec:
         - name: {{ .name }}
           mountPath: {{ .mountPath }}
         {{- end }}
+        {{- if .enableRSAKeys }}
+        - name: rsa-keys
+          mountPath: /app/keys
+          readOnly: true
+        {{- end }}
         {{- if .livenessProbe }}
         livenessProbe:
           httpGet:
@@ -85,6 +90,12 @@ spec:
       - name: {{ .name }}
         persistentVolumeClaim:
           claimName: {{ .name }}-pvc
+      {{- end }}
+      {{- if .enableRSAKeys }}
+      - name: rsa-keys
+        secret:
+          secretName: credential-rsa-keys
+          defaultMode: 0444
       {{- end }}
 
 ---
