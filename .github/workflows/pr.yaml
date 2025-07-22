@@ -47,7 +47,7 @@ jobs:
       - name: Install cargo-nextest
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
-          cargo install cargo-nextest --locked || echo "cargo-nextest already installed"
+          cargo install cargo-nextest --version 0.9.100 --locked || echo "cargo-nextest already installed"
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
       - name: Set up TENSORZERO_CLICKHOUSE_URL
@@ -139,7 +139,7 @@ jobs:
       - name: Install cargo-nextest, cargo-deny, and cargo-hack
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
-          cargo install cargo-nextest --locked || echo "cargo-nextest already installed"
+          cargo install cargo-nextest --version 0.9.100 --locked || echo "cargo-nextest already installed"
           cargo install cargo-deny --locked || echo "cargo-deny already installed"
           cargo install cargo-hack --locked || echo "cargo-hack already installed"
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
@@ -214,7 +214,7 @@ jobs:
       - name: Install cargo-nextest
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
-          cargo install cargo-nextest --locked || echo "cargo-nextest already installed"
+          cargo install cargo-nextest --version 0.9.100 --locked || echo "cargo-nextest already installed"
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
       - name: Install uv
