@@ -294,6 +294,9 @@ impl ClientBuilder {
                                 kafka_connection_info:
                                     tensorzero_internal::kafka::KafkaConnectionInfo::Disabled,
                                 authentication_info: setup_authentication(&config),
+                                model_credential_store: std::sync::Arc::new(
+                                    std::sync::RwLock::new(std::collections::HashMap::new()),
+                                ),
                             },
                         },
                         timeout: *timeout,
@@ -472,6 +475,7 @@ impl Client {
                         &gateway.state.http_client,
                         gateway.state.clickhouse_connection_info.clone(),
                         gateway.state.kafka_connection_info.clone(),
+                        gateway.state.model_credential_store.clone(),
                         params.try_into().map_err(err_to_http)?,
                     )
                     .await

@@ -111,6 +111,10 @@ tower-layer = "0.3.3"
 pyo3 = { workspace = true, optional = true }
 google-cloud-auth = "0.20.0"
 redis = { version = "0.31.0", features = ["tokio-comp"] }
+rsa = { version = "0.9", features = ["sha2"] }
+pem = "3.0"
+pkcs8 = { version = "0.10", features = ["encryption", "pem"] }
+der = "0.7"
 
 
 [dev-dependencies]

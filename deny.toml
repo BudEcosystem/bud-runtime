@@ -13,7 +13,8 @@ skip = [
 
 [advisories]
 ignore = [
-    "RUSTSEC-2024-0436" # We don't care that 'paste' is unmaintained
+    "RUSTSEC-2024-0436", # We don't care that 'paste' is unmaintained
+    "RUSTSEC-2023-0071", # RSA Marvin Attack - timing side channel. We only use RSA for decrypting API keys from Redis in a trusted environment
 ]
 
 [licenses]

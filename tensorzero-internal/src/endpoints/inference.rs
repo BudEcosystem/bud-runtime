@@ -154,6 +154,7 @@ pub async fn inference_handler(
         clickhouse_connection_info,
         kafka_connection_info,
         authentication_info: _,
+        model_credential_store,
     }): AppState,
     headers: HeaderMap,
     StructuredJson(mut params): StructuredJson<Params>,
@@ -186,6 +187,7 @@ pub async fn inference_handler(
         &http_client,
         clickhouse_connection_info,
         kafka_connection_info,
+        model_credential_store,
         params,
     )
     .await?;
@@ -243,6 +245,7 @@ pub async fn inference(
     http_client: &reqwest::Client,
     clickhouse_connection_info: ClickHouseConnectionInfo,
     kafka_connection_info: KafkaConnectionInfo,
+    model_credential_store: Arc<std::sync::RwLock<HashMap<String, SecretString>>>,
     params: Params,
 ) -> Result<InferenceOutput, Error> {
     let span = tracing::Span::current();
@@ -373,10 +376,23 @@ pub async fn inference(
         extra_body: Default::default(),
         extra_headers: Default::default(),
     };
+    // Merge credentials from the credential store with the provided credentials
+    let mut merged_credentials = params.credentials.clone();
+    {
+        #[expect(clippy::expect_used)]
+        let credential_store = model_credential_store.read().expect("RwLock poisoned");
+        for (key, value) in credential_store.iter() {
+            // Only add if not already present (user-provided credentials take precedence)
+            if !merged_credentials.contains_key(key) {
+                merged_credentials.insert(key.clone(), value.clone());
+            }
+        }
+    }
+
     let inference_clients = InferenceClients {
         http_client,
         clickhouse_connection_info: &clickhouse_connection_info,
-        credentials: &params.credentials,
+        credentials: &merged_credentials,
         cache_options: &(params.cache_options, dryrun).into(),
     };
 
