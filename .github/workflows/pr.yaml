@@ -45,9 +45,10 @@ jobs:
           sudo apt-get install -y libsasl2-dev
           
       - name: Install cargo-nextest
-        uses: taiki-e/install-action@37bdc826eaedac215f638a96472df572feab0f9b
-        with:
-          tool: cargo-nextest
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          cargo install cargo-nextest --locked || echo "cargo-nextest already installed"
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
       - name: Set up TENSORZERO_CLICKHOUSE_URL
         run: |
@@ -136,9 +137,12 @@ jobs:
           sudo apt-get install -y libsasl2-dev
           
       - name: Install cargo-nextest, cargo-deny, and cargo-hack
-        uses: taiki-e/install-action@37bdc826eaedac215f638a96472df572feab0f9b
-        with:
-          tool: cargo-nextest,cargo-deny,cargo-hack
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          cargo install cargo-nextest --locked || echo "cargo-nextest already installed"
+          cargo install cargo-deny --locked || echo "cargo-deny already installed"
+          cargo install cargo-hack --locked || echo "cargo-hack already installed"
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
       - name: Build (Rust)
         run: cargo build --workspace --verbose
@@ -208,9 +212,10 @@ jobs:
           sudo apt-get install -y libsasl2-dev
           
       - name: Install cargo-nextest
-        uses: taiki-e/install-action@37bdc826eaedac215f638a96472df572feab0f9b
-        with:
-          tool: cargo-nextest
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          cargo install cargo-nextest --locked || echo "cargo-nextest already installed"
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
       - name: Install uv
         run: curl -LsSf https://astral.sh/uv/0.6.17/install.sh | sh
