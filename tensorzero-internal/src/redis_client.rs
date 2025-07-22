@@ -367,6 +367,7 @@ mod tests {
     use std::sync::Arc;
 
     #[tokio::test]
+    #[cfg(feature = "e2e_tests")]
     async fn test_parse_models_with_api_key() {
         // Create a mock AppStateData with credential store
         let config = Arc::new(Config::default());
@@ -529,6 +530,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(feature = "e2e_tests")]
     async fn test_parse_model_with_encrypted_api_key() {
         use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
         use rsa::pkcs1::EncodeRsaPrivateKey;
