@@ -1,6 +1,5 @@
 use crate::error::Error;
 use crate::rate_limit::{DistributedRateLimiter, RateLimitDecision};
-use crate::rate_limit::early_extract::ExtractedModel;
 use axum::{
     extract::{Request, State},
     http::StatusCode,
@@ -10,21 +9,19 @@ use axum::{
 use std::sync::Arc;
 use tracing::{debug, warn};
 
-/// Optimized rate limiting middleware that uses pre-extracted model information
-pub async fn rate_limit_middleware_optimized(
+/// Header-based rate limiting middleware
+/// 
+/// This middleware extracts the model name from a header instead of parsing the body,
+/// which allows it to run before body parsing and achieve much better performance.
+/// 
+/// Clients should pass the model name in the X-Model-Name header for optimal performance.
+pub async fn rate_limit_middleware_headers(
     State(limiter): State<Arc<DistributedRateLimiter>>,
     request: Request,
     next: Next,
 ) -> Result<Response, RateLimitError> {
-    // Try to get pre-extracted model from request extensions
-    let model_name = if let Some(extracted) = request.extensions().get::<ExtractedModel>() {
-        debug!("Using pre-extracted model: {}", extracted.0);
-        extracted.0.clone()
-    } else {
-        // Fallback to extracting from path or headers
-        debug!("No pre-extracted model found, using fallback extraction for path: {}", request.uri().path());
-        extract_model_from_request(&request)?
-    };
+    // Extract model from header or path
+    let model_name = extract_model_from_request(&request)?;
     
     // Extract API key from authorization header
     let api_key = extract_api_key_from_request(&request)
@@ -73,7 +70,7 @@ pub async fn rate_limit_middleware_optimized(
 
 /// Extract model name from request headers or path
 fn extract_model_from_request(request: &Request) -> Result<String, RateLimitError> {
-    // First, check for X-Model-Name header (if client provides it)
+    // First, check for X-Model-Name header (fastest path)
     if let Some(model_header) = request.headers().get("x-model-name") {
         if let Ok(model) = model_header.to_str() {
             return Ok(model.to_string());
@@ -89,8 +86,8 @@ fn extract_model_from_request(request: &Request) -> Result<String, RateLimitErro
         return Ok(segments[3].to_string());
     }
     
-    // No fallback - if we can't extract the model, rate limiting should fail
-    tracing::error!("Could not determine model for rate limiting on path: {}. Early extraction failed and no model found in headers/path.", path);
+    // For OpenAI endpoints, we'll need to use a default or extract from body later
+    // For now, return an error to indicate model extraction is needed
     Err(RateLimitError::ModelNotFound)
 }
 
@@ -152,7 +149,7 @@ impl IntoResponse for RateLimitError {
                 StatusCode::BAD_REQUEST,
                 serde_json::json!({
                     "error": {
-                        "message": "Could not determine model from request. For OpenAI-compatible endpoints, ensure the 'model' field is present in the JSON body, or pass the model name in the 'X-Model-Name' header.",
+                        "message": "Model not specified. Please include X-Model-Name header for rate limiting.",
                         "type": "invalid_request_error",
                         "code": "model_not_found"
                     }

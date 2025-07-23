@@ -5,7 +5,7 @@ use crate::rate_limit::{
 use crate::redis_client::RedisClient;
 use dashmap::DashMap;
 use governor::{
-    clock::{Clock, QuantaClock, QuantaInstant},
+    clock::{Clock, QuantaClock, QuantaInstant, Reference},
     middleware::NoOpMiddleware,
     state::{InMemoryState, NotKeyed},
     Quota, RateLimiter,
@@ -32,15 +32,60 @@ fn get_unix_timestamp() -> u64 {
         .unwrap_or(0)
 }
 
-/// Cached rate limit entry
+/// Cached rate limit entry with local counting
 #[derive(Clone, Debug)]
 struct CachedRateLimit {
     remaining: u32,
     limit: u32,
+    local_consumed: Arc<std::sync::atomic::AtomicU32>,  // Track local usage since cache
     #[allow(dead_code)]
     reset_at: QuantaInstant,
     cached_at: QuantaInstant,
     ttl: Duration,
+}
+
+impl CachedRateLimit {
+    /// Check if the cache entry is still fresh
+    fn is_fresh(&self) -> bool {
+        let elapsed = QuantaClock::default().now().duration_since(self.cached_at);
+        elapsed < self.ttl.into()
+    }
+    
+    /// Try to consume one request from local quota
+    /// Returns Some(remaining) if allowed, None if local quota exhausted
+    fn try_consume_local(&self) -> Option<u32> {
+        let consumed = self.local_consumed.load(std::sync::atomic::Ordering::Relaxed);
+        
+        // Check if we have local quota remaining
+        if consumed < self.remaining {
+            // Atomically increment and check again
+            let new_consumed = self.local_consumed.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+            
+            if new_consumed <= self.remaining {
+                // Successfully consumed locally
+                Some(self.remaining - new_consumed)
+            } else {
+                // Raced with another thread, local quota exhausted
+                None
+            }
+        } else {
+            // Local quota already exhausted
+            None
+        }
+    }
+    
+    /// Convert to rate limit headers
+    fn to_headers(&self, retry_after: Option<u32>) -> RateLimitHeaders {
+        let consumed = self.local_consumed.load(std::sync::atomic::Ordering::Relaxed);
+        let remaining = self.remaining.saturating_sub(consumed);
+        
+        RateLimitHeaders {
+            limit: self.limit,
+            remaining,
+            reset: get_unix_timestamp() + self.ttl.as_secs(),
+            retry_after,
+        }
+    }
 }
 
 /// Configuration update message for pub/sub
@@ -50,22 +95,6 @@ struct ConfigUpdate {
     config: Option<RateLimitConfig>,
 }
 
-impl CachedRateLimit {
-    fn is_fresh(&self) -> bool {
-        QuantaClock::default().now() < self.cached_at + self.ttl.into()
-    }
-
-    fn to_headers(&self, retry_after: Option<u32>) -> RateLimitHeaders {
-        let reset_timestamp = get_unix_timestamp() + 60; // Simplified - in production would calculate actual reset time
-
-        RateLimitHeaders {
-            limit: self.limit,
-            remaining: self.remaining,
-            reset: reset_timestamp,
-            retry_after,
-        }
-    }
-}
 
 /// Model-specific rate limiter with multiple time windows
 struct ModelRateLimiter {
@@ -251,20 +280,25 @@ impl DistributedRateLimiter {
         let start = tokio::time::Instant::now();
         let cache_key = format!("{}:{}", model, api_key);
 
-        // Get config for performance optimizations
-        let config = self.local_limiters.get(model)
-            .map(|l| Arc::clone(&l.config));
 
-        // Fast path 1: Check local cache
+        // Fast path 1: Check local cache with local counting
         if let Some(cached) = self.cache.get(&cache_key).await {
-            if cached.is_fresh() && cached.remaining > 0 {
-                self.metrics.record_cache_hit();
-                debug!(
-                    model = model,
-                    remaining = cached.remaining,
-                    "Rate limit cache hit"
-                );
-                return Ok(RateLimitDecision::Allow(cached.to_headers(None)));
+            if cached.is_fresh() {
+                if let Some(remaining) = cached.try_consume_local() {
+                    self.metrics.record_cache_hit();
+                    debug!(
+                        model = model,
+                        remaining = remaining,
+                        "Rate limit cache hit with local quota"
+                    );
+                    return Ok(RateLimitDecision::Allow(cached.to_headers(None)));
+                } else {
+                    debug!(
+                        model = model,
+                        "Rate limit cache hit but local quota exhausted, falling through to Redis"
+                    );
+                    // Cache exists but local quota exhausted, fall through to Redis
+                }
             }
         }
 
@@ -272,13 +306,9 @@ impl DistributedRateLimiter {
         if let Some(limiter) = self.local_limiters.get(model) {
             match limiter.check_local() {
                 Ok(_) => {
-                    // Local check passed
+                    // Local check passed, update Redis asynchronously
+                    self.schedule_redis_update(model, api_key);
                     self.metrics.record_local_allow();
-
-                    // Only update Redis if not skipping on allow
-                    if !config.as_ref().map_or(false, |c| c.skip_redis_on_allow) {
-                        self.schedule_redis_update(model, api_key);
-                    }
 
                     let headers = self.compute_headers(model, api_key).await?;
                     debug!(
@@ -289,16 +319,6 @@ impl DistributedRateLimiter {
                     return Ok(RateLimitDecision::Allow(headers));
                 }
                 Err(_retry_at) => {
-                    // Check if we should use local-only under load
-                    if config.as_ref().map_or(false, |c| c.use_local_only_under_load) {
-                        let load = start.elapsed().as_micros() > 100; // Simple load detection
-                        if load {
-                            debug!(model = model, "Using local-only under load");
-                            let headers = self.compute_headers(model, api_key).await?;
-                            return Ok(RateLimitDecision::Deny(headers));
-                        }
-                    }
-                    
                     // Local limit exceeded, check with Redis for accuracy
                     debug!(model = model, "Local rate limit exceeded, checking Redis");
                 }
@@ -333,15 +353,14 @@ impl DistributedRateLimiter {
         let key = format!("rl:{}:{}", model, api_key);
 
         // Get the rate limit config for this model
-        let config = self
-            .local_limiters
-            .get(model)
-            .map(|limiter| Arc::clone(&limiter.config))
-            .ok_or_else(|| {
-                Error::new(ErrorDetails::ModelNotFound {
-                    name: model.to_string(),
-                })
-            })?;
+        // If model not found, fall back to local fallback (allows unknown models)
+        let config = match self.local_limiters.get(model) {
+            Some(limiter) => Arc::clone(&limiter.config),
+            None => {
+                debug!(model = model, "Model not configured for rate limiting, allowing request");
+                return self.check_local_fallback(model);
+            }
+        };
 
         // Use the most restrictive limit
         let (limit, window) = config.most_restrictive_limit().ok_or_else(|| {
@@ -369,6 +388,7 @@ impl DistributedRateLimiter {
                     let cached = CachedRateLimit {
                         remaining: headers.remaining,
                         limit: headers.limit,
+                        local_consumed: Arc::new(std::sync::atomic::AtomicU32::new(0)),
                         reset_at: QuantaClock::default().now()
                             + Duration::from_secs(headers.reset - now).into(),
                         cached_at: QuantaClock::default().now(),

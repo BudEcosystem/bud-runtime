@@ -1,8 +1,9 @@
 pub mod config;
 pub mod limiter;
 pub mod middleware;
+pub mod middleware_headers;
 pub mod middleware_optimized;
-pub mod middleware_fast;
+pub mod early_extract;
 pub mod store;
 
 #[cfg(test)]
@@ -33,11 +34,11 @@ impl RateLimitHeaders {
         if let Ok(value) = HeaderValue::from_str(&self.limit.to_string()) {
             headers.insert("X-RateLimit-Limit", value);
         }
-        
+
         if let Ok(value) = HeaderValue::from_str(&self.remaining.to_string()) {
             headers.insert("X-RateLimit-Remaining", value);
         }
-        
+
         if let Ok(value) = HeaderValue::from_str(&self.reset.to_string()) {
             headers.insert("X-RateLimit-Reset", value);
         }

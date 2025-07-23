@@ -281,19 +281,25 @@ enabled = true
 
 ### Performance Optimization
 
-1. **Cache TTL**: 
+1. **Use X-Model-Name Header** (Recommended):
+   - Pass model name in `X-Model-Name` header to skip body parsing
+   - Reduces latency by 3-5ms for large request bodies
+   - Example: `X-Model-Name: gpt-3.5-turbo`
+
+2. **Cache TTL**: 
    - Start with 200ms default
    - Increase to 500-1000ms for better performance
    - Decrease to 50-100ms for stricter enforcement
 
-2. **Local Allowance**:
+3. **Local Allowance**:
    - Use 0.1-0.2 for balanced performance/accuracy
    - Use 0.05-0.1 for strict enforcement
    - Use 0.3-0.5 for performance-critical applications
 
-3. **Redis Timeout**:
-   - Use 1-5ms for fast failover
-   - Use 10-50ms for tolerating Redis latency
+4. **Redis Timeout**:
+   - Default 10ms provides good balance
+   - Use 2-5ms for ultra-low latency requirements
+   - Use 20-50ms for tolerating Redis latency
 
 ### Multi-Window Configuration
 
@@ -334,17 +340,24 @@ requests_per_minute = 60    # 1/s average - this will be the effective limit!
 
 ### Performance Issues
 
-1. **High Redis latency**:
-   - Increase `redis_timeout_ms`
-   - Increase `local_allowance`
-   - Increase `cache_ttl_ms`
+1. **High request latency (>2ms P99)**:
+   - Enable early model extraction (automatic in latest version)
+   - Use `X-Model-Name` header to skip body parsing
+   - Increase `cache_ttl_ms` to 500-1000ms
+   - Use `fixed_window` algorithm
+   - See [Performance Guide](../PERFORMANCE_GUIDE.md) for detailed optimizations
 
-2. **Inaccurate rate limiting**:
-   - Decrease `cache_ttl_ms`
-   - Decrease `local_allowance`
+2. **High Redis latency**:
+   - Increase `redis_timeout_ms` to 10-20ms
+   - Increase `local_allowance` to 0.2-0.3
+   - Increase `sync_interval_ms` to 200-500ms
+
+3. **Inaccurate rate limiting**:
+   - Decrease `cache_ttl_ms` to 100-200ms
+   - Decrease `local_allowance` to 0.05-0.1
    - Use `sliding_window` algorithm
 
-3. **High CPU usage**:
+4. **High CPU usage**:
    - Use `fixed_window` algorithm
    - Increase `cache_ttl_ms`
    - Increase `sync_interval_ms`

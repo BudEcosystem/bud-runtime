@@ -23,7 +23,7 @@ use tensorzero_internal::endpoints::status::TENSORZERO_VERSION;
 use tensorzero_internal::error;
 use tensorzero_internal::gateway_util::{self, AuthenticationInfo};
 use tensorzero_internal::observability::{self, LogFormat, RouterExt};
-use tensorzero_internal::rate_limit::rate_limit_middleware;
+use tensorzero_internal::rate_limit::{early_extract::early_model_extraction, middleware_optimized::rate_limit_middleware_optimized};
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
@@ -303,12 +303,13 @@ async fn main() {
         );
 
     // Apply rate limiting middleware if enabled
+    // Note: In Axum, middleware layers run in REVERSE order of application
     let openai_routes = if app_state.is_rate_limiting_enabled() {
         if let Some(ref rate_limiter) = app_state.rate_limiter {
-            tracing::info!("Applying rate limiting middleware to OpenAI routes");
+            tracing::info!("Applying optimized rate limiting middleware to OpenAI routes");
             openai_routes.layer(axum::middleware::from_fn_with_state(
                 rate_limiter.clone(),
-                rate_limit_middleware,
+                rate_limit_middleware_optimized,
             ))
         } else {
             openai_routes
@@ -316,8 +317,11 @@ async fn main() {
     } else {
         openai_routes
     };
+    
+    // Apply early model extraction layer (runs before rate limiting to avoid double parsing)
+    let openai_routes = openai_routes.layer(axum::middleware::from_fn(early_model_extraction));
 
-    // Apply authentication middleware only if authentication is enabled
+    // Apply authentication middleware only if authentication is enabled (runs first)
     let openai_routes = match &app_state.authentication_info {
         AuthenticationInfo::Enabled(auth) => openai_routes.layer(
             axum::middleware::from_fn_with_state(auth.clone(), require_api_key),
