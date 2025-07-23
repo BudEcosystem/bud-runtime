@@ -13,6 +13,16 @@ pub async fn early_model_extraction(
     mut request: Request,
     next: Next,
 ) -> Response {
+    // Fast path: Check for X-Model-Name header first
+    if let Some(model_header) = request.headers().get("x-model-name") {
+        if let Ok(model_str) = model_header.to_str() {
+            let model = model_str.to_string();
+            tracing::debug!("Fast path: extracted model '{}' from X-Model-Name header", model);
+            request.extensions_mut().insert(ExtractedModel(model));
+            return next.run(request).await;
+        }
+    }
+    
     // Only process POST requests to OpenAI endpoints
     if request.method() == axum::http::Method::POST {
         let path = request.uri().path();
@@ -25,9 +35,11 @@ pub async fn early_model_extraction(
             || path == "/v1/messages" {
             
             tracing::debug!("Early extraction starting for path: {}", path);
+            let extract_start = tokio::time::Instant::now();
             
             // Extract and buffer the body
             let (parts, body) = request.into_parts();
+            let body_read_start = tokio::time::Instant::now();
             let bytes = match axum::body::to_bytes(body, 1024 * 1024).await {
                 Ok(bytes) => bytes,
                 Err(_) => {
@@ -43,7 +55,12 @@ pub async fn early_model_extraction(
                     // Store the model in request extensions
                     request = Request::from_parts(parts, Body::from(bytes.clone()));
                     request.extensions_mut().insert(ExtractedModel(model.clone()));
-                    tracing::debug!("Early extraction SUCCESS: found model '{}' in JSON", model);
+                    let total_time = extract_start.elapsed();
+                    let body_time = body_read_start.elapsed();
+                    tracing::debug!(
+                        "Early extraction SUCCESS: found model '{}' in JSON. Total: {:?}, Body read: {:?}", 
+                        model, total_time, body_time
+                    );
                 } else {
                     // No model found, reconstruct request
                     let preview = &json_str[..std::cmp::min(200, json_str.len())];

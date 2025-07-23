@@ -122,6 +122,7 @@ echo "🧪 Testing single request to /v1/chat/completions..."
 RESPONSE=$(curl -s -w "\n%{http_code}" -X POST http://localhost:3000/v1/chat/completions \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer PLACEHOLDER_API_KEY" \
+    -H "X-Model-Name: gpt-3.5-turbo" \
     -d @"$SCRIPT_DIR/openai-test-request.json" \
     --max-time 5)
 
