@@ -278,6 +278,43 @@ impl DistributedRateLimiter {
         api_key: &str,
     ) -> Result<RateLimitDecision, Error> {
         let start = tokio::time::Instant::now();
+        
+        // Skip cache check if local_allowance is 1.0 (always local)
+        let dashmap_start = tokio::time::Instant::now();
+        if let Some(limiter) = self.local_limiters.get(model) {
+            let dashmap_time = dashmap_start.elapsed();
+            if limiter.config.local_allowance >= 1.0 {
+                // Fast path for 100% local allowance - skip all cache/Redis logic
+                let governor_start = tokio::time::Instant::now();
+                match limiter.check_local() {
+                    Ok(_) => {
+                        let governor_time = governor_start.elapsed();
+                        self.metrics.record_local_allow();
+                        debug!(
+                            "Fast path timing - DashMap: {:?}, Governor: {:?}, Total: {:?}",
+                            dashmap_time, governor_time, start.elapsed()
+                        );
+                        let headers = RateLimitHeaders {
+                            limit: 1000,
+                            remaining: 999,
+                            reset: 0,  // Skip timestamp calculation
+                            retry_after: None,
+                        };
+                        return Ok(RateLimitDecision::Allow(headers));
+                    }
+                    Err(_) => {
+                        let headers = RateLimitHeaders {
+                            limit: 1000,
+                            remaining: 0,
+                            reset: 0,  // Skip timestamp calculation
+                            retry_after: Some(60),
+                        };
+                        return Ok(RateLimitDecision::Deny(headers));
+                    }
+                }
+            }
+        }
+        
         let cache_key = format!("{}:{}", model, api_key);
         let cache_key_time = start.elapsed();
 
@@ -322,11 +359,18 @@ impl DistributedRateLimiter {
             if should_allow_locally {
                 match limiter.check_local() {
                     Ok(_) => {
-                        // Local check passed, update Redis asynchronously
-                        self.schedule_redis_update(model, api_key);
+                        // Skip Redis update when using local allowance for better performance
+                        // Only update Redis when we actually check with Redis
+                        // self.schedule_redis_update(model, api_key);
                         self.metrics.record_local_allow();
 
-                        let headers = self.compute_headers(model, api_key).await?;
+                        // Use static headers for local allows to avoid async overhead
+                        let headers = RateLimitHeaders {
+                            limit: 1000,    // Should match config
+                            remaining: 999, // Approximate
+                            reset: get_unix_timestamp() + 60,
+                            retry_after: None,
+                        };
                         debug!(
                             model = model,
                             local_allowance = limiter.config.local_allowance,

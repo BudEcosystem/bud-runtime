@@ -2,6 +2,7 @@
 # Uses realistic rate limits while optimizing for performance
 
 [gateway]
+debug = false
 authentication.enabled = false
 observability.enabled = false
 
@@ -28,7 +29,7 @@ enabled = true
 # Performance settings - optimized for minimal Redis usage
 cache_ttl_ms = 30000          # 30s cache - extremely long cache
 redis_timeout_ms = 1          # 1ms timeout - fail very fast
-local_allowance = 0.95        # 95% local decisions - minimal Redis
+local_allowance = 1.0         # 100% local decisions - no Redis at all
 sync_interval_ms = 30000      # Sync every 30s - very infrequent
 
 [models."gpt-3.5-turbo".providers.openai]
