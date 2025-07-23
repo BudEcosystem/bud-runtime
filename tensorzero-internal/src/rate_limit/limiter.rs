@@ -279,16 +279,21 @@ impl DistributedRateLimiter {
     ) -> Result<RateLimitDecision, Error> {
         let start = tokio::time::Instant::now();
         let cache_key = format!("{}:{}", model, api_key);
-
+        let cache_key_time = start.elapsed();
 
         // Fast path 1: Check local cache with local counting
+        let cache_check_start = tokio::time::Instant::now();
         if let Some(cached) = self.cache.get(&cache_key).await {
+            let cache_lookup_time = cache_check_start.elapsed();
             if cached.is_fresh() {
                 if let Some(remaining) = cached.try_consume_local() {
                     self.metrics.record_cache_hit();
                     debug!(
                         model = model,
                         remaining = remaining,
+                        cache_key_us = cache_key_time.as_micros(),
+                        cache_lookup_us = cache_lookup_time.as_micros(),
+                        total_us = start.elapsed().as_micros(),
                         "Rate limit cache hit with local quota"
                     );
                     return Ok(RateLimitDecision::Allow(cached.to_headers(None)));
