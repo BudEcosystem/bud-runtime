@@ -302,6 +302,9 @@ async fn main() {
             post(endpoints::openai_compatible::batch_cancel_handler),
         );
 
+    // Apply early model extraction layer BEFORE rate limiting
+    let openai_routes = openai_routes.layer(axum::middleware::from_fn(early_model_extraction));
+    
     // Apply rate limiting middleware if enabled
     // Note: In Axum, middleware layers run in REVERSE order of application
     let openai_routes = if app_state.is_rate_limiting_enabled() {
