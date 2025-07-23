@@ -110,11 +110,17 @@ tower-http = { workspace = true }
 tower-layer = "0.3.3"
 pyo3 = { workspace = true, optional = true }
 google-cloud-auth = "0.20.0"
-redis = { version = "0.31.0", features = ["tokio-comp"] }
+redis = { version = "0.31.0", features = ["tokio-comp", "script"] }
 rsa = { version = "0.9", features = ["sha2"] }
 pem = "3.0"
 pkcs8 = { version = "0.10", features = ["encryption", "pem"] }
 der = "0.7"
+# Rate limiting dependencies
+governor = "0.6"
+nonzero_ext = "0.3"
+arc-swap = "1.7"
+moka = { version = "0.12", features = ["future"] }
+dashmap = "6.1.0"
 
 
 [dev-dependencies]

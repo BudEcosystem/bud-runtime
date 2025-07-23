@@ -23,7 +23,7 @@ use tensorzero_internal::endpoints::status::TENSORZERO_VERSION;
 use tensorzero_internal::error;
 use tensorzero_internal::gateway_util::{self, AuthenticationInfo};
 use tensorzero_internal::observability::{self, LogFormat, RouterExt};
-use tensorzero_internal::redis_client::RedisClient;
+use tensorzero_internal::rate_limit::rate_limit_middleware;
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
@@ -172,24 +172,10 @@ async fn main() {
         .await
         .expect_pretty("Failed to initialize AppState");
 
-    // Setup Redis client if authentication is enabled
-    if let AuthenticationInfo::Enabled(ref auth) = app_state.authentication_info {
-        if let Ok(redis_url) = std::env::var("TENSORZERO_REDIS_URL") {
-            if !redis_url.is_empty() {
-                let redis_client = RedisClient::new(&redis_url, app_state.clone(), auth.clone())
-                    .await
-                    .expect_pretty("Failed to create Redis client");
-                redis_client
-                    .start()
-                    .await
-                    .expect_pretty("Failed to start Redis client");
-            } else {
-                tracing::warn!(
-                    "TENSORZERO_REDIS_URL is empty, so Redis client will not be started"
-                );
-            }
-        }
-    }
+    // Setup Redis and rate limiter
+    let app_state = gateway_util::setup_redis_and_rate_limiter(app_state, &config)
+        .await
+        .expect_pretty("Failed to setup Redis and rate limiter");
 
     // Create a new observability_enabled_pretty string for the log message below
     let observability_enabled_pretty = match &app_state.clickhouse_connection_info {
@@ -315,6 +301,21 @@ async fn main() {
             "/v1/batches/{batch_id}/cancel",
             post(endpoints::openai_compatible::batch_cancel_handler),
         );
+
+    // Apply rate limiting middleware if enabled
+    let openai_routes = if app_state.is_rate_limiting_enabled() {
+        if let Some(ref rate_limiter) = app_state.rate_limiter {
+            tracing::info!("Applying rate limiting middleware to OpenAI routes");
+            openai_routes.layer(axum::middleware::from_fn_with_state(
+                rate_limiter.clone(),
+                rate_limit_middleware,
+            ))
+        } else {
+            openai_routes
+        }
+    } else {
+        openai_routes
+    };
 
     // Apply authentication middleware only if authentication is enabled
     let openai_routes = match &app_state.authentication_info {

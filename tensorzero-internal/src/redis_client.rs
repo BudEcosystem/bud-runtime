@@ -227,6 +227,11 @@ impl RedisClient {
         Ok(())
     }
 
+    /// Get a connection for rate limiting operations
+    pub async fn get_connection(&self) -> Result<MultiplexedConnection, redis::RedisError> {
+        self.client.get_multiplexed_async_connection().await
+    }
+
     #[instrument(skip(self))]
     pub async fn start(mut self) -> Result<(), Error> {
         // Initial fetch: fetch all model_table:* and api_key:* keys

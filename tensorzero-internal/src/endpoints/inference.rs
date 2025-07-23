@@ -155,6 +155,7 @@ pub async fn inference_handler(
         kafka_connection_info,
         authentication_info: _,
         model_credential_store,
+        ..
     }): AppState,
     headers: HeaderMap,
     StructuredJson(mut params): StructuredJson<Params>,

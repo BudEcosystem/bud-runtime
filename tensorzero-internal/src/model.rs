@@ -63,6 +63,7 @@ pub struct ModelConfig {
     pub routing: Vec<Arc<str>>, // [provider name A, provider name B, ...]
     pub providers: HashMap<Arc<str>, ModelProvider>, // provider name => provider config
     pub endpoints: HashSet<EndpointCapability>, // supported endpoint capabilities
+    pub rate_limits: Option<crate::rate_limit::RateLimitConfig>, // rate limiting configuration
 }
 
 #[derive(Debug, Deserialize)]
@@ -72,6 +73,8 @@ pub(crate) struct UninitializedModelConfig {
     pub providers: HashMap<Arc<str>, UninitializedModelProvider>, // provider name => provider config
     #[serde(default = "default_capabilities")]
     pub endpoints: HashSet<EndpointCapability>, // supported endpoint capabilities
+    #[serde(default)]
+    pub rate_limits: Option<crate::rate_limit::RateLimitConfig>, // rate limiting configuration
 }
 
 /// Determine endpoint capabilities based on model name patterns
@@ -566,6 +569,7 @@ impl UninitializedModelConfig {
             routing: self.routing,
             providers,
             endpoints: self.endpoints,
+            rate_limits: self.rate_limits,
         })
     }
 }
@@ -3021,7 +3025,8 @@ impl ShorthandModelConfig for ModelConfig {
                     extra_headers: Default::default(),
                 },
             )]),
-            endpoints, // Use pre-computed endpoints based on model name
+            endpoints,         // Use pre-computed endpoints based on model name
+            rate_limits: None, // Shorthand models don't have rate limits
         })
     }
 
@@ -3132,6 +3137,7 @@ mod tests {
                 },
             )]),
             endpoints: default_capabilities(),
+            rate_limits: None,
         };
         let tool_config = ToolCallConfig {
             tools_available: vec![],
@@ -3199,6 +3205,7 @@ mod tests {
                 },
             )]),
             endpoints: default_capabilities(),
+            rate_limits: None,
         };
         let response = model_config
             .infer(&request, &clients, model_name)
@@ -3295,6 +3302,7 @@ mod tests {
                 ),
             ]),
             endpoints: default_capabilities(),
+            rate_limits: None,
         };
 
         let model_name = "test model";
@@ -3361,6 +3369,7 @@ mod tests {
                 },
             )]),
             endpoints: default_capabilities(),
+            rate_limits: None,
         };
         let (
             StreamResponse {
@@ -3431,6 +3440,7 @@ mod tests {
                 },
             )]),
             endpoints: default_capabilities(),
+            rate_limits: None,
         };
         let response = model_config
             .infer_stream(
@@ -3529,6 +3539,7 @@ mod tests {
                 ),
             ]),
             endpoints: default_capabilities(),
+            rate_limits: None,
         };
         let (
             StreamResponse {
@@ -3607,6 +3618,7 @@ mod tests {
                 },
             )]),
             endpoints: default_capabilities(),
+            rate_limits: None,
         };
         let tool_config = ToolCallConfig {
             tools_available: vec![],
@@ -3714,6 +3726,7 @@ mod tests {
                 },
             )]),
             endpoints: default_capabilities(),
+            rate_limits: None,
         };
         let tool_config = ToolCallConfig {
             tools_available: vec![],
@@ -3837,6 +3850,7 @@ mod tests {
                 },
             )]),
             endpoints: default_capabilities(),
+            rate_limits: None,
         };
         let model_table: ModelTable = HashMap::from([("claude".into(), anthropic_model_config)])
             .try_into()
@@ -3945,6 +3959,7 @@ mod tests {
             routing: vec!["test".into()],
             providers: HashMap::new(),
             endpoints,
+            rate_limits: None,
         };
 
         assert!(model.supports_endpoint(EndpointCapability::Chat));
@@ -3969,6 +3984,7 @@ mod tests {
                 },
             )]),
             endpoints: HashSet::new(), // Empty endpoints
+            rate_limits: None,
         };
 
         let result = model.validate("test_model");
@@ -4006,6 +4022,7 @@ mod tests {
                 routing: vec!["test".into()],
                 providers: HashMap::new(),
                 endpoints: chat_endpoints,
+                rate_limits: None,
             },
         );
         models.insert(
@@ -4014,6 +4031,7 @@ mod tests {
                 routing: vec!["test".into()],
                 providers: HashMap::new(),
                 endpoints: embedding_endpoints,
+                rate_limits: None,
             },
         );
         models.insert(
@@ -4022,6 +4040,7 @@ mod tests {
                 routing: vec!["test".into()],
                 providers: HashMap::new(),
                 endpoints: both_endpoints,
+                rate_limits: None,
             },
         );
 
@@ -4071,6 +4090,7 @@ mod tests {
                             },
                         )]),
                         endpoints,
+                        rate_limits: None,
                     },
                 );
 
@@ -4112,6 +4132,7 @@ mod tests {
             routing: vec!["test".into()],
             providers: HashMap::new(),
             endpoints,
+            rate_limits: None,
         };
 
         let request = crate::embeddings::EmbeddingRequest {

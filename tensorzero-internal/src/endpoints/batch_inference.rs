@@ -111,6 +111,7 @@ pub async fn start_batch_inference_handler(
         kafka_connection_info: _,
         authentication_info: _,
         model_credential_store: _,
+        ..
     }): AppState,
     StructuredJson(params): StructuredJson<StartBatchInferenceParams>,
 ) -> Result<Response<Body>, Error> {
@@ -342,6 +343,7 @@ pub async fn poll_batch_inference_handler(
         kafka_connection_info: _,
         authentication_info: _,
         model_credential_store: _,
+        ..
     }): AppState,
     Path(path_params): Path<PollPathParams>,
 ) -> Result<Response<Body>, Error> {

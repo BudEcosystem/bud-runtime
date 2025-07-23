@@ -223,12 +223,13 @@ jobs:
       - name: Download ClickHouse fixtures
         run: uv run ./ui/fixtures/download-fixtures.py
 
-      - name: Set up TENSORZERO_CLICKHOUSE_URL for E2E tests
+      - name: Set up environment variables for E2E tests
         run: |
           echo "TENSORZERO_CLICKHOUSE_URL=http://chuser:chpassword@localhost:8123/tensorzero_e2e_tests" >> $GITHUB_ENV
+          echo "TENSORZERO_REDIS_URL=redis://localhost:6379" >> $GITHUB_ENV
 
-      - name: Launch ClickHouse container for E2E tests
-        run: TENSORZERO_CLICKHOUSE_VERSION=${{ matrix.clickhouse_version.tag }} docker compose -f tensorzero-internal/tests/e2e/docker-compose.yml up clickhouse --wait
+      - name: Launch ClickHouse and Redis containers for E2E tests
+        run: TENSORZERO_CLICKHOUSE_VERSION=${{ matrix.clickhouse_version.tag }} docker compose -f tensorzero-internal/tests/e2e/docker-compose.yml up clickhouse redis --wait
 
       # Make an HTTP request to ClickHouse and check that the version matches '${{ matrix.clickhouse_version }}'
       - name: Check ClickHouse version
@@ -389,9 +390,49 @@ jobs:
           # Use release profile in CI for faster builds
           cargo build --release --bin gateway --bin mock-inference-provider
           
+      - name: Start Redis for rate limiting test
+        run: |
+          docker compose -f tensorzero-internal/tests/e2e/docker-compose.yml up -d redis
+          # Wait for Redis to be ready
+          timeout 30s bash -c 'until docker compose -f tensorzero-internal/tests/e2e/docker-compose.yml exec -T redis redis-cli ping; do sleep 1; done'
+          echo "Redis is ready"
+          
       - name: Run performance test
         run: |
           ./ci/performance/run-performance-test-ci.sh
+          
+      - name: Run performance test with rate limiting
+        run: |
+          # Export Redis URL for rate limiting
+          export TENSORZERO_REDIS_URL="redis://localhost:6379"
+          
+          # Copy config with rate limiting enabled
+          cp ci/performance/tensorzero-perf-test-with-rate-limit.toml ci/performance/tensorzero-perf-test.toml.tmp
+          mv ci/performance/tensorzero-perf-test.toml ci/performance/tensorzero-perf-test.toml.bak
+          mv ci/performance/tensorzero-perf-test.toml.tmp ci/performance/tensorzero-perf-test.toml
+          
+          # Run test
+          ./ci/performance/run-performance-test-ci.sh
+          mv performance-results.json performance-results-with-rate-limit.json
+          
+          # Restore original config
+          mv ci/performance/tensorzero-perf-test.toml.bak ci/performance/tensorzero-perf-test.toml
+          
+          # Compare results
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "Rate Limiting Performance Impact:"
+          P99_BASE=$(jq -r '.latencies."99th"' performance-results.json | awk '{print $1/1000000}')
+          P99_RL=$(jq -r '.latencies."99th"' performance-results-with-rate-limit.json | awk '{print $1/1000000}')
+          echo "P99 without rate limiting: ${P99_BASE}ms"
+          echo "P99 with rate limiting: ${P99_RL}ms"
+          OVERHEAD=$(awk -v base="$P99_BASE" -v rl="$P99_RL" 'BEGIN { printf "%.2f", ((rl - base) / base) * 100 }')
+          echo "Overhead: ${OVERHEAD}%"
+          
+          # Ensure rate limiting doesn't exceed threshold
+          if [ $(awk -v p99="$P99_RL" 'BEGIN { print (p99 > 1.5) }') -eq 1 ]; then
+              echo "❌ Error: P99 latency with rate limiting exceeds 1.5ms threshold"
+              exit 1
+          fi
           
       - name: Upload performance results
         uses: actions/upload-artifact@v4
