@@ -1,6 +1,8 @@
 pub mod config;
 pub mod limiter;
 pub mod middleware;
+pub mod middleware_optimized;
+pub mod middleware_fast;
 pub mod store;
 
 #[cfg(test)]

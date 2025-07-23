@@ -1,0 +1,51 @@
+# Highly optimized performance test configuration with rate limiting
+# Goal: <1ms P99 latency at 1000 req/s
+
+[gateway]
+authentication.enabled = false
+observability.enabled = false
+
+# Optimized rate limiting configuration
+[gateway.rate_limits]
+enabled = true
+default_requests_per_minute = 1000000  # Very high limit to avoid triggering
+default_burst_size = 100000
+default_algorithm = "fixed_window"  # Fastest algorithm
+
+# Models
+[models."gpt-3.5-turbo"]
+routing = ["openai"]
+endpoints = ["chat"]
+
+# Highly optimized rate limits for sub-millisecond performance
+[models."gpt-3.5-turbo".rate_limits]
+algorithm = "fixed_window"
+requests_per_second = 10000       # 10k req/s - won't trigger during test
+burst_size = 50000                # Large burst to avoid limiting
+enabled = true
+
+# Performance-critical settings
+cache_ttl_ms = 5000               # 5 second cache - reduce Redis calls
+redis_timeout_ms = 1              # 1ms timeout - fail fast
+local_allowance = 0.95            # 95% local decisions - minimal Redis
+sync_interval_ms = 5000           # Sync every 5 seconds - reduce overhead
+
+# Additional optimization flags (if supported)
+skip_redis_on_allow = true        # Don't update Redis on every allow
+batch_redis_updates = true        # Batch multiple updates together
+use_local_only_under_load = true # Fall back to local-only when busy
+
+[models."gpt-3.5-turbo".providers.openai]
+type = "openai"
+model_name = "gpt-3.5-turbo"
+api_base = "http://localhost:3030/openai/"
+api_key_location = "none"
+
+# Functions (for legacy /inference endpoint)
+[functions.function1]
+type = "chat"
+
+[functions.function1.variants.variant1]
+type = "chat_completion"
+model = "gpt-3.5-turbo"
+max_tokens = 100

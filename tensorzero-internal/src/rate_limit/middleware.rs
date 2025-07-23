@@ -7,7 +7,6 @@ use axum::{
     middleware::Next,
     response::{IntoResponse, Response},
 };
-use bytes::Bytes;
 use serde_json::Value;
 use std::sync::Arc;
 use tracing::{debug, warn};

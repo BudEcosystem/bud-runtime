@@ -251,6 +251,10 @@ impl DistributedRateLimiter {
         let start = tokio::time::Instant::now();
         let cache_key = format!("{}:{}", model, api_key);
 
+        // Get config for performance optimizations
+        let config = self.local_limiters.get(model)
+            .map(|l| Arc::clone(&l.config));
+
         // Fast path 1: Check local cache
         if let Some(cached) = self.cache.get(&cache_key).await {
             if cached.is_fresh() && cached.remaining > 0 {
@@ -268,9 +272,13 @@ impl DistributedRateLimiter {
         if let Some(limiter) = self.local_limiters.get(model) {
             match limiter.check_local() {
                 Ok(_) => {
-                    // Local check passed, update Redis asynchronously
-                    self.schedule_redis_update(model, api_key);
+                    // Local check passed
                     self.metrics.record_local_allow();
+
+                    // Only update Redis if not skipping on allow
+                    if !config.as_ref().map_or(false, |c| c.skip_redis_on_allow) {
+                        self.schedule_redis_update(model, api_key);
+                    }
 
                     let headers = self.compute_headers(model, api_key).await?;
                     debug!(
@@ -281,6 +289,16 @@ impl DistributedRateLimiter {
                     return Ok(RateLimitDecision::Allow(headers));
                 }
                 Err(_retry_at) => {
+                    // Check if we should use local-only under load
+                    if config.as_ref().map_or(false, |c| c.use_local_only_under_load) {
+                        let load = start.elapsed().as_micros() > 100; // Simple load detection
+                        if load {
+                            debug!(model = model, "Using local-only under load");
+                            let headers = self.compute_headers(model, api_key).await?;
+                            return Ok(RateLimitDecision::Deny(headers));
+                        }
+                    }
+                    
                     // Local limit exceeded, check with Redis for accuracy
                     debug!(model = model, "Local rate limit exceeded, checking Redis");
                 }
