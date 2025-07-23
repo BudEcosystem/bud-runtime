@@ -311,8 +311,8 @@ impl DistributedRateLimiter {
         if let Some(limiter) = self.local_limiters.get(model) {
             match limiter.check_local() {
                 Ok(_) => {
-                    // Local check passed, update Redis asynchronously
-                    self.schedule_redis_update(model, api_key);
+                    // TEMPORARY: Skip Redis update for performance testing
+                    // self.schedule_redis_update(model, api_key);
                     self.metrics.record_local_allow();
 
                     let headers = self.compute_headers(model, api_key).await?;
@@ -330,9 +330,10 @@ impl DistributedRateLimiter {
             }
         }
 
-        // Slow path: Check with Redis
+        // TEMPORARY: Skip Redis entirely for performance testing
+        // Just use local fallback
         self.metrics.record_cache_miss();
-        self.check_redis_with_timeout(model, api_key).await
+        self.check_local_fallback(model)
     }
 
     /// Schedule an async Redis update
