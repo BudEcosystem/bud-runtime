@@ -359,15 +359,15 @@ impl DistributedRateLimiter {
             if should_allow_locally {
                 match limiter.check_local() {
                     Ok(_) => {
-                        // Skip Redis update when using local allowance for better performance
-                        // Only update Redis when we actually check with Redis
-                        // self.schedule_redis_update(model, api_key);
+                        // Update Redis asynchronously for accurate distributed counting
+                        self.schedule_redis_update(model, api_key);
                         self.metrics.record_local_allow();
 
-                        // Use static headers for local allows to avoid async overhead
+                        // Use proper headers based on config
+                        let limit = limiter.config.requests_per_second.unwrap_or(1000);
                         let headers = RateLimitHeaders {
-                            limit: 1000,    // Should match config
-                            remaining: 999, // Approximate
+                            limit,
+                            remaining: limit - 1, // Approximate
                             reset: get_unix_timestamp() + 60,
                             retry_after: None,
                         };
