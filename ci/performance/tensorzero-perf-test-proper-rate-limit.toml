@@ -1,0 +1,47 @@
+# Proper rate limiting configuration for performance testing
+# Uses realistic rate limits while optimizing for performance
+
+[gateway]
+authentication.enabled = false
+observability.enabled = false
+
+# Rate limiting configuration
+[gateway.rate_limits]
+enabled = true
+default_requests_per_minute = 60000  # 1000 req/s
+default_burst_size = 2000
+default_algorithm = "fixed_window"  # Fastest algorithm
+
+# Models
+[models."gpt-3.5-turbo"]
+routing = ["openai"]
+endpoints = ["chat"]
+
+# Realistic rate limits with performance optimizations
+[models."gpt-3.5-turbo".rate_limits]
+algorithm = "fixed_window"
+requests_per_second = 1000    # Match test rate
+requests_per_minute = 60000   # 1000 req/s
+burst_size = 2000             # Allow bursts
+enabled = true
+
+# Performance settings
+cache_ttl_ms = 500            # 500ms cache - balance accuracy and performance
+redis_timeout_ms = 2          # 2ms timeout - fail fast but not too fast
+local_allowance = 0.2         # 20% local decisions
+sync_interval_ms = 200        # Sync every 200ms
+
+[models."gpt-3.5-turbo".providers.openai]
+type = "openai"
+model_name = "gpt-3.5-turbo"
+api_base = "http://localhost:3030/openai/"
+api_key_location = "none"
+
+# Functions (for legacy /inference endpoint)
+[functions.function1]
+type = "chat"
+
+[functions.function1.variants.variant1]
+type = "chat_completion"
+model = "gpt-3.5-turbo"
+max_tokens = 100

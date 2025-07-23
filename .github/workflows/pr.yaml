@@ -406,8 +406,8 @@ jobs:
           # Export Redis URL for rate limiting
           export TENSORZERO_REDIS_URL="redis://localhost:6379"
           
-          # Copy optimized config with rate limiting enabled
-          cp ci/performance/tensorzero-perf-test-optimized-rate-limit.toml ci/performance/tensorzero-perf-test.toml.tmp
+          # Copy proper config with rate limiting enabled
+          cp ci/performance/tensorzero-perf-test-proper-rate-limit.toml ci/performance/tensorzero-perf-test.toml.tmp
           mv ci/performance/tensorzero-perf-test.toml ci/performance/tensorzero-perf-test.toml.bak
           mv ci/performance/tensorzero-perf-test.toml.tmp ci/performance/tensorzero-perf-test.toml
           

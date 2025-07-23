@@ -23,7 +23,7 @@ use tensorzero_internal::endpoints::status::TENSORZERO_VERSION;
 use tensorzero_internal::error;
 use tensorzero_internal::gateway_util::{self, AuthenticationInfo};
 use tensorzero_internal::observability::{self, LogFormat, RouterExt};
-use tensorzero_internal::rate_limit::rate_limit_middleware;
+use tensorzero_internal::rate_limit::{rate_limit_middleware, early_extract::early_model_extraction, middleware_optimized::rate_limit_middleware_optimized};
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
@@ -302,13 +302,16 @@ async fn main() {
             post(endpoints::openai_compatible::batch_cancel_handler),
         );
 
+    // Apply early model extraction layer BEFORE rate limiting
+    let openai_routes = openai_routes.layer(axum::middleware::from_fn(early_model_extraction));
+    
     // Apply rate limiting middleware if enabled
     let openai_routes = if app_state.is_rate_limiting_enabled() {
         if let Some(ref rate_limiter) = app_state.rate_limiter {
-            tracing::info!("Applying rate limiting middleware to OpenAI routes");
+            tracing::info!("Applying optimized rate limiting middleware to OpenAI routes");
             openai_routes.layer(axum::middleware::from_fn_with_state(
                 rate_limiter.clone(),
-                rate_limit_middleware,
+                rate_limit_middleware_optimized,
             ))
         } else {
             openai_routes

@@ -56,18 +56,6 @@ pub struct RateLimitConfig {
     /// Background sync interval in milliseconds
     #[serde(default = "default_sync_interval_ms")]
     pub sync_interval_ms: u64,
-    
-    /// Performance optimization: Skip Redis update on allow decisions
-    #[serde(default)]
-    pub skip_redis_on_allow: bool,
-    
-    /// Performance optimization: Batch Redis updates
-    #[serde(default)]
-    pub batch_redis_updates: bool,
-    
-    /// Performance optimization: Use local-only under high load
-    #[serde(default)]
-    pub use_local_only_under_load: bool,
 }
 
 fn default_enabled() -> bool {
@@ -79,7 +67,7 @@ fn default_cache_ttl_ms() -> u64 {
 }
 
 fn default_redis_timeout_ms() -> u64 {
-    1
+    10
 }
 
 fn default_local_allowance() -> f64 {
@@ -103,9 +91,6 @@ impl Default for RateLimitConfig {
             redis_timeout_ms: default_redis_timeout_ms(),
             local_allowance: default_local_allowance(),
             sync_interval_ms: default_sync_interval_ms(),
-            skip_redis_on_allow: false,
-            batch_redis_updates: false,
-            use_local_only_under_load: false,
         }
     }
 }
@@ -172,9 +157,6 @@ impl RateLimitConfig {
             } else {
                 self.sync_interval_ms
             },
-            skip_redis_on_allow: other.skip_redis_on_allow || self.skip_redis_on_allow,
-            batch_redis_updates: other.batch_redis_updates || self.batch_redis_updates,
-            use_local_only_under_load: other.use_local_only_under_load || self.use_local_only_under_load,
         }
     }
 }

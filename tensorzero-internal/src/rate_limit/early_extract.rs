@@ -1,0 +1,116 @@
+use axum::{
+    body::Body,
+    extract::Request,
+    http::HeaderMap,
+    middleware::Next,
+    response::Response,
+};
+use bytes::Bytes;
+use std::sync::Arc;
+use tokio::sync::RwLock;
+
+/// Early model extraction layer
+/// 
+/// This layer runs BEFORE rate limiting and extracts the model name from the request body,
+/// storing it in request extensions so the rate limiter can access it without re-parsing.
+pub async fn early_model_extraction(
+    mut request: Request,
+    next: Next,
+) -> Response {
+    // Only process POST requests to OpenAI endpoints
+    if request.method() == axum::http::Method::POST {
+        let path = request.uri().path();
+        
+        // Check if this is an endpoint that needs model extraction
+        if path == "/v1/chat/completions" 
+            || path == "/v1/embeddings" 
+            || path == "/v1/moderations"
+            || path == "/v1/messages" {
+            
+            // Extract and buffer the body
+            let (parts, body) = request.into_parts();
+            let bytes = match axum::body::to_bytes(body, 1024 * 1024).await {
+                Ok(bytes) => bytes,
+                Err(_) => {
+                    // If we can't read the body, reconstruct and continue
+                    request = Request::from_parts(parts, Body::empty());
+                    return next.run(request).await;
+                }
+            };
+            
+            // Try to extract model name from JSON
+            if let Ok(json_str) = std::str::from_utf8(&bytes) {
+                if let Some(model) = extract_model_from_json(json_str) {
+                    // Store the model in request extensions
+                    request = Request::from_parts(parts, Body::from(bytes.clone()));
+                    request.extensions_mut().insert(ExtractedModel(model));
+                } else {
+                    // No model found, reconstruct request
+                    request = Request::from_parts(parts, Body::from(bytes));
+                }
+            } else {
+                // Not valid UTF-8, reconstruct request
+                request = Request::from_parts(parts, Body::from(bytes));
+            }
+        }
+    }
+    
+    next.run(request).await
+}
+
+/// Extracted model stored in request extensions
+#[derive(Clone)]
+pub struct ExtractedModel(pub String);
+
+/// Fast JSON model extraction
+fn extract_model_from_json(json_str: &str) -> Option<String> {
+    // Look for "model": "value" pattern
+    let model_key = "\"model\"";
+    let model_pos = json_str.find(model_key)?;
+    
+    // Find the colon after "model"
+    let after_key = &json_str[model_pos + model_key.len()..];
+    let colon_pos = after_key.find(':')?;
+    
+    // Skip whitespace after colon
+    let after_colon = &after_key[colon_pos + 1..].trim_start();
+    
+    // Check if value starts with quote
+    if !after_colon.starts_with('"') {
+        return None;
+    }
+    
+    // Find the closing quote
+    let value_start = 1;
+    let closing_quote = after_colon[value_start..].find('"')?;
+    
+    Some(after_colon[value_start..value_start + closing_quote].to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_model_from_json() {
+        assert_eq!(
+            extract_model_from_json(r#"{"model": "gpt-3.5-turbo", "messages": []}"#),
+            Some("gpt-3.5-turbo".to_string())
+        );
+        
+        assert_eq!(
+            extract_model_from_json(r#"{"messages": [], "model": "gpt-4"}"#),
+            Some("gpt-4".to_string())
+        );
+        
+        assert_eq!(
+            extract_model_from_json(r#"{"model":"claude-3","temperature":0.7}"#),
+            Some("claude-3".to_string())
+        );
+        
+        assert_eq!(
+            extract_model_from_json(r#"{"no_model": "here"}"#),
+            None
+        );
+    }
+}
