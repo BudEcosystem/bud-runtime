@@ -307,33 +307,51 @@ impl DistributedRateLimiter {
             }
         }
 
-        // Fast path 2: Check local governor
+        // Fast path 2: Check local governor with local_allowance
         if let Some(limiter) = self.local_limiters.get(model) {
-            match limiter.check_local() {
-                Ok(_) => {
-                    // TEMPORARY: Skip Redis update for performance testing
-                    // self.schedule_redis_update(model, api_key);
-                    self.metrics.record_local_allow();
+            // Check if we should use local allowance to skip Redis
+            let should_allow_locally = if limiter.config.local_allowance >= 1.0 {
+                true // Always allow locally if local_allowance is 1.0
+            } else if limiter.config.local_allowance <= 0.0 {
+                false // Never allow locally if local_allowance is 0.0
+            } else {
+                // Use probabilistic approach for partial local allowance
+                rand::random::<f64>() < limiter.config.local_allowance
+            };
 
-                    let headers = self.compute_headers(model, api_key).await?;
-                    debug!(
-                        model = model,
-                        duration_us = start.elapsed().as_micros(),
-                        "Rate limit local allow"
-                    );
-                    return Ok(RateLimitDecision::Allow(headers));
+            if should_allow_locally {
+                match limiter.check_local() {
+                    Ok(_) => {
+                        // Local check passed, update Redis asynchronously
+                        self.schedule_redis_update(model, api_key);
+                        self.metrics.record_local_allow();
+
+                        let headers = self.compute_headers(model, api_key).await?;
+                        debug!(
+                            model = model,
+                            local_allowance = limiter.config.local_allowance,
+                            duration_us = start.elapsed().as_micros(),
+                            "Rate limit local allow (within local_allowance)"
+                        );
+                        return Ok(RateLimitDecision::Allow(headers));
+                    }
+                    Err(_retry_at) => {
+                        // Local limit exceeded, still check with Redis
+                        debug!(model = model, "Local rate limit exceeded, checking Redis");
+                    }
                 }
-                Err(_retry_at) => {
-                    // Local limit exceeded, check with Redis for accuracy
-                    debug!(model = model, "Local rate limit exceeded, checking Redis");
-                }
+            } else {
+                debug!(
+                    model = model, 
+                    local_allowance = limiter.config.local_allowance,
+                    "Not within local allowance, checking Redis"
+                );
             }
         }
 
-        // TEMPORARY: Skip Redis entirely for performance testing
-        // Just use local fallback
+        // Slow path: Check with Redis
         self.metrics.record_cache_miss();
-        self.check_local_fallback(model)
+        self.check_redis_with_timeout(model, api_key).await
     }
 
     /// Schedule an async Redis update
