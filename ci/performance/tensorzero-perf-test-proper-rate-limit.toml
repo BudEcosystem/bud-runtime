@@ -27,10 +27,9 @@ burst_size = 2000             # Allow bursts
 enabled = true
 
 # Performance settings - optimized for <1.5ms P99
-cache_ttl_ms = 500           # 5s cache - longer cache, fewer Redis calls
-redis_timeout_ms = 3          # 3ms timeout - more reliable
+cache_ttl_ms = 200           # 5s cache - longer cache, fewer Redis calls
 local_allowance = 0.8         # 80% local decisions - minimize Redis
-sync_interval_ms = 200       # Sync every 2s - less frequent updates
+sync_interval_ms = 100       # Sync every 2s - less frequent updates
 
 [models."gpt-3.5-turbo".providers.openai]
 type = "openai"
