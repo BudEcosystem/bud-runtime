@@ -340,6 +340,10 @@ async fn setup_rate_limiter(
     }
     drop(models); // Release the read lock
 
+    // Start background sync for distributed rate limiting
+    rate_limiter.start_background_sync().await;
+    tracing::info!("Started background sync for distributed rate limiting");
+
     // Start pub/sub listener for dynamic configuration updates
     if let Err(e) = rate_limiter.start_pubsub_listener().await {
         tracing::warn!(

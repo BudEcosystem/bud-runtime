@@ -15,6 +15,7 @@ use moka::future::Cache;
 use redis::{AsyncCommands, Script};
 use std::num::NonZeroU32;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::sync::RwLock;
 // use futures::StreamExt;  // TODO: Uncomment when pub/sub is re-enabled
@@ -213,6 +214,9 @@ pub struct DistributedRateLimiter {
 
     /// Redis Lua script for atomic check and increment
     check_and_increment_script: Script,
+    
+    /// Track local consumption per key for background sync
+    local_consumption: Arc<DashMap<String, Arc<AtomicU32>>>,
 }
 
 impl DistributedRateLimiter {
@@ -259,6 +263,7 @@ impl DistributedRateLimiter {
             pubsub_handle: Arc::new(RwLock::new(None)),
             metrics: Arc::new(RateLimiterMetrics::default()),
             check_and_increment_script,
+            local_consumption: Arc::new(DashMap::new()),
         })
     }
 
@@ -359,10 +364,17 @@ impl DistributedRateLimiter {
                 // Try to get fresh data from Redis in background
                 if let Ok(mut conn) = redis_client.get_connection().await {
                     let key = format!("rl:{}:{}", model_for_refresh, api_key_for_refresh);
-                    if let Ok(remaining) = conn.get::<_, u32>(&key).await {
+                    
+                    // First, increment the counter in Redis (distributed count)
+                    let _: Result<(), _> = conn.incr(&key, 1u32).await;
+                    
+                    // Then get the current count
+                    if let Ok(count) = conn.get::<_, u32>(&key).await {
+                        let limit = config_clone.requests_per_second.unwrap_or(1000);
+                        let remaining = limit.saturating_sub(count);
                         let cached = CachedRateLimit {
                             remaining,
-                            limit: config_clone.requests_per_second.unwrap_or(1000),
+                            limit,
                             local_consumed: Arc::new(std::sync::atomic::AtomicU32::new(0)),
                             reset_at: QuantaClock::default().now() + Duration::from_secs(60).into(),
                             cached_at: QuantaClock::default().now(),
@@ -370,6 +382,9 @@ impl DistributedRateLimiter {
                         };
                         cache_for_refresh.insert(cache_key_for_refresh, cached).await;
                     }
+                    
+                    // Set expiry on the key (1 minute for fixed window)
+                    let _: Result<(), _> = conn.expire(&key, 60).await;
                 }
             });
             
@@ -377,6 +392,12 @@ impl DistributedRateLimiter {
             match limiter.check_local() {
                 Ok(_) => {
                     self.metrics.record_local_allow();
+                    
+                    // Track local consumption for this key
+                    let consumption_entry = self.local_consumption
+                        .entry(cache_key.clone())
+                        .or_insert_with(|| Arc::new(AtomicU32::new(0)));
+                    consumption_entry.fetch_add(1, Ordering::Relaxed);
 
                     // Use proper headers based on config
                     let limit = limiter.config.requests_per_second.unwrap_or(1000);
@@ -615,18 +636,54 @@ impl DistributedRateLimiter {
 
     /// Start background synchronization with Redis
     pub async fn start_background_sync(&self) {
-        let _redis_client = Arc::clone(&self.redis_client);
-        let _cache = Arc::clone(&self.cache);
+        // Get all necessary components
+        let redis_client = Arc::clone(&self.redis_client);
+        let local_consumption = Arc::clone(&self.local_consumption);
+        
+        // Get sync interval from first model config (or use default)
+        let sync_interval_ms = self.local_limiters
+            .iter()
+            .next()
+            .map(|entry| entry.value().config.sync_interval_ms)
+            .unwrap_or(100);
 
         let handle = tokio::spawn(async move {
-            let mut sync_interval = interval(Duration::from_millis(100));
+            let mut sync_interval = interval(Duration::from_millis(sync_interval_ms));
+            sync_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
             loop {
                 sync_interval.tick().await;
 
-                // Batch sync logic would go here
-                // For now, this is a placeholder
-                debug!("Background sync tick");
+                // Sync local consumption to Redis
+                if let Ok(mut conn) = redis_client.get_connection().await {
+                    // Collect all entries to sync
+                    let mut entries_to_sync = Vec::new();
+                    for entry in local_consumption.iter() {
+                        let key = entry.key().clone();
+                        let count = entry.value().swap(0, Ordering::Relaxed);
+                        if count > 0 {
+                            entries_to_sync.push((key, count));
+                        }
+                    }
+                    
+                    // Sync each entry to Redis
+                    for (cache_key, count) in entries_to_sync {
+                        // Extract model and api_key from cache key (format: "model:api_key")
+                        if let Some(colon_pos) = cache_key.find(':') {
+                            let redis_key = format!("rl:{}", cache_key);
+                            
+                            // Increment by the local count
+                            let _: Result<(), _> = conn.incr(&redis_key, count).await;
+                            
+                            // Set expiry (60 seconds for fixed window)
+                            let _: Result<(), _> = conn.expire(&redis_key, 60).await;
+                            
+                            debug!("Synced {} requests for key {}", count, cache_key);
+                        }
+                    }
+                }
+                
+                debug!("Background sync completed");
             }
         });
 
