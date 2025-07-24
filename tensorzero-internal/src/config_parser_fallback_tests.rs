@@ -1,7 +1,6 @@
 #[cfg(test)]
 mod tests {
     use crate::config_parser::Config;
-    use crate::error::ErrorDetails;
     use std::collections::{HashMap, HashSet};
 
     #[test]
@@ -30,12 +29,8 @@ mod tests {
             config.check_fallback_cycle("model-a", &fallback_graph, &mut visited, &mut path);
         assert!(result.is_err());
 
-        match result.unwrap_err().get_details() {
-            ErrorDetails::CircularFallbackDetected { chain } => {
-                assert!(chain.contains(&"model-a".to_string()));
-            }
-            _ => panic!("Expected CircularFallbackDetected error"),
-        }
+        let chain = result.unwrap_err();
+        assert!(chain.contains(&"model-a".to_string()));
     }
 
     #[test]
@@ -52,15 +47,11 @@ mod tests {
             config.check_fallback_cycle("model-a", &fallback_graph, &mut visited, &mut path);
         assert!(result.is_err());
 
-        match result.unwrap_err().get_details() {
-            ErrorDetails::CircularFallbackDetected { chain } => {
-                // The cycle should contain all three models
-                assert!(chain.contains(&"model-a".to_string()));
-                assert!(chain.contains(&"model-b".to_string()));
-                assert!(chain.contains(&"model-c".to_string()));
-            }
-            _ => panic!("Expected CircularFallbackDetected error"),
-        }
+        let chain = result.unwrap_err();
+        // The cycle should contain all three models
+        assert!(chain.contains(&"model-a".to_string()));
+        assert!(chain.contains(&"model-b".to_string()));
+        assert!(chain.contains(&"model-c".to_string()));
     }
 
     #[test]
@@ -101,12 +92,8 @@ mod tests {
             config.check_fallback_cycle("model-a", &fallback_graph, &mut visited, &mut path);
         assert!(result.is_err());
 
-        match result.unwrap_err().get_details() {
-            ErrorDetails::CircularFallbackDetected { chain } => {
-                // The cycle should be detected
-                assert!(chain.len() > 0);
-            }
-            _ => panic!("Expected CircularFallbackDetected error"),
-        }
+        let chain = result.unwrap_err();
+        // The cycle should be detected
+        assert!(chain.len() > 0);
     }
 }

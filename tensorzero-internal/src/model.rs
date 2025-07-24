@@ -1,4 +1,4 @@
-use backon::ExponentialBuilder;
+use backon::{ExponentialBuilder, Retryable};
 use futures::StreamExt;
 use reqwest::Client;
 use secrecy::SecretString;
@@ -805,6 +805,23 @@ impl ModelConfig {
         Err(err)
     }
 
+    /// Helper to execute a closure with retry logic based on retry_config
+    async fn execute_with_retry<F, T, Fut>(&self, operation: F) -> Result<T, Error>
+    where
+        F: Fn() -> Fut,
+        Fut: std::future::Future<Output = Result<T, Error>>,
+    {
+        if let Some(ref retry_config) = self.retry_config {
+            if retry_config.num_retries > 0 {
+                operation.retry(retry_config.get_backoff()).await
+            } else {
+                operation().await
+            }
+        } else {
+            operation().await
+        }
+    }
+
     /// Inference with model-level fallback chain support
     #[tracing::instrument(skip_all, fields(model_name = model_name, otel.name = "model_chain_inference", stream = false))]
     pub async fn infer_with_fallback_chain<'request>(
@@ -823,8 +840,10 @@ impl ModelConfig {
         }
         visited_models.insert(model_name.into());
 
-        // Try current model first (all providers)
-        let current_model_result = self.infer(request, clients, model_name).await;
+        // Try current model first (all providers) with retry logic
+        let current_model_result = self
+            .execute_with_retry(|| async { self.infer(request, clients, model_name).await })
+            .await;
 
         match current_model_result {
             Ok(response) => {
@@ -998,8 +1017,10 @@ impl ModelConfig {
         }
         visited_models.insert(model_name.into());
 
-        // Try current model first (all providers)
-        let current_model_result = self.infer_stream(request, clients, model_name).await;
+        // Try current model first (all providers) with retry logic
+        let current_model_result = self
+            .execute_with_retry(|| async { self.infer_stream(request, clients, model_name).await })
+            .await;
 
         match current_model_result {
             Ok(response) => {

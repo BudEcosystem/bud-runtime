@@ -196,7 +196,7 @@ impl Variant for DiclConfig {
         })?;
 
         // Actually run the inference
-        let mut visited_models = HashSet::new();
+        let visited_models = HashSet::new();
         let (inference_result_stream, mut model_used_info) = infer_model_request_stream(
             request,
             self.model.clone(),

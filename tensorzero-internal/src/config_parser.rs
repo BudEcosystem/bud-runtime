@@ -650,15 +650,12 @@ impl<'c> Config<'c> {
             }
         }
 
-        // Build a map of all models and their fallback chains
-        let mut fallback_map: HashMap<String, Vec<String>> = HashMap::new();
+        // Build a map of all models and their fallback chains using Arc<str> for efficiency
+        let mut fallback_map: HashMap<Arc<str>, Vec<Arc<str>>> = HashMap::new();
 
         for (model_name, model) in models.iter_static_models() {
             if let Some(ref fallback_models) = model.fallback_models {
-                fallback_map.insert(
-                    model_name.to_string(),
-                    fallback_models.iter().map(|m| m.to_string()).collect(),
-                );
+                fallback_map.insert(model_name.clone(), fallback_models.clone());
             }
         }
 
@@ -666,18 +663,27 @@ impl<'c> Config<'c> {
         for (model_name, _) in models.iter_static_models() {
             let mut visited = HashSet::new();
             let mut path = Vec::new();
+            let mut path_set = HashSet::new();
 
-            if let Err(cycle_path) =
-                self.check_fallback_cycle(model_name, &fallback_map, &mut visited, &mut path)
-            {
-                return Err(ErrorDetails::CircularFallbackDetected { chain: cycle_path }.into());
+            if let Err(cycle_path) = self.check_fallback_cycle_optimized(
+                &model_name,
+                &fallback_map,
+                &mut visited,
+                &mut path,
+                &mut path_set,
+            ) {
+                return Err(ErrorDetails::CircularFallbackDetected {
+                    chain: cycle_path.iter().map(|s| s.to_string()).collect(),
+                }
+                .into());
             }
         }
 
         Ok(())
     }
 
-    /// Recursively check for cycles in fallback chains using DFS
+    /// Simple wrapper for tests - converts String types to Arc<str> for the optimized method
+    #[cfg(test)]
     fn check_fallback_cycle(
         &self,
         current_model: &str,
@@ -685,11 +691,64 @@ impl<'c> Config<'c> {
         visited: &mut HashSet<String>,
         path: &mut Vec<String>,
     ) -> Result<(), Vec<String>> {
-        // If we've seen this model in the current path, we have a cycle
-        if path.contains(&current_model.to_string()) {
-            let cycle_start = path.iter().position(|m| m == current_model).unwrap();
+        // Convert to Arc<str> types for the optimized method
+        let arc_fallback_map: HashMap<Arc<str>, Vec<Arc<str>>> = fallback_map
+            .iter()
+            .map(|(k, v)| {
+                (
+                    k.as_str().into(),
+                    v.iter().map(|s| s.as_str().into()).collect(),
+                )
+            })
+            .collect();
+
+        let mut arc_visited: HashSet<Arc<str>> =
+            visited.iter().map(|s| s.as_str().into()).collect();
+
+        let mut arc_path: Vec<Arc<str>> = path.iter().map(|s| s.as_str().into()).collect();
+
+        let mut arc_path_set: HashSet<Arc<str>> = arc_path.iter().cloned().collect();
+
+        let current_model_arc: Arc<str> = current_model.into();
+
+        match self.check_fallback_cycle_optimized(
+            &current_model_arc,
+            &arc_fallback_map,
+            &mut arc_visited,
+            &mut arc_path,
+            &mut arc_path_set,
+        ) {
+            Ok(()) => {
+                // Update the original collections
+                visited.clear();
+                visited.extend(arc_visited.iter().map(|s| s.to_string()));
+                path.clear();
+                path.extend(arc_path.iter().map(|s| s.to_string()));
+                Ok(())
+            }
+            Err(cycle_path) => Err(cycle_path.iter().map(|s| s.to_string()).collect()),
+        }
+    }
+
+    /// Optimized cycle detection using Arc<str> and efficient data structures
+    #[expect(clippy::only_used_in_recursion)]
+    fn check_fallback_cycle_optimized(
+        &self,
+        current_model: &Arc<str>,
+        fallback_map: &HashMap<Arc<str>, Vec<Arc<str>>>,
+        visited: &mut HashSet<Arc<str>>,
+        path: &mut Vec<Arc<str>>,
+        path_set: &mut HashSet<Arc<str>>,
+    ) -> Result<(), Vec<Arc<str>>> {
+        // Check for cycle using the path set for O(1) lookup
+        if path_set.contains(current_model) {
+            // Find the cycle start for reporting
+            let cycle_start = path
+                .iter()
+                .position(|m| m == current_model)
+                .expect("Model should exist in path since path_set contains it");
             let mut cycle_path = path[cycle_start..].to_vec();
-            cycle_path.push(current_model.to_string());
+            cycle_path.push(current_model.clone());
             return Err(cycle_path);
         }
 
@@ -698,20 +757,28 @@ impl<'c> Config<'c> {
             return Ok(());
         }
 
-        // Add to current path
-        path.push(current_model.to_string());
+        // Add to current path and path set
+        path.push(current_model.clone());
+        path_set.insert(current_model.clone());
 
         // Check all fallback models for this model
         if let Some(fallback_models) = fallback_map.get(current_model) {
             for fallback_model in fallback_models {
                 // Recursively check for cycles in fallback model
-                self.check_fallback_cycle(fallback_model, fallback_map, visited, path)?;
+                self.check_fallback_cycle_optimized(
+                    fallback_model,
+                    fallback_map,
+                    visited,
+                    path,
+                    path_set,
+                )?;
             }
         }
 
-        // Remove from current path and mark as visited
+        // Remove from current path and path set, mark as visited
         path.pop();
-        visited.insert(current_model.to_string());
+        path_set.remove(current_model);
+        visited.insert(current_model.clone());
 
         Ok(())
     }

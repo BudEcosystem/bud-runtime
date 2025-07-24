@@ -962,8 +962,7 @@ impl std::fmt::Display for ErrorDetails {
             } => {
                 write!(
                     f,
-                    "Fallback model '{}' referenced by model '{}' does not exist",
-                    fallback_model, model_name
+                    "Fallback model '{fallback_model}' referenced by model '{model_name}' does not exist"
                 )
             }
             ErrorDetails::ModelValidation { message } => {

@@ -675,6 +675,7 @@ async fn infer_model_request<'a, 'request>(
 }
 
 #[instrument(fields(model_name = %model_name), skip_all)]
+#[expect(clippy::too_many_arguments)]
 async fn infer_model_request_stream<'request>(
     request: ModelInferenceRequest<'request>,
     model_name: Arc<str>,
@@ -1456,7 +1457,7 @@ mod tests {
             _ => panic!("Expected Chat inference result"),
         }
         assert!(logs_contain(
-            r#"ERROR test_infer_model_request_errors:infer_model_request{model_name=dummy_chat_model}:infer{model_name="dummy_chat_model" otel.name="model_inference" stream=false}:infer{provider_name="error"}:infer{provider_name="error" otel.name="model_provider_inference" gen_ai.operation.name="chat" gen_ai.system="dummy" gen_ai.request.model="error" stream=false}: tensorzero_internal::error: Error from dummy client: Error sending request to Dummy provider for model 'error'."#
+            r#"ERROR test_infer_model_request_errors:infer_model_request{model_name=dummy_chat_model}:infer_with_fallback_chain{model_name="dummy_chat_model" otel.name="model_chain_inference" stream=false}:infer{model_name="dummy_chat_model" otel.name="model_inference" stream=false}:infer{provider_name="error"}:infer{provider_name="error" otel.name="model_provider_inference" gen_ai.operation.name="chat" gen_ai.system="dummy" gen_ai.request.model="error" stream=false}: tensorzero_internal::error: Error from dummy client: Error sending request to Dummy provider for model 'error'."#
         ));
     }
 
@@ -1540,7 +1541,7 @@ mod tests {
         // Initialize inference parameters
         let inference_params = InferenceParams::default();
         let models = Box::leak(Box::new(ModelTable::default()));
-        let mut visited_models = std::collections::HashSet::new();
+        let visited_models = std::collections::HashSet::new();
 
         // Call infer_model_request_stream
         let result = infer_model_request_stream(
@@ -1713,7 +1714,7 @@ mod tests {
             retry_config: None,
         }));
         let models = Box::leak(Box::new(ModelTable::default()));
-        let mut visited_models = std::collections::HashSet::new();
+        let visited_models = std::collections::HashSet::new();
 
         // Call infer_model_request_stream
         let result = infer_model_request_stream(
@@ -1780,7 +1781,7 @@ mod tests {
         assert_eq!(full_response, expected_response);
 
         assert!(logs_contain(
-            r#"ERROR test_infer_model_request_errors_stream:infer_model_request_stream{model_name=dummy_chat_model}:infer_stream{model_name="dummy_chat_model" otel.name="model_inference" stream=true}:infer_stream{provider_name="error" otel.name="model_provider_inference" gen_ai.operation.name="chat" gen_ai.system="dummy" gen_ai.request.model="error" stream=true}: tensorzero_internal::error: Error from dummy client: Error sending request to Dummy provider for model 'error'."#
+            r#"ERROR test_infer_model_request_errors_stream:infer_model_request_stream{model_name=dummy_chat_model}:infer_stream_with_fallback_chain{model_name="dummy_chat_model" otel.name="model_chain_inference" stream=true}:infer_stream{model_name="dummy_chat_model" otel.name="model_inference" stream=true}:infer_stream{provider_name="error" otel.name="model_provider_inference" gen_ai.operation.name="chat" gen_ai.system="dummy" gen_ai.request.model="error" stream=true}: tensorzero_internal::error: Error from dummy client: Error sending request to Dummy provider for model 'error'."#
         ));
     }
 }
