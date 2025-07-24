@@ -120,9 +120,12 @@ impl RateLimitConfig {
         }
 
         // Return the most restrictive (lowest rate) limit
-        limits.into_iter().min_by_key(|(limit, duration)| {
-            // Calculate requests per second for comparison
-            (*limit as f64 / duration.as_secs_f64() * 1000.0) as u64
+        limits.into_iter().min_by(|a, b| {
+            // Compare rates: requests per second
+            // Lower rate = more restrictive
+            let rate_a = (a.0 as f64) / a.1.as_secs_f64();
+            let rate_b = (b.0 as f64) / b.1.as_secs_f64();
+            rate_a.partial_cmp(&rate_b).unwrap_or(std::cmp::Ordering::Equal)
         })
     }
 
@@ -199,16 +202,33 @@ mod tests {
 
     #[test]
     fn test_most_restrictive_limit() {
+        // Test case 1: per-hour is most restrictive  
         let config = RateLimitConfig {
-            requests_per_second: Some(10),
-            requests_per_minute: Some(300), // Less restrictive than 10/s
-            requests_per_hour: Some(1000),  // Most restrictive
+            requests_per_second: Some(10),   // 10 req/s = 36000 req/hour
+            requests_per_minute: Some(300),  // 300 req/min = 18000 req/hour
+            requests_per_hour: Some(1000),   // 1000 req/hour = most restrictive (0.28 req/s)
             ..Default::default()
         };
 
         let (limit, duration) = config.most_restrictive_limit().unwrap();
-        assert_eq!(limit, 1000);
+        assert_eq!(limit, 1000);  // 1000 req/hour is the most restrictive
         assert_eq!(duration, std::time::Duration::from_secs(3600));
+        
+        // Test case 2: per-hour is most restrictive
+        // To make 1000/hour most restrictive:
+        // - 1 req/s = 3600 req/hour (more permissive)
+        // - 20 req/min = 1200 req/hour (more permissive)
+        // - 1000 req/hour (most restrictive)
+        let config2 = RateLimitConfig {
+            requests_per_second: None,       // Not configured
+            requests_per_minute: Some(20),   // 20 req/min = 1200 req/hour  
+            requests_per_hour: Some(1000),   // 1000 req/hour = most restrictive
+            ..Default::default()
+        };
+        
+        let (limit2, duration2) = config2.most_restrictive_limit().unwrap();
+        assert_eq!(limit2, 1000);
+        assert_eq!(duration2, std::time::Duration::from_secs(3600));
     }
 
     #[test]

@@ -24,8 +24,8 @@ type = "chat_completion"
 model = "gpt-3.5-turbo"
 max_tokens = 100
 
-[api_keys."sk-BudLLMMasterKey_123"]
-[api_keys."sk-BudLLMMasterKey_123"."gpt-3.5-turbo"]
+[api_keys."PLACEHOLDER_API_KEY"]
+[api_keys."PLACEHOLDER_API_KEY"."gpt-3.5-turbo"]
 endpoint_id = "gpt-3.5-turbo"
 model_id = "019787c1-3de1-7b50-969b-e0a58514b6a2"
 project_id = "019787c1-3de1-7b50-969b-e0a58514b6a1"

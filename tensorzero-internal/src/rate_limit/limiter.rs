@@ -1,9 +1,11 @@
 use crate::error::{Error, ErrorDetails};
 use crate::rate_limit::{
-    config::{RateLimitAlgorithm, RateLimitConfig}, RateLimitDecision, RateLimitHeaders, RateLimiterMetrics,
+    config::{RateLimitAlgorithm, RateLimitConfig},
+    RateLimitDecision, RateLimitHeaders, RateLimiterMetrics,
 };
 use crate::redis_client::RedisClient;
 use dashmap::DashMap;
+use futures::StreamExt;
 use governor::{
     clock::{Clock, QuantaClock, QuantaInstant, Reference},
     middleware::NoOpMiddleware,
@@ -13,13 +15,12 @@ use governor::{
 use moka::future::Cache;
 // Redis connection managed by RedisClient
 use redis::{AsyncCommands, Script};
+use serde::{Deserialize, Serialize};
 use std::num::NonZeroU32;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::sync::RwLock;
-// use futures::StreamExt;  // TODO: Uncomment when pub/sub is re-enabled
-use serde::{Deserialize, Serialize};
 use tokio::task::JoinHandle;
 use tokio::time::{interval, timeout};
 use tracing::{debug, warn};
@@ -38,8 +39,8 @@ fn get_unix_timestamp() -> u64 {
 struct CachedRateLimit {
     remaining: u32,
     limit: u32,
-    local_consumed: Arc<std::sync::atomic::AtomicU32>,  // Track local usage since cache
-    #[allow(dead_code)]
+    local_consumed: Arc<std::sync::atomic::AtomicU32>, // Track local usage since cache
+    #[expect(dead_code)] // May be used in future for more sophisticated caching
     reset_at: QuantaInstant,
     cached_at: QuantaInstant,
     ttl: Duration,
@@ -51,17 +52,22 @@ impl CachedRateLimit {
         let elapsed = QuantaClock::default().now().duration_since(self.cached_at);
         elapsed < self.ttl.into()
     }
-    
+
     /// Try to consume one request from local quota
     /// Returns Some(remaining) if allowed, None if local quota exhausted
     fn try_consume_local(&self) -> Option<u32> {
-        let consumed = self.local_consumed.load(std::sync::atomic::Ordering::Relaxed);
-        
+        let consumed = self
+            .local_consumed
+            .load(std::sync::atomic::Ordering::Relaxed);
+
         // Check if we have local quota remaining
         if consumed < self.remaining {
             // Atomically increment and check again
-            let new_consumed = self.local_consumed.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
-            
+            let new_consumed = self
+                .local_consumed
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+                + 1;
+
             if new_consumed <= self.remaining {
                 // Successfully consumed locally
                 Some(self.remaining - new_consumed)
@@ -74,12 +80,14 @@ impl CachedRateLimit {
             None
         }
     }
-    
+
     /// Convert to rate limit headers
     fn to_headers(&self, retry_after: Option<u32>) -> RateLimitHeaders {
-        let consumed = self.local_consumed.load(std::sync::atomic::Ordering::Relaxed);
+        let consumed = self
+            .local_consumed
+            .load(std::sync::atomic::Ordering::Relaxed);
         let remaining = self.remaining.saturating_sub(consumed);
-        
+
         RateLimitHeaders {
             limit: self.limit,
             remaining,
@@ -95,7 +103,6 @@ struct ConfigUpdate {
     action: String, // "create", "update", or "delete"
     config: Option<RateLimitConfig>,
 }
-
 
 /// Model-specific rate limiter with multiple time windows
 struct ModelRateLimiter {
@@ -198,7 +205,7 @@ pub struct DistributedRateLimiter {
     local_limiters: Arc<DashMap<String, Arc<ModelRateLimiter>>>,
 
     /// Redis client for distributed coordination
-    redis_client: Arc<RedisClient>,
+    pub(crate) redis_client: Arc<RedisClient>,
 
     /// High-performance local cache
     cache: Arc<Cache<String, CachedRateLimit>>,
@@ -214,7 +221,7 @@ pub struct DistributedRateLimiter {
 
     /// Redis Lua script for atomic check and increment
     check_and_increment_script: Script,
-    
+
     /// Track local consumption per key for background sync
     local_consumption: Arc<DashMap<String, Arc<AtomicU32>>>,
 }
@@ -276,6 +283,57 @@ impl DistributedRateLimiter {
         // Note: moka doesn't have pattern-based invalidation, so we'd need to track keys
     }
 
+    /// Remove a model's rate limit configuration
+    pub fn remove_model_config(&self, model: &str) {
+        self.local_limiters.remove(model);
+        debug!("Removed rate limit configuration for model: {}", model);
+    }
+
+    /// Update rate limit configurations from model table changes
+    /// This integrates with the existing model table update mechanism
+    pub fn sync_from_model_table(&self, models: &crate::model::ModelTable) {
+        let current_models: std::collections::HashSet<String> = 
+            self.local_limiters.iter().map(|entry| entry.key().clone()).collect();
+        
+        let mut updated_models = std::collections::HashSet::new();
+
+        // Update or add configurations from the model table
+        for (model_name, model_config) in models.iter() {
+            updated_models.insert(model_name.to_string());
+            
+            if let Some(rate_config) = &model_config.rate_limits {
+                // Check if this is a new configuration or an update
+                let needs_update = match self.local_limiters.get(model_name.as_ref()) {
+                    Some(_existing) => {
+                        // Compare configurations to see if update is needed
+                        // For simplicity, we'll always update if rate_limits is present
+                        true
+                    }
+                    None => true, // New model with rate limits
+                };
+
+                if needs_update {
+                    debug!("Syncing rate limit config for model: {}", model_name);
+                    self.update_model_config(model_name.to_string(), rate_config.clone());
+                }
+            } else {
+                // Model doesn't have rate limits configured, remove if it exists
+                if current_models.contains(model_name.as_ref()) {
+                    debug!("Removing rate limit config for model (no longer configured): {}", model_name);
+                    self.remove_model_config(model_name);
+                }
+            }
+        }
+
+        // Remove configurations for models that are no longer in the model table
+        for old_model in current_models {
+            if !updated_models.contains(&old_model) {
+                debug!("Removing rate limit config for deleted model: {}", old_model);
+                self.remove_model_config(&old_model);
+            }
+        }
+    }
+
     /// Check rate limit for a model and API key
     pub async fn check_rate_limit(
         &self,
@@ -283,7 +341,7 @@ impl DistributedRateLimiter {
         api_key: &str,
     ) -> Result<RateLimitDecision, Error> {
         let start = tokio::time::Instant::now();
-        
+
         // Skip cache check if local_allowance is 1.0 (always local)
         let dashmap_start = tokio::time::Instant::now();
         if let Some(limiter) = self.local_limiters.get(model) {
@@ -297,18 +355,21 @@ impl DistributedRateLimiter {
                         self.metrics.record_local_allow();
                         debug!(
                             "Fast path timing - DashMap: {:?}, Governor: {:?}, Total: {:?}",
-                            dashmap_time, governor_time, start.elapsed()
+                            dashmap_time,
+                            governor_time,
+                            start.elapsed()
                         );
-                        let (limit, window_seconds) = if let Some(rps) = limiter.config.requests_per_second {
-                            (rps, 1)
-                        } else if let Some(rpm) = limiter.config.requests_per_minute {
-                            (rpm, 60)
-                        } else if let Some(rph) = limiter.config.requests_per_hour {
-                            (rph, 3600)
-                        } else {
-                            (1000, 60) // Default fallback
-                        };
-                        
+                        let (limit, window_seconds) =
+                            if let Some(rps) = limiter.config.requests_per_second {
+                                (rps, 1)
+                            } else if let Some(rpm) = limiter.config.requests_per_minute {
+                                (rpm, 60)
+                            } else if let Some(rph) = limiter.config.requests_per_hour {
+                                (rph, 3600)
+                            } else {
+                                (1000, 60) // Default fallback
+                            };
+
                         let headers = RateLimitHeaders {
                             limit,
                             remaining: limit - 1,
@@ -318,16 +379,17 @@ impl DistributedRateLimiter {
                         return Ok(RateLimitDecision::Allow(headers));
                     }
                     Err(_) => {
-                        let (limit, window_seconds) = if let Some(rps) = limiter.config.requests_per_second {
-                            (rps, 1)
-                        } else if let Some(rpm) = limiter.config.requests_per_minute {
-                            (rpm, 60)
-                        } else if let Some(rph) = limiter.config.requests_per_hour {
-                            (rph, 3600)
-                        } else {
-                            (1000, 60) // Default fallback
-                        };
-                        
+                        let (limit, window_seconds) =
+                            if let Some(rps) = limiter.config.requests_per_second {
+                                (rps, 1)
+                            } else if let Some(rpm) = limiter.config.requests_per_minute {
+                                (rpm, 60)
+                            } else if let Some(rph) = limiter.config.requests_per_hour {
+                                (rph, 3600)
+                            } else {
+                                (1000, 60) // Default fallback
+                            };
+
                         let headers = RateLimitHeaders {
                             limit,
                             remaining: 0,
@@ -339,8 +401,8 @@ impl DistributedRateLimiter {
                 }
             }
         }
-        
-        let cache_key = format!("{}:{}", model, api_key);
+
+        let cache_key = format!("{model}:{api_key}");
         let cache_key_time = start.elapsed();
 
         // Fast path 1: Check local cache with local counting
@@ -379,17 +441,17 @@ impl DistributedRateLimiter {
             let api_key_for_refresh = api_key.to_string();
             let redis_client = Arc::clone(&self.redis_client);
             let config_clone = Arc::clone(&limiter.config);
-            
+
             tokio::spawn(async move {
                 // Try to get fresh data from Redis in background
                 if let Ok(mut conn) = redis_client.get_connection().await {
-                    let key = format!("rl:{}:{}", model_for_refresh, api_key_for_refresh);
-                    
+                    let key = format!("rl:{model_for_refresh}:{api_key_for_refresh}");
+
                     // Just get the current count - don't increment here
                     // The background sync will handle incrementing
                     if let Ok(count) = conn.get::<_, Option<u32>>(&key).await {
                         let count = count.unwrap_or(0);
-                        
+
                         // Get the appropriate limit and window based on config
                         let (limit, window_seconds) = match config_clone.algorithm {
                             RateLimitAlgorithm::FixedWindow => {
@@ -406,78 +468,85 @@ impl DistributedRateLimiter {
                             }
                             _ => (1000, 60), // Default for other algorithms
                         };
-                        
+
                         let remaining = limit.saturating_sub(count);
                         let cached = CachedRateLimit {
                             remaining,
                             limit,
                             local_consumed: Arc::new(std::sync::atomic::AtomicU32::new(0)),
-                            reset_at: QuantaClock::default().now() + Duration::from_secs(window_seconds).into(),
+                            reset_at: QuantaClock::default().now()
+                                + Duration::from_secs(window_seconds).into(),
                             cached_at: QuantaClock::default().now(),
                             ttl: Duration::from_millis(config_clone.cache_ttl_ms),
                         };
-                        cache_for_refresh.insert(cache_key_for_refresh, cached).await;
+                        cache_for_refresh
+                            .insert(cache_key_for_refresh, cached)
+                            .await;
                     }
-                    
+
                     // Note: expiry is already handled by the background sync process
                     // which has access to the proper window configuration
                 }
             });
-            
+
             // Always use local decision first for speed
             match limiter.check_local() {
                 Ok(_) => {
                     self.metrics.record_local_allow();
-                    
+
                     // Track local consumption for this key
-                    let consumption_entry = self.local_consumption
+                    let consumption_entry = self
+                        .local_consumption
                         .entry(cache_key.clone())
                         .or_insert_with(|| Arc::new(AtomicU32::new(0)));
                     consumption_entry.fetch_add(1, Ordering::Relaxed);
 
                     // Use proper headers based on config
-                    let (limit, window_seconds) = if let Some(rps) = limiter.config.requests_per_second {
-                        (rps, 1)
-                    } else if let Some(rpm) = limiter.config.requests_per_minute {
-                        (rpm, 60)
-                    } else if let Some(rph) = limiter.config.requests_per_hour {
-                        (rph, 3600)
-                    } else {
-                        (1000, 60) // Default fallback
-                    };
-                    
+                    let (limit, window_seconds) =
+                        if let Some(rps) = limiter.config.requests_per_second {
+                            (rps, 1)
+                        } else if let Some(rpm) = limiter.config.requests_per_minute {
+                            (rpm, 60)
+                        } else if let Some(rph) = limiter.config.requests_per_hour {
+                            (rph, 3600)
+                        } else {
+                            (1000, 60) // Default fallback
+                        };
+
                     let headers = RateLimitHeaders {
                         limit,
                         remaining: limit - 1, // Approximate
                         reset: get_unix_timestamp() + window_seconds,
                         retry_after: None,
                     };
-                    
+
                     // Also update cache with local result immediately
                     let cached = CachedRateLimit {
                         remaining: limit - 1,
                         limit,
                         local_consumed: Arc::new(std::sync::atomic::AtomicU32::new(1)),
-                        reset_at: QuantaClock::default().now() + Duration::from_secs(window_seconds).into(),
+                        reset_at: QuantaClock::default().now()
+                            + Duration::from_secs(window_seconds).into(),
                         cached_at: QuantaClock::default().now(),
                         ttl: Duration::from_millis(limiter.config.cache_ttl_ms),
                     };
                     self.cache.insert(cache_key.clone(), cached).await;
-                    
+
                     return Ok(RateLimitDecision::Allow(headers));
                 }
                 Err(_retry_at) => {
                     // Local limit exceeded, return deny immediately
-                    let (limit, window_seconds) = if let Some(rps) = limiter.config.requests_per_second {
-                        (rps, 1)
-                    } else if let Some(rpm) = limiter.config.requests_per_minute {
-                        (rpm, 60)
-                    } else if let Some(rph) = limiter.config.requests_per_hour {
-                        (rph, 3600)
-                    } else {
-                        (1000, 60) // Default fallback
-                    };
-                    
+                    let (limit, window_seconds) =
+                        if let Some(rps) = limiter.config.requests_per_second {
+                            (rps, 1)
+                        } else if let Some(rpm) = limiter.config.requests_per_minute {
+                            (rpm, 60)
+                        } else if let Some(rph) = limiter.config.requests_per_hour {
+                            (rph, 3600)
+                        } else {
+                            (1000, 60) // Default fallback
+                        };
+
                     let headers = RateLimitHeaders {
                         limit,
                         remaining: 0,
@@ -494,34 +563,23 @@ impl DistributedRateLimiter {
         self.check_redis_with_timeout(model, api_key).await
     }
 
-    /// Schedule an async Redis update
-    fn schedule_redis_update(&self, model: &str, api_key: &str) {
-        let model = model.to_string();
-        let api_key = api_key.to_string();
-        let redis_client = Arc::clone(&self.redis_client);
-
-        tokio::spawn(async move {
-            // Fire and forget Redis update
-            if let Err(e) = update_redis_counter(&redis_client, &model, &api_key).await {
-                debug!("Failed to update Redis counter: {}", e);
-            }
-        });
-    }
-
     /// Check rate limit with Redis, using timeout for performance
     async fn check_redis_with_timeout(
         &self,
         model: &str,
         api_key: &str,
     ) -> Result<RateLimitDecision, Error> {
-        let key = format!("rl:{}:{}", model, api_key);
+        let key = format!("rl:{model}:{api_key}");
 
         // Get the rate limit config for this model
         // If model not found, fall back to local fallback (allows unknown models)
         let config = match self.local_limiters.get(model) {
             Some(limiter) => Arc::clone(&limiter.config),
             None => {
-                debug!(model = model, "Model not configured for rate limiting, allowing request");
+                debug!(
+                    model = model,
+                    "Model not configured for rate limiting, allowing request"
+                );
                 return self.check_local_fallback(model);
             }
         };
@@ -611,10 +669,10 @@ impl DistributedRateLimiter {
         }
 
         let allowed = result[0] == 1;
-        let remaining = result[1] as u32;
-        let limit = result[2] as u32;
+        let remaining = u32::try_from(result[1]).unwrap_or(0);
+        let limit = u32::try_from(result[2]).unwrap_or(0);
         let reset_at = if result.len() > 3 {
-            result[3] as u64
+            u64::try_from(result[3]).unwrap_or_else(|_| get_unix_timestamp() + 60)
         } else {
             get_unix_timestamp() + 60
         };
@@ -626,7 +684,7 @@ impl DistributedRateLimiter {
             retry_after: if allowed {
                 None
             } else {
-                Some((reset_at.saturating_sub(get_unix_timestamp())) as u32)
+                Some(u32::try_from(reset_at.saturating_sub(get_unix_timestamp())).unwrap_or(0))
             },
         };
 
@@ -651,7 +709,7 @@ impl DistributedRateLimiter {
             } else {
                 (1000, 60) // Default fallback
             };
-            
+
             match limiter.check_local() {
                 Ok(_) => {
                     let headers = RateLimitHeaders {
@@ -684,30 +742,16 @@ impl DistributedRateLimiter {
         }
     }
 
-    /// Compute headers based on current state
-    async fn compute_headers(
-        &self,
-        _model: &str,
-        _api_key: &str,
-    ) -> Result<RateLimitHeaders, Error> {
-        // This is a simplified version - in production you'd want to query actual remaining counts
-        Ok(RateLimitHeaders {
-            limit: 100,    // Default, should be from config
-            remaining: 99, // Should be calculated
-            reset: get_unix_timestamp() + 60,
-            retry_after: None,
-        })
-    }
-
     /// Start background synchronization with Redis
     pub async fn start_background_sync(&self) {
         // Get all necessary components
         let redis_client = Arc::clone(&self.redis_client);
         let local_consumption = Arc::clone(&self.local_consumption);
         let local_limiters = Arc::clone(&self.local_limiters);
-        
+
         // Get sync interval from first model config (or use default)
-        let sync_interval_ms = self.local_limiters
+        let sync_interval_ms = self
+            .local_limiters
             .iter()
             .next()
             .map(|entry| entry.value().config.sync_interval_ms)
@@ -731,17 +775,17 @@ impl DistributedRateLimiter {
                             entries_to_sync.push((key, count));
                         }
                     }
-                    
+
                     // Sync each entry to Redis
                     for (cache_key, count) in entries_to_sync {
                         // Extract model and api_key from cache key (format: "model:api_key")
                         if let Some(colon_pos) = cache_key.find(':') {
                             let model = &cache_key[..colon_pos];
-                            let redis_key = format!("rl:{}", cache_key);
-                            
+                            let redis_key = format!("rl:{cache_key}");
+
                             // Increment by the local count
                             let _: Result<(), _> = conn.incr(&redis_key, count).await;
-                            
+
                             // Determine the appropriate window based on model configuration
                             let window_seconds = if let Some(limiter) = local_limiters.get(model) {
                                 // Get the window from the most restrictive limit
@@ -757,15 +801,18 @@ impl DistributedRateLimiter {
                             } else {
                                 60 // Default to 60 seconds if model not found
                             };
-                            
+
                             // Set expiry with the appropriate window
                             let _: Result<(), _> = conn.expire(&redis_key, window_seconds).await;
-                            
-                            debug!("Synced {} requests for key {} with {}s window", count, cache_key, window_seconds);
+
+                            debug!(
+                                "Synced {} requests for key {} with {}s window",
+                                count, cache_key, window_seconds
+                            );
                         }
                     }
                 }
-                
+
                 debug!("Background sync completed");
             }
         });
@@ -781,41 +828,144 @@ impl DistributedRateLimiter {
     }
 
     /// Start Redis pub/sub listener for dynamic configuration updates
-    pub async fn start_pubsub_listener(&self) -> Result<(), Error> {
-        // TODO: Implement pub/sub listener for dynamic configuration updates
-        // For now, log that this feature is not yet implemented
-        warn!(
-            "Pub/sub listener for dynamic rate limit configuration updates is not yet implemented"
-        );
-        warn!("Rate limit configurations will only be updated on gateway restart");
+    pub fn start_pubsub_listener(&self) -> Result<(), Error> {
+        let redis_client = Arc::clone(&self.redis_client);
+        let local_limiters = Arc::clone(&self.local_limiters);
+        let cache = Arc::clone(&self.cache);
+
+        let handle = tokio::spawn(async move {
+            loop {
+                match Self::run_pubsub_listener(
+                    &redis_client,
+                    &local_limiters,
+                    &cache,
+                ).await {
+                    Ok(()) => {
+                        debug!("Pub/sub listener completed normally");
+                        break;
+                    }
+                    Err(e) => {
+                        warn!("Pub/sub listener error: {}, retrying in 5 seconds", e);
+                        tokio::time::sleep(Duration::from_secs(5)).await;
+                    }
+                }
+            }
+        });
+
+        // Store handle for cleanup - spawn a task to store it since we can't await here
+        let handle_for_storage = Arc::clone(&self.pubsub_handle);
+        tokio::spawn(async move {
+            if let Ok(mut pubsub_handle_guard) = handle_for_storage.try_write() {
+                *pubsub_handle_guard = Some(handle);
+            } else {
+                warn!("Failed to store pub/sub handle - could not acquire write lock");
+            }
+        });
+
+        debug!("Started pub/sub listener for rate limit configuration updates");
+        Ok(())
+    }
+
+    /// Internal function to run the pub/sub listener
+    async fn run_pubsub_listener(
+        redis_client: &RedisClient,
+        local_limiters: &Arc<DashMap<String, Arc<ModelRateLimiter>>>,
+        cache: &Arc<Cache<String, CachedRateLimit>>,
+    ) -> Result<(), Error> {
+        // Get a connection for pub/sub
+        let mut pubsub_conn = redis_client.client.get_async_pubsub().await.map_err(|e| {
+            Error::new(ErrorDetails::InternalError {
+                message: format!("Failed to get Redis pub/sub connection: {e}"),
+            })
+        })?;
+
+        // Subscribe to rate limit configuration updates
+        pubsub_conn
+            .psubscribe("rate_limit:config:*")
+            .await
+            .map_err(|e| {
+                Error::new(ErrorDetails::InternalError {
+                    message: format!("Failed to subscribe to rate limit config updates: {e}"),
+                })
+            })?;
+
+        debug!("Listening for rate limit configuration updates on rate_limit:config:*");
+
+        let mut stream = pubsub_conn.on_message();
+        while let Some(msg) = stream.next().await {
+            let channel: String = msg.get_channel_name().to_string();
+            
+            // Extract model name from channel (format: rate_limit:config:model_name)
+            let model_name = if let Some(model_name) = channel.strip_prefix("rate_limit:config:") {
+                model_name.to_string()
+            } else {
+                warn!("Received message from unexpected channel: {}", channel);
+                continue;
+            };
+
+            let payload: String = match msg.get_payload() {
+                Ok(p) => p,
+                Err(e) => {
+                    warn!("Failed to decode rate limit config message: {}", e);
+                    continue;
+                }
+            };
+
+            if let Err(e) = Self::handle_config_update(&model_name, &payload, local_limiters, cache).await {
+                warn!("Failed to handle rate limit config update for model {}: {}", model_name, e);
+            }
+        }
 
         Ok(())
     }
 
-    /*
-    // TODO: Re-enable pub/sub functionality once Redis connection setup is resolved
+    /// Handle a configuration update message
+    async fn handle_config_update(
+        model_name: &str,
+        payload: &str,
+        local_limiters: &Arc<DashMap<String, Arc<ModelRateLimiter>>>,
+        _cache: &Arc<Cache<String, CachedRateLimit>>,
+    ) -> Result<(), Error> {
+        let update: ConfigUpdate = serde_json::from_str(payload).map_err(|e| {
+            Error::new(ErrorDetails::InternalError {
+                message: format!("Failed to parse config update: {e}"),
+            })
+        })?;
 
-    /// Main pub/sub listener loop
-    async fn pubsub_listener_loop(
-        redis_client: Arc<RedisClient>,
-        local_limiters: Arc<DashMap<String, Arc<ModelRateLimiter>>>,
-    ) {
-        loop {
-            match Self::run_pubsub_listener(&redis_client, &local_limiters).await {
-                Ok(()) => {
-                    debug!("Pub/sub listener completed normally");
-                    break;
-                }
-                Err(e) => {
-                    warn!("Pub/sub listener error: {}, retrying in 5 seconds", e);
-                    tokio::time::sleep(Duration::from_secs(5)).await;
+        match update.action.as_str() {
+            "create" | "update" => {
+                if let Some(config) = update.config {
+                    debug!("Updating rate limit config for model: {}", model_name);
+                    
+                    // Create new rate limiter with updated config
+                    let limiter = Arc::new(ModelRateLimiter::new(Arc::new(config)));
+                    local_limiters.insert(model_name.to_string(), limiter);
+
+                    // Invalidate cache entries for this model
+                    // Since moka doesn't have pattern-based invalidation, we'll let entries expire naturally
+                    // or implement a more sophisticated cache key tracking system if needed
+                    
+                    debug!("Successfully updated rate limit config for model: {}", model_name);
+                } else {
+                    warn!("Received create/update action without config for model: {}", model_name);
                 }
             }
+            "delete" => {
+                debug!("Removing rate limit config for model: {}", model_name);
+                local_limiters.remove(model_name);
+                
+                // Note: Cache entries will expire naturally or could be invalidated
+                // if we implement cache key tracking
+                
+                debug!("Successfully removed rate limit config for model: {}", model_name);
+            }
+            _ => {
+                warn!("Unknown config update action: {} for model: {}", update.action, model_name);
+            }
         }
-    }
-    */
 
-    // TODO: Implement full pub/sub functionality - currently commented out due to Redis connection issues
+        Ok(())
+    }
 
     /// Stop pub/sub listener
     pub async fn stop_pubsub_listener(&self) {
@@ -839,22 +989,22 @@ impl DistributedRateLimiter {
 
         let payload = serde_json::to_string(&update).map_err(|e| {
             Error::new(ErrorDetails::InternalError {
-                message: format!("Failed to serialize config update: {}", e),
+                message: format!("Failed to serialize config update: {e}"),
             })
         })?;
 
-        let channel = format!("rate_limit:config:{}", model_name);
+        let channel = format!("rate_limit:config:{model_name}");
 
         // Use a multiplexed connection for publishing
         let mut conn = redis_client.get_connection().await.map_err(|e| {
             Error::new(ErrorDetails::InternalError {
-                message: format!("Failed to get Redis connection for publishing: {}", e),
+                message: format!("Failed to get Redis connection for publishing: {e}"),
             })
         })?;
 
         let _: i32 = conn.publish(&channel, &payload).await.map_err(|e| {
             Error::new(ErrorDetails::InternalError {
-                message: format!("Failed to publish config update: {}", e),
+                message: format!("Failed to publish config update: {e}"),
             })
         })?;
 
@@ -864,20 +1014,6 @@ impl DistributedRateLimiter {
         );
         Ok(())
     }
-}
-
-/// Helper function to update Redis counter
-async fn update_redis_counter(
-    redis_client: &RedisClient,
-    model: &str,
-    api_key: &str,
-) -> Result<(), redis::RedisError> {
-    let key = format!("rl:{}:{}", model, api_key);
-    let mut conn = redis_client.get_connection().await?;
-
-    // Simple increment for now - in production this would be more sophisticated
-    let _: i64 = conn.incr(&key, 1).await?;
-    Ok(())
 }
 
 #[cfg(test)]

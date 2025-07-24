@@ -1,42 +1,37 @@
-use axum::{
-    body::Body,
-    extract::Request,
-    middleware::Next,
-    response::Response,
-};
+use axum::{body::Body, extract::Request, middleware::Next, response::Response};
 
 /// Early model extraction layer
-/// 
+///
 /// This layer runs BEFORE rate limiting and extracts the model name from the request body,
 /// storing it in request extensions so the rate limiter can access it without re-parsing.
-pub async fn early_model_extraction(
-    mut request: Request,
-    next: Next,
-) -> Response {
+pub async fn early_model_extraction(mut request: Request, next: Next) -> Response {
     // Fast path: Check for X-Model-Name header first
     if let Some(model_header) = request.headers().get("x-model-name") {
         if let Ok(model_str) = model_header.to_str() {
             let model = model_str.to_string();
-            tracing::debug!("Fast path: extracted model '{}' from X-Model-Name header", model);
+            tracing::debug!(
+                "Fast path: extracted model '{}' from X-Model-Name header",
+                model
+            );
             request.extensions_mut().insert(ExtractedModel(model));
             return next.run(request).await;
         }
     }
-    
+
     // Only process POST requests to OpenAI endpoints
     if request.method() == axum::http::Method::POST {
         let path = request.uri().path();
         tracing::debug!("Early extraction checking path: {}", path);
-        
+
         // Check if this is an endpoint that needs model extraction
-        if path == "/v1/chat/completions" 
-            || path == "/v1/embeddings" 
+        if path == "/v1/chat/completions"
+            || path == "/v1/embeddings"
             || path == "/v1/moderations"
-            || path == "/v1/messages" {
-            
+            || path == "/v1/messages"
+        {
             tracing::debug!("Early extraction starting for path: {}", path);
             let extract_start = tokio::time::Instant::now();
-            
+
             // Extract and buffer the body
             let (parts, body) = request.into_parts();
             let body_read_start = tokio::time::Instant::now();
@@ -48,13 +43,15 @@ pub async fn early_model_extraction(
                     return next.run(request).await;
                 }
             };
-            
+
             // Try to extract model name from JSON
             if let Ok(json_str) = std::str::from_utf8(&bytes) {
                 if let Some(model) = extract_model_from_json(json_str) {
                     // Store the model in request extensions
                     request = Request::from_parts(parts, Body::from(bytes.clone()));
-                    request.extensions_mut().insert(ExtractedModel(model.clone()));
+                    request
+                        .extensions_mut()
+                        .insert(ExtractedModel(model.clone()));
                     let total_time = extract_start.elapsed();
                     let body_time = body_read_start.elapsed();
                     tracing::debug!(
@@ -64,7 +61,10 @@ pub async fn early_model_extraction(
                 } else {
                     // No model found, reconstruct request
                     let preview = &json_str[..std::cmp::min(200, json_str.len())];
-                    tracing::debug!("Early extraction FAILED: no model found in JSON preview: {}", preview);
+                    tracing::debug!(
+                        "Early extraction FAILED: no model found in JSON preview: {}",
+                        preview
+                    );
                     request = Request::from_parts(parts, Body::from(bytes));
                 }
             } else {
@@ -73,12 +73,18 @@ pub async fn early_model_extraction(
                 request = Request::from_parts(parts, Body::from(bytes));
             }
         } else {
-            tracing::debug!("Early extraction skipped: path '{}' not in extraction list", path);
+            tracing::debug!(
+                "Early extraction skipped: path '{}' not in extraction list",
+                path
+            );
         }
     } else {
-        tracing::debug!("Early extraction skipped: method '{}' is not POST", request.method());
+        tracing::debug!(
+            "Early extraction skipped: method '{}' is not POST",
+            request.method()
+        );
     }
-    
+
     next.run(request).await
 }
 
@@ -91,23 +97,23 @@ fn extract_model_from_json(json_str: &str) -> Option<String> {
     // Look for "model": "value" pattern
     let model_key = "\"model\"";
     let model_pos = json_str.find(model_key)?;
-    
+
     // Find the colon after "model"
     let after_key = &json_str[model_pos + model_key.len()..];
     let colon_pos = after_key.find(':')?;
-    
+
     // Skip whitespace after colon
     let after_colon = &after_key[colon_pos + 1..].trim_start();
-    
+
     // Check if value starts with quote
     if !after_colon.starts_with('"') {
         return None;
     }
-    
+
     // Find the closing quote
     let value_start = 1;
     let closing_quote = after_colon[value_start..].find('"')?;
-    
+
     Some(after_colon[value_start..value_start + closing_quote].to_string())
 }
 
@@ -121,20 +127,17 @@ mod tests {
             extract_model_from_json(r#"{"model": "gpt-3.5-turbo", "messages": []}"#),
             Some("gpt-3.5-turbo".to_string())
         );
-        
+
         assert_eq!(
             extract_model_from_json(r#"{"messages": [], "model": "gpt-4"}"#),
             Some("gpt-4".to_string())
         );
-        
+
         assert_eq!(
             extract_model_from_json(r#"{"model":"claude-3","temperature":0.7}"#),
             Some("claude-3".to_string())
         );
-        
-        assert_eq!(
-            extract_model_from_json(r#"{"no_model": "here"}"#),
-            None
-        );
+
+        assert_eq!(extract_model_from_json(r#"{"no_model": "here"}"#), None);
     }
 }

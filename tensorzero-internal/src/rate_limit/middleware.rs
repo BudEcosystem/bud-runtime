@@ -1,4 +1,5 @@
 use crate::error::Error;
+use crate::rate_limit::early_extract::ExtractedModel;
 use crate::rate_limit::{DistributedRateLimiter, RateLimitDecision};
 use axum::{
     body::Body,
@@ -11,13 +12,19 @@ use serde_json::Value;
 use std::sync::Arc;
 use tracing::{debug, warn};
 
-/// Rate limiting middleware for Axum
+/// Unified rate limiting middleware
+///
+/// This middleware combines the best features from all previous implementations:
+/// - Checks pre-extracted model from early extraction layer
+/// - Falls back to X-Model-Name header
+/// - Falls back to URL path extraction  
+/// - Falls back to body parsing only when necessary
 pub async fn rate_limit_middleware(
     State(limiter): State<Arc<DistributedRateLimiter>>,
     mut request: Request,
     next: Next,
 ) -> Result<Response, RateLimitError> {
-    // Extract model name from the request path or body
+    // Extract model name using the best available method
     let model_name = extract_model_from_request(&mut request).await?;
 
     // Extract API key from authorization header (use "anonymous" if no auth)
@@ -65,22 +72,39 @@ pub async fn rate_limit_middleware(
     }
 }
 
-/// Extract model name from the request path or body
+/// Extract model name from the request using multiple strategies
 async fn extract_model_from_request(request: &mut Request) -> Result<String, RateLimitError> {
-    let path = request.uri().path();
+    // Strategy 1: Check for pre-extracted model from early extraction layer
+    if let Some(extracted) = request.extensions().get::<ExtractedModel>() {
+        debug!("Using pre-extracted model: {}", extracted.0);
+        return Ok(extracted.0.clone());
+    }
 
-    // Try to extract model from various OpenAI-compatible endpoints
-    if let Some(model) = try_extract_from_path(path) {
+    // Strategy 2: Check for X-Model-Name header (fastest path)
+    if let Some(model_header) = request.headers().get("x-model-name") {
+        if let Ok(model) = model_header.to_str() {
+            debug!("Extracted model from X-Model-Name header: {}", model);
+            return Ok(model.to_string());
+        }
+    }
+
+    // Strategy 3: Try to extract from URL path
+    let path = request.uri().path().to_string(); // Clone the path to avoid borrow issues
+    if let Some(model) = try_extract_from_path(&path) {
+        debug!("Extracted model from URL path: {}", model);
         return Ok(model);
     }
 
-    // Try to extract from request body (for POST requests with JSON bodies)
+    // Strategy 4: Try to extract from request body (slowest path, only for POST)
     if request.method() == axum::http::Method::POST {
         // Read the body
         let body = std::mem::replace(request.body_mut(), Body::empty());
         let bytes = match axum::body::to_bytes(body, usize::MAX).await {
             Ok(bytes) => bytes,
-            Err(_) => return Err(RateLimitError::ModelNotFound),
+            Err(_) => {
+                debug!("Failed to read request body for model extraction");
+                return Err(RateLimitError::ModelNotFound);
+            }
         };
 
         // Try to parse as JSON and extract model field
@@ -89,6 +113,7 @@ async fn extract_model_from_request(request: &mut Request) -> Result<String, Rat
                 if let Some(model) = json_value.get("model").and_then(|m| m.as_str()) {
                     // Reconstruct the request body for the next handler
                     *request.body_mut() = Body::from(bytes);
+                    debug!("Extracted model from request body: {}", model);
                     return Ok(model.to_string());
                 }
             }
@@ -98,7 +123,12 @@ async fn extract_model_from_request(request: &mut Request) -> Result<String, Rat
         *request.body_mut() = Body::from(bytes);
     }
 
-    // Fallback to a default model or error
+    // No model found anywhere
+    debug!(
+        "Could not determine model for rate limiting on path: {}. \
+        Consider using early extraction layer or X-Model-Name header for better performance.",
+        path
+    );
     Err(RateLimitError::ModelNotFound)
 }
 
@@ -108,10 +138,8 @@ fn try_extract_from_path(path: &str) -> Option<String> {
     let segments: Vec<&str> = path.split('/').collect();
 
     // Look for model patterns in different endpoints
-    if segments.len() >= 4 {
-        if segments[1] == "v1" && segments[2] == "models" {
-            return Some(segments[3].to_string());
-        }
+    if segments.len() >= 4 && segments[1] == "v1" && segments[2] == "models" {
+        return Some(segments[3].to_string());
     }
 
     None
@@ -137,6 +165,21 @@ fn extract_api_key_from_request(request: &Request) -> Result<String, RateLimitEr
     }
 
     Err(RateLimitError::ApiKeyMissing)
+}
+
+/// Conditional rate limiting middleware - only applies if rate limiting is enabled
+pub async fn conditional_rate_limit_middleware(
+    State((limiter, enabled)): State<(Arc<DistributedRateLimiter>, bool)>,
+    request: Request,
+    next: Next,
+) -> Result<Response, RateLimitError> {
+    if enabled {
+        // Use the regular rate limit middleware
+        rate_limit_middleware(State(limiter), request, next).await
+    } else {
+        // Skip rate limiting
+        Ok(next.run(request).await)
+    }
 }
 
 /// Rate limiting specific errors
@@ -175,7 +218,7 @@ impl IntoResponse for RateLimitError {
                 StatusCode::BAD_REQUEST,
                 serde_json::json!({
                     "error": {
-                        "message": "Could not determine model from request",
+                        "message": "Could not determine model from request. For optimal performance, use the X-Model-Name header or ensure the 'model' field is present in the JSON body.",
                         "type": "invalid_request_error",
                         "code": "model_not_found"
                     }
@@ -211,23 +254,6 @@ impl IntoResponse for RateLimitError {
     }
 }
 
-// Helper function to create rate limiting layer - users can call axum::middleware::from_fn_with_state directly
-
-/// Conditional rate limiting middleware - only applies if rate limiting is enabled
-pub async fn conditional_rate_limit_middleware(
-    State((limiter, enabled)): State<(Arc<DistributedRateLimiter>, bool)>,
-    request: Request,
-    next: Next,
-) -> Result<Response, RateLimitError> {
-    if enabled {
-        // Use the regular rate limit middleware
-        rate_limit_middleware(State(limiter), request, next).await
-    } else {
-        // Skip rate limiting
-        Ok(next.run(request).await)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -241,12 +267,6 @@ mod tests {
             "authorization",
             HeaderValue::from_static("Bearer sk-test-key-123"),
         );
-
-        let _request = Request::builder()
-            .method(Method::GET)
-            .uri("/test")
-            .body(())
-            .unwrap();
 
         let mut req_with_headers = Request::builder().method(Method::GET).uri("/test");
 

@@ -82,11 +82,21 @@ impl AppStateData {
         for (name, config) in std::mem::take(&mut *new_models).into_iter() {
             models.insert(name, config);
         }
+
+        // Sync rate limiter configurations if rate limiting is enabled
+        if let Some(rate_limiter) = &self.rate_limiter {
+            rate_limiter.sync_from_model_table(&models);
+        }
     }
 
     pub async fn remove_model_table(&self, model_name: &str) {
         let mut models = self.config.models.write().await;
         models.remove(model_name);
+
+        // Remove rate limiter configuration if it exists
+        if let Some(rate_limiter) = &self.rate_limiter {
+            rate_limiter.remove_model_config(model_name);
+        }
 
         // Also remove associated credential if it exists
         let credential_key = format!("store_{model_name}");
@@ -239,15 +249,14 @@ pub async fn setup_redis_and_rate_limiter(
                     .map_err(|e| {
                         Error::new(ErrorDetails::AppState {
                             message: format!(
-                                "Failed to create Redis client for authentication: {}",
-                                e
+                                "Failed to create Redis client for authentication: {e}"
                             ),
                         })
                     })?;
 
                 auth_redis_client.start().await.map_err(|e| {
                     Error::new(ErrorDetails::AppState {
-                        message: format!("Failed to start Redis client for authentication: {}", e),
+                        message: format!("Failed to start Redis client for authentication: {e}"),
                     })
                 })?;
 
@@ -313,7 +322,7 @@ async fn setup_rate_limiter(
         .await
         .map_err(|e| {
             Error::new(ErrorDetails::AppState {
-                message: format!("Failed to create Redis client for rate limiting: {}", e),
+                message: format!("Failed to create Redis client for rate limiting: {e}"),
             })
         })?;
 
@@ -324,7 +333,7 @@ async fn setup_rate_limiter(
         .await
         .map_err(|e| {
             Error::new(ErrorDetails::AppState {
-                message: format!("Failed to create distributed rate limiter: {}", e),
+                message: format!("Failed to create distributed rate limiter: {e}"),
             })
         })?;
 
@@ -345,7 +354,7 @@ async fn setup_rate_limiter(
     tracing::info!("Started background sync for distributed rate limiting");
 
     // Start pub/sub listener for dynamic configuration updates
-    if let Err(e) = rate_limiter.start_pubsub_listener().await {
+    if let Err(e) = rate_limiter.start_pubsub_listener() {
         tracing::warn!(
             "Failed to start pub/sub listener for rate limit updates: {}",
             e

@@ -1,9 +1,7 @@
 pub mod config;
+pub mod early_extract;
 pub mod limiter;
 pub mod middleware;
-pub mod middleware_headers;
-pub mod middleware_optimized;
-pub mod early_extract;
 pub mod store;
 
 #[cfg(test)]
@@ -11,7 +9,9 @@ mod tests;
 
 pub use config::{RateLimitAlgorithm, RateLimitConfig};
 pub use limiter::DistributedRateLimiter;
-pub use middleware::{conditional_rate_limit_middleware, rate_limit_middleware, RateLimitError};
+pub use middleware::{
+    conditional_rate_limit_middleware, rate_limit_middleware, RateLimitError,
+};
 pub use store::RateLimiterStore;
 
 use axum::http::{HeaderMap, HeaderValue};
