@@ -1,0 +1,14 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: {{ .Release.Name }}-configstore
+spec:
+  type: configuration.redis
+  version: v1
+  metadata:
+    - name: redisHost
+      value: {{ .Release.Name }}-valkey-primary
+    - name: redisPassword
+      value: {{ .Values.valkey.auth.password }}
+    - name: redisDB
+      value: 3

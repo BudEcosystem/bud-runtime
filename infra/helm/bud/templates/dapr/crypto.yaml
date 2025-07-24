@@ -1,0 +1,22 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: {{ .Release.Name }}-crypto
+spec:
+  type: crypto.dapr.localstorage
+  version: v1
+  metadata:
+  - name: path
+    value: /mnt/crypto-keys
+scopes:
+  - budcluster
+  - askbud
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Release.Name }}-dapr-crypto
+data:
+  symmetric-key-256: {{ .Values.daprExtra.crypto.symmetricKey | b64enc }}
+  rsa-private-key.pem: |
+    {{- .Values.daprExtra.crypto.asymmetricKey | b64enc | nindent 4 }}

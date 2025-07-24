@@ -1,0 +1,51 @@
+apiVersion: v2
+
+name: bud
+description: Bud Helm chart for Kubernetes
+type: application
+
+version: 0.1.0
+appVersion: "0.24.0"
+
+maintainers:
+  - name: "sinanmohd"
+    email: "sinan@sinanmohd.com"
+    url: "https://www.sinanmohd.com"
+
+dependencies:
+  - name: postgresql
+    version: 16.7.18
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
+  - name: valkey
+    version: 3.0.20
+    repository: https://charts.bitnami.com/bitnami
+    condition: valkey.enabled
+  - name: clickhouse
+    version: 9.3.9
+    repository: https://charts.bitnami.com/bitnami
+    condition: clickhouse.enabled
+  - name: minio
+    version: 17.0.15
+    repository: https://charts.bitnami.com/bitnami
+    condition: minio.enabled
+  - name: keycloak
+    version: 24.7.7
+    repository: https://charts.bitnami.com/bitnami
+    condition: keycloak.enabled
+  - name: dapr
+    version: 1.15.8
+    repository: https://dapr.github.io/helm-charts/
+    condition: dapr.enabled
+  - name: kafka
+    version: 32.3.5
+    repository: https://charts.bitnami.com/bitnami
+    condition: kafka.enabled
+  - name: mongodb
+    version: 16.5.31
+    repository: https://charts.bitnami.com/bitnami
+    condition: mongodb.enabled
+  - name: lgtm-distributed
+    version: 2.1.0
+    repository: https://grafana.github.io/helm-charts
+    condition: lgtm-distributed.enabled

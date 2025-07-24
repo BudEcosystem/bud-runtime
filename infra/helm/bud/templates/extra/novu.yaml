@@ -1,0 +1,60 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Release.Name }}-novu-externals3
+data:
+  endpoint: {{ printf "http://%s-minio" .Release.Name | b64enc }}
+  bucketName: {{ "novu-local" | b64enc }}
+  region: {{ "us-east-1" | b64enc }}
+  accessKey: {{ .Values.minio.auth.rootUser | b64enc }}
+  secretKey: {{ .Values.minio.auth.rootPassword | b64enc }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Release.Name }}-novu-externalredis
+data:
+  redis-password: {{ .Values.valkey.auth.password | b64enc }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "{{ .Release.Name }}-embed"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: "{{ .Release.Name }}-embed"
+  template:
+    metadata:
+      labels:
+        app: "{{ .Release.Name }}-embed"
+    spec:
+      containers:
+      - name: embed
+        image: "ghcr.io/novuhq/novu/embed:0.24.0"
+        ports:
+        - containerPort: 4701
+        env:
+          - name: REDIS_HOST
+            value : "{{ .Release.Name }}-valkey-primary"
+          - name: REDIS_PORT
+            value : "6379"
+          - name: REDIS_DB_INDEX
+            value : "2"
+          - name: REDIS_PASSWORD
+            value : "{{ .Values.valkey.auth.password }}"
+          - name: MONGO_URL
+            value: "mongodb://{{ index .Values.mongodb.auth.usernames 0 }}:{{ index .Values.mongodb.auth.passwords 0 }}@{{ .Release.Name }}-mongodb:27017/{{ index .Values.mongodb.auth.databases 0 }}"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: "{{ .Release.Name }}-embed"
+spec:
+  ports:
+  - protocol: TCP
+    port: 4701
+    targetPort: 4701
+  selector:
+    app: "{{ .Release.Name }}-embed"

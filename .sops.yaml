@@ -1,0 +1,5 @@
+keys:
+  - &sinan age1q5sfy74d53n6jxlgsc2zrsz4wcl9d830nxuagc3wfmdkrrp55ckq9ev6nv
+
+creation_rules:
+  - age: *sinan

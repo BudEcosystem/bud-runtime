@@ -1,0 +1,77 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-budproxy-config
+data:
+  tensorzero.toml: |
+    [gateway]
+    bind_address = "0.0.0.0:3000"
+
+    [gateway.observability.kafka]
+    enabled = true
+    brokers = "{{ .Release.Name }}-kafka:9092"
+    topic_prefix = "tensorzero"
+    compression_type = "lz4"
+    batch_size = 1000
+    linger_ms = 10
+    security_protocol = "SASL_PLAINTEXT"
+
+    [gateway.observability.kafka.sasl]
+    mechanism = "PLAIN"
+    username = "{{ index .Values.kafka.sasl.client.users 0 }}"
+    password = "{{ index .Values.kafka.sasl.client.passwords 0 }}"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-budproxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-budproxy
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-budproxy
+    spec:
+      containers:
+        - name: budproxy
+          image: {{ .Values.microservices.budproxy.image }}
+          imagePullPolicy: Always
+          command: ["gateway"]
+          args:
+            - --config-file=/app/config/tensorzero.toml
+          ports:
+            - containerPort: 3000
+          env:
+            - name: TENSORZERO_REDIS_URL
+              value: "redis://default:{{ .Values.valkey.auth.password}}@{{ .Release.Name }}-valkey-primary:6379/2"
+            - name: TENSORZERO_CLICKHOUSE_URL
+              value: "http://{{ .Values.clickhouse.auth.username }}:{{ .Values.clickhouse.auth.password }}@{{ .Release.Name }}-clickhouse:8123/budproxy"
+          volumeMounts:
+            - name: {{ .Release.Name }}-budproxy-config
+              mountPath: /app/config
+          resources:
+            limits:
+              cpu: 2000m
+              memory: 4096Mi
+            requests:
+              cpu: 2000m
+              memory: 4096Mi
+      volumes:
+        - name: {{ .Release.Name }}-budproxy-config
+          configMap:
+            name: {{ .Release.Name }}-budproxy-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-budproxy
+spec:
+  selector:
+    app: {{ .Release.Name }}-budproxy
+  ports:
+    - protocol: TCP
+      port: 3000
+      targetPort: 3000

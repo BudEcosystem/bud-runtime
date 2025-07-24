@@ -1,0 +1,30 @@
+dependencies:
+- name: postgresql
+  repository: https://charts.bitnami.com/bitnami
+  version: 16.7.18
+- name: valkey
+  repository: https://charts.bitnami.com/bitnami
+  version: 3.0.20
+- name: clickhouse
+  repository: https://charts.bitnami.com/bitnami
+  version: 9.3.9
+- name: minio
+  repository: https://charts.bitnami.com/bitnami
+  version: 17.0.15
+- name: keycloak
+  repository: https://charts.bitnami.com/bitnami
+  version: 24.7.7
+- name: dapr
+  repository: https://dapr.github.io/helm-charts/
+  version: 1.15.8
+- name: kafka
+  repository: https://charts.bitnami.com/bitnami
+  version: 32.3.5
+- name: mongodb
+  repository: https://charts.bitnami.com/bitnami
+  version: 16.5.31
+- name: lgtm-distributed
+  repository: https://grafana.github.io/helm-charts
+  version: 2.1.0
+digest: sha256:55107d5b63595ac37bb787a94bc93be4cea30ff463006da3028c5f21bb66a4da
+generated: "2025-07-24T15:44:46.905114455+05:30"

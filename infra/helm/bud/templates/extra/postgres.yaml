@@ -1,0 +1,42 @@
+{{- if not (empty $.Values.postgresqlExtra.autoCreateDB) }}
+apiVersion: v1
+kind: ConfigMap # TODO: convert to secret or nix
+metadata:
+  name: {{ .Release.Name }}-postgres-db-create-script
+data:
+  script.sh: |-
+    export PGPASSWORD="{{ $.Values.postgresql.auth.postgresPassword }}"
+
+    while ! pg_isready -h {{ $.Release.Name }}-postgresql -U postgres ; do
+      sleep 1
+    done
+
+    psql -h {{ $.Release.Name }}-postgresql -U postgres <<- EOF
+    {{- range $.Values.postgresqlExtra.autoCreateDB }}
+      CREATE USER {{ . }} WITH PASSWORD '{{ . }}';
+      CREATE DATABASE {{ . }} OWNER {{ . }};
+    {{- end }}
+    EOF
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-postgres-db-create
+spec:
+  template:
+    spec:
+      volumes:
+        - name: {{ .Release.Name }}-postgres-db-create-script
+          configMap:
+            name: {{ .Release.Name }}-postgres-db-create-script
+      containers:
+      - name: postgres-db-create
+        image: {{ .Values.postgresql.image.repository }}:{{ .Values.postgresql.image.tag }}
+        volumeMounts:
+          - mountPath: "/var/script.sh"
+            name: {{ .Release.Name }}-postgres-db-create-script
+            subPath: script.sh
+            readOnly: true
+        command: ["/bin/bash", "/var/script.sh"]
+      restartPolicy: Never
+{{- end }}
