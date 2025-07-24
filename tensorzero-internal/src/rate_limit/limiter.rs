@@ -344,53 +344,72 @@ impl DistributedRateLimiter {
             }
         }
 
-        // Fast path 2: Check local governor with local_allowance
+        // Fast path 2: On cache miss, ALWAYS use local governor immediately
+        // But spawn background task to refresh cache from Redis
         if let Some(limiter) = self.local_limiters.get(model) {
-            // Check if we should use local allowance to skip Redis
-            let should_allow_locally = if limiter.config.local_allowance >= 1.0 {
-                true // Always allow locally if local_allowance is 1.0
-            } else if limiter.config.local_allowance <= 0.0 {
-                false // Never allow locally if local_allowance is 0.0
-            } else {
-                // Use probabilistic approach for partial local allowance
-                rand::random::<f64>() < limiter.config.local_allowance
-            };
-
-            if should_allow_locally {
-                match limiter.check_local() {
-                    Ok(_) => {
-                        // Skip Redis updates for local allows - they'll be synced periodically
-                        // This avoids spawning hundreds of tasks per second
-                        // The sync_interval_ms (200ms) handles periodic syncing
-                        self.metrics.record_local_allow();
-
-                        // Use proper headers based on config
-                        let limit = limiter.config.requests_per_second.unwrap_or(1000);
-                        let headers = RateLimitHeaders {
-                            limit,
-                            remaining: limit - 1, // Approximate
-                            reset: get_unix_timestamp() + 60,
-                            retry_after: None,
+            // Spawn background Redis refresh (fire and forget)
+            let cache_for_refresh = Arc::clone(&self.cache);
+            let cache_key_for_refresh = cache_key.clone();
+            let model_for_refresh = model.to_string();
+            let api_key_for_refresh = api_key.to_string();
+            let redis_client = Arc::clone(&self.redis_client);
+            let config_clone = Arc::clone(&limiter.config);
+            
+            tokio::spawn(async move {
+                // Try to get fresh data from Redis in background
+                if let Ok(mut conn) = redis_client.get_connection().await {
+                    let key = format!("rl:{}:{}", model_for_refresh, api_key_for_refresh);
+                    if let Ok(remaining) = conn.get::<_, u32>(&key).await {
+                        let cached = CachedRateLimit {
+                            remaining,
+                            limit: config_clone.requests_per_second.unwrap_or(1000),
+                            local_consumed: Arc::new(std::sync::atomic::AtomicU32::new(0)),
+                            reset_at: QuantaClock::default().now() + Duration::from_secs(60).into(),
+                            cached_at: QuantaClock::default().now(),
+                            ttl: Duration::from_millis(config_clone.cache_ttl_ms),
                         };
-                        debug!(
-                            model = model,
-                            local_allowance = limiter.config.local_allowance,
-                            duration_us = start.elapsed().as_micros(),
-                            "Rate limit local allow (within local_allowance)"
-                        );
-                        return Ok(RateLimitDecision::Allow(headers));
-                    }
-                    Err(_retry_at) => {
-                        // Local limit exceeded, still check with Redis
-                        debug!(model = model, "Local rate limit exceeded, checking Redis");
+                        cache_for_refresh.insert(cache_key_for_refresh, cached).await;
                     }
                 }
-            } else {
-                debug!(
-                    model = model, 
-                    local_allowance = limiter.config.local_allowance,
-                    "Not within local allowance, checking Redis"
-                );
+            });
+            
+            // Always use local decision first for speed
+            match limiter.check_local() {
+                Ok(_) => {
+                    self.metrics.record_local_allow();
+
+                    // Use proper headers based on config
+                    let limit = limiter.config.requests_per_second.unwrap_or(1000);
+                    let headers = RateLimitHeaders {
+                        limit,
+                        remaining: limit - 1, // Approximate
+                        reset: 0,  // Skip timestamp for speed
+                        retry_after: None,
+                    };
+                    
+                    // Also update cache with local result immediately
+                    let cached = CachedRateLimit {
+                        remaining: limit - 1,
+                        limit,
+                        local_consumed: Arc::new(std::sync::atomic::AtomicU32::new(1)),
+                        reset_at: QuantaClock::default().now() + Duration::from_secs(60).into(),
+                        cached_at: QuantaClock::default().now(),
+                        ttl: Duration::from_millis(limiter.config.cache_ttl_ms),
+                    };
+                    self.cache.insert(cache_key.clone(), cached).await;
+                    
+                    return Ok(RateLimitDecision::Allow(headers));
+                }
+                Err(_retry_at) => {
+                    // Local limit exceeded, return deny immediately
+                    let headers = RateLimitHeaders {
+                        limit: 1000,
+                        remaining: 0,
+                        reset: 0,
+                        retry_after: Some(60),
+                    };
+                    return Ok(RateLimitDecision::Deny(headers));
+                }
             }
         }
 
