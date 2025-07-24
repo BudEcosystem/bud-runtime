@@ -49,7 +49,7 @@ model = "dummy"
                 role: tensorzero::Role::User,
                 content: vec![tensorzero::ClientInputMessageContent::Text(
                     tensorzero_internal::inference::types::TextKind::Text {
-                        text: format!("Test request {}", i),
+                        text: format!("Test request {i}"),
                     },
                 )],
             }],
@@ -65,7 +65,7 @@ model = "dummy"
         };
 
         let result = client.inference(params).await;
-        assert!(result.is_ok(), "Request {} should succeed", i);
+        assert!(result.is_ok(), "Request {i} should succeed");
     }
 
     // Third request should be rate limited
@@ -302,7 +302,7 @@ model = "dummy2"
                 role: tensorzero::Role::User,
                 content: vec![tensorzero::ClientInputMessageContent::Text(
                     tensorzero_internal::inference::types::TextKind::Text {
-                        text: format!("Test model 1 request {}", i),
+                        text: format!("Test model 1 request {i}"),
                     },
                 )],
             }],
@@ -331,7 +331,7 @@ model = "dummy2"
                 role: tensorzero::Role::User,
                 content: vec![tensorzero::ClientInputMessageContent::Text(
                     tensorzero_internal::inference::types::TextKind::Text {
-                        text: format!("Test model 2 request {}", i),
+                        text: format!("Test model 2 request {i}"),
                     },
                 )],
             }],
@@ -398,7 +398,7 @@ model = "dummy"
                 role: tensorzero::Role::User,
                 content: vec![tensorzero::ClientInputMessageContent::Text(
                     tensorzero_internal::inference::types::TextKind::Text {
-                        text: format!("Test request {}", i),
+                        text: format!("Test request {i}"),
                     },
                 )],
             }],
@@ -416,8 +416,7 @@ model = "dummy"
         let result = client.inference(params).await;
         assert!(
             result.is_ok(),
-            "Request {} should succeed when rate limiting is disabled",
-            i
+            "Request {i} should succeed when rate limiting is disabled"
         );
     }
 }

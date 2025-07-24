@@ -220,15 +220,19 @@ impl RedisClient {
                     // Publish rate limit deletion if rate limiting is enabled
                     if app_state.is_rate_limiting_enabled() {
                         if let Some(rate_limiter) = &app_state.rate_limiter {
-                            if let Err(e) = crate::rate_limit::DistributedRateLimiter::publish_config_update(
-                                &rate_limiter.redis_client,
-                                model_name,
-                                "delete",
-                                None,
-                            ).await {
+                            if let Err(e) =
+                                crate::rate_limit::DistributedRateLimiter::publish_config_update(
+                                    &rate_limiter.redis_client,
+                                    model_name,
+                                    "delete",
+                                    None,
+                                )
+                                .await
+                            {
                                 tracing::warn!(
                                     "Failed to publish rate limit config deletion for model {}: {}",
-                                    model_name, e
+                                    model_name,
+                                    e
                                 );
                             } else {
                                 tracing::debug!(
@@ -238,7 +242,7 @@ impl RedisClient {
                             }
                         }
                     }
-                    
+
                     app_state.remove_model_table(model_name).await;
                 } else {
                     tracing::error!("Invalid model table key format: {key}");
@@ -259,10 +263,7 @@ impl RedisClient {
     }
 
     /// Publish rate limit configuration updates for models with rate limits
-    async fn publish_rate_limit_updates(
-        models: &ModelTable,
-        app_state: &AppStateData,
-    ) {
+    async fn publish_rate_limit_updates(models: &ModelTable, app_state: &AppStateData) {
         // Only publish if rate limiting is enabled
         if !app_state.is_rate_limiting_enabled() {
             return;
@@ -272,15 +273,19 @@ impl RedisClient {
             for (model_name, model_config) in models.iter() {
                 if let Some(rate_config) = &model_config.rate_limits {
                     // Publish configuration update
-                    if let Err(e) = crate::rate_limit::DistributedRateLimiter::publish_config_update(
-                        &rate_limiter.redis_client,
-                        model_name,
-                        "update",
-                        Some(rate_config.clone()),
-                    ).await {
+                    if let Err(e) =
+                        crate::rate_limit::DistributedRateLimiter::publish_config_update(
+                            &rate_limiter.redis_client,
+                            model_name,
+                            "update",
+                            Some(rate_config.clone()),
+                        )
+                        .await
+                    {
                         tracing::warn!(
                             "Failed to publish rate limit config update for model {}: {}",
-                            model_name, e
+                            model_name,
+                            e
                         );
                     } else {
                         tracing::debug!(

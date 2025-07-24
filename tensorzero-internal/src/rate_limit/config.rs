@@ -125,7 +125,9 @@ impl RateLimitConfig {
             // Lower rate = more restrictive
             let rate_a = (a.0 as f64) / a.1.as_secs_f64();
             let rate_b = (b.0 as f64) / b.1.as_secs_f64();
-            rate_a.partial_cmp(&rate_b).unwrap_or(std::cmp::Ordering::Equal)
+            rate_a
+                .partial_cmp(&rate_b)
+                .unwrap_or(std::cmp::Ordering::Equal)
         })
     }
 
@@ -201,31 +203,109 @@ mod tests {
     }
 
     #[test]
-    fn test_most_restrictive_limit() {
-        // Test case 1: per-hour is most restrictive  
+    fn test_rate_limit_config_creation() {
         let config = RateLimitConfig {
-            requests_per_second: Some(10),   // 10 req/s = 36000 req/hour
-            requests_per_minute: Some(300),  // 300 req/min = 18000 req/hour
-            requests_per_hour: Some(1000),   // 1000 req/hour = most restrictive (0.28 req/s)
+            algorithm: RateLimitAlgorithm::FixedWindow,
+            requests_per_second: Some(10),
+            requests_per_minute: Some(100),
+            requests_per_hour: None,
+            burst_size: Some(15),
+            enabled: true,
+            cache_ttl_ms: 1000,
+            redis_timeout_ms: 500,
+            local_allowance: 0.8,
+            sync_interval_ms: 10000,
+        };
+
+        assert_eq!(config.algorithm, RateLimitAlgorithm::FixedWindow);
+        assert_eq!(config.requests_per_second, Some(10));
+        assert_eq!(config.requests_per_minute, Some(100));
+        assert!(config.requests_per_hour.is_none());
+        assert_eq!(config.burst_size, Some(15));
+        assert!(config.enabled);
+        assert_eq!(config.cache_ttl_ms, 1000);
+        assert_eq!(config.redis_timeout_ms, 500);
+        assert_eq!(config.local_allowance, 0.8);
+        assert_eq!(config.sync_interval_ms, 10000);
+    }
+
+    #[test]
+    fn test_rate_limit_algorithms() {
+        // Test different algorithm types
+        let fixed_window = RateLimitAlgorithm::FixedWindow;
+        let sliding_window = RateLimitAlgorithm::SlidingWindow;
+        let token_bucket = RateLimitAlgorithm::TokenBucket;
+
+        // Ensure they can be compared and cloned
+        assert_ne!(fixed_window, sliding_window);
+        assert_ne!(sliding_window, token_bucket);
+        assert_ne!(token_bucket, fixed_window);
+
+        let cloned = fixed_window;
+        assert_eq!(fixed_window, cloned);
+    }
+
+    #[test]
+    fn test_rate_limit_config_performance() {
+        use std::time::Instant;
+
+        // Test configuration creation performance
+        let iterations = 10000;
+        let start = Instant::now();
+
+        for _ in 0..iterations {
+            let _config = RateLimitConfig {
+                algorithm: RateLimitAlgorithm::FixedWindow,
+                requests_per_second: Some(1000),
+                requests_per_minute: None,
+                requests_per_hour: None,
+                burst_size: Some(100),
+                enabled: true,
+                cache_ttl_ms: 1000,
+                redis_timeout_ms: 500,
+                local_allowance: 0.8,
+                sync_interval_ms: 10000,
+            };
+        }
+
+        let duration = start.elapsed();
+        let avg_ns = duration.as_nanos() / iterations as u128;
+
+        // Config creation should be very fast (< 100 nanoseconds)
+        assert!(
+            avg_ns < 100,
+            "Config creation average {avg_ns}ns exceeds 100ns target"
+        );
+
+        tracing::debug!("Rate limit config creation performance: {avg_ns}ns average");
+    }
+
+    #[test]
+    fn test_most_restrictive_limit() {
+        // Test case 1: per-hour is most restrictive
+        let config = RateLimitConfig {
+            requests_per_second: Some(10),  // 10 req/s = 36000 req/hour
+            requests_per_minute: Some(300), // 300 req/min = 18000 req/hour
+            requests_per_hour: Some(1000),  // 1000 req/hour = most restrictive (0.28 req/s)
             ..Default::default()
         };
 
         let (limit, duration) = config.most_restrictive_limit().unwrap();
-        assert_eq!(limit, 1000);  // 1000 req/hour is the most restrictive
+        assert_eq!(limit, 1000); // 1000 req/hour is the most restrictive
         assert_eq!(duration, std::time::Duration::from_secs(3600));
-        
+
         // Test case 2: per-hour is most restrictive
         // To make 1000/hour most restrictive:
         // - 1 req/s = 3600 req/hour (more permissive)
         // - 20 req/min = 1200 req/hour (more permissive)
         // - 1000 req/hour (most restrictive)
         let config2 = RateLimitConfig {
-            requests_per_second: None,       // Not configured
-            requests_per_minute: Some(20),   // 20 req/min = 1200 req/hour  
-            requests_per_hour: Some(1000),   // 1000 req/hour = most restrictive
+            requests_per_second: None,     // Not configured
+            requests_per_minute: Some(20), // 20 req/min = 1200 req/hour
+            requests_per_hour: Some(1000), // 1000 req/hour = most restrictive
             ..Default::default()
         };
-        
+
         let (limit2, duration2) = config2.most_restrictive_limit().unwrap();
         assert_eq!(limit2, 1000);
         assert_eq!(duration2, std::time::Duration::from_secs(3600));

@@ -23,7 +23,9 @@ use tensorzero_internal::endpoints::status::TENSORZERO_VERSION;
 use tensorzero_internal::error;
 use tensorzero_internal::gateway_util::{self, AuthenticationInfo};
 use tensorzero_internal::observability::{self, LogFormat, RouterExt};
-use tensorzero_internal::rate_limit::{early_extract::early_model_extraction, middleware::rate_limit_middleware};
+use tensorzero_internal::rate_limit::{
+    early_extract::early_model_extraction, middleware::rate_limit_middleware,
+};
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
@@ -317,7 +319,7 @@ async fn main() {
     } else {
         openai_routes
     };
-    
+
     // Apply early model extraction layer (runs before rate limiting to avoid double parsing)
     let openai_routes = openai_routes.layer(axum::middleware::from_fn(early_model_extraction));
 

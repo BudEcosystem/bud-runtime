@@ -292,15 +292,18 @@ impl DistributedRateLimiter {
     /// Update rate limit configurations from model table changes
     /// This integrates with the existing model table update mechanism
     pub fn sync_from_model_table(&self, models: &crate::model::ModelTable) {
-        let current_models: std::collections::HashSet<String> = 
-            self.local_limiters.iter().map(|entry| entry.key().clone()).collect();
-        
+        let current_models: std::collections::HashSet<String> = self
+            .local_limiters
+            .iter()
+            .map(|entry| entry.key().clone())
+            .collect();
+
         let mut updated_models = std::collections::HashSet::new();
 
         // Update or add configurations from the model table
         for (model_name, model_config) in models.iter() {
             updated_models.insert(model_name.to_string());
-            
+
             if let Some(rate_config) = &model_config.rate_limits {
                 // Check if this is a new configuration or an update
                 let needs_update = match self.local_limiters.get(model_name.as_ref()) {
@@ -319,7 +322,10 @@ impl DistributedRateLimiter {
             } else {
                 // Model doesn't have rate limits configured, remove if it exists
                 if current_models.contains(model_name.as_ref()) {
-                    debug!("Removing rate limit config for model (no longer configured): {}", model_name);
+                    debug!(
+                        "Removing rate limit config for model (no longer configured): {}",
+                        model_name
+                    );
                     self.remove_model_config(model_name);
                 }
             }
@@ -328,7 +334,10 @@ impl DistributedRateLimiter {
         // Remove configurations for models that are no longer in the model table
         for old_model in current_models {
             if !updated_models.contains(&old_model) {
-                debug!("Removing rate limit config for deleted model: {}", old_model);
+                debug!(
+                    "Removing rate limit config for deleted model: {}",
+                    old_model
+                );
                 self.remove_model_config(&old_model);
             }
         }
@@ -835,11 +844,7 @@ impl DistributedRateLimiter {
 
         let handle = tokio::spawn(async move {
             loop {
-                match Self::run_pubsub_listener(
-                    &redis_client,
-                    &local_limiters,
-                    &cache,
-                ).await {
+                match Self::run_pubsub_listener(&redis_client, &local_limiters, &cache).await {
                     Ok(()) => {
                         debug!("Pub/sub listener completed normally");
                         break;
@@ -894,7 +899,7 @@ impl DistributedRateLimiter {
         let mut stream = pubsub_conn.on_message();
         while let Some(msg) = stream.next().await {
             let channel: String = msg.get_channel_name().to_string();
-            
+
             // Extract model name from channel (format: rate_limit:config:model_name)
             let model_name = if let Some(model_name) = channel.strip_prefix("rate_limit:config:") {
                 model_name.to_string()
@@ -911,8 +916,13 @@ impl DistributedRateLimiter {
                 }
             };
 
-            if let Err(e) = Self::handle_config_update(&model_name, &payload, local_limiters, cache).await {
-                warn!("Failed to handle rate limit config update for model {}: {}", model_name, e);
+            if let Err(e) =
+                Self::handle_config_update(&model_name, &payload, local_limiters, cache).await
+            {
+                warn!(
+                    "Failed to handle rate limit config update for model {}: {}",
+                    model_name, e
+                );
             }
         }
 
@@ -936,7 +946,7 @@ impl DistributedRateLimiter {
             "create" | "update" => {
                 if let Some(config) = update.config {
                     debug!("Updating rate limit config for model: {}", model_name);
-                    
+
                     // Create new rate limiter with updated config
                     let limiter = Arc::new(ModelRateLimiter::new(Arc::new(config)));
                     local_limiters.insert(model_name.to_string(), limiter);
@@ -944,23 +954,35 @@ impl DistributedRateLimiter {
                     // Invalidate cache entries for this model
                     // Since moka doesn't have pattern-based invalidation, we'll let entries expire naturally
                     // or implement a more sophisticated cache key tracking system if needed
-                    
-                    debug!("Successfully updated rate limit config for model: {}", model_name);
+
+                    debug!(
+                        "Successfully updated rate limit config for model: {}",
+                        model_name
+                    );
                 } else {
-                    warn!("Received create/update action without config for model: {}", model_name);
+                    warn!(
+                        "Received create/update action without config for model: {}",
+                        model_name
+                    );
                 }
             }
             "delete" => {
                 debug!("Removing rate limit config for model: {}", model_name);
                 local_limiters.remove(model_name);
-                
+
                 // Note: Cache entries will expire naturally or could be invalidated
                 // if we implement cache key tracking
-                
-                debug!("Successfully removed rate limit config for model: {}", model_name);
+
+                debug!(
+                    "Successfully removed rate limit config for model: {}",
+                    model_name
+                );
             }
             _ => {
-                warn!("Unknown config update action: {} for model: {}", update.action, model_name);
+                warn!(
+                    "Unknown config update action: {} for model: {}",
+                    update.action, model_name
+                );
             }
         }
 
