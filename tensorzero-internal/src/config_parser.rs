@@ -32,6 +32,10 @@ use crate::variant::mixture_of_n::UninitializedMixtureOfNConfig;
 use crate::variant::{Variant, VariantConfig};
 use std::error::Error as StdError;
 
+#[cfg(test)]
+#[path = "config_parser_fallback_tests.rs"]
+mod fallback_tests;
+
 tokio::task_local! {
     /// When set, we skip performing credential validation in model providers
     /// This is used when running in e2e test mode, and by the 'evaluations' binary
@@ -445,6 +449,8 @@ impl<'c> Config<'c> {
                             routing: embedding_config.routing,
                             providers,
                             endpoints,
+                            fallback_models: None,
+                            retry_config: None,
                         };
                         (name, model_config)
                     })
@@ -607,6 +613,9 @@ impl<'c> Config<'c> {
             model.validate(model_name)?;
         }
 
+        // Validate model fallback chains for cycles and existence
+        self.validate_model_fallback_chains(&models)?;
+
         // Embedding models are now part of the unified model table, validated above
 
         // Validate each tool
@@ -618,6 +627,92 @@ impl<'c> Config<'c> {
                 .into());
             }
         }
+        Ok(())
+    }
+
+    /// Validate model fallback chains for cycles and existence
+    fn validate_model_fallback_chains(&self, models: &ModelTable) -> Result<(), Error> {
+        use crate::error::ErrorDetails;
+        use std::collections::{HashMap, HashSet};
+
+        // First, validate that all fallback models exist
+        for (model_name, model) in models.iter_static_models() {
+            if let Some(ref fallback_models) = model.fallback_models {
+                for fallback_model in fallback_models {
+                    if models.validate(fallback_model).is_err() {
+                        return Err(ErrorDetails::FallbackModelNotFound {
+                            model_name: model_name.to_string(),
+                            fallback_model: fallback_model.to_string(),
+                        }
+                        .into());
+                    }
+                }
+            }
+        }
+
+        // Build a map of all models and their fallback chains
+        let mut fallback_map: HashMap<String, Vec<String>> = HashMap::new();
+
+        for (model_name, model) in models.iter_static_models() {
+            if let Some(ref fallback_models) = model.fallback_models {
+                fallback_map.insert(
+                    model_name.to_string(),
+                    fallback_models.iter().map(|m| m.to_string()).collect(),
+                );
+            }
+        }
+
+        // Check each model's fallback chain for cycles
+        for (model_name, _) in models.iter_static_models() {
+            let mut visited = HashSet::new();
+            let mut path = Vec::new();
+
+            if let Err(cycle_path) =
+                self.check_fallback_cycle(model_name, &fallback_map, &mut visited, &mut path)
+            {
+                return Err(ErrorDetails::CircularFallbackDetected { chain: cycle_path }.into());
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Recursively check for cycles in fallback chains using DFS
+    fn check_fallback_cycle(
+        &self,
+        current_model: &str,
+        fallback_map: &HashMap<String, Vec<String>>,
+        visited: &mut HashSet<String>,
+        path: &mut Vec<String>,
+    ) -> Result<(), Vec<String>> {
+        // If we've seen this model in the current path, we have a cycle
+        if path.contains(&current_model.to_string()) {
+            let cycle_start = path.iter().position(|m| m == current_model).unwrap();
+            let mut cycle_path = path[cycle_start..].to_vec();
+            cycle_path.push(current_model.to_string());
+            return Err(cycle_path);
+        }
+
+        // If we've already fully explored this model, skip it
+        if visited.contains(current_model) {
+            return Ok(());
+        }
+
+        // Add to current path
+        path.push(current_model.to_string());
+
+        // Check all fallback models for this model
+        if let Some(fallback_models) = fallback_map.get(current_model) {
+            for fallback_model in fallback_models {
+                // Recursively check for cycles in fallback model
+                self.check_fallback_cycle(fallback_model, fallback_map, visited, path)?;
+            }
+        }
+
+        // Remove from current path and mark as visited
+        path.pop();
+        visited.insert(current_model.to_string());
+
         Ok(())
     }
 

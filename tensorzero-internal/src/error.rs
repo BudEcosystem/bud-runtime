@@ -300,6 +300,19 @@ pub enum ErrorDetails {
     ModelProvidersExhausted {
         provider_errors: HashMap<String, Error>,
     },
+    /// All models in the fallback chain failed
+    ModelChainExhausted {
+        model_errors: HashMap<String, Error>,
+    },
+    /// Circular dependency detected in model fallback chain
+    CircularFallbackDetected {
+        chain: Vec<String>,
+    },
+    /// Referenced fallback model does not exist
+    FallbackModelNotFound {
+        model_name: String,
+        fallback_model: String,
+    },
     ModelValidation {
         message: String,
     },
@@ -469,6 +482,9 @@ impl ErrorDetails {
             ErrorDetails::MissingBatchInferenceResponse { .. } => tracing::Level::WARN,
             ErrorDetails::MissingFileExtension { .. } => tracing::Level::WARN,
             ErrorDetails::ModelProvidersExhausted { .. } => tracing::Level::ERROR,
+            ErrorDetails::ModelChainExhausted { .. } => tracing::Level::ERROR,
+            ErrorDetails::CircularFallbackDetected { .. } => tracing::Level::ERROR,
+            ErrorDetails::FallbackModelNotFound { .. } => tracing::Level::ERROR,
             ErrorDetails::ModelValidation { .. } => tracing::Level::ERROR,
             ErrorDetails::Observability { .. } => tracing::Level::ERROR,
             ErrorDetails::OutputParsing { .. } => tracing::Level::WARN,
@@ -566,6 +582,9 @@ impl ErrorDetails {
             ErrorDetails::MissingFunctionInVariants { .. } => StatusCode::BAD_REQUEST,
             ErrorDetails::MissingFileExtension { .. } => StatusCode::BAD_REQUEST,
             ErrorDetails::ModelProvidersExhausted { .. } => StatusCode::INTERNAL_SERVER_ERROR,
+            ErrorDetails::ModelChainExhausted { .. } => StatusCode::INTERNAL_SERVER_ERROR,
+            ErrorDetails::CircularFallbackDetected { .. } => StatusCode::INTERNAL_SERVER_ERROR,
+            ErrorDetails::FallbackModelNotFound { .. } => StatusCode::BAD_REQUEST,
             ErrorDetails::ModelValidation { .. } => StatusCode::INTERNAL_SERVER_ERROR,
             ErrorDetails::Observability { .. } => StatusCode::INTERNAL_SERVER_ERROR,
             ErrorDetails::OutputParsing { .. } => StatusCode::INTERNAL_SERVER_ERROR,
@@ -917,6 +936,34 @@ impl std::fmt::Display for ErrorDetails {
                         .map(|(provider_name, error)| format!("{provider_name}: {error}"))
                         .collect::<Vec<_>>()
                         .join(", ")
+                )
+            }
+            ErrorDetails::ModelChainExhausted { model_errors } => {
+                write!(
+                    f,
+                    "All models in fallback chain failed to infer with errors: {}",
+                    model_errors
+                        .iter()
+                        .map(|(model_name, error)| format!("{model_name}: {error}"))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            }
+            ErrorDetails::CircularFallbackDetected { chain } => {
+                write!(
+                    f,
+                    "Circular dependency detected in model fallback chain: {}",
+                    chain.join(" -> ")
+                )
+            }
+            ErrorDetails::FallbackModelNotFound {
+                model_name,
+                fallback_model,
+            } => {
+                write!(
+                    f,
+                    "Fallback model '{}' referenced by model '{}' does not exist",
+                    fallback_model, model_name
                 )
             }
             ErrorDetails::ModelValidation { message } => {

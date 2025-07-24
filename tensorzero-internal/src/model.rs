@@ -1,6 +1,8 @@
+use backon::ExponentialBuilder;
 use futures::StreamExt;
 use reqwest::Client;
 use secrecy::SecretString;
+use serde::Deserialize;
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, OnceLock};
@@ -56,13 +58,42 @@ use crate::{
         types::{ModelInferenceRequest, ModelInferenceResponse, ProviderInferenceResponse},
     },
 };
-use serde::Deserialize;
+
+#[cfg(test)]
+#[path = "model_fallback_tests.rs"]
+mod fallback_tests;
+
+#[derive(Debug, Deserialize, Copy, Clone)]
+pub struct RetryConfig {
+    pub num_retries: usize,
+    pub max_delay_s: f32,
+}
+
+impl Default for RetryConfig {
+    fn default() -> Self {
+        RetryConfig {
+            num_retries: 0,
+            max_delay_s: 10.0,
+        }
+    }
+}
+
+impl RetryConfig {
+    pub fn get_backoff(&self) -> backon::ExponentialBuilder {
+        ExponentialBuilder::default()
+            .with_jitter()
+            .with_max_delay(Duration::from_secs_f32(self.max_delay_s))
+            .with_max_times(self.num_retries)
+    }
+}
 
 #[derive(Debug)]
 pub struct ModelConfig {
     pub routing: Vec<Arc<str>>, // [provider name A, provider name B, ...]
     pub providers: HashMap<Arc<str>, ModelProvider>, // provider name => provider config
     pub endpoints: HashSet<EndpointCapability>, // supported endpoint capabilities
+    pub fallback_models: Option<Vec<Arc<str>>>, // Optional fallback to other models
+    pub retry_config: Option<RetryConfig>, // Optional model-level retry configuration
 }
 
 #[derive(Debug, Deserialize)]
@@ -72,6 +103,8 @@ pub(crate) struct UninitializedModelConfig {
     pub providers: HashMap<Arc<str>, UninitializedModelProvider>, // provider name => provider config
     #[serde(default = "default_capabilities")]
     pub endpoints: HashSet<EndpointCapability>, // supported endpoint capabilities
+    pub fallback_models: Option<Vec<Arc<str>>>, // Optional fallback to other models
+    pub retry_config: Option<RetryConfig>,      // Optional model-level retry configuration
 }
 
 /// Determine endpoint capabilities based on model name patterns
@@ -566,6 +599,8 @@ impl UninitializedModelConfig {
             routing: self.routing,
             providers,
             endpoints: self.endpoints,
+            fallback_models: self.fallback_models,
+            retry_config: self.retry_config,
         })
     }
 }
@@ -770,6 +805,97 @@ impl ModelConfig {
         Err(err)
     }
 
+    /// Inference with model-level fallback chain support
+    #[tracing::instrument(skip_all, fields(model_name = model_name, otel.name = "model_chain_inference", stream = false))]
+    pub async fn infer_with_fallback_chain<'request>(
+        &self,
+        request: &'request ModelInferenceRequest<'request>,
+        clients: &'request InferenceClients<'request>,
+        model_name: &'request str,
+        models: &'request ModelTable,
+        visited_models: &mut HashSet<Arc<str>>,
+    ) -> Result<ModelInferenceResponse, Error> {
+        // Prevent infinite recursion by tracking visited models
+        if visited_models.contains(model_name) {
+            return Err(Error::new(ErrorDetails::CircularFallbackDetected {
+                chain: visited_models.iter().map(|s| s.to_string()).collect(),
+            }));
+        }
+        visited_models.insert(model_name.into());
+
+        // Try current model first (all providers)
+        let current_model_result = self.infer(request, clients, model_name).await;
+
+        match current_model_result {
+            Ok(response) => {
+                visited_models.remove(model_name);
+                Ok(response)
+            }
+            Err(current_model_error) => {
+                // If current model failed, try fallback models
+                if let Some(ref fallback_models) = self.fallback_models {
+                    let mut model_errors = HashMap::new();
+                    model_errors.insert(model_name.to_string(), current_model_error);
+
+                    for fallback_model_name in fallback_models {
+                        // Skip if we would create a cycle
+                        if visited_models.contains(fallback_model_name) {
+                            continue;
+                        }
+
+                        // Get the fallback model config
+                        let fallback_model = match models.get(fallback_model_name).await {
+                            Ok(Some(model)) => model,
+                            Ok(None) => {
+                                model_errors.insert(
+                                    fallback_model_name.to_string(),
+                                    Error::new(ErrorDetails::ModelNotFound {
+                                        name: fallback_model_name.to_string(),
+                                    }),
+                                );
+                                continue;
+                            }
+                            Err(err) => {
+                                model_errors.insert(fallback_model_name.to_string(), err);
+                                continue;
+                            }
+                        };
+
+                        // Try inference with fallback model (box the recursive call)
+                        let fallback_result = Box::pin(fallback_model.infer_with_fallback_chain(
+                            request,
+                            clients,
+                            fallback_model_name,
+                            models,
+                            visited_models,
+                        ))
+                        .await;
+
+                        match fallback_result {
+                            Ok(response) => {
+                                visited_models.remove(model_name);
+                                return Ok(response);
+                            }
+                            Err(fallback_error) => {
+                                model_errors
+                                    .insert(fallback_model_name.to_string(), fallback_error);
+                            }
+                        }
+                    }
+
+                    visited_models.remove(model_name);
+                    Err(Error::new(ErrorDetails::ModelChainExhausted {
+                        model_errors,
+                    }))
+                } else {
+                    // No fallback models, return original error
+                    visited_models.remove(model_name);
+                    Err(current_model_error)
+                }
+            }
+        }
+    }
+
     #[tracing::instrument(skip_all, fields(model_name = model_name, otel.name = "model_inference", stream = true))]
     pub async fn infer_stream<'request>(
         &self,
@@ -852,6 +978,98 @@ impl ModelConfig {
         Err(Error::new(ErrorDetails::ModelProvidersExhausted {
             provider_errors,
         }))
+    }
+
+    /// Streaming inference with model-level fallback chain support
+    #[tracing::instrument(skip_all, fields(model_name = model_name, otel.name = "model_chain_inference", stream = true))]
+    pub async fn infer_stream_with_fallback_chain<'request>(
+        &self,
+        request: &'request ModelInferenceRequest<'request>,
+        clients: &'request InferenceClients<'request>,
+        model_name: &'request str,
+        models: &'request ModelTable,
+        visited_models: &mut HashSet<Arc<str>>,
+    ) -> Result<(StreamResponse, Vec<RequestMessage>), Error> {
+        // Prevent infinite recursion by tracking visited models
+        if visited_models.contains(model_name) {
+            return Err(Error::new(ErrorDetails::CircularFallbackDetected {
+                chain: visited_models.iter().map(|s| s.to_string()).collect(),
+            }));
+        }
+        visited_models.insert(model_name.into());
+
+        // Try current model first (all providers)
+        let current_model_result = self.infer_stream(request, clients, model_name).await;
+
+        match current_model_result {
+            Ok(response) => {
+                visited_models.remove(model_name);
+                Ok(response)
+            }
+            Err(current_model_error) => {
+                // If current model failed, try fallback models
+                if let Some(ref fallback_models) = self.fallback_models {
+                    let mut model_errors = HashMap::new();
+                    model_errors.insert(model_name.to_string(), current_model_error);
+
+                    for fallback_model_name in fallback_models {
+                        // Skip if we would create a cycle
+                        if visited_models.contains(fallback_model_name) {
+                            continue;
+                        }
+
+                        // Get the fallback model config
+                        let fallback_model = match models.get(fallback_model_name).await {
+                            Ok(Some(model)) => model,
+                            Ok(None) => {
+                                model_errors.insert(
+                                    fallback_model_name.to_string(),
+                                    Error::new(ErrorDetails::ModelNotFound {
+                                        name: fallback_model_name.to_string(),
+                                    }),
+                                );
+                                continue;
+                            }
+                            Err(err) => {
+                                model_errors.insert(fallback_model_name.to_string(), err);
+                                continue;
+                            }
+                        };
+
+                        // Try streaming inference with fallback model (box the recursive call)
+                        let fallback_result =
+                            Box::pin(fallback_model.infer_stream_with_fallback_chain(
+                                request,
+                                clients,
+                                fallback_model_name,
+                                models,
+                                visited_models,
+                            ))
+                            .await;
+
+                        match fallback_result {
+                            Ok(response) => {
+                                visited_models.remove(model_name);
+                                return Ok(response);
+                            }
+                            Err(fallback_error) => {
+                                model_errors
+                                    .insert(fallback_model_name.to_string(), fallback_error);
+                            }
+                        }
+                    }
+
+                    visited_models.remove(model_name);
+                    Err(Error::new(ErrorDetails::ModelChainExhausted {
+                        model_errors,
+                    }))
+                } else {
+                    // No fallback models, return original error
+                    visited_models.remove(model_name);
+                    Err(current_model_error)
+                }
+            }
+        }
     }
 
     pub async fn start_batch_inference<'request>(
@@ -3021,7 +3239,9 @@ impl ShorthandModelConfig for ModelConfig {
                     extra_headers: Default::default(),
                 },
             )]),
-            endpoints, // Use pre-computed endpoints based on model name
+            endpoints,             // Use pre-computed endpoints based on model name
+            fallback_models: None, // Shorthand models don't support fallback
+            retry_config: None,    // Shorthand models don't have retry config
         })
     }
 
@@ -3132,6 +3352,8 @@ mod tests {
                 },
             )]),
             endpoints: default_capabilities(),
+            fallback_models: None,
+            retry_config: None,
         };
         let tool_config = ToolCallConfig {
             tools_available: vec![],
@@ -3199,6 +3421,8 @@ mod tests {
                 },
             )]),
             endpoints: default_capabilities(),
+            fallback_models: None,
+            retry_config: None,
         };
         let response = model_config
             .infer(&request, &clients, model_name)
@@ -3295,6 +3519,8 @@ mod tests {
                 ),
             ]),
             endpoints: default_capabilities(),
+            fallback_models: None,
+            retry_config: None,
         };
 
         let model_name = "test model";
@@ -3361,6 +3587,8 @@ mod tests {
                 },
             )]),
             endpoints: default_capabilities(),
+            fallback_models: None,
+            retry_config: None,
         };
         let (
             StreamResponse {
@@ -3431,6 +3659,8 @@ mod tests {
                 },
             )]),
             endpoints: default_capabilities(),
+            fallback_models: None,
+            retry_config: None,
         };
         let response = model_config
             .infer_stream(
@@ -3529,6 +3759,8 @@ mod tests {
                 ),
             ]),
             endpoints: default_capabilities(),
+            fallback_models: None,
+            retry_config: None,
         };
         let (
             StreamResponse {
@@ -3607,6 +3839,8 @@ mod tests {
                 },
             )]),
             endpoints: default_capabilities(),
+            fallback_models: None,
+            retry_config: None,
         };
         let tool_config = ToolCallConfig {
             tools_available: vec![],
@@ -3714,6 +3948,8 @@ mod tests {
                 },
             )]),
             endpoints: default_capabilities(),
+            fallback_models: None,
+            retry_config: None,
         };
         let tool_config = ToolCallConfig {
             tools_available: vec![],
@@ -3837,6 +4073,8 @@ mod tests {
                 },
             )]),
             endpoints: default_capabilities(),
+            fallback_models: None,
+            retry_config: None,
         };
         let model_table: ModelTable = HashMap::from([("claude".into(), anthropic_model_config)])
             .try_into()
@@ -3945,6 +4183,8 @@ mod tests {
             routing: vec!["test".into()],
             providers: HashMap::new(),
             endpoints,
+            fallback_models: None,
+            retry_config: None,
         };
 
         assert!(model.supports_endpoint(EndpointCapability::Chat));
@@ -3969,6 +4209,8 @@ mod tests {
                 },
             )]),
             endpoints: HashSet::new(), // Empty endpoints
+            fallback_models: None,
+            retry_config: None,
         };
 
         let result = model.validate("test_model");
@@ -4006,6 +4248,8 @@ mod tests {
                 routing: vec!["test".into()],
                 providers: HashMap::new(),
                 endpoints: chat_endpoints,
+                fallback_models: None,
+                retry_config: None,
             },
         );
         models.insert(
@@ -4014,6 +4258,8 @@ mod tests {
                 routing: vec!["test".into()],
                 providers: HashMap::new(),
                 endpoints: embedding_endpoints,
+                fallback_models: None,
+                retry_config: None,
             },
         );
         models.insert(
@@ -4022,6 +4268,8 @@ mod tests {
                 routing: vec!["test".into()],
                 providers: HashMap::new(),
                 endpoints: both_endpoints,
+                fallback_models: None,
+                retry_config: None,
             },
         );
 
@@ -4071,6 +4319,8 @@ mod tests {
                             },
                         )]),
                         endpoints,
+                        fallback_models: None,
+                        retry_config: None,
                     },
                 );
 
@@ -4112,6 +4362,8 @@ mod tests {
             routing: vec!["test".into()],
             providers: HashMap::new(),
             endpoints,
+            fallback_models: None,
+            retry_config: None,
         };
 
         let request = crate::embeddings::EmbeddingRequest {

@@ -1,12 +1,10 @@
-use backon::ExponentialBuilder;
-use backon::Retryable;
 use futures::StreamExt;
 use itertools::izip;
 use serde::Deserialize;
 use serde::Serialize;
 use std::borrow::Cow;
+use std::collections::HashSet;
 use std::sync::Arc;
-use tokio::time::Duration;
 use tracing::instrument;
 use uuid::Uuid;
 
@@ -30,6 +28,7 @@ use crate::inference::types::{
 use crate::jsonschema_util::DynamicJSONSchema;
 use crate::minijinja_util::TemplateConfig;
 use crate::model::ModelTable;
+pub use crate::model::RetryConfig;
 use crate::model::StreamResponse;
 use crate::tool::{create_dynamic_implicit_tool_config, ToolCallConfig};
 use crate::{inference::types::InferenceResult, model::ModelConfig};
@@ -634,7 +633,8 @@ struct InferModelRequestArgs<'a, 'request> {
     inference_config: &'request InferenceConfig<'a, 'request>,
     clients: &'request InferenceClients<'request>,
     inference_params: InferenceParams,
-    retry_config: &'a RetryConfig,
+    models: &'request ModelTable, // Access to all models for fallback
+    visited_models: &'a mut HashSet<Arc<str>>, // Track visited models for cycle detection
 }
 
 /// Refactored `infer_model_request` function accepting a single struct argument
@@ -642,13 +642,17 @@ struct InferModelRequestArgs<'a, 'request> {
 async fn infer_model_request<'a, 'request>(
     args: InferModelRequestArgs<'a, 'request>,
 ) -> Result<InferenceResult, Error> {
-    let model_inference_response = (|| async {
-        args.model_config
-            .infer(&args.request, args.clients, &args.model_name)
-            .await
-    })
-    .retry(args.retry_config.get_backoff())
-    .await?;
+    // Use fallback-aware inference with model-level retry handling
+    let model_inference_response = args
+        .model_config
+        .infer_with_fallback_chain(
+            &args.request,
+            args.clients,
+            &args.model_name,
+            args.models,
+            args.visited_models,
+        )
+        .await?;
 
     let original_response = model_inference_response.raw_response.clone();
     let model_inference_result =
@@ -678,8 +682,10 @@ async fn infer_model_request_stream<'request>(
     function: &FunctionConfig,
     clients: &'request InferenceClients<'request>,
     inference_params: InferenceParams,
-    retry_config: RetryConfig,
+    models: &'request ModelTable,
+    mut visited_models: HashSet<Arc<str>>,
 ) -> Result<(InferenceResultStream, ModelUsedInfo), Error> {
+    // Use fallback-aware inference with model-level retry handling
     let (
         StreamResponse {
             stream,
@@ -688,13 +694,15 @@ async fn infer_model_request_stream<'request>(
             cached,
         },
         input_messages,
-    ) = (|| async {
-        model_config
-            .infer_stream(&request, clients, &model_name)
-            .await
-    })
-    .retry(retry_config.get_backoff())
-    .await?;
+    ) = model_config
+        .infer_stream_with_fallback_chain(
+            &request,
+            clients,
+            &model_name,
+            models,
+            &mut visited_models,
+        )
+        .await?;
     let system = request.system.clone();
     let model_used_info = ModelUsedInfo {
         model_name,
@@ -710,30 +718,6 @@ async fn infer_model_request_stream<'request>(
     let stream =
         stream.map(move |chunk| chunk.map(|chunk| InferenceResultChunk::new(chunk, config_type)));
     Ok((Box::pin(stream), model_used_info))
-}
-
-#[derive(Debug, Deserialize, Copy, Clone)]
-pub struct RetryConfig {
-    pub num_retries: usize,
-    pub max_delay_s: f32,
-}
-
-impl Default for RetryConfig {
-    fn default() -> Self {
-        RetryConfig {
-            num_retries: 0,
-            max_delay_s: 10.0,
-        }
-    }
-}
-
-impl RetryConfig {
-    pub fn get_backoff(&self) -> backon::ExponentialBuilder {
-        ExponentialBuilder::default()
-            .with_jitter()
-            .with_max_delay(Duration::from_secs_f32(self.max_delay_s))
-            .with_max_times(self.num_retries)
-    }
 }
 
 impl<'a> BatchInferenceConfig<'a> {
@@ -1106,8 +1090,11 @@ mod tests {
                 },
             )]),
             endpoints: crate::endpoints::capability::default_capabilities(),
+            fallback_models: None,
+            retry_config: None,
         };
-        let retry_config = Box::leak(Box::new(RetryConfig::default()));
+        let models = Box::leak(Box::new(ModelTable::default()));
+        let mut visited_models = std::collections::HashSet::new();
 
         // Create the arguments struct
         let args = InferModelRequestArgs {
@@ -1118,7 +1105,8 @@ mod tests {
             inference_config: &inference_config,
             clients: &clients,
             inference_params: inference_params.clone(),
-            retry_config,
+            models,
+            visited_models: &mut visited_models,
         };
 
         // Refactored function call
@@ -1214,7 +1202,11 @@ mod tests {
                 },
             )]),
             endpoints: crate::endpoints::capability::default_capabilities(),
+            fallback_models: None,
+            retry_config: None,
         };
+        let models = Box::leak(Box::new(ModelTable::default()));
+        let mut visited_models = std::collections::HashSet::new();
 
         // Create the arguments struct
         let args = InferModelRequestArgs {
@@ -1225,7 +1217,8 @@ mod tests {
             inference_config: &inference_config,
             clients: &clients,
             inference_params: inference_params.clone(),
-            retry_config,
+            models,
+            visited_models: &mut visited_models,
         };
 
         // Refactored function call
@@ -1272,7 +1265,11 @@ mod tests {
                 },
             )]),
             endpoints: crate::endpoints::capability::default_capabilities(),
+            fallback_models: None,
+            retry_config: None,
         };
+        let models = Box::leak(Box::new(ModelTable::default()));
+        let mut visited_models = std::collections::HashSet::new();
 
         // Create the arguments struct
         let args = InferModelRequestArgs {
@@ -1283,7 +1280,8 @@ mod tests {
             inference_config: &inference_config,
             clients: &clients,
             inference_params: inference_params.clone(),
-            retry_config,
+            models,
+            visited_models: &mut visited_models,
         };
 
         // Refactored function call
@@ -1414,8 +1412,11 @@ mod tests {
                 ),
             ]),
             endpoints: crate::endpoints::capability::default_capabilities(),
+            fallback_models: None,
+            retry_config: None,
         };
-        let retry_config = Box::leak(Box::new(RetryConfig::default()));
+        let models = Box::leak(Box::new(ModelTable::default()));
+        let mut visited_models = std::collections::HashSet::new();
 
         // Create the arguments struct
         let args = InferModelRequestArgs {
@@ -1426,7 +1427,8 @@ mod tests {
             inference_config: &inference_config,
             clients: &clients,
             inference_params: inference_params.clone(),
-            retry_config,
+            models,
+            visited_models: &mut visited_models,
         };
 
         // Refactored function call
@@ -1473,7 +1475,6 @@ mod tests {
                 enabled: CacheEnabledMode::WriteOnly,
             },
         };
-        let retry_config = RetryConfig::default();
         // Create a dummy function config (chat completion)
         let function_config = FunctionConfig::Chat(FunctionConfigChat {
             variants: HashMap::new(),
@@ -1511,6 +1512,8 @@ mod tests {
                 },
             )]),
             endpoints: crate::endpoints::capability::default_capabilities(),
+            fallback_models: None,
+            retry_config: None,
         }));
 
         // Prepare the model inference request
@@ -1536,6 +1539,8 @@ mod tests {
 
         // Initialize inference parameters
         let inference_params = InferenceParams::default();
+        let models = Box::leak(Box::new(ModelTable::default()));
+        let mut visited_models = std::collections::HashSet::new();
 
         // Call infer_model_request_stream
         let result = infer_model_request_stream(
@@ -1545,7 +1550,8 @@ mod tests {
             &function_config,
             &clients,
             inference_params.clone(),
-            retry_config,
+            models,
+            visited_models,
         )
         .await;
 
@@ -1703,8 +1709,11 @@ mod tests {
                 ),
             ]),
             endpoints: crate::endpoints::capability::default_capabilities(),
+            fallback_models: None,
+            retry_config: None,
         }));
-        let retry_config = RetryConfig::default();
+        let models = Box::leak(Box::new(ModelTable::default()));
+        let mut visited_models = std::collections::HashSet::new();
 
         // Call infer_model_request_stream
         let result = infer_model_request_stream(
@@ -1714,7 +1723,8 @@ mod tests {
             &function_config_chat,
             &clients,
             inference_params.clone(),
-            retry_config,
+            models,
+            visited_models,
         )
         .await;
 

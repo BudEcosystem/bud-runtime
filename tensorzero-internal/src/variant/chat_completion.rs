@@ -1,5 +1,6 @@
 use serde::Deserialize;
 use serde_json::Value;
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -329,6 +330,7 @@ impl Variant for ChatCompletionConfig {
                 name: self.model.to_string(),
             })
         })?;
+        let mut visited_models = HashSet::new();
         let args = InferModelRequestArgs {
             request,
             model_name: self.model.clone(),
@@ -337,7 +339,8 @@ impl Variant for ChatCompletionConfig {
             inference_config,
             clients,
             inference_params: inference_params_for_model,
-            retry_config: &self.retries,
+            models: &models.models,
+            visited_models: &mut visited_models,
         };
         infer_model_request(args).await
     }
@@ -382,6 +385,7 @@ impl Variant for ChatCompletionConfig {
                 name: self.model.to_string(),
             })
         })?;
+        let mut visited_models = HashSet::new();
         infer_model_request_stream(
             request,
             self.model.clone(),
@@ -389,7 +393,8 @@ impl Variant for ChatCompletionConfig {
             function,
             clients,
             inference_params_for_model,
-            self.retries,
+            &models.models,
+            visited_models,
         )
         .await
     }
