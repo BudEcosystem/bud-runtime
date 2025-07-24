@@ -96,6 +96,7 @@ pub async fn inference_handler(
         kafka_connection_info,
         authentication_info: _,
         model_credential_store,
+        ..
     }): AppState,
     headers: HeaderMap,
     StructuredJson(openai_compatible_params): StructuredJson<OpenAICompatibleParams>,
@@ -1462,6 +1463,7 @@ pub async fn embedding_handler(
         kafka_connection_info: _,
         authentication_info: _,
         model_credential_store,
+        ..
     }): AppState,
     headers: HeaderMap,
     StructuredJson(openai_compatible_params): StructuredJson<OpenAICompatibleEmbeddingParams>,
@@ -1619,6 +1621,7 @@ pub async fn moderation_handler(
         kafka_connection_info: _,
         authentication_info: _,
         model_credential_store,
+        ..
     }): AppState,
     headers: HeaderMap,
     StructuredJson(openai_compatible_params): StructuredJson<OpenAICompatibleModerationParams>,
@@ -1913,6 +1916,7 @@ pub async fn audio_transcription_handler(
         kafka_connection_info: _,
         authentication_info: _,
         model_credential_store,
+        ..
     }): AppState,
     headers: HeaderMap,
     multipart: axum::extract::Multipart,
@@ -2122,6 +2126,7 @@ pub async fn audio_translation_handler(
         kafka_connection_info: _,
         authentication_info: _,
         model_credential_store,
+        ..
     }): AppState,
     headers: HeaderMap,
     multipart: axum::extract::Multipart,
@@ -2269,6 +2274,7 @@ pub async fn text_to_speech_handler(
         kafka_connection_info: _,
         authentication_info: _,
         model_credential_store,
+        ..
     }): AppState,
     headers: HeaderMap,
     StructuredJson(params): StructuredJson<OpenAICompatibleTextToSpeechParams>,
@@ -2430,6 +2436,7 @@ pub async fn realtime_session_handler(
         kafka_connection_info: _,
         authentication_info: _,
         model_credential_store: _,
+        ..
     }): AppState,
     headers: HeaderMap,
     StructuredJson(params): StructuredJson<RealtimeSessionRequest>,
@@ -2514,6 +2521,7 @@ pub async fn realtime_transcription_session_handler(
         kafka_connection_info: _,
         authentication_info: _,
         model_credential_store: _,
+        ..
     }): AppState,
     headers: HeaderMap,
     StructuredJson(params): StructuredJson<RealtimeTranscriptionRequest>,
@@ -2754,6 +2762,7 @@ pub async fn image_generation_handler(
         kafka_connection_info: _,
         authentication_info: _,
         model_credential_store,
+        ..
     }): AppState,
     headers: HeaderMap,
     StructuredJson(params): StructuredJson<OpenAICompatibleImageGenerationParams>,
@@ -2909,6 +2918,7 @@ pub async fn image_edit_handler(
         kafka_connection_info: _,
         authentication_info: _,
         model_credential_store,
+        ..
     }): AppState,
     headers: HeaderMap,
     multipart: axum::extract::Multipart,
@@ -3059,6 +3069,7 @@ pub async fn image_variation_handler(
         kafka_connection_info: _,
         authentication_info: _,
         model_credential_store,
+        ..
     }): AppState,
     headers: HeaderMap,
     multipart: axum::extract::Multipart,
@@ -3481,6 +3492,7 @@ pub async fn response_create_handler(
         kafka_connection_info: _,
         authentication_info: _,
         model_credential_store,
+        ..
     }): AppState,
     headers: HeaderMap,
     StructuredJson(params): StructuredJson<OpenAIResponseCreateParams>,
@@ -3587,6 +3599,7 @@ pub async fn response_retrieve_handler(
         kafka_connection_info: _,
         authentication_info: _,
         model_credential_store: _,
+        ..
     }): AppState,
     headers: HeaderMap,
     Path(response_id): Path<String>,
@@ -3671,6 +3684,7 @@ pub async fn response_delete_handler(
         kafka_connection_info: _,
         authentication_info: _,
         model_credential_store: _,
+        ..
     }): AppState,
     headers: HeaderMap,
     Path(response_id): Path<String>,
@@ -3751,6 +3765,7 @@ pub async fn response_cancel_handler(
         kafka_connection_info: _,
         authentication_info: _,
         model_credential_store: _,
+        ..
     }): AppState,
     headers: HeaderMap,
     Path(response_id): Path<String>,
@@ -3831,6 +3846,7 @@ pub async fn response_input_items_handler(
         kafka_connection_info: _,
         authentication_info: _,
         model_credential_store: _,
+        ..
     }): AppState,
     headers: HeaderMap,
     Path(response_id): Path<String>,
@@ -3950,6 +3966,7 @@ pub async fn file_upload_handler(
         kafka_connection_info: _,
         authentication_info: _,
         model_credential_store: _,
+        ..
     }): AppState,
     _headers: HeaderMap,
     mut multipart: Multipart,
@@ -4080,6 +4097,7 @@ pub async fn file_retrieve_handler(
         kafka_connection_info: _,
         authentication_info: _,
         model_credential_store: _,
+        ..
     }): AppState,
     _headers: HeaderMap,
     Path(file_id): Path<String>,
@@ -4125,6 +4143,7 @@ pub async fn file_content_handler(
         kafka_connection_info: _,
         authentication_info: _,
         model_credential_store: _,
+        ..
     }): AppState,
     _headers: HeaderMap,
     Path(file_id): Path<String>,
@@ -4170,6 +4189,7 @@ pub async fn file_delete_handler(
         kafka_connection_info: _,
         authentication_info: _,
         model_credential_store: _,
+        ..
     }): AppState,
     _headers: HeaderMap,
     Path(file_id): Path<String>,
@@ -4203,6 +4223,7 @@ pub async fn batch_create_handler(
         kafka_connection_info: _,
         authentication_info: _,
         model_credential_store: _,
+        ..
     }): AppState,
     _headers: HeaderMap,
     Json(request): Json<OpenAIBatchCreateRequest>,
@@ -4287,6 +4308,7 @@ pub async fn batch_retrieve_handler(
         kafka_connection_info: _,
         authentication_info: _,
         model_credential_store: _,
+        ..
     }): AppState,
     _headers: HeaderMap,
     Path(batch_id): Path<String>,
@@ -4332,6 +4354,7 @@ pub async fn batch_list_handler(
         kafka_connection_info: _,
         authentication_info: _,
         model_credential_store: _,
+        ..
     }): AppState,
     _headers: HeaderMap,
     Query(params): Query<ListBatchesParams>,
@@ -4377,6 +4400,7 @@ pub async fn batch_cancel_handler(
         kafka_connection_info: _,
         authentication_info: _,
         model_credential_store: _,
+        ..
     }): AppState,
     _headers: HeaderMap,
     Path(batch_id): Path<String>,

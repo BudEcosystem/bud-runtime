@@ -23,6 +23,7 @@ mod otel_jaeger;
 mod prometheus;
 mod providers;
 mod proxy;
+mod rate_limiting;
 mod realtime;
 mod render_inferences;
 mod responses;

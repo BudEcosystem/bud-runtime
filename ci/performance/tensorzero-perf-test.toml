@@ -1,13 +1,29 @@
-# Performance test configuration with authentication disabled
+# Performance test configuration with rate limiting enabled
 
 [gateway]
-authentication.enabled = false
+authentication.enabled = true
 observability.enabled = false
+
+# Rate limiting configuration
+[gateway.rate_limits]
+enabled = true
 
 # Models
 [models."gpt-3.5-turbo"]
 routing = ["openai"]
 endpoints = ["chat"]
+
+# Performance-optimized rate limits
+[models."gpt-3.5-turbo".rate_limits]
+algorithm = "fixed_window"
+requests_per_second = 1000    # High limit for performance testing
+burst_size = 2000             # Allow bursts
+enabled = true
+
+# Performance settings - optimized for low latency
+cache_ttl_ms = 200           # 200ms cache
+local_allowance = 0.8        # 80% local decisions
+sync_interval_ms = 100       # Sync every 100ms
 
 [models."gpt-3.5-turbo".providers.openai]
 type = "openai"
@@ -23,3 +39,9 @@ type = "chat"
 type = "chat_completion"
 model = "gpt-3.5-turbo"
 max_tokens = 100
+
+[api_keys."PLACEHOLDER_API_KEY"]
+[api_keys."PLACEHOLDER_API_KEY"."gpt-3.5-turbo"]
+endpoint_id = "gpt-3.5-turbo"
+model_id = "019787c1-3de1-7b50-969b-e0a58514b6a2"
+project_id = "019787c1-3de1-7b50-969b-e0a58514b6a1"

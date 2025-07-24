@@ -26,6 +26,7 @@ pub mod model_table;
 pub mod moderation; // moderation API
 pub mod observability; // utilities for observability (logs, metrics, etc.)
 pub mod openai_batch; // OpenAI-compatible batch API types
+pub mod rate_limit; // rate limiting
 pub mod realtime; // realtime API session management
 pub mod redis_client; // redis client
 pub mod responses; // OpenAI-compatible Responses API
