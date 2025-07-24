@@ -16,6 +16,7 @@ mod tests {
                 num_retries: 2,
                 max_delay_s: 5.0,
             }),
+            rate_limits: None,
         };
 
         assert!(model_config.fallback_models.is_some());
@@ -33,6 +34,7 @@ mod tests {
             endpoints: HashSet::from([EndpointCapability::Chat]),
             fallback_models: None,
             retry_config: None,
+            rate_limits: None,
         };
 
         assert!(model_config.fallback_models.is_none());
