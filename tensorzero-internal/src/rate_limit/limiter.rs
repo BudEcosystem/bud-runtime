@@ -1,6 +1,6 @@
 use crate::error::{Error, ErrorDetails};
 use crate::rate_limit::{
-    config::RateLimitConfig, RateLimitDecision, RateLimitHeaders, RateLimiterMetrics,
+    config::{RateLimitAlgorithm, RateLimitConfig}, RateLimitDecision, RateLimitHeaders, RateLimiterMetrics,
 };
 use crate::redis_client::RedisClient;
 use dashmap::DashMap;
@@ -299,20 +299,40 @@ impl DistributedRateLimiter {
                             "Fast path timing - DashMap: {:?}, Governor: {:?}, Total: {:?}",
                             dashmap_time, governor_time, start.elapsed()
                         );
+                        let (limit, window_seconds) = if let Some(rps) = limiter.config.requests_per_second {
+                            (rps, 1)
+                        } else if let Some(rpm) = limiter.config.requests_per_minute {
+                            (rpm, 60)
+                        } else if let Some(rph) = limiter.config.requests_per_hour {
+                            (rph, 3600)
+                        } else {
+                            (1000, 60) // Default fallback
+                        };
+                        
                         let headers = RateLimitHeaders {
-                            limit: 1000,
-                            remaining: 999,
-                            reset: 0,  // Skip timestamp calculation
+                            limit,
+                            remaining: limit - 1,
+                            reset: get_unix_timestamp() + window_seconds,
                             retry_after: None,
                         };
                         return Ok(RateLimitDecision::Allow(headers));
                     }
                     Err(_) => {
+                        let (limit, window_seconds) = if let Some(rps) = limiter.config.requests_per_second {
+                            (rps, 1)
+                        } else if let Some(rpm) = limiter.config.requests_per_minute {
+                            (rpm, 60)
+                        } else if let Some(rph) = limiter.config.requests_per_hour {
+                            (rph, 3600)
+                        } else {
+                            (1000, 60) // Default fallback
+                        };
+                        
                         let headers = RateLimitHeaders {
-                            limit: 1000,
+                            limit,
                             remaining: 0,
-                            reset: 0,  // Skip timestamp calculation
-                            retry_after: Some(60),
+                            reset: get_unix_timestamp() + window_seconds,
+                            retry_after: Some(window_seconds as u32),
                         };
                         return Ok(RateLimitDecision::Deny(headers));
                     }
@@ -365,26 +385,42 @@ impl DistributedRateLimiter {
                 if let Ok(mut conn) = redis_client.get_connection().await {
                     let key = format!("rl:{}:{}", model_for_refresh, api_key_for_refresh);
                     
-                    // First, increment the counter in Redis (distributed count)
-                    let _: Result<(), _> = conn.incr(&key, 1u32).await;
-                    
-                    // Then get the current count
-                    if let Ok(count) = conn.get::<_, u32>(&key).await {
-                        let limit = config_clone.requests_per_second.unwrap_or(1000);
+                    // Just get the current count - don't increment here
+                    // The background sync will handle incrementing
+                    if let Ok(count) = conn.get::<_, Option<u32>>(&key).await {
+                        let count = count.unwrap_or(0);
+                        
+                        // Get the appropriate limit and window based on config
+                        let (limit, window_seconds) = match config_clone.algorithm {
+                            RateLimitAlgorithm::FixedWindow => {
+                                // Use the most restrictive limit
+                                if let Some(rps) = config_clone.requests_per_second {
+                                    (rps, 1)
+                                } else if let Some(rpm) = config_clone.requests_per_minute {
+                                    (rpm, 60)
+                                } else if let Some(rph) = config_clone.requests_per_hour {
+                                    (rph, 3600)
+                                } else {
+                                    (1000, 60) // Default fallback
+                                }
+                            }
+                            _ => (1000, 60), // Default for other algorithms
+                        };
+                        
                         let remaining = limit.saturating_sub(count);
                         let cached = CachedRateLimit {
                             remaining,
                             limit,
                             local_consumed: Arc::new(std::sync::atomic::AtomicU32::new(0)),
-                            reset_at: QuantaClock::default().now() + Duration::from_secs(60).into(),
+                            reset_at: QuantaClock::default().now() + Duration::from_secs(window_seconds).into(),
                             cached_at: QuantaClock::default().now(),
                             ttl: Duration::from_millis(config_clone.cache_ttl_ms),
                         };
                         cache_for_refresh.insert(cache_key_for_refresh, cached).await;
                     }
                     
-                    // Set expiry on the key (1 minute for fixed window)
-                    let _: Result<(), _> = conn.expire(&key, 60).await;
+                    // Note: expiry is already handled by the background sync process
+                    // which has access to the proper window configuration
                 }
             });
             
@@ -400,11 +436,20 @@ impl DistributedRateLimiter {
                     consumption_entry.fetch_add(1, Ordering::Relaxed);
 
                     // Use proper headers based on config
-                    let limit = limiter.config.requests_per_second.unwrap_or(1000);
+                    let (limit, window_seconds) = if let Some(rps) = limiter.config.requests_per_second {
+                        (rps, 1)
+                    } else if let Some(rpm) = limiter.config.requests_per_minute {
+                        (rpm, 60)
+                    } else if let Some(rph) = limiter.config.requests_per_hour {
+                        (rph, 3600)
+                    } else {
+                        (1000, 60) // Default fallback
+                    };
+                    
                     let headers = RateLimitHeaders {
                         limit,
                         remaining: limit - 1, // Approximate
-                        reset: 0,  // Skip timestamp for speed
+                        reset: get_unix_timestamp() + window_seconds,
                         retry_after: None,
                     };
                     
@@ -413,7 +458,7 @@ impl DistributedRateLimiter {
                         remaining: limit - 1,
                         limit,
                         local_consumed: Arc::new(std::sync::atomic::AtomicU32::new(1)),
-                        reset_at: QuantaClock::default().now() + Duration::from_secs(60).into(),
+                        reset_at: QuantaClock::default().now() + Duration::from_secs(window_seconds).into(),
                         cached_at: QuantaClock::default().now(),
                         ttl: Duration::from_millis(limiter.config.cache_ttl_ms),
                     };
@@ -423,11 +468,21 @@ impl DistributedRateLimiter {
                 }
                 Err(_retry_at) => {
                     // Local limit exceeded, return deny immediately
+                    let (limit, window_seconds) = if let Some(rps) = limiter.config.requests_per_second {
+                        (rps, 1)
+                    } else if let Some(rpm) = limiter.config.requests_per_minute {
+                        (rpm, 60)
+                    } else if let Some(rph) = limiter.config.requests_per_hour {
+                        (rph, 3600)
+                    } else {
+                        (1000, 60) // Default fallback
+                    };
+                    
                     let headers = RateLimitHeaders {
-                        limit: 1000,
+                        limit,
                         remaining: 0,
-                        reset: 0,
-                        retry_after: Some(60),
+                        reset: get_unix_timestamp() + window_seconds,
+                        retry_after: Some(window_seconds as u32),
                     };
                     return Ok(RateLimitDecision::Deny(headers));
                 }
@@ -586,23 +641,33 @@ impl DistributedRateLimiter {
     /// Fallback to local-only rate limiting
     fn check_local_fallback(&self, model: &str) -> Result<RateLimitDecision, Error> {
         if let Some(limiter) = self.local_limiters.get(model) {
+            // Get the window from the model configuration
+            let (limit, window_seconds) = if let Some(rps) = limiter.config.requests_per_second {
+                (rps, 1)
+            } else if let Some(rpm) = limiter.config.requests_per_minute {
+                (rpm, 60)
+            } else if let Some(rph) = limiter.config.requests_per_hour {
+                (rph, 3600)
+            } else {
+                (1000, 60) // Default fallback
+            };
+            
             match limiter.check_local() {
                 Ok(_) => {
                     let headers = RateLimitHeaders {
-                        limit: 0,     // Unknown
-                        remaining: 0, // Unknown
-                        reset: get_unix_timestamp() + 60,
+                        limit,
+                        remaining: limit - 1, // Approximate
+                        reset: get_unix_timestamp() + window_seconds,
                         retry_after: None,
                     };
                     Ok(RateLimitDecision::Allow(headers))
                 }
                 Err(_retry_at) => {
-                    let retry_after = 60; // Simplified - would calculate from retry_at
                     let headers = RateLimitHeaders {
-                        limit: 0, // Unknown
+                        limit,
                         remaining: 0,
-                        reset: get_unix_timestamp() + retry_after as u64,
-                        retry_after: Some(retry_after),
+                        reset: get_unix_timestamp() + window_seconds,
+                        retry_after: Some(window_seconds as u32),
                     };
                     self.metrics.record_rate_limit_exceeded();
                     Ok(RateLimitDecision::Deny(headers))
@@ -639,6 +704,7 @@ impl DistributedRateLimiter {
         // Get all necessary components
         let redis_client = Arc::clone(&self.redis_client);
         let local_consumption = Arc::clone(&self.local_consumption);
+        let local_limiters = Arc::clone(&self.local_limiters);
         
         // Get sync interval from first model config (or use default)
         let sync_interval_ms = self.local_limiters
@@ -670,15 +736,32 @@ impl DistributedRateLimiter {
                     for (cache_key, count) in entries_to_sync {
                         // Extract model and api_key from cache key (format: "model:api_key")
                         if let Some(colon_pos) = cache_key.find(':') {
+                            let model = &cache_key[..colon_pos];
                             let redis_key = format!("rl:{}", cache_key);
                             
                             // Increment by the local count
                             let _: Result<(), _> = conn.incr(&redis_key, count).await;
                             
-                            // Set expiry (60 seconds for fixed window)
-                            let _: Result<(), _> = conn.expire(&redis_key, 60).await;
+                            // Determine the appropriate window based on model configuration
+                            let window_seconds = if let Some(limiter) = local_limiters.get(model) {
+                                // Get the window from the most restrictive limit
+                                if limiter.config.requests_per_second.is_some() {
+                                    1
+                                } else if limiter.config.requests_per_minute.is_some() {
+                                    60
+                                } else if limiter.config.requests_per_hour.is_some() {
+                                    3600
+                                } else {
+                                    60 // Default to 60 seconds if no limits configured
+                                }
+                            } else {
+                                60 // Default to 60 seconds if model not found
+                            };
                             
-                            debug!("Synced {} requests for key {}", count, cache_key);
+                            // Set expiry with the appropriate window
+                            let _: Result<(), _> = conn.expire(&redis_key, window_seconds).await;
+                            
+                            debug!("Synced {} requests for key {} with {}s window", count, cache_key, window_seconds);
                         }
                     }
                 }

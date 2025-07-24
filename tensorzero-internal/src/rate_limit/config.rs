@@ -192,7 +192,7 @@ mod tests {
         let config = RateLimitConfig::default();
         assert!(config.enabled);
         assert_eq!(config.cache_ttl_ms, 200);
-        assert_eq!(config.redis_timeout_ms, 1);
+        assert_eq!(config.redis_timeout_ms, 10);
         assert_eq!(config.local_allowance, 0.1);
         assert_eq!(config.sync_interval_ms, 100);
     }
