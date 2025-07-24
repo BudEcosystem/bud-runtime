@@ -359,8 +359,8 @@ impl DistributedRateLimiter {
             if should_allow_locally {
                 match limiter.check_local() {
                     Ok(_) => {
-                        // Update Redis asynchronously for accurate distributed counting
-                        self.schedule_redis_update(model, api_key);
+                        // TEMPORARILY DISABLED: Update Redis asynchronously for accurate distributed counting
+                        // self.schedule_redis_update(model, api_key);
                         self.metrics.record_local_allow();
 
                         // Use proper headers based on config

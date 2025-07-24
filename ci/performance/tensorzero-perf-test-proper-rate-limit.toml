@@ -26,11 +26,11 @@ requests_per_minute = 60000   # 1000 req/s
 burst_size = 2000             # Allow bursts
 enabled = true
 
-# Performance settings - balanced for accuracy and performance
-cache_ttl_ms = 1000           # 1s cache - good balance
-redis_timeout_ms = 2          # 2ms timeout - reasonable for local Redis
-local_allowance = 0.2         # 20% local decisions - 80% accuracy
-sync_interval_ms = 500        # Sync every 500ms - frequent updates
+# Performance settings - optimized for <1.5ms P99
+cache_ttl_ms = 500           # 5s cache - longer cache, fewer Redis calls
+redis_timeout_ms = 3          # 3ms timeout - more reliable
+local_allowance = 0.8         # 80% local decisions - minimize Redis
+sync_interval_ms = 200       # Sync every 2s - less frequent updates
 
 [models."gpt-3.5-turbo".providers.openai]
 type = "openai"
