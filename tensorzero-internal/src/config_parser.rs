@@ -666,7 +666,7 @@ impl<'c> Config<'c> {
             let mut path_set = HashSet::new();
 
             if let Err(cycle_path) = self.check_fallback_cycle_optimized(
-                &model_name,
+                model_name,
                 &fallback_map,
                 &mut visited,
                 &mut path,
@@ -743,13 +743,17 @@ impl<'c> Config<'c> {
         // Check for cycle using the path set for O(1) lookup
         if path_set.contains(current_model) {
             // Find the cycle start for reporting
-            let cycle_start = path
-                .iter()
-                .position(|m| m == current_model)
-                .expect("Model should exist in path since path_set contains it");
-            let mut cycle_path = path[cycle_start..].to_vec();
-            cycle_path.push(current_model.clone());
-            return Err(cycle_path);
+            if let Some(cycle_start) = path.iter().position(|m| m == current_model) {
+                let mut cycle_path = path[cycle_start..].to_vec();
+                cycle_path.push(current_model.clone());
+                return Err(cycle_path);
+            } else {
+                // This should never happen if path_set is kept in sync with path
+                // But if it does, return the whole path as the cycle
+                let mut cycle_path = path.clone();
+                cycle_path.push(current_model.clone());
+                return Err(cycle_path);
+            }
         }
 
         // If we've already fully explored this model, skip it
