@@ -79,6 +79,8 @@ pub struct GatewayConfig {
     pub enable_template_filesystem_access: bool,
     #[serde(default)]
     pub export: ExportConfig,
+    #[serde(default)]
+    pub rate_limits: Option<crate::rate_limit::config::GlobalRateLimitConfig>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -451,6 +453,7 @@ impl<'c> Config<'c> {
                             endpoints,
                             fallback_models: None,
                             retry_config: None,
+                            rate_limits: None, // Embedding models don't have rate limits in this conversion
                         };
                         (name, model_config)
                     })

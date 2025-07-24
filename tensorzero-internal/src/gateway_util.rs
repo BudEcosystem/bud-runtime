@@ -21,6 +21,8 @@ use crate::endpoints;
 use crate::error::{Error, ErrorDetails};
 use crate::kafka::KafkaConnectionInfo;
 use crate::model::ModelTable;
+use crate::rate_limit::DistributedRateLimiter;
+use crate::redis_client::RedisClient;
 
 /// Represents the authentication state of the gateway
 #[derive(Clone)]
@@ -38,6 +40,7 @@ pub struct AppStateData {
     pub kafka_connection_info: KafkaConnectionInfo,
     pub authentication_info: AuthenticationInfo,
     pub model_credential_store: Arc<RwLock<HashMap<String, SecretString>>>,
+    pub rate_limiter: Option<Arc<DistributedRateLimiter>>,
 }
 pub type AppState = axum::extract::State<AppStateData>;
 
@@ -70,6 +73,7 @@ impl AppStateData {
             kafka_connection_info,
             authentication_info,
             model_credential_store: Arc::new(RwLock::new(HashMap::new())),
+            rate_limiter: None, // Will be initialized later with Redis client
         })
     }
     pub async fn update_model_table(&self, mut new_models: ModelTable) {
@@ -78,11 +82,21 @@ impl AppStateData {
         for (name, config) in std::mem::take(&mut *new_models).into_iter() {
             models.insert(name, config);
         }
+
+        // Sync rate limiter configurations if rate limiting is enabled
+        if let Some(rate_limiter) = &self.rate_limiter {
+            rate_limiter.sync_from_model_table(&models);
+        }
     }
 
     pub async fn remove_model_table(&self, model_name: &str) {
         let mut models = self.config.models.write().await;
         models.remove(model_name);
+
+        // Remove rate limiter configuration if it exists
+        if let Some(rate_limiter) = &self.rate_limiter {
+            rate_limiter.remove_model_config(model_name);
+        }
 
         // Also remove associated credential if it exists
         let credential_key = format!("store_{model_name}");
@@ -93,6 +107,22 @@ impl AppStateData {
                 "Failed to acquire credential store write lock (poisoned) when removing model {}",
                 model_name
             );
+        }
+    }
+
+    /// Create a new instance with rate limiter initialized
+    pub fn with_rate_limiter(mut self, rate_limiter: Arc<DistributedRateLimiter>) -> Self {
+        self.rate_limiter = Some(rate_limiter);
+        self
+    }
+
+    /// Check if rate limiting is enabled
+    pub fn is_rate_limiting_enabled(&self) -> bool {
+        // Rate limiting is enabled if we have both a rate limiter and global config enables it
+        if let Some(global_config) = &self.config.gateway.rate_limits {
+            global_config.enabled && self.rate_limiter.is_some()
+        } else {
+            false
         }
     }
 }
@@ -193,6 +223,145 @@ pub fn setup_authentication(config: &Config<'static>) -> AuthenticationInfo {
             AuthenticationInfo::Enabled(Auth::new(config.api_keys.clone()))
         }
     }
+}
+
+/// Setup Redis clients and rate limiter based on configuration
+pub async fn setup_redis_and_rate_limiter(
+    app_state: AppStateData,
+    config: &Config<'static>,
+) -> Result<AppStateData, Error> {
+    // Check if authentication is enabled and requires Redis
+    let auth_info = match &app_state.authentication_info {
+        AuthenticationInfo::Enabled(auth) => Some(auth.clone()),
+        AuthenticationInfo::Disabled => None,
+    };
+
+    // Get Redis URL from environment
+    let redis_url = std::env::var("TENSORZERO_REDIS_URL").ok();
+
+    // Setup Redis client for authentication if needed
+    if let Some(auth) = auth_info {
+        if let Some(ref url) = redis_url {
+            if !url.is_empty() {
+                // Create and start Redis client for authentication
+                let auth_redis_client = RedisClient::new(url, app_state.clone(), auth.clone())
+                    .await
+                    .map_err(|e| {
+                        Error::new(ErrorDetails::AppState {
+                            message: format!(
+                                "Failed to create Redis client for authentication: {e}"
+                            ),
+                        })
+                    })?;
+
+                auth_redis_client.start().await.map_err(|e| {
+                    Error::new(ErrorDetails::AppState {
+                        message: format!("Failed to start Redis client for authentication: {e}"),
+                    })
+                })?;
+
+                tracing::info!("Redis client for authentication started successfully");
+            } else {
+                tracing::warn!("TENSORZERO_REDIS_URL is empty, authentication Redis client will not be started");
+            }
+        } else {
+            tracing::info!("TENSORZERO_REDIS_URL not set, authentication will work without Redis");
+        }
+    }
+
+    // Setup rate limiter if configured
+    let app_state = if let Some(ref global_rate_config) = config.gateway.rate_limits {
+        if global_rate_config.enabled {
+            if let Some(ref url) = redis_url {
+                if !url.is_empty() {
+                    match setup_rate_limiter(url, &app_state, config).await {
+                        Ok(rate_limiter) => {
+                            tracing::info!("Distributed rate limiter initialized successfully");
+                            app_state.with_rate_limiter(rate_limiter)
+                        }
+                        Err(e) => {
+                            tracing::error!("Failed to initialize rate limiter: {}", e);
+                            app_state
+                        }
+                    }
+                } else {
+                    tracing::warn!("Rate limiting is enabled but TENSORZERO_REDIS_URL is empty");
+                    app_state
+                }
+            } else {
+                tracing::warn!("Rate limiting is enabled but TENSORZERO_REDIS_URL is not set");
+                app_state
+            }
+        } else {
+            tracing::info!("Rate limiting is disabled in configuration");
+            app_state
+        }
+    } else {
+        tracing::info!("No rate limiting configuration found");
+        app_state
+    };
+
+    Ok(app_state)
+}
+
+/// Setup the distributed rate limiter with Redis backend
+async fn setup_rate_limiter(
+    redis_url: &str,
+    app_state: &AppStateData,
+    config: &Config<'static>,
+) -> Result<Arc<DistributedRateLimiter>, Error> {
+    tracing::info!("Initializing distributed rate limiter");
+
+    // Create a new Redis client for rate limiting
+    let auth = match &app_state.authentication_info {
+        AuthenticationInfo::Enabled(auth) => auth.clone(),
+        AuthenticationInfo::Disabled => Auth::new(config.api_keys.clone()),
+    };
+
+    let rate_limit_redis_client = RedisClient::new(redis_url, app_state.clone(), auth)
+        .await
+        .map_err(|e| {
+            Error::new(ErrorDetails::AppState {
+                message: format!("Failed to create Redis client for rate limiting: {e}"),
+            })
+        })?;
+
+    let rate_limit_redis_client = Arc::new(rate_limit_redis_client);
+
+    // Create the distributed rate limiter
+    let rate_limiter = DistributedRateLimiter::new(rate_limit_redis_client)
+        .await
+        .map_err(|e| {
+            Error::new(ErrorDetails::AppState {
+                message: format!("Failed to create distributed rate limiter: {e}"),
+            })
+        })?;
+
+    let rate_limiter = Arc::new(rate_limiter);
+
+    // Load model rate limit configurations
+    let models = config.models.read().await;
+    for (model_name, model_config) in models.iter() {
+        if let Some(model_rate_config) = &model_config.rate_limits {
+            rate_limiter.update_model_config(model_name.to_string(), model_rate_config.clone());
+            tracing::debug!("Configured rate limits for model {}", model_name);
+        }
+    }
+    drop(models); // Release the read lock
+
+    // Start background sync for distributed rate limiting
+    rate_limiter.start_background_sync().await;
+    tracing::info!("Started background sync for distributed rate limiting");
+
+    // Start pub/sub listener for dynamic configuration updates
+    if let Err(e) = rate_limiter.start_pubsub_listener() {
+        tracing::warn!(
+            "Failed to start pub/sub listener for rate limit updates: {}",
+            e
+        );
+    }
+
+    Ok(rate_limiter)
 }
 
 /// Custom Axum extractor that validates the JSON body and deserializes it into a custom type
@@ -347,6 +516,7 @@ mod tests {
             debug: false,
             enable_template_filesystem_access: false,
             export: Default::default(),
+            rate_limits: None,
         };
 
         let config = Box::leak(Box::new(Config {
@@ -402,6 +572,7 @@ mod tests {
             debug: false,
             enable_template_filesystem_access: false,
             export: Default::default(),
+            rate_limits: None,
         };
 
         let config = Box::leak(Box::new(Config {
@@ -426,6 +597,7 @@ mod tests {
             debug: false,
             enable_template_filesystem_access: false,
             export: Default::default(),
+            rate_limits: None,
         };
         let config = Box::leak(Box::new(Config {
             gateway: gateway_config,
@@ -614,6 +786,7 @@ mod tests {
             debug: false,
             enable_template_filesystem_access: false,
             export: Default::default(),
+            rate_limits: None,
         };
         let config = Config {
             gateway: gateway_config,

@@ -94,6 +94,7 @@ pub struct ModelConfig {
     pub endpoints: HashSet<EndpointCapability>, // supported endpoint capabilities
     pub fallback_models: Option<Vec<Arc<str>>>, // Optional fallback to other models
     pub retry_config: Option<RetryConfig>, // Optional model-level retry configuration
+    pub rate_limits: Option<crate::rate_limit::RateLimitConfig>, // rate limiting configuration
 }
 
 #[derive(Debug, Deserialize)]
@@ -105,6 +106,8 @@ pub(crate) struct UninitializedModelConfig {
     pub endpoints: HashSet<EndpointCapability>, // supported endpoint capabilities
     pub fallback_models: Option<Vec<Arc<str>>>, // Optional fallback to other models
     pub retry_config: Option<RetryConfig>,      // Optional model-level retry configuration
+    #[serde(default)]
+    pub rate_limits: Option<crate::rate_limit::RateLimitConfig>, // rate limiting configuration
 }
 
 /// Determine endpoint capabilities based on model name patterns
@@ -601,6 +604,7 @@ impl UninitializedModelConfig {
             endpoints: self.endpoints,
             fallback_models: self.fallback_models,
             retry_config: self.retry_config,
+            rate_limits: self.rate_limits,
         })
     }
 }
@@ -3263,6 +3267,7 @@ impl ShorthandModelConfig for ModelConfig {
             endpoints,             // Use pre-computed endpoints based on model name
             fallback_models: None, // Shorthand models don't support fallback
             retry_config: None,    // Shorthand models don't have retry config
+            rate_limits: None,     // Shorthand models don't have rate limits
         })
     }
 
@@ -3375,6 +3380,7 @@ mod tests {
             endpoints: default_capabilities(),
             fallback_models: None,
             retry_config: None,
+            rate_limits: None,
         };
         let tool_config = ToolCallConfig {
             tools_available: vec![],
@@ -3444,6 +3450,7 @@ mod tests {
             endpoints: default_capabilities(),
             fallback_models: None,
             retry_config: None,
+            rate_limits: None,
         };
         let response = model_config
             .infer(&request, &clients, model_name)
@@ -3542,6 +3549,7 @@ mod tests {
             endpoints: default_capabilities(),
             fallback_models: None,
             retry_config: None,
+            rate_limits: None,
         };
 
         let model_name = "test model";
@@ -3610,6 +3618,7 @@ mod tests {
             endpoints: default_capabilities(),
             fallback_models: None,
             retry_config: None,
+            rate_limits: None,
         };
         let (
             StreamResponse {
@@ -3682,6 +3691,7 @@ mod tests {
             endpoints: default_capabilities(),
             fallback_models: None,
             retry_config: None,
+            rate_limits: None,
         };
         let response = model_config
             .infer_stream(
@@ -3782,6 +3792,7 @@ mod tests {
             endpoints: default_capabilities(),
             fallback_models: None,
             retry_config: None,
+            rate_limits: None,
         };
         let (
             StreamResponse {
@@ -3862,6 +3873,7 @@ mod tests {
             endpoints: default_capabilities(),
             fallback_models: None,
             retry_config: None,
+            rate_limits: None,
         };
         let tool_config = ToolCallConfig {
             tools_available: vec![],
@@ -3971,6 +3983,7 @@ mod tests {
             endpoints: default_capabilities(),
             fallback_models: None,
             retry_config: None,
+            rate_limits: None,
         };
         let tool_config = ToolCallConfig {
             tools_available: vec![],
@@ -4096,6 +4109,7 @@ mod tests {
             endpoints: default_capabilities(),
             fallback_models: None,
             retry_config: None,
+            rate_limits: None,
         };
         let model_table: ModelTable = HashMap::from([("claude".into(), anthropic_model_config)])
             .try_into()
@@ -4206,6 +4220,7 @@ mod tests {
             endpoints,
             fallback_models: None,
             retry_config: None,
+            rate_limits: None,
         };
 
         assert!(model.supports_endpoint(EndpointCapability::Chat));
@@ -4232,6 +4247,7 @@ mod tests {
             endpoints: HashSet::new(), // Empty endpoints
             fallback_models: None,
             retry_config: None,
+            rate_limits: None,
         };
 
         let result = model.validate("test_model");
@@ -4271,6 +4287,7 @@ mod tests {
                 endpoints: chat_endpoints,
                 fallback_models: None,
                 retry_config: None,
+                rate_limits: None,
             },
         );
         models.insert(
@@ -4281,6 +4298,7 @@ mod tests {
                 endpoints: embedding_endpoints,
                 fallback_models: None,
                 retry_config: None,
+                rate_limits: None,
             },
         );
         models.insert(
@@ -4291,6 +4309,7 @@ mod tests {
                 endpoints: both_endpoints,
                 fallback_models: None,
                 retry_config: None,
+                rate_limits: None,
             },
         );
 
@@ -4342,6 +4361,7 @@ mod tests {
                         endpoints,
                         fallback_models: None,
                         retry_config: None,
+                        rate_limits: None,
                     },
                 );
 
@@ -4385,6 +4405,7 @@ mod tests {
             endpoints,
             fallback_models: None,
             retry_config: None,
+            rate_limits: None,
         };
 
         let request = crate::embeddings::EmbeddingRequest {

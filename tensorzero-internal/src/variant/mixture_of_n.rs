@@ -1064,6 +1064,7 @@ mod tests {
                 endpoints: crate::endpoints::capability::default_capabilities(),
                 fallback_models: None,
                 retry_config: None,
+                rate_limits: None,
             },
         )]))
         .expect("Failed to create model table");
@@ -1165,6 +1166,7 @@ mod tests {
                     endpoints: crate::endpoints::capability::default_capabilities(),
                     fallback_models: None,
                     retry_config: None,
+                    rate_limits: None,
                 },
             );
             ModelTable::try_from(map).expect("Failed to create model table")
@@ -1233,6 +1235,7 @@ mod tests {
                     endpoints: crate::endpoints::capability::default_capabilities(),
                     fallback_models: None,
                     retry_config: None,
+                    rate_limits: None,
                 },
             );
             ModelTable::try_from(map).expect("Failed to create model table")

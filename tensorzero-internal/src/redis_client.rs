@@ -18,7 +18,7 @@ const MODEL_TABLE_KEY_PREFIX: &str = "model_table:";
 const API_KEY_KEY_PREFIX: &str = "api_key:";
 
 pub struct RedisClient {
-    client: redis::Client,
+    pub(crate) client: redis::Client,
     conn: MultiplexedConnection,
     app_state: AppStateData,
     auth: Auth,
@@ -183,7 +183,11 @@ impl RedisClient {
 
                 match Self::parse_models(&value, &app_state.config.provider_types, app_state).await
                 {
-                    Ok(models) => app_state.update_model_table(models).await,
+                    Ok(models) => {
+                        // Publish rate limit config updates for models that have rate limits
+                        Self::publish_rate_limit_updates(&models, app_state).await;
+                        app_state.update_model_table(models).await;
+                    }
                     Err(e) => {
                         tracing::error!("Failed to parse models from redis (key: {key}): {e}")
                     }
@@ -213,6 +217,32 @@ impl RedisClient {
             }
             k if k.starts_with(MODEL_TABLE_KEY_PREFIX) => {
                 if let Some(model_name) = key.rsplit(':').next() {
+                    // Publish rate limit deletion if rate limiting is enabled
+                    if app_state.is_rate_limiting_enabled() {
+                        if let Some(rate_limiter) = &app_state.rate_limiter {
+                            if let Err(e) =
+                                crate::rate_limit::DistributedRateLimiter::publish_config_update(
+                                    &rate_limiter.redis_client,
+                                    model_name,
+                                    "delete",
+                                    None,
+                                )
+                                .await
+                            {
+                                tracing::warn!(
+                                    "Failed to publish rate limit config deletion for model {}: {}",
+                                    model_name,
+                                    e
+                                );
+                            } else {
+                                tracing::debug!(
+                                    "Published rate limit config deletion for model: {}",
+                                    model_name
+                                );
+                            }
+                        }
+                    }
+
                     app_state.remove_model_table(model_name).await;
                 } else {
                     tracing::error!("Invalid model table key format: {key}");
@@ -227,6 +257,47 @@ impl RedisClient {
         Ok(())
     }
 
+    /// Get a connection for rate limiting operations
+    pub async fn get_connection(&self) -> Result<MultiplexedConnection, redis::RedisError> {
+        self.client.get_multiplexed_async_connection().await
+    }
+
+    /// Publish rate limit configuration updates for models with rate limits
+    async fn publish_rate_limit_updates(models: &ModelTable, app_state: &AppStateData) {
+        // Only publish if rate limiting is enabled
+        if !app_state.is_rate_limiting_enabled() {
+            return;
+        }
+
+        if let Some(rate_limiter) = &app_state.rate_limiter {
+            for (model_name, model_config) in models.iter() {
+                if let Some(rate_config) = &model_config.rate_limits {
+                    // Publish configuration update
+                    if let Err(e) =
+                        crate::rate_limit::DistributedRateLimiter::publish_config_update(
+                            &rate_limiter.redis_client,
+                            model_name,
+                            "update",
+                            Some(rate_config.clone()),
+                        )
+                        .await
+                    {
+                        tracing::warn!(
+                            "Failed to publish rate limit config update for model {}: {}",
+                            model_name,
+                            e
+                        );
+                    } else {
+                        tracing::debug!(
+                            "Published rate limit config update for model: {}",
+                            model_name
+                        );
+                    }
+                }
+            }
+        }
+    }
+
     #[instrument(skip(self))]
     pub async fn start(mut self) -> Result<(), Error> {
         // Initial fetch: fetch all model_table:* and api_key:* keys
@@ -239,7 +310,11 @@ impl RedisClient {
             for key in model_keys {
                 if let Ok(json) = self.conn.get::<_, String>(&key).await {
                     match Self::parse_models(&json, &self.app_state.config.provider_types, &self.app_state).await {
-                        Ok(models) => self.app_state.update_model_table(models).await,
+                        Ok(models) => {
+                            // Publish rate limit config updates for models that have rate limits
+                            Self::publish_rate_limit_updates(&models, &self.app_state).await;
+                            self.app_state.update_model_table(models).await;
+                        }
                         Err(e) => tracing::error!(
                             "Failed to parse initial model table from redis (key: {key}): {e} -> data in redis -> {json:?}"
                         ),

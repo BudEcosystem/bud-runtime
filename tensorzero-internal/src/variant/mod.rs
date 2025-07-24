@@ -1093,6 +1093,7 @@ mod tests {
             endpoints: crate::endpoints::capability::default_capabilities(),
             fallback_models: None,
             retry_config: None,
+            rate_limits: None,
         };
         let models = Box::leak(Box::new(ModelTable::default()));
         let mut visited_models = std::collections::HashSet::new();
@@ -1205,6 +1206,7 @@ mod tests {
             endpoints: crate::endpoints::capability::default_capabilities(),
             fallback_models: None,
             retry_config: None,
+            rate_limits: None,
         };
         let models = Box::leak(Box::new(ModelTable::default()));
         let mut visited_models = std::collections::HashSet::new();
@@ -1268,6 +1270,7 @@ mod tests {
             endpoints: crate::endpoints::capability::default_capabilities(),
             fallback_models: None,
             retry_config: None,
+            rate_limits: None,
         };
         let models = Box::leak(Box::new(ModelTable::default()));
         let mut visited_models = std::collections::HashSet::new();
@@ -1415,6 +1418,7 @@ mod tests {
             endpoints: crate::endpoints::capability::default_capabilities(),
             fallback_models: None,
             retry_config: None,
+            rate_limits: None,
         };
         let models = Box::leak(Box::new(ModelTable::default()));
         let mut visited_models = std::collections::HashSet::new();
@@ -1515,6 +1519,7 @@ mod tests {
             endpoints: crate::endpoints::capability::default_capabilities(),
             fallback_models: None,
             retry_config: None,
+            rate_limits: None,
         }));
 
         // Prepare the model inference request
@@ -1712,6 +1717,7 @@ mod tests {
             endpoints: crate::endpoints::capability::default_capabilities(),
             fallback_models: None,
             retry_config: None,
+            rate_limits: None,
         }));
         let models = Box::leak(Box::new(ModelTable::default()));
         let visited_models = std::collections::HashSet::new();

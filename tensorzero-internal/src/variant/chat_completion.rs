@@ -984,6 +984,7 @@ mod tests {
             endpoints: crate::endpoints::capability::default_capabilities(),
             fallback_models: None,
             retry_config: None,
+            rate_limits: None,
         };
         let json_model_config = ModelConfig {
             routing: vec!["json_provider".into()],
@@ -999,6 +1000,7 @@ mod tests {
             endpoints: crate::endpoints::capability::default_capabilities(),
             fallback_models: None,
             retry_config: None,
+            rate_limits: None,
         };
         let tool_provider_config = ProviderConfig::Dummy(DummyProvider {
             model_name: "tool".into(),
@@ -1018,6 +1020,7 @@ mod tests {
             endpoints: crate::endpoints::capability::default_capabilities(),
             fallback_models: None,
             retry_config: None,
+            rate_limits: None,
         };
         let error_model_config = ModelConfig {
             routing: vec!["error".into()],
@@ -1033,6 +1036,7 @@ mod tests {
             endpoints: crate::endpoints::capability::default_capabilities(),
             fallback_models: None,
             retry_config: None,
+            rate_limits: None,
         };
         // Test case 1: invalid message (String passed when template required)
         let messages = vec![ResolvedInputMessage {
@@ -1218,6 +1222,7 @@ mod tests {
             endpoints: crate::endpoints::capability::default_capabilities(),
             fallback_models: None,
             retry_config: None,
+            rate_limits: None,
         };
         let models = HashMap::from([("good".into(), text_model_config)])
             .try_into()
@@ -1793,6 +1798,7 @@ mod tests {
             endpoints: crate::endpoints::capability::default_capabilities(),
             fallback_models: None,
             retry_config: None,
+            rate_limits: None,
         };
         let error_model_config = ModelConfig {
             routing: vec!["error_provider".into()],
@@ -1808,6 +1814,7 @@ mod tests {
             endpoints: crate::endpoints::capability::default_capabilities(),
             fallback_models: None,
             retry_config: None,
+            rate_limits: None,
         };
         // Test case 1: Model inference fails because of model issues
         let inference_params = InferenceParams::default();

@@ -24,5 +24,6 @@ pub fn get_unit_test_app_state_data(
         model_credential_store: std::sync::Arc::new(std::sync::RwLock::new(
             std::collections::HashMap::new(),
         )),
+        rate_limiter: None,
     }
 }
