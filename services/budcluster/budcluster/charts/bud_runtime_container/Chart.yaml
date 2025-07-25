@@ -1,0 +1,4 @@
+apiVersion: v2
+name: bud-runtime-container
+description: A Helm chart for BudServe runtime container deployment
+version: 0.1.0

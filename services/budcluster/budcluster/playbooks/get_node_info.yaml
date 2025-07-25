@@ -1,0 +1,32 @@
+---
+- name: Fetch Node Information from Kubernetes ConfigMap
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars_files:
+    - vars/common.yaml
+    
+  roles:
+    - create_kubeconfig
+
+  tasks:
+
+    - name: Get list of nodes
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Node
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: false
+      register: nodes_list
+
+    - name: Fetch Node Information ConfigMap for each node
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: ConfigMap
+        namespace: "{{ namespace }}"
+        name: "node-info-collector-{{ item.metadata.name }}"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: false
+      loop: "{{ nodes_list.resources }}"
+      register: node_info_configmaps

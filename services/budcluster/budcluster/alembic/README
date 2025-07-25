@@ -1,0 +1,16 @@
+Generic single-database configuration.
+
+To generate migrations:
+1. First deploy the services.
+```
+./deploy/start_dev.sh --build
+```
+2. Start docker shell for app microservice container
+3. Run the following command.
+```
+alembic -c cluster/alembic.ini revision --autogenerate -m "message"
+```
+4. To apply migrations.
+```
+alembic -c cluster/alembic.ini upgrade head
+```

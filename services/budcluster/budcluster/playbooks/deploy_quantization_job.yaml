@@ -1,0 +1,54 @@
+---
+- name: Deploy quantization job
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars_files:
+    - vars/common.yaml
+
+  vars:
+    chart_path: "{{ charts_dir }}/quantization_job"
+    release_name: "{{ runtime_release_name | default('quantization-job') }}"
+  roles:
+    - create_kubeconfig
+
+  tasks:
+    - name: Deploy quantization job
+      kubernetes.core.helm:
+        release_name: "{{ release_name }}"
+        chart_ref: "{{ chart_path }}"
+        release_namespace: "{{ namespace }}"
+        create_namespace: true
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+        values:
+          namespace: "{{ namespace }}"
+          # nodes: "{{ nodes }}"
+          image:
+            repository: "{{ quantization_job_image }}"
+          hfToken: "{{ hf_token }}"
+          imagePullSecrets:
+            auth: "{{ image_pull_secrets }}"
+          volumeType: "{{ volume_type }}"
+          nfs:
+            server: "{{ nfs_server }}"
+          quantizationConfig: "{{ quantization_config }}"
+      register: helm_result
+      failed_when: helm_result.failed
+
+    - name: Wait for quantization job to be completed
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: "{{ namespace }}"
+        label_selectors:
+          - job-name={{ release_name }}
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: quantization_job
+      retries: 30
+      delay: 60
+      until: >
+        quantization_job.resources | selectattr('status.phase', 'equalto', 'Running') | list | length > 0 or
+        quantization_job.resources | selectattr('status.phase', 'equalto', 'Succeeded') | list | length > 0
+      when: not helm_result.failed

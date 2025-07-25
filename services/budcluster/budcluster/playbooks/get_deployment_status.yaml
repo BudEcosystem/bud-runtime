@@ -1,0 +1,77 @@
+---
+- name: Get Deployment Status
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars_files:
+    - vars/common.yaml
+
+  roles:
+    - create_kubeconfig
+
+  tasks:
+    - name: Check if namespace exists
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Namespace
+        name: "{{ namespace }}"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: namespace_info
+
+    - name: Fail if namespace doesn't exist
+      fail:
+        msg: "Namespace '{{ namespace }}' does not exist"
+      when: namespace_info.resources | length == 0
+
+    - name: Gather list of Deployments
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Deployment
+        namespace: "{{ namespace }}"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: deployment_info
+    
+    - name: Gather list of ReplicaSets
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: ReplicaSet
+        namespace: "{{ namespace }}"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: replica_set_info
+
+    - name: Gather list of Pods
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Pod
+        namespace: "{{ namespace }}"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: pod_info
+
+    - name: Gather events for Pods
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Event
+        namespace: "{{ namespace }}"
+        field_selectors:
+          - involvedObject.kind=Pod
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: pod_events
+
+    - name: Print the list of Pods with their status and events
+      debug:
+        msg: >
+          {% for pod in pod_info.resources %}
+            Pod: {{ pod.metadata.name }}, Status: {{ pod.status.phase }}
+            Events:
+            {% for event in pod_events.resources %}
+              {% if event.involvedObject.name == pod.metadata.name %}
+                - {{ event.message }}
+              {% endif %}
+            {% endfor %}
+          {% endfor %}

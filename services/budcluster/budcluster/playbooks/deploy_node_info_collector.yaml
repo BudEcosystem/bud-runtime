@@ -1,0 +1,720 @@
+---
+- name: Deploy Node Device Labeler and NodeInfo Collector
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars_files:
+    - vars/common.yaml
+
+  vars:
+    node_labeler_chart_path: "{{ charts_dir }}/node_device_labeler"
+    node_info_chart_path: "{{ charts_dir }}/node_info_collector"
+    nfs_provisioner_chart_path: "{{ charts_dir }}/nfs-provisioner"
+    node_labeler_release_name: node-device-labeler
+    node_info_release_name: node-info-collector
+    nfs_provisioner_release_name: nfs-provisioner
+    prometheus_release_name: bud-metrics
+    prometheus_chart_path: "{{ charts_dir }}/prometheus-stack"
+    # Conditional deployment controls
+    update_existing_components: "{{ update_existing | default(false) }}"
+    force_reinstall_components: "{{ force_reinstall | default(false) }}"
+    skip_healthy_components: "{{ skip_healthy | default(true) }}"
+
+  roles:
+    - create_kubeconfig
+
+  tasks:
+    # Node Device Labeler Section
+    - name: Check if nodes already have device labels
+      kubernetes.core.k8s_info:
+        kind: Node
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: existing_nodes
+      ignore_errors: true
+
+    - name: Count nodes with device labels
+      set_fact:
+        nodes_with_device_labels: "{{ existing_nodes.resources | 
+          selectattr('metadata.labels', 'defined') |
+          map(attribute='metadata.labels') | 
+          selectattr('device.kubernetes.io/type', 'defined') | 
+          list | length }}"
+        total_nodes: "{{ existing_nodes.resources | length }}"
+      when: existing_nodes is succeeded
+
+    - name: Determine if node labeling is needed
+      set_fact:
+        need_node_labeling: "{{ nodes_with_device_labels | int < total_nodes | int or force_reinstall_components }}"
+      when: existing_nodes is succeeded
+
+    - name: Skip node labeling if all nodes are already labeled
+      debug:
+        msg: "All {{ total_nodes }} nodes already have device labels. Skipping node labeler deployment."
+      when: 
+        - existing_nodes is succeeded
+        - not need_node_labeling
+        - skip_healthy_components
+
+    - name: Deploy Node Device Labeler Helm Chart
+      kubernetes.core.helm:
+        release_name: "{{ node_labeler_release_name }}"
+        chart_ref: "{{ node_labeler_chart_path }}"
+        release_namespace: "{{ namespace }}"
+        create_namespace: true
+        atomic: true
+        wait: false
+        wait_timeout: "{{ helm_timeout }}"
+        force: true
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+        values:
+          platform: "{{ platform }}"
+          image:
+            repository: "{{node_labeler_image}}"
+          imagePullSecrets:
+            auth: "{{ image_pull_secrets }}"
+      when: need_node_labeling | default(true)
+
+    - name: Wait for Node Device Labeler pods to be ready
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: "{{ namespace }}"
+        label_selectors:
+          - app.kubernetes.io/name=node-device-labeler
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: labeler_pods
+      retries: 6
+      delay: 10
+      until: labeler_pods is defined and labeler_pods.resources | selectattr('status.phase', 'equalto', 'Running') | list | length == labeler_pods.resources | length
+      when: need_node_labeling | default(true)
+
+    - name: Wait for node labeling to complete
+      kubernetes.core.k8s_info:
+        kind: Node
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: nodes
+      retries: 12
+      delay: 10
+      until: nodes is defined and nodes.resources | map(attribute='metadata.labels') | map('dict2items') | flatten | selectattr('key', 'equalto', 'device.kubernetes.io/type') | list | length >= 1
+      when: need_node_labeling | default(true)
+
+    - name: Uninstall Node Device Labeler Helm Chart if labeling is successful
+      kubernetes.core.helm:
+        name: "{{ node_labeler_release_name }}"
+        namespace: "{{ namespace }}"
+        state: absent
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      when: 
+        - need_node_labeling | default(true)
+        - nodes.resources | map(attribute='metadata.labels') | map('dict2items') | flatten | selectattr('key', 'equalto', 'device.kubernetes.io/type') | list | length == labeler_pods.resources | length
+
+    # NodeInfo Collector Section
+    - name: Check if NodeInfo Collector is already deployed
+      kubernetes.core.helm_info:
+        name: "{{ node_info_release_name }}"
+        namespace: "{{ namespace }}"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: nodeinfo_helm_info
+      ignore_errors: true
+
+    - name: Check NodeInfo Collector pods status
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: "{{ namespace }}"
+        label_selectors:
+          - app.kubernetes.io/name=node-info-collector
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: nodeinfo_pods_check
+      ignore_errors: true
+      when: nodeinfo_helm_info is succeeded
+
+    - name: Determine NodeInfo Collector deployment action
+      set_fact:
+        nodeinfo_needs_deployment: >-
+          {{ nodeinfo_helm_info.failed or 
+             nodeinfo_helm_info.status is not defined or
+             nodeinfo_helm_info.status.status | default('') != 'deployed' or
+             nodeinfo_pods_check.resources | default([]) | selectattr('status.phase', 'ne', 'Running') | list | length > 0 or
+             force_reinstall_components or
+             update_existing_components }}
+
+    - name: Skip NodeInfo Collector if already deployed and healthy
+      debug:
+        msg: "NodeInfo Collector is already deployed and healthy. Skipping deployment."
+      when: 
+        - not nodeinfo_needs_deployment
+        - skip_healthy_components
+
+    - name: Deploy NodeInfo Collector Helm Chart
+      kubernetes.core.helm:
+        release_name: "{{ node_info_release_name }}"
+        chart_ref: "{{ node_info_chart_path }}"
+        release_namespace: "{{ namespace }}"
+        create_namespace: true
+        atomic: true
+        wait: true
+        wait_timeout: "{{ helm_timeout }}"
+        force: true
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+        values:
+          platform: "{{ platform }}"
+          devices:
+            cpu:
+              image: "{{ node_info_collector_image_cpu }}"
+            cpu-amx:
+              image: "{{ node_info_collector_image_cpu }}"
+            cuda:
+              image: "{{ node_info_collector_image_cuda }}"
+            hpu:
+              image: "{{ node_info_collector_image_hpu }}"
+          imagePullSecrets:
+            auth: "{{ image_pull_secrets }}"
+      when: nodeinfo_needs_deployment | default(true)
+
+    - name: Get NFS Server Service IP
+      kubernetes.core.k8s_info:
+        kind: Service
+        namespace: "{{ namespace }}"
+        name: "nfs-service"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: nfs_service
+      retries: 6
+      delay: 10
+      until: nfs_service.resources[0].spec.clusterIP is defined
+
+    - name: Set NFS Server IP
+      set_fact:
+        nfs_server: "{{ nfs_service.resources[0].spec.clusterIP }}"
+
+    # NFS Provisioner Section
+    - name: Check if NFS Provisioner is already deployed
+      kubernetes.core.helm_info:
+        name: "{{ nfs_provisioner_release_name }}"
+        namespace: "{{ namespace }}"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: nfs_helm_info
+      ignore_errors: true
+
+    - name: Check if NFS storage class exists
+      kubernetes.core.k8s_info:
+        api_version: storage.k8s.io/v1
+        kind: StorageClass
+        name: nfs-client
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: nfs_storage_class
+      ignore_errors: true
+
+    - name: Check NFS Provisioner deployment status
+      kubernetes.core.k8s_info:
+        kind: Deployment
+        namespace: "{{ namespace }}"
+        name: "nfs-client-provisioner"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: nfs_deployment_check
+      ignore_errors: true
+
+    - name: Determine NFS Provisioner deployment action
+      set_fact:
+        nfs_needs_deployment: >-
+          {{ nfs_helm_info.failed or 
+             nfs_helm_info.status is not defined or
+             nfs_helm_info.status.status | default('') != 'deployed' or
+             nfs_storage_class.failed or
+             not nfs_storage_class.resources or
+             nfs_storage_class.resources | length == 0 or
+             nfs_deployment_check.failed or
+             not nfs_deployment_check.resources or
+             nfs_deployment_check.resources | length == 0 or
+             (nfs_deployment_check.resources[0].status.availableReplicas | default(0)) == 0 or
+             force_reinstall_components or
+             update_existing_components }}
+
+    - name: Skip NFS Provisioner if already deployed and healthy
+      debug:
+        msg: "NFS Provisioner is already deployed with storage class 'nfs-client'. Skipping deployment."
+      when: 
+        - not nfs_needs_deployment
+        - skip_healthy_components
+
+    - name: Deploy NFS Provisioner Helm Chart
+      kubernetes.core.helm:
+        release_name: "{{ nfs_provisioner_release_name }}"
+        chart_ref: "{{ nfs_provisioner_chart_path }}"
+        release_namespace: "{{ namespace }}"
+        create_namespace: true
+        atomic: true
+        wait: true
+        wait_timeout: "{{ helm_timeout }}"
+        force: true
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+        values:
+          nfs:
+            server: "{{ nfs_server }}"
+      when: nfs_needs_deployment | default(true)
+
+    - name: Wait for NFS Provisioner deployment to be ready
+      kubernetes.core.k8s_info:
+        kind: Deployment
+        namespace: "{{ namespace }}"
+        name: "nfs-client-provisioner"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: nfs_deployment
+      retries: 6
+      delay: 10
+      until: nfs_deployment.resources[0].status.availableReplicas is defined and nfs_deployment.resources[0].status.availableReplicas > 0
+      when: nfs_needs_deployment | default(true)
+
+    - name: Ensure all NodeInfo Collector pods are running
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: "{{ namespace }}"
+        label_selectors:
+          - app.kubernetes.io/name=node-info-collector
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: nodeinfo_pods
+      retries: 6
+      delay: 10
+      until: nodeinfo_pods.resources | selectattr('status.phase', 'equalto', 'Running') | list | length == nodeinfo_pods.resources | length
+
+    - name: Install Aibrix dependencies
+      kubernetes.core.k8s:
+        state: present
+        src: https://github.com/BudEcosystem/aibrix/releases/download/0.2.0/aibrix-dependency-v0.2.0.yaml
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+
+    - name: Install Aibrix core components
+      kubernetes.core.k8s:
+        state: present
+        src: https://github.com/BudEcosystem/aibrix/releases/download/0.2.0/aibrix-core-v0.2.0.yaml
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+
+    - name: Add Prometheus Community Helm repo
+      kubernetes.core.helm_repository:
+        name: prometheus-community
+        repo_url: https://prometheus-community.github.io/helm-charts
+        state: present
+
+    - name: Add Kepler Helm repo
+      kubernetes.core.helm_repository:
+        name: kepler
+        repo_url: https://sustainable-computing-io.github.io/kepler-helm-chart
+        state: present
+
+    - name: Update Helm repos
+      shell: helm repo update
+
+    # Prometheus Stack Section
+    - name: Check if Prometheus Stack is already deployed
+      kubernetes.core.helm_info:
+        name: prometheus-stack
+        namespace: "{{ namespace }}"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: prometheus_helm_info
+      ignore_errors: true
+
+    - name: Check Prometheus StatefulSet status
+      kubernetes.core.k8s_info:
+        kind: StatefulSet
+        namespace: "{{ namespace }}"
+        name: prometheus-prometheus-stack-kube-prom-prometheus
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: prometheus_sts_check
+      ignore_errors: true
+      when: prometheus_helm_info is succeeded
+
+    - name: Check if Prometheus operator is running
+      kubernetes.core.k8s_info:
+        kind: Deployment
+        namespace: "{{ namespace }}"
+        label_selectors:
+          - app.kubernetes.io/name=kube-prometheus-stack-operator
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: prometheus_operator_check
+      ignore_errors: true
+
+    - name: Determine Prometheus Stack deployment action
+      set_fact:
+        prometheus_needs_deployment: >-
+          {{ prometheus_helm_info.failed or 
+             prometheus_helm_info.status is not defined or
+             prometheus_helm_info.status.status | default('') != 'deployed' or
+             (prometheus_helm_info.status.chart | default('') != 'kube-prometheus-stack-68.3.0' and update_existing_components) or
+             prometheus_sts_check.failed or
+             not prometheus_sts_check.resources or
+             prometheus_sts_check.resources | length == 0 or
+             (prometheus_sts_check.resources[0].status.readyReplicas | default(0)) == 0 or
+             prometheus_operator_check.failed or
+             not prometheus_operator_check.resources or
+             prometheus_operator_check.resources | length == 0 or
+             prometheus_operator_check.resources | selectattr('status.availableReplicas', 'undefined') | list | length > 0 or
+             force_reinstall_components }}
+
+    - name: Show Prometheus Stack current version
+      debug:
+        msg: "Current Prometheus Stack version: {{ prometheus_helm_info.status.chart | default('not installed') }}"
+      when: 
+        - prometheus_helm_info is succeeded
+        - prometheus_helm_info.status is defined
+
+    - name: Skip Prometheus Stack if already deployed and healthy
+      debug:
+        msg: "Prometheus Stack is already deployed ({{ prometheus_helm_info.status.chart | default('unknown version') }}) and healthy. Skipping deployment."
+      when: 
+        - not prometheus_needs_deployment
+        - skip_healthy_components
+
+    - name: Deploy Prometheus Stack (without waiting for DaemonSets)
+      kubernetes.core.helm:
+        release_name: prometheus-stack
+        chart_ref: prometheus-community/kube-prometheus-stack
+        chart_version: "68.3.0"
+        release_namespace: "{{ namespace }}"
+        create_namespace: true
+        atomic: false  # Don't rollback on timeout
+        wait: true
+        wait_timeout: 600s  # Only wait for core components
+        force: true
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+        values:
+          prometheus-node-exporter:
+            enabled: true
+            service:
+              port: 9100
+              targetPort: 9100
+            updateStrategy:
+              type: RollingUpdate
+              rollingUpdate:
+                maxUnavailable: "50%"  # Deploy to half the nodes at once
+          prometheus:
+            enabled: true
+            prometheusSpec:
+              externalLabels:
+                cluster: "{{ cluster_name }}"
+              remoteWrite:
+                - url: "{{ prometheus_url | default('https://metric.bud.studio/api/v1/write') }}"
+                  queueConfig:
+                    maxSamplesPerSend: 1000
+                    capacity: 2500
+                    maxShards: 200
+                    minShards: 1
+                    maxRetries: 10
+                    minBackoff: 30ms
+                    maxBackoff: 5s
+              retention: 24h
+              resources:
+                requests:
+                  memory: "1Gi"
+                  cpu: "250m"
+                limits:
+                  memory: "2Gi"
+                  cpu: "500m"
+              storageSpec:
+                volumeClaimTemplate:
+                  spec:
+                    accessModes: ["ReadWriteOnce"]
+                    resources:
+                      requests:
+                        storage: 20Gi
+          kube-state-metrics:
+            enabled: true
+            resources:
+              requests:
+                memory: "64Mi"
+                cpu: "100m"
+              limits:
+                memory: "128Mi"
+                cpu: "200m"
+          grafana:
+            enabled: false
+          alertmanager:
+            enabled: false
+          networkPolicy:
+            enabled: true
+      register: helm_result
+      retries: 2
+      delay: 30
+      until: helm_result is succeeded
+      when: prometheus_needs_deployment | default(true)
+
+    - name: Debug Helm deployment
+      debug:
+        var: helm_result
+      when: helm_result is failed
+
+    - name: Wait for Prometheus operator to be ready
+      kubernetes.core.k8s_info:
+        kind: Deployment
+        namespace: "{{ namespace }}"
+        name: prometheus-stack-kube-prom-operator
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: prometheus_operator_status
+      retries: 6
+      delay: 20
+      until: >
+        prometheus_operator_status is defined and 
+        prometheus_operator_status.resources | length > 0 and
+        prometheus_operator_status.resources[0].status.readyReplicas is defined and
+        prometheus_operator_status.resources[0].status.readyReplicas > 0
+      when: prometheus_needs_deployment | default(true)
+
+    - name: Wait for kube-state-metrics to be ready
+      kubernetes.core.k8s_info:
+        kind: Deployment
+        namespace: "{{ namespace }}"
+        name: prometheus-stack-kube-state-metrics
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: kube_state_metrics_status
+      retries: 6
+      delay: 20
+      until: >
+        kube_state_metrics_status is defined and 
+        kube_state_metrics_status.resources | length > 0 and
+        kube_state_metrics_status.resources[0].status.readyReplicas is defined and
+        kube_state_metrics_status.resources[0].status.readyReplicas > 0
+      when: prometheus_needs_deployment | default(true)
+
+    - name: Wait for Prometheus StatefulSet to be ready
+      kubernetes.core.k8s_info:
+        kind: StatefulSet
+        namespace: "{{ namespace }}"
+        name: prometheus-prometheus-stack-kube-prom-prometheus
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: prometheus_sts
+      retries: 6
+      delay: 20
+      until: >
+        prometheus_sts is defined and 
+        prometheus_sts.resources[0].status.readyReplicas is defined and
+        prometheus_sts.resources[0].status.readyReplicas > 0
+      when: prometheus_needs_deployment | default(true)
+
+    - name: Check node-exporter DaemonSet rollout status (non-blocking)
+      kubernetes.core.k8s_info:
+        kind: DaemonSet
+        namespace: "{{ namespace }}"
+        name: prometheus-stack-prometheus-node-exporter
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: node_exporter_ds
+      ignore_errors: true
+
+    - name: Report node-exporter rollout progress
+      debug:
+        msg: >
+          Node-exporter rollout progress: 
+          {{ node_exporter_ds.resources[0].status.numberReady | default(0) }}/{{ node_exporter_ds.resources[0].status.desiredNumberScheduled | default(0) }} nodes ready.
+          This will continue in the background.
+      when: node_exporter_ds is defined and node_exporter_ds.resources | length > 0
+
+    # Kepler Section
+    - name: Check if Kepler is already deployed
+      kubernetes.core.helm_info:
+        name: kepler
+        namespace: "{{ namespace }}"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: kepler_helm_info
+      ignore_errors: true
+
+    - name: Check Kepler DaemonSet status
+      kubernetes.core.k8s_info:
+        kind: DaemonSet
+        namespace: "{{ namespace }}"
+        name: kepler
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: kepler_ds_check
+      ignore_errors: true
+
+    - name: Determine Kepler deployment action
+      set_fact:
+        kepler_needs_deployment: >-
+          {{ kepler_helm_info.failed or 
+             kepler_helm_info.status is not defined or
+             kepler_helm_info.status.status | default('') != 'deployed' or
+             kepler_ds_check.failed or
+             not kepler_ds_check.resources or
+             kepler_ds_check.resources | length == 0 or
+             (kepler_ds_check.resources[0].status.numberReady | default(0)) == 0 or
+             (kepler_ds_check.resources[0].status.numberUnavailable | default(0)) > (kepler_ds_check.resources[0].status.desiredNumberScheduled | default(1) * 0.5) or
+             force_reinstall_components or
+             update_existing_components }}
+
+    - name: Skip Kepler if already deployed and healthy
+      debug:
+        msg: >
+          Kepler is already deployed and healthy. 
+          Running on {{ kepler_ds_check.resources[0].status.numberReady | default(0) }}/{{ kepler_ds_check.resources[0].status.desiredNumberScheduled | default(0) }} nodes.
+          Skipping deployment.
+      when: 
+        - not kepler_needs_deployment
+        - skip_healthy_components
+        - kepler_ds_check is succeeded
+        - kepler_ds_check.resources | length > 0
+
+    - name: Deploy Kepler Helm Chart
+      kubernetes.core.helm:
+        release_name: kepler
+        chart_ref: kepler/kepler
+        release_namespace: "{{ namespace }}"
+        create_namespace: true
+        atomic: true
+        wait: true
+        wait_timeout: 180s
+        force: true
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+        values:
+          serviceMonitor:
+            enabled: true
+            labels:
+              release: prometheus-stack
+          tolerations:
+            # Handle GPU and special hardware nodes
+            - effect: NoSchedule
+              operator: Exists
+            # Handle nodes being drained or with issues
+            - effect: NoExecute
+              operator: Exists
+            # Specifically handle NotReady nodes
+            - key: node.kubernetes.io/not-ready
+              effect: NoExecute
+              tolerationSeconds: 300
+            - key: node.kubernetes.io/unreachable
+              effect: NoExecute
+              tolerationSeconds: 300
+            # Handle network issues
+            - key: node.kubernetes.io/network-unavailable
+              effect: NoSchedule
+              operator: Exists
+      when: kepler_needs_deployment | default(true)
+
+    - name: Get ready nodes for Kepler validation
+      kubernetes.core.k8s_info:
+        kind: Node
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: cluster_nodes
+      when: kepler_needs_deployment | default(true)
+
+    - name: Calculate ready nodes that can run Kepler
+      set_fact:
+        # Count nodes that are Ready and schedulable
+        ready_schedulable_nodes: "{{ cluster_nodes.resources | 
+          selectattr('status.conditions', 'defined') | 
+          rejectattr('spec.unschedulable', 'defined') |
+          map(attribute='status.conditions') | 
+          map('selectattr', 'type', 'equalto', 'Ready') | 
+          map('selectattr', 'status', 'equalto', 'True') | 
+          map('list') | select('length') | list | length }}"
+      when: kepler_needs_deployment | default(true)
+
+    - name: Verify Kepler DaemonSet exists and is rolling out
+      kubernetes.core.k8s_info:
+        kind: DaemonSet
+        namespace: "{{ namespace }}"
+        name: kepler
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: kepler_ds
+      retries: 6
+      delay: 10
+      until: kepler_ds is defined and kepler_ds.resources | length > 0
+      when: kepler_needs_deployment | default(true)
+
+    - name: Wait for minimum Kepler pods to be ready
+      kubernetes.core.k8s_info:
+        kind: DaemonSet
+        namespace: "{{ namespace }}"
+        name: kepler
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: kepler_status
+      retries: 12
+      delay: 30
+      until: >
+        kepler_status is defined and 
+        kepler_status.resources[0].status.numberReady is defined and
+        (kepler_status.resources[0].status.numberReady >= [ready_schedulable_nodes | int * 0.5, 1] | max | int or
+         kepler_status.resources[0].status.numberUnavailable | default(0) == 0)
+      when: kepler_needs_deployment | default(true)
+
+    - name: Report Kepler rollout progress
+      debug:
+        msg: >
+          Kepler rollout progress: 
+          {{ kepler_status.resources[0].status.numberReady | default(0) }}/{{ kepler_status.resources[0].status.desiredNumberScheduled | default(0) }} pods ready
+          ({{ ready_schedulable_nodes }} nodes are currently schedulable).
+          Waited for 50% of schedulable nodes. Deployment will continue in the background for remaining nodes.
+      when: kepler_needs_deployment | default(true)
+
+  post_tasks:  # Runs after all other tasks
+    - name: Generate deployment summary
+      set_fact:
+        deployment_summary:
+          node_labeler: "{{ 'Deployed' if (need_node_labeling | default(true)) else 'Skipped (nodes already labeled)' }}"
+          nodeinfo_collector: "{{ 'Deployed' if (nodeinfo_needs_deployment | default(true)) else 'Skipped (already healthy)' }}"
+          nfs_provisioner: "{{ 'Deployed' if (nfs_needs_deployment | default(true)) else 'Skipped (already healthy)' }}"
+          prometheus_stack: >-
+            {%- if prometheus_needs_deployment | default(true) -%}
+              Deployed (v68.3.0)
+            {%- else -%}
+              Skipped ({{ prometheus_helm_info.status.chart | default('version unknown') }} already healthy)
+            {%- endif -%}
+          kepler: >-
+            {%- if kepler_needs_deployment | default(true) -%}
+              Deployed
+            {%- else -%}
+              Skipped (already running on {{ kepler_ds_check.resources[0].status.numberReady | default(0) }}/{{ kepler_ds_check.resources[0].status.desiredNumberScheduled | default(0) }} nodes)
+            {%- endif -%}
+          aibrix: "Deployed/Updated"
+
+    - name: Display deployment summary
+      debug:
+        msg: |
+          ========== Deployment Summary ==========
+          Cluster: {{ cluster_name | default('unknown') }}
+          Namespace: {{ namespace }}
+          
+          Components:
+          - Node Device Labeler: {{ deployment_summary.node_labeler }}
+          - NodeInfo Collector: {{ deployment_summary.nodeinfo_collector }}
+          - NFS Provisioner: {{ deployment_summary.nfs_provisioner }}
+          - Prometheus Stack: {{ deployment_summary.prometheus_stack }}
+          - Kepler: {{ deployment_summary.kepler }}
+          - Aibrix: {{ deployment_summary.aibrix }}
+          
+          Configuration Options:
+          - Skip Healthy Components: {{ skip_healthy_components }}
+          - Update Existing: {{ update_existing_components }}
+          - Force Reinstall: {{ force_reinstall_components }}
+          =======================================
+
+    - name: Cleanup kubeconfig file
+      ansible.builtin.include_role:
+        name: cleanup_kubeconfig
+      

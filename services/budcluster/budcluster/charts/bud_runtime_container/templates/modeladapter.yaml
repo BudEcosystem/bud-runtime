@@ -1,0 +1,18 @@
+{{- range .Values.adapters }}
+---
+apiVersion: model.aibrix.ai/v1alpha1
+kind: ModelAdapter
+metadata:
+  name: {{ .name }}
+  namespace: {{$.Values.namespace}}
+  labels:
+    model.aibrix.ai/name: {{ .name }}
+    model.aibrix.ai/port: "{{ $.Values.containerPort }}"
+spec:
+  baseModel: {{ $.Values.modelName }}
+  podSelector:
+    matchLabels:
+      model.aibrix.ai/name: {{ $.Values.modelName }}
+  artifactURL: {{ .artifactURL }}
+  schedulerName: default
+{{- end }}

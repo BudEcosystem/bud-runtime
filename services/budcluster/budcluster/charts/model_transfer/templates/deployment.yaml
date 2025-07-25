@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ $.Values.podName }}
+  namespace: {{ $.Values.namespace }}
+  labels:
+    app: {{ $.Values.podName }}
+spec:
+  restartPolicy: Never
+  serviceAccountName: model-transfer
+  imagePullSecrets:
+    - name: {{ $.Values.imagePullSecrets.name }}
+  containers:
+    - name: transfer
+      image: {{ $.Values.image }}
+      imagePullPolicy: Always
+      args:
+        - --model-path={{ $.Values.modelPath }}
+        - --operation={{ $.Values.operation }}
+        - --local-path=/data/models-registry
+        - --use-kubernetes
+        - --namespace={{ $.Values.namespace }}
+      envFrom:
+      - configMapRef:
+          name: minio-config-{{ $.Values.podName }}
+      volumeMounts:
+        - name: model-vol
+          mountPath: /data/models-registry
+  volumes:
+    - name: model-vol
+    {{- if eq $.Values.volumeType "nfs" }}
+      nfs:
+        server: "{{ $.Values.nfs.server }}"
+        path: "{{ $.Values.nfs.path }}"
+    {{- else if eq $.Values.volumeType "local" }}
+      persistentVolumeClaim:
+        claimName: "{{ $.Values.pvcName }}"
+    {{- end }}

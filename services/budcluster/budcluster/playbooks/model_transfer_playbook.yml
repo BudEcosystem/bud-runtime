@@ -1,0 +1,116 @@
+---
+- name: Deploy Model Transfer Pod and Copy Files
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars_files:
+    - vars/common.yaml
+
+  vars:
+    helm_release_name: model-transfer
+    helm_chart_path: "{{ charts_dir }}/model_transfer"
+    source_model_path: "{{ source_model_path }}"
+    namespace: "{{namespace}}"
+  roles:
+    - create_kubeconfig
+
+  tasks:
+    - name: Create namespace
+      kubernetes.core.k8s:
+        name: "{{namespace}}"
+        api_version: v1
+        kind: Namespace
+        state: present
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+        force: true
+      register: ns_result
+      ignore_errors: true
+
+    - name: Wait for namespace to be active
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Namespace
+        name: "{{namespace}}"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: ns_status
+      until: ns_status.resources is defined and 
+             ns_status.resources | length > 0 and 
+             ns_status.resources[0].status.phase == "Active"
+      retries: 10
+      delay: 5
+      when: ns_result is not failed
+
+    - name: Install Helm chart for model transfer
+      kubernetes.core.helm:
+        name: "{{ helm_release_name }}"
+        chart_ref: "{{ helm_chart_path }}"
+        release_namespace: "{{ namespace }}"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+        wait: true
+        atomic: true
+        state: present
+        values:
+          namespace: "{{ namespace }}"
+          modelPath: "{{ source_model_path }}"
+          pvcSize: "{{model_size}}"
+          nodes: "{{ nodes }}"
+          minio:
+            endpoint: "{{ minio_endpoint }}"
+            accessKey: "{{ minio_access_key }}"
+            secretKey: "{{ minio_secret_key }}"
+            bucket: "{{ minio_bucket }}"
+            secure: "{{ minio_secure }}"
+          volumeType: "{{ volume_type }}"
+          nfs:
+            server: "{{ nfs_server }}"
+          imagePullSecrets:
+            auth: "{{ image_pull_secrets }}"
+
+    - name: Debug - List all pods in namespace
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: "{{ namespace }}"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: all_pods
+
+    - name: Wait for pod to be running
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: "{{ namespace }}"
+        label_selectors:
+          - "app=model-transfer"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: pod_info
+      until: pod_info.resources is defined and 
+             ((pod_info.resources | type_debug == "list" and
+              pod_info.resources | length > 0 and
+              pod_info.resources[0].status is defined and
+              (pod_info.resources[0].status.phase == "Running" or 
+               pod_info.resources[0].status.phase == "Succeeded")) or
+              (pod_info.resources | type_debug == "dict" and
+              pod_info.resources.status is defined and
+              (pod_info.resources.status.phase == "Running" or
+               pod_info.resources.status.phase == "Succeeded")))
+      retries: 30
+      delay: 10
+
+    - name: Get pod name
+      set_fact:
+        pod_name: "model-transfer-pod"
+      when: all_pods.resources | length > 0
+    
+    # - name: Delete the model transfer pod
+    #   kubernetes.core.k8s:
+    #     state: absent
+    #     kind: Pod
+    #     label_selectors:
+    #       - "app=model-transfer"
+    #     namespace: "{{ namespace }}"
+    #     kubeconfig: "{{ kubeconfig_path }}"
+    #     validate_certs: "{{ validate_certs }}"

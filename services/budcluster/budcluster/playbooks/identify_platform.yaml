@@ -1,0 +1,29 @@
+---
+- name: Identify Platform Type
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars_files:
+    - vars/common.yaml
+
+  roles:
+    - create_kubeconfig
+
+  tasks:
+    - name: Check for OpenShift API
+      kubernetes.core.k8s_info:
+        api_version: config.openshift.io/v1
+        kind: ClusterVersion
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: openshift_check
+      ignore_errors: true
+
+    - name: Set platform type
+      set_fact:
+        platform_type: "{{ 'openshift' if openshift_check.resources | length > 0 else 'kubernetes' }}"
+
+    - name: Display platform type
+      debug:
+        msg: "Detected platform: {{ platform_type }}"

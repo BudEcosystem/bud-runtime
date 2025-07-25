@@ -1,0 +1,32 @@
+# Reference: https://medium.com/@vishal.sharma./run-postgresql-and-pgadmin-using-docker-compose-34120618bcf9
+
+version: '3.9'
+
+services:
+  db:
+    image: postgres
+    restart: always
+    container_name: postgres-db
+    environment:
+      POSTGRES_USER: buduser
+      POSTGRES_PASSWORD: budpassword
+      POSTGRES_DB: budserve
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+  pgadmin:
+    image: dpage/pgadmin4
+    restart: always
+    container_name: pgadmin4_container
+    ports:
+      - "8888:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: user@bud.studio
+      PGADMIN_DEFAULT_PASSWORD: budpassword
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+
+volumes:
+  db-data:
+  pgadmin-data:

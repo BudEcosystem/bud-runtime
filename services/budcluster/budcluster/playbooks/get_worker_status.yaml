@@ -1,0 +1,41 @@
+---
+- name: Get Deployment Status
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars_files:
+    - vars/common.yaml
+
+  roles:
+    - create_kubeconfig
+
+  tasks:
+    - name: Check if namespace exists
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Namespace
+        name: "{{ namespace }}"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: namespace_info
+
+    - name: Fail if namespace doesn't exist
+      fail:
+        msg: "Namespace '{{ namespace }}' does not exist"
+      when: namespace_info.resources | length == 0
+
+    - name: Get Pod Info
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Pod
+        name: "{{ pod_name }}"  # Fetch only the specified pod
+        namespace: "{{ namespace }}"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: pod_info
+
+    - name: Fail if the Pod does not exist
+      fail:
+        msg: "Pod '{{ pod_name }}' does not exist in namespace '{{ namespace }}'"
+      when: pod_info.resources | length == 0

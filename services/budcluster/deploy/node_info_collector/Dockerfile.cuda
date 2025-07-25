@@ -1,0 +1,40 @@
+ARG CUDA_VERSION=12.4.1
+FROM nvidia/cuda:${CUDA_VERSION}-devel-ubuntu22.04 AS env
+ARG CUDA_VERSION=12.4.1
+ARG PYTHON_VERSION=3.12
+ARG TARGETPLATFORM
+ENV DEBIAN_FRONTEND=noninteractive
+
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    util-linux \
+    pciutils \
+    dmidecode \
+    numactl \
+    mbw \
+    git \
+    python3 \
+    python3-pip \
+    python3-dev \
+    && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install kubectl
+RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && \
+    chmod +x kubectl && \
+    mv kubectl /usr/local/bin/
+
+FROM env AS build
+
+RUN pip install --upgrade setuptools wheel pycuda nvidia-ml-py3
+RUN pip install git+https://github.com/BudEcosystem/llmperf.git#egg=LLMPerf
+RUN git clone https://github.com/BudEcosystem/llm-benchmark.git /llm-benchmark
+WORKDIR /llm-benchmark
+RUN python3 -m pip install .
+
+WORKDIR /app
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]

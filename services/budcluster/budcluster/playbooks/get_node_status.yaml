@@ -1,0 +1,35 @@
+---
+- name: Fetch Node Status from Kubernetes Cluster
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars_files:
+    - vars/common.yaml
+    
+  roles:
+    - create_kubeconfig
+
+  tasks:
+    - name: Get node status
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Node
+        name: "{{ node_name }}"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: node_info
+      failed_when: node_info.resources | length == 0
+
+    - name: Extract node ready status
+      set_fact:
+        node_status: >-
+          {{
+            (node_info.resources[0].status.conditions | 
+            selectattr('type', 'equalto', 'Ready') | 
+            map(attribute='status') | first == 'True')
+            | ternary('Ready', 
+              (node_info.resources[0].spec.unschedulable | default(false)) | 
+              ternary('SchedulingDisabled', 'NotReady')
+            )
+          }}

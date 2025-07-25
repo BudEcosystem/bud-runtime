@@ -1,0 +1,32 @@
+
+- name: Get Model Transfer Status
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars_files:
+    - vars/common.yaml
+
+  roles:
+    - create_kubeconfig
+
+  tasks:
+    - name: Get Pod status
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: "{{ namespace }}"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: pod_info
+      failed_when: pod_info.resources | length == 0
+    
+    - name: Get ConfigMap data
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: ConfigMap
+        namespace: "{{ namespace }}"
+        name: "transfer-progress"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: model_transfer_status_configmap
+      failed_when: model_transfer_status_configmap.resources | length == 0
