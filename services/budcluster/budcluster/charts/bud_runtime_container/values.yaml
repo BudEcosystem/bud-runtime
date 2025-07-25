@@ -1,0 +1,33 @@
+chartName: "bud-runtime-container"
+namespace: bud-runtime # will be replaced by the deployment handler
+platform: "kubernetes"
+pullPolicy: Always
+hfToken: "" # will be replaced by the deployment handler
+containerPort: "8000" # will be replaced by the deployment handler
+ingressHost: "bud-runtime-inference.apps.partner.lab.com" # will be replaced by the deployment handler
+
+volumeType: "local" # nfs, local
+pvcName: "models-pvc"
+nfs:
+  server: ""
+  path: "/exports"
+
+nodes: [] # will be replaced by the deployment handler
+
+imagePullSecrets:
+  name: bud-registry-secret
+  auth: {} # replaced with the actual auth
+
+modelName: "" # will be replaced by the deployment handler
+adapters: []
+
+podscaler:
+  enabled: false
+  type: "metrics" # metrics or optimizer
+  minReplicas: 1
+  maxReplicas: 2
+  upFluctuationTolerance: 1.5
+  downFluctuationTolerance: 0.5
+  window: 30s
+  targetMetric: gpu_cache_usage_perc
+  targetValue: 0.5

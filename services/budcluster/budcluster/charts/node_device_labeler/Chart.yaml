@@ -1,0 +1,6 @@
+apiVersion: v2
+name: node-device-labeler
+description: A Helm chart for labeling Kubernetes nodes based on device types (GPU, HPU, CPU)
+type: application
+version: 0.1.0
+appVersion: "1.0.0" 

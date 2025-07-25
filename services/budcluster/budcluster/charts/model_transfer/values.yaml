@@ -1,0 +1,23 @@
+namespace: default
+pvcName: models-pvc
+image: budimages.azurecr.io/budecosystem/minio-downloader:latest
+podName: model-transfer
+pvcSize: 10
+
+imagePullSecrets:
+  name: bud-registry-secret
+  auth: {} # replaced with the actual auth
+  
+operation: "download"
+minio:
+  endpoint: ""
+  accessKey: ""
+  secretKey: ""
+  bucket: ""
+  secure: false
+
+modelPath: ""
+volumeType: ""
+nfs:
+  server: ""
+  path: "/exports"

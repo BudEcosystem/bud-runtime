@@ -1,0 +1,12 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: local-crypto
+  namespace: development
+spec:
+  type: crypto.dapr.localstorage
+  metadata:
+    - name: version
+      value: v1
+    - name: path
+      value: ./crypto-keys/

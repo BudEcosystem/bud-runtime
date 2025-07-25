@@ -1,0 +1,79 @@
+include:
+  - ./docker-compose-redis.yaml
+  - ./docker-compose-postgres.yaml
+
+services:
+  budapp:
+    image: bud-serve/$APP_NAME:$NAMESPACE
+    container_name: bud-serve-$NAMESPACE-$APP_NAME
+    build:
+      context: ..
+      dockerfile: ./deploy/Dockerfile
+    # command: [ "sh", "-c", "uvicorn $APP_NAME.main:app --host 0.0.0.0 --port $APP_PORT --reload" ]
+    command: [ "sh", "-c", "alembic -c ./budapp/alembic.ini upgrade head && uvicorn $APP_NAME.main:app --host 0.0.0.0 --port $APP_PORT --reload" ]
+    ports:
+      - "$DAPR_GRPC_PORT:$DAPR_GRPC_PORT" # Dapr instances communicate over gRPC so gRPC port needs to be exposed
+      - "$DAPR_HTTP_PORT:$DAPR_HTTP_PORT" # Expose Dapr HTTP port for service invocation
+      - "$APP_PORT:$APP_PORT" # Expose app port for debugging purposes
+    volumes:
+      - ../:/app/
+    env_file:
+      - path: ../.env
+        required: true
+    depends_on:
+      - budapp-redis
+      - budapp-placement
+      - budapp-postgres
+      - budapp-scheduler
+    networks:
+      - bud-microframe-nw
+  budapp-sidecar:
+    container_name: bud-serve-$NAMESPACE-$APP_NAME-dapr
+    image: "daprio/daprd:edge"
+    command: [
+      "./daprd",
+      "--app-id", "$APP_NAME",
+      "--app-port", "$APP_PORT",
+      "--dapr-http-port", "$DAPR_HTTP_PORT",
+      "--dapr-grpc-port", "$DAPR_GRPC_PORT",
+      "--placement-host-address", "$DAPR_PLACEMENT_HOST:$DAPR_PLACEMENT_PORT", # Dapr's placement service can be reach via the docker DNS entry
+      "--scheduler-host-address", "${DAPR_SCHEDULER_HOST:-0.0.0.0}:${DAPR_SCHEDULER_PORT:-50006}",
+      "--dapr-internal-grpc-port", "${DAPR_INTERNAL_GRPC_PORT:-50002}",
+      "--resources-path", "/components",
+      "--config", "/config/appconfig.yaml",
+      "--log-as-json"
+    ]
+    env_file:
+      - path: ../.env
+        required: true
+    volumes:
+      - "${DAPR_COMPONENTS:-../.dapr/components/}:/components" # Mount the components folder for the runtime to use. The mounted location must match the --resources-path argument.
+      - "${DAPR_APP_CONFIG:-../.dapr/appconfig-dev.yaml}:/config/appconfig.yaml" # Mount the config file for the runtime to use. The mounted location must match the --config argument.
+    depends_on:
+      - budapp
+    network_mode: "service:budapp" # Attach the sidecar service to the app network namespace
+  budapp-placement:
+    container_name: bud-serve-$NAMESPACE-placement
+    image: "daprio/placement:edge"
+    command: [ "./placement", "--port", "50006" ]
+    ports:
+      - "50006:50006"
+  budapp-scheduler:
+    container_name: budserve-$NAMESPACE-$APP_NAME-scheduler
+    image: "daprio/dapr"
+    command: [ "./scheduler", "--port", "$DAPR_SCHEDULER_PORT", "--log-as-json" ]
+    ports:
+      - "$DAPR_SCHEDULER_PORT:$DAPR_SCHEDULER_PORT"
+    # WARNING - This is a tmpfs volume, your state will not be persisted across restarts
+    volumes:
+      - type: tmpfs
+        target: /data
+        tmpfs:
+          size: 10GB
+    privileged: true
+    networks:
+      - bud-microframe-nw
+
+networks:
+  bud-microframe-nw:
+    name: bud-microframe-$NAMESPACE

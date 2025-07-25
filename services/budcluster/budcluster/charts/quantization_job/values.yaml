@@ -1,0 +1,42 @@
+# Default values for quantization-job
+image:
+  repository: your-registry/quantization-image:latest
+  pullPolicy: IfNotPresent
+
+imagePullSecrets:
+  name: bud-registry-secret
+  auth: {} # replaced with the actual auth
+
+serviceAccount:
+  create: true
+  name: quantization-job-sa
+
+job:
+  backoffLimit: 3
+  activeDeadlineSeconds: 3600  # 1 hour timeout
+  restartPolicy: OnFailure
+
+resources:
+  requests:
+    cpu: 14
+    memory: 20Gi
+  limits:
+    cpu: 14
+    memory: 20Gi
+
+# Volume configurations
+volumeType: "local" # nfs, local
+pvcName: "models-pvc"
+nfs:
+  server: ""
+  path: "/exports"
+
+quantizationConfig:
+  # Your JSON/YAML configuration here
+  method: RTN
+  # ... other config values ...
+
+# Hugging Face token secret reference
+hfTokenSecret:
+  name: hf-token-secret
+  key: token

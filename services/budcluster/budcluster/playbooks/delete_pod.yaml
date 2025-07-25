@@ -1,0 +1,86 @@
+---
+- name: Delete BudServe Pod
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars_files:
+    - vars/common.yaml
+  vars:
+    chart_path: "{{ charts_dir }}/bud_runtime_container"
+    release_name: "{{ runtime_release_name | default('bud-runtime') }}"
+  roles:
+    - create_kubeconfig
+
+  tasks:
+    - name: Delete Pod
+      kubernetes.core.k8s:
+        state: absent
+        name: "{{ pod_name }}"
+        namespace: "{{ namespace }}"
+        kind: Pod
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+    - name: Get the current deployment details
+      kubernetes.core.k8s_info:
+        kind: Deployment
+        namespace: "{{ namespace }}"
+        name: "{{ deployment_name }}"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: deployment_info
+    - name: Calculate new replica count
+      set_fact:
+        new_replica_count: "{{ item }}"
+      loop: "{{ [[(deployment_info.resources[0].spec.replicas | default(1) | int) - 1, 0] | max | int] }}"
+    - name: Scale deployment to desired replica count
+      kubernetes.core.k8s:
+        kind: Deployment
+        name: "{{ deployment_name }}"
+        namespace: "{{ namespace }}"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+        definition:           # Changed from resource_definition to definition
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: "{{ deployment_name }}"
+            namespace: "{{ namespace }}"
+          spec:
+            replicas: "{{ new_replica_count }}"
+    # - name: Delay for scaling down the deployment
+    #   pause:
+    #     seconds: 10
+    # - name: Get the current deployment details
+    #   kubernetes.core.k8s_info:
+    #     kind: Deployment
+    #     namespace: "{{ namespace }}"
+    #     name: "{{ deployment_name }}"
+    #     kubeconfig: "{{ kubeconfig_path }}"
+    #     validate_certs: "{{ validate_certs }}"
+    #   register: new_deployment_info
+    # - name: Get list of Pods
+    #   kubernetes.core.k8s_info:
+    #     api_version: v1
+    #     kind: Pod
+    #     namespace: "{{ namespace }}"
+    #     kubeconfig: "{{ kubeconfig_path }}"
+    #     validate_certs: "{{ validate_certs }}"
+    #   register: pod_info
+    # - name: Filter running pods
+    #   set_fact:
+    #     running_pods: "{{ pod_info.resources | selectattr('status.phase', 'equalto', 'Running') | list }}"
+    # - name: Print running pods
+    #   debug:
+    #     var: (running_pods | length)
+    # - name: Print new deployment info
+    #   debug:
+    #     var: new_deployment_info.resources[0].spec.replicas
+    # - name: Confirm the deployment is scaled down
+    #   assert:
+    #     that:
+    #       - new_deployment_info.resources[0].spec.replicas == (running_pods | length)
+    #     fail_msg: "The deployment {{ deployment_name }} in namespace {{ namespace }} is not scaled down."
+    #     success_msg: "The deployment {{ deployment_name }} in namespace {{ namespace }} is successfully scaled down."
+
+

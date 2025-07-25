@@ -1,0 +1,198 @@
+[
+    {
+        "id": "49ec33d5-a86b-4e03-8a4f-156a260c93e5",
+        "name": "Test Cluster 1",
+        "nodes": [
+            {
+                "name": "ng-exoi24arvi-5a7b5",
+                "id": "49ec33d5-a86b-4e03-8a4f-156a260c93e5",
+                "devices": [
+                    {
+                        "name": "Intel(R) Xeon(R) Platinum 8368 CPU @ 2.40GHz",
+                        "type": "cpu",
+                        "peak_i4_TFLOPS": 500,
+                        "peak_i8_TFLOPS": 250,
+                        "available_count": 152,
+                        "peak_fp16_TFLOPS": 2.0672,
+                        "mem_per_GPU_in_GB": 503.749603271484,
+                        "hbm_bandwidth_in_GB_per_sec": 56.25,
+                        "intra_node_min_message_latency": 0.000008,
+                        "inter_node_bandwidth_in_GB_per_sec": 200,
+                        "intra_node_bandwidth_in_GB_per_sec": 4.8434013671875
+                    },
+                    {
+                        "name": "HL_225",
+                        "type": "hpu",
+                        "peak_i4_TFLOPS": 1728,
+                        "peak_i8_TFLOPS": 864,
+                        "available_count": 8,
+                        "peak_fp16_TFLOPS": 432,
+                        "mem_per_GPU_in_GB": 96,
+                        "hbm_bandwidth_in_GB_per_sec": 2450,
+                        "intra_node_min_message_latency": 0.000008,
+                        "inter_node_bandwidth_in_GB_per_sec": 200,
+                        "intra_node_bandwidth_in_GB_per_sec": 300
+                    }
+                ]
+            },
+            {
+                "name": "ng-exoi24arvi-eb598",
+                "id": "49ec33d5-a86b-4e03-8a4f-156a260c93e6",
+                "devices": [
+                    {
+                        "name": "Intel(R) Xeon(R) Platinum 8368 CPU @ 2.40GHz",
+                        "type": "cpu",
+                        "peak_i4_TFLOPS": 500,
+                        "peak_i8_TFLOPS": 250,
+                        "available_count": 152,
+                        "peak_fp16_TFLOPS": 2.0672,
+                        "mem_per_GPU_in_GB": 503.749639511108,
+                        "hbm_bandwidth_in_GB_per_sec": 56.25,
+                        "intra_node_min_message_latency": 0.000008,
+                        "inter_node_bandwidth_in_GB_per_sec": 200,
+                        "intra_node_bandwidth_in_GB_per_sec": 5.140681640625
+                    },
+                    {
+                        "name": "HL_225",
+                        "type": "hpu",
+                        "peak_i4_TFLOPS": 1728,
+                        "peak_i8_TFLOPS": 864,
+                        "available_count": 8,
+                        "peak_fp16_TFLOPS": 432,
+                        "mem_per_GPU_in_GB": 96,
+                        "hbm_bandwidth_in_GB_per_sec": 2450,
+                        "intra_node_min_message_latency": 0.000008,
+                        "inter_node_bandwidth_in_GB_per_sec": 200,
+                        "intra_node_bandwidth_in_GB_per_sec": 300
+                    }
+                ]
+            },
+            {
+                "name": "ng-exoi24arvi-eb599",
+                "id": "49ec33d5-a86b-4e03-8a4f-156a260c93e7",
+                "devices": [
+                    {
+                        "name": "Intel(R) Xeon(R) Platinum 8368 CPU @ 2.40GHz",
+                        "type": "cpu",
+                        "peak_i4_TFLOPS": 500,
+                        "peak_i8_TFLOPS": 250,
+                        "available_count": 152,
+                        "peak_fp16_TFLOPS": 2.0672,
+                        "mem_per_GPU_in_GB": 503.749639511108,
+                        "hbm_bandwidth_in_GB_per_sec": 56.25,
+                        "intra_node_min_message_latency": 0.000008,
+                        "inter_node_bandwidth_in_GB_per_sec": 200,
+                        "intra_node_bandwidth_in_GB_per_sec": 5.140681640625
+                    },
+                    {
+                        "name": "HL_225",
+                        "type": "hpu",
+                        "peak_i4_TFLOPS": 1728,
+                        "peak_i8_TFLOPS": 864,
+                        "available_count": 8,
+                        "peak_fp16_TFLOPS": 432,
+                        "mem_per_GPU_in_GB": 96,
+                        "hbm_bandwidth_in_GB_per_sec": 2450,
+                        "intra_node_min_message_latency": 0.000008,
+                        "inter_node_bandwidth_in_GB_per_sec": 200,
+                        "intra_node_bandwidth_in_GB_per_sec": 300
+                    }
+                ]
+            },
+            {
+                "name": "ng-exoi24arvi-eb5a0",
+                "id": "49ec33d5-a86b-4e03-8a4f-156a260c93e8",
+                "devices": [
+                    {
+                        "name": "Intel(R) Xeon(R) Platinum 8368 CPU @ 2.40GHz",
+                        "type": "cpu",
+                        "peak_i4_TFLOPS": 500,
+                        "peak_i8_TFLOPS": 250,
+                        "available_count": 152,
+                        "peak_fp16_TFLOPS": 2.0672,
+                        "mem_per_GPU_in_GB": 503.749639511108,
+                        "hbm_bandwidth_in_GB_per_sec": 56.25,
+                        "intra_node_min_message_latency": 0.000008,
+                        "inter_node_bandwidth_in_GB_per_sec": 200,
+                        "intra_node_bandwidth_in_GB_per_sec": 5.140681640625
+                    },
+                    {
+                        "name": "HL_225",
+                        "type": "hpu",
+                        "peak_i4_TFLOPS": 1728,
+                        "peak_i8_TFLOPS": 864,
+                        "available_count": 8,
+                        "peak_fp16_TFLOPS": 432,
+                        "mem_per_GPU_in_GB": 96,
+                        "hbm_bandwidth_in_GB_per_sec": 2450,
+                        "intra_node_min_message_latency": 0.000008,
+                        "inter_node_bandwidth_in_GB_per_sec": 200,
+                        "intra_node_bandwidth_in_GB_per_sec": 300
+                    }
+                ]
+            },
+            {
+                "name": "ng-exoi24arvi-eb5a1",
+                "id": "49ec33d5-a86b-4e03-8a4f-156a260c93e9",
+                "devices": [
+                    {
+                        "name": "Intel(R) Xeon(R) Platinum 8368 CPU @ 2.40GHz",
+                        "type": "cpu",
+                        "peak_i4_TFLOPS": 500,
+                        "peak_i8_TFLOPS": 250,
+                        "available_count": 152,
+                        "peak_fp16_TFLOPS": 2.0672,
+                        "mem_per_GPU_in_GB": 503.749639511108,
+                        "hbm_bandwidth_in_GB_per_sec": 56.25,
+                        "intra_node_min_message_latency": 0.000008,
+                        "inter_node_bandwidth_in_GB_per_sec": 200,
+                        "intra_node_bandwidth_in_GB_per_sec": 5.140681640625
+                    },
+                    {
+                        "name": "HL_225",
+                        "type": "hpu",
+                        "peak_i4_TFLOPS": 1728,
+                        "peak_i8_TFLOPS": 864,
+                        "available_count": 8,
+                        "peak_fp16_TFLOPS": 432,
+                        "mem_per_GPU_in_GB": 96,
+                        "hbm_bandwidth_in_GB_per_sec": 2450,
+                        "intra_node_min_message_latency": 0.000008,
+                        "inter_node_bandwidth_in_GB_per_sec": 200,
+                        "intra_node_bandwidth_in_GB_per_sec": 300
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "id": "8fcd49bd-fd83-43e3-85ce-7e203b47d05d",
+        "name": "Dev Cluster 114",
+        "nodes": []
+    },
+    {
+        "id": "d01a72dc-3e9d-4776-b2c8-67fc79d83a3d",
+        "name": "Xeon Dev",
+        "nodes": [
+            {
+                "name": "dev-server",
+                "id": "d01a72dc-3e9d-4776-b2c8-67fc79d83a3d",
+                "devices": [
+                    {
+                        "name": "Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz",
+                        "type": "cpu",
+                        "peak_i4_TFLOPS": 500,
+                        "peak_i8_TFLOPS": 250,
+                        "available_count": 32,
+                        "peak_fp16_TFLOPS": 0.3584,
+                        "mem_per_GPU_in_GB": 62.778751373291,
+                        "hbm_bandwidth_in_GB_per_sec": 25,
+                        "intra_node_min_message_latency": 0.000008,
+                        "inter_node_bandwidth_in_GB_per_sec": 200,
+                        "intra_node_bandwidth_in_GB_per_sec": 6.42615234375
+                    }
+                ]
+            }
+        ]
+    }
+]

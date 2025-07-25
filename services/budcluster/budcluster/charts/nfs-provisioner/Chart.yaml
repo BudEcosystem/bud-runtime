@@ -1,0 +1,6 @@
+apiVersion: v2
+name: nfs-provisioner
+description: A Helm chart to create a NFS provisioner
+type: application
+version: 0.1.0
+appVersion: "1.0"

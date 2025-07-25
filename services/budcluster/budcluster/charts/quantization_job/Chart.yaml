@@ -1,0 +1,6 @@
+apiVersion: v2
+name: quantization-job
+description: A Helm chart for running model quantization as a Kubernetes Job
+type: application
+version: 0.1.0
+appVersion: "1.0.0" 

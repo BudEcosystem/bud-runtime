@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: minio-config-{{ $.Values.podName }}
+  namespace: {{ $.Values.namespace }}
+data:
+  MINIO_ENDPOINT: "{{ $.Values.minio.endpoint }}"
+  MINIO_ACCESS_KEY: "{{ $.Values.minio.accessKey }}"
+  MINIO_SECRET_KEY: "{{ $.Values.minio.secretKey }}"
+  MINIO_BUCKET: "{{ $.Values.minio.bucket }}"
+  MINIO_SECURE: "{{ $.Values.minio.secure }}"
+  LOCAL_PATH: "/data/models-registry" 

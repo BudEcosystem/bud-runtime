@@ -1,0 +1,56 @@
+kube-prometheus-stack:
+  prometheus-node-exporter:
+    enabled: true
+    service:
+      port: 9100
+      targetPort: 9100
+
+  prometheus:
+    enabled: true
+    prometheusSpec:
+      externalLabels:
+        cluster: "remote-cluster-1"
+      remoteWrite:
+        - url: "https://metric.bud.studio/api/v1/write"
+          queueConfig:
+            maxSamplesPerSend: 1000
+            capacity: 2500
+            maxShards: 200
+            minShards: 1
+            maxRetries: 10
+            minBackoff: 30ms
+            maxBackoff: 5s
+      retention: 24h
+      resources:
+        requests:
+          memory: "1Gi"
+          cpu: "250m"
+        limits:
+          memory: "2Gi"
+          cpu: "500m"
+      storageSpec:
+        volumeClaimTemplate:
+          spec:
+            accessModes: ["ReadWriteOnce"]
+            resources:
+              requests:
+                storage: 20Gi
+
+  kube-state-metrics:
+    enabled: true
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "100m"
+      limits:
+        memory: "128Mi"
+        cpu: "200m"
+
+  grafana:
+    enabled: false
+
+  alertmanager:
+    enabled: false
+
+  networkPolicy:
+    enabled: false

@@ -1,0 +1,33 @@
+{{- range $key, $device := .Values.devices }}
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ $.Values.chartName }}-{{ $key }}
+  namespace: {{ $.Release.Namespace }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ $.Values.chartName }}-{{ $key }}
+  template:
+    metadata:
+      labels:
+        app: {{ $.Values.chartName }}-{{ $key }}
+    spec:
+      nodeSelector:
+        device.kubernetes.io/type: {{ $key }}
+      serviceAccountName: {{ $.Values.serviceAccount.name }}
+      imagePullSecrets:
+      - name: {{ $.Values.imagePullSecrets.name }}
+      {{- if eq $key "cuda" }}
+      runtimeClassName: nvidia
+      {{- end }}
+      containers:
+      {{- if or (eq $key "cpu") (eq $key "cpu-amx") }}
+        {{- include "node-info-collector-cpu" (dict "device" $device) | nindent 8 }}
+      {{- else if eq $key "cuda" }}
+        {{- include "node-info-collector-cuda" (dict "device" $device) | nindent 8 }}
+      {{- else if eq $key "hpu" }}
+        {{- include "node-info-collector-hpu" (dict "device" $device) | nindent 8 }}
+      {{- end }}
+{{- end }}

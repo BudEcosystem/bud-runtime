@@ -1,0 +1,53 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "quantization-job.fullname" . }}
+  labels:
+    {{- include "quantization-job.labels" . | nindent 4 }}
+spec:
+  backoffLimit: {{ .Values.job.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.job.activeDeadlineSeconds }}
+  template:
+    metadata:
+      labels:
+        {{- include "quantization-job.selectorLabels" . | nindent 8 }}
+    spec:
+      imagePullSecrets:
+        - name: {{ .Values.imagePullSecrets.name }}
+      serviceAccountName: {{ include "quantization-job.serviceAccountName" . }}
+      restartPolicy: {{ .Values.job.restartPolicy }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: NAMESPACE
+              value: {{ .Values.namespace }}
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.hfTokenSecret.name | default "hf-token-secret" }}
+                  key: {{ .Values.hfTokenSecret.key | default "token" }}
+          args:
+            - /config/quantization-config.yml
+            - use_kubernetes
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: model-registry
+              mountPath: /data/model-registry
+            - name: config-volume
+              mountPath: /config
+      volumes:
+      - name: model-registry
+      {{- if eq $.Values.volumeType "nfs" }}
+        nfs:
+          server: "{{ $.Values.nfs.server }}"
+          path: "{{ $.Values.nfs.path }}"
+      {{- else if eq $.Values.volumeType "local" }}
+        persistentVolumeClaim:
+          claimName: "{{ $.Values.pvcName }}"
+      {{- end }}
+      - name: config-volume
+        configMap:
+          name: {{ include "quantization-job.fullname" . }}-config
