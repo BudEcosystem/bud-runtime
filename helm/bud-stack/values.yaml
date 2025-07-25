@@ -359,7 +359,7 @@ apps:
       - name: "add-model-dir-pv"
         mountPath: "{{ .Values.globalEnv.data.ADD_MODEL_DIR }}"
   - name: "budui" # Second instance of budui from original, assuming this is the primary one
-    image: "budstudio/bud-dashboard:0.5.0"
+    image: "budstudio/bud-dashboard:0.7.0"
     containerPort: 3000
     daprAppId: "budui"
     DisableShell: "True" # App-specific flag
