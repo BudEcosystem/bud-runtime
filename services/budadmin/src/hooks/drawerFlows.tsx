@@ -3465,6 +3465,9 @@ const selectFallbackDeployment: DrawerFlowType = {
         },
       ],
     },
+  ],
+};
+
 // New Experiment Flow
 const newExperiment: DrawerFlowType = {
   title: "New Experiment",
