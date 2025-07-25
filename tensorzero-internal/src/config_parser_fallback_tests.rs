@@ -94,6 +94,6 @@ mod tests {
 
         let chain = result.unwrap_err();
         // The cycle should be detected
-        assert!(chain.len() > 0);
+        assert!(!chain.is_empty());
     }
 }
