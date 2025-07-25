@@ -14,6 +14,7 @@ Bud-stack is a comprehensive multi-service platform for AI/ML model deployment a
 - **budmetrics**: Observability service built on ClickHouse for analytics and time-series metrics collection
 - **budnotify**: Notification service for pub/sub messaging across the platform
 - **ask-bud**: AI assistant service providing cluster and performance analysis capabilities
+- **budgateway**: Rust-based high-performance API gateway service for model inference routing and load balancing
 
 ### Frontend Service (TypeScript/Next.js)
 - **budadmin**: Next.js 14 dashboard application for managing AI/ML model deployments and infrastructure with real-time updates via Socket.io
@@ -32,7 +33,10 @@ bud-stack/
 │   ├── budmetrics/          # Observability service (ClickHouse analytics)
 │   ├── budnotify/           # Notification service (pub/sub messaging)
 │   ├── ask-bud/             # AI assistant service
-│   └── budadmin/            # Next.js 14 frontend dashboard
+│   ├── budgateway/          # Rust API gateway service (high-performance inference routing)
+│   ├── budadmin/            # Next.js 14 frontend dashboard
+│   ├── budeval/             # Evaluation service (AI model benchmarking)
+│   └── budplayground/       # Interactive playground interface
 ├── infra/
 │   ├── terraform/           # Infrastructure as code (multi-cloud)
 │   └── helm/               # Main Helm chart with dependencies
@@ -54,7 +58,7 @@ nix develop .#bud
 Each service has its own development setup:
 
 ```bash
-# Backend Python services (FastAPI with Dapr)
+# Backend Python services (FastAPI with Dapr) - use --build flag for first run
 cd services/budapp && ./deploy/start_dev.sh
 cd services/budcluster && ./deploy/start_dev.sh --build
 cd services/budsim && ./deploy/start_dev.sh --build
@@ -64,7 +68,13 @@ cd services/budnotify && ./deploy/start_dev.sh
 cd services/ask-bud && ./deploy/start_dev.sh
 
 # Frontend dashboard (Next.js 14)
-cd services/budadmin && npm run dev  # Starts on http://localhost:8007
+cd services/budadmin && npm install && npm run dev  # Starts on http://localhost:8007
+
+# Rust gateway service
+cd services/budgateway && cargo run
+
+# Stop services
+cd services/<service_name> && ./deploy/stop_dev.sh  # For Python services
 ```
 
 ## Common Development Commands
@@ -88,19 +98,37 @@ pytest tests/test_specific.py::test_function
 
 # Run tests with Dapr (required for most services)
 pytest --dapr-http-port 3510 --dapr-api-token <YOUR_DAPR_API_TOKEN>
+
+# Install pre-commit hooks for code quality
+./scripts/install_hooks.sh
 ```
 
 #### Frontend Service (budadmin)
 ```bash
+# Development server (runs on port 8007)
+npm run dev
+
 # Linting and building
 npm run lint
 npm run build
 
-# Development server
-npm run dev
-
 # Production server  
 npm run start
+```
+
+#### Rust Service (budgateway)
+```bash
+# Format code
+cargo fmt
+
+# Lint code
+cargo clippy
+
+# Run tests
+cargo test
+
+# Build project
+cargo build --release
 ```
 
 ### Database Operations
@@ -158,6 +186,7 @@ nix develop  # Enter development shell with k3d, kubectl, helm, opentofu, azure-
 
 ### Key Technologies
 - **Python 3.8+** with FastAPI and budmicroframe for REST APIs
+- **Rust** for high-performance gateway service (budgateway)
 - **SQLAlchemy + Alembic** for PostgreSQL ORM and migrations
 - **ClickHouse** for time-series analytics (budmetrics)
 - **Pydantic** for data validation and serialization
@@ -200,6 +229,7 @@ Each service requires `.env` file (copy from `.env.sample`):
 - **budmetrics**: ClickHouse, Redis, Dapr configuration
 - **budnotify**: Redis, Dapr, notification provider credentials
 - **ask-bud**: Database, Redis, Dapr, AI model configuration
+- **budgateway**: Redis, gateway configuration, model routing settings
 - **budadmin**: `NEXT_PUBLIC_BASE_URL`, `NEXT_PUBLIC_NOVU_*`, authentication keys
 
 ## Development Guidelines
@@ -212,7 +242,7 @@ Each service requires `.env` file (copy from `.env.sample`):
 
 ### Service Patterns (consistent across all services)
 
-#### Backend Services (budapp, budcluster, budsim, budmodel, budmetrics, budnotify, ask-bud)
+#### Python Backend Services (budapp, budcluster, budsim, budmodel, budmetrics, budnotify, ask-bud)
 - **API Layer**: Routes in `*_routes.py` (budapp) or `routes.py` (other services)
 - **Business Logic**: Services in `services.py` 
 - **Data Access**: CRUD operations in `crud.py`
@@ -220,6 +250,12 @@ Each service requires `.env` file (copy from `.env.sample`):
 - **Data Validation**: Pydantic schemas in `schemas.py`
 - **Workflows**: Long-running Dapr workflows in `workflows.py`
 - **Configuration**: Using budmicroframe for consistent config management
+
+#### Rust Gateway Service (budgateway)
+- **Configuration**: TOML-based configuration in `config/`
+- **Route Handlers**: HTTP route handling in `gateway/src/`
+- **Model Integration**: Provider proxy patterns for various AI model APIs
+- **Load Balancing**: High-performance request routing and load balancing
 
 #### Frontend Service (budadmin)
 - **Pages**: Next.js pages in `/src/pages/`

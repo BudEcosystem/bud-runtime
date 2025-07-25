@@ -1,487 +1,666 @@
-<img src="https://github.com/user-attachments/assets/47d67430-386d-4675-82ad-d4734d3262d9" width=128 height=128>
+# BudGateway Service
 
-# TensorZero
+[![License](https://img.shields.io/badge/License-AGPL%203.0-blue.svg)](https://opensource.org/licenses/AGPL-3.0)
+[![Rust](https://img.shields.io/badge/rust-1.70+-orange.svg)](https://www.rust-lang.org/)
+[![Tokio](https://img.shields.io/badge/tokio-async-blue.svg)](https://tokio.rs/)
+[![Redis](https://img.shields.io/badge/redis-6.0+-red.svg)](https://redis.io/)
 
-**TensorZero creates a feedback loop for optimizing LLM applications — turning production data into smarter, faster, and cheaper models.**
+A high-performance API gateway service built in Rust for model inference routing and load balancing. BudGateway provides enterprise-grade performance, reliability, and scalability for AI/ML model serving with sub-millisecond latency overhead.
 
-1. Integrate our model gateway
-2. Send metrics or feedback
-3. Optimize prompts, models, and inference strategies
-4. Watch your LLMs improve over time
+## 🚀 Features
 
-It provides a **data & learning flywheel for LLMs** by unifying:
+- **High-Performance Routing**: Sub-millisecond latency overhead with async Rust architecture
+- **Load Balancing**: Intelligent request distribution across multiple model endpoints
+- **Multi-Provider Support**: Routes requests to various AI/ML serving engines (VLLM, SGLang, LiteLLM)
+- **Rate Limiting**: Configurable rate limiting per user, model, and endpoint
+- **Circuit Breaker**: Automatic failover and circuit breaking for unhealthy endpoints
+- **Request/Response Transformation**: Protocol conversion and payload transformation
+- **Metrics & Monitoring**: Comprehensive metrics collection with Prometheus integration
+- **Authentication & Authorization**: JWT-based authentication with role-based access control
+- **Caching**: Intelligent response caching with Redis backend
+- **Health Checking**: Active health monitoring of downstream services
 
-- [x] **Inference:** one API for all LLMs, with <1ms P99 overhead
-- [x] **Observability:** inference & feedback → your database
-- [x] **Optimization:** from prompts to fine-tuning and RL
-- [x] **Evaluations:** compare prompts, models, inference strategies
-- [x] **Experimentation:** built-in A/B testing, routing, fallbacks
+## 📋 Table of Contents
 
----
+- [Architecture](#-architecture)
+- [Prerequisites](#-prerequisites)
+- [Quick Start](#-quick-start)
+- [Development](#-development)
+- [Configuration](#-configuration)
+- [API Documentation](#-api-documentation)
+- [Deployment](#-deployment)
+- [Testing](#-testing)
+- [Troubleshooting](#-troubleshooting)
 
-<p align="center">
-  <b><a href="https://www.tensorzero.com/" target="_blank">Website</a></b>
-  ·
-  <b><a href="https://www.tensorzero.com/docs" target="_blank">Docs</a></b>
-  ·
-  <b><a href="https://www.x.com/tensorzero" target="_blank">Twitter</a></b>
-  ·
-  <b><a href="https://www.tensorzero.com/slack" target="_blank">Slack</a></b>
-  ·
-  <b><a href="https://www.tensorzero.com/discord" target="_blank">Discord</a></b>
-  <br>
-  <br>
-  <b><a href="https://www.tensorzero.com/docs/quickstart" target="_blank">Quick Start (5min)</a></b>
-  ·
-  <b><a href="https://www.tensorzero.com/docs/gateway/tutorial" target="_blank">Comprehensive Tutorial</a></b>
-  ·
-  <b><a href="https://www.tensorzero.com/docs/gateway/deployment" target="_blank">Deployment Guide</a></b>
-  ·
-  <b><a href="https://www.tensorzero.com/docs/gateway/api-reference" target="_blank">API Reference</a></b>
-  ·
-  <b><a href="https://www.tensorzero.com/docs/gateway/deployment" target="_blank">Configuration Reference</a></b>
-</p>
+## 🏗️ Architecture
 
----
+### Service Structure
 
-<table>
-  <tr>
-    <td width="30%" valign="top"><b>What is TensorZero?</b></td>
-    <td width="70%" valign="top">TensorZero is an open-source framework for building production-grade LLM applications. It unifies an LLM gateway, observability, optimization, evaluations, and experimentation.</td>
-  </tr>
-  <tr>
-    <td width="30%" valign="top"><b>How is TensorZero different from other LLM frameworks?</b></td>
-    <td width="70%" valign="top">
-      1. TensorZero enables you to optimize complex LLM applications based on production metrics and human feedback.<br>
-      2. TensorZero supports the needs of industrial-scale LLM applications: low latency, high throughput, type safety, self-hosted, GitOps, customizability, etc.<br>
-      3. TensorZero unifies the entire LLMOps stack, creating compounding benefits. For example, LLM evaluations can be used for fine-tuning models alongside AI judges.
-    </td>
-  </tr>
-  <tr>
-    <td width="30%" valign="top"><b>Can I use TensorZero with ___?</b></td>
-    <td width="70%" valign="top">Yes. Every major programming language is supported. You can use TensorZero with our Python client, any OpenAI SDK, or our HTTP API.</td>
-  </tr>
-  <tr>
-    <td width="30%" valign="top"><b>Is TensorZero production-ready?</b></td>
-    <td width="70%" valign="top">Yes. Here's a case study: <b><a href="https://www.tensorzero.com/blog/case-study-automating-code-changelogs-at-a-large-bank-with-llms">Automating Code Changelogs at a Large Bank with LLMs</a></b></td>
-  </tr>
-  <tr>
-    <td width="30%" valign="top"><b>How much does TensorZero cost?</b></td>
-    <td width="70%" valign="top">Nothing. TensorZero is 100% self-hosted and open-source. There are no paid features.</td>
-  </tr>
-  <tr>
-    <td width="30%" valign="top"><b>Who is building TensorZero?</b></td>
-    <td width="70%" valign="top">Our technical team includes a former Rust compiler maintainer, machine learning researchers (Stanford, CMU, Oxford, Columbia) with thousands of citations, and the chief product officer of a decacorn startup. We're backed by the same investors as leading open-source projects (e.g. ClickHouse, CockroachDB) and AI labs (e.g. OpenAI, Anthropic).</td>
-  </tr>
-  <tr>
-    <td width="30%" valign="top"><b>How do I get started?</b></td>
-    <td width="70%" valign="top">You can adopt TensorZero incrementally. Our <b><a href="https://www.tensorzero.com/docs/quickstart">Quick Start</a></b> goes from a vanilla OpenAI wrapper to a production-ready LLM application with observability and fine-tuning in just 5 minutes.</td>
-  </tr>
-</table>
-
----
-
-## Features
-
-### 🌐 LLM Gateway
-
-> **Integrate with TensorZero once and access every major LLM provider.**
-
-<table>
-  <tr></tr> <!-- flip highlight order -->
-  <tr>
-    <td width="50%" align="center" valign="middle"><b>Model Providers</b></td>
-    <td width="50%" align="center" valign="middle"><b>Features</b></td>
-  </tr>
-  <tr>
-    <td width="50%" align="left" valign="top">
-      <p>
-        The TensorZero Gateway natively supports:
-      </p>
-      <ul>
-        <li><b><a href="https://www.tensorzero.com/docs/gateway/guides/providers/anthropic">Anthropic</a></b></li>
-        <li><b><a href="https://www.tensorzero.com/docs/gateway/guides/providers/aws-bedrock">AWS Bedrock</a></b></li>
-        <li><b><a href="https://www.tensorzero.com/docs/gateway/guides/providers/aws-sagemaker">AWS SageMaker</a></b></li>
-        <li><b><a href="https://www.tensorzero.com/docs/gateway/guides/providers/azure">Azure OpenAI Service</a></b></li>
-        <li><b><a href="https://www.tensorzero.com/docs/gateway/guides/providers/deepseek">DeepSeek</a></b></li>
-        <li><b><a href="https://www.tensorzero.com/docs/gateway/guides/providers/fireworks">Fireworks</a></b></li>
-        <li><b><a href="https://www.tensorzero.com/docs/gateway/guides/providers/gcp-vertex-ai-anthropic">GCP Vertex AI Anthropic</a></b></li>
-        <li><b><a href="https://www.tensorzero.com/docs/gateway/guides/providers/gcp-vertex-ai-gemini">GCP Vertex AI Gemini</a></b></li>
-        <li><b><a href="https://www.tensorzero.com/docs/gateway/guides/providers/google-ai-studio-gemini">Google AI Studio (Gemini API)</a></b></li>
-        <li><b><a href="https://www.tensorzero.com/docs/gateway/guides/providers/hyperbolic">Hyperbolic</a></b></li>
-        <li><b><a href="https://www.tensorzero.com/docs/gateway/guides/providers/mistral">Mistral</a></b></li>
-        <li><b><a href="https://www.tensorzero.com/docs/gateway/guides/providers/openai">OpenAI</a></b></li>
-        <li><b><a href="https://www.tensorzero.com/docs/gateway/guides/providers/together">Together</a></b></li>
-        <li><b><a href="https://www.tensorzero.com/docs/gateway/guides/providers/vllm">vLLM</a></b></li>
-        <li><b><a href="https://www.tensorzero.com/docs/gateway/guides/providers/xai">xAI</a></b></li>
-      </ul>
-      <p>
-        <em>
-          Need something else?
-          Your provider is most likely supported because TensorZero integrates with <b><a href="https://www.tensorzero.com/docs/gateway/guides/providers/openai-compatible">any OpenAI-compatible API (e.g. Ollama)</a></b>.
-          </em>
-      </p>
-    </td>
-    <td width="50%" align="left" valign="top">
-      <p>
-        The TensorZero Gateway supports advanced features like:
-      </p>
-      <ul>
-        <li><b><a href="https://www.tensorzero.com/docs/gateway/guides/retries-fallbacks">Retries & Fallbacks</a></b></li>
-        <li><b><a href="https://www.tensorzero.com/docs/gateway/guides/inference-time-optimizations">Inference-Time Optimizations</a></b></li>
-        <li><b><a href="https://www.tensorzero.com/docs/gateway/guides/prompt-templates-schemas">Prompt Templates & Schemas</a></b></li>
-        <li><b><a href="https://www.tensorzero.com/docs/gateway/tutorial#experimentation">Experimentation (A/B Testing)</a></b></li>
-        <li><b><a href="https://www.tensorzero.com/docs/gateway/configuration-reference">Configuration-as-Code (GitOps)</a></b></li>
-        <li><b><a href="https://www.tensorzero.com/docs/gateway/guides/batch-inference">Batch Inference</a></b></li>
-        <li><b><a href="https://www.tensorzero.com/docs/gateway/guides/multimodal-inference">Multimodal Inference (VLMs)</a></b></li>
-        <li><b><a href="https://www.tensorzero.com/docs/gateway/guides/inference-caching">Inference Caching</a></b></li>
-        <li><b><a href="https://www.tensorzero.com/docs/gateway/guides/metrics-feedback">Metrics & Feedback</a></b></li>
-        <li><b><a href="https://www.tensorzero.com/docs/gateway/guides/episodes">Multi-Step LLM Workflows (Episodes)</a></b></li>
-        <li><em>& a lot more...</em></li>
-      </ul>
-      <p>
-        The TensorZero Gateway is written in Rust 🦀 with <b>performance</b> in mind (&lt;1ms p99 latency overhead @ 10k QPS).
-        See <b><a href="https://www.tensorzero.com/docs/gateway/benchmarks">Benchmarks</a></b>.<br>
-      </p>
-      <p>
-        You can run inference using the <b>TensorZero client</b> (recommended), the <b>OpenAI client</b>, or the <b>HTTP API</b>.
-      </p>
-    </td>
-  </tr>
-</table>
-
-<br>
-
-<details open>
-<summary><b>Usage: Python &mdash; TensorZero Client (Recommended)</b></summary>
-
-You can access any provider using the TensorZero Python client.
-
-1. `pip install tensorzero`
-2. Optional: Set up the TensorZero configuration.
-3. Run inference:
-
-```python
-from tensorzero import TensorZeroGateway  # or AsyncTensorZeroGateway
-
-
-with TensorZeroGateway.build_embedded(clickhouse_url="...", config_file="...") as client:
-    response = client.inference(
-        model_name="openai::gpt-4o-mini",
-        # Try other providers easily: "anthropic::claude-3-7-sonnet-20250219"
-        input={
-            "messages": [
-                {
-                    "role": "user",
-                    "content": "Write a haiku about artificial intelligence.",
-                }
-            ]
-        },
-    )
+```
+budgateway/
+├── src/
+│   ├── main.rs             # Application entry point
+│   ├── config/             # Configuration management
+│   │   ├── mod.rs
+│   │   ├── gateway.rs      # Gateway configuration
+│   │   └── routes.rs       # Route configuration
+│   ├── gateway/            # Core gateway functionality
+│   │   ├── mod.rs
+│   │   ├── router.rs       # Request routing logic
+│   │   ├── load_balancer.rs # Load balancing algorithms
+│   │   ├── circuit_breaker.rs # Circuit breaker implementation
+│   │   └── middleware.rs   # Request/response middleware
+│   ├── providers/          # Model provider integrations
+│   │   ├── mod.rs
+│   │   ├── vllm.rs        # VLLM integration
+│   │   ├── sglang.rs      # SGLang integration
+│   │   ├── litellm.rs     # LiteLLM integration
+│   │   └── openai.rs      # OpenAI-compatible APIs
+│   ├── auth/               # Authentication & authorization
+│   │   ├── mod.rs
+│   │   ├── jwt.rs         # JWT token validation
+│   │   └── rbac.rs        # Role-based access control
+│   ├── cache/              # Caching layer
+│   │   ├── mod.rs
+│   │   ├── redis.rs       # Redis cache implementation
+│   │   └── strategies.rs  # Caching strategies
+│   ├── metrics/            # Metrics collection
+│   │   ├── mod.rs
+│   │   ├── prometheus.rs  # Prometheus metrics
+│   │   └── collectors.rs  # Custom metric collectors
+│   └── utils/              # Shared utilities
+│       ├── mod.rs
+│       ├── health.rs      # Health check utilities
+│       └── tracing.rs     # Distributed tracing
+├── config/                 # Configuration files
+│   ├── gateway.toml        # Main gateway configuration
+│   ├── routes.toml         # Route definitions
+│   └── providers.toml      # Provider configurations
+├── tests/                  # Test suite
+│   ├── integration/        # Integration tests
+│   ├── load/              # Load tests
+│   └── unit/              # Unit tests
+├── benchmarks/             # Performance benchmarks
+├── docker/                 # Docker configurations
+└── deploy/                 # Deployment scripts
 ```
 
-See **[Quick Start](https://www.tensorzero.com/docs/quickstart)** for more information.
+### Core Components
 
-</details>
+- **Router Engine**: High-performance request routing with pattern matching
+- **Load Balancer**: Multiple algorithms (round-robin, least-connections, weighted)
+- **Circuit Breaker**: Automatic failure detection and recovery
+- **Provider Adapters**: Pluggable adapters for different AI/ML serving engines
+- **Authentication Layer**: JWT validation and role-based access control
+- **Cache Manager**: Intelligent caching with TTL and invalidation strategies
+- **Metrics Collector**: Real-time performance and usage metrics
 
-<details>
-<summary><b>Usage: Python &mdash; OpenAI Client</b></summary>
+### Request Flow
 
-You can access any provider using the OpenAI Python client with TensorZero.
-
-1. `pip install tensorzero`
-2. Optional: Set up the TensorZero configuration.
-3. Run inference:
-
-```python
-from openai import OpenAI  # or AsyncOpenAI
-from tensorzero import patch_openai_client
-
-client = OpenAI()
-
-patch_openai_client(
-    client,
-    clickhouse_url="http://chuser:chpassword@localhost:8123/tensorzero",
-    config_file="config/tensorzero.toml",
-    async_setup=False,
-)
-
-response = client.chat.completions.create(
-    model="tensorzero::model_name::openai::gpt-4o-mini",
-    # Try other providers easily: "tensorzero::model_name::anthropic::claude-3-7-sonnet-20250219"
-    messages=[
-        {
-            "role": "user",
-            "content": "Write a haiku about artificial intelligence.",
-        }
-    ],
-)
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   Client    │────▶│    Auth     │────▶│   Router    │
+│   Request   │     │Middleware   │     │   Engine    │
+└─────────────┘     └─────────────┘     └──────┬──────┘
+                                               │
+                    ┌──────────────────────────┼──────────────────────────┐
+                    │                          │                          │
+            ┌───────▼───────┐        ┌────────▼────────┐        ┌────────▼────────┐
+            │     Cache     │        │  Load Balancer  │        │ Circuit Breaker │
+            │    Check      │        │   Selection     │        │    Health       │
+            └───────┬───────┘        └────────┬────────┘        └────────┬────────┘
+                    │                         │                          │
+                    └─────────────────────────┼──────────────────────────┘
+                                              │
+                                    ┌─────────▼─────────┐
+                                    │   Provider        │
+                                    │   Proxy           │
+                                    └─────────┬─────────┘
+                                              │
+                                    ┌─────────▼─────────┐
+                                    │   Response        │
+                                    │   Transform       │
+                                    └───────────────────┘
 ```
 
-See **[Quick Start](https://www.tensorzero.com/docs/quickstart)** for more information.
+## 📦 Prerequisites
 
-</details>
+### Required
 
-<details>
-<summary><b>Usage: JavaScript / TypeScript (Node) &mdash; OpenAI Client</b></summary>
+- **Rust** 1.70+
+- **Docker** and Docker Compose
+- **Git**
 
-You can access any provider using the OpenAI Node client with TensorZero.
+### Service Dependencies
 
-1. Deploy `tensorzero/gateway` using Docker.
-   **[Detailed instructions →](https://www.tensorzero.com/docs/gateway/deployment)**
-2. Set up the TensorZero configuration.
-3. Run inference:
+- **Redis** - Caching and session management
+- **Model Providers** - At least one AI/ML serving endpoint (VLLM, SGLang, etc.)
 
-```ts
-import OpenAI from "openai";
+### Optional Dependencies
 
-const client = new OpenAI({
-  baseURL: "http://localhost:3000/openai/v1",
-});
+- **Prometheus** - Metrics collection
+- **Jaeger** - Distributed tracing
+- **Grafana** - Metrics visualization
 
-const response = await client.chat.completions.create({
-  model: "tensorzero::model_name::openai::gpt-4o-mini",
-  // Try other providers easily: "tensorzero::model_name::anthropic::claude-3-7-sonnet-20250219"
-  messages: [
-    {
-      role: "user",
-      content: "Write a haiku about artificial intelligence.",
-    },
-  ],
-});
-```
+## 🚀 Quick Start
 
-See **[Quick Start](https://www.tensorzero.com/docs/quickstart)** for more information.
-
-</details>
-
-<details>
-<summary><b>Usage: Other Languages & Platforms &mdash; HTTP API</b></summary>
-
-TensorZero supports virtually any programming language or platform via its HTTP API.
-
-1. Deploy `tensorzero/gateway` using Docker.
-   **[Detailed instructions →](https://www.tensorzero.com/docs/gateway/deployment)**
-2. Optional: Set up the TensorZero configuration.
-3. Run inference:
+### 1. Clone and Setup
 
 ```bash
-curl -X POST "http://localhost:3000/inference" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model_name": "openai::gpt-4o-mini",
-    "input": {
-      "messages": [
-        {
-          "role": "user",
-          "content": "Write a haiku about artificial intelligence."
-        }
-      ]
-    }
-  }'
+# Clone the repository
+git clone https://github.com/BudEcosystem/bud-stack.git
+cd bud-stack/services/budgateway
+
+# Setup environment
+cp .env.sample .env
+# Edit .env with your configuration
 ```
 
-See **[Quick Start](https://www.tensorzero.com/docs/quickstart)** for more information.
+### 2. Configure Environment
 
-</details>
+Edit `.env` file with required configurations:
 
-<br>
+```bash
+# Gateway Configuration
+GATEWAY_HOST=0.0.0.0
+GATEWAY_PORT=8080
+WORKERS=4
+LOG_LEVEL=info
 
-### 📈 LLM Optimization
+# Redis Configuration
+REDIS_URL=redis://localhost:6379
+REDIS_POOL_SIZE=10
 
-> **Send production metrics and human feedback to easily optimize your prompts, models, and inference strategies &mdash; using the UI or programmatically.**
+# Authentication
+JWT_SECRET=your-jwt-secret
+JWT_EXPIRATION=3600
 
-#### Model Optimization
+# Metrics
+ENABLE_METRICS=true
+METRICS_PORT=9090
 
-Optimize closed-source and open-source models using supervised fine-tuning (SFT) and preference fine-tuning (DPO).
+# Tracing
+ENABLE_TRACING=true
+JAEGER_ENDPOINT=http://localhost:14268/api/traces
 
-<table>
-  <tr></tr> <!-- flip highlight order -->
-  <tr>
-    <td width="50%" align="center" valign="middle"><b>Supervised Fine-tuning &mdash; UI</b></td>
-    <td width="50%" align="center" valign="middle"><b>Preference Fine-tuning (DPO) &mdash; Jupyter Notebook</b></td>
-  </tr>
-  <tr>
-    <td width="50%" align="center" valign="middle"><img src="https://github.com/user-attachments/assets/cf7acf66-732b-43b3-af2a-5eba1ce40f6f"></td>
-    <td width="50%" align="center" valign="middle"><img src="https://github.com/user-attachments/assets/a67a0634-04a7-42b0-b934-9130cb7cdf51"></td>
-  </tr>
-</table>
+# Provider Endpoints
+VLLM_ENDPOINTS=http://vllm-1:8000,http://vllm-2:8000
+SGLANG_ENDPOINTS=http://sglang-1:8001
+LITELLM_ENDPOINT=http://litellm:4000
+```
 
-#### Inference-Time Optimization
+### 3. Configure Gateway
 
-Boost performance by dynamically updating your prompts with relevant examples, combining responses from multiple inferences, and more.
+Edit `config/gateway.toml`:
 
-<table>
-  <tr></tr> <!-- flip highlight order -->
-  <tr>
-    <td width="50%" align="center" valign="middle"><b><a href="https://www.tensorzero.com/docs/gateway/guides/inference-time-optimizations#best-of-n-sampling">Best-of-N Sampling</a></b></td>
-    <td width="50%" align="center" valign="middle"><b><a href="https://www.tensorzero.com/docs/gateway/guides/inference-time-optimizations#mixture-of-n-sampling">Mixture-of-N Sampling</a></b></td>
-  </tr>
-  <tr>
-    <td width="50%" align="center" valign="middle"><img src="https://github.com/user-attachments/assets/c0edfa4c-713c-4996-9964-50c0d26e6970"></td>
-    <td width="50%" align="center" valign="middle"><img src="https://github.com/user-attachments/assets/75b5bf05-4c1f-43c4-b158-d69d1b8d05be"></td>
-  </tr>
-  <tr>
-    <td width="50%" align="center" valign="middle"><b><a href="https://www.tensorzero.com/docs/gateway/guides/inference-time-optimizations#dynamic-in-context-learning-dicl">Dynamic In-Context Learning (DICL)</a></b></td>
-    <td width="50%" align="center" valign="middle"><b><a href="https://www.tensorzero.com/docs/gateway/guides/inference-time-optimizations#chain-of-thought-cot">Chain-of-Thought (CoT)</a></b></td>
-  </tr>
-  <tr>
-    <td width="50%" align="center" valign="middle"><img src="https://github.com/user-attachments/assets/d8489e92-ce93-46ac-9aab-289ce19bb67d"></td>
-    <td width="50%" align="center" valign="middle"><img src="https://github.com/user-attachments/assets/ea13d73c-76a4-4e0c-a35b-0c648f898311" height="320"></td>
-  </tr>
-</table>
+```toml
+[gateway]
+host = "0.0.0.0"
+port = 8080
+workers = 4
+max_connections = 1000
+request_timeout = 30
+keepalive_timeout = 60
 
-_More coming soon..._
+[rate_limiting]
+enabled = true
+requests_per_minute = 1000
+burst_capacity = 100
 
-<br>
+[circuit_breaker]
+failure_threshold = 5
+timeout_duration = 60
+half_open_max_calls = 3
 
-#### Prompt Optimization
+[cache]
+enabled = true
+default_ttl = 300
+max_memory = "1GB"
+```
 
-Optimize your prompts programmatically using research-driven optimization techniques.
+### 4. Start Development Environment
 
-<table>
-  <tr></tr> <!-- flip highlight order -->
-  <tr>
-    <td width="50%" align="center" valign="middle"><b><a href="https://www.tensorzero.com/docs/gateway/guides/inference-time-optimizations#best-of-n-sampling">MIPROv2</a></b></td>
-    <td width="50%" align="center" valign="middle"><b><a href="https://github.com/tensorzero/tensorzero/tree/main/examples/gsm8k-custom-recipe-dspy">DSPy Integration</a></b></td>
-  </tr>
-  <tr>
-    <td width="50%" align="center" valign="middle"><img src="https://github.com/user-attachments/assets/d81a7c37-382f-4c46-840f-e6c2593301db" alt="MIPROv2 diagram"></td>
-    <td width="50%" align="center" valign="middle">
-      TensorZero comes with several optimization recipes, but you can also easily create your own.
-      This example shows how to optimize a TensorZero function using an arbitrary tool — here, DSPy, a popular library for automated prompt engineering.
-    </td>
-  </tr>
-</table>
+```bash
+# Build the project
+cargo build --release
 
-_More coming soon..._
+# Start Redis
+docker-compose up -d redis
 
-<br>
+# Run the gateway
+cargo run --release
 
-### 🔍 LLM Observability
+# Or start with development configuration
+./deploy/start_dev.sh
 
-> **Zoom in to debug individual API calls, or zoom out to monitor metrics across models and prompts over time &mdash; all using the open-source TensorZero UI.**
+# Gateway will be available at:
+# API: http://localhost:8080
+# Metrics: http://localhost:9090/metrics
+```
 
-<table>
-  <tr></tr> <!-- flip highlight order -->
-  <tr>
-    <td width="50%" align="center" valign="middle"><b>Observability » Inference</b></td>
-    <td width="50%" align="center" valign="middle"><b>Observability » Function</b></td>
-  </tr>
-  <tr>
-    <td width="50%" align="center" valign="middle"><img src="https://github.com/user-attachments/assets/2cc3cc9a-f33f-4e94-b8de-07522326f80a"></td>
-    <td width="50%" align="center" valign="middle"><img src="https://github.com/user-attachments/assets/00ae6605-8fa0-4efd-8238-ae8ea589860f"></td>
-  </tr>
-</table>
+## 💻 Development
 
-<br>
+### Code Quality
 
-### 📊 LLM Evaluations
+```bash
+# Format code
+cargo fmt
 
-> **Compare prompts, models, and inference strategies using TensorZero Evaluations &mdash; with support for heuristics and LLM judges.**
+# Lint code
+cargo clippy
 
-<table>
-  <tr></tr> <!-- flip highlight order -->
-  <tr>
-    <td width="50%" align="center" valign="middle"><b>Evaluation » UI</b></td>
-    <td width="50%" align="center" valign="middle"><b>Evaluation » CLI</b></td>
-  </tr>
-  <tr>
-    <td width="50%" align="center" valign="middle"><img src="https://github.com/user-attachments/assets/f4bf54e3-1b63-46c8-be12-2eaabf615699"></td>
-    <td width="50%" align="left" valign="middle">
-<pre><code class="language-bash">docker compose run --rm evaluations \
-  --evaluation-name extract_data \
-  --dataset-name hard_test_cases \
-  --variant-name gpt_4o \
-  --concurrency 5</code></pre>
-<pre><code class="language-bash">Run ID: 01961de9-c8a4-7c60-ab8d-15491a9708e4
-Number of datapoints: 100
-██████████████████████████████████████ 100/100
-exact_match: 0.83 ± 0.03
-semantic_match: 0.98 ± 0.01
-item_count: 7.15 ± 0.39</code></pre>
-    </td>
-  </tr>
-</table>
+# Run tests
+cargo test
 
-## Demo
+# Run tests with coverage
+cargo tarpaulin --out html
 
-> **Watch LLMs get better at data extraction in real-time with TensorZero!**
->
-> **[Dynamic in-context learning (DICL)](https://www.tensorzero.com/docs/gateway/guides/inference-time-optimizations#dynamic-in-context-learning-dicl)** is a powerful inference-time optimization available out of the box with TensorZero.
-> It enhances LLM performance by automatically incorporating relevant historical examples into the prompt, without the need for model fine-tuning.
+# Check for security vulnerabilities
+cargo audit
+```
 
-https://github.com/user-attachments/assets/4df1022e-886e-48c2-8f79-6af3cdad79cb
+### Configuration Management
 
-## LLM Engineering with TensorZero
+```bash
+# Validate configuration
+cargo run -- --validate-config
 
-<br>
-<p align="center" >
-  <a href="https://www.tensorzero.com/docs">
-    <picture>
-      <source media="(prefers-color-scheme: light)" srcset="https://github.com/user-attachments/assets/34a92c18-242e-4d76-a99c-861283de68a6">
-      <source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/e8bc699b-6378-4c2a-9cc1-6d189025e270">
-      <img alt="TensorZero Flywheel" src="https://github.com/user-attachments/assets/34a92c18-242e-4d76-a99c-861283de68a6" width=720>
-    </picture>
-  </a>
-</p>
-<br>
+# Reload configuration (without restart)
+curl -X POST http://localhost:8080/admin/reload-config
+```
 
-1. The **[TensorZero Gateway](https://www.tensorzero.com/docs/gateway/)** is a high-performance model gateway written in Rust 🦀 that provides a unified API interface for all major LLM providers, allowing for seamless cross-platform integration and fallbacks.
-2. It handles structured schema-based inference with &lt;1ms P99 latency overhead (see **[Benchmarks](https://www.tensorzero.com/docs/gateway/benchmarks)**) and built-in observability, experimentation, and **[inference-time optimizations](https://www.tensorzero.com/docs/gateway/guides/inference-time-optimizations)**.
-3. It also collects downstream metrics and feedback associated with these inferences, with first-class support for multi-step LLM systems.
-4. Everything is stored in a ClickHouse data warehouse that you control for real-time, scalable, and developer-friendly analytics.
-5. Over time, **[TensorZero Recipes](https://www.tensorzero.com/docs/recipes)** leverage this structured dataset to optimize your prompts and models: run pre-built recipes for common workflows like fine-tuning, or create your own with complete flexibility using any language and platform.
-6. Finally, the gateway's experimentation features and GitOps orchestration enable you to iterate and deploy with confidence, be it a single LLM or thousands of LLMs.
+### Load Testing
 
-Our goal is to help engineers build, manage, and optimize the next generation of LLM applications: systems that learn from real-world experience.
-Read more about our **[Vision & Roadmap](https://www.tensorzero.com/docs/vision-roadmap/)**.
+```bash
+# Simple load test
+cargo run --bin load-test -- --url http://localhost:8080 --requests 1000 --concurrency 10
 
-## Get Started
+# Advanced load test with wrk
+wrk -t12 -c400 -d30s --latency http://localhost:8080/v1/models
 
-**Start building today.**
-The **[Quick Start](https://www.tensorzero.com/docs/quickstart)** shows it's easy to set up an LLM application with TensorZero.
-If you want to dive deeper, the **[Tutorial](https://www.tensorzero.com/docs/gateway/tutorial)** teaches how to build a simple chatbot, an email copilot, a weather RAG system, and a structured data extraction pipeline.
+# Artillery.js load test
+artillery run tests/load/artillery-config.yml
+```
 
-**Questions?**
-Ask us on **[Slack](https://www.tensorzero.com/slack)** or **[Discord](https://www.tensorzero.com/discord)**.
+## ⚙️ Configuration
 
-**Using TensorZero at work?**
-Email us at **[hello@tensorzero.com](mailto:hello@tensorzero.com)** to set up a Slack or Teams channel with your team (free).
+### Route Configuration
 
-**Work with us.**
-We're **[hiring in NYC](https://www.tensorzero.com/jobs)**.
-We'd also welcome **[open-source contributions](https://github.com/tensorzero/tensorzero/blob/main/CONTRIBUTING.md)**!
+Edit `config/routes.toml`:
 
-## Examples
+```toml
+[[routes]]
+path = "/v1/models"
+method = "GET"
+provider = "vllm"
+load_balancer = "round_robin"
+cache_ttl = 300
 
-We are working on a series of **complete runnable examples** illustrating TensorZero's data & learning flywheel.
+[[routes]]
+path = "/v1/chat/completions"
+method = "POST"
+provider = "vllm"
+load_balancer = "least_connections"
+rate_limit = 100
+auth_required = true
 
-> **[Optimizing Data Extraction (NER) with TensorZero](https://github.com/tensorzero/tensorzero/tree/main/examples/data-extraction-ner)**
->
-> This example shows how to use TensorZero to optimize a data extraction pipeline.
-> We demonstrate techniques like fine-tuning and dynamic in-context learning (DICL).
-> In the end, an optimized GPT-4o Mini model outperforms GPT-4o on this task &mdash; at a fraction of the cost and latency &mdash; using a small amount of training data.
+[[routes]]
+path = "/v1/completions"
+method = "POST"
+provider = "sglang"
+load_balancer = "weighted"
+timeout = 60
+```
 
-> **[Agentic RAG — Multi-Hop Question Answering with LLMs](https://github.com/tensorzero/tensorzero/tree/main/examples/rag-retrieval-augmented-generation/simple-agentic-rag/)**
->
-> This example shows how to build a multi-hop retrieval agent using TensorZero.
-> The agent iteratively searches Wikipedia to gather information, and decides when it has enough context to answer a complex question.
+### Provider Configuration
 
-> **[Writing Haikus to Satisfy a Judge with Hidden Preferences](https://github.com/tensorzero/tensorzero/tree/main/examples/haiku-hidden-preferences)**
->
-> This example fine-tunes GPT-4o Mini to generate haikus tailored to a specific taste.
-> You'll see TensorZero's "data flywheel in a box" in action: better variants leads to better data, and better data leads to better variants.
-> You'll see progress by fine-tuning the LLM multiple times.
+Edit `config/providers.toml`:
 
-> **[Improving LLM Chess Ability with Best-of-N Sampling](https://github.com/tensorzero/tensorzero/tree/main/examples/chess-puzzles/)**
->
-> This example showcases how best-of-N sampling can significantly enhance an LLM's chess-playing abilities by selecting the most promising moves from multiple generated options.
+```toml
+[providers.vllm]
+name = "VLLM Provider"
+endpoints = [
+    { url = "http://vllm-1:8000", weight = 1 },
+    { url = "http://vllm-2:8000", weight = 1 }
+]
+health_check_path = "/health"
+health_check_interval = 30
 
-> **[Improving Math Reasoning with a Custom Recipe for Automated Prompt Engineering (DSPy)](https://github.com/tensorzero/tensorzero/tree/main/examples/gsm8k-custom-recipe-dspy)**
->
-> TensorZero provides a number of pre-built optimization recipes covering common LLM engineering workflows.
-> But you can also easily create your own recipes and workflows!
-> This example shows how to optimize a TensorZero function using an arbitrary tool — here, DSPy.
+[providers.sglang]
+name = "SGLang Provider"
+endpoints = [
+    { url = "http://sglang-1:8001", weight = 2 },
+    { url = "http://sglang-2:8001", weight = 1 }
+]
+health_check_path = "/v1/health"
+health_check_interval = 15
 
-_& many more on the way!_
+[providers.litellm]
+name = "LiteLLM Provider"
+endpoints = [
+    { url = "http://litellm:4000", weight = 1 }
+]
+```
+
+## 📚 API Documentation
+
+### Gateway Management Endpoints
+
+#### Health Check
+```
+GET /health
+```
+
+#### Metrics
+```
+GET /metrics
+```
+
+#### Configuration Reload
+```
+POST /admin/reload-config
+```
+
+#### Route Information
+```
+GET /admin/routes
+```
+
+### Proxy Endpoints
+
+The gateway proxies requests to configured model providers:
+
+#### Model List
+```
+GET /v1/models
+```
+
+#### Chat Completions
+```
+POST /v1/chat/completions
+Content-Type: application/json
+Authorization: Bearer <token>
+
+{
+  "model": "llama-2-7b",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Hello, how are you?"
+    }
+  ],
+  "max_tokens": 100,
+  "temperature": 0.7
+}
+```
+
+#### Text Completions
+```
+POST /v1/completions
+Content-Type: application/json
+
+{
+  "model": "llama-2-7b",
+  "prompt": "Once upon a time",
+  "max_tokens": 100,
+  "temperature": 0.7
+}
+```
+
+### Authentication
+
+The gateway supports JWT-based authentication:
+
+```bash
+# Include JWT token in requests
+curl -H "Authorization: Bearer <jwt-token>" \
+     -H "Content-Type: application/json" \
+     -d '{"model": "llama-2-7b", "prompt": "Hello"}' \
+     http://localhost:8080/v1/completions
+```
+
+### Rate Limiting
+
+Rate limits are enforced per user/IP:
+
+```
+Rate-Limit-Limit: 1000
+Rate-Limit-Remaining: 999
+Rate-Limit-Reset: 1642089600
+```
+
+## 🚀 Deployment
+
+### Docker Deployment
+
+```bash
+# Build Docker image
+docker build -t budgateway:latest .
+
+# Run with docker-compose
+docker-compose up -d
+
+# Check logs
+docker-compose logs -f budgateway
+```
+
+### Kubernetes Deployment
+
+```bash
+# Deploy with Helm
+helm install budgateway ./charts/budgateway/
+
+# Or as part of full stack
+cd ../../infra/helm/bud
+helm dependency update
+helm install bud .
+```
+
+### Production Configuration
+
+```yaml
+# values.yaml for Helm
+budgateway:
+  replicas: 3
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "2000m"
+  env:
+    - name: WORKERS
+      value: "8"
+    - name: LOG_LEVEL
+      value: "info"
+  service:
+    type: LoadBalancer
+    port: 80
+    targetPort: 8080
+  ingress:
+    enabled: true
+    annotations:
+      nginx.ingress.kubernetes.io/rate-limit: "1000"
+    hosts:
+      - host: gateway.yourdomain.com
+        paths:
+          - path: /
+            pathType: Prefix
+```
+
+## 🧪 Testing
+
+### Unit Tests
+
+```bash
+# Run all tests
+cargo test
+
+# Run specific test
+cargo test test_load_balancer
+
+# Run tests with output
+cargo test -- --nocapture
+```
+
+### Integration Tests
+
+```bash
+# Start test dependencies
+docker-compose -f docker-compose.test.yml up -d
+
+# Run integration tests
+cargo test --test integration
+
+# Clean up
+docker-compose -f docker-compose.test.yml down
+```
+
+### Load Tests
+
+```bash
+# HTTP load test
+cargo run --bin http-load-test
+
+# WebSocket load test (if applicable)
+cargo run --bin ws-load-test
+
+# Custom benchmark
+cargo bench
+```
+
+### Performance Benchmarks
+
+```bash
+# Run benchmarks
+cargo bench
+
+# Profile with perf
+cargo build --release
+perf record --call-graph=dwarf ./target/release/budgateway
+perf report
+```
+
+## 🔧 Troubleshooting
+
+### Common Issues
+
+#### High Memory Usage
+```bash
+# Error: Gateway consuming too much memory
+# Solution: Adjust cache settings and connection limits
+# In gateway.toml:
+[cache]
+max_memory = "512MB"
+
+[gateway]
+max_connections = 500
+```
+
+#### Connection Pool Exhausted
+```bash
+# Error: Cannot acquire connection from pool
+# Solution: Increase Redis pool size
+export REDIS_POOL_SIZE=20
+
+# Or in config:
+[redis]
+pool_size = 20
+max_connections = 100
+```
+
+#### Circuit Breaker Triggered
+```bash
+# Error: Circuit breaker open for provider
+# Solution: Check provider health and adjust thresholds
+curl http://vllm-endpoint:8000/health
+
+# Adjust in gateway.toml:
+[circuit_breaker]
+failure_threshold = 10
+timeout_duration = 30
+```
+
+#### Rate Limiting False Positives
+```bash
+# Error: Rate limit exceeded unexpectedly
+# Solution: Check rate limit configuration and Redis state
+redis-cli GET rate_limit:user:123
+
+# Adjust limits in gateway.toml:
+[rate_limiting]
+requests_per_minute = 2000
+burst_capacity = 200
+```
+
+### Debug Mode
+
+Enable detailed logging:
+```bash
+# Set log level
+export LOG_LEVEL=debug
+export RUST_LOG=budgateway=debug
+
+# Enable request tracing
+export ENABLE_REQUEST_TRACING=true
+
+# Start with debug symbols
+cargo run --features debug
+```
+
+### Performance Monitoring
+
+```bash
+# Check gateway metrics
+curl http://localhost:9090/metrics
+
+# Monitor connection stats
+curl http://localhost:8080/admin/stats
+
+# Check provider health
+curl http://localhost:8080/admin/providers/health
+```
+
+### Profiling
+
+```bash
+# CPU profiling
+cargo flamegraph --bin budgateway
+
+# Memory profiling
+valgrind --tool=massif ./target/release/budgateway
+
+# Async profiling
+tokio-console ./target/release/budgateway
+```
+
+## 🤝 Contributing
+
+Please see the main [Bud Stack Contributing Guide](../../CONTRIBUTING.md).
+
+### Service-Specific Guidelines
+
+1. Follow Rust best practices and idioms
+2. Add benchmarks for performance-critical code
+3. Write comprehensive integration tests
+4. Update configuration documentation
+5. Ensure memory safety and thread safety
+6. Profile performance impact of changes
+
+## 📄 License
+
+This project is licensed under the AGPL-3.0 License - see the [LICENSE](../../LICENSE) file for details.
+
+## 🔗 Related Documentation
+
+- [Main Bud Stack README](../../README.md)
+- [CLAUDE.md Development Guide](../../CLAUDE.md)
+- [Gateway Metrics](http://localhost:9090/metrics) (when running)
+- [Configuration Reference](./docs/configuration.md)
+- [Provider Integration Guide](./docs/provider-integration.md)
+- [Performance Tuning Guide](./docs/performance-tuning.md)
+
+# Acknowlegment
+
+- Thanks to TensorZero for providing intial version of the gateway. https://github.com/tensorzero/tensorzero
