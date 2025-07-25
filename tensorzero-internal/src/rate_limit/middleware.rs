@@ -15,6 +15,7 @@ use tracing::{debug, warn};
 /// Unified rate limiting middleware
 ///
 /// This middleware combines the best features from all previous implementations:
+/// - Prioritizes resolved endpoint ID from authentication for accurate rate limiting
 /// - Checks pre-extracted model from early extraction layer
 /// - Falls back to X-Model-Name header
 /// - Falls back to URL path extraction  
@@ -74,13 +75,24 @@ pub async fn rate_limit_middleware(
 
 /// Extract model name from the request using multiple strategies
 async fn extract_model_from_request(request: &mut Request) -> Result<String, RateLimitError> {
-    // Strategy 1: Check for pre-extracted model from early extraction layer
+    // Strategy 1: Check for resolved endpoint ID from authentication (highest priority for rate limiting)
+    if let Some(endpoint_id_header) = request.headers().get("x-tensorzero-endpoint-id") {
+        if let Ok(endpoint_id) = endpoint_id_header.to_str() {
+            debug!(
+                "Using resolved endpoint ID for rate limiting: {}",
+                endpoint_id
+            );
+            return Ok(endpoint_id.to_string());
+        }
+    }
+
+    // Strategy 2: Check for pre-extracted model from early extraction layer
     if let Some(extracted) = request.extensions().get::<ExtractedModel>() {
         debug!("Using pre-extracted model: {}", extracted.0);
         return Ok(extracted.0.clone());
     }
 
-    // Strategy 2: Check for X-Model-Name header (fastest path)
+    // Strategy 3: Check for X-Model-Name header (fastest path)
     if let Some(model_header) = request.headers().get("x-model-name") {
         if let Ok(model) = model_header.to_str() {
             debug!("Extracted model from X-Model-Name header: {}", model);
@@ -88,14 +100,14 @@ async fn extract_model_from_request(request: &mut Request) -> Result<String, Rat
         }
     }
 
-    // Strategy 3: Try to extract from URL path
+    // Strategy 4: Try to extract from URL path
     let path = request.uri().path().to_string(); // Clone the path to avoid borrow issues
     if let Some(model) = try_extract_from_path(&path) {
         debug!("Extracted model from URL path: {}", model);
         return Ok(model);
     }
 
-    // Strategy 4: Try to extract from request body (slowest path, only for POST)
+    // Strategy 5: Try to extract from request body (slowest path, only for POST)
     if request.method() == axum::http::Method::POST {
         // Read the body
         let body = std::mem::replace(request.body_mut(), Body::empty());
@@ -305,5 +317,39 @@ mod tests {
         );
 
         assert_eq!(try_extract_from_path("/v1/chat/completions"), None);
+    }
+
+    #[tokio::test]
+    async fn test_extract_model_prioritizes_endpoint_id() {
+        use axum::http::{HeaderMap, HeaderValue, Method};
+
+        let mut headers = HeaderMap::new();
+        // Set both headers - endpoint ID should take priority
+        headers.insert(
+            "x-tensorzero-endpoint-id",
+            HeaderValue::from_static("6eb1afa1-281f-4023-bc4f-4531c3e2100d"),
+        );
+        headers.insert(
+            "x-tensorzero-model-name",
+            HeaderValue::from_static("voice-assistant"),
+        );
+
+        let mut req_with_headers = Request::builder()
+            .method(Method::POST)
+            .uri("/v1/chat/completions");
+
+        for (key, value) in headers.iter() {
+            req_with_headers = req_with_headers.header(key, value);
+        }
+
+        let mut request = req_with_headers
+            .body(Body::from(
+                r#"{"model": "voice-assistant", "messages": []}"#,
+            ))
+            .unwrap();
+
+        let model_name = extract_model_from_request(&mut request).await.unwrap();
+        // Should use endpoint ID, not the original model name
+        assert_eq!(model_name, "6eb1afa1-281f-4023-bc4f-4531c3e2100d");
     }
 }
