@@ -1,9 +1,0 @@
-{
-  "type": "object",
-  "properties": {
-    "assistant_name": {
-      "type": "string"
-    }
-  },
-  "required": ["assistant_name"]
-}

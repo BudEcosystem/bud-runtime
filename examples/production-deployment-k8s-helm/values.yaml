@@ -50,49 +50,6 @@ gateway:
           - path: /
             pathType: Prefix
 
-# UI Configuration
-ui:
-  deploy: true # TODO: change this to false if you don't want to deploy the UI
-  replicaCount: 1
-  image:
-    repository: tensorzero/ui
-    tag: latest
-    pullPolicy: IfNotPresent
-
-  service:
-    type: ClusterIP
-    port: 4000
-
-  additionalEnv:
-    secretName: "tensorzero-secret"
-    keys:
-      - name: TENSORZERO_CLICKHOUSE_URL
-        key: TENSORZERO_CLICKHOUSE_URL
-      - name: TENSORZERO_GATEWAY_URL
-        key: TENSORZERO_GATEWAY_URL
-
-  resources:
-    limits:
-      cpu: 1000m
-      memory: 1024Mi
-    requests:
-      cpu: 500m
-      memory: 512Mi
-
-  nodeSelector: {}
-
-  tolerations: []
-
-  affinity: {}
-
-  ingress:
-    enabled: true
-    hosts:
-      - host: tensorzero-ui.local # TODO: change this to the correct host
-        paths:
-          - path: /
-            pathType: Prefix
-
 # TensorZero Configuration
 configMap:
   data:

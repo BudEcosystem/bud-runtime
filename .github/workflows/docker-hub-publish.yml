@@ -1,4 +1,4 @@
-# This workflow builds and pushes the gateway, ui, and evaluations docker images to Docker Hub
+# This workflow builds and pushes the gateway docker image to Docker Hub
 # when we tag a release.
 name: Publish docker images
 

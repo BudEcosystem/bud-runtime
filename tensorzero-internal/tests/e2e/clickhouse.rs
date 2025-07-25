@@ -157,7 +157,7 @@ async fn count_table_rows(clickhouse: &ClickHouseConnectionInfo, table: &str) ->
 
 async fn insert_large_fixtures(clickhouse: &ClickHouseConnectionInfo) {
     // Insert data so that we test the migration re-creates the tables properly.
-    let s3_fixtures_path: String = format!("{MANIFEST_PATH}/../ui/fixtures/s3-fixtures");
+    let s3_fixtures_path: String = format!("{MANIFEST_PATH}/../ci/fixtures/s3-fixtures");
 
     let ClickHouseConnectionInfo::Production {
         database_url,

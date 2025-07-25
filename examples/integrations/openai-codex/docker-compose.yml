@@ -47,22 +47,3 @@ services:
       start_period: 30s
       start_interval: 1s
       timeout: 1s
-
-  # TensorZero UI provides observability and other features (optional).
-  ui:
-    image: tensorzero/ui
-    volumes:
-      # Mount our tensorzero.toml file into the container
-      - ./config:/app/config:ro
-    environment:
-      TENSORZERO_CLICKHOUSE_URL: http://chuser:chpassword@clickhouse:8123/tensorzero
-      TENSORZERO_GATEWAY_URL: http://gateway:3000
-    env_file:
-      - .env
-    ports:
-      - "4000:4000"
-    depends_on:
-      clickhouse:
-        condition: service_healthy
-      gateway:
-        condition: service_healthy

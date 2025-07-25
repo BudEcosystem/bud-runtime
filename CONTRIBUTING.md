@@ -173,13 +173,11 @@ cargo test-unit
    uv run ruff check --output-format=github --extend-select I .
    ```
 
-#### Dashboard
+#### Test Fixtures
 
-For development, the UI runs against hardcoded fixtures in `ui/fixtures/`.
-It depends on a running ClickHouse instance that has been initialized with the TensorZero data model.
-We include some fixture data as well in order to exercise some functionality.
-
-It also requires a one-time build of a WebAssembly module from Rust source code that is used to ensure consistent templating of messages across the gateway and UI.
+Test fixtures for ClickHouse are stored in `ci/fixtures/`.
+The E2E tests depend on a running ClickHouse instance that has been initialized with the TensorZero data model.
+Fixture data is downloaded automatically during CI to exercise database functionality.
 
 The steps below assume you are in the `ui/` directory.
 
