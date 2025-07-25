@@ -46,23 +46,6 @@ services:
       start_interval: 1s
       timeout: 1s
 
-  ui:
-    image: tensorzero/ui
-    volumes:
-      - ./config:/app/config:ro
-    environment:
-      - TENSORZERO_CLICKHOUSE_URL=http://chuser:chpassword@clickhouse:8123/tensorzero
-      - TENSORZERO_GATEWAY_URL=http://gateway:3000
-    env_file:
-      - ${ENV_FILE:-.env}
-    ports:
-      - "6901:4000" # UI port exposed to local machine on 6901
-    depends_on:
-      clickhouse:
-        condition: service_healthy
-      gateway:
-        condition: service_healthy
-
   nginx:
     image: nginx:alpine
     volumes:

@@ -3,7 +3,6 @@ members = [
     "tensorzero-internal",
     "tensorzero-internal/tests/mock-inference-provider",
     "gateway",
-    "ui/app/utils/minijinja",
     "clients/rust",
     "clients/python",
     "provider-proxy",
@@ -78,5 +77,3 @@ lto = "fat"
 codegen-units = 1
 incremental = false
 
-[profile.release.package.minijinja-bindings]
-opt-level = "s"
