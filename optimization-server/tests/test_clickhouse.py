@@ -8,7 +8,7 @@ from tensorzero import AsyncTensorZeroGateway
 @pytest.mark.asyncio
 async def test_curated_inferences():
     client_fut = AsyncTensorZeroGateway.build_embedded(
-        config_file="../ui/fixtures/config/tensorzero.toml",
+        config_file="../ci/fixtures/config/tensorzero.toml",
         clickhouse_url=os.environ["TENSORZERO_CLICKHOUSE_URL"],
     )
     assert inspect.isawaitable(client_fut)

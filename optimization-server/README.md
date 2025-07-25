@@ -19,4 +19,4 @@ The following optional environment variables can also be set:
 
 To start the server, run `uv run fastapi run src/optimization_server/main.py --port 7001`
 
-To use the ui fixtures config, run `TENSORZERO_UI_CONFIG_PATH=../ui/fixtures/config/tensorzero.toml uv run fastapi run src/optimization_server/main.py --port 7001`
+To use the fixtures config, run `TENSORZERO_UI_CONFIG_PATH=../ci/fixtures/config/tensorzero.toml uv run fastapi run src/optimization_server/main.py --port 7001`
