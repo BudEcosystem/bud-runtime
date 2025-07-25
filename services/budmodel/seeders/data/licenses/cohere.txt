@@ -1,0 +1,309 @@
+COHERE INC. TERMS OF USE
+
+Last updated: September 7, 2022
+
+The following terms of use (the “Terms of Use”) govern your access to and use of: (a) our website located at www.cohere.ai (the “Cohere Website”); (b) any mobile device software provided by us to you (the “Cohere Application”); (c) Cohere’s proprietary application programming interface, and any related documentation (the “Cohere API”); (d) any text, pictures, media, data, information and other materials or content (collectively, the “Content”) contained on or provided through the foregoing (a) to (c); and (e) all other Content, products or services provided by us to you, as more particularly described on the Cohere Website and the Cohere Application. The Cohere Website, Cohere Application, Cohere API and Content are collectively referred to as the “Cohere Solution”. 
+
+These Terms of Use form an agreement between Cohere Inc. (“Cohere”, “us”, “we”, “our”) and you. The term “you” or “User” refers to the person or entity browsing, installing, downloading, accessing or otherwise using the Cohere Solution (“use” or “using” in these Terms of Use will mean any of the foregoing).
+
+BY USING THE COHERE SOLUTION IN ANY WAY, INCLUDING PURCHASING ANY SERVICES WE SELL ON THE COHERE SOLUTION (THE “SERVICES”), YOU: (A) REPRESENT AND WARRANT THAT (I) YOU HAVE REACHED THE AGE OF MAJORITY IN YOUR JURISDICTION, (II) YOU HAVE THE CAPACITY TO ENTER INTO BINDING OBLIGATIONS, AND (III) ALL INFORMATION SUPPLIED BY YOU TO US THROUGH THE COHERE SOLUTION IS TRUE, ACCURATE, CURRENT, AND COMPLETE; AND (B) AGREE TO BE BOUND BY AND COMPLY WITH THESE TERMS OF USE, AS UPDATED FROM TIME TO TIME IN ACCORDANCE WITH SECTION 1. 
+
+IF YOU ARE USING THE COHERE SOLUTION ON BEHALF OF ANOTHER PERSON OR A CORPORATE ENTITY, YOU REPRESENT AND WARRANT THAT YOU HAVE THE AUTHORITY TO BIND SUCH PERSON OR ENTITY TO THESE TERMS OF USE.
+
+YOU MAY NOT ACCESS THE COHERE SOLUTION FOR PURPOSES OF MONITORING AVAILABILITY, PERFORMANCE OR FUNCTIONALITY, OR FOR ANY OTHER BENCHMARKING OR COMPETITIVE PURPOSES.
+
+COHERE’S DIRECT COMPETITORS ARE PROHIBITED FROM ACCESSING THE COHERE SOLUTION, EXCEPT WITH COHERE’S PRIOR WRITTEN CONSENT.
+
+This Agreement does not alter in any way the terms or conditions of any other agreement you may have with us in respect of any Services, products, applications or otherwise, including any Subscription Agreement (defined in Section 5 below) you enter with us.
+
+Changes to these Terms of Use and the Cohere Solution
+
+Except where prohibited by applicable law, we reserve the right to change any element of these Terms of Use at any time. When we change these Terms of Use, we will: (i) place a notice on the Cohere Website and Cohere Application, send you an email, and/or notify you by some other means as required by applicable law; (ii) post a new version to the Cohere Website and Cohere Application; and (iii) update the “Last Updated” date at the top of these Terms of Use. We may require you to provide consent to the updated Terms of Use in a specified manner before further use of the Cohere Solution is permitted. If you do not agree to any change(s) after receiving a notice of such change(s), you will stop using the Cohere Solution. Otherwise, your continued access to or use of the Cohere Solution after any changes to these Terms of Use indicates your acceptance of such changes.  
+
+Except where prohibited by applicable law, we reserve the right to change any element of the Cohere Solution at any time, without notice. We may, at our discretion, suspend your access to or use of the Cohere Solution or any component thereof: (i) for scheduled maintenance; (ii) due to a force majeure event; (iii) if you are delinquent in your payment of fees to Cohere under any agreement; (iv) if Cohere believes in good faith that you have violated any provision of these Terms of Use, the Responsible Use Guidelines (as defined below) or any other responsible use guidelines we provide to you or are posted on the Cohere Website;  (v) to address any emergency security concerns; or (vi) if required to do so by a regulatory body or as a result of a change in applicable law. 
+
+You may need to update third-party software from time to time in order to use the Cohere Solution.
+
+Cohere may engage third parties, including cloud service providers, to provide the Cohere Solution or the Services.
+
+By agreeing to these Terms of Use, you hereby acknowledge and agree that you have read the agree to be bound by (collectively, the “Responsible Use Guidelines”):
+
+the model cards, available at https://docs.cohere.ai/generation-card/;
+
+the data statement, available at https://docs.cohere.ai/data-statement/; and
+
+ the usage guidelines, available at https://docs.cohere.ai/usage-guidelines/.
+
+User Account
+
+To access certain features of the Cohere Solution, you may be required to successfully sign up for a user account using the available interfaces of the services, and select a username and password login credentials (the “User ID”). 
+
+
+If you select a User ID, you will keep your User ID secure and will not grant access to or otherwise share your User ID with any other person. 
+
+
+You must provide us with true, accurate, current and complete information for your User ID. If we believe or suspect that your information is not true, accurate, current or complete, we may deny or terminate your access to the Cohere Solution.
+
+
+We reserve the right to disable any User ID issued to you at any time in our sole discretion. If we disable access to a User ID issued to you, you may be prevented from accessing the Cohere Solution (or any portion thereof).
+
+
+Cohere is entitled to act on instructions received through your account. Cohere is not responsible for any actions taken or transactions made to or from your account by any other party using your User ID. You are solely responsible for any and all use of your User ID and all purchases and activities that occur under or in connection with the User ID. Without limiting any rights which we may otherwise have, we reserve the right to take any and all action, as we deem necessary or reasonable, to ensure the security of the Cohere Solution and your account, including without limitation terminating your account, changing your password, or requesting additional information to authorize transactions on your account.  You agree to be responsible for any act or omission of any users that access the Cohere Solution under your User ID that, if undertaken by you, would be deemed a violation of these Terms of Use.
+
+Electronic Communications
+
+When you use or view the Cohere Solution or send e-mails, texts or other electronic messages to us, you are communicating with us electronically and you consent to receive communications from us electronically. We will communicate with you by e-mail, by text message or by posting notices on the Cohere Solution. You agree that all agreements, notices, disclosures and other communications that we provide to you electronically satisfy any legal requirement that such communications be in writing.
+
+By creating an account to access the Cohere Solution, you acknowledge that Cohere will send you service-related e-mails relating to your account, including service updates. Your consent to receive communications and do business electronically, and our agreement to do so, applies to all of your interactions and transactions with us. You may withdraw your consent to receive communications electronically by contacting us in the manner described below. If you withdraw your consent (excluding consent to receive marketing communications), from that time forward, you must stop using the Cohere Solution. The withdrawal of your consent will not affect the legal validity and enforceability of any obligations or any electronic communications exchanged or business transacted between us prior to the time you withdraw your consent.   Please keep us informed of any changes in your email or mailing address so that you continue to receive all communications without interruption.
+
+If you are a member of our mailing list you will also receive email communications from us regarding our products, services and initiatives (including collaborations and partnerships). If you do not wish to receive these communications, you can unsubscribe from such promotional e-mails at any time by clicking on the unsubscribe link in any of our e-mail communications. Users who unsubscribe from receiving such promotional communications may continue to receive certain transactional and/or account-related communications.
+
+If you sign up through Cohere to receive special offers regarding products and services from our partners, you authorize us to share your email address and other Personal Information (as defined below) you authorize with the partner whose offer you wish to receive. If you request these special offers, you acknowledge the partner may also send you future offers that may interest you. You can opt out of future communications from Cohere by contacting us in the manner described below; you can unsubscribe from future partner communications by following their unsubscribe and opt out instructions. You do not have to agree to participate in these offers in order to use the Cohere Solution. You understand that Cohere may receive financial remuneration in exchange for sharing your email address and other Personal Information you authorize with partners if you choose to sign up for an offer. Once you sign up for an offer, you can change your mind at any time, but if the partner or Cohere has already relied on your authorization to share your email or other Personal Information for a particular offer, any action already taken cannot be undone. 
+
+By using the Cohere Solution, you acknowledge and agree that Cohere will be transmitting certain of your Personal Information electronically.
+
+You acknowledge and agree that you are solely responsible for providing Cohere with accurate contact information, including your mobile device number and email address, where we may send communications in accordance with these Terms of Use and our Privacy Policy. 
+
+
+Customer Data and Privacy
+
+YOU GRANT US A NONEXCLUSIVE, WORLDWIDE, ROYALTY-FREE, IRREVOCABLE, SUBLICENSABLE, AND FULLY PAID-UP RIGHT TO ACCESS, COLLECT, USE, PROCESS, STORE, DISCLOSE AND TRANSMIT ANY DATA, INFORMATION, CONTENT, RECORDS OR FILES (“CONTENT”) THAT YOU LOAD, SUBMIT, TRANSMIT TO OR ENTER INTO THE COHERE SOLUTION, OR THAT YOU OTHERWISE TRANSMIT TO COHERE IN CONNECTION WITH THESE TERMS OF USE (“CUSTOMER DATA”) TO: (I) PROVIDE THE COHERE SOLUTION; (II) EXERCISE ITS RIGHTS AND PERFORM ITS OBLIGATIONS UNDER THESE TERMS OF USE, INCLUDING ENSURING YOU ARE COMPLYING WITH THESE TERMS OF USE, THE RESPONSIBLE USE GUIDELINES  AND ANY OTHER RESPONSIBLE USE GUIDELINES WE PROVIDE TO YOU OR ARE POSTED ON THE COHERE WEBSITE; AND (III) IMPROVE AND ENHANCE THE COHERE SOLUTION AND OUR OTHER OFFERINfGS AND BENCHMARK THE FOREGOING, INCLUDING BY SHARING API DATA AND FINETUNING DATA  WITH THIRD PARTIES WHO MAY USE THE FINETUNING DATA AND API DATA TO PROVIDE SERVICES TO COHERE AND FOR OTHER PURPOSES PERMITTED UNDER THEIR TERMS AND CONDITIONS. FOR CLARITY AND NOTWITHSTANDING ANYTHING TO THE CONTRARY IN THESE TERMS OF USE, COHERE WILL NOT SHARE A CUSTOM MODEL WITH ANY THIRD PARTY BUT MAY SHARE FINETUNING DATA USED TO FINETUNE OR TRAIN A CUSTOM MODEL WITH THIRD PARTIES. THE TERM “API DATA” MEANS CUSTOMER DATA SUBMITTED BY YOU TO THE COHERE API. THE TERM “FINETUNING DATA” MEANS CUSTOMER DATA COMPRISED OF ANY TRAINING OR FINETUNING DATA SUBMITTED BY YOU TO THE COHERE SOLUTION. THE TERM “CUSTOM MODEL” MEANS AN AI-POWERED NEURAL NETWORK FOR NATURAL LANGUAGE PROCESSING BASED ON PARAMETERS THAT ARE TRAINED USING CUSTOMER DATA.
+
+COHERE DOES NOT REPRESENT, WARRANT, OR COVENANT THAT IT HAS REVIEWED ANY THIRD PARTY TERMS AND CONDITIONS AND IS NOT RESPONSIBLE FOR ANY API DATA OR FINETUNING DATA SHARED WITH THIRD PARTIES. COHERE DOES NOT ENDORSE ANY THIRD PARTY SERVICE AND YOU ACKNOWLEDGE THAT IF YOU CHOOSE TO SUBMIT ANY API DATA OR FINETUNING DATA TO THE COHERE SOLUTION, YOU DO SO ENTIRELY AT YOUR OWN RISK. YOU FURTHER ACKNOWLEDGE THAT ANY THIRD PARTY TERMS AND CONDITIONS MAY NOT HAVE THE SAME OR SIMILAR COMMITMENTS OR PROTECTIONS AS THOSE CONTAINED IN THESE TERMS OF USE AND ANY FINETUNING DATA OR API DATA SHARED BY COHERE WITH THIRD PARTIES WILL BE ACCESSED, USED, AND OTHERWISE HANDLED BY SUCH THIRD PARTIES IN ACCORDANCE WITH THEIR TERMS AND CONDITIONS, WHICH MAY PERMIT SUCH THIRD PARTY TO USE FINETUNING DATA OR API DATA FOR ITS OWN PURPOSES.
+
+Please review our current Privacy Policy, available at www.cohere.ai/privacy, which contains important information about our practices in collecting, storing, using and disclosing information about identifiable individuals (“Personal Information”) and which is hereby incorporated into and forms a part of these Terms of Use. 
+
+Subscription Orders 
+
+These Terms of Use will govern the placement of any order you make through the Cohere Solution for a subscription to the Services (each such order, a “Subscription Order”). We will confirm your request by sending an email to the email address you have provided. Your placement of a Subscription Order through the Cohere Solution is an offer to purchase the Services ordered, and we may accept your Subscription Order by providing a subscription agreement (the “Subscription Agreement”) for your acceptance and processing your payment through the Cohere Solution. Your receipt of an electronic or other form of Subscription Order confirmation does not signify our acceptance of your Subscription Order, nor does it constitute confirmation of our offer to sell. For any reason, we may decline to accept your Subscription Order or any part of your Subscription Order. No Subscription Order will be considered accepted by Cohere until the applicable Subscription Agreement has been accepted by us and your payment has been processed. If (a) we decline to accept your Subscription Order, (b) one or more elements of your Subscription Order are unavailable, or (c) your Subscription Order cannot be fulfilled for any reason in our discretion, we will attempt to notify you as soon as practicable at the email address you provided. We may require additional verifications or information before considering any Subscription Order.
+
+Payment
+
+To pay for a Subscription Order as described in an accepted Subscription Agreement, you will need to provide Cohere or, if applicable, a third-party payment processor (the “Payment Processor”) with the information necessary to process payment from you, including the billing information requested on the Cohere Solution or the applicable Payment Processor’s platform. The processing of payments will be subject to the terms, conditions and privacy policies of the Payment Processor, if any, in addition to these Terms of Use. We are not responsible for any error by, or other acts or omissions of, any Payment Processor. You may pay for your Subscription Order via credit card or any other manner then available on the Cohere Solution or applicable Payment Processor’s platform. By submitting your payment information to us or the Payment Processor, you authorize us or the Payment Processor to charge the applicable payment method at our or their convenience (but within thirty (30) days of credit card authorization). You represent and warrant that you will not use any credit card or other form of payment unless you have all necessary authorization to do so. We assume that because Subscription Order payments require a valid credit card, only persons age 18 or over are placing Subscription Orders and providing us and/or the Payment Processor with the information requested during the payment process. We and/or the Payment Processor are not liable in the event your children or others acting with or without your permission use your credit card or other means of payment to make purchases on the Cohere Solution or the Payment Processor’s platform (and to the extent your minor children make any such purchases, you hereby represent and warrant that they are authorized to do so); however, you may report any unauthorized use to us or the Payment Processor, and we and/or the Payment Processor will use reasonable measures within our control to help prevent future unauthorized use of your card. We reserve the right to correct any errors or mistakes that any Payment Processor makes even if it has already requested or received payment. 
+
+
+The terms of your payment will be based on your chosen payment provider and may be determined by agreements between you and the financial institution, credit card issuer or other provider of your chosen payment method. If we, either through the Payment Processor or otherwise, do not receive payment from you, you agree to pay all amounts due on your billing account upon demand.
+
+
+You must provide current, complete and accurate information for your billing account. You must promptly update all information to keep your billing account current, complete and accurate (such as a change in billing address, credit card number, or credit card expiration date), and you must promptly notify us if your payment method is cancelled (e.g., for loss or theft) or if you become aware of a potential breach of security, such as the unauthorized disclosure or use of your user name or password. Changes to such information can be made in your account settings. If you fail to provide any of the foregoing information, you agree that we may continue charging you for any use of paid services under your billing account unless you have terminated your paid services in accordance with any applicable Subscription Agreement.
+
+
+If the amount to be charged to your billing account varies from the amount you preauthorized (other than due to the imposition or change in the amount of applicable sales taxes), you have the right to receive, and we will provide, notice of the amount to be charged and the date of the charge before the scheduled date of the transaction. Any agreement you have with your payment provider will govern your use of your payment method of choice. You agree that we may accumulate charges incurred and submit them as one or more aggregate charges during or at the end of each billing cycle.
+
+Pricing and Services
+
+Subscription and Services options displayed on the Cohere Solution may be discontinued or unavailable for any other reason, and prices are subject to change. Except where otherwise indicated, all prices do not include any applicable sales taxes, which will be added to your total purchase price. You are responsible for the payment of any provincial and local sales or use taxes that may apply to your Subscription Order. We will provide you no less than seven (7) days’ notice prior to implementing a change to our prices.
+
+Promotional Offers
+
+We may run promotional offers from time to time on the Cohere Solution. The terms of any such promotion will be posted on the Cohere Solution. Unless otherwise indicated, we may establish and modify, in our sole discretion, the terms of such offer and end such offer at any point. Promotional offers may not be available in your jurisdiction. 
+
+Ownership of the Cohere Solution
+
+All right, title and interest, including intellectual property rights, in the Cohere Solution, the source code in the software we use to provide the Cohere Solution (the “Software”) and all other materials provided by us hereunder, and any updates, adaptation, translation, customization or derivative works thereof, will remain the sole property of Cohere (or our third-party suppliers, if applicable). 
+
+
+The Cohere Solution and all materials provided by us hereunder are made available or licensed and not “sold” to you.  
+
+
+The Software and all other materials provided by us hereunder, including content we make available through or in the Cohere Solution, are protected by copyright in Canada.  You are prohibited from modifying, copying, reproducing, publishing, posting, transmitting, distributing, creating derivative works from, decompiling, transferring or selling any of the Cohere Solution, the Software or other materials provided by us hereunder, or sharing or granting access in any of the foregoing to any third party for any purpose. 
+
+
+Any use of third-party software provided in connection with the Cohere Solution will be governed by such third parties’ licences and not by these Terms of Use;
+
+
+“Cohere” is the trade name and mark of Cohere Inc. Any trademarks, graphics or logos appearing in or on the Cohere Solution are the exclusive property of Cohere (or its third-party suppliers) and may not be used in any manner without our express written consent.
+
+
+All rights not expressly granted to you in these Terms of Use are reserved by Cohere.
+
+Licence to the Cohere Solution
+
+Subject to these Terms of Use, we grant you a non-exclusive, non-transferable, non-sublicensable and revocable licence to use the Cohere Solution in accordance with these Terms of Use.
+
+Additional Terms
+
+Your access to and use of certain functionalities provided in or through the Cohere Solution may be subject to additional terms and conditions presented to you by Cohere or its service providers. Such additional terms and conditions are incorporated herein by reference.  If there is a conflict or inconsistency between the terms and conditions of such additional terms and these Terms of Use, then the provisions of these Terms of Use will govern to the extent of such conflict or inconsistency. If you do not purchase such additional functionalities or do not agree to such additional terms, you may not have access to, and you should not access or use, those functionalities. 
+
+These Terms of Use relate to the Cohere Solution only and do not alter in any way the terms or conditions of any Subscription Agreement that may apply to your use of the Cohere Solution or any Services available thereon. For greater certainty, if there is a conflict or inconsistency between the terms and conditions of your Subscription Agreement and these Terms of Use, then the provisions of the Subscription Agreement will govern to the extent of such conflict or inconsistency.
+
+Updates and Upgrades
+
+You acknowledge that we may from time to time issue updated or upgraded versions of the Cohere Software Development Kit (SDK). We will not automatically update or upgrade the version of the SDK that you are then currently using on your device, and the download and installation of any such update or upgrade must be manually carried out by you. The SDK (including any updates or upgrades) may: (i) cause your device to communicate with our servers to deliver the functionality described in the SDK description or through new features as they are introduced, and to record usage metrics; (ii) affect preferences or data stored on your device; and (iii) collect Personal Information as set out in our Privacy Policy . We are not responsible if an update or upgrade affects how the SDK works if this is caused by your own equipment or device not supporting the update or upgrade. You can withdraw consent at any time under certain conditions by contacting us at team@cohere.ai.
+
+Your Responsibilities
+
+You agree to:
+
+use reasonable efforts to prevent unauthorized access to or use of the Cohere Solution; 
+
+keep your User IDs and all other login information confidential;
+
+not register for more than one account, register for an account on behalf of an individual other than yourself without such individual’s authorization, or register for an account on behalf of any group or entity;
+
+monitor and control all activity conducted through your account in connection with the Cohere Solution;
+
+upload and disseminate only data to which you own all required rights under law and do so only consistent with applicable law;
+
+promptly notify us if you become aware or reasonably suspect any illegal or unauthorized activity or a security breach involving your account, including any loss, theft, or unauthorized disclosure or use of a User ID or account;
+
+not use anyone else’s User ID at any time, without the permission of the User ID holder;
+
+not attempt, in any manner, to obtain the password, account, or other security information from any other user; and
+
+comply with all applicable laws and regulations, including, but not limited to, all intellectual property, data and privacy laws. Except as authorized by applicable law, you agree not to export, re-export or transfer the Cohere Solution or any part thereof to any country, person, entity or end user subject to applicable export controls or sanctions. For greater certainty, you are responsible for complying with all applicable trade restrictions, regulations and laws both foreign and domestic.
+
+No Unlawful or Prohibited Use
+
+You will not use the Cohere Solution in violation of these Terms of Use, any applicable Subscription Agreement, the Responsible Use Guidelines or any other responsible use guidelines we provide to you or are posted on the Cohere Website, or of any applicable law, or in the case of third party materials, websites or content accessed through or provided with the Cohere Solution or the Services, the applicable third-party license agreement. You will not, without our prior written permission, use the Cohere Solution for any purpose other than to access and use the software and Services we make available through the Cohere Solution. You acknowledge and agree that the Cohere Solution has been designed for business use and you represent and warrant to and covenant with Cohere that you will not use the Cohere Solution for personal, family or household purposes. Without limiting the generality of the foregoing, you further represent and warrant to and covenant with Cohere that you will not (and will not attempt to) directly or indirectly: 
+
+disable, overly burden, impair, or otherwise interfere with servers or networks connected to the Cohere Solution (e.g., a denial of service attack);
+
+attempt to gain unauthorized access to the Cohere Solution, or bypass any measures we may use to prevent or restrict access to the Cohere Solution, attempt to circumvent the intended features, functionality or limitations of the Cohere Solution, or otherwise use, copy, distribute, or make available the Cohere Solution to permit timesharing, service bureau use or commercially exploit the Cohere Solution;
+
+send, upload, collect, transmit, store, use, post, publish, or otherwise communicate on the Cohere Solution any data, information, pictures, videos, audio or other materials or content that: (i) contains any computer viruses, worms, malicious code, or any software intended to damage or alter a computer system or data; (ii) you do not have the lawful right to send, upload, collect, transmit, store, use, post, publish, or otherwise communicate; (iii) is false, intentionally misleading, or impersonates any other person; (iv) is libelous, slanderous, defamatory, bullying, harassing, abusive, threatening, vulgar, obscene, or offensive, or that contains pornography, nudity, or graphic or gratuitous violence, or that promotes violence, racism, discrimination, bigotry, hatred, or physical harm of any kind against any group or individual; (v) is harmful to minors in any way or targeted at minors; (vi) infringes, violates or otherwise misappropriates the intellectual property or other rights of any third party (including any moral right, privacy right or right of publicity); or (vii) encourages any conduct that may violate any applicable laws or would give rise to civil or criminal liability; (viii) discloses or provides information protected under any law, agreement or fiduciary relationship, including proprietary or confidential information of others; or (ix) contains information about an identifiable individual, other than as required by Cohere: (A) to provide support services as further set out in the applicable Subscription Agreement; or (B) as part of its onboarding process as further set out in Section 2 (User Account); 
+
+use the Cohere Solution in a manner which, in the opinion of Cohere would tend to bring Cohere or any of its trademarks into public disrepute, contempt, scandal or ridicule, would adversely affect the reputation or goodwill of Cohere or any of its the trademarks, or adversely affect the relationship between Cohere and any of its licensors or other customers;
+
+use the Cohere Solution to store or transmit material that is dangerous, harmful, fraudulent, deceptive, threatening, harassing, defamatory, libelous, obscene, or otherwise objectionable or unlawful;
+
+use the Cohere Solution for any activities where the use or failure of the Cohere Solution would reasonably be expected to result in death, serious personal injury, or severe environmental or property damage (such as the creation or operation of weaponry);
+
+use the Cohere Solution to transmit, store, or process health information subject to United States Health Insurance Portability and Accountability Act of 1996, as it may be amended from time to time (and any regulations issued under it);
+
+use the Cohere Solution for materials or activities that are subject to the International Traffic in Arms Regulations (ITAR) maintained by the United States Department of State;
+
+use the Cohere Solution to generate political propaganda;
+
+use any data mining, robots, or similar data gathering or extraction methods, or copy, modify, reverse engineer, reverse assemble, disassemble, or decompile the Cohere Solution or any part thereof or otherwise attempt to discover any source code;
+
+remove or obscure any proprietary notices or labels on the Cohere Solution, including brand, copyright, trademark and patent or patent pending notices;
+
+use the Cohere Solution or any Content that You receive through or from the Cohere Solution for the purpose of building a similar or competitive product or service;
+
+perform any vulnerability, penetration or similar testing of the Cohere Solution;
+
+advertise to, or solicit, any user to buy or sell any third party products or services, or use any information obtained from the Cohere Solution in order to contact, advertise to, solicit, or sell to any user without their prior express consent;
+
+use the Cohere Solution or any part thereof to distribute, promote or otherwise publish any material containing any solicitation for funds, advertising or solicitation for goods or services, promoting any website, or use any paid advertising platform to promote links that direct to the Cohere domain or use the Cohere trademark;
+
+run Maillist, Listserv, any form of auto-responder or “spam” on the Cohere Solution, or any processes that run or are activated while you are not logged into the Cohere Solution, or that otherwise interfere with the proper working of the Cohere Solution (including by placing an unreasonable load on the Cohere Solution’s infrastructure);
+
+publish, market, advertise or in any way distribute the Content;
+
+share, transfer or otherwise provide access to an account designated for you to another person;
+
+copy or store any significant portion of the Content;
+
+use the Cohere Solution or Content to stalk, harass or harm another individual;
+
+mirror or frame the Cohere Solution or any Content, place pop-up windows over its pages, or otherwise affect the display of its pages; or
+
+authorize, permit, enable, induce or encourage any third party to do any of the above. 
+
+Communications Not Confidential
+
+We do not guarantee the confidentiality of any communications made by you through the Cohere Solution. We do not guarantee the security of data transmitted over the Internet or public networks in connection with your use of the Cohere Solution. 
+
+Feedback
+
+You agree that any suggestion or idea provided by you (such suggestions or ideas, “Feedback”) will not be treated as confidential, and nothing in these Terms of Use will restrict our right to use, profit from, disclose, publish or otherwise exploit any Feedback, without compensation to you. You grant to us a worldwide, royalty-free, fully paid, perpetual, irrevocable licence to use, reproduce, modify, translate, distribute, perform, display, import, sell, offer for sale, make, have made and otherwise exploit the Feedback in any form, media, or technology, whether now known or hereafter developed, and to allow others to do the same. This is true whether you provide the Feedback on the Cohere Solution or through any other method of communication with us, unless we have entered into a separate agreement with you that provides otherwise. You will not have any claim, including, without limitation, claims based upon invasion of privacy, defamation or right of publicity, arising out of any use, alteration, blurring, distortion or use in composite form of any Feedback. Except as prohibited by law, you hereby waive, and you agree to waive, any moral and author’s rights (including attribution and integrity) that you may have in any Feedback, even if it is altered or changed in a manner not agreeable to you.
+
+Third Party Content, Websites or Services
+
+The Cohere Solution may provide links or access to third party content, websites, or services. Likewise, we may allow you to access the Cohere Solution from third party systems. Cohere does not endorse any third-party content, websites, services, or systems, or guarantee or warrant their quality, durability, accuracy, reliability, completeness, currency, timeliness, non-infringement, merchantability, or fitness for any purpose. Third party content, websites, services, or systems are not under Cohere’s control, and if you choose to access any such content, websites, or services, or to access the Cohere Solution from such systems, you do so entirely at your own risk. You acknowledge that you may be required to accept terms of use applicable to third party content, websites, services, or systems and agree to accept and comply with any such terms of use.
+
+Your interactions with organizations and/or individuals found on or through the Cohere Solution, including payment and delivery of goods and services, and any other terms, conditions, warranties or representations associated with such dealings, are solely between you and such organizations and/or individuals. You agree that to the fullest extent permitted by applicable law Cohere is not responsible or liable for any loss or damage of any sort incurred as the result of any such dealings.
+
+Malicious Code and Security
+
+The downloading and viewing of Content is done at your own risk. We do not guarantee or warrant that the Cohere Solution is compatible with your computer system or mobile device or that the Cohere Solution, or any links from the Cohere Solution, will be free of viruses, worms, trojan horses or disabling devices or other code that manifests contaminating or destructive properties. You are responsible for implementing safeguards to protect the security and integrity of your computer system and/or mobile device, and you are responsible for the entire cost of any service, repairs or connections of and to your computer system and/or mobile device that may be necessary as a result of your use of the Cohere Solution.
+
+Disclaimer
+
+THE LAWS OF CERTAIN JURISDICTIONS, WHICH MAY INCLUDE QUEBEC, DO NOT ALLOW THE EXCLUSION OR LIMITATION OF CERTAIN LEGAL WARRANTIES, CONDITIONS OR REPRESENTATIONS. IF THESE LAWS APPLY TO YOU, SOME OR ALL OF THE EXCLUSIONS OR LIMITATIONS IN THESE TERMS OF USE (INCLUDING THE FOLLOWING DISCLAIMERS) MAY NOT APPLY, AND YOU MAY HAVE ADDITIONAL RIGHTS. TO THE EXTENT THAT WE MAY NOT, AS A MATTER OF APPLICABLE LAW, DISCLAIM ANY IMPLIED WARRANTY OR CONDITION, THE SCOPE AND DURATION OF SUCH WARRANTY OR CONDITION WILL BE THE MINIMUM PERMITTED UNDER SUCH APPLICABLE LAW.
+
+TO THE FULLEST EXTENT PERMITTED BY APPLICABLE LAW, YOU ACKNOWLEDGE, UNDERSTAND, AND AGREE THAT THE COHERE SOLUTION AND THE SERVICES ARE PROVIDED “AS IS” AND “AS AVAILABLE”, WITH ALL FAULTS AND WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND. EXCEPT FOR ANY SPECIFIC WARRANTIES OR CONDITIONS PROVIDED IN AN APPLICABLE SUBSCRIPTION AGREEMENT OR AS OTHERWISE REQUIRED BY APPLICABLE LAW, TO THE FULLEST EXTENT PERMITTED BY APPLICABLE LAW, WE DISCLAIM ALL WARRANTIES, REPRESENTATIONS AND CONDITIONS OF ANY KIND WITH RESPECT TO THE COHERE SOLUTION AND THE SERVICES, WHETHER EXPRESS, IMPLIED, STATUTORY OR COLLATERAL, INCLUDING, WITHOUT LIMITATION, ANY WARRANTIES AND CONDITIONS OF MERCHANTABILITY, QUALITY, DURABILITY, COMPATIBILITY, TITLE, SECURITY, RELIABILITY, COMPLETENESS, QUIET ENJOYMENT, ACCURACY, CURRENCY, TIMELINESS, INTEGRATION, FITNESS FOR A PARTICULAR OR GENERAL PURPOSE AND NON-INFRINGEMENT, AND/OR ANY WARRANTIES OR CONDITIONS ARISING OUT OF COURSE OF DEALING OR USAGE OF TRADE, AND/OR THAT THE COHERE SOLUTION AND THE SERVICES ARE OR WILL BE ERROR-FREE OR WILL OPERATE WITHOUT INTERRUPTION. TO THE FULLEST EXTENT PERMITTED BY APPLICABLE LAW, WE DISCLAIM ALL WARRANTIES, REPRESENTATIONS AND CONDITIONS OF ANY KIND WITH RESPECT TO THIRD PARTY COMMUNICATIONS AND ANY THIRD-PARTY MATERIALS, WEBSITES OR CONTENT DIRECTLY OR INDIRECTLY ACCESSED THROUGH THE COHERE SOLUTION. ANY REPRESENTATION OR WARRANTY OF OR CONCERNING ANY THIRD PARTY MATERIALS, WEBSITES OR CONTENT IS STRICTLY BETWEEN CUSTOMER AND THE THIRD PARTY.
+
+IN THE EVENT THAT THERE IS AN INTERRUPTION OR DISRUPTION IN ANY OF THE SERVICES OFFERED BY COHERE FOR WHATEVER REASON, EVEN IF COHERE HAS BEEN MADE AWARE OF AN ISSUE THAT COULD RESULT IN OR IS LIKELY TO RESULT IN AN INTERRUPTION OR DISRUPTION OF SERVICES, TO THE FULLEST EXTENT PERMITTED BY APPLICABLE LAW, COHERE WILL NOT BE REQUIRED TO ISSUE A REFUND FOR ANY PURCHASE MADE BY YOU. AS SOON AS COHERE HAS IDENTIFIED THE CAUSE OF AN INTERRUPTION OR DISRUPTION, COHERE WILL USE REASONABLE EFFORTS TO RETURN SERVICE AS SOON AS REASONABLY POSSIBLE.
+
+Limitation of Liability
+
+TO THE FULLEST EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT WILL WE OR OUR PARENTS, SUBSIDIARIES OR AFFILIATES AND OUR AND THEIR RESPECTIVE OFFICERS, DIRECTORS, SHAREHOLDERS, EMPLOYEES, CONTRACTORS, AGENTS, LICENSORS, LICENSEES AND SERVICE PROVIDERS AND ITS AND THEIR SUCCESSORS AND ASSIGNS (COLLECTIVELY, THE “COHERE PARTIES”), BE LIABLE, WHETHER BASED ON WARRANTY, CONTRACT, TORT, NEGLIGENCE, STRICT LIABILITY OR ANY OTHER LEGAL THEORY, FOR ANY DIRECT, INDIRECT, INCIDENTAL, CONSEQUENTIAL, SPECIAL, EXEMPLARY OR PUNITIVE DAMAGES, OR LOST PROFITS, LOSS OF USE, LOSS OF DATA, PERSONAL INJURY, FINES, FEES, PENALTIES OR OTHER LIABILITIES (COLLECTIVELY, “LOSSES”), IN EACH CASE, WHETHER OR NOT WE WERE ADVISED OR SHOULD HAVE KNOWN OF THE POSSIBILITY OF SUCH DAMAGES, RESULTING FROM OR RELATED TO THE COHERE SOLUTION OR THE INABILITY TO MAKE USE OF THE COHERE SOLUTION, OR THESE TERMS OF USE, INCLUDING, FOR CLARITY, ANY LOSSES RESULTING FROM THE ACCESS, COLLECTION, USE, PROCESSING, STORING, DISCLOSING OR TRANSMITTING OF API DATA OR FINETUNING DATA BY THIRD PARTIES. IF YOU ARE DISSATISFIED WITH ANY PORTION OF THE COHERE SOLUTION, YOUR SOLE AND EXCLUSIVE REMEDY IS TO DISCONTINUE USE OF THE COHERE SOLUTION. 
+
+TO THE FULLEST EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT WILL OUR TOTAL AGGREGATE LIABILITY IN CONNECTION WITH OR UNDER THESE TERMS OF USE, OR YOUR USE OF, OR INABILITY TO MAKE USE OF, THE COHERE SOLUTION, EXCEED $100 CAD. FOR GREATER CERTAINTY, THE EXISTENCE OF ONE OR MORE CLAIMS UNDER THESE TERMS OF USE WILL NOT INCREASE THIS MAXIMUM LIABILITY AMOUNT. 
+
+Without limiting the foregoing, under no circumstances will any of the Cohere Parties be held liable for any delay or failure in performance resulting directly or indirectly from acts of nature, forces, or causes beyond our or their reasonable control, including, without limitation, Internet failures, computer equipment failures, telecommunication equipment failures, other equipment failures, electrical power failures, strikes, labour disputes, riots, insurrections, civil disturbances, shortages of labour or materials, fires, floods, storms, explosions, pandemics, acts of God, war, governmental actions, orders of domestic or foreign courts or tribunals, or non-performance of third parties. 
+
+Indemnification
+
+You will defend, indemnify and hold harmless the Cohere Parties from and against any claims, causes of action, demands, recoveries, losses, damages, fines, penalties or other costs or expenses of any kind or nature including reasonable legal and accounting fees, arising out of or in connection with: 
+
+your use (or the use by any third party using your User ID) of the Cohere Solution or the Services (except to the extent prohibited by law);
+
+your breach of any provision of these Terms of Use or any documents referenced herein;
+
+your violation of any law or the rights of a third party (including intellectual property rights); 
+
+your Customer Data; or
+
+any viruses, Trojan horses, worms, time bombs, spyware, malware, cancelbots or other similar harmful or deleterious programming routines input by you into the Cohere Solution.
+
+Cohere reserves the right, at its own cost, to assume the exclusive defence and control of any matter otherwise subject to indemnification by you, in which event you will fully cooperate with us in asserting any available defences. You agree that the provisions in this section will survive any termination of your account, the Terms of Use or your access to the Cohere Solution.
+
+Term and Termination; Survival
+
+These Terms of Use will commence on the day you first use the Cohere Solution and will continue for as long as you use the Cohere Solution or until terminated in accordance with the provisions of these Terms of Use. At any time, Cohere may: (i) suspend or terminate your rights to access or use the Cohere Solution, or (ii) terminate these Terms of Use, in Cohere’s sole discretion, for any reason, including if Cohere in good faith believes that you have used the Cohere Solution in violation of these Terms of Use, the Responsible Use Guidelines or any other responsible use guidelines we provide to you or are posted on the Cohere Website, or have engaged in fraudulent activity. You may terminate these Terms of Use at any time and with immediate effect by requesting by email that your User ID be deleted, ceasing use of the Cohere Solution and uninstalling and deleting the Cohere Solution. For greater certainty, your termination of these Terms of Use will not automatically terminate an active Subscription Agreement and if you continue to use any portion of the Cohere Solution after these Terms of Use have been purportedly terminated by you as described above, including any use pursuant to an active Subscription Agreement, these Terms of Use will continue to apply to the extent of such use. In the event of termination, you are no longer authorized to access the benefits of the Cohere Solution. 
+
+The following Sections, together with any other provision of these Terms of Use which expressly or by its nature survives termination or expiration, or which contemplates performance or observance subsequent to termination or expiration of these Terms of Use, will survive expiration or termination of these Terms of Use for any reason: Sections 4 (Customer Data and Privacy), 9 (Ownership of the Cohere Solution), 11 (Additional Terms), 15 (Communications Not Confidential), 17 (Third Party Content, Websites or Services) 18 (Malicious Code and Security), 19 (Disclaimer), 20 (Limitation of Liability), 21 (Indemnification), 22(b) (Survival), and 23 (General Provisions).
+
+General Provisions
+
+Choice of Law. Except as restricted by applicable law, these Terms of Use will be governed by the laws of the Province of Ontario and the federal laws of Canada applicable therein (without giving effect to any principles of conflicts of law), and such laws apply to your access to or use of the Cohere Solution notwithstanding your physical location. You will only use the Cohere Solution in jurisdictions where the Cohere Solution may lawfully be used. Except as restricted by applicable law, you hereby consent to the exclusive jurisdiction and venue of courts in Toronto, Ontario in all disputes arising out of or relating to the use of the Cohere Solution. This choice of jurisdiction does not prevent us from seeking injunctive relief with respect to a violation of intellectual property rights or confidentiality obligations in any appropriate jurisdiction. 
+
+Entire Agreement. These Terms of Use, any applicable Subscription Agreement, and any applicable confidential disclosure agreement entered into by the parties that references these Terms of Use, constitute the entire agreement between you and us pertaining to the subject matter hereof and supersede all prior or contemporaneous communications and proposals, whether electronic, oral or written, between you and us with respect to the Cohere Solution and the Services. A printed version of these Terms of Use and of any notice given in electronic form will be admissible in judicial or administrative proceedings based upon or relating to these Terms of Use (and/or any applicable Subscription Agreement) to the same extent and subject to the same conditions as other business documents and records originally generated and maintained in printed form.
+
+Waiver. Our failure to insist upon or enforce strict performance of any provision of these Terms of Use will not be construed as a waiver of any provision or right. A waiver of any provision of these Terms of Use must be in writing and a waiver in one instance will not preclude enforcement of such provision on other occasions.
+
+Severable. If any of the provisions contained in these Terms of Use are determined to be void, invalid or otherwise unenforceable by a court of competent jurisdiction, such provision will be severed from these Terms of Use and all other provisions of these Terms of Use will remain in full force and effect. 
+
+Assignment. You will not assign these Terms of Use to any third party without our prior written consent. We may assign these Terms of Use or any rights under these Terms of Use to any third party without your consent. Any attempted assignment, subcontract, delegation, or transfer in violation of this Section will be null and void. The terms of these Terms of Use will be binding upon permitted assignees. These Terms of Use will inure to the benefit of and be binding upon the parties, their permitted successors and permitted assignees.
+
+Dispute Resolution. If you believe that Cohere has not adhered to these Terms of Use, please contact Cohere using the contact information listed below. We will do our best to address your concerns. If you feel that your complaint has been addressed incompletely, we invite you to let us know for further investigation.
+
+English Language. It is the express wish of the parties that these Terms of Use and all related documents be drawn up in English. C’est la volonté expresse des parties que la présente convention ainsi que les documents qui s’y rattachent soient rédigés en anglais.
+
+Contact
+
+If you have any questions or comments regarding these Terms of Use, please contact us at team@cohere.ai.
+
+
+Apple App Store Additional License Terms 
+
+If the Cohere Solution is provided to you through the Apple Inc. (Apple Inc. together with all of its affiliates, “Apple”) App Store, the following terms and conditions apply to you in addition to all the other terms and conditions of these Terms of Use:
+
+the parties acknowledge these Terms of Use are concluded between the parties, and not with Apple. The responsibility for the Cohere Solution and content thereof is governed by these Terms of Use;
+
+notwithstanding anything to the contrary hereunder, you may use the Cohere Solution only on an iPhone or iPod touch that you own or control;
+
+you and we acknowledge that Apple has no obligation to furnish any maintenance or support services with respect to the Cohere Solution;
+
+in the event of any failure of the Cohere Solution to conform to any applicable warranty, you may notify Apple, and Apple will refund the purchase price for the Cohere Solution (if any) to you. Except for the foregoing, to the maximum extent permitted by applicable law, Apple will have no other warranty obligation whatsoever with respect to the Cohere Solution, and any other claims, losses, liabilities, damages, costs or expenses attributable to any failure to conform to any warranty will be governed by these Terms of Use; 
+
+any claim in connection with the Cohere Solution related to product liability, a failure to conform to applicable legal or regulatory requirements, or claims under consumer protection or similar legislation is governed by these Terms of Use, and Apple is not responsible for such claim; 
+
+any third party claim that the Cohere Solution or your possession and use of the Cohere Solution infringes that third party’s intellectual property rights will be governed by these Terms of Use, and Apple will not be responsible for the investigation, defense, settlement and discharge of such intellectual property infringement claim;
+
+you represent and warrant that you are not: (i) located in any country that is subject to a U.S. Government embargo, or that has been designated by the U.S. Government as a “terrorist supporting” country; or (ii) listed on any U.S. Government list of prohibited or restricted parties; 
+
+Apple is a third party beneficiary to these Terms of Use and may enforce these Terms of Use against you; and
+
+if any of the terms and conditions in these Terms of Use are inconsistent or in conflict with Apple’s applicable instructions for Minimum Terms for Developer’s End User License Agreement (the current version as of the date these Terms of Use was last updated is located at: http://www.apple.com/legal/internet-services/itunes/appstore/dev/minterms/) or the App Store Terms of Service (the current version as of the date these Terms of Use was last updated is located at: http://www.apple.com/legal/internet-services/itunes/ca/terms.html), the terms and conditions of Apple’s instructions for Minimum Terms for Developer’s End User License Agreement or App Store Terms of Service, as applicable, will apply to the extent of such inconsistency or conflict.
+
+Google Play
+
+If the Cohere Solution is provided to you through the Google Inc. (Google Inc. together with all of its affiliates, “Google”) Google Play store, the following terms and conditions apply to you in addition to all the other terms and conditions of these Terms of Use:
+
+you acknowledge that Google is not responsible for providing support services for the Cohere Solution; and
+
+f any of the terms and conditions in these Terms of Use are inconsistent or in conflict with the Google Play Developer Distribution Agreement (the current version as of the date these Terms of Use was last updated is located at https://play.google.com/about/developer-distribution-agreement.html), the terms and conditions of Google’s Google Play Developer Distribution Agreement will apply to the extent of such inconsistency or conflict.

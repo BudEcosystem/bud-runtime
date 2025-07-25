@@ -1,0 +1,2946 @@
+   Terms of Service
+
+   Effective 6 February 2025
+
+   Welcome to Mistral AI! We provide technology and services that
+   enable access to and use of Mistral AI’s artificial
+   intelligence models. These Terms of Service (these “Terms”)
+   govern your use of La Plateforme, Le Chat, and the other
+   websites, products, services, and technologies we offer (the
+   “Services”), except where we expressly state that other terms
+   apply (we refer to those other terms as “Additional Terms”).
+
+   The Services are provided by Mistral AI, a French limited
+   joint-stock corporation, incorporated in Paris, under number
+   952 418 325, having its registered offices at 15 rue des
+   Halles, 75001 Paris, France ("Mistral AI" or "us").
+
+   We encourage you to read and understand these Terms because by
+   clicking on “I agree” (or any similar button or checkbox) at
+   the time you sign up for a Service or by accessing or using any
+   of the Services, you are agreeing to these Terms (including all
+   applicable Additional Terms), which constitute an agreement
+   between you and Mistral AI.
+
+1. Accessing the Services
+
+   Age requirements. You must be at least thirteen (13) years old
+   to use the Services. You must have parental or legal guardian
+   permission if you are a minor creating a Mistral AI account. We
+   will delete any Mistral AI found to violate these requirements.
+
+   Mistral AI accounts. Some Services require a Mistral AI
+   account. You must provide complete and accurate account
+   information and promptly update your account if any of your
+   information changes. Your account is intended for your
+   individual use only and you may not share your account with any
+   other person. You are responsible for any activities conducted
+   through your account, including activities of any end user
+   provisioned with an account under your account (“End User
+   Account”), whether or not those activities were actually
+   conducted by you. You may not make account access credentials
+   available to third parties, share individual login credentials
+   between multiple users on an account, or resell or lease access
+   to your account or any End User Account. You must promptly
+   notify us at [13]support@mistral.ai or through the [14]Help
+   Center in the event you detect any unauthorized or fraudulent
+   access or use of your account.
+
+   Admin accounts. If you have an admin account, you will have
+   access to additional features, such as (a) adding authorized
+   users to your workspace either by invitation or automatically,
+   through the domain of their email address, (b) managing
+   accounts within your workspace, and (c) managing features for
+   the authorized users of your workspace.
+
+2. Using the Services
+
+   Our Services. We grant you a non-exclusive right to access and
+   use the Services only in compliance with these Terms, any
+   applicable Additional Terms, all applicable laws and
+   regulations, and any other documentation, guidelines, or
+   policies we make available to you, including our [15]Usage
+   Policy. Certain Services are only available if you have a paid
+   subscription. Some Services may be subject to certain
+   restrictions, such as formatting or size restrictions, or rate
+   limits. Any such restrictions can be found in the applicable
+   documentation or on our platform. The different subscription
+   plans applicable to the Services are described on our platform.
+
+   Restrictions. We own all right, title, and interest in and to
+   the Services. You only receive rights to use the Services as
+   explicitly granted in these Terms and any applicable Additional
+   Terms. You will not, and will not permit any other person to:
+
+   (a) Use the Services or Your Data in a manner that violates any
+   applicable laws (including trade laws, and sanctions and export
+   control laws), these Terms (including any Additional Terms), or
+   any of our policies;
+
+   (b) Use the Services or Your Data in a manner that infringes,
+   misappropriates, or otherwise violates any third party’s
+   rights, including intentionally using the Services to generate
+   Outputs that infringe third party rights; (c) Send us any
+   personal information of children under 13 or the applicable age
+   of digital consent or allow minors to use the Services without
+   consent from their parent or guardian;
+
+   (d) Reverse assemble, reverse compile, decompile, translate,
+   engage in model extraction or stealing attacks, or otherwise
+   attempt to discover the source code or underlying components of
+   the Services, algorithms, and systems of the Services (except
+   to the extent these restrictions are contrary to applicable
+   law);
+
+   (e) Use the Output or any modified version of the Output to
+   reverse engineer the Services;
+
+   (f) Compromise the security or proper functionality of the
+   Services, including interfering with, circumventing, or
+   bypassing security or moderation mechanisms in the Services or
+   performing any vulnerability, penetration, or similar testing
+   of the Services;
+
+   (g) Use any method to extract any content from the Services
+   other than as permitted through the Services;or
+
+   (h) Buy, sell, or transfer API keys or Service accounts from,
+   to or with a third party.
+
+   Third-Party Services. You may connect services provided by
+   third-parties (the "Third-Party Services") to our Services. By
+   enabling these connections, you grant our Services permission
+   to access the Third-Party Services and retrieve the necessary
+   data to use as Inputs to generate Outputs. You warrant and
+   represent that you have all necessary rights, licenses, and
+   permissions to connect these Third-Party Services with our
+   Services. The use of Third-Party Services is subject to their
+   respective terms and conditions, and you are solely responsible
+   for complying with these terms. We are not liable for any
+   disruptions, data loss, or issues arising from your use of
+   Third-Party Services. You acknowledge and agree that Third
+   Party Services are not Services and, accordingly, we are not
+   responsible for them.
+
+3. Your Data
+
+   Your Data. You and your authorized users may provide input to
+   the Services, such as prompts or fine-tuning data (“Input”),
+   and receive output from the Services based on such Input
+   (“Output”). We refer to Input and Output collectively as “Your
+   Data”. For clarity, any third-party content displayed on Le
+   Chat to help you understand the Output, such as hyperlinks,
+   snippets or thumbnails, for which you are only granted a right
+   to view and read (the “Third-Party Content”) do not constitute
+   Output. To the extent permitted by applicable law, you (i)
+   retain all ownership rights in Input and (ii) own all Output.
+   We assign to you all right, title, and interest, if any, in and
+   to Output that we may have.
+
+   Responsibility for Your Data. You are responsible for all Input
+   and represent and warrant that you have all rights, licenses,
+   and permissions required to provide Input to the Services. You
+   are solely responsible for all use of the Outputs and
+   evaluating the Output for accuracy and appropriateness for your
+   use case. You must also not represent that the Output was
+   generated by a human when it was generated by the Services. We
+   may also provide Output filters for certain Services. If you
+   deactivate these filters, you are solely responsible for the
+   Output that is generated.
+
+   How we use Your Data. We use and store Your Data in accordance
+   with the Additional Terms for the applicable Service and our
+   [16]Privacy Policy.
+
+   Similarity of Output. Due to the nature of the Services, your
+   Output may be similar or identical to the response generated
+   for another user of the Services. We provide no guarantees that
+   your Output will be unique. Any responses generated for other
+   users by the Service are not considered your Output even if
+   similar or identical to your Output.
+
+   Illegal content. You have the availability to report to us any
+   of Your Data or Third-Party Content that violate our [17]Usage
+   Policy or (a) incites hate, violence, or discrimination against
+   individuals based on their origin, ethnicity, religion, gender,
+   sexual orientation, etc., (b) glorifies sexual harassment, (c)
+   violates human dignity (e.g., human trafficking or pimping),
+   (d) glorifies crimes against humanity or denying their
+   existence, (e) incites terrorism, (f) glorifies very serious
+   crimes against individuals (e.g., murder or sexual assault),
+   (g) glorifies crimes involving theft, extortion, or material
+   damage posing a danger to individuals, (h) constitute child
+   abuse sexual material, or (i) are dangerous for minors. You can
+   report such content by using the report feature on the Services
+   and/or by sending an email at [18]support@mistral.ai. You grant
+   us the right to access the reported content to improve the
+   Services (e.g., to help us make sure that the Services do not
+   generate such illegal content again). This right is granted
+   worldwide and for the duration of the intellectual property
+   rights under applicable law. Where applicable, you must delete
+   such content using the applicable feature on the Services.
+
+4. Warranties; Disclaimer
+
+   Our Warranties. We warrant that, when used in accordance with
+   these Terms and the applicable Additional Terms, the Services
+   will conform in all material respects with the documentation we
+   provide to you or otherwise make publicly available.
+
+   Your Warranties. You warrant that (a) you have the authority to
+   enter into and accept these Terms and (b) you and your
+   authorized users (if any) will use the Services in accordance
+   with the applicable laws and regulations and these Terms.
+
+   Disclaimer. EXCEPT FOR THE WARRANTIES IN THIS SECTION 4
+   (WARRANTIES; DISCLAIMER), THE SERVICES ARE PROVIDED “AS IS” AND
+   WE AND OUR AFFILIATES AND LICENSORS DISCLAIM ALL WARRANTIES,
+   EXPRESS OR IMPLIED, INCLUDING ALL IMPLIED WARRANTIES OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND TITLE,
+   NONINFRINGEMENT, OR QUIET ENJOYMENT, AND ANY WARRANTIES ARISING
+   OUT OF COURSE OF DEALING OR TRADE USAGE. WE MAKE NO
+   REPRESENTATIONS OR WARRANTIES (I) THAT USE OF THE SERVICES WILL
+   BE UNINTERRUPTED, ERROR FREE, SECURE, OR BE SUITABLE FOR YOUR
+   SPECIFIC PURPOSES OR USE-CASES, (II) THAT DEFECTS WILL BE
+   CORRECTED, OR (III) THAT YOUR DATA WILL BE ACCURATE.
+
+5. Indemnification
+
+   By you. You will indemnify, defend, and hold us and our
+   affiliates, service providers, and licensors harmless against
+   any liabilities, damages, and costs (including reasonable
+   attorneys’ fees) payable to a third party arising out of a
+   third party claim related to (i) the use of the Services in
+   violation of these Terms (including violation of applicable
+   Additional Terms or our policies), (ii) any of your products or
+   services that you make available to end-users in connection
+   with the Services or Outputs (“Your Offerings”) (if any), or
+   (iii) Your Data.
+
+   By us. We will indemnify and defend you for any damages finally
+   awarded by a court of competent jurisdiction and any settlement
+   amounts payable to a third party arising out of a third party
+   claim alleging that the Services infringe any third party
+   intellectual property right. This excludes claims to the extent
+   arising from: (i) combination of any Services with products,
+   services, or software not provided by us or on our behalf
+   (including Your Offerings), (ii) fine-tuning, customization, or
+   modification of the Services by any party other than us, (iii)
+   the Input, including any training or fine-tuning data you
+   provide to us, (iv) your modification of the Output, (v) your
+   failure to comply with these Terms (including applicable
+   Additional Terms) or applicable laws, regulations, or industry
+   standards, (vi) your use of the Services or Your Data in a
+   manner that you knew, or reasonably should have known, was
+   likely to violate third party rights or applicable laws or
+   regulations, (vii) Your Offerings (if the claim would not have
+   arisen but for Your Offerings), or (viii) any Services made
+   available to you for beta testing purposes.
+
+   Indemnification Procedure. The indemnification obligations this
+   Section 5 (Indemnification) are subject to the indemnifying
+   party (i) receiving a prompt written notice of such claim from
+   the party seeking indemnification; (ii) having sole control of
+   defense and settlement of the claim (provided that the party
+   seeking indemnification may participate in its own defense at
+   its sole expense), and (iii) the party seeking indemnification
+   providing all reasonable necessary cooperation and assistance,
+   including preserving and sharing relevant information. The
+   indemnifying party cannot enter into any settlement or
+   compromise of any claim without prior written consent of the
+   other party, which will not be unreasonably withheld, except
+   that the indemnifying party may without consent enter into any
+   settlement of a claim that resolves the claim without liability
+   to the other party, impairment to any of the other party’s
+   rights, or requiring the other party to make any admission of
+   liability.
+
+   Remedies. The remedies in this Section 5 (Indemnification) are
+   the sole and exclusive remedies for any third-party claim that
+   the Services or Your Data infringe intellectual property
+   rights.
+
+6. Liability
+
+   Limitation of Liability. NEITHER WE NOR ANY OF OUR AFFILIATES,
+   EMPLOYEES, SHAREHOLDERS, LICENSORS, AGENTS, SUPPLIERS, OR
+   SERVICE PROVIDERS WILL BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
+   SPECIAL, CONSEQUENTIAL, OR EXEMPLARY DAMAGES, INCLUDING DAMAGES
+   FOR LOSS OF PROFITS, GOODWILL, USE, OR DATA OR OTHER LOSSES,
+   EVEN IF WE HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH
+   DAMAGES. OUR AGGREGATE LIABILITY UNDER THESE TERMS AND ANY
+   APPLICABLE ADDITIONAL TERMS WILL NOT EXCEED THE GREATER OF THE
+   AMOUNT YOU PAID FOR THE SERVICE THAT GAVE RISE TO THE CLAIM
+   DURING THE 12 MONTHS BEFORE THE LIABILITY AROSE OR 100 EUROS.
+   THE LIMITATIONS IN THIS SECTION 6 (LIABILITY) APPLY ONLY TO THE
+   MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW.
+
+7. Term, Suspension, and Termination
+
+   Term. These Terms will commence on the earlier of (i) the date
+   you first use the Services or (ii) the date you accept these
+   Terms, and will continue until terminated.
+
+   Termination or suspension. We reserve the right to suspend or
+   terminate your account and/or your access to all or part of the
+   Services if: (i) you breach these Terms (including any
+   applicable Additional Terms) or our policies (including our
+   [19]Usage Policy), (ii) you fail to pay any fees when due
+   (iii), we need to do so in order to comply with applicable law,
+   or (iv) your continued use of the Services could cause risk or
+   harm to Mistral AI, our users, or anyone else. If you believe
+   we have suspended or terminated your account in error, you can
+   file an appeal with us by contacting us via
+   [20]support@mistral.ai.
+
+   Requests to terminate. You can delete your account at any time
+   by using the feature available on your account or, if
+   unavailable, via our Help Center accessible on your account.
+
+   Effects of termination. Termination or expiration will not
+   affect any rights or obligations, including the payment of
+   amounts due, which have accrued under these Terms (or any
+   applicable Additional Terms) up to the date of termination or
+   expiration. Upon termination or expiration of these Terms, the
+   provisions of these Terms (or any applicable Additional Terms)
+   that are intended by their nature to survive termination will
+   survive and continue in full force and effect in accordance
+   with their terms, including confidentiality obligations,
+   payment obligations, limitations of liability, and disclaimers.
+
+8. Privacy
+
+   Privacy Policy. We process your personal data as data
+   controller for the purposes of (a) providing the Services
+   (unless you are using our Services on behalf of your business)
+   and (b) managing your relationship with us in accordance with
+   these Terms, including any billing, payment, or marketing
+   activities. For clarity, our [21]Privacy Policy explains how we
+   collect and use personal information.
+
+   Processing personal data. If you use the Services to process
+   personal data on behalf of your business you must (a) provide
+   legally adequate privacy notices and obtain necessary consents
+   for the processing of personal data by the Services, (b)
+   process personal data in accordance with applicable law, and
+   (c) execute our [22]Data Processing Agreement.
+
+9. Changes to these Terms or the Services
+
+   Updates to these Terms. We may update these Terms, the
+   Additional Terms, our [23]Usage Policy or our Services
+   (including our models) from time to time. Some reasons why we
+   might make changes to these Terms or the Services include: (a)
+   Changes that we make to the Services, including to introduce
+   new features or functionality or improve Service quality. (b)
+   Changes to the law or regulatory requirements that apply to us
+   or the Services;or (c) Security or safety reasons.
+
+   Notice. We will give you at least 30 days advance notice of
+   changes to these Terms (including any applicable Additional
+   Terms) that materially adversely impact you either via email or
+   an in-product notification. All other changes will be effective
+   as soon as we post them. If you do not agree to the changes,
+   you must stop using our Services.
+
+10. General
+
+   Assignment. You may not assign or transfer any rights or
+   obligations under these Terms and any attempt to do so will be
+   void. We may assign our rights or obligations under these Terms
+   to any affiliate, subsidiary, or successor in interest of any
+   business associated with our Services.
+
+   Force Majeure. Neither party will be liable to the other for
+   any delay or failure to perform any obligation under these
+   Terms (except for a failure to pay fees) if such delay or
+   failure is due to unforeseen events beyond the reasonable
+   control of such party.
+
+   Independent Contractors. There is no relationship of
+   partnership, joint venture, employment, franchise or agency
+   created between the parties under these Terms. Neither party
+   will have the power to bind the other or incur obligations on
+   the other party’s behalf without the other party’s prior
+   written consent.
+
+   No Third-Party Rights. There are no third-party beneficiaries
+   to these Terms.
+
+   Waivers. No waiver of any term of these Terms will be deemed a
+   further or continuing waiver of such term or of any other term,
+   and our failure to assert any right or provision under these
+   Terms will not constitute a waiver of such right or provision.
+
+   Entire Agreement; severability. Unless otherwise agreed in
+   writing between you and Mistral AI, these Terms, including our
+   [24]Usage Policy and any applicable Additional Terms,
+   constitute the entire agreement between you and us concerning
+   the Services. Any statements or comments made between you and
+   any of our employees or representatives are expressly excluded
+   from these Terms and will not apply to you or us, or to your
+   access to or use of the Services. If any provision of these
+   Terms is deemed invalid by a court of competent jurisdiction,
+   the invalidity of such provision will not affect the validity
+   of the remaining provisions of these Terms, which will remain
+   in full force and effect.
+
+   Governing law and venue.
+
+   (a) Unless you are located in the United States, the laws of
+   France will govern all disputes arising out of or relating to
+   these Terms (including any applicable Additional Terms), or
+   related Services, regardless of conflict of laws rules. These
+   disputes will be resolved exclusively in the courts located in
+   Paris, France, and you and Mistral AI consent to personal
+   jurisdiction in those courts.
+
+   (b) If you are located in the United States, California law
+   will govern all disputes arising out of or relating to these
+   Terms (including any applicable Additional Terms), or related
+   Services, regardless of conflict of laws rules. These disputes
+   will be resolved exclusively in the federal or state courts of
+   Santa Clara County, California, USA, and you and Mistral AI
+   consent to personal jurisdiction in those courts.
+
+   Conflicts with Additional Terms. If these Terms conflict with
+   any Additional Terms, the Additional Terms will govern for the
+   applicable Service.
+
+   Support. Support for the Services is provided through the
+   [25]Help Center.
+
+   Additional Terms for consumers
+
+   Effective 6 February 2025
+
+   These Additional Terms apply to any natural person residing in
+   the European Union who is accessing or using the Services for
+   purposes which are outside his trade, business, craft or
+   profession (“Consumer”).
+
+   If you are a Consumer, the following terms apply to your use of
+   the Services: (a) these Additional Terms for consumers residing
+   in the European Union, (b) any applicable Additional Terms for
+   the specific Service you are using, (c) our [26]Usage Policy,
+   and (d) the [27]Terms of Service.
+
+1. Cancellation of paid Services
+
+1.1 Cancellation right
+
+   You have the right to cancel your subscription within fourteen
+   (14) days from the date of your subscription (the “Cancellation
+   Period”). After this Cancellation Period, your right to cancel
+   will no longer apply. To exercise your right to cancel within
+   the Cancellation Period, you must notify us of your decision to
+   cancel before such period expires. You can do this by canceling
+   your subscription directly through your account settings and
+   reaching out to us at [28]support@mistral.ai.
+
+1.2 Model cancellation form
+
+   If you wish to cancel your subscription, you can use the
+   following form:
+
+   To: Mistral AI, French limited joint-stock company, having its
+   registered offices at 15 rue des Halles, 75001 Paris.
+
+   Subject: Cancellation Request
+
+   I hereby give notice that I cancel my contract for the
+   provision of the following services [to be completed] ordered
+   on [date].
+
+   First Name: Last Name: Email address used to process the order:
+   Signature: Date:
+
+2. Updates
+
+2.1 Updates
+
+   In this Section 2 (Updates), “Updates” refers to any updates or
+   modifications aimed at maintaining, adapting, or evolving the
+   functionalities of the Services, including security updates,
+   whether or not these updates are necessary to maintain the
+   compliance of the services.
+
+2.2 Updates necessary to maintain the compliance of the Services
+
+   We will inform you of any Updates necessary to maintain the
+   compliance of the Services during the Term. We will notify you
+   of the availability of Updates and the consequences of their
+   non-installation for you. We shall not be held liable for any
+   non-compliance related issues when you fail to install, within
+   a reasonable timeframe, the necessary Updates to maintain the
+   Services’ compliance.
+
+2.3 Updates not necessary to maintain the compliance of the Services
+
+   We may propose Updates that are not necessary to maintain the
+   compliance of the Services. In such cases, we will inform you
+   of such Updates and their implementation date. You can refuse
+   or de-install the Update if such Update has a negative impact
+   on your access or use to our Services.
+
+3. Legal warranty
+
+3.1 Legal warranty
+
+   Along with any commercial warranty provided under these Terms
+   or the applicable Additional Terms, Consumers residing in
+   France also benefit from the following legal warranty:
+
+   “Le consommateur a droit à la mise en œuvre de la garantie
+   légale de conformité en cas d’apparition d’un défaut de
+   conformité durant la période de la fourniture du contenu
+   numérique ou du service numérique. Durant ce délai, le
+   consommateur n’est tenu d’établir que l’existence du défaut de
+   conformité et non la date d’apparition de celui-ci. La garantie
+   légale de conformité emporte obligation de fournir toutes les
+   mises à jour nécessaires au maintien de la conformité du
+   contenu numérique ou du service numérique durant la durée
+   d’enregistrement du compte du consommateur sur la plateforme.
+   La garantie légale de conformité donne au consommateur droit à
+   la mise en conformité du contenu numérique ou du service
+   numérique sans retard injustifié suivant sa demande, sans frais
+   et sans inconvénient majeur pour lui. Le consommateur peut
+   obtenir une réduction du prix en conservant le contenu
+   numérique ou le service numérique, ou il peut mettre fin au
+   contrat en se faisant rembourser intégralement contre
+   renoncement au contenu numérique ou au service numérique, si :
+    1. Le professionnel refuse de mettre le contenu numérique ou
+       le service numérique en conformité ;
+    2. La mise en conformité du contenu numérique ou du service
+       numérique est retardée de manière injustifiée ;
+    3. La mise en conformité du contenu numérique ou du service
+       numérique ne peut intervenir sans frais imposés au
+       consommateur ;
+    4. La mise en conformité du contenu numérique ou du service
+       numérique occasionne un inconvénient majeur pour le
+       consommateur ;
+    5. La non-conformité du contenu numérique ou du service
+       numérique persiste en dépit de la tentative de mise en
+       conformité du professionnel restée infructueuse.
+
+   Le consommateur a également droit à une réduction du prix ou à
+   la résolution du contrat lorsque le défaut de conformité est si
+   grave qu’il justifie que la réduction du prix ou la résolution
+   du contrat soit immédiate. Le consommateur n’est alors pas tenu
+   de demander la mise en conformité du contenu numérique ou du
+   service numérique au préalable. Dans les cas où le défaut de
+   conformité est mineur, le consommateur n’a droit à l’annulation
+   du contrat que si le contrat ne prévoit pas le paiement d’un
+   prix. Toute période d’indisponibilité du contenu numérique ou
+   du service numérique en vue de sa remise en conformité suspend
+   la garantie qui restait à courir jusqu’à la fourniture du
+   contenu numérique ou du service numérique de nouveau conforme.
+   Ces droits résultent de l’application des articles L. 224-25-1
+   à L. 224-25-31 du code de la consommation. Le professionnel qui
+   fait obstacle de mauvaise foi à la mise en œuvre de la garantie
+   légale de conformité encourt une amende civile d’un montant
+   maximal de 300 000 euros, qui peut être porté jusqu’à 10 % du
+   chiffre d’affaires moyen annuel (article L. 242-18-1 du code de
+   la consommation). Le consommateur bénéficie également de la
+   garantie légale des vices cachés en application des articles
+   1641 à 1649 du code civil, pendant une durée de deux ans à
+   compter de la découverte du défaut. Cette garantie donne droit
+   à une réduction de prix si le contenu numérique ou le service
+   numérique est conservé, ou à un remboursement intégral contre
+   renonciation au contenu numérique ou au service numérique."
+
+4. Dispute resolution
+
+   If you are a consumer residing within the European Union, you
+   have the right to start a mediation process in case of a
+   dispute.
+
+   To this end, you may contact:
+     * Our mediation service, the CMAP, by mail at Centre de
+       Médiation et d’Arbitrage de Paris, 39 avenue Franklin D.
+       Roosevelt, 75008 PARIS or by email at cmap@cmap.fr.
+     * Or the european platform for the online settlement of
+       disputes accessible at the following address:
+       [29]https://ec.europa.eu/consumers/odr/main/index.cfm?e
+
+   You agree that the mediation process is not mandatory and that
+   either party may withdraw from such mediation process at any
+   time.
+
+
+   Additional Terms for Paid services
+
+   Effective 6 February 2025
+
+   Your payment for any Services is subject to our Terms of
+   Service and these Additional Terms for paid Services.
+
+   Payment. To pay for any Services, you must provide complete and
+   accurate billing information, including a valid payment method.
+   For paid subscriptions, we will automatically charge your
+   payment method on each agreed-upon periodic renewal until you
+   cancel. You’re responsible for all applicable taxes, and we’ll
+   charge tax when required. If your payment cannot be completed,
+   we may downgrade your account or suspend your access to our
+   Services until payment is received.
+
+   Cancellation. You can cancel your paid subscription at any time
+   via your account or the Help Center. Payments are
+   non-refundable, except where required by law or otherwise
+   stated in these Additional Terms. These Additional Terms do not
+   override any mandatory local laws regarding your cancellation
+   rights.
+
+   Termination. You may terminate your account at any time by
+   using the features available on the platform or, if
+   unavailable, by contacting us through the Help Center. Prior to
+   the termination of your account, you must pay all outstanding
+   fees, including any unpaid invoices and other charges incurred
+   up to the termination date.
+
+   Changes. We may change our prices from time to time. If we
+   increase our subscription prices, we will give you at least 30
+   days’ notice and any price increase will take effect on your
+   next renewal so that you can cancel if you do not agree to the
+   price increase.
+
+   Additional Terms for La Plateforme
+
+   Effective as of February 6 2025
+
+   La Plateforme is our platform available
+   at [30]http://console.mistral.ai, that allows you to use and
+   fine-tune our models through our APIs (the “APIs”), build and
+   deploy agents using our models, and access a range of other
+   complimentary services (“La Plateforme”).
+
+   Your use of La Plateforme is subject to our Terms of Service
+   and these Additional Terms for La Plateforme.
+
+1. Using our APIs
+
+1.1 General provisions
+
+   Permitted Use. You, and any of your authorized users, may only
+   use our APIs (i) for your own personal or internal business
+   needs and (ii) to incorporate them in Your Offerings, in
+   accordance with the Terms of Service, these Additional Terms
+   and the applicable documentation.
+
+   API Key. We will provide you with a confidential API key (the
+   “API Key”) to enable you to access our APIs. You must use your
+   API Key in accordance with our documentation. You may not share
+   your API Key with any third party without our prior written
+   permission. Upon termination of your account, you must
+   immediately delete your API Key.
+
+   API call limitations. We may limit the number of API calls you
+   can make within a specific period. Any such limits may be based
+   on factors including the expected usage volume for Your
+   Offerings.
+
+   Third party services. Our APIs are compatible with the third
+   party services listed on La Plateforme. To use a third party
+   service, you must follow the instructions provided on La
+   Plateforme. You acknowledge that we do not provide such third
+   party services and are not responsible for any loss, damage, or
+   claim arising out of or in relation with your use of a third
+   party service on La Plateforme.
+
+   Rate limits. Your use of our APIs is subject to the rate limits
+   specified on La Plateforme. If you reach these limits, your
+   access to the Services will be temporarily suspended until the
+   limits reset or you upgrade your subscription.
+
+1.2 Using our Fine-Tuning API
+
+   The Fine-Tuning API. Our fine-tuning API allows you to
+   fine-tune our models on La Plateforme using Your Data (the
+   “Fine-Tuning API”). Upon completion of a fine-tuning job, you
+   can use the fine-tuned model (the “Fine-Tuned Model”) on La
+   Plateforme. For the avoidance of doubt, the Fine-Tuned Model
+   does not constitute an Output. You are solely responsible for
+   the fine-tuning process and the Input you used to fine-tune our
+   models. We are not responsible for the performance of the
+   Fine-Tuned Model or its Outputs. Your rights to access or use
+   the Fine-Tuned Model will cease upon termination of your
+   account. You can delete the Fine-Tuned Model from La Plateforme
+   at any time.
+
+   Confidentiality. We will not use the Fine-Tuned Model except to
+   provide it to you under these Terms. We will not disclose or
+   distribute the Fine-Tuned Model to third parties without your
+   consent, except for authorized transfers to our cloud-provider
+   distributors.
+
+2. Creating an agent
+
+   Agent creation. You can create an agent either through our
+   Fine-Tuning API or through the agent builder feature on La
+   Plateforme by following the instructions given on La
+   Plateforme. Your rights to access or use your agent will cease
+   after the termination of your account.
+
+   Sharing. You can share your agent with your authorized users in
+   your workspace via our API or Le Chat, subject to your
+   subscription plan. Any use of your agent on Le Chat is governed
+   by the Additional Terms for Le Chat. By default, agents are
+   shared with all of the authorized users in your workspace. You
+   must set specific permissions to restrict access to your agents
+   to specific authorized users.
+
+   Confidentiality. We will not use your agent except to provide
+   it to you under these Terms. We will not disclose or distribute
+   your agent to third parties without your consent.
+
+   Your responsibility. You are responsible for the creation and
+   performance of your agent. Specifically, you must ensure that
+   the name of your agent complies with applicable laws and the
+   rights of third parties.
+
+   Deletion of your agent. You can delete your agent from La
+   Plateforme at any time.
+
+3. Your Data
+
+   Free Services. If you are using La Plateforme without a paid
+   subscription, we use Your Data to (a) provide the Services,
+   including to generate an Output based on your Input and to
+   fine-tune a model with your Input, (b) monitor abuse, and (c)
+   improve, enhance, or train our models or the Services. You
+   grant us a non-exclusive, worldwide, royalty-free, irrevocable
+   license to use Your Data for these purposes for the duration of
+   your subscription to La Plateforme, except for the use of Your
+   Data for training purposes where the license will continue for
+   the applicable duration of the intellectual property rights.
+
+   Paid Services. If you are using La Plateforme under a paid
+   subscription, we only use Your Data to (a) provide the
+   Services, including to generate an Output based on your Input
+   and fine-tune a model with your Input, and (b) monitor abuse.
+   You grant us a non-exclusive, worldwide, royalty-free,
+   irrevocable license to use Your Data for these purposes for the
+   duration of your paid subscription on La Plateforme. For
+   clarity, we do not use Your Data to improve, enhance, or train
+   our models or the Services or for any other purpose than to
+   provide the Services and to monitor abuse.
+
+   Zero data retention. Customers with legitimate reasons can
+   request zero data retention. With this option, your Input and
+   Output are processed only as long as necessary to generate the
+   Output and are not retained further, except as required by law.
+   To activate zero data retention, you must submit your request
+   via our Help Center (available on your account) or
+   [31]support@mistral.ai. As part of this request, you must
+   provide sufficient detail of your legitimate reasons for
+   requesting zero data retention. We will review your request
+   and, at our discretion, approve or deny the request.
+
+   Additional Terms for Le Chat
+
+   Effective 6 February 2025
+
+   Le Chat is our chat interface that allows you to interact with
+   our Services, including your agents. The features available on
+   Le Chat and the applicable rate limits depend on your
+   subscription plan. The available subscription plans are
+   described on [32]our platform. Your use of Le Chat is subject
+   to our Terms of Service and these Additional Terms for Le Chat.
+
+1. Using Le Chat
+
+   Permitted Use. You, and any of your authorized users, may only
+   use Le Chat for your own personal purposes or your own internal
+   business needs.
+
+   Restrictions. You may not integrate or combine Le Chat with
+   Your Offerings or any other software, hardware, or other
+   technology, nor grant any third party access to Le Chat without
+   our prior written authorization.
+
+   Availability of Services on Le Chat. Certain Services are
+   available on Le Chat depending on your subscription plan.
+   Subscription plans are detailed on our platform.
+
+   Deactivation of Services. You can deactivate certain Services
+   from Le Chat by using the feature available on your account or
+   your workspace.
+
+   Rate Limits. Any use of Le Chat or any third party services
+   that may be made available on Le Chat may be subject to the
+   rate limits specified in the applicable documentation or our
+   platform. If you reach these rate limits, your access to or use
+   of Le Chat or the applicable third party service will be
+   temporarily restricted or suspended until the rate limits reset
+   or, if applicable, you subscribe to a subscription plan with a
+   higher rate limit.
+
+   Sharing Conversation Links. Le Chat provides you with the
+   ability to share unique links to conversations you have with Le
+   Chat with others (each a “Conversation Link”). Conversations
+   that are viewable via a Conversation Link will not include (a)
+   your Mistral AI username (unless you expressly include it in
+   the conversation), (b) any addition you make to the
+   conversation after sharing it, or (c) any other conversation
+   you may have with Le Chat. Anyone with the Conversation Link
+   will be able to view your conversation, including any person
+   with whom your intended recipient shares the Conversation Link.
+   We do not monitor or control who accesses your conversations
+   via Conversation Links that you create. As such, it is your
+   responsibility to ensure that there is no information you are
+   not comfortable sharing before sharing the Conversation Link,
+   including personal information, confidential information,
+   sensitive business information, or trade secrets.
+
+   Media Customers. In this section, “Media Customer” means any
+   entity that disseminates information for editorial purposes on
+   a regular basis and in a professional capacity, whether to the
+   general public or to professionals, even if such activity is
+   conducted by a specific department within the entity and
+   constitutes only a part of its overall business activities. If
+   You are a Media Customer, You are not authorized to use the
+   news feature, such as the AFP news feature, on Le Chat for
+   editorial use, and any use by You of such news feature may be
+   automatically blocked. If you are a Media Customer and wish to
+   use the news feature for editorial purposes, you must contact
+   Mistral AI at [33]legal@mistral.ai. Any unauthorized use of the
+   news feature by a Media Customer will result in the immediate
+   suspension of such Media Customer’s account.
+
+2. Your Data
+
+   How we use Your Data. How we use Your Data depends on your
+   subscription plan:
+
+   (a) If you use Le Chat Free, Le Chat Pro or Le Chat Student, we
+   may use Your Data to train our artificial intelligence models,
+   unless you opt-out of training by using the settings in your
+   Mistral AI Account. You can opt-out at any moment by using the
+   settings in your Mistral AI Account.
+
+   (b) If you use other paid plans such as Le Chat Team, we only
+   use Your Data to provide the Services and we do not use Your
+   Data to train our artificial intelligence models, unless you
+   opt-in through your account settings.
+
+   (c) In any case, if you provide Feedback to us by using the
+   "thumbs up" or "thumbs down" buttons on Le Chat, we will use
+   your Feedback and the associated Input and Output to improve
+   the behavior of our artificial intelligence models. If you do
+   not want us to use your Feedback to improve the behavior of our
+   artificial intelligence models, please do not share your
+   Feedback with us.
+
+   Permission to use Your Data. You grant us a non-exclusive,
+   worldwide, royalty-free, irrevocable license to use Your Data
+   (a) to provide the Services you signed up for and for the
+   duration of your subscription to Le Chat, and (b) to train our
+   artificial intelligence models, for the duration of the
+   applicable intellectual property rights in Your Data, unless
+   (i) you have opted-out of training by using the settings in
+   your Mistral AI Account or (ii) you use Le Chat Team and have
+   not authorized us to use Your Data for training.
+
+   Permission to Use Your Feedback. When you click “Thumbs Up” or
+   “Thumbs Down” to rate an Output Data, your Input, your Output,
+   and the rating you provide constitute your “Feedback”. You
+   grant us a non-exclusive, worldwide, royalty-free, and
+   irrevocable license to use your Feedback to improve the
+   behavior of our artificial intelligence models for the duration
+   of the applicable intellectual property rights in your
+   Feedback. If you do not wish for us to use your Feedback to
+   improve our models, you should not provide us with your
+   Feedback.
+
+   Output restrictions. You may not use: (a) image Outputs to
+   develop or train any competing image-generation service and (b)
+   Outputs generated using our web-search feature to (i) copy,
+   store, archive, cache or create a database of the Outputs, (ii)
+   redistribute, resell, or sublicense the Outputs, (iii) as part
+   of any machine learning or similar algorithmic activity, or
+   (iv) to create, train, evaluate or improve Your Offerings.
+
+   Third-Party Content. When you use our web-search or news tools
+   on Le Chat, you may receive (a) your Output, and (b)
+   Third-Party Content in the form of additional resources such as
+   hyperlinks, thumbnails, or snippets from third-parties to help
+   you further explore or understand the Output. Such Third-Party
+   Content does not constitute Your Data and you shall have no
+   right to this Third-Party Content, other than viewing and
+   reading it on Le Chat. For clarity, we do not use the
+   Third-Party Content you provide in Your Input
+
+   Moderation. We reserve the right to monitor your use of Le Chat
+   through automated means, in accordance with our [34]Usage
+   Policy. This monitoring is conducted to ensure compliance with
+   our terms and policies, and to maintain the security and
+   integrity of our Services.
+
+   Data Processing Agreement
+
+   Effective 6 February 2025
+
+   This data processing agreement (the “Data Processing Agreement”
+   or the “DPA”) is entered into by and between you (the
+   “Customer” or “you”) and Mistral AI as of the Effective Date.
+   This DPA only applies if Customer is a business entity and uses
+   the Services to process personal data on behalf of its
+   business.
+
+1. Definitions
+
+   For the purposes of this Data Processing Agreement:
+
+   (a) “Agreement” means the service agreement (including the
+   Terms of Service and any applicable Additional Terms) entered
+   into by and between the Parties, governing the provision of the
+   Services by Mistral AI to the Customer. The DPA is hereby
+   incorporated to the Agreement by reference.
+
+   (b) “Applicable Data Protection Law” means any applicable
+   national, federal, EU, state, provincial or other privacy, data
+   security, or data protection law or regulation, including, to
+   the extent applicable, Regulation (EU) 2016/679 of the European
+   Parliament and of the Council of 27 April 2016 applicable since
+   25 May 2018 (the “GDPR”).
+
+   (c) “Authorized Purpose” means the authorized purpose for the
+   Processing as set out in Exhibit 1.
+
+   (d) “Customer Data” means (i) the input provided by Customer,
+   Customer’s authorized users or Customer’s end-users (the
+   “Input”), (ii) the output generated by the Services (the
+   “Output”), and (iii) the feedback (if any) provided by Customer
+   to evaluate the output generated by the Services by using the
+   thumbs up or thumbs down feature on Le Chat (the “Feedback”).
+
+   (e) “International Data Transfer” means any transfer of
+   Personal Data to a Restricted Country.
+
+   (f) “Processing” means the processing of Personal Data
+   described in Exhibit 1.
+
+   (g) “Restricted Country” means any country located outside of
+   the European Economic Area (EEA) and that does not benefit from
+   an adequacy decision from the European Commission.
+
+   (h) “SCC” means the clauses annexed to the EU Commission
+   Implementing Decision 2021/914 of June 4, 2021 on standard
+   contractual clauses for the transfer of personal data to third
+   countries pursuant to the GDPR.
+
+   (i) “Services” means the services provided by Mistral AI to the
+   Customer under the Agreement.
+
+   (j) “Subprocessor” means any Processor appointed by Mistral AI
+   to carry-out all or part of the Processing on behalf of the
+   Customer.
+
+   The terms “Controller”, “Processor”, “Data Subjects”, “Personal
+   Data”, “Personal Data Breach”, and “Supervisory Authority” as
+   used in this Agreement will have the meanings in the Applicable
+   Data Protection Law. The capitalized terms not defined herein
+   shall have the meaning given in the Agreement.
+
+2. Role of the Parties and description of the Processing
+
+2.1 Role of the Parties
+
+   Customer is the Controller of the Processing. Mistral AI
+   processes the Personal Data on behalf of Customer, as
+   Processor, to provide the Services to Customer, solely for the
+   Authorized Purpose.
+
+2.2 Description of the Processing
+
+   A description of the Processing is available in Exhibit 1 of
+   this DPA. Mistral AI may update the description of the
+   Processing from time to time to reflect new Services, features,
+   functionalities or Subprocessors.
+
+2.3 Mistral AI as Controller
+
+   If Customer uses the Services under an unpaid subscription, or
+   if Customer uses the Services under a paid subscription and has
+   not opted-out of training through the features on its account,
+   Customer authorizes Mistral AI to process the Personal Data,
+   including Feedback, as Controller for the purpose of training,
+   improving or enhancing its Services, including its artificial
+   intelligence models. If Customer uses the paid Services and if
+   such paid Services are not opted-out by default, Customer can
+   opt-out of the training at any time by using the applicable
+   setting on its account.
+
+3. General obligations of the Parties
+
+3.1 Mutual obligations of the Parties
+
+   Each Party shall comply with their respective obligations under
+   the Applicable Data Protection Law and shall not, by any act or
+   omission, cause the other to be in breach of any such
+   obligations under the Applicable Data Protection Law.
+
+3.2 Obligations of Mistral AI
+
+   Mistral AI shall:
+     * Process the Personal Data only (a) in accordance with the
+       documented lawful instructions of Customer as set forth in
+       this DPA, and (b) for no purpose other than the Authorized
+       Purpose, unless required to do so by the applicable laws.
+       In such a case, Mistral AI shall promptly inform Customer
+       of such legal requirement, unless prohibited to do so by
+       applicable law and/or on important grounds of public
+       interest,
+     * Promptly inform Customer if, in its opinion, Customer’s
+       instructions regarding the Processing infringe the
+       Applicable Data Protection Law. In such an event, Mistral
+       AI is entitled to refuse to perform the Processing that it
+       believes to be in violation of the Applicable Data
+       Protection Law,
+     * Ensure that any person Mistral AI authorizes to process
+       Personal Data (including Mistral AI team members and the
+       Subprocessors), is subject to a duty of confidentiality,
+       whether by contract or statutory, and must not allow any
+       person to process Personal Data who is not under such
+       confidentiality obligations, and
+     * Taking into account the nature of the Processing and the
+       information available to Mistral AI, upon Customer’s
+       written request and to the extent that is (a) commercially
+       reasonable and (b) required by the Applicable Data
+       Protection Law, provide Customer with reasonable and timely
+       assistance (i) in the event of an investigation from a
+       Supervisory Authority related to the Processing, (ii) to
+       conduct a data protection impact assessment, (iii) in case
+       of a prior consultation with a Supervisory Authority, (iv)
+       to allow Customer to comply with its obligations under
+       Article 32 of the GDPR, always subject to confidentiality
+       and trade secrets, and (v) to contribute to the audits
+       performed by Customer under Section 9 of this DPA.
+
+3.3 Obligations of Customer
+
+   Customer shall:
+     * Comply with its obligations under the Applicable Data
+       Protection Law regarding the Processing and any instruction
+       provided to Mistral AI,
+     * Provide notice and obtain all consents and rights required
+       by the Applicable Data Protection Law for Mistral AI to
+       process Personal Data as part of the Processing, under this
+       DPA.
+
+4. Data Subjects
+
+4.1 Customer responsibility
+
+   Customer shall (a) provide Data Subjects with the information
+   required by the Applicable Data Protection Law and (b) respond
+   to all Data Subjects requests to exercise their rights
+   regarding the Processing.
+
+4.2 Assistance
+
+   Taking into account the nature of the Processing and upon
+   Customer’s request, Mistral AI shall provide Customer with
+   commercially reasonable assistance to enable Customer to
+   respond to requests from Data Subjects to exercise their
+   rights.
+
+4.3 Requests sent to Mistral AI
+
+   In the event that any Data Subject request is made directly to
+   Mistral AI, Mistral AI will not respond to such request
+   directly without the Customer’s prior consent, unless required
+   to do so by applicable law. Instead, Mistral AI will transfer
+   that request to Customer who will then be solely responsible to
+   respond to such request. If Mistral AI is legally required to
+   respond to the Data Subjects’ request, Mistral AI will promptly
+   notify the Customer of such legal requirement and provide it
+   with a copy of the request unless prohibited to do so by
+   applicable law.
+
+5. Security
+
+5.1 Security measures
+
+   Taking into account the state of the art, the costs of
+   implementation and the nature, scope, context and purposes of
+   Processing, as well as the risk of varying likelihood and
+   severity for the rights and freedoms of natural persons,
+   Mistral AI shall implement and maintain appropriate technical
+   and organizational measures to protect Personal Data from any
+   Personal Data Breach and to preserve the security and
+   confidentiality of the Personal Data. The security measures
+   implemented by Mistral AI under this DPA are listed in Exhibit
+   2 of this DPA. Customer acknowledges that such security
+   measures are subject to technical progress and development and
+   that Mistral AI may update them from time to time, provided
+   that such updates do not materially decrease the overall
+   security of the Processing.
+
+5.2 Customer responsibility
+
+   Mistral AI’s security obligations under this DPA apply without
+   prejudice to Customer’s own security obligations under the
+   Applicable Data Protection Law.
+
+6. Personal Data Breach
+
+6.1 Notification
+
+   Taking into account the nature of the Processing and the
+   information available to Mistral AI, Mistral AI shall notify
+   Customer of any Personal Data Breach without undue delay and
+   where feasible after becoming aware of such Personal Data
+   Breach. Mistral AI’s notification of or response to a Personal
+   Data Breach in accordance with this Section 6 (Personal Data
+   Breach) shall not be construed as an acknowledgment by Mistral
+   AI of any fault or liability with respect to the Personal Data
+   Breach.
+
+6.2 Notification content
+
+   This notification shall include:
+     * The name and contact details of Mistral AI’s point of
+       contact point where more information can be obtained,
+     * The nature of the Personal Data Breach, including but not
+       limited to the categories and number of Data Subjects and
+       Personal Data concerned by the Personal Data Breach,
+     * A description of the measures Customer could take to
+       mitigate the possible adverse effects of the Personal Data
+       Breach and to prevent from another potential Personal Data
+       Breach,
+     * The likely consequences of the Personal Data Breach, and
+     * The measures proposed or taken by Mistral AI following the
+       Personal Data Breach, including to prevent from any new
+       occurrence.
+
+6.3 Customer responsibility
+
+   Customer is solely responsible for notifying the Personal Data
+   Breach to the Supervisory Authority and/or to the Data
+   Subjects.
+
+6.4 Assistance
+
+   Upon Customer’s written request, taking into account the nature
+   of the Processing and the information available to Mistral AI,
+   Mistral AI shall provide the Customer with commercially
+   reasonable assistance with respect to Customer’s compliance
+   with its obligation to communicate the Personal Data Breach to
+   Data Subjects, when required by the Applicable Data Protection
+   Laws. If necessary, Mistral AI shall provide Customer with
+   commercially reasonable and timely assistance to mitigate or
+   remediate the Personal Data Breach.
+
+7. Subprocessing
+
+7.1 General authorization
+
+   Customer provides a prior and general authorization allowing
+   Mistral AI to appoint any Subprocessors to assist Mistral AI in
+   the provision of the Services and in the Processing, in
+   accordance with the terms of this DPA. This authorisation is
+   subject to the following:
+     * Mistral AI will maintain an up-to-date list of its
+       Subprocessors on Mistral AI’s website, including in the
+       online version of Exhibit 1 of this DPA,
+     * Mistral AI will notify Customer of any addition or
+       replacement of a Subprocessor to this list in accordance
+       with this Section 7 (Subprocessing),
+     * Mistral AI will enter into a written agreement with each
+       Subprocessor imposing data protection terms that require
+       the Subprocessor to protect the Personal Data to the same
+       standards provided by this DPA, and
+     * Mistral AI will remain liable to Customer if such
+       Subprocessor fails to fulfill its data protection
+       obligations with regard to the relevant Processing
+       activities under the DPA.
+
+7.2 Notification
+
+   Mistral AI will provide reasonable notice to the Customer of
+   any changes to the list of Subprocessors prior to engaging such
+   Subprocessor. The Customer may object in writing to Mistral
+   AI’s appointment of a new Subprocessor within ten (10) days of
+   such notice, provided that such objection is based on
+   reasonable grounds relating to the Applicable Data Protection
+   Law, otherwise such new Subprocessor will be deemed approved.
+   If Customer provides observations during this ten (10) days
+   period, the parties will consult and negotiate in good faith to
+   find a mutually acceptable resolution to address any objections
+   raised by Customer.
+
+8. Transfers of Personal Data to a Restricted Country
+
+8.1 General authorization
+
+   Customer authorized Mistral AI to transfer Personal Data to any
+   country deemed to have an adequate level of data protection by
+   the European Commission. Customer also authorizes Mistral AI to
+   perform International Data Transfers to (a) on the basis of
+   adequate safeguards in accordance with Applicable Data
+   Protection Laws, or (b) pursuant to the SCCs.
+
+8.2 Customer located in a Restricted Country
+
+   This Section only applies if Customer is located in a
+   Restricted Country. By accepting this DPA, Mistral AI and
+   Customer conclude Module 4 (Processor-to-Controller) of the
+   SCCs which applies to any International Data Transfer conducted
+   by Mistral AI acting as a Data Processor and is hereby
+   incorporated and completed as follows:
+     * The “data exporter” is Mistral AI and the “data importer”
+       is the Customer;
+     * The optional docking clause in Clause 7 is implemented; the
+       optional redress clause in Clause 11(a) is struck;
+     * The governing law in Clause 17 is the law of France;
+     * The courts in Clause 18(b) are the Courts of France; and
+     * Annex I and II to the Module 4 of the SCCs are Exhibit 1
+       and 2 to this DPA respectively.
+
+9. Audit
+
+9.1 Document audit
+
+   Upon Customer’s written request, Mistral AI will make available
+   all documents and information to demonstrate that the
+   Processing carried-out by Mistral AI complies with this DPA in
+   a timely manner, to the extent that is commercially reasonable
+   and required by the Applicable Data Protection Laws, subject to
+   confidentiality and trade secrets.
+
+9.2 Onsite audit
+
+   Only to the extent Customer cannot reasonably be satisfied with
+   Mistral AI’s compliance with this DPA through the exercise of
+   the audit set out in Section 9 (Audit) of this DPA, Customer
+   may conduct up to one (1) audit per year to verify Mistral AI’s
+   compliance with this DPA, under the conditions defined below:
+     * This audit must be conducted with reasonable advance
+       written notice of at least ninety (90) calendar days,
+     * This audit shall be carried out by an independent auditor
+       selected jointly by the Parties for its expertise,
+       independence and impartiality and which is, in any event,
+       not a direct or indirect competitor of the Mistral AI,
+     * The selected auditor shall be bound by a confidentiality
+       agreement and/or by professional secrecy,
+     * This audit shall be conducted during Mistral AI’s regular
+       business hours,
+     * This audit shall restrict its findings to only information
+       and/or Personal Data relevant to Customer,
+     * The audit shall not unreasonably impair or slow down the
+       Services offered by Mistral AI or affect the organizational
+       management of the Mistral AI,
+     * Mistral AI will contribute to the audit upon Customer’s
+       request and to the extent that is commercially reasonable,
+     * An identical copy of the audit report shall be given to
+       both Parties following the completion of the audit. Each
+       Party may make observations regarding the audit report,
+     * The costs of this audit shall be borne exclusively by
+       Customer.
+
+10. Return or destruction of Personal Data
+
+10.1 Return or destruction
+
+   After the end of the provision of the Services, Mistral AI will
+   delete or return to Customer all Personal Data processed on
+   Customer’s behalf, in accordance with Mistral AI’s deletion
+   policies and procedures. Customer acknowledges that the
+   Personal Data will no longer be accessible upon the expiry of a
+   thirty (30) days period following the termination of the
+   Customer’s access to and use of the Services.
+
+11. General
+
+11.1 Term
+
+   This DPA shall commence on the effective date of the Agreement
+   and will continue for the duration of the Agreement.
+
+11.2 Incorporation and conflict
+
+   The Data Processing Addendum (DPA) is incorporated in the
+   Agreement by reference and forms an integral part of the
+   Agreement. In the event of any conflict between the terms of
+   the DPA and this Agreement, the terms of the DPA shall prevail
+   to the extent of such conflict.
+
+11.3 Liability
+
+   The liability of each party and each party’s affiliates under
+   this DPA is subject to the exclusions and limitations of
+   liability set out in the Agreement.
+
+EXHIBIT 1 - Description of the Processing
+
+   Mistral AI may update the description of the Processing from
+   time to time to reflect new Services, features, functionalities
+   or Subprocessors.
+
+1 La Plateforme
+
+1.1 List of the Parties
+
+     * Controller: Customer
+     * Controller’s privacy contact: email address associated with
+       Customer’s account on the Mistral AI platform
+     * Processor: Mistral AI
+     * Processor privacy contact: [35]privacy@mistral.ai
+
+1.2 Description of the Processing
+
+   Categories of Data Subjects:
+     * Customer;
+     * Customer’s authorized users;
+     * Customer’s end-users;
+     * Any other natural person whose Personal Data is included in
+       the Customer Data.
+
+   Categories of Personal Data:
+     * Customer’s and Customer’s authorized users’ account data,
+       such as professional contact details, name of the
+       organization or Mistral AI user ID or workspace ID;
+     * Customer’s API Key (if any);
+     * Any Personal Data included in the Customer Data;
+     * Any Personal Data associated with a support request made by
+       Customer or Customer’s authorized users, such as Customer’s
+       or Customer’s authorized users’ name, email address, or any
+       other personal data included within the request.
+
+   Special categories of Personal Data:
+     * None. Customer does not process sensitive data under this
+       DPA. In case Customer wishes to process sensitive data,
+       Customer shall contact Mistral AI by email at
+       [36]privacy@mistral.ai
+
+   Frequency of the Processing:
+     * On a continuous basis.
+
+   Nature of the Processing:
+     * The Personal Data will be processed as described in this
+       DPA.
+
+   Authorized Purposes:
+     * The provision of the Services associated with La
+       Plateforme, including:
+          + Managing the Customer’s and Customer’s authorized
+            users’ accounts;
+          + Generation of Output based on Input;
+          + Fine-tuning Models with Customer’s Input,
+          + Agent creation based on Customer’s Input, and
+          + Processing Customer’s support requests.
+     * When Customer does not have a paid subscription:
+       de-identifying the Personal Data included in Your Data for
+       the purpose of training or improving the Models on such
+       de-identified data.
+
+   Duration of the Processing:
+     * The term of this DPA.
+
+   Retention Periods:
+     * Customer Data:
+          + The Input and Output are stored for the duration of
+            the generation of the Outputs. Mistral AI retains the
+            Inputs and Outputs for thirty (30) rolling days to
+            monitor abuse as a Data Controller, unless zero data
+            retention is activated. In such a case, the Input and
+            Output are stored for the duration of generating the
+            Output and then deleted.
+          + If Customer uses the Fine-Tuning API, the Input
+            (including fine-tuning data) is stored for the
+            duration of the fine-tuning job and until the deletion
+            of the Input by Customer on the Services.
+     * Account data:
+          + For the duration of the registration of the Customer
+            and Customer’s authorized users and for 1 year from
+            the termination of such registration.
+     * Customer support data:
+          + For the duration necessary to process Customer’s
+            request and for five (5) additional years for
+            evidential purposes.
+
+1.3 Subprocessors
+
+     * Azure:
+          + Purpose: Cloud Infrastructure.
+          + Data location: Sweden.
+     * Cerebras:
+          + Purpose: Cloud infrastructure. The Personal Data is
+            encrypted and zero data retention is activated (data
+            is retained solely for the duration of processing the
+            request).
+          + Data location: United States.
+          + Opt-in: By default, Customer Data is not processed by
+            Cerebras. Customer Data is only processed by Cerebras
+            if Customer opts-in.
+
+     * Google Cloud Platform (only if you use the US API):
+          + Purpose: Cloud Infrastructure only for the US API.
+          + Data location: United States.
+     * Intercom:
+          + Purpose: Customer support management.
+          + Data location: United States.
+
+2 Le Chat
+
+2.1 List of the Parties
+
+     * Controller: Customer
+     * Controller’s privacy contact: email address associated with
+       Customer’s account on the Mistral AI platform
+     * Processor: Mistral AI
+     * Processor privacy contact: [37]privacy@mistral.ai
+
+2.2 Description of the Processing
+
+   Categories of Data Subjects:
+     * Customer;
+     * Customer’s authorized users;
+     * Customer’s end-users;
+     * Any other natural person whose Personal Data is included in
+       the Customer Data.
+
+   Categories of Personal Data:
+     * Customer’s and Customer’s authorized users’ account data,
+       such as professional contact details, name of the
+       organization or Mistral AI user ID or workspace ID;
+     * Any Personal Data included in the Customer Data or in the
+       Third-Party Content;
+     * Any Personal Data associated with a support request made by
+       Customer or Customer’s authorized users, such as Customer’s
+       or Customer’s authorized users’ name, email address, or any
+       other personal data included within the request.
+
+   Special categories of Personal Data:
+     * None. Customer does not process sensitive data under this
+       DPA. In case Customer wishes to process sensitive data,
+       Customer shall contact Mistral AI by email at
+       [38]privacy@mistral.ai.
+
+   Frequency of the Processing:
+     * On a continuous basis.
+
+   Nature of the Processing:
+     * The Personal Data will be processed as described in this
+       DPA.
+
+   Authorized Purposes:
+     * The provision of the Services associated with Le Chat,
+       including:
+          + Managing the Customer’s and Customer’s authorized
+            users’ accounts;
+          + Generation of Output based on Input;
+          + Displaying Input, Output and Third-Party Content
+            history on Le Chat;
+          + Managing Customer’s or Customer’s authorized users’
+            shared conversations;
+          + Agent creation based on Customer’s Input;
+          + Processing Customer’s support requests.
+     * When Customer uses an unpaid subscription or when Customer
+       uses Le Chat Pro and has not opted-out of the training:
+       de-identifying the Personal Data included by Customer in
+       the User Data for the purpose of training or improving the
+       models or the Services on such de-identified data. If
+       Customer uses other paid subscriptions such as Le Chat Team
+       or Le Chat Enterprise, Mistral AI will not use the Customer
+       Data for training purposes, unless Customer authorizes
+       Mistral AI to do so by activating such option on its
+       account.
+
+   Duration of the Processing:
+     * The term of this DPA.
+
+   Retention Periods:
+     * Customer Data:
+          + The Customer Data is stored until its deletion by
+            Customer or Customer’s authorized users.
+     * Account data:
+          + For the duration of the registration of the Customer
+            and Customer’s authorized users and for 1 year from
+            the termination of such registration.
+     * Customer support data:
+          + For the duration necessary to process Customer’s
+            request and for five (5) additional years for
+            evidential purposes.
+
+2.3 Authorized Recipients
+
+   Sub-processors:
+     * Azure:
+          + Purpose: Cloud Infrastructure.
+          + Data location: Sweden.
+     * Black Forest Labs:
+          + Purpose: Image generation.
+          + Data location: United States.
+          + Opt-out: Customer can opt-out of Black Forest Labs at
+            any time by using the settings in Customer’s account.
+     * Brave:
+          + Purpose: Websearch.
+          + Data location: United States.
+          + Opt-out: Customer can opt-out of using Brave at any
+            time by using the settings in Customer’s account.
+     * Cerebras:
+          + Purpose: Cloud infrastructure. The Personal Data is
+            encrypted and zero data retention is activated (data
+            is retained solely for the duration of processing the
+            request).
+          + Data location: United States.
+          + Opt-out: Customer can opt-out of using Cerebra's at
+            any time by using the settings in Customer’s account
+            (deactivating flash answers).
+     * E2B:
+          + Purpose: provide the code interpreter feature on Le
+            Chat.
+          + Data location: EEA.
+     * Google Cloud Platform:
+          + Purpose: Cloud Infrastructure.
+          + Data location: Ireland, United States.
+
+3 Providing Support Services through Partners
+
+3.1 List of the Parties
+
+     * Controller: Customer
+     * Controller’s privacy contact: email address provided to the
+       Partner (as defined in the Partner-Hosted Deployment Terms)
+     * Processor: Mistral AI
+     * Processor privacy contact: [39]privacy@mistral.ai
+
+3.2 Description of the Processing
+
+   Categories of Data Subjects:
+     * Customer;
+     * Customer’s authorized users;
+     * Any person whose Personal Data is included in Customer’s
+       support request.
+
+   Categories of Personal Data:
+     * Professional contact details, such as name and professional
+       email address;
+     * Any Personal Data included in Customer’s or Customer’s
+       authorized user’s support request.
+
+   Special categories of Personal Data:
+     * None.
+
+   Frequency of the Processing:
+     * On a continuous basis.
+
+   Nature of the Processing:
+     * The Personal Data will be processed as described in this
+       DPA and the Partner-Hosted Deployment Terms.
+
+   Authorized Purposes:
+     * The provision of support services when Customer uses the
+       Services through a Partner.
+
+   Duration of the Processing:
+     * The term of this DPA.
+
+   Retention Periods:
+     * Customer Support:
+          + For the duration necessary to process Customer’s
+            request and for five (5) additional years for
+            evidential purposes.
+
+3.3 Authorized recipients
+
+   Sub-processors:
+     * Intercom: Support management. The Personal Data are stored
+       in the United States.
+
+   Third-Parties:
+     * The Partner.
+
+EXHIBIT 2 - Technical and organizational measures
+
+   The technical and organizational measures implemented by
+   Mistral AI are listed in Mistral AI’s trust center available at
+   [40]https://trust.mistral.ai/.
+
+   Mistral AI may update these measures at any time, subject to
+   Section 5 (Security) of the DPA.
+
+   Privacy Policy
+
+   Effective 6 February 2025 - [41]French Version/Version
+   Française
+
+   Welcome to Mistral AI!
+
+   We know that your privacy is important, and we're committed to
+   protecting it. This Privacy Policy explains, in a clear and
+   simple way, how we collect, use, and protect your personal data
+   when you use our generative AI services ("Services").
+
+1. Who collects your data?
+
+1.1. Mistral AI as data controller
+
+   Mistral AI is the data controller. This means that Mistral AI
+   is the entity that decides how and why your personal data is
+   collected and used.
+
+   Who we are. Mistral AI is a French company incorporated in
+   Paris, under number 952 418 325, having its registered offices
+   at 15 rue des Halles, 75001 Paris (“We”, “Us” or “Mistral AI”).
+
+   How to contact us:
+
+   By using the contact form available here
+   https://mistral.ai/en/contact in the section “data and privacy”
+     * By using the contact form available [42]here in the section
+       “Data and privacy”
+     * Through our Help Center available via your Mistral AI
+       Account
+     * By mail: Mistral AI, 15 rue des Halles, 75001 Paris,
+       France.
+
+1.2. Mistral AI as data processor
+
+   Mistral AI is your data processor. If you use our Services to
+   process personal data on behalf of your business, you are the
+   data controller, and Mistral AI is the data processor. This
+   means that you decide how and why the personal data is
+   processed, and we process such data on your behalf and
+   according to your instructions to provide you with the
+   Services.
+
+   Scope of this Privacy Policy. This Privacy Policy only covers
+   the processing activities we carry out as a data controller. It
+   does not apply to the processing activities we carry out as a
+   data processor on your behalf, which are governed by our Data
+   Processing Agreement.
+
+2. What data do we collect?
+
+2.1. Data you provide directly to us
+
+   Identity, account and contact data:
+     * When you create your account on our platform to use our
+       Services;
+     * When you subscribe to our newsletter.
+
+   Payment and billing information:
+     * When you subscribe to our paid Services.
+
+   Data you provide when you use the Services: We collect Input
+   and Feedback when you use the Services.
+     * Input. This is the input you provide to the Services to
+       generate an Output, such as your prompts or your
+       fine-tuning data.
+     * Feedback. This is the ratings or comments you choose to
+       provide on the Output.
+
+2.2. Personal data generated by your use of our Services
+
+   When you use the Services, we automatically collect the
+   following information:
+     * Security logs;
+     * Technical information such as, for instance, your IP
+       address ;
+     * Output. This is the content generated by the Services based
+       on your Input. If you include personal data in Your Input,
+       then such personal data may be included in the Output.
+
+2.3. Personal data that is indirectly provided to us
+
+   Data publicly available on the Internet. Our models are trained
+   on data that is publicly available on the Internet, which may
+   contain personal data, even if we use good practices to filter
+   out such personal data.
+
+   Data provided by third-parties:
+     * Hugging Face. If you download our models on Hugging Face,
+       we collect your username and email address to enforce our
+       license and send you communications about our new models.
+     * Third-Party Content. When you use our websearch or news
+       tool on Le Chat, we may display content from third parties
+       on Le Chat, such as links, thumbnails, or snippets. This
+       content is displayed to help you understand the Output
+       better. If you include personal data in your Input,
+       personal data might also appear in the Third-Party Content.
+       We do not use this Third-Party Content to train or improve
+       our models or Services.
+
+3. Why do we use your personal data?
+
+   We use your personal data:
+     * To provide and improve the Services;
+     * For the general administration and security of the
+       Services;
+     * To manage and enforce our license agreement;
+     * To develop and train our general-purpose artificial
+       intelligence models;
+     * To send you newsletters and marketing communications;
+     * To manage your commercial relationship with us;
+     * For dispute resolution;
+     * To reply to your requests regarding your personal data.
+
+   If you want to know more about why we use your personal data,
+   you will find more details below.
+
+3.1. To provide and improve the Services
+
+   For users acting as consumers:
+     * Account Management: Create and administer your account.
+     * Providing Le Chat to you, including:
+          + Generating Outputs and displaying Third-Party Content
+            based on your Input.
+          + We  use part of your IP address to make your
+            experience better, such as, for instance, to provide
+            you with more accurate Outputs depending on the
+            country associated with your IP address. You can
+            opt-out of this processing at any time through your
+            user preferences.
+          + Displaying your conversation history (Input, Output
+            and Third-Party Content).
+     * Providing La Plateforme:
+          + Generating Outputs based on your Input.
+          + Allowing you to fine-tune our models using Our
+            Fine-Tuning API.
+          + Allowing you to create agents through the Agent
+            Builder.
+     * Customer Support: Answer and manage your support requests,
+       including fixing errors or bugs related to your use of our
+       Services.
+
+   Lawful basis for the processing: The performance of the
+   agreement between you and Mistral AI.
+
+   For all users:
+     * Service Improvement: Generate aggregated and anonymized
+       statistics about the use of the Services to enhance their
+       functionality and performance.
+
+   Lawful basis for the processing: Our legitimate interest to
+   continuously improve the Services.
+
+3.2. General administration of our Services
+
+   We use your personal data for the following administrative
+   purposes:
+     * Security management. Manage the security of Our Services;
+     * Non-marketing communications. Communicate with you for
+       purposes other than marketing, such as:
+          + Notifying you of temporary unavailability or
+            disruptions to our Services.
+          + Sending you important updates or information related
+            to your account or the Services.
+     * Cookie Management. Use cookies and similar technologies to
+       enhance your user experience.
+
+   Lawful basis: Our legitimate interests to manage the security
+   and administration of the Services and for cookies that are
+   technically required. Your consent for cookies that are not
+   technically required.
+
+3.3. To manage and enforce our license agreement
+
+     * Abuse monitoring. Automatically monitor breaches of our
+       Terms of Service or Usage Policy;
+     * License management. Manage requests for downloading our
+       artificial intelligence models and enforce our open source
+       and commercial licenses.
+
+   Lawful basis: The performance of the contract between you and
+   Mistral AI.
+
+3.4. Develop and train our Models
+
+   We use personal data to develop and train our general-purpose
+   artificial intelligence models, which help us provide
+   state-of-the-art services to our customers.
+
+   Here’s how we handle personal data in different scenarios:
+
+3.4.1. Data publicly available on the Internet
+
+   If your personal data is publicly available on the Internet, we
+   may use it to train our general-purpose artificial intelligence
+   models, even though we apply good practices to filter out
+   personal data. Our models (large language models) are trained
+   to answer questions, generate text according to context/Inputs
+   (e-mails, letters, reports, computer code, etc.), translating,
+   summarizing and correcting text, classifying text, analyzing
+   feelings, etc.
+
+   Lawful basis: Our legitimate interests in providing advanced
+   artificial intelligence models to our customers.
+
+3.4.2. Input and Output provided on La Plateforme
+
+     * If you use our paid Services: We do not use your Input and
+       Output to train or improve our models.
+     * If you use our free Services: We use your Input and Output
+       to train our general-purpose artificial intelligence
+       models. We use commercially reasonable efforts to
+       de-identify such data before using it to train or improve
+       our models. For clarity and as set out in Section 8 (Your
+       rights), you have the right to object to this processing
+       (opt-out) by using the contact form available [43]here, via
+       the "Data and privacy" section, or using any other method
+       provided in Section 8 (Your rights).
+
+   Lawful basis: Our legitimate interests in providing advanced
+   artificial intelligence models to our customers.
+
+3.4.3. Le Chat
+
+     * If You use Le Chat Free, Le Chat Pro or Le Chat Student: We
+       use your Input, Output and Feedback to train our
+       general-purpose artificial intelligence models. We use
+       commercially reasonable efforts to de-identify such data
+       before using it to train or improve our models. You can
+       opt-out of training at any time by using the feature
+       available on your account. In this case, we do not use your
+       Input and Output to train our artificial intelligence
+       models, unless you expressly authorize us to do so.
+     * If you use Le Chat Team : We do not use your Input, Output
+       and Feedback to train our artificial intelligence models.
+       If you wish to allow us to use such data to train our
+       artificial intelligence models, you can opt-in of training
+       at any time by using the feature available on your account.
+     * Feedback: If you click on "Thumbs Up" or "Thumbs Down" to
+       rate an Output, we use your Feedback to train our
+       artificial intelligence models. If you do not want us to
+       use your Feedback to improve our artificial intelligence
+       models, please do not click on  "Thumbs Up" or "Thumbs
+       Down".
+
+   Lawful basis: Our legitimate interests in providing advanced
+   artificial intelligence models to our customers.
+
+   3.4.4. Third-party services
+
+   If you connect a third-party service to our Services, we do not
+   use this third-party service to train or improve our artificial
+   intelligence models.
+
+3.5. Marketing operations
+
+   We use your personal data for the following marketing
+   activities:
+     * Newsletters. Sending you our newsletters with updates and
+       information about our Services.
+     * Lead Development. Identifying and nurturing potential
+       business opportunities.
+     * Event Invitations. Inviting you to our events and webinars.
+
+   Lawful Basis: Your consent, for sending you our newsletters.
+   You can withdraw your consent at any time by unsubscribing .
+   Our legitimate interest, for lead development and event
+   invitations, which helps us promote our Services and grow our
+   business.
+
+3.6. Commercial Management
+
+   We use your personal data for the following commercial
+   management purposes:
+     * Contract Management. Administering and managing our
+       contractual relationship with you.
+     * Invoicing. Generating and sending invoices for the fees
+       applicable to our Services.
+     * Payment Processing. Processing your payments to ensure
+       timely and accurate billing.
+
+   Lawful Basis: The performance of the agreement between you and
+   Mistral AI. To comply with our legal requirements to invoice
+   for our Services.
+
+3.7. Dispute Resolution
+
+   We use your personal data for the following purposes:
+     * Dispute Resolution: To investigate and resolve any disputes
+       that may arise out of your use of the Services.
+     * Contract Enforcement: To enforce our contract, including
+       actions such as suspending your account.
+
+   Lawful Basis: Our legitimate interest to protect and exercise
+   our legal rights. The performance of the Agreement between you
+   and Mistral AI.
+
+3.8. Data Subject Requests
+
+   We use your personal data to reply to Your requests to exercise
+   Your rights on Your Personal Data.
+
+   Lawful basis: Our legal obligation to reply to your requests.
+
+4. Cookies
+
+   When you visit our website, we use cookies (small text files
+   stored on your device) to enhance your experience on our
+   Services. For more information about the way we use cookies,
+   please see our [44]Cookie Policy.
+
+5. How long do we keep your personal data?
+
+   We store your personal data only as long as needed for the
+   purposes described in Section 3 of this Privacy Policy.
+   Sometimes, we may keep it longer if required by law or for
+   legal proceedings.
+
+   For illustrative purposes, here are the applicable data
+   retention periods:
+
+   Data we use to provide and improve the Services:
+     * Account data: for as long as you're registered and 1 year
+       after you terminate your account in accordance with our
+       legal obligations.
+     * On La Plateforme:
+          + We keep your Input and Output for the period necessary
+            to generate the Output and then for thirty (30)
+            rolling days to monitor abuse, unless zero data
+            retention is activated.
+          + We keep your fine-tuning data until you delete it from
+            La Plateforme or until you delete your account.
+     * On Le Chat:
+          + If you use Le Chat without an account, we keep your
+            Input, Output and Feedback in an identifying form for
+            the duration of your conversation on Le Chat.
+          + If you use Le Chat with an account, we keep your
+            Input, Output and Feedback in an identifying form
+            until you delete your account.
+     * Technical support data: We keep your data until your
+       request is processed and for 5 years for record-keeping.
+
+   Data we use to administer and manage the security of the
+   Services:
+     * Security Data: Security logs are kept for 1 rolling year.
+     * Cookies: As long as you consent to their use.
+
+   Data we use to manage our license agreement:
+     * On La Plateforme: we keep your Input and Output for thirty
+       (30) rolling days to monitor abuse.
+     * Contracts and contact details for the subscription to a
+       commercial license to use our Models: we keep your data for
+       the duration of the contract and for five years following
+       the contract.
+
+   Data we use to manage your commercial relationship with us:
+     * Contracts: term of the contract and 5 years from the
+       termination date.
+     * Invoices: For 10 years from the year-end date.
+
+   Data we use for marketing operations:
+     * Contact data: until you unsubscribe from our newsletter.
+     * Leads identity and contact data: for 3 years from
+       collection.
+     * B2B customer data: for the duration of the contract and for
+       three years following the termination of the contract.
+
+   Data we use for dispute resolution: until the appeal period
+   ends, provided that we may keep such data longer for archival
+   purposes.
+
+   Data we use to reply to your privacy requests: for the duration
+   of processing the request and for six (6) years following the
+   request.
+
+6. Who do we share your personal data with?
+
+   We may share your personal data on a need-to-know basis with
+   the following parties:
+     * Our Team Members. Authorized members of our teams who need
+       access to perform their jobs.
+     * Financial Institutions. Banks and other financial
+       organizations.
+     * Regulatory Authorities. Such as the French data protection
+       authority (CNIL).
+     * Legal and Professional Services. When appropriate, we may
+       share data with competent courts, mediators, accountants,
+       auditors, lawyers, bailiffs, and debt collection agencies.
+
+   Additionally, we may share all or part of your personal data
+   with our service providers. Before engaging with any provider,
+   we conduct audits to ensure they meet our privacy and security
+   standards, and we sign a dedicated data protection agreement
+   with them.
+
+   Our main providers are:
+     * Azure:
+          + Purpose: Cloud Infrastructure
+          + Data location: Sweden
+     * Black Forest Labs:
+          + Purpose: Image generation based on Your Input. Black
+            Forest Labs accesses Your Input and Output. Your Input
+            is stored for 15 days and then permanently deleted
+            from Black Forest Labs’ systems. Your Outputs are
+            permanently destroyed within 1 day from Black Forest
+            Labs’ systems. Black Forest Labs does not use Your
+            User Data to train their models.
+          + Data location: United States
+     * Brave, Inc.:
+          + Purpose: Search engine providing content to generate
+            Outputs. Brave accesses Your Input and the content
+            sent to Mistral AI to generate the Output. Brave Inc.
+            does not access the Output. Brave, Inc. does not use
+            Your User Data to train any artificial intelligence
+            models or for any other purposes than to provide
+            content to generate an Output.
+          + Data location: United States
+     * Cerebras:
+          + Purpose: Cloud Infrastructure
+          + Data location: United States
+          + Opt-out: You can opt-out of Cerebras any time by using
+            the feature available on your account.
+     * : Cloudflare
+          + Purpose: Security of the Services.
+          + Data location: United States
+     * E2B:
+          + Purpose: Providing our code interpreter feature on Le
+            Chat.
+          + Data location: United States
+     * Google Cloud Platform:
+          + Purpose: Cloud Infrastructure
+          + Data location: Ireland
+     * Google Cloud Platform:
+          + Purpose: Cloud Infrastructure for Le Chat and the US
+            version of Our APIs
+          + Data location: United States
+     * Intercom:
+          + Purpose: Support
+          + Data location: United States
+     * Kong:
+          + Purpose: API security
+          + Data location: United States
+     * Lago:
+          + Purpose: Billing
+          + Data location: EEA
+     * Mailjet:
+          + Purpose: Mailing
+          + Data location: United States
+     * Ory:
+          + Purpose: Authentication on the Services
+          + Data location: EEA
+     * Stripe:
+          + Purpose: Payment management
+          + Data location: United States
+
+7. Do we transfer Your Personal Data Outside of the European Union?
+
+   We prioritize selecting providers within the European Union
+   that strictly adhere to the GDPR. However, in exceptional
+   cases, we may opt for non-EU providers that meet our high
+   standards of data security and Personal Data protection.
+
+   We take the necessary steps to ensure that all contracts with
+   service providers who process personal data outside the
+   European Union have adequate safeguards in compliance with
+   Article 46 of the GDPR. Additionally, we attach the most recent
+   version of the European Commission’s Standard Contractual
+   Clauses to all such contracts.
+
+8. Your rights
+
+   You can exercise:
+     * Access. You have the right to know if we process your
+       personal data. You also have the right to request a copy of
+       such personal data and to obtain further information about
+       the way we process your personal data.
+     * Rectification. You have the right to update or correct your
+       personal data.
+     * Deletion. You have the right to delete and/or ask us to
+       delete your personal data.
+     * Objection. You have the right to object to the processing
+       of your personal data. This right does not apply when we
+       have a legal obligation to process your personal data.
+     * Consent withdrawal. You have the right to withdraw your
+       consent to the processing of your personal data at any
+       time.
+     * Limitation. You have the right to ask us to freeze the
+       processing of your personal data.
+     * Automated decision. You have the right to not be subject to
+       an automated decision (including profiling) and to appeal
+       such a decision. Mistral AI does not engage in profiling or
+       automated decision-making in the processing of personal
+       data.
+     * Portability. You have the right to obtain and transfer your
+       personal data to another entity.
+     * Post mortem. You have the right to tell us how you would
+       like us to process your personal data after your death.
+     * Lodge a complaint. You have the right to lodge a complaint
+       before the competent data protection authority, including
+       the French data protection authority (the CNIL).
+
+   We will take every step to make sure we reply to your requests.
+   However, when your request concerns the training of our models,
+   it’s important to note that your rights have technical
+   limitations and fulfilling your requests might involve a
+   complex technical process.
+
+   You can exercise these rights:
+     * By using the contact form available [45]here in the section
+       “Data and privacy”
+     * By making a request using our Help Center available on your
+       account
+     * By sending us a letter at Mistral AI, Attn: Privacy Team,
+       Mistral AI, 15 rue des Halles, 75001 Paris, France.
+
+9. Changes to this Privacy Policy
+
+   We may amend this Privacy Policy from time to time as our
+   Services continuously evolve. Make sure to check this Privacy
+   Policy frequently.
+
+   Usage Policy
+
+   Effective 6 February 2025
+
+Scope
+
+   Our usage policy (the “Usage Policy”) applies to:
+     * All the Services accessible on our platform, including Le
+       Chat and La Plateforme,
+     * All users of our services, including individuals,
+       organizations, and businesses,
+     * All content generated, shared, or accessed through our
+       services, and
+     * All interactions and activities conducted on or through our
+       services.
+
+Our principles
+
+   Our goal is to make technology more accessible and showcase how
+   generative AI enables greater access to knowledge. To further
+   responsible artificial intelligence development and deployment,
+   the following principles guide how we build and offer our
+   services:
+     * Be neutral: we believe technology should be as neutral as
+       possible.
+     * Empower people: we believe in minimizing the risk of abuse
+       while trusting that you should be empowered to define and
+       use available and robust controls adapted to you and your
+       priorities.
+     * Build trust through transparency: we believe in building
+       services that provide everyone the right to access
+       generative AI and in being transparent about our artificial
+       intelligence models, policies, and enforcement.
+
+Prohibited content and activities
+
+   Illegal activities. When using our services, you must comply
+   with applicable laws. As such, you must not use our services to
+   engage in, encourage, promote, offer, or solicit illegal
+   activity, and any such use may be reported to law enforcement.
+   For instance, you must not use our services to generate:
+     * Content that promotes, facilitates, or provides
+       instructions for drug trafficking or distribution, or
+       information on obtaining or using illegal substances,
+     * Content related to activities with high-risk of physical
+       harm, such as weapons development, military and warfare,
+       management, or operation of critical infrastructure in
+       energy, transportation, and water, or
+     * Content that enables or exploits individuals, including
+       through human trafficking or sexual services.
+
+   Child Sexual Abuse Material (“CSAM”) Mistral AI has a zero
+   tolerance policy regarding CSAM. Any generation or attempt to
+   generate CSAM on our services is strictly prohibited. We will
+   report all actual or suspected CSAM to the relevant law
+   enforcement authorities and will terminate your account.
+
+   Non-consensual intimate imagery. You shall not use our services
+   to generate intimate images of any person without the explicit
+   consent of all individuals involved.
+
+   Hate and discrimination. You shall not use our services to
+   promote hate, discrimination, or harassment, including
+   generating any content that promotes, incites, glorifies, or
+   celebrates:
+     * Hate or discrimination based on an individual’s race,
+       gender, ethnicity, religion, nationality, sexual
+       orientation, disability status, or caste,
+     * Engaging in revisionism or denialism, particularly
+       regarding historically documented events such as the
+       Holocaust or other genocides,
+     * Harassing language towards any target, or
+     * The suffering or humiliation of others.
+
+   Violence and threats. Use of our services to conduct or
+   generate any activity or content that promotes, incites,
+   threatens, or glorifies violence is not permitted. This
+   includes, for instance, threats of physical harm or
+   glorification of violent acts or terrorism.
+
+   Self-harm. You shall not use our services to generate content
+   that promotes, encourages, or provides instructions for
+   self-harm or suicide. This includes, for instance:
+     * Graphic depictions of self-harm,
+     * Detailed descriptions of self-harm methods, or
+     * Encouragement of others to engage in self-harm or suicidal
+       behavior.
+
+   Fraud and scams. Using our services to engage in any form of
+   fraudulent activity or scams is prohibited. This includes, for
+   instance:
+     * Phishing attempts,
+     * Financial scams,
+     * Impersonation, or
+     * Misrepresentation of facts and data.
+
+   Misinformation. You shall not use our services to generate
+   content that is deliberately misleading, false, or intended to
+   deceive others. This includes, for instance:
+     * Spreading false information about current events, health,
+       science, or that undermines the integrity of a civic or
+       political process,
+     * Promoting conspiracy theories that can cause harm,
+     * Misinformation that targets protected groups.
+
+   Privacy. Generating content that invades or violates the
+   privacy of others is prohibited.
+
+   Professional advice. You shall not use our services to provide
+   professional advice without proper qualification. This
+   includes, for instance:
+     * Offering investment advice, financial planning, or any form
+       of financial guidance;
+     * Providing legal counsel, interpretations of the law, or
+       recommendations on legal actions;
+     * Offering medical diagnoses, treatment suggestions, or any
+       form of health-related guidance.
+
+Our enforcement
+
+   Violations of this Usage Policy may result in temporary
+   suspension or permanent termination of your account in
+   accordance with our Terms of Service, and, where appropriate,
+   reporting to relevant authorities.
+
+Report violations
+
+   If you encounter any content or activity that violates this
+   Usage Policy, please report it immediately through our Help
+   Center or at [46]legal@mistral.ai. We take all reports
+   seriously and will investigate promptly.
+
+Updates
+
+   We reserve the right to update this Usage Policy from time to
+   time on our website.We reserve the right to update the Terms of
+   Use at any time. We therefore invite you to consult our Usage
+   Policy frequently to stay informed of any changes.
+
+   Partner Served - Deployment Terms
+
+   Effective 6 February 2025
+
+Preamble
+
+   These deployment terms (these “Terms”) govern your use of the
+   products and/or services, including artificial intelligence
+   models (the "Models"), provided by Mistral AI (the "Mistral AI
+   Products") through:
+     * Our cloud provider partners (the "Cloud Providers"), on the
+       Cloud Provider's infrastructure (the "Partner
+       Infrastructure"), or your infrastructure ("Your
+       Infrastructure"), or
+     * Our resellers (the "Resellers") on Your Infrastructure.
+
+   In these Terms, we refer to the Cloud Provider Infrastructure
+   and Your Infrastructure as the "Infrastructure". We refer to
+   Cloud Providers and Resellers as "Partners".  The Mistral AI
+   Products are provided by Mistral AI, a French limited
+   corporation, having its registered offices at 15 rue des
+   Halles, 75001 Paris, France.
+
+   We encourage you to read and understand these Terms because by
+   accessing or using any of the Mistral AI Products through a
+   Partner, you are agreeing to these Terms which constitute an
+   agreement between you and Mistral AI.
+
+   Here are some key points to understand about using the Mistral
+   AI Products via a Partner:
+     * We do not have access to the Infrastructure or Your Data
+       and do not use Your Data to train our Models.
+     * You also have a contract with the Partner that governs your
+       use of the Partner Infrastructure (if applicable) and any
+       services provided by such Partner (the “Partner Terms”).
+     * When you use the Mistral AI Products through a Cloud
+       Provider on the Infrastructure, the Cloud Provider is your
+       sole point of contact, including for support.
+
+1. Responsibilities
+
+1.1 Our responsibilities
+
+   We are responsible for providing the Mistral AI Products to you
+   on the Infrastructure in accordance with applicable laws and
+   these Terms.
+
+1.2 The Partner’s responsibilities
+
+   The Partner is responsible billing and collecting any fees for
+   use of the Mistral AI Products on the Infrastructure.
+
+   When you use the Mistral AI Products through a Cloud Provider,
+   the Cloud Provider is responsible for (a) making the Mistral AI
+   Products available to you on the Infrastructure, (b) providing
+   you with the Partner Infrastructure (if applicable) and
+   complementary services, and (c) being your sole point of
+   contact for any requests related to the Mistral AI Products on
+   the Infrastructure.
+
+1.3 Your responsibilities
+
+   You are responsible for using the Mistral AI Products in
+   accordance with applicable laws, these Terms and the Partner
+   Terms (if applicable).
+
+2. Using the Mistral AI Products
+
+2.1 License
+
+   We grant you, and any of your authorized users, a non-exclusive
+   right to access and use the Mistral AI Products on the
+   Infrastructure only in compliance with these Terms, all
+   applicable laws and regulations, and any other documentation,
+   guidelines, or policies we make available to you, whether
+   directly or through our Partner. This right includes the rights
+   to (a) integrate our Mistral AI Product into Your Offerings (as
+   defined in Section 6) and (b) use the Mistral AI Products for
+   your own internal business purposes. For the avoidance of
+   doubt, the license granted in this Section also applies to any
+   Customized Mistral AI Product (as defined in Section 7.5).
+
+2.2 Restrictions
+
+   For the avoidance of doubt, we remain the sole owner of all
+   right, title, and interest in and to the the Mistral AI
+   Products (including all Models, documentation, and related
+   software developed by Mistral AI and provided to you in
+   connection with these Terms), including any modifications or
+   enhancements to any of the foregoing, and all intellectual
+   property in all of the foregoing, but excluding any Customer
+   Owned Developments. “Customer Owned Developments” means any
+   developments made by you to customize a Mistral AI Product or
+   in furtherance of Customer’s use of a Mistral AI Product, in
+   each case only as expressly authorized in these Terms.
+
+   You only receive rights to use the Mistral AI Products as
+   explicitly granted in these Terms. You will not, and will not
+   permit any other person to:
+
+   (a) use the Mistral AI Products or Your Data in a manner that
+   violates any applicable laws (including trade laws, and
+   sanctions and export control laws), these Terms, or any of our
+   policies;
+
+   (b) use the Mistral AI Products or Your Data in a manner that
+   infringes, misappropriates, or otherwise violates any third
+   party’s rights, including intentionally using the Mistral AI
+   Products to generate Outputs that infringe third party rights;
+
+   (c) send any personal information of children under 13 or the
+   applicable age of digital consent or allow minors to use the
+   Mistral AI Products without consent from their parent or
+   guardian;
+
+   (d) reverse assemble, reverse compile, decompile, translate,
+   engage in model extraction or stealing attacks, or otherwise
+   attempt to discover the source code or underlying components of
+   the Mistral AI Products, algorithms, and systems of the Mistral
+   AI Products (except to the extent these restrictions are
+   contrary to applicable law);
+
+   (e) compromise the security or proper functionality of the
+   Mistral AI Products, including interfering with, circumventing,
+   or bypassing security or moderation mechanisms in the Mistral
+   AI Products or performing any vulnerability, penetration, or
+   similar testing of the Mistral AI Products;
+
+   (f) use any method to extract any content from the Mistral AI
+   Products other than Outputs; or
+
+   (g) distribute or market the Mistral AI Products as a
+   standalone product or service and/or act as a distributor of
+   the Mistral AI Products without our prior written consent.
+
+2.3 Support
+
+   When the Mistral AI Products are provided on the Partner
+   Infrastructure, any support requests must be made to the
+   Partner, in accordance with the Partner Terms.
+
+2.4 Mistral AI Product discontinuation
+
+   We reserve the right to discontinue the availability of the
+   Mistral AI Products. We will provide a minimum notice period of
+   six (6) months prior to the discontinuation of any Mistral AI
+   Product. During such notice period, the Mistral AI Product will
+   not be available to any new customers. You are responsible for
+   ensuring that your contact information is up-to-date to receive
+   such notifications.
+
+2.5 Specific Access
+
+   “Specific Access” refers to any Mistral AI Product where you
+   have access to the weights of our Models. If your subscription
+   includes Specific Access, the following terms apply to your use
+   of the Mistral AI Products:
+     * (a) Our Models and their weights are highly confidential
+       and you must ensure their confidentiality by implementing
+       confidentiality and security measures at least as stringent
+       as those you use to protect your own Confidential
+       Information (as defined in Section 9) of similar
+       sensitivity;
+     * (b) In the event of any unauthorized disclosure or access
+       to our Models or their weights (each, a “Security
+       Incident”), you must immediately notify us at
+       [47]legal@mistral.ai. Such notification must include at
+       least the following details: (a) the time the Security
+       Incident occurred, (b) the Model affected by the Security
+       Incident, (c) the nature and impact of the Security
+       Incident, and (d) the measures which have been taken or
+       which are proposed to be taken to address the Security
+       Incident and to mitigate its possible adverse effects.
+     * (c) You acknowledge that we implement security measures,
+       such as watermarking, for each Model provided to users
+       whose subscriptions include Specific Access to ensure the
+       Model’s traceability. While these measures allow us to
+       trace our Models, they do not allow us to access or use
+       that specific copy of the Model or Your Data.
+
+3. Your User Data
+
+3.1 Your Data
+
+   You and your authorized users may provide input to the Mistral
+   AI Products (“Input”), and receive output from the Mistral AI
+   Products based on the Input (“Output”). For clarity, (i) Input
+   also includes any training or fine-tuning data provided by you
+   and (ii) Output excludes any Model weights. We refer to Input
+   and Output collectively as “Your Data”. To the extent permitted
+   by applicable law, you (i) retain all ownership rights in Input
+   and (ii) own all Output. We assign to you all right, title, and
+   interest, if any, in and to Output that we may have.
+
+3.2 Responsibility for Your Data
+
+   You are responsible for all Input and represent and warrant
+   that you have all rights, licenses, and permissions required to
+   provide Input to the Mistral AI Products. You are solely
+   responsible for all use of the Outputs and evaluating the
+   Output for accuracy and appropriateness for your use case. You
+   must also not represent that the Output was generated by a
+   human when it was generated by the Mistral AI Products. We may
+   also provide Output filters for certain Mistral AI Products. If
+   you deactivate these filters, you are solely responsible for
+   the Output that is generated.
+
+3.3 Similarity of Output
+
+   Due to the nature of the Mistral AI Products, your Output may
+   be similar or identical to the response generated for another
+   user of the Mistral AI Products. We provide no guarantees that
+   your Output will be unique. Any responses generated for other
+   users by the Mistral AI Products are not considered your Output
+   even if similar or identical to your Output.
+
+3.4 How we use Your Data
+
+   We do not access or use Your Data, unless you include Your Data
+   in your technical support request and such request is shared
+   with us by the Partner. In any case, we do not use Your Data to
+   train our Models.
+
+4. Warranties; Disclaimer
+
+4.1 Our Warranties
+
+   We warrant that, when used in accordance with these Terms, the
+   Mistral AI Products will conform in all material respects with
+   the documentation we provide to you or otherwise make publicly
+   available.
+
+4.2 Your Warranties
+
+   You warrant that (i) you have the authority to enter into and
+   accept these Terms and (ii) you and your end-users (if any)
+   will use the Mistral AI Products in accordance with the
+   applicable laws and regulations and these Terms.
+
+4.3 Disclaimer
+
+   EXCEPT FOR THE WARRANTIES IN THIS SECTION 4 (WARRANTIES;
+   DISCLAIMER), THE MISTRAL AI PRODUCTS ARE PROVIDED “AS IS” AND
+   WE AND OUR AFFILIATES AND LICENSORS DISCLAIM ALL WARRANTIES,
+   EXPRESS OR IMPLIED, INCLUDING ALL IMPLIED WARRANTIES OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND TITLE,
+   NONINFRINGEMENT, OR QUIET ENJOYMENT, AND ANY WARRANTIES ARISING
+   OUT OF COURSE OF DEALING OR TRADE USAGE. WE MAKE NO
+   REPRESENTATIONS OR WARRANTIES (I) THAT USE OF THE MISTRAL AI
+   PRODUCTS WILL BE UNINTERRUPTED, ERROR-FREE, SECURE, OR BE
+   SUITABLE FOR YOUR SPECIFIC PURPOSES OR USE-CASES, (II) THAT
+   DEFECTS WILL BE CORRECTED, OR (III) THAT YOUR DATA WILL BE
+   ACCURATE. MOREOVER, WE MAKE NO WARRANTY AS TO THE SERVICES
+   PROVIDED BY THE PARTNER OR ANY THIRD-PARTY, OR THE
+   INFRASTRUCTURE.
+
+5. Indemnification
+
+5.1 By you
+
+   You will indemnify, defend, and hold us and our affiliates,
+   service providers, and licensors harmless against any
+   liabilities, damages, and costs (including reasonable
+   attorneys’ fees) payable to a third party arising out of a
+   third party claim related to (i) the use of the Mistral AI
+   Products in violation of these Terms (including violation of
+   our policies), (ii) any of your products or services that you
+   make available to users in connection with the Mistral AI
+   Products or Outputs (“Your Offerings”) (if any), or (iii) Your
+   Data.
+
+5.2 By us
+
+   We will indemnify and defend you for any damages finally
+   awarded by a court of competent jurisdiction and any settlement
+   amounts payable to a third party arising out of a third party
+   claim alleging that the Mistral AI Products infringe any third
+   party intellectual property right. This excludes claims to the
+   extent arising from: (i) the Partner Infrastructure and/or any
+   services provided solely by the Partner, (ii) Your
+   Infrastructure, (iii) the combination of any of the Mistral AI
+   Products with products, services, or software not provided by
+   us or on our behalf (including Your Offerings, Your
+   Infrastructure, the Partner Infrastructure or services provided
+   by the Partner), (iv) any modification of the Mistral AI
+   Products by any party other than us, (v) the Input, (vi) your
+   modification of the Output, (vii) your failure to comply with
+   these Terms or applicable laws, regulations, or industry
+   standards, (viii) your use of the Mistral AI Products or Your
+   Data in a manner that you knew, or reasonably should have
+   known, was likely to violate third party rights or applicable
+   laws or regulations, (ix) Your Offerings (if the claim would
+   not have arisen but for Your Offerings), or (x) any Mistral AI
+   Products made available to you for beta testing purposes.
+
+5.3 Indemnification Procedure
+
+   The indemnification obligations in this Section 5
+   (Indemnification) are subject to the indemnifying party (i)
+   receiving a prompt written notice of such claim from the party
+   seeking indemnification; (ii) having sole control of defense
+   and settlement of the claim (provided that the party seeking
+   indemnification may participate in its own defense at its sole
+   expense), and (iii) the party seeking indemnification providing
+   all reasonable necessary cooperation and assistance, including
+   preserving and sharing relevant information. The indemnifying
+   party cannot enter into any settlement or compromise of any
+   claim without prior written consent of the other party, which
+   will not be unreasonably withheld, except that the indemnifying
+   party may without consent enter into any settlement of a claim
+   that resolves the claim without liability to the other party,
+   impairment to any of the other party’s rights, or requiring the
+   other party to make any admission of liability.
+
+5.4 Remedies
+
+   The remedies in this Section 5 (Indemnification) are the sole
+   and exclusive remedies for any third-party claim that the
+   Mistral AI Products or Your Data infringe intellectual property
+   rights.
+
+6. Liability
+
+6.1 Limitation of Liability
+
+   NEITHER WE NOR ANY OF OUR AFFILIATES, EMPLOYEES, SHAREHOLDERS,
+   LICENSORS, AGENTS, SUPPLIERS, OR SERVICE PROVIDERS WILL BE
+   LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR
+   EXEMPLARY DAMAGES, INCLUDING DAMAGES FOR LOSS OF PROFITS,
+   GOODWILL, USE, OR DATA OR OTHER LOSSES, EVEN IF WE HAVE BEEN
+   ADVISED OF THE POSSIBILITY OF SUCH DAMAGES. OUR AGGREGATE
+   LIABILITY UNDER THESE TERMS WILL NOT EXCEED THE AMOUNT YOU PAID
+   FOR THE MISTRAL AI PRODUCT THAT GAVE RISE TO THE CLAIM DURING
+   THE 12 MONTHS BEFORE THE LIABILITY AROSE. THE LIMITATIONS IN
+   THIS SECTION 6 (LIABILITY) APPLY ONLY TO THE MAXIMUM EXTENT
+   PERMITTED BY APPLICABLE LAW.
+
+6.2 Exclusions
+
+   Notwithstanding anything to the contrary in this Agreement,
+   nothing limits either Party’s liability for: (i) Death or
+   personal injury to limb or health caused by its negligence
+   (including of its personnel); (ii) fraud or fraudulent
+   misrepresentation; (iii) breach of Section 2.1 (License),
+   Section 2.2 (Restrictions), or Section 9 (Confidentiality);
+   (iv) matters for which liability may not be limited by
+   applicable law.
+
+7. Term, suspension and termination
+
+7.1 Term
+
+   These Terms will commence on the earlier of (i) the date you
+   first use the Mistral AI Products or (ii) the date you accept
+   these Terms, and will continue until terminated.
+
+7.2 Suspension
+
+   We reserve the right to suspend or terminate your access to all
+   or part of the Mistral AI Products if: (i) you breach these
+   Terms, (ii) you fail to pay any fees when due, (iii) we need to
+   do so in order to comply with applicable law, or (iv) your
+   continued use of the Mistral AI Products could cause risk or
+   harm to Mistral AI, our users, or anyone else. If you believe
+   we have suspended or terminated your account in error, you can
+   file an appeal with us by contacting us via the Help Center.
+
+7.3 Termination for breach
+
+   Subject to the Partner Terms, either party may terminate this
+   Agreement upon providing written notice to the other party if
+   the other party commits a material breach of any term or
+   condition of this Agreement and fails to cure such breach
+   within thirty (30) days after receipt of written notice
+   specifying the breach.
+
+7.4 Other causes of termination
+
+   These Terms will automatically terminate upon the termination
+   or expiration of (i) our agreement with Partner that enables
+   you to access the Mistral AI Products on the Infrastructure or
+   (ii) your agreement with Partner that enables you to access the
+   Mistral AI Product on the Infrastructure.
+
+7.5 Effects of termination
+
+   Termination or expiration will not affect any rights or
+   obligations, including the payment of amounts due, which have
+   accrued under these Terms up to the date of termination or
+   expiration. Upon termination or expiration of these Terms, the
+   provisions that are intended by their nature to survive
+   termination will survive and continue in full force and effect
+   in accordance with their terms, including confidentiality
+   obligations, limitations of liability, and disclaimers.
+
+   Upon any expiration or termination of these Terms, you will (a)
+   cease to use the Mistral AI Products (including all Customized
+   Mistral AI Products); and (b) destroy and certify the
+   destruction within seven (7) days of the effective date of
+   termination or expiration of these Terms: (i) all copies of the
+   Mistral AI Products (including all Customized Mistral AI
+   Products) you may have in your possession on Your
+   Infrastructure and (ii) all copies of Mistral AI Confidential
+   Information you may have in your possession on Your
+   Infrastructure. “Customized Mistral AI Product” means a Mistral
+   AI Product that has been customized under these Terms,
+   including by means of combining the Mistral AI Product and
+   Customer Owned Developments.
+
+8. Personal Data
+
+   We may process your personal data included in your support
+   requests. If you use the Mistral AI Products through a Partner,
+   we may act as your Processor for the processing of personal
+   data included in your support request and such processing shall
+   be governed by our [48]Data Processing Agreement, unless
+   otherwise stated in the Partner Terms.
+
+9. Confidentiality
+
+   Confidential Information. “Confidential Information” means any
+   and all information, in any medium, which is provided by one
+   Party (“Discloser”) to the other Party (“Recipient”), that is
+   either (a) marked as “confidential”, “proprietary” or similar
+   words, or if disclosed orally, confirmed in writing as such by
+   the Discloser following the disclosure; or (b) any information
+   which Recipient should have reasonably considered to be
+   confidential under the circumstances surrounding disclosure.
+
+   Confidentiality obligation. Each Party acknowledges that during
+   the course of performing its obligations hereunder it may
+   receive or disclose Confidential Information. Each Party
+   expressly acknowledges that the Confidential Information of the
+   other Party may consist of trade secrets and proprietary
+   information having significant commercial value, and that
+   knowledge of all or any part of the Confidential Information
+   would potentially yield a competitive advantage over others not
+   having such knowledge. Accordingly, neither Party will (a) use
+   the Confidential Information of the other Party except to
+   exercise rights or perform obligations under this Agreement or
+   (b) disclose the Confidential Information of the other Party to
+   any third party except to Recipient’s directors, employees, or
+   consultants to the extent necessary to carry out the purposes
+   of this Agreement, provided that all such recipients are
+   obligated by a written agreement containing confidentiality
+   obligations at least as stringent as described herein. Each
+   Party will take such steps as may be reasonable in the
+   circumstances, or as may be reasonably requested by the other
+   party, to prevent any unauthorized disclosure, copying or use
+   of the Confidential Information by such third parties. Each
+   Party may also disclose Confidential Information to the extent
+   required by judicial or governmental order or as necessary to
+   comply with any applicable law or regulation governing
+   regulated businesses or the issuance of securities to the
+   public, provided that the party making the disclosure gives the
+   other party reasonable notice prior to such disclosure and, in
+   the case of a judicial or governmental order, complies with any
+   applicable protective order or equivalent. Recipient agrees to
+   exercise due care in protecting Discloser’s Confidential
+   Information from unauthorized use and disclosure, and at a
+   minimum will use at least the degree of care a reasonable
+   person would use with respect to Confidential Information of
+   similar sensitivity. Recipient will promptly notify Discloser
+   if Recipient becomes aware of any unauthorized disclosure or
+   access to Discloser’s Confidential Information, or any security
+   incident that may result in any unauthorized disclosure or
+   access to Discloser’s Confidential Information and will
+   cooperate with Discloser to remedy any such unauthorized
+   disclosure or access and/or secure such Confidential
+   Information.
+
+   Exclusions. Confidential Information herein will not include
+   information that: (a) Recipient can demonstrate by its written
+   records to have had in its possession prior to disclosure by
+   Discloser; (b) was part of the public knowledge or literature,
+   not as a result of  any action or inaction of Recipient; (c)
+   was subsequently disclosed to Recipient from a  source other
+   than Discloser who was not bound by an obligation of
+   confidentiality to Discloser; or (d) Recipient can demonstrate
+   by its written records to have been independently developed by
+   Recipient without the use, directly or indirectly, of any
+   Confidential  Information.
+
+10. Audit
+
+   This Section 10 (Audit) only applies when you use the Mistral
+   AI Products on Your Infrastructure and through a Reseller.
+
+   During the Term and for one (1) year thereafter, Mistral AI
+   may, at its own expense and with thirty (30) business days'
+   notice, conduct audits (up to one (1) audit per year) to ensure
+   your compliance with Sections 2.1 (License) and 7.5 (Effects of
+   Termination). You agree to provide all relevant documents and
+   grant access to your premises and computer systems to enable
+   Mistral AI to assess Customer’s compliance with this Agreement.
+   Audits will be conducted by a third-party company selected by
+   Mistral AI, free from any competitive interests with you and
+   bound by professional confidentiality. You agree to cooperate
+   in good faith with the appointed third-party auditor, providing
+   necessary information and responding to audit-related
+   inquiries. Audits must not unduly disrupt your business
+   operations. If the audit reveals unauthorized use of the
+   Mistral AI Products or Confidential Information, Mistral AI
+   may: (a) instruct Reseller to charge you additional fees that
+   you should have paid due to such unauthorized use; or (b)
+   mandate the destruction of unauthorized versions or copies of
+   the Mistral AI Products and/or Confidential Information. In the
+   event of audit findings indicating Customer’s breach of the
+   Agreement, the costs of the audit will be borne by Customer
+   only.
+
+11.  General Provisions
+
+   Assignment. You may not assign or transfer any rights or
+   obligations under these Terms and any attempt to do so will be
+   void. We may assign our rights or obligations under these Terms
+   to any affiliate, subsidiary, or successor in interest of any
+   business associated with our Mistral AI Product.
+
+   Force Majeure. Neither party will be liable to the other for
+   any delay or failure to perform any obligation under these
+   Terms (except for a failure to pay fees) if such delay or
+   failure is due to unforeseen events beyond the reasonable
+   control of such party.
+
+   Independent Contractors. There is no relationship of
+   partnership, joint venture, employment, franchise or agency
+   created between the parties under these Terms. Neither party
+   will have the power to bind the other or incur obligations on
+   the other party’s behalf without the other party’s prior
+   written consent.
+
+   No Third-Party Rights. There are no third-party beneficiaries
+   to these Terms.
+
+   Waivers. No waiver of any term of these Terms will be deemed a
+   further or continuing waiver of such term or of any other term,
+   and our failure to assert any right or provision under these
+   Terms will not constitute a waiver of such right or provision.
+
+   Entire Agreement; severability. Unless otherwise agreed in
+   writing between you and Mistral AI, these Terms, constitute the
+   entire agreement between you and us concerning the Mistral AI
+   Products. Any statements or comments made between you and any
+   of our employees or representatives are expressly excluded from
+   these Terms and will not apply to you or us, or to your access
+   to or use of the Mistral AI products. If any provision of these
+   Terms is deemed invalid by a court of competent jurisdiction,
+   the invalidity of such provision will not affect the validity
+   of the remaining provisions of these Terms, which will remain
+   in full force and effect.
+
+   Governing law and venue. (a) Unless you are located in the
+   United States, the laws of France will govern all disputes
+   arising out of or relating to these Terms (including any
+   applicable Additional Terms), or related Mistral AI Products,
+   regardless of conflict of laws rules. These disputes will be
+   resolved exclusively in the courts located in Paris, France,
+   and you and Mistral AI consent to personal jurisdiction in
+   those courts. (b) If you are located in the United States,
+   California law will govern all disputes arising out of or
+   relating to these Terms (including any applicable Additional
+   Terms), or related Mistral AI Products, regardless of conflict
+   of laws rules. These disputes will be resolved exclusively in
+   the federal or state courts of Santa Clara County, California,
+   USA, and you and Mistral AI consent to personal jurisdiction in
+   those courts.
+
+
+   Cookie Policy
+
+   Effective as of March 31 2025
+
+1. What is a cookie ?
+
+   A cookie is a small text file that is temporarily stored on
+   your device, such as a computer, tablet, smartphone, or other
+   device, when you access our website or our services such as Le
+   Chat or La Plateforme.
+
+   These cookies enable us to distinguish you from other users,
+   remember your preferences, and analyze how you interact with
+   our services to improve them. Cookies also allow us to display
+   personalized advertisements on our website or on other
+   websites. They do not directly identify you, but can offer a
+   more personalized web experience.
+
+2. What cookies do we use ?
+
+   Technically required cookies. These cookies are essential for
+   the operation of our website and our services and cannot be
+   disabled through our cookie banner. They are typically
+   activated in response to your actions, such as configuring
+   privacy settings, logging in, or completing forms. While you
+   can configure your browser to block or notify you about these
+   cookies, doing so may impair the functionality of certain parts
+   of the site. These cookies do not collect or store any
+   personally identifiable information.
+     * Cloudflare
+          + Cookies: __cf_bm, _cfuvid
+          + Purpose: Security and rate limiting rules.
+          + Privacy
+            Policy: [49]https://www.cloudflare.com/privacypolicy/
+          + Provider: Cloudflare
+          + Domain: mistral.ai
+
+     * Intercom
+          + Cookies: intercom-device-id, intercom-id,
+            intercom-session
+          + Purpose: Support chatbot.
+          + Privacy Policy:
+            [50]https://www.intercom.com/help/en/articles/2361922-
+            intercom-messenger-cookies
+          + Provider: Intercom
+          + Domain: chat.mistral.ai
+
+     * Mistral AI
+          + Cookies: NEXT_LOCALE
+          + Purpose: Language preferences.
+          + Domain: chat.mistral.ai
+     * Ory
+          + Cookies: ory_kratos_continuity, ory_session_
+          + Purpose: Authentication.
+          + Privacy Policy: [51]https://www.ory.sh/legal/privacy
+          + Provider: Ory
+          + Domain: chat.mistral.ai
+
+   Analytics. We use analytics cookies to count visits and track
+   traffic sources. These cookies help us measure and improve our
+   website's performance. For instance, they show us which pages
+   are popular and how visitors navigate our website or our
+   services, through aggregated and anonymous statistics. Without
+   these cookies, we are not able to monitor the performance of
+   our website or count your visit on our services.
+     * Google Analytics
+          + Cookies: _ga, _gid, _gat, _gac_<property-id>
+          + Purpose: We use these cookies to count the visits and
+            measure performance of our website.
+          + Privacy Policy:
+            [52]https://business.safety.google/adscookies/
+          + Provider: Google
+          + Domain: mistral.ai
+     * Posthog
+          + Cookies: ph_, ph_phc, _rdt_uuid
+          + Purpose: We use these cookies to analyse the way you
+            interact with our website in order to improve it.
+          + Privacy Policy: [53]https://posthog.com/privacy
+          + Provider: Posthog.
+          + Domain: chat.mistral.ai
+
+   Marketing. Marketing cookies, set by our partners, help us
+   deliver more effective marketing by showing relevant ads on
+   other websites. These cookies do not allow us to directly
+   identify you, but use your browser and device's unique ID to
+   display those ads, to provide aggregated reporting, and track
+   when marketing content has been shown to you. Without these
+   cookies, you will see less targeted ads, but our services will
+   still function.
+     * X
+          + Cookies: personalization_id, guest_id, twid
+          + Purpose: Track your interactions with the posts or ads
+            we display on X to measure the performance of our
+            marketing campaigns.
+          + Privacy
+            Policy: [54]https://help.x.com/en/rules-and-policies/x
+            -cookies
+          + Provider: X
+          + Domain: mistral.ai
+
+
+     * Meta
+          + Cookies: _fbp, fr, datr
+          + Purpose: Track your interactions with the posts or ads
+            we display on Meta to measure the performance of our
+            marketing campaigns
+          + Privacy
+            Policy: [55]https://www.facebook.com/privacy/policies/
+            cookies?subpage=subpage-1.7
+          + Provider: Meta
+          + Domain: mistral.ai
+
+3. Cookie management
+
+   Upon your initial visit on our website or our services, a
+   banner will prompt you to accept or disallow cookies that are
+   not strictly necessary for the website's operation, categorized
+   by type of cookie.
+
+   Within this banner, you will find a list of cookies that may be
+   placed on your device. You have several options to control and
+   manage cookies through this banner. Blocking cookies may affect
+   your experience and limit access to certain parts of our
+   website or services.
+
+   You can change your cookie settings at any time by clicking on
+   “Privacy Choices” in the footer of our website.
+
+   You can also change your cookies preferences directly on your
+   browser. The configuration for each browser is different. For
+   guidance, here are some examples of configuration pages for
+   different browsers:
+     * For Chrome:
+       [56]https://support.google.com/chrome/answer/95647?hl=en&hl
+       rm=en
+     * For Internet Explorer:
+       [57]https://support.microsoft.com/en-us/help/17442/windows-
+       internet-explorer-delete-manage-cookies
+     * For Safari:
+       [58]https://support.apple.com/en-ph/guide/safari/sfri11471/
+       mac
+     * For Mozilla Firefox:
+       [59]https://support.mozilla.org/en-US/kb/enable-and-disable
+       -cookies-website-preferences
+     * For Opera:
+       [60]https://blogs.opera.com/news/2015/08/how-to-manage-cook
+       ies-in-opera/
+
+   In any case, you will find more information on behavioural
+   advertising and privacy protection on the Internet on this
+   website: [61]http://www.youronlinechoices.com/fr/.

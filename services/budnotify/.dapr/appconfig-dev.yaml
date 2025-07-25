@@ -1,0 +1,16 @@
+apiVersion: dapr.io/v1alpha1
+kind: Configuration
+metadata:
+  name: appconfig
+  namespace: default
+spec:
+  tracing:
+    samplingRate: "1"
+    stdout: true
+  #    zipkin:
+  #      endpointAddress: http://localhost:9411/api/v2/spans
+  secrets:
+    scopes:
+      - storeName: local-secretstore
+        defaultAccess: allow
+        deniedSecrets: [ ]

@@ -1,0 +1,15 @@
+.venv/
+.git/
+
+docs/
+.dapr/
+deploy/
+# scripts/
+tests/
+
+.gitignore
+.pre-commit-config.yaml
+requirements-*.txt
+
+README.md
+LICENSE

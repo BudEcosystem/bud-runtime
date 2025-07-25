@@ -1,0 +1,9 @@
+# Service
+budmicroframe @ git+https://github.com/BudEcosystem/bud-microframe.git
+
+# Database
+asynch >= 0.3.0
+
+tqdm
+orjson
+starlette-compress

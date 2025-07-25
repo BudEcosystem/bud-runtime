@@ -1,0 +1,31 @@
+# Service
+budmicroframe @ git+https://github.com/BudEcosystem/bud-microframe.git
+
+# Model
+transformers >= 4.46.2
+llm-benchmark @ git+https://github.com/BudEcosystem/llm-benchmark.git
+modelscan[tensorflow,h5py] @ git+https://github.com/BudEcosystem/modelscan
+
+# Scrapper
+crawl4ai == 0.4.248
+arxiv == 2.1.3
+
+GitPython >=3.1.44
+
+# Minio
+minio>=7.2.14
+
+PyPDF2>=3.0.1
+
+# Database
+alembic-postgresql-enum>=1.6.1
+
+# Aria2p
+aria2p >= 0.12.1
+
+# Inference
+openai >= 1.69.0
+json_repair >= 0.40.0
+
+# Antivirus Scanner (ClamAV)
+clamd>=1.0.2

@@ -1,0 +1,130 @@
+Service Agreement
+
+I. Acceptance of Terms
+Welcome to the Large Model Open Platform. The following terms and conditions constitute an agreement (the “Agreement”) between the user of the Large Model Open Platform (hereinafter referred to as “User” or “You”) and Beijing Zhipu Huazhang Technology Co., Ltd. (hereinafter referred to as “Zhipu”) regarding your use of the services provided by the Large Model Open Platform.
+
+This Agreement includes, but is not limited to, the main text of this Agreement and all rules, regulations, announcements, statements, and notices that Zhipu has issued or may issue in the future regarding the services, as well as various website rules and systems. All such rules are integral parts of this Agreement and have equal legal effect. If you have entered into other legal documents with Zhipu regarding your use of the Large Model Open Platform services, the conflicting parts of this Agreement will not apply to you.
+
+Zhipu reserves the right to modify this Agreement from time to time based on changes in national laws and regulations and the actual business operations, and will notify users by announce publicly in advance the platform system, website, etc. The revised terms will take effect on the date specified in the notice. If you choose to continue topping up, it means that you agree to and accept the modified agreement and are bound by it; if you do not agree to our modifications to this Agreement, please immediately abandon topping up or stop using the service. The signature at the end of this Agreement is reserved to meet the requirements of some customers for signing the agreement, and the absence of signatures does not affect the effectiveness of this Agreement.
+
+Due to various reasons such as marketing activities and product promotion, Zhipu may launch “limited-time free,” “limited-time discounts,” “limited-quantity discounts,” “top-up discounts,” and other promotional measures (collectively referred to as “Promotional Measures”) during specific periods. You understand and agree that these Promotional Measures may be temporary, phased, or subject to quantity limits, and may only apply to customers meeting specific conditions. Unless otherwise expressly stated in writing, Promotional Measures cannot be applied simultaneously. You fully understand and agree that the promotional benefits you have obtained may be adjusted or become invalid due to product/service version updates, functional adjustments, etc. Zhipu has the final right of interpretation over the application rules of Promotional Measures. You promise not to hold Zhipu liable for any adjustments to Promotional Measures or the invalidation of promotional benefits.
+
+Please note that this Agreement limits Zhipu’s liability and also limits your remedies. Specific clauses will be highlighted in bold and underlined to draw your attention. Please read them carefully. If you have any questions about the terms of this Agreement, please inquire through customer service channels (email: service@zhipuai.cn; or the customer service WeChat at the bottom right corner of the platform), and Zhipu will explain the content of the terms to you. If you do not agree to any content of this Agreement, or if you cannot accurately understand Zhipu’s interpretation of the terms, please do not agree to this Agreement or use the services under this Agreement.
+
+II. Definitions
+2.1 Large Model Open Platform User Top-up Balance Account:“Balance Account,” refers to the account automatically configured by Zhipu for the user based on the user’s Large Model Open Platform account. The act of topping up into this account is deemed as a prepayment by the user to Zhipu, and the prepayment amount can be used to purchase products or services provided by the Large Model Open Platform.
+
+2.2 Top-up Amount: Refers to the amount (in RMB) that the user pays online, excluding the platform-provided trial funds and top-up discount amounts. The top-up amount can be freely consumed on the Large Model Open Platform.
+
+2.3 Platform Trial Funds: Refers to the limited-time effective trial funds granted by the Large Model Open Platform to new customers for trial scenarios, which can be used for consumption of the platform’s large model API calls. Unless otherwise agreed upon at the time of granting, the validity period of platform trial funds is generally 30 days from the date of issuance, and the platform reserves the right to adjust the validity period and usage rules of trial funds at any time, and Zhipu has the final right of interpretation over these rules. Platform trial funds are non-withdrawable, non-transferable, and cannot be invoiced.
+
+2.4 Top-up Discount Amount: Refers to the additional amount (including but not limited to red envelopes, discounts, top-up cashback, coupons, vouchers, etc.) granted based on the top-up amount due to the top-up discount activities launched from time to time by the Large Model Open Platform. The top-up discount amount is non-withdrawable, non-transferable, and cannot be invoiced. The content of the top-up discount activities and the use and issuance of the top-up discount amount are subject to the rules announced by the Large Model Open Platform, and Zhipu has the final right of interpretation over these rules.
+
+III. Your Rights and Obligations
+3.1 When you top up, you should have full civil capacity and possess a Large Model Open Platform account that has been successfully verified through real-name authentication.
+
+3.2 To ensure the accuracy of our billing, you should ensure that the product/service you choose and the order information you fill in are accurate. We are not responsible for billing errors due to incorrect order information you fill in, and we do not need to refund the service fees you have paid. Unless you have conclusive proof the usage data of the Large Model Open Platform is incorrect, the billing statistics are based on the display of the Large Model Open Platform.
+
+3.3 Your use of any service provided by the Large Model Open Platform should comply with the “Interim Measures for the Administration of Generative Artificial Intelligence Services,” the “Regulations on the Management of Algorithmic Recommendation Services for Internet Information,” the “Regulations on the Management of Deep Synthesis Services for Internet Information,” and other applicable laws and regulations. The products and applications you develop using the model API within the Large Model Open Platform are your responsibility to conduct compliance procedures such as internet information service algorithm filing, internet information service security assessment for public opinion attributes or social mobilization capabilities, online filing, etc., as well as other approval, filing, assessment, and processes required by relevant laws, regulations, and policies, and to truthfully and accurately disclose the use of Zhipu models and other models (if any) in accordance with relevant regulations and the requirements of the competent authorities. You shall not make false or misleading disclosures, identifications, and displays of products and services that have not used Zhipu models. The consequences of your violation of the aforementioned laws, regulations, and agreements shall be borne by you. If your actions cause losses to Zhipu, you shall compensate for such losses.
+
+3.4 Unless expressly agreed upon in this Agreement, without the written consent of Zhipu and the relevant rights holders, you shall not copy, transfer, sell, lease, lend, license, provide to others for use, or use the content on the Large Model Open Platform, platform models, etc. in any commercial manner other than those explicitly permitted by Zhipu. To avoid doubt, you may commercially use the models on the platform and the content generated by them in accordance with the rules of the specific product after paying the fees in accordance with the rules of the Large Model Open Platform at that time.
+
+3.5 We have the right to supervise and independently judge your use of the product services. If we find that you have violated any agreement reached with us when using the products and services provided by the Large Model Open Platform, we have the right to take measures such as requiring you to correct, suspending services, terminating the agreement, etc. The losses caused thereby shall be borne by you.
+
+3.6 If you use Zhipu’s products or services to provide content generative artificial intelligence products or services to the public, you should carry out security assessments, algorithm filings, online filings, or other requirements stipulated by applicable laws and regulations, and truthfully and accurately disclose the use of Zhipu models and other models (if any) in accordance with relevant regulations and the requirements of the competent authorities, and refrain from making false, misleading disclosures, identifications, and displays of products and services that have not used Zhipu models. You should effectively manage and control the security, legality, and compliance of the content generated by your applications, and establish mechanisms including but not limited to content review, user management, data security, monitoring and early warning, and emergency response.
+
+3.7 When using Zhipu’s products and services, you must comply with relevant laws and regulations, fulfill the safety obligations stipulated by laws and regulations, and not violate the “Criminal Law of the People’s Republic of China,” the “Anti-Unfair Competition Law of the People’s Republic of China,” the “Cybersecurity Law of the People’s Republic of China,” the “Data Security Law of the People’s Republic of China,” the “Personal Information Protection Law of the People’s Republic of China,” the “Regulations on the Management of Algorithmic Recommendation Services for Internet Information,” the “Regulations on the Management of Deep Synthesis Services for Internet Information,” the “Interim Measures for the Administration of Generative Artificial Intelligence Services,” the “Regulations on the Security Assessment of Internet Information Services with Public Opinion Attributes or Social Mobilization Capabilities,” the “Regulations on the Safety Assessment of New Technologies and Applications of Internet News Information Services,” the “Regulations on the Ecological Governance of Network Information Content,” and other relevant laws, regulations, and policies, and maintain internet order and cybersecurity. Refrain from using products to publish speeches that endanger national security, undermine national unity, disrupt social order, are discriminatory, or are unfair, or infringe upon any third party’s personal information protection rights, reputation rights, personality rights, intellectual property rights, property rights, portrait rights, or any other rights, or engage in behaviors involving pornography, gambling, drugs, or other behaviors that violate laws, regulations, or public order and good customs.
+
+3.8 If you use Zhipu’s products to create virtual characters, you must ensure that the images, avatars, names, character settings, and data and content involved in the creation of virtual characters do not infringe upon the intellectual property rights, portrait rights, reputation rights, privacy rights, personal information protection rights, or other legal rights of third parties, and do not engage in any behaviors that may constitute unfair competition through virtual characters.
+
+IV. Account and Data Security
+4.1 When you top up, the user should carefully confirm their account and information. If you damage your own rights due to improper operations, lack of understanding, or insufficient understanding of the top-up billing method, you should bear the responsibility yourself.
+
+4.2 When you top up using the services provided by third-party payment companies, you should comply with all agreements and service rules with that third party; during the use of third-party payment services, you should properly safeguard personal information, including but not limited to bank account numbers, passwords, verification codes, etc.; you agree and confirm that Zhipu is not responsible for any disputes arising from third-party payment services.
+
+4.3 You should ensure the security of your Large Model Open Platform account and password. Any actions that occur under your account will be deemed as your actions, whether or not they are authorized by you, or are carried out by you, your employees, or third parties (including your contractors or agents). We are not responsible for unauthorized access to your account.
+
+4.4 Zhipu respects your data security and privacy and will take reasonable measures to protect your data security. The data you process, store, upload, download, distribute, and process in other ways through the services provided by Zhipu are your data, and you fully own your data, but at the same time, you should ensure that your data complies with relevant laws and regulations and the provisions of this Agreement.
+
+4.5 Except as necessary to provide services to you, Zhipu will not use or disclose your data without authorization; however, the following exceptions apply:
+
+(1) When national authorities legally inquire about or review user business data, Zhipu has the obligation to provide cooperation and disclose to third parties or administrative, judicial institutions in accordance with relevant laws, regulations, or policy documents;
+
+(2) You and Zhipu have reached a separate agreement;
+
+(3) Other provisions of laws and regulations.
+
+4.6 Zhipu only stores your data within the minimum necessary scope for providing services and meeting compliance requirements, and will conduct necessary anonymization and encryption processing.
+
+V. Top-up Methods
+5.1 You can top up the fees into your account on the Large Model Open Platform through Alipay, bank transfer, and other methods, with the specific rules for payment methods and other details displayed on the Large Model Open Platform.
+
+5.2 If you entrust a third party to top up your balance account, you warrant and guarantee that you understand and trust the third party, and the third party also understands and agrees to accept your entrustment to top up for you; otherwise, if Zhipu is notified by the third party that such top-up is not consented to by the relevant rights holder, Zhipu has the right to immediately lock your balance account (during the account lock period, Zhipu will suspend user service usage and lock user API keys, the same below). Within 30 days from the date your balance account is locked, you should provide sufficient evidence to prove that the relevant rights holder has agreed to top up in advance, otherwise, you agree and authorize Zhipu to cooperate with the third party’s requirements and refund the corresponding amount from your locked balance account to the relevant rights holder. If your consumption account balance is insufficient to refund at that time, you agree to top up the corresponding amount within 30 days at the latest, entrust Zhipu to refund, or refund from your WeChat account or Alipay account yourself, unless the relevant rights holder agrees that you do not need to refund this part of the amount.
+
+5.3 You warrant and guarantee that the funds used for topping up your consumption account are of legal origin, otherwise, Zhipu has the right to cooperate with the requirements of judicial authorities or other government authorities and take corresponding measures against your balance account, including but not limited to locking, sealing, restricting usage, etc.
+
+VI. Account Amount Usage
+6.1 After topping up, the use of the top-up amount does not have an expiration date and cannot be transferred or gifted. Therefore, please choose the top-up amount based on your consumption situation, and Zhipu does not limit the number of top-ups.
+
+6.2 You can start using the corresponding products (or services) immediately after successful top-up.
+
+6.3 The payment model for the products you purchase is displayed on the product page. For prepaid services, you need to pay the full usage fee to Zhipu before using the product, and you can start using the services provided by the Large Model Open Platform after payment is completed. For postpaid services, you need to prepay on the Large Model Open Platform, and you can use the services provided by the Large Model Open Platform when the balance is sufficient. The Large Model Open Platform has the right to stop services if your balance is insufficient.
+
+6.4 You should pay attention to your account balance during the use of the service. Zhipu is not responsible for any related losses caused by the service stoppage due to insufficient account balance.
+
+VII. Invoicing
+7.1 Zhipu will issue corresponding invoices according to the actual consumption amount after your top-up amount is consumed, based on the product (or service) agreement you have ordered. The specific process and method of issuing invoices will be displayed to you by the Large Model Open Platform at that time.
+
+7.2 Personal authentication accounts support the issuance of personal and corporate invoices. Individuals need to provide employment certificates, business licenses, and work badges as proof materials when applying for corporate invoices. Corporate authentication accounts only support invoicing based on the authenticated corporate entity.
+
+VIII. Refunds
+8.1 You should fully estimate your actual needs and determine the top-up amount. If you must apply for a refund due to special circumstances, the unconsumed top-up amount (excluding trial funds, discount amounts, etc.) can be applied for a refund by contacting the platform customer service and providing relevant proof materials. Zhipu will review the user’s refund matters. If the review is approved, the corresponding top-up amount will be refunded to you through the original payment method you selected when topping up.
+
+8.2 The top-up amount only supports a one-time refund, and trial funds/top-up discount amounts (including but not limited to trial funds, red envelopes, and similar non-cash discounts) do not support refund applications. Once a refund application is initiated, the top-up discount amount will become invalid upon approval of the refund application. If your top-up discount amount has been used and you initiate a full or partial refund for this top-up, we will fully deduct the already used top-up discount amount from the top-up amount when processing the refund.
+
+8.3 Refunds are not supported for amounts that have been topped up and consumed, or that should be deducted according to the relevant product (or service) agreement.
+
+8.4 Refunds are not supported for amounts that have been invoiced.
+
+IX. Liability for Breach of Contract
+9.1 Both parties should fulfill the obligations stipulated in this Agreement. If either party breaches the Agreement and causes losses to the other party, the breaching party should compensate for the losses. The losses referred to in this Agreement include, but are not limited to, litigation fees, arbitration fees, attorney fees, appraisal fees, travel expenses, investigation and evidence collection fees, compensation fees, liquidated damages, settlement costs, administrative penalties, etc.
+
+9.2 The Large Model Open Platform fulfills basic保障obligations in accordance with legal regulations, but does not bear corresponding liability for breach of contract for the following reasons:
+
+① Force majeure factors such as natural disasters, strikes, riots, wars, government actions, judicial administrative orders, etc.;
+
+② Public service factors such as power supply failures, communication network failures, or third-party factors;
+
+③ Factors such as routine or emergency equipment and system maintenance, equipment and system failures, network information and data security under the condition of good faith management by the Large Model Open Platform.
+
+9.3 **Zhipu is not liable to you for special, incidental, indirect, consequential damages and losses (including but not limited to: expected benefits,profit, business opportunities, business interruption, information loss, etc.), even if Zhipu has been informed of the possibility of such damages occurring.
+
+9.4 Zhipu is not responsible for any losses you or any third party may suffer due to the actions or inactions of a third party in the performance of this Agreement.
+
+9.5 Under any circumstances, the total liability for breach of contract of Zhipu under this Agreement shall not exceed the total service fee of the service in breach.
+
+X. Dispute Resolution
+10.1 This Agreement is governed by the laws of the People’s Republic of China. If a dispute arises between the user and Zhipu due to this Agreement, the parties shall first attempt to resolve it through friendly negotiation. If the negotiation fails, the dispute shall be subject to the jurisdiction of the people’s court where Zhipu is located.
+
+XI. Miscellaneous
+11.1 Without the written/email consent of Zhipu, you shall not, at any time and in any manner (whether directly or indirectly, and whether expressly or impliedly; including but not limited to any marketing, advertising, promotional, or other purposes):
+
+Use, cite, disclose, copy, distribute, display (publicly or privately), mention, register, or apply for registration:
+
+(i) Any trademarks (whether registered or not), trade names, names, logos, or identifiers owned or licensed by Zhipu or its affiliates (including but not limited to: “Zhipu,” “ZhipuAI,” “Zhipu.AI,” “AMiner,” “ChatGLM,” “ChatGLM-130B,” “CodeGeeX,” “CogView,” or any text and logos related to Tsinghua University, such as “Tsinghua University,” “Department of Computer Science, Tsinghua University,” “Tsinghua University KEG Lab,” etc.), or any descriptions that may identify Zhipu or any of its affiliates to third parties.
+
+(ii) The names, portraits, images, photos, pictures, identifiers, speeches, or comments (or any part thereof) of any directors, supervisors, managers, employees, or partners, scientists of Zhipu or any of its affiliates.
+
+(iii) Or any names, trademarks, identifiers, text, words, symbols, or any combination thereof similar to the foregoing in any language;
+
+Directly or indirectly declare that any products or services provided by you or any of your affiliates have been recognized or supported by Zhipu or any of its affiliates. In particular, without the prior written/email consent of Zhipu, you shall not promote or disclose to any third party the publicity/advertising/influence strategies and content related to Zhipu, nor directly or indirectly seek and/or solicit any investment and/or cooperation opportunities using the brand of Zhipu or its related parties.
+
+11.2 The text generation algorithm filing information provided by Zhipu to you is as follows: Algorithm name: Zhipu Interactive Content Generation Algorithm; Filing number: Cybersecurity Filing 110108105858001230027.
+
+11.3 Zhipu has the right to send legally effective notices to the phone number, email address, etc. you left when registering, and such notices are deemed to have been delivered on the date of sending.
+
+11.4 Unless otherwise provided by law, the failure to exercise or delay in exercising any right under this Agreement shall not constitute a waiver of such right; the exercise of any right shall not preclude the exercise of any other rights.
+
+11.5 If any provision of this Agreement is wholly or partially invalid or unenforceable for any reason, the remaining provisions of this Agreement shall remain valid and binding.
+
+11.6 Without the prior written consent of Zhipu, you shall not assign or transfer this Agreement or any of your rights and obligations under this Agreement. Any assignment or transfer in violation of this clause is invalid.
