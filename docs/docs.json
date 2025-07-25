@@ -1,0 +1,85 @@
+{
+    "$schema": "https://mintlify.com/docs.json",
+    "theme": "maple",
+    "name": "Bud Runtime Docs",
+    "colors": {
+      "primary": "#965CDE",
+      "light": "#965CDE",
+      "dark": "#965CDE"
+    },
+    "favicon": "/images/favicon.ico",
+    "navigation": {
+      "tabs": [
+        {
+          "tab": "Guides",
+          "groups": [
+            {
+              "group": "Get Started",
+              "icon": "book-open",
+              "pages": [
+                "getstarted/quickstart",
+                "getstarted/installation"
+              ]
+            },
+            {
+              "group": "Features",
+              "pages": [
+                "features/gateway",
+                "features/multi-lora-support",
+                "features/images",
+                "features/settings",
+                "features/navigation",
+                "features/reusable-snippets"
+              ]
+            },
+            {
+              "group": "OpenAI-Compatible API",
+              "pages": [
+                "openai-api/chat",
+                "openai-api/embedding",
+                "openai-api/audio",
+                "openai-api/images",
+                "openai-api/batch",
+                "openai-api/realtime",
+                "openai-api/responses"
+              ]
+            },
+            {
+              "group": "Development",
+              "icon": "code",
+              "pages": [
+                "development/guidelines",
+                "development/architecture"
+              ]
+            }
+          ]
+        }
+      ],
+      "global": {
+        "anchors": [
+          
+          {
+            "anchor": "Blog",
+            "href": "https://bud.studio/content/blog",
+            "icon": "newspaper"
+          }
+        ]
+      }
+    },
+    "logo": "/images/bud-icon.png",
+    "navbar": {
+      "links": [
+        {
+          "label": "Support",
+          "href": "mailto:contact@bud.studio"
+        }
+      ]
+    },
+    "footer": {
+      "socials": {
+        "x": "https://x.com/BudEcosystem",
+        "github": "https://github.com/BudEcosystem/bud-runtime",
+        "linkedin": "https://www.linkedin.com/company/bud-ecosystem"
+      }
+    }
+  }

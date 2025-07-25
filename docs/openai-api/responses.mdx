@@ -1,0 +1,664 @@
+---
+title: "Responses API"
+description: "Advanced conversational AI interface with multi-turn support, parallel tool calling, and multimodal interactions."
+---
+
+## Overview
+
+The Responses API provides a next-generation interface for complex AI interactions, supporting:
+- Multi-turn conversations with context preservation
+- Parallel tool/function calling
+- Multimodal inputs (text, image, audio)
+- Reasoning model capabilities
+- Streaming responses
+
+## Endpoints
+
+```
+POST   /v1/responses
+GET    /v1/responses/{response_id}
+DELETE /v1/responses/{response_id}
+POST   /v1/responses/{response_id}/cancel
+GET    /v1/responses/{response_id}/input_items
+```
+
+## Authentication
+
+```
+Authorization: Bearer <API_KEY>
+```
+
+## Create Response
+
+Generate AI responses with advanced conversational features.
+
+### Request Format
+
+**Endpoint:** `POST /v1/responses`
+
+**Headers:**
+- `Authorization: Bearer YOUR_API_KEY` (required)
+- `Content-Type: application/json` (required)
+
+**Request Body:**
+
+```json
+{
+  "model": "gpt-4o",
+  "input": "Explain quantum computing",
+  "previous_response_id": "resp_abc123",
+  "instructions": "You are a helpful physics tutor",
+  "modalities": ["text"],
+  "reasoning": true,
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "calculate_quantum_state",
+        "description": "Calculate quantum state probabilities",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "qubits": {"type": "integer"},
+            "state": {"type": "string"}
+          },
+          "required": ["qubits", "state"]
+        }
+      }
+    }
+  ],
+  "tool_choice": "auto",
+  "temperature": 0.7,
+  "max_tokens": 1500,
+  "stream": false,
+  "metadata": {
+    "user_id": "user123",
+    "session": "quantum_tutorial"
+  }
+}
+```
+
+### Parameters
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `model` | string | Yes | Model identifier |
+| `input` | string/array | Yes | Text or multimodal content |
+| `previous_response_id` | string | No | ID for conversation continuity |
+| `instructions` | string | No | System instructions |
+| `modalities` | array | No | Output types: `["text"]`, `["text", "audio"]` |
+| `reasoning` | boolean | No | Enable reasoning/thinking mode |
+| `tools` | array | No | Available functions/tools |
+| `tool_choice` | string/object | No | Tool selection: `auto`, `none`, `required` |
+| `temperature` | float | No | Sampling temperature (0.0 to 2.0) |
+| `max_tokens` | integer | No | Maximum output tokens |
+| `stream` | boolean | No | Enable streaming response |
+| `metadata` | object | No | Custom metadata |
+
+### Multimodal Input Format
+
+```json
+{
+  "input": [
+    {
+      "type": "text",
+      "text": "What's in this image?"
+    },
+    {
+      "type": "image_url",
+      "image_url": {
+        "url": "data:image/jpeg;base64,..."
+      }
+    }
+  ]
+}
+```
+
+### Response Format
+
+```json
+{
+  "id": "resp_abc123",
+  "object": "response",
+  "created": 1699123456,
+  "model": "gpt-4o",
+  "status": "completed",
+  "output": {
+    "type": "message",
+    "role": "assistant",
+    "content": "Quantum computing uses quantum mechanical phenomena...",
+    "tool_calls": []
+  },
+  "reasoning_content": "To explain quantum computing, I should start with...",
+  "usage": {
+    "prompt_tokens": 25,
+    "completion_tokens": 150,
+    "total_tokens": 175
+  },
+  "metadata": {
+    "user_id": "user123",
+    "session": "quantum_tutorial"
+  }
+}
+```
+
+### Streaming Response Format
+
+When `stream: true`, returns Server-Sent Events:
+
+```
+data: {"id":"resp_abc123","object":"response.chunk","delta":{"content":"Quantum"}}
+
+data: {"id":"resp_abc123","object":"response.chunk","delta":{"content":" computing"}}
+
+data: {"id":"resp_abc123","object":"response.chunk","delta":{"tool_calls":[{"id":"call_123","function":{"name":"calculate_quantum_state","arguments":"{\"qub"}}]}}
+
+data: {"id":"resp_abc123","object":"response.done","usage":{"prompt_tokens":25,"completion_tokens":150,"total_tokens":175}}
+
+data: [DONE]
+```
+
+## Retrieve Response
+
+Get details of a specific response.
+
+**Endpoint:** `GET /v1/responses/{response_id}`
+
+### Response Format
+
+Returns the same format as the create response endpoint.
+
+## Delete Response
+
+Remove a response from the system.
+
+**Endpoint:** `DELETE /v1/responses/{response_id}`
+
+### Response Format
+
+```json
+{
+  "id": "resp_abc123",
+  "object": "response",
+  "deleted": true
+}
+```
+
+## Cancel Response
+
+Cancel an in-progress response generation.
+
+**Endpoint:** `POST /v1/responses/{response_id}/cancel`
+
+### Response Format
+
+```json
+{
+  "id": "resp_abc123",
+  "object": "response",
+  "status": "cancelled",
+  "cancelled_at": 1699123456
+}
+```
+
+## List Input Items
+
+Retrieve the input conversation history for a response.
+
+**Endpoint:** `GET /v1/responses/{response_id}/input_items`
+
+### Response Format
+
+```json
+{
+  "object": "list",
+  "data": [
+    {
+      "type": "message",
+      "role": "system",
+      "content": "You are a helpful physics tutor"
+    },
+    {
+      "type": "message",
+      "role": "user",
+      "content": "Explain quantum computing"
+    },
+    {
+      "type": "message",
+      "role": "assistant",
+      "content": "I'd be happy to explain quantum computing..."
+    }
+  ]
+}
+```
+
+## Usage Examples
+
+### Basic Response
+
+```bash
+curl -X POST http://localhost:3000/v1/responses \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4o",
+    "input": "What is machine learning?"
+  }'
+```
+
+### Multi-turn Conversation
+
+```bash
+# First response
+RESPONSE_ID=$(curl -X POST http://localhost:3000/v1/responses \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4o",
+    "input": "Explain neural networks"
+  }' | jq -r '.id')
+
+# Follow-up response
+curl -X POST http://localhost:3000/v1/responses \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4o",
+    "input": "How do they differ from traditional algorithms?",
+    "previous_response_id": "'$RESPONSE_ID'"
+  }'
+```
+
+### With Tool Calling
+
+```bash
+curl -X POST http://localhost:3000/v1/responses \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4o",
+    "input": "Calculate the fibonacci sequence up to 10",
+    "tools": [
+      {
+        "type": "function",
+        "function": {
+          "name": "calculate_fibonacci",
+          "description": "Calculate fibonacci numbers",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "n": {"type": "integer", "description": "Number of terms"}
+            },
+            "required": ["n"]
+          }
+        }
+      }
+    ]
+  }'
+```
+
+### Python Example
+
+```python
+import requests
+import json
+
+class ResponsesAPI:
+    def __init__(self, api_key, base_url="http://localhost:3000"):
+        self.api_key = api_key
+        self.base_url = base_url
+        self.headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+    
+    def create_response(self, model, input_text, **kwargs):
+        data = {
+            "model": model,
+            "input": input_text,
+            **kwargs
+        }
+        
+        response = requests.post(
+            f"{self.base_url}/v1/responses",
+            headers=self.headers,
+            json=data
+        )
+        return response.json()
+    
+    def create_conversation(self, model, messages):
+        """Create a multi-turn conversation"""
+        response_id = None
+        responses = []
+        
+        for message in messages:
+            data = {
+                "model": model,
+                "input": message
+            }
+            
+            if response_id:
+                data["previous_response_id"] = response_id
+            
+            response = self.create_response(model, message, 
+                                          previous_response_id=response_id)
+            responses.append(response)
+            response_id = response["id"]
+        
+        return responses
+    
+    def stream_response(self, model, input_text, **kwargs):
+        """Stream response with SSE"""
+        data = {
+            "model": model,
+            "input": input_text,
+            "stream": True,
+            **kwargs
+        }
+        
+        response = requests.post(
+            f"{self.base_url}/v1/responses",
+            headers=self.headers,
+            json=data,
+            stream=True
+        )
+        
+        for line in response.iter_lines():
+            if line:
+                line = line.decode('utf-8')
+                if line.startswith('data: '):
+                    data = line[6:]
+                    if data == '[DONE]':
+                        break
+                    yield json.loads(data)
+
+# Usage
+api = ResponsesAPI("YOUR_API_KEY")
+
+# Simple response
+response = api.create_response(
+    "gpt-4o",
+    "Explain the theory of relativity",
+    temperature=0.7
+)
+print(response["output"]["content"])
+
+# Multi-turn conversation
+conversation = api.create_conversation(
+    "gpt-4o",
+    [
+        "What is artificial intelligence?",
+        "How does it relate to machine learning?",
+        "What are some practical applications?"
+    ]
+)
+
+# Streaming response
+for chunk in api.stream_response("gpt-4o", "Write a short story"):
+    if "delta" in chunk and "content" in chunk["delta"]:
+        print(chunk["delta"]["content"], end="", flush=True)
+
+# Multimodal input
+with open("image.jpg", "rb") as f:
+    import base64
+    image_data = base64.b64encode(f.read()).decode()
+    
+    response = api.create_response(
+        "gpt-4o-vision",
+        [
+            {"type": "text", "text": "Describe this image"},
+            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data}"}}
+        ]
+    )
+```
+
+### JavaScript Example
+
+```javascript
+class ResponsesAPI {
+  constructor(apiKey, baseUrl = 'http://localhost:3000') {
+    this.apiKey = apiKey;
+    this.baseUrl = baseUrl;
+  }
+
+  async createResponse(model, input, options = {}) {
+    const response = await fetch(`${this.baseUrl}/v1/responses`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model,
+        input,
+        ...options
+      })
+    });
+
+    return await response.json();
+  }
+
+  async *streamResponse(model, input, options = {}) {
+    const response = await fetch(`${this.baseUrl}/v1/responses`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model,
+        input,
+        stream: true,
+        ...options
+      })
+    });
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6);
+          if (data === '[DONE]') return;
+          yield JSON.parse(data);
+        }
+      }
+    }
+  }
+
+  async createConversation(model, messages) {
+    let responseId = null;
+    const responses = [];
+
+    for (const message of messages) {
+      const response = await this.createResponse(
+        model,
+        message,
+        responseId ? { previous_response_id: responseId } : {}
+      );
+      
+      responses.push(response);
+      responseId = response.id;
+    }
+
+    return responses;
+  }
+}
+
+// Usage
+const api = new ResponsesAPI('YOUR_API_KEY');
+
+// Simple response
+const response = await api.createResponse(
+  'gpt-4o',
+  'What is the meaning of life?',
+  { temperature: 0.9 }
+);
+console.log(response.output.content);
+
+// Streaming response
+for await (const chunk of api.streamResponse('gpt-4o', 'Tell me a joke')) {
+  if (chunk.delta?.content) {
+    process.stdout.write(chunk.delta.content);
+  }
+}
+
+// Tool calling
+const toolResponse = await api.createResponse(
+  'gpt-4o',
+  'What is the weather in Paris?',
+  {
+    tools: [{
+      type: 'function',
+      function: {
+        name: 'get_weather',
+        description: 'Get weather information',
+        parameters: {
+          type: 'object',
+          properties: {
+            location: { type: 'string' }
+          },
+          required: ['location']
+        }
+      }
+    }]
+  }
+);
+
+// Handle tool calls
+if (toolResponse.output.tool_calls?.length > 0) {
+  for (const toolCall of toolResponse.output.tool_calls) {
+    console.log(`Calling ${toolCall.function.name} with:`, 
+                JSON.parse(toolCall.function.arguments));
+  }
+}
+```
+
+## Advanced Features
+
+### Reasoning Models
+
+Enable step-by-step reasoning:
+
+```json
+{
+  "model": "o1-preview",
+  "input": "Solve this complex problem...",
+  "reasoning": true
+}
+```
+
+### Parallel Tool Calling
+
+The API supports calling multiple tools in parallel:
+
+```json
+{
+  "output": {
+    "tool_calls": [
+      {
+        "id": "call_1",
+        "type": "function",
+        "function": {
+          "name": "get_weather",
+          "arguments": "{\"location\": \"Paris\"}"
+        }
+      },
+      {
+        "id": "call_2",
+        "type": "function",
+        "function": {
+          "name": "get_weather",
+          "arguments": "{\"location\": \"London\"}"
+        }
+      }
+    ]
+  }
+}
+```
+
+### Conversation Context
+
+Maintain context across multiple interactions:
+
+```json
+{
+  "model": "gpt-4o",
+  "input": "Continue our discussion",
+  "previous_response_id": "resp_previous",
+  "instructions": "You are a helpful tutor who remembers previous conversations"
+}
+```
+
+## Error Responses
+
+### 400 Bad Request
+
+```json
+{
+  "error": {
+    "message": "Invalid model specified",
+    "type": "invalid_request_error",
+    "code": "invalid_model"
+  }
+}
+```
+
+### 401 Unauthorized
+
+```json
+{
+  "error": {
+    "message": "Invalid API key",
+    "type": "authentication_error",
+    "code": "invalid_api_key"
+  }
+}
+```
+
+### 429 Rate Limit
+
+```json
+{
+  "error": {
+    "message": "Rate limit exceeded",
+    "type": "rate_limit_error",
+    "code": "rate_limit_exceeded",
+    "retry_after": 60
+  }
+}
+```
+
+## Best Practices
+
+- **Conversation Management**: Use `previous_response_id` for coherent multi-turn conversations
+- **Tool Design**: Create focused, single-purpose tools for better reliability
+- **Streaming**: Use streaming for long responses to improve user experience
+- **Error Handling**: Implement robust retry logic for transient failures
+- **Metadata**: Use metadata to track conversations and user sessions
+- **Context Window**: Be mindful of token limits when building long conversations
+- **Parallel Tools**: Leverage parallel tool calling for independent operations
+
+## Limitations
+
+- Some advanced retrieval features may not be fully implemented
+- Response management endpoints have limited functionality
+- Conversation history is maintained only through `previous_response_id` chaining
+- Maximum context window depends on the model used
+
+## Supported providers
+
+<CardGroup cols={2}>
+  <Card title="OpenAI">
+    Next-generation Responses API with full support for advanced conversational features, multi-turn interactions, and parallel tool calling.
+  </Card>
+</CardGroup>
