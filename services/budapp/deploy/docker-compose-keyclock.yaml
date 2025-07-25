@@ -1,0 +1,17 @@
+services:
+    keycloak:
+        image: quay.io/keycloak/keycloak:26.1.4
+        container_name: keycloak
+        environment:
+            - KEYCLOAK_ADMIN=admin
+            - KEYCLOAK_ADMIN_PASSWORD=admin
+            - KC_DB=postgres
+            - KC_DB_URL=jdbc:postgresql://${PSQL_HOST}:${PSQL_PORT}/bud_keyclock
+            - KC_DB_USERNAME=${PSQL_USER}
+            - KC_DB_PASSWORD=${PSQL_PASSWORD}
+        ports:
+            - "8080:8080"
+        command: start-dev
+        restart: unless-stopped
+
+# docker compose -f docker-compose-keyclock.yaml up -d --build

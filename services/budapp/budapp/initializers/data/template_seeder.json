@@ -1,0 +1,2207 @@
+[
+    {
+        "use_case_id": "uc_001",
+        "name": "Question Answering",
+        "description": "Quickly retrieve specific answers to user queries from a given context.",
+        "icon": "icons/template/uc_001.png",
+        "template_type": "question_answering",
+        "avg_context_length": 1000,
+        "avg_sequence_length": 200,
+        "ttft": [
+            1000,
+            2000
+        ],
+        "e2e_latency": [
+            4,
+            6
+        ],
+        "per_session_tokens_per_sec": [
+            5,
+            10
+        ]
+    },
+    {
+        "use_case_id": "uc_002",
+        "name": "Text Summarization",
+        "description": "Condense large input text into brief, concise summaries.",
+        "icon": "icons/template/uc_002.png",
+        "template_type": "text_summarization",
+        "avg_context_length": 15000,
+        "avg_sequence_length": 1000,
+        "ttft": [
+            2000,
+            3000
+        ],
+        "e2e_latency": [
+            10,
+            15
+        ],
+        "per_session_tokens_per_sec": [
+            5,
+            10
+        ]
+    },
+    {
+        "use_case_id": "uc_003",
+        "name": "Chatbot",
+        "description": "Engage users in real-time conversations to provide instant answers and assistance across customer support scenarios.",
+        "icon": "icons/template/uc_003.png",
+        "template_type": "chatbot",
+        "avg_context_length": 2048,
+        "avg_sequence_length": 128,
+        "ttft": [
+            1000,
+            1500
+        ],
+        "e2e_latency": [
+            2,
+            3
+        ],
+        "per_session_tokens_per_sec": [
+            9,
+            17
+        ]
+    },
+    {
+        "use_case_id": "uc_004",
+        "name": "Code Generation",
+        "description": "Automatically generate code snippets based on concise user prompts.",
+        "icon": "icons/template/uc_004.png",
+        "template_type": "code_generation",
+        "avg_context_length": 20000,
+        "avg_sequence_length": 50,
+        "ttft": [
+            1000,
+            2000
+        ],
+        "e2e_latency": [
+            3,
+            4
+        ],
+        "per_session_tokens_per_sec": [
+            17,
+            33
+        ]
+    },
+    {
+        "use_case_id": "uc_005",
+        "name": "Long Document QA",
+        "description": "Answer questions based on long enterprise documents with high accuracy and contextual understanding.",
+        "icon": "icons/template/uc_005.png",
+        "template_type": "long_document_qa",
+        "avg_context_length": 12000,
+        "avg_sequence_length": 300,
+        "ttft": [
+            2000,
+            2000
+        ],
+        "e2e_latency": [
+            8,
+            10
+        ],
+        "per_session_tokens_per_sec": [
+            6,
+            9
+        ]
+    },
+    {
+        "use_case_id": "uc_006",
+        "name": "Conversational Summarization",
+        "description": "Generate concise summaries of customer conversations to streamline support workflows and reduce review time.",
+        "icon": "icons/template/uc_006.png",
+        "template_type": "conversational_summarization",
+        "avg_context_length": 5000,
+        "avg_sequence_length": 250,
+        "ttft": [
+            1000,
+            1000
+        ],
+        "e2e_latency": [
+            4,
+            5
+        ],
+        "per_session_tokens_per_sec": [
+            10,
+            19
+        ]
+    },
+    {
+        "use_case_id": "uc_007",
+        "name": "Interactive Code Assistant",
+        "description": "Assist developers with real-time coding help, offering suggestions, explanations, and code completions in an interactive workflow.",
+        "icon": "icons/template/uc_007.png",
+        "template_type": "interactive_code_assistant",
+        "avg_context_length": 8000,
+        "avg_sequence_length": 150,
+        "ttft": [
+            1000,
+            1500
+        ],
+        "e2e_latency": [
+            3,
+            4
+        ],
+        "per_session_tokens_per_sec": [
+            25,
+            38
+        ]
+    },
+    {
+        "use_case_id": "uc_008",
+        "name": "Contextual Chatbot",
+        "description": "Engage users in meaningful conversations with memory of prior exchanges, enabling context-aware and coherent responses.",
+        "icon": "icons/template/uc_008.png",
+        "template_type": "contextual_chatbot",
+        "avg_context_length": 4000,
+        "avg_sequence_length": 200,
+        "ttft": [
+            1000,
+            1500
+        ],
+        "e2e_latency": [
+            2,
+            3
+        ],
+        "per_session_tokens_per_sec": [
+            9,
+            18
+        ]
+    },
+    {
+        "use_case_id": "uc_009",
+        "name": "Code Documentation",
+        "description": "Generate clear and concise documentation from source code to improve readability and maintainability.",
+        "icon": "icons/template/uc_009.png",
+        "template_type": "code_documentation",
+        "avg_context_length": 10000,
+        "avg_sequence_length": 500,
+        "ttft": [
+            2000,
+            3000
+        ],
+        "e2e_latency": [
+            8,
+            10
+        ],
+        "per_session_tokens_per_sec": [
+            18,
+            29
+        ]
+    },
+    {
+        "use_case_id": "uc_010",
+        "name": "Meeting Minutes",
+        "description": "Summarize long meeting transcripts into structured and actionable minutes for enterprise teams.",
+        "icon": "icons/template/uc_010.png",
+        "template_type": "meeting_minutes",
+        "avg_context_length": 15000,
+        "avg_sequence_length": 750,
+        "ttft": [
+            2000,
+            2000
+        ],
+        "e2e_latency": [
+            10,
+            15
+        ],
+        "per_session_tokens_per_sec": [
+            10,
+            10
+        ]
+    },
+    {
+        "use_case_id": "uc_011",
+        "name": "Retrieval Augmented Generation",
+        "description": "Enhance generated outputs with external knowledge retrieval.",
+        "icon": "icons/template/uc_011.png",
+        "template_type": "retrieval_augmented_generation",
+        "avg_context_length": 16000,
+        "avg_sequence_length": 350,
+        "ttft": [
+            2000,
+            2000
+        ],
+        "e2e_latency": [
+            10,
+            12
+        ],
+        "per_session_tokens_per_sec": [
+            6,
+            9
+        ]
+    },
+    {
+        "use_case_id": "uc_012",
+        "name": "Agentic Task Execution",
+        "description": "Autonomously plan and execute multi-step tasks based on user goals using intelligent agent behavior.",
+        "icon": "icons/template/uc_012.png",
+        "template_type": "agentic_task_execution",
+        "avg_context_length": 6000,
+        "avg_sequence_length": 400,
+        "ttft": [
+            1500,
+            1500
+        ],
+        "e2e_latency": [
+            5,
+            6
+        ],
+        "per_session_tokens_per_sec": [
+            10,
+            19
+        ]
+    },
+    {
+        "use_case_id": "usecase_013",
+        "name": "Patient note summarization",
+        "description": "Summarizes detailed patient notes into concise summaries. Uses a single request with beam search to generate outputs between 50 and 128 tokens, with a TTFT of 1-2 seconds and an overall latency of 4-5 seconds.",
+        "icon": "icons/template/usecase_013.png",
+        "template_type": "patient_note_summarization",
+        "avg_context_length": 1000,
+        "avg_sequence_length": 89,
+        "ttft": [
+            1000,
+            2000
+        ],
+        "e2e_latency": [
+            4,
+            5
+        ],
+        "per_session_tokens_per_sec": [
+            4,
+            5
+        ]
+    },
+    {
+        "use_case_id": "usecase_014",
+        "name": "Medical Q&A chatbot (symptoms)",
+        "description": "Provides quick, accurate answers for patient symptom queries. The system processes short queries with outputs between 50 and 100 tokens, ensuring a rapid TTFT of 0.5\u20132 seconds and overall latency within 1-3 seconds.",
+        "icon": "icons/template/usecase_014.png",
+        "template_type": "medical_q_a_chatbot_symptoms",
+        "avg_context_length": 125,
+        "avg_sequence_length": 75,
+        "ttft": [
+            500,
+            2000
+        ],
+        "e2e_latency": [
+            1,
+            3
+        ],
+        "per_session_tokens_per_sec": [
+            7,
+            18
+        ]
+    },
+    {
+        "use_case_id": "usecase_015",
+        "name": "Radiology report generation",
+        "description": "Generates detailed radiology reports based on input findings. With a beam size of 4, it produces reports between 100-200 tokens after an initial delay of 1-2 seconds and a total latency of 5-8 seconds.",
+        "icon": "icons/template/usecase_015.png",
+        "template_type": "radiology_report_generation",
+        "avg_context_length": 300,
+        "avg_sequence_length": 150,
+        "ttft": [
+            1000,
+            2000
+        ],
+        "e2e_latency": [
+            5,
+            8
+        ],
+        "per_session_tokens_per_sec": [
+            5,
+            10
+        ]
+    },
+    {
+        "use_case_id": "usecase_016",
+        "name": "Discharge instructions writer",
+        "description": "Creates clear and patient-friendly discharge instructions from medical visit summaries. It operates with fixed input and output sizes and maintains a quick response time with TTFT of 1 second and end-to-end latency between 2 and 4 seconds.",
+        "icon": "icons/template/usecase_016.png",
+        "template_type": "discharge_instructions_writer",
+        "avg_context_length": 200,
+        "avg_sequence_length": 150,
+        "ttft": [
+            1000,
+            1000
+        ],
+        "e2e_latency": [
+            2,
+            4
+        ],
+        "per_session_tokens_per_sec": [
+            9,
+            18
+        ]
+    },
+    {
+        "use_case_id": "usecase_017",
+        "name": "Medical research summarizer",
+        "description": "Aggregates and summarizes multiple medical research papers into a concise overview. Processes long inputs (2000 tokens) with beam search and delivers summaries of 300 tokens with a TTFT of 2-3 seconds and total latency up to 15 seconds.",
+        "icon": "icons/template/usecase_017.png",
+        "template_type": "medical_research_summarizer",
+        "avg_context_length": 2000,
+        "avg_sequence_length": 300,
+        "ttft": [
+            2000,
+            3000
+        ],
+        "e2e_latency": [
+            10,
+            15
+        ],
+        "per_session_tokens_per_sec": [
+            3,
+            3
+        ]
+    },
+    {
+        "use_case_id": "usecase_018",
+        "name": "Medical coding assistant",
+        "description": "Assists in assigning billing and diagnostic codes from patient notes. It operates with very short outputs (5-10 tokens) and is optimized for near-instantaneous responses.",
+        "icon": "icons/template/usecase_018.png",
+        "template_type": "medical_coding_assistant",
+        "avg_context_length": 100,
+        "avg_sequence_length": 8,
+        "ttft": [
+            500,
+            500
+        ],
+        "e2e_latency": [
+            1,
+            1
+        ],
+        "per_session_tokens_per_sec": [
+            10,
+            20
+        ]
+    },
+    {
+        "use_case_id": "usecase_019",
+        "name": "Mental health support chatbot",
+        "description": "Provides empathetic conversational support for mental health. Designed for interactive sessions with short inputs and outputs, ensuring responses within 1-3 seconds for a smooth user experience.",
+        "icon": "icons/template/usecase_019.png",
+        "template_type": "mental_health_support_chatbot",
+        "avg_context_length": 75,
+        "avg_sequence_length": 75,
+        "ttft": [
+            1000,
+            1000
+        ],
+        "e2e_latency": [
+            2,
+            3
+        ],
+        "per_session_tokens_per_sec": [
+            14,
+            17
+        ]
+    },
+    {
+        "use_case_id": "usecase_020",
+        "name": "Clinical trial protocol generator",
+        "description": "Generates draft protocols for clinical trials based on specific requirements. Uses beam search to produce comprehensive 300-token protocols with a consistent TTFT of 2 seconds and an overall latency of 8-10 seconds.",
+        "icon": "icons/template/usecase_020.png",
+        "template_type": "clinical_trial_protocol_generator",
+        "avg_context_length": 500,
+        "avg_sequence_length": 300,
+        "ttft": [
+            2000,
+            2000
+        ],
+        "e2e_latency": [
+            8,
+            10
+        ],
+        "per_session_tokens_per_sec": [
+            38,
+            38
+        ]
+    },
+    {
+        "use_case_id": "usecase_021",
+        "name": "Financial report summarization",
+        "description": "Summarizes lengthy financial reports such as 10-K filings into key highlights. Processes large inputs (3000 tokens) with a beam search of 4 and generates 150-token summaries within 6-8 seconds.",
+        "icon": "icons/template/usecase_021.png",
+        "template_type": "financial_report_summarization",
+        "avg_context_length": 3000,
+        "avg_sequence_length": 150,
+        "ttft": [
+            2000,
+            2000
+        ],
+        "e2e_latency": [
+            6,
+            8
+        ],
+        "per_session_tokens_per_sec": [
+            5,
+            5
+        ]
+    },
+    {
+        "use_case_id": "usecase_022",
+        "name": "Earnings call Q&A assistant",
+        "description": "Assists analysts during earnings calls by providing concise answers from long transcripts. Maintains a consistent TTFT of about 1 second and an overall response time within 2-3 seconds.",
+        "icon": "icons/template/usecase_022.png",
+        "template_type": "earnings_call_q_a_assistant",
+        "avg_context_length": 1000,
+        "avg_sequence_length": 75,
+        "ttft": [
+            1000,
+            1000
+        ],
+        "e2e_latency": [
+            2,
+            3
+        ],
+        "per_session_tokens_per_sec": [
+            8,
+            9
+        ]
+    },
+    {
+        "use_case_id": "usecase_023",
+        "name": "Portfolio analysis generator",
+        "description": "Generates an analytical report based on portfolio statistics. Uses moderate input and output sizes with a quick turnaround of 1 second for TTFT and 4-5 seconds total latency.",
+        "icon": "icons/template/usecase_023.png",
+        "template_type": "portfolio_analysis_generator",
+        "avg_context_length": 200,
+        "avg_sequence_length": 200,
+        "ttft": [
+            1000,
+            1000
+        ],
+        "e2e_latency": [
+            4,
+            5
+        ],
+        "per_session_tokens_per_sec": [
+            40,
+            40
+        ]
+    },
+    {
+        "use_case_id": "usecase_024",
+        "name": "Financial advisor chatbot",
+        "description": "Provides personalized financial advice based on user queries. With a single-batch interactive setting, it delivers responses of 100 tokens within 2-3 seconds.",
+        "icon": "icons/template/usecase_024.png",
+        "template_type": "financial_advisor_chatbot",
+        "avg_context_length": 75,
+        "avg_sequence_length": 100,
+        "ttft": [
+            1000,
+            1000
+        ],
+        "e2e_latency": [
+            2,
+            3
+        ],
+        "per_session_tokens_per_sec": [
+            17,
+            17
+        ]
+    },
+    {
+        "use_case_id": "usecase_025",
+        "name": "Insurance claim summarizer",
+        "description": "Summarizes insurance claims to highlight key details for processing. Uses beam search with fixed input and output sizes to deliver results within 4-6 seconds.",
+        "icon": "icons/template/usecase_025.png",
+        "template_type": "insurance_claim_summarizer",
+        "avg_context_length": 800,
+        "avg_sequence_length": 100,
+        "ttft": [
+            1000,
+            2000
+        ],
+        "e2e_latency": [
+            4,
+            6
+        ],
+        "per_session_tokens_per_sec": [
+            5,
+            9
+        ]
+    },
+    {
+        "use_case_id": "usecase_026",
+        "name": "Regulatory compliance analyzer",
+        "description": "Analyzes lengthy regulatory texts to produce concise compliance reports. It processes 2000-token inputs and generates 200-token outputs with a TTFT of 2-3 seconds and total latency fixed at 10 seconds.",
+        "icon": "icons/template/usecase_026.png",
+        "template_type": "regulatory_compliance_analyzer",
+        "avg_context_length": 2000,
+        "avg_sequence_length": 200,
+        "ttft": [
+            2000,
+            3000
+        ],
+        "e2e_latency": [
+            10,
+            10
+        ],
+        "per_session_tokens_per_sec": [
+            4,
+            4
+        ]
+    },
+    {
+        "use_case_id": "usecase_027",
+        "name": "E-commerce FAQ chatbot",
+        "description": "Handles common customer questions on e-commerce platforms. This interactive use case is designed for short exchanges with low latency for a smooth user experience.",
+        "icon": "icons/template/usecase_027.png",
+        "template_type": "e_commerce_faq_chatbot",
+        "avg_context_length": 35,
+        "avg_sequence_length": 35,
+        "ttft": [
+            500,
+            1000
+        ],
+        "e2e_latency": [
+            1,
+            2
+        ],
+        "per_session_tokens_per_sec": [
+            10,
+            17
+        ]
+    },
+    {
+        "use_case_id": "usecase_028",
+        "name": "IT helpdesk assistant",
+        "description": "Assists with IT troubleshooting by generating troubleshooting steps from short problem descriptions. Provides responses within 3-4 seconds to aid fast resolution.",
+        "icon": "icons/template/usecase_028.png",
+        "template_type": "it_helpdesk_assistant",
+        "avg_context_length": 50,
+        "avg_sequence_length": 75,
+        "ttft": [
+            1000,
+            1000
+        ],
+        "e2e_latency": [
+            3,
+            4
+        ],
+        "per_session_tokens_per_sec": [
+            8,
+            17
+        ]
+    },
+    {
+        "use_case_id": "usecase_029",
+        "name": "Travel booking agent",
+        "description": "Facilitates travel bookings by processing customer requests and generating itinerary options. Maintains interactive response times between 3 and 5 seconds.",
+        "icon": "icons/template/usecase_029.png",
+        "template_type": "travel_booking_agent",
+        "avg_context_length": 75,
+        "avg_sequence_length": 100,
+        "ttft": [
+            1000,
+            1000
+        ],
+        "e2e_latency": [
+            3,
+            5
+        ],
+        "per_session_tokens_per_sec": [
+            17,
+            17
+        ]
+    },
+    {
+        "use_case_id": "usecase_030",
+        "name": "Banking customer bot",
+        "description": "Handles banking queries by providing quick and secure responses. Operates with a fixed input size and delivers answers within 2 seconds.",
+        "icon": "icons/template/usecase_030.png",
+        "template_type": "banking_customer_bot",
+        "avg_context_length": 30,
+        "avg_sequence_length": 45,
+        "ttft": [
+            500,
+            1000
+        ],
+        "e2e_latency": [
+            2,
+            2
+        ],
+        "per_session_tokens_per_sec": [
+            12,
+            17
+        ]
+    },
+    {
+        "use_case_id": "usecase_031",
+        "name": "Multi-lingual support",
+        "description": "Provides support in multiple languages by processing and responding to queries in the user's language. Maintains a consistent response time across languages.",
+        "icon": "icons/template/usecase_031.png",
+        "template_type": "multi_lingual_support",
+        "avg_context_length": 50,
+        "avg_sequence_length": 50,
+        "ttft": [
+            1000,
+            1000
+        ],
+        "e2e_latency": [
+            2,
+            3
+        ],
+        "per_session_tokens_per_sec": [
+            8,
+            14
+        ]
+    },
+    {
+        "use_case_id": "usecase_032",
+        "name": "Agent assist (draft reply)",
+        "description": "Assists customer support agents by drafting replies for emails or chat messages. It provides a full draft reply in 2-4 seconds, enabling faster customer interactions.",
+        "icon": "icons/template/usecase_032.png",
+        "template_type": "agent_assist_draft_reply",
+        "avg_context_length": 100,
+        "avg_sequence_length": 100,
+        "ttft": [
+            1000,
+            1000
+        ],
+        "e2e_latency": [
+            2,
+            4
+        ],
+        "per_session_tokens_per_sec": [
+            9,
+            17
+        ]
+    },
+    {
+        "use_case_id": "usecase_034",
+        "name": "NPC dialogue generation (text)",
+        "description": "Generates text-based dialogue for non-player characters (NPCs) in games. The system quickly produces engaging responses to maintain real-time interaction with players.",
+        "icon": "icons/template/usecase_034.png",
+        "template_type": "npc_dialogue_generation_text",
+        "avg_context_length": 20,
+        "avg_sequence_length": 45,
+        "ttft": [
+            500,
+            1000
+        ],
+        "e2e_latency": [
+            2,
+            2
+        ],
+        "per_session_tokens_per_sec": [
+            12,
+            17
+        ]
+    },
+    {
+        "use_case_id": "usecase_035",
+        "name": "NPC dialogue (voice pipeline)",
+        "description": "Converts spoken player input into text, generates NPC dialogue, and converts it back to speech. Designed to keep the conversation natural with an overall response under 2 seconds.",
+        "icon": "icons/template/usecase_035.png",
+        "template_type": "npc_dialogue_voice_pipeline",
+        "avg_context_length": 20,
+        "avg_sequence_length": 30,
+        "ttft": [
+            1500,
+            1500
+        ],
+        "e2e_latency": [
+            2,
+            2
+        ],
+        "per_session_tokens_per_sec": [
+            7,
+            7
+        ]
+    },
+    {
+        "use_case_id": "usecase_036",
+        "name": "Dynamic quest generation",
+        "description": "Generates dynamic quests and storyline content in games using beam search to provide creative and engaging quest narratives with a fixed latency.",
+        "icon": "icons/template/usecase_036.png",
+        "template_type": "dynamic_quest_generation",
+        "avg_context_length": 100,
+        "avg_sequence_length": 200,
+        "ttft": [
+            1000,
+            2000
+        ],
+        "e2e_latency": [
+            6,
+            6
+        ],
+        "per_session_tokens_per_sec": [
+            29,
+            33
+        ]
+    },
+    {
+        "use_case_id": "usecase_037",
+        "name": "Procedural lore/item generation",
+        "description": "Produces descriptions and lore for in-game items or backstories. This use case focuses on creative text generation with a quick turnaround for immersive gameplay.",
+        "icon": "icons/template/usecase_037.png",
+        "template_type": "procedural_lore_item_generation",
+        "avg_context_length": 50,
+        "avg_sequence_length": 75,
+        "ttft": [
+            500,
+            1000
+        ],
+        "e2e_latency": [
+            2,
+            3
+        ],
+        "per_session_tokens_per_sec": [
+            14,
+            18
+        ]
+    },
+    {
+        "use_case_id": "usecase_038",
+        "name": "Character backstory creation",
+        "description": "Develops detailed backstories for game characters by expanding on initial profiles. Uses beam search to ensure creative diversity and coherence with moderate latency.",
+        "icon": "icons/template/usecase_038.png",
+        "template_type": "character_backstory_creation",
+        "avg_context_length": 100,
+        "avg_sequence_length": 200,
+        "ttft": [
+            1000,
+            2000
+        ],
+        "e2e_latency": [
+            5,
+            6
+        ],
+        "per_session_tokens_per_sec": [
+            25,
+            29
+        ]
+    },
+    {
+        "use_case_id": "usecase_039",
+        "name": "Game level description gen.",
+        "description": "Generates descriptive narratives for game levels based on parameters. Provides a clear, concise level description with a low inter-token delay for smooth integration.",
+        "icon": "icons/template/usecase_039.png",
+        "template_type": "game_level_description_gen",
+        "avg_context_length": 200,
+        "avg_sequence_length": 150,
+        "ttft": [
+            1000,
+            1000
+        ],
+        "e2e_latency": [
+            3,
+            4
+        ],
+        "per_session_tokens_per_sec": [
+            13,
+            13
+        ]
+    },
+    {
+        "use_case_id": "usecase_040",
+        "name": "Tutor Q&A (homework help)",
+        "description": "Acts as a homework helper by answering student questions with detailed explanations. Delivers answers interactively with a total response time of around 3 seconds.",
+        "icon": "icons/template/usecase_040.png",
+        "template_type": "tutor_q_a_homework_help",
+        "avg_context_length": 50,
+        "avg_sequence_length": 100,
+        "ttft": [
+            1000,
+            1000
+        ],
+        "e2e_latency": [
+            3,
+            3
+        ],
+        "per_session_tokens_per_sec": [
+            9,
+            17
+        ]
+    },
+    {
+        "use_case_id": "usecase_041",
+        "name": "Lesson plan generation",
+        "description": "Generates detailed lesson plans from a given topic and requirements. Utilizes beam search for creative diversity while keeping the process within 6-8 seconds.",
+        "icon": "icons/template/usecase_041.png",
+        "template_type": "lesson_plan_generation",
+        "avg_context_length": 200,
+        "avg_sequence_length": 300,
+        "ttft": [
+            2000,
+            2000
+        ],
+        "e2e_latency": [
+            6,
+            8
+        ],
+        "per_session_tokens_per_sec": [
+            38,
+            38
+        ]
+    },
+    {
+        "use_case_id": "usecase_042",
+        "name": "Quiz question generation",
+        "description": "Automatically generates quiz questions from lesson content. Typically outputs one or two short questions with a rapid response time for high-volume educational settings.",
+        "icon": "icons/template/usecase_042.png",
+        "template_type": "quiz_question_generation",
+        "avg_context_length": 100,
+        "avg_sequence_length": 2,
+        "ttft": [
+            500,
+            1000
+        ],
+        "e2e_latency": [
+            1,
+            2
+        ],
+        "per_session_tokens_per_sec": [
+            1,
+            3
+        ]
+    },
+    {
+        "use_case_id": "usecase_043",
+        "name": "Essay feedback generator",
+        "description": "Provides constructive feedback on student essays by summarizing strengths and areas for improvement. Optimized for essays around 500 tokens with feedback in about 4-5 seconds.",
+        "icon": "icons/template/usecase_043.png",
+        "template_type": "essay_feedback_generator",
+        "avg_context_length": 500,
+        "avg_sequence_length": 100,
+        "ttft": [
+            1000,
+            2000
+        ],
+        "e2e_latency": [
+            4,
+            5
+        ],
+        "per_session_tokens_per_sec": [
+            14,
+            25
+        ]
+    },
+    {
+        "use_case_id": "usecase_044",
+        "name": "Language conversation partner",
+        "description": "Acts as an interactive conversation partner for language learners. Processes short inputs and provides replies quickly, supporting real-time language practice.",
+        "icon": "icons/template/usecase_044.png",
+        "template_type": "language_conversation_partner",
+        "avg_context_length": 35,
+        "avg_sequence_length": 35,
+        "ttft": [
+            500,
+            1000
+        ],
+        "e2e_latency": [
+            1,
+            2
+        ],
+        "per_session_tokens_per_sec": [
+            10,
+            17
+        ]
+    },
+    {
+        "use_case_id": "usecase_045",
+        "name": "Code debugging helper (for students)",
+        "description": "Helps students debug code by analyzing snippets and providing corrections or explanations. Maintains interactive speeds with a total response time around 3-4 seconds.",
+        "icon": "icons/template/usecase_045.png",
+        "template_type": "code_debugging_helper_for_students",
+        "avg_context_length": 100,
+        "avg_sequence_length": 100,
+        "ttft": [
+            1000,
+            1000
+        ],
+        "e2e_latency": [
+            3,
+            4
+        ],
+        "per_session_tokens_per_sec": [
+            17,
+            17
+        ]
+    },
+    {
+        "use_case_id": "usecase_046",
+        "name": "Legal case summarization",
+        "description": "Summarizes long legal case documents into concise overviews. Processes very large inputs (5000 tokens) with a TTFT of 3-5 seconds and an overall latency of 15-20 seconds.",
+        "icon": "icons/template/usecase_046.png",
+        "template_type": "legal_case_summarization",
+        "avg_context_length": 5000,
+        "avg_sequence_length": 300,
+        "ttft": [
+            3000,
+            5000
+        ],
+        "e2e_latency": [
+            15,
+            20
+        ],
+        "per_session_tokens_per_sec": [
+            3,
+            3
+        ]
+    },
+    {
+        "use_case_id": "usecase_047",
+        "name": "Contract clause summarization",
+        "description": "Focuses on extracting and summarizing key clauses from contracts. Delivers concise summaries from a fixed input size of 1000 tokens with a consistent latency.",
+        "icon": "icons/template/usecase_047.png",
+        "template_type": "contract_clause_summarization",
+        "avg_context_length": 1000,
+        "avg_sequence_length": 100,
+        "ttft": [
+            2000,
+            2000
+        ],
+        "e2e_latency": [
+            6,
+            8
+        ],
+        "per_session_tokens_per_sec": [
+            8,
+            8
+        ]
+    },
+    {
+        "use_case_id": "usecase_048",
+        "name": "Contract drafting assistant",
+        "description": "Assists in drafting legal contracts by generating full contract text based on user inputs. The process may take up to 30 seconds for comprehensive outputs.",
+        "icon": "icons/template/usecase_048.png",
+        "template_type": "contract_drafting_assistant",
+        "avg_context_length": 200,
+        "avg_sequence_length": 800,
+        "ttft": [
+            2000,
+            2000
+        ],
+        "e2e_latency": [
+            20,
+            30
+        ],
+        "per_session_tokens_per_sec": [
+            19,
+            31
+        ]
+    },
+    {
+        "use_case_id": "usecase_049",
+        "name": "Legal Q&A (jurisdiction-specific)",
+        "description": "Answers legal questions with a focus on jurisdiction-specific details. Processes moderate-length queries and provides clear answers within 3-4 seconds.",
+        "icon": "icons/template/usecase_049.png",
+        "template_type": "legal_q_a_jurisdiction_specific",
+        "avg_context_length": 100,
+        "avg_sequence_length": 100,
+        "ttft": [
+            1000,
+            1000
+        ],
+        "e2e_latency": [
+            3,
+            4
+        ],
+        "per_session_tokens_per_sec": [
+            17,
+            17
+        ]
+    },
+    {
+        "use_case_id": "usecase_050",
+        "name": "E-discovery summarization",
+        "description": "Processes large volumes of documents for e-discovery by summarizing them into a concise report. Due to the very large input size, latency is higher, typically 20-30 seconds.",
+        "icon": "icons/template/usecase_050.png",
+        "template_type": "e_discovery_summarization",
+        "avg_context_length": 10000,
+        "avg_sequence_length": 200,
+        "ttft": [
+            5000,
+            5000
+        ],
+        "e2e_latency": [
+            20,
+            30
+        ],
+        "per_session_tokens_per_sec": [
+            4,
+            4
+        ]
+    },
+    {
+        "use_case_id": "usecase_051",
+        "name": "Legislation summarizer (for analysts)",
+        "description": "Converts complex legislative texts into accessible summaries for legal analysts. Uses beam search to ensure accuracy while keeping the process within 8-10 seconds.",
+        "icon": "icons/template/usecase_051.png",
+        "template_type": "legislation_summarizer_for_analysts",
+        "avg_context_length": 3000,
+        "avg_sequence_length": 200,
+        "ttft": [
+            2000,
+            2000
+        ],
+        "e2e_latency": [
+            8,
+            10
+        ],
+        "per_session_tokens_per_sec": [
+            9,
+            9
+        ]
+    },
+    {
+        "use_case_id": "usecase_052",
+        "name": "Story/novel writer",
+        "description": "Generates creative story or novel text based on a brief outline. Designed for creative writing with longer outputs and a total latency of 30-40 seconds.",
+        "icon": "icons/template/usecase_052.png",
+        "template_type": "story_novel_writer",
+        "avg_context_length": 100,
+        "avg_sequence_length": 1000,
+        "ttft": [
+            2000,
+            2000
+        ],
+        "e2e_latency": [
+            30,
+            40
+        ],
+        "per_session_tokens_per_sec": [
+            19,
+            31
+        ]
+    },
+    {
+        "use_case_id": "usecase_053",
+        "name": "Screenplay script assist",
+        "description": "Helps screenwriters by generating dialogue and scene descriptions using beam search to maintain style and coherence, with moderate overall latency.",
+        "icon": "icons/template/usecase_053.png",
+        "template_type": "screenplay_script_assist",
+        "avg_context_length": 200,
+        "avg_sequence_length": 300,
+        "ttft": [
+            2000,
+            2000
+        ],
+        "e2e_latency": [
+            10,
+            15
+        ],
+        "per_session_tokens_per_sec": [
+            18,
+            18
+        ]
+    },
+    {
+        "use_case_id": "usecase_054",
+        "name": "Joke/punchline generator",
+        "description": "Generates quick punchlines based on short joke setups. It is optimized for speed, delivering a complete punchline in just 1 second.",
+        "icon": "icons/template/usecase_054.png",
+        "template_type": "joke_punchline_generator",
+        "avg_context_length": 20,
+        "avg_sequence_length": 20,
+        "ttft": [
+            500,
+            500
+        ],
+        "e2e_latency": [
+            1,
+            1
+        ],
+        "per_session_tokens_per_sec": [
+            13,
+            13
+        ]
+    },
+    {
+        "use_case_id": "usecase_055",
+        "name": "Lyric/poetry generation",
+        "description": "Creates song lyrics or poems from a given theme or style prompt. Delivers creative text in about 4-5 seconds with a focus on maintaining artistic quality.",
+        "icon": "icons/template/usecase_055.png",
+        "template_type": "lyric_poetry_generation",
+        "avg_context_length": 50,
+        "avg_sequence_length": 100,
+        "ttft": [
+            1000,
+            1000
+        ],
+        "e2e_latency": [
+            4,
+            5
+        ],
+        "per_session_tokens_per_sec": [
+            17,
+            17
+        ]
+    },
+    {
+        "use_case_id": "usecase_056",
+        "name": "News article generation",
+        "description": "Automatically drafts news articles from bullet-point facts. Balances speed and accuracy to deliver a 400-token article in under 10 seconds.",
+        "icon": "icons/template/usecase_056.png",
+        "template_type": "news_article_generation",
+        "avg_context_length": 100,
+        "avg_sequence_length": 400,
+        "ttft": [
+            1000,
+            2000
+        ],
+        "e2e_latency": [
+            8,
+            10
+        ],
+        "per_session_tokens_per_sec": [
+            40,
+            44
+        ]
+    },
+    {
+        "use_case_id": "usecase_057",
+        "name": "Social media content",
+        "description": "Generates short, engaging social media posts from given topics. With very short inputs and outputs, it achieves near-instantaneous response times.",
+        "icon": "icons/template/usecase_057.png",
+        "template_type": "social_media_content",
+        "avg_context_length": 30,
+        "avg_sequence_length": 30,
+        "ttft": [
+            500,
+            500
+        ],
+        "e2e_latency": [
+            1,
+            2
+        ],
+        "per_session_tokens_per_sec": [
+            27,
+            27
+        ]
+    },
+    {
+        "use_case_id": "usecase_058",
+        "name": "Branding slogan generator",
+        "description": "Creates concise and catchy branding slogans using beam search to explore multiple creative options, all within a 1-second generation window.",
+        "icon": "icons/template/usecase_058.png",
+        "template_type": "branding_slogan_generator",
+        "avg_context_length": 10,
+        "avg_sequence_length": 10,
+        "ttft": [
+            500,
+            500
+        ],
+        "e2e_latency": [
+            1,
+            1
+        ],
+        "per_session_tokens_per_sec": [
+            10,
+            10
+        ]
+    },
+    {
+        "use_case_id": "usecase_059",
+        "name": "Market research summarizer",
+        "description": "Condenses extensive market research data into a concise summary. Processes long inputs with a fixed output length and maintains consistent response times.",
+        "icon": "icons/template/usecase_059.png",
+        "template_type": "market_research_summarizer",
+        "avg_context_length": 1000,
+        "avg_sequence_length": 200,
+        "ttft": [
+            2000,
+            2000
+        ],
+        "e2e_latency": [
+            8,
+            10
+        ],
+        "per_session_tokens_per_sec": [
+            9,
+            9
+        ]
+    },
+    {
+        "use_case_id": "usecase_060",
+        "name": "Research paper summarizer",
+        "description": "Summarizes long academic papers into short, digestible overviews. Designed to handle 5000-token inputs with a TTFT of 4-5 seconds and a total latency of 15-20 seconds.",
+        "icon": "icons/template/usecase_060.png",
+        "template_type": "research_paper_summarizer",
+        "avg_context_length": 5000,
+        "avg_sequence_length": 300,
+        "ttft": [
+            4000,
+            5000
+        ],
+        "e2e_latency": [
+            15,
+            20
+        ],
+        "per_session_tokens_per_sec": [
+            4,
+            4
+        ]
+    },
+    {
+        "use_case_id": "usecase_061",
+        "name": "Technical report generator",
+        "description": "Generates technical reports from summarized data findings. Optimized for consistent 300-token outputs with a moderate latency of 6-8 seconds.",
+        "icon": "icons/template/usecase_061.png",
+        "template_type": "technical_report_generator",
+        "avg_context_length": 300,
+        "avg_sequence_length": 300,
+        "ttft": [
+            1000,
+            2000
+        ],
+        "e2e_latency": [
+            6,
+            8
+        ],
+        "per_session_tokens_per_sec": [
+            21,
+            23
+        ]
+    },
+    {
+        "use_case_id": "usecase_062",
+        "name": "Experiment design suggestion",
+        "description": "Provides suggestions for designing experiments based on a brief research goal description. It quickly produces a 150-token plan with a total response time of 4-5 seconds.",
+        "icon": "icons/template/usecase_062.png",
+        "template_type": "experiment_design_suggestion",
+        "avg_context_length": 100,
+        "avg_sequence_length": 150,
+        "ttft": [
+            1000,
+            1000
+        ],
+        "e2e_latency": [
+            4,
+            5
+        ],
+        "per_session_tokens_per_sec": [
+            27,
+            27
+        ]
+    },
+    {
+        "use_case_id": "usecase_063",
+        "name": "Scientific code generator",
+        "description": "Generates scientific or technical code based on problem descriptions. Focused on short, precise outputs with a consistent 4-second end-to-end latency.",
+        "icon": "icons/template/usecase_063.png",
+        "template_type": "scientific_code_generator",
+        "avg_context_length": 80,
+        "avg_sequence_length": 120,
+        "ttft": [
+            1000,
+            1000
+        ],
+        "e2e_latency": [
+            4,
+            4
+        ],
+        "per_session_tokens_per_sec": [
+            26,
+            26
+        ]
+    },
+    {
+        "use_case_id": "usecase_064",
+        "name": "Data query/analysis assistant",
+        "description": "Acts as an assistant for data queries and analysis tasks, converting simple questions into analytical outputs. Provides answers quickly within 2-3 seconds.",
+        "icon": "icons/template/usecase_064.png",
+        "template_type": "data_query_analysis_assistant",
+        "avg_context_length": 50,
+        "avg_sequence_length": 100,
+        "ttft": [
+            500,
+            1000
+        ],
+        "e2e_latency": [
+            2,
+            3
+        ],
+        "per_session_tokens_per_sec": [
+            17,
+            18
+        ]
+    },
+    {
+        "use_case_id": "usecase_065",
+        "name": "Knowledge base chatbot (R&D)",
+        "description": "Utilizes a knowledge base to answer complex R&D questions. Designed to incorporate retrieved context and provide detailed responses within 5-6 seconds.",
+        "icon": "icons/template/usecase_065.png",
+        "template_type": "knowledge_base_chatbot_r_d",
+        "avg_context_length": 200,
+        "avg_sequence_length": 150,
+        "ttft": [
+            1000,
+            2000
+        ],
+        "e2e_latency": [
+            5,
+            6
+        ],
+        "per_session_tokens_per_sec": [
+            16,
+            18
+        ]
+    },
+    {
+        "use_case_id": "usecase_069",
+        "name": "Voice cloning (TTS)",
+        "description": "Clones a given voice using TTS technology, processing a 100-token script to produce high-fidelity speech within 5-10 seconds.",
+        "icon": "icons/template/usecase_069.png",
+        "template_type": "voice_cloning_tts",
+        "avg_context_length": 100,
+        "avg_sequence_length": 100,
+        "ttft": [
+            200,
+            200
+        ],
+        "e2e_latency": [
+            5,
+            10
+        ],
+        "per_session_tokens_per_sec": [
+            45,
+            45
+        ]
+    },
+    {
+        "use_case_id": "usecase_071",
+        "name": "Code autocompletion (IDE)",
+        "description": "Provides near-instantaneous code autocompletion in an IDE, suggesting 10-50 tokens of code with a very short TTFT and inter-token latency to maintain user productivity.",
+        "icon": "icons/template/usecase_071.png",
+        "template_type": "code_autocompletion_ide",
+        "avg_context_length": 75,
+        "avg_sequence_length": 30,
+        "ttft": [
+            300,
+            500
+        ],
+        "e2e_latency": [
+            0,
+            1
+        ],
+        "per_session_tokens_per_sec": [
+            14,
+            62
+        ]
+    },
+    {
+        "use_case_id": "usecase_072",
+        "name": "Code generation from spec",
+        "description": "Generates code based on a functional specification. Outputs a complete 100-token code block in 2-3 seconds with a quick initial response.",
+        "icon": "icons/template/usecase_072.png",
+        "template_type": "code_generation_from_spec",
+        "avg_context_length": 100,
+        "avg_sequence_length": 100,
+        "ttft": [
+            500,
+            1000
+        ],
+        "e2e_latency": [
+            2,
+            3
+        ],
+        "per_session_tokens_per_sec": [
+            25,
+            40
+        ]
+    },
+    {
+        "use_case_id": "usecase_073",
+        "name": "Code explanation (docstring)",
+        "description": "Generates clear and concise docstrings or explanations for a given code snippet. The system maintains a fast response time, making it useful for inline documentation.",
+        "icon": "icons/template/usecase_073.png",
+        "template_type": "code_explanation_docstring",
+        "avg_context_length": 50,
+        "avg_sequence_length": 100,
+        "ttft": [
+            500,
+            1000
+        ],
+        "e2e_latency": [
+            2,
+            3
+        ],
+        "per_session_tokens_per_sec": [
+            17,
+            18
+        ]
+    },
+    {
+        "use_case_id": "usecase_074",
+        "name": "Unit test generation",
+        "description": "Automatically generates unit tests for a given function or code snippet using beam search. It outputs concise tests within 3-4 seconds.",
+        "icon": "icons/template/usecase_074.png",
+        "template_type": "unit_test_generation",
+        "avg_context_length": 200,
+        "avg_sequence_length": 75,
+        "ttft": [
+            1000,
+            1000
+        ],
+        "e2e_latency": [
+            3,
+            4
+        ],
+        "per_session_tokens_per_sec": [
+            8,
+            17
+        ]
+    },
+    {
+        "use_case_id": "usecase_075",
+        "name": "Code review assistant",
+        "description": "Assists in code review by generating feedback and suggestions for a given code diff. It provides clear commentary within a fixed response time.",
+        "icon": "icons/template/usecase_075.png",
+        "template_type": "code_review_assistant",
+        "avg_context_length": 300,
+        "avg_sequence_length": 100,
+        "ttft": [
+            1000,
+            2000
+        ],
+        "e2e_latency": [
+            5,
+            5
+        ],
+        "per_session_tokens_per_sec": [
+            20,
+            25
+        ]
+    },
+    {
+        "use_case_id": "usecase_076",
+        "name": "DevOps config generator",
+        "description": "Generates configuration files for DevOps pipelines (such as Dockerfiles or CI/CD scripts) based on input requirements, delivering results in 2-3 seconds.",
+        "icon": "icons/template/usecase_076.png",
+        "template_type": "devops_config_generator",
+        "avg_context_length": 50,
+        "avg_sequence_length": 100,
+        "ttft": [
+            500,
+            1000
+        ],
+        "e2e_latency": [
+            2,
+            3
+        ],
+        "per_session_tokens_per_sec": [
+            17,
+            18
+        ]
+    },
+    {
+        "use_case_id": "usecase_077",
+        "name": "SQL query generator",
+        "description": "Transforms natural language questions into SQL queries. Optimized for very short inputs and outputs, providing instantaneous responses.",
+        "icon": "icons/template/usecase_077.png",
+        "template_type": "sql_query_generator",
+        "avg_context_length": 30,
+        "avg_sequence_length": 20,
+        "ttft": [
+            500,
+            500
+        ],
+        "e2e_latency": [
+            1,
+            1
+        ],
+        "per_session_tokens_per_sec": [
+            20,
+            20
+        ]
+    },
+    {
+        "use_case_id": "usecase_078",
+        "name": "Documentation generator",
+        "description": "Automatically generates user-facing documentation from code or API specifications. It is designed to produce consistent outputs in a short time frame.",
+        "icon": "icons/template/usecase_078.png",
+        "template_type": "documentation_generator",
+        "avg_context_length": 200,
+        "avg_sequence_length": 150,
+        "ttft": [
+            1000,
+            1000
+        ],
+        "e2e_latency": [
+            4,
+            5
+        ],
+        "per_session_tokens_per_sec": [
+            27,
+            27
+        ]
+    },
+    {
+        "use_case_id": "usecase_079",
+        "name": "Ad copy generation",
+        "description": "Generates brief, catchy advertisement copy from product details. Designed for high-throughput and fast generation to support dynamic marketing campaigns.",
+        "icon": "icons/template/usecase_079.png",
+        "template_type": "ad_copy_generation",
+        "avg_context_length": 30,
+        "avg_sequence_length": 30,
+        "ttft": [
+            500,
+            500
+        ],
+        "e2e_latency": [
+            1,
+            1
+        ],
+        "per_session_tokens_per_sec": [
+            27,
+            27
+        ]
+    },
+    {
+        "use_case_id": "usecase_080",
+        "name": "Product description writer",
+        "description": "Generates detailed and appealing product descriptions from a brief list of attributes. Maintains a consistent style and tone with a response time under 3 seconds.",
+        "icon": "icons/template/usecase_080.png",
+        "template_type": "product_description_writer",
+        "avg_context_length": 50,
+        "avg_sequence_length": 100,
+        "ttft": [
+            500,
+            1000
+        ],
+        "e2e_latency": [
+            2,
+            3
+        ],
+        "per_session_tokens_per_sec": [
+            17,
+            18
+        ]
+    },
+    {
+        "use_case_id": "usecase_081",
+        "name": "Personalized email drafter",
+        "description": "Drafts personalized emails for outreach or customer engagement from a set of bullet points. Provides human-like content within 4-5 seconds to assist marketing teams.",
+        "icon": "icons/template/usecase_081.png",
+        "template_type": "personalized_email_drafter",
+        "avg_context_length": 50,
+        "avg_sequence_length": 150,
+        "ttft": [
+            1000,
+            1000
+        ],
+        "e2e_latency": [
+            4,
+            5
+        ],
+        "per_session_tokens_per_sec": [
+            27,
+            27
+        ]
+    },
+    {
+        "use_case_id": "usecase_082",
+        "name": "Social media campaign posts",
+        "description": "Generates engaging social media posts for campaign purposes. Designed for fast, short responses to enable high-volume content scheduling.",
+        "icon": "icons/template/usecase_082.png",
+        "template_type": "social_media_campaign_posts",
+        "avg_context_length": 20,
+        "avg_sequence_length": 50,
+        "ttft": [
+            500,
+            500
+        ],
+        "e2e_latency": [
+            1,
+            2
+        ],
+        "per_session_tokens_per_sec": [
+            33,
+            33
+        ]
+    },
+    {
+        "use_case_id": "usecase_084",
+        "name": "Chatbot for mental health triage",
+        "description": "Specialized chatbot designed to triage mental health concerns quickly, providing initial guidance and referrals within 2-3 seconds.",
+        "icon": "icons/template/usecase_084.png",
+        "template_type": "chatbot_for_mental_health_triage",
+        "avg_context_length": 30,
+        "avg_sequence_length": 50,
+        "ttft": [
+            500,
+            500
+        ],
+        "e2e_latency": [
+            2,
+            3
+        ],
+        "per_session_tokens_per_sec": [
+            17,
+            17
+        ]
+    },
+    {
+        "use_case_id": "usecase_085",
+        "name": "Virtual nurse assistant",
+        "description": "Acts as a virtual nurse by providing patient guidance and answering routine healthcare questions with quick response times.",
+        "icon": "icons/template/usecase_085.png",
+        "template_type": "virtual_nurse_assistant",
+        "avg_context_length": 100,
+        "avg_sequence_length": 150,
+        "ttft": [
+            1000,
+            1000
+        ],
+        "e2e_latency": [
+            3,
+            4
+        ],
+        "per_session_tokens_per_sec": [
+            18,
+            18
+        ]
+    },
+    {
+        "use_case_id": "usecase_086",
+        "name": "Medical report anomaly detector",
+        "description": "Analyzes medical reports to detect anomalies or inconsistencies. Uses beam search to provide detailed output within 4-5 seconds for quality assurance.",
+        "icon": "icons/template/usecase_086.png",
+        "template_type": "medical_report_anomaly_detector",
+        "avg_context_length": 500,
+        "avg_sequence_length": 100,
+        "ttft": [
+            1000,
+            1000
+        ],
+        "e2e_latency": [
+            4,
+            5
+        ],
+        "per_session_tokens_per_sec": [
+            9,
+            9
+        ]
+    },
+    {
+        "use_case_id": "usecase_087",
+        "name": "Fraud detection explanation generator",
+        "description": "Generates explanations for detected fraudulent activities in financial data. Aims to clarify anomalies by outputting concise summaries quickly.",
+        "icon": "icons/template/usecase_087.png",
+        "template_type": "fraud_detection_explanation_generator",
+        "avg_context_length": 200,
+        "avg_sequence_length": 50,
+        "ttft": [
+            500,
+            500
+        ],
+        "e2e_latency": [
+            2,
+            3
+        ],
+        "per_session_tokens_per_sec": [
+            17,
+            17
+        ]
+    },
+    {
+        "use_case_id": "usecase_088",
+        "name": "Credit risk report generator",
+        "description": "Generates a report assessing credit risk based on financial data. Designed for quick turnaround with consistent processing speeds for financial institutions.",
+        "icon": "icons/template/usecase_088.png",
+        "template_type": "credit_risk_report_generator",
+        "avg_context_length": 300,
+        "avg_sequence_length": 100,
+        "ttft": [
+            1000,
+            1000
+        ],
+        "e2e_latency": [
+            3,
+            4
+        ],
+        "per_session_tokens_per_sec": [
+            17,
+            17
+        ]
+    },
+    {
+        "use_case_id": "usecase_089",
+        "name": "Stock market sentiment analyzer",
+        "description": "Analyzes text data from financial news and social media to determine market sentiment. Offers quick insights with minimal latency.",
+        "icon": "icons/template/usecase_089.png",
+        "template_type": "stock_market_sentiment_analyzer",
+        "avg_context_length": 100,
+        "avg_sequence_length": 50,
+        "ttft": [
+            500,
+            500
+        ],
+        "e2e_latency": [
+            2,
+            3
+        ],
+        "per_session_tokens_per_sec": [
+            17,
+            17
+        ]
+    },
+    {
+        "use_case_id": "usecase_090",
+        "name": "Virtual travel assistant",
+        "description": "Provides travel assistance by generating itinerary suggestions and travel information in real time. Ensures an interactive experience with responses under 4 seconds.",
+        "icon": "icons/template/usecase_090.png",
+        "template_type": "virtual_travel_assistant",
+        "avg_context_length": 50,
+        "avg_sequence_length": 100,
+        "ttft": [
+            1000,
+            1000
+        ],
+        "e2e_latency": [
+            3,
+            4
+        ],
+        "per_session_tokens_per_sec": [
+            17,
+            17
+        ]
+    },
+    {
+        "use_case_id": "usecase_091",
+        "name": "Retail product recommendation chatbot",
+        "description": "Interacts with customers to recommend products based on brief inputs. Optimized for low latency to deliver quick suggestions.",
+        "icon": "icons/template/usecase_091.png",
+        "template_type": "retail_product_recommendation_chatbot",
+        "avg_context_length": 30,
+        "avg_sequence_length": 50,
+        "ttft": [
+            500,
+            500
+        ],
+        "e2e_latency": [
+            1,
+            2
+        ],
+        "per_session_tokens_per_sec": [
+            17,
+            17
+        ]
+    },
+    {
+        "use_case_id": "usecase_092",
+        "name": "Automated customer sentiment responder",
+        "description": "Responds to customer feedback by generating sentiment-based responses. Maintains a consistent tone with a total latency of 1-2 seconds.",
+        "icon": "icons/template/usecase_092.png",
+        "template_type": "automated_customer_sentiment_responder",
+        "avg_context_length": 40,
+        "avg_sequence_length": 40,
+        "ttft": [
+            500,
+            500
+        ],
+        "e2e_latency": [
+            1,
+            2
+        ],
+        "per_session_tokens_per_sec": [
+            16,
+            16
+        ]
+    },
+    {
+        "use_case_id": "usecase_093",
+        "name": "Personalized workout planner",
+        "description": "Creates personalized workout plans from user inputs. Designed to generate 150-token plans within 3-4 seconds for quick recommendations.",
+        "icon": "icons/template/usecase_093.png",
+        "template_type": "personalized_workout_planner",
+        "avg_context_length": 50,
+        "avg_sequence_length": 150,
+        "ttft": [
+            1000,
+            1000
+        ],
+        "e2e_latency": [
+            3,
+            4
+        ],
+        "per_session_tokens_per_sec": [
+            18,
+            18
+        ]
+    },
+    {
+        "use_case_id": "usecase_094",
+        "name": "Diet recommendation generator",
+        "description": "Generates tailored diet recommendations based on user preferences and health data, delivering concise advice in 2-3 seconds.",
+        "icon": "icons/template/usecase_094.png",
+        "template_type": "diet_recommendation_generator",
+        "avg_context_length": 30,
+        "avg_sequence_length": 100,
+        "ttft": [
+            500,
+            500
+        ],
+        "e2e_latency": [
+            2,
+            3
+        ],
+        "per_session_tokens_per_sec": [
+            18,
+            18
+        ]
+    },
+    {
+        "use_case_id": "usecase_095",
+        "name": "Virtual career counselor",
+        "description": "Provides career advice and guidance through an interactive chatbot interface, offering personalized recommendations within 2-3 seconds.",
+        "icon": "icons/template/usecase_095.png",
+        "template_type": "virtual_career_counselor",
+        "avg_context_length": 50,
+        "avg_sequence_length": 100,
+        "ttft": [
+            1000,
+            1000
+        ],
+        "e2e_latency": [
+            2,
+            3
+        ],
+        "per_session_tokens_per_sec": [
+            17,
+            17
+        ]
+    },
+    {
+        "use_case_id": "usecase_096",
+        "name": "Resume analyzer and optimizer",
+        "description": "Analyzes resumes and suggests improvements for clarity and effectiveness. Processes a 300-token resume and provides feedback within 4-5 seconds.",
+        "icon": "icons/template/usecase_096.png",
+        "template_type": "resume_analyzer_and_optimizer",
+        "avg_context_length": 300,
+        "avg_sequence_length": 100,
+        "ttft": [
+            1000,
+            1000
+        ],
+        "e2e_latency": [
+            4,
+            5
+        ],
+        "per_session_tokens_per_sec": [
+            17,
+            17
+        ]
+    },
+    {
+        "use_case_id": "usecase_097",
+        "name": "Interview question generator",
+        "description": "Generates relevant interview questions based on job descriptions or candidate profiles. Uses beam search to produce multiple quality questions quickly.",
+        "icon": "icons/template/usecase_097.png",
+        "template_type": "interview_question_generator",
+        "avg_context_length": 50,
+        "avg_sequence_length": 50,
+        "ttft": [
+            500,
+            500
+        ],
+        "e2e_latency": [
+            2,
+            3
+        ],
+        "per_session_tokens_per_sec": [
+            17,
+            17
+        ]
+    },
+    {
+        "use_case_id": "usecase_098",
+        "name": "Legal contract risk analyzer",
+        "description": "Analyzes legal contracts to identify potential risks. Processes a 500-token contract snippet and outputs a risk summary in 3-4 seconds.",
+        "icon": "icons/template/usecase_098.png",
+        "template_type": "legal_contract_risk_analyzer",
+        "avg_context_length": 500,
+        "avg_sequence_length": 50,
+        "ttft": [
+            1000,
+            1000
+        ],
+        "e2e_latency": [
+            3,
+            4
+        ],
+        "per_session_tokens_per_sec": [
+            14,
+            14
+        ]
+    },
+    {
+        "use_case_id": "usecase_099",
+        "name": "Smart meeting transcription summarizer",
+        "description": "Summarizes long meeting transcriptions into key action items and decisions. Handles large inputs of 12,000 tokens and produces a 750-token summary with moderate latency.",
+        "icon": "icons/template/usecase_099.png",
+        "template_type": "smart_meeting_transcription_summarizer",
+        "avg_context_length": 12000,
+        "avg_sequence_length": 750,
+        "ttft": [
+            2000,
+            2000
+        ],
+        "e2e_latency": [
+            10,
+            15
+        ],
+        "per_session_tokens_per_sec": [
+            10,
+            10
+        ]
+    },
+    {
+        "use_case_id": "usecase_100",
+        "name": "Real-time meeting action item extractor",
+        "description": "Extracts action items from meeting transcriptions in real time, providing a quick summary (100 tokens) with overall latency under 4 seconds.",
+        "icon": "icons/template/usecase_100.png",
+        "template_type": "real_time_meeting_action_item_extractor",
+        "avg_context_length": 1000,
+        "avg_sequence_length": 100,
+        "ttft": [
+            1000,
+            1000
+        ],
+        "e2e_latency": [
+            3,
+            4
+        ],
+        "per_session_tokens_per_sec": [
+            17,
+            17
+        ]
+    },
+    {
+        "use_case_id": "usecase_101",
+        "name": "Interactive project management assistant",
+        "description": "Assists project management by generating status updates and task summaries interactively. Provides concise outputs within 4-5 seconds.",
+        "icon": "icons/template/usecase_101.png",
+        "template_type": "interactive_project_management_assistant",
+        "avg_context_length": 200,
+        "avg_sequence_length": 100,
+        "ttft": [
+            1000,
+            1000
+        ],
+        "e2e_latency": [
+            4,
+            5
+        ],
+        "per_session_tokens_per_sec": [
+            17,
+            17
+        ]
+    },
+    {
+        "use_case_id": "usecase_102",
+        "name": "Real estate property description generator",
+        "description": "Generates attractive property descriptions for real estate listings based on minimal input, enabling fast content creation for marketing purposes.",
+        "icon": "icons/template/usecase_102.png",
+        "template_type": "real_estate_property_description_generator",
+        "avg_context_length": 50,
+        "avg_sequence_length": 150,
+        "ttft": [
+            1000,
+            1000
+        ],
+        "e2e_latency": [
+            3,
+            4
+        ],
+        "per_session_tokens_per_sec": [
+            18,
+            18
+        ]
+    },
+    {
+        "use_case_id": "usecase_103",
+        "name": "Virtual interior design assistant",
+        "description": "Provides design recommendations and visual descriptions for interior spaces, helping users envision redesigns with a prompt turnaround time.",
+        "icon": "icons/template/usecase_103.png",
+        "template_type": "virtual_interior_design_assistant",
+        "avg_context_length": 100,
+        "avg_sequence_length": 200,
+        "ttft": [
+            1000,
+            1000
+        ],
+        "e2e_latency": [
+            4,
+            5
+        ],
+        "per_session_tokens_per_sec": [
+            18,
+            18
+        ]
+    },
+    {
+        "use_case_id": "usecase_104",
+        "name": "Cooking recipe generator",
+        "description": "Generates cooking recipes from a short prompt specifying ingredients or cuisine type, delivering a complete recipe in 3-4 seconds.",
+        "icon": "icons/template/usecase_104.png",
+        "template_type": "cooking_recipe_generator",
+        "avg_context_length": 50,
+        "avg_sequence_length": 150,
+        "ttft": [
+            1000,
+            1000
+        ],
+        "e2e_latency": [
+            3,
+            4
+        ],
+        "per_session_tokens_per_sec": [
+            18,
+            18
+        ]
+    },
+    {
+        "use_case_id": "usecase_105",
+        "name": "Virtual travel itinerary planner",
+        "description": "Plans travel itineraries based on user preferences, generating detailed itineraries quickly to help users plan trips efficiently.",
+        "icon": "icons/template/usecase_105.png",
+        "template_type": "virtual_travel_itinerary_planner",
+        "avg_context_length": 50,
+        "avg_sequence_length": 150,
+        "ttft": [
+            1000,
+            1000
+        ],
+        "e2e_latency": [
+            3,
+            4
+        ],
+        "per_session_tokens_per_sec": [
+            18,
+            18
+        ]
+    },
+    {
+        "use_case_id": "usecase_106",
+        "name": "Personalized news aggregator",
+        "description": "Curates personalized news content based on user interests. Aggregates articles and presents a 200-token summary within 3-4 seconds.",
+        "icon": "icons/template/usecase_106.png",
+        "template_type": "personalized_news_aggregator",
+        "avg_context_length": 50,
+        "avg_sequence_length": 200,
+        "ttft": [
+            1000,
+            1000
+        ],
+        "e2e_latency": [
+            3,
+            4
+        ],
+        "per_session_tokens_per_sec": [
+            18,
+            18
+        ]
+    },
+    {
+        "use_case_id": "usecase_107",
+        "name": "E-learning content generator",
+        "description": "Creates interactive e-learning modules and educational content. Processes course outlines and generates comprehensive 300-token modules within 4-5 seconds.",
+        "icon": "icons/template/usecase_107.png",
+        "template_type": "e_learning_content_generator",
+        "avg_context_length": 100,
+        "avg_sequence_length": 300,
+        "ttft": [
+            1000,
+            1000
+        ],
+        "e2e_latency": [
+            4,
+            5
+        ],
+        "per_session_tokens_per_sec": [
+            19,
+            19
+        ]
+    },
+    {
+        "use_case_id": "usecase_108",
+        "name": "Automated survey question generator",
+        "description": "Generates survey questions from provided topics or research areas. Optimized for quick turnaround to support dynamic market research.",
+        "icon": "icons/template/usecase_108.png",
+        "template_type": "automated_survey_question_generator",
+        "avg_context_length": 50,
+        "avg_sequence_length": 50,
+        "ttft": [
+            500,
+            500
+        ],
+        "e2e_latency": [
+            2,
+            3
+        ],
+        "per_session_tokens_per_sec": [
+            17,
+            17
+        ]
+    },
+    {
+        "use_case_id": "usecase_109",
+        "name": "ChatGPT-like conversational assistant for HR policies",
+        "description": "Provides a conversational interface for HR policy queries, delivering accurate and policy-compliant answers quickly for enterprise use.",
+        "icon": "icons/template/usecase_109.png",
+        "template_type": "chatgpt_like_conversational_assistant_for_hr_policies",
+        "avg_context_length": 50,
+        "avg_sequence_length": 100,
+        "ttft": [
+            1000,
+            1000
+        ],
+        "e2e_latency": [
+            3,
+            4
+        ],
+        "per_session_tokens_per_sec": [
+            17,
+            17
+        ]
+    },
+    {
+        "use_case_id": "usecase_111",
+        "name": "Multimodal document analyzer (text + image)",
+        "description": "Analyzes documents containing both text and image data, extracting key insights and summarizing content for enterprise use. Ensures multimodal integration with a moderate latency.",
+        "icon": "icons/template/usecase_111.png",
+        "template_type": "multimodal_document_analyzer_text_image",
+        "avg_context_length": 1000,
+        "avg_sequence_length": 200,
+        "ttft": [
+            2000,
+            2000
+        ],
+        "e2e_latency": [
+            5,
+            6
+        ],
+        "per_session_tokens_per_sec": [
+            17,
+            17
+        ]
+    },
+    {
+        "use_case_id": "usecase_112",
+        "name": "Interactive language learning tutor",
+        "description": "Serves as an interactive tutor for language learners, generating responses in the target language to facilitate real-time conversation practice with minimal delay.",
+        "icon": "icons/template/usecase_112.png",
+        "template_type": "interactive_language_learning_tutor",
+        "avg_context_length": 20,
+        "avg_sequence_length": 50,
+        "ttft": [
+            500,
+            500
+        ],
+        "e2e_latency": [
+            1,
+            2
+        ],
+        "per_session_tokens_per_sec": [
+            17,
+            17
+        ]
+    }
+]

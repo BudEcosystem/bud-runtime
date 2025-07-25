@@ -1,0 +1,196 @@
+
+// consider base text size 16px and create rem values based text-[size] classes
+@function rem($px) {
+    @return #{$px / 16}rem;
+  }
+  
+  @for $i from 1 through 80 {
+    .text-#{$i} {
+      font-size: rem($i);
+    }
+  }
+  
+  // consider base text size 16px and create rem values based width-[size] classes
+  @for $i from 1 through 500 {
+    .width-#{$i} {
+      width: rem($i);
+    }
+  }
+  
+  // consider base text size 16px and create rem values based height-[size] classes
+  @for $i from 1 through 500 {
+    .height-#{$i} {
+      height: rem($i);
+    }
+  }
+
+  // min width classes
+  @for $i from 1 through 500 {
+    .min-width-#{$i} {
+      min-width: rem($i);
+    }
+  }
+
+  // min height classes
+  @for $i from 1 through 500 {
+    .min-height-#{$i} {
+      min-height: rem($i);
+    }
+  }
+  
+  
+  // font weight classes
+  .font-100 {
+    font-weight: 100;
+  }
+  
+  .font-200 {
+    font-weight: 200;
+  }
+  
+  .font-300 {
+    font-weight: 300;
+  }
+  
+  .font-400 {
+    font-weight: 400;
+  }
+  
+  .font-500 {
+    font-weight: 500;
+  }
+  
+  .font-600 {
+    font-weight: 600;
+  }
+  
+  .font-700 {
+    font-weight: 700;
+  }
+  
+  .font-800 {
+    font-weight: 800;
+  }
+  
+  .font-900 {
+    font-weight: 900;
+  }
+  
+  // gap classes
+  @for $i from 1 through 20 {
+    .gap-size-#{$i} {
+      gap: rem($i);
+    }
+  }
+  
+  // padding classes
+  @for $i from 1 through 20 {
+    .padding-size-#{$i} {
+      padding: rem($i);
+    }
+  }
+  
+  @for $i from 1 through 20 {
+    .padding-top-size-#{$i} {
+      padding-top: rem($i);
+    }
+  }
+  
+  @for $i from 1 through 20 {
+    .padding-bottom-size-#{$i} {
+      padding-bottom: rem($i);
+    }
+  }
+  
+  @for $i from 1 through 20 {
+    .padding-left-size-#{$i} {
+      padding-left: rem($i);
+    }
+  }
+  
+  @for $i from 1 through 20 {
+    .padding-right-size-#{$i} {
+      padding-right: rem($i);
+    }
+  }
+  
+  // padding x
+  @for $i from 1 through 20 {
+    .padding-x-size-#{$i} {
+      padding-left: rem($i);
+      padding-right: rem($i);
+    }
+  }
+  
+  // padding y
+  @for $i from 1 through 20 {
+    .padding-y-size-#{$i} {
+      padding-top: rem($i);
+      padding-bottom: rem($i);
+    }
+  }
+  
+  
+  // margin classes
+  @for $i from 1 through 20 {
+    .margin-size-#{$i} {
+      margin: rem($i);
+    }
+  }
+  
+  @for $i from 1 through 20 {
+    .margin-top-size-#{$i} {
+      margin-top: rem($i);
+    }
+  }
+  
+  @for $i from 1 through 20 {
+    .margin-bottom-size-#{$i} {
+      margin-bottom: rem($i);
+    }
+  }
+  
+  @for $i from 1 through 20 {
+    .margin-left-size-#{$i} {
+      margin-left: rem($i);
+    }
+  }
+  
+  @for $i from 1 through 20 {
+    .margin-right-size-#{$i} {
+      margin-right: rem($i);
+    }
+  }
+  
+  // margin x
+  @for $i from 1 through 20 {
+    .margin-x-size-#{$i} {
+      margin-left: rem($i);
+      margin-right: rem($i);
+    }
+  }
+  
+  // margin y
+  
+  @for $i from 1 through 20 {
+    .margin-y-size-#{$i} {
+      margin-top: rem($i);
+      margin-bottom: rem($i);
+    }
+  }
+  
+  // border radius classes
+  @for $i from 1 through 20 {
+    .border-radius-size-#{$i} {
+      border-radius: rem($i);
+    }
+  }
+  
+  // border width classes
+  
+  @for $i from 1 through 20 {
+    .border-width-size-#{$i} {
+      border-width: rem($i);
+    }
+  }
+  

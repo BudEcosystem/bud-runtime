@@ -1,0 +1,114 @@
+[
+    {
+        "name": "RTN",
+        "description": "RTN is a quantization method that uses a rounding technique to quantize the weights and activations of a model.",
+        "hardware_support": ["CPU", "CUDA"],
+        "method_type": ["INT2", "INT4", "INT8"],
+        "runtime_hardware_support": ["CPU", "CUDA"]
+    },
+    {
+        "name": "AWQ",
+        "description": "AWQ (Activation-aware Weight Quantization) is a hardware-friendly weight-only quantization method that selectively scales salient weight channels before quantization to minimize accuracy loss. It improves performance while maintaining generalization across different models and domains.",
+        "hardware_support": ["CPU", "CUDA"],
+        "method_type": ["INT2", "INT4", "INT8"],
+        "runtime_hardware_support": ["CPU", "CUDA"]
+    },
+    {
+        "name": "AdaDim",
+        "description": "AdaDim (Adaptive Dimensions) is a quantization framework that adaptively selects between per-input-channel (per-IC) and per-output-channel (per-OC) quantization to mitigate activation outlier effects. It improves accuracy for sub-4-bit weight quantization without requiring specialized mixed-precision kernels.",
+        "hardware_support": ["CUDA"],
+        "method_type": ["INT4", "INT8"],
+        "runtime_hardware_support": ["CUDA"]
+    },
+    {
+        "name": "DGQ",
+        "description": "Distribution-aware Group Quantization (DGQ) is a novel method specifically designed for quantizing text-to-image diffusion models. It addresses challenges in preserving image quality and text-image alignment by adaptively handling pixel-wise and channel-wise activation outliers and applying prompt-specific logarithmic quantization scales for attention scores. DGQ enables lower-bit quantization (under 8-bit) without requiring additional fine-tuning.",
+        "hardware_support": ["CUDA"],
+        "method_type": ["INT2", "INT4", "INT8"],
+        "runtime_hardware_support": ["CUDA"]
+    },
+    {
+        "name": "GPTQ",
+        "description": "GPTQ (Generative Pre-trained Transformer Quantization) is a novel one-shot weight quantization method that uses approximate second-order information to compress Generative Pre-trained Transformer (GPT) models. It achieves high accuracy and efficiency, enabling the quantization of very large models (e.g., 175 billion parameters) to 3 or 4 bits per weight with negligible accuracy degradation, allowing generative inference on a single GPU. It also supports extreme quantization down to 2-bit or ternary levels.",
+        "hardware_support": ["CUDA"],
+        "method_type": ["INT2", "INT4", "INT8"],
+        "runtime_hardware_support": ["CUDA"]
+    },
+    {
+        "name": "HQQ",
+        "description": "HQQ (Half-Quadratic Quantization) is a fast and accurate model quantizer that eliminates the need for calibration data. It supports a wide range of bitwidths and is compatible with various optimized CUDA/Triton kernels and PEFT training. HQQ aims for full compatibility with `torch.compile` for accelerated inference and training, and also offers HQQ+ which includes trainable low-rank adapters for enhanced quantization quality at lower bits.",
+        "hardware_support": ["CUDA"],
+        "method_type": ["INT2", "INT4", "INT8"],
+        "runtime_hardware_support": ["CUDA"]
+    },
+    {
+        "name": "KVQuant",
+        "description": "KVQuant is a methodology for efficient KV cache quantization in Large Language Models (LLMs). Its primary goal is to reduce the memory bottleneck during long context length inference by quantizing the KV cache to low precision. It achieves high accuracy through innovations such as per-channel, pre-RoPE Key quantization, Non-Uniform Quantization (NUQ), and Dense-and-Sparse Quantization to handle outliers and non-uniform activation distributions.",
+        "hardware_support": ["CUDA"],
+        "method_type": ["INT2", "INT4", "INT8"],
+        "runtime_hardware_support": ["CUDA"]
+    },
+    {
+        "name": "LLM.int8()",
+        "description": "LLM.int8() is a novel method for quantizing large language models (LLMs) to 8-bit integers (Int8) for inference without performance degradation. It addresses the significant GPU memory requirements for LLM inference by utilizing vector-wise quantization and mixed-precision decomposition. This decomposition isolates outlier feature dimensions into a 16-bit matrix multiplication while the remaining values are processed in 8-bit.",
+        "hardware_support": ["CUDA"],
+        "method_type": ["INT8"],
+        "runtime_hardware_support": ["CUDA"]
+    },
+    {
+        "name": "Norm Tweaking",
+        "description": "Norm Tweaking is a novel technique that enhances the performance of low-bit quantization in large language models (LLMs). It works by adjusting the parameters of normalization layers (LayerNorm) to align the quantized activation distribution with the original float distribution. This method can be integrated as a plugin with existing quantization techniques like GPTQ and Smoothquant to significantly improve accuracy, especially at aggressive lower bit quantization levels.",
+        "hardware_support": ["CUDA"],
+        "method_type": ["INT2", "INT4", "INT8"],
+        "runtime_hardware_support": ["CUDA"]
+    },
+    {
+        "name": "OmniQuant",
+        "description": "OmniQuant is a novel Post-Training Quantization (PTQ) technique for Large Language Models (LLMs) that aims to achieve high performance while maintaining computational efficiency. It introduces Learnable Weight Clipping (LWC) for optimizing weight clipping thresholds and Learnable Equivalent Transformation (LET) to address activation outliers. OmniQuant operates within a differentiable framework, enabling efficient optimization for both weight-only and weight-activation quantization.",
+        "hardware_support": ["CUDA"],
+        "method_type": ["INT2", "INT4", "INT8"],
+        "runtime_hardware_support": ["CUDA"]
+    },
+    {
+        "name": "OS+",
+        "description": "Outlier Suppression+ (OS+) is a framework designed to enhance the accuracy of post-training quantization (PTQ) for large language models (LLMs). It mitigates accuracy degradation caused by activation outliers through channel-wise shifting and scaling operations. OS+ has been validated on various models, including BERT, OPT, BLOOM, BLOOMZ, and LLaMA, demonstrating improved performance in both standard and fine-grained quantization settings.",
+        "hardware_support": ["CUDA"],
+        "method_type": ["INT2", "INT4", "INT8"],
+        "runtime_hardware_support": ["CUDA"]
+    },
+    {
+        "name": "QUICK",
+        "description": "QUICK is a collection of optimized CUDA kernels designed to accelerate inference for weight-only quantized Large Language Models (LLMs). It replaces mixed-precision GEMM kernels by performing an offline rearrangement of the quantized weight matrix, which eliminates shared memory write-back bank conflicts found in previous kernels.",
+        "hardware_support": ["CUDA"],
+        "method_type": ["INT2", "INT4", "INT8"],
+        "runtime_hardware_support": ["CUDA"]
+    },
+    {
+        "name": "SmoothQuant",
+        "description": "SmoothQuant is a post-training quantization method that uses a smooth activation function to quantize the weights and activations of a model. It achieves high accuracy and efficiency by using a smooth activation function to quantize the weights and activations of a model.",
+        "hardware_support": ["CUDA"],
+        "method_type": ["INT2", "INT4", "INT8"],
+        "runtime_hardware_support": ["CUDA"]
+    },
+    {
+        "name": "QuaRot",
+        "description": "QuaRot is a novel quantization scheme for Large Language Models (LLMs) designed to enable end-to-end 4-bit inference. It works by rotating LLMs to effectively remove outliers from the hidden state without altering the model's output, thereby simplifying the quantization process. This rotation-based approach is applied comprehensively across hidden states, feed-forward components, attention mechanisms, and the KV cache.",
+        "hardware_support": ["CUDA"],
+        "method_type": ["INT2", "INT4", "INT8"],
+        "runtime_hardware_support": ["CUDA"]
+    },
+    {
+        "name": "SpQR",
+        "description": "Sparse-Quantized Representation (SpQR) is a novel compression format and quantization technique for Large Language Models (LLMs). It achieves near-lossless compression by identifying and isolating outlier weights, storing them in higher precision, while compressing the remaining weights to 3-4 bits. SpQR includes efficient algorithms for encoding and decoding weights, along with GPU inference algorithms that offer faster inference and significant memory compression.",
+        "hardware_support": ["CUDA"],
+        "method_type": ["INT4", "INT8"],
+        "runtime_hardware_support": ["CUDA"]
+    },
+    {
+        "name": "TesseraQ",
+        "description": "TesseraQ is a novel Post-Training Quantization (PTQ) technique designed for ultra-low bit quantization of Large Language Model (LLM) weights. It optimizes weight rounding parameters using a block reconstruction method and introduces Progressive Adaptive Rounding (PAR) for iterative refinement of rounding variables. TesseraQ also optimizes dequantization scale parameters and can be integrated with existing PTQ algorithms like AWQ and OmniQuant.",
+        "hardware_support": ["CUDA"],
+        "method_type": ["INT2", "INT4", "INT8"],
+        "runtime_hardware_support": ["CUDA"]
+    }
+]
