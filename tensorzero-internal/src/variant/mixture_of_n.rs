@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::path::Path;
 
 use futures::future::join_all;
@@ -381,15 +382,17 @@ async fn inner_fuse_candidates<'a, 'request>(
             name: fuser.inner.model.to_string(),
         })
     })?;
+    let mut visited_models = HashSet::new();
     let infer_model_request_args = InferModelRequestArgs {
         request: inference_request,
         model_name: fuser.inner.model.clone(),
         model_config: &model_config,
         function,
         inference_config,
-        retry_config: &fuser.inner.retries,
         clients,
         inference_params: params_for_call,
+        models,
+        visited_models: &mut visited_models,
     };
     let inference_result = infer_model_request(infer_model_request_args).await?;
     Ok(inference_result)
@@ -1059,6 +1062,8 @@ mod tests {
                     },
                 )]),
                 endpoints: crate::endpoints::capability::default_capabilities(),
+                fallback_models: None,
+                retry_config: None,
                 rate_limits: None,
             },
         )]))
@@ -1159,6 +1164,8 @@ mod tests {
                         },
                     )]),
                     endpoints: crate::endpoints::capability::default_capabilities(),
+                    fallback_models: None,
+                    retry_config: None,
                     rate_limits: None,
                 },
             );
@@ -1226,6 +1233,8 @@ mod tests {
                         },
                     )]),
                     endpoints: crate::endpoints::capability::default_capabilities(),
+                    fallback_models: None,
+                    retry_config: None,
                     rate_limits: None,
                 },
             );

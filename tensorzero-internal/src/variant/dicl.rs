@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
@@ -127,6 +128,7 @@ impl Variant for DiclConfig {
 
         // Instantiate the InferModelRequestArgs struct
         let params_for_args = inference_params.clone();
+        let mut visited_models = HashSet::new();
         let args = InferModelRequestArgs {
             request: model_inference_request,
             model_name: self.model.clone(),
@@ -135,7 +137,8 @@ impl Variant for DiclConfig {
             inference_config,
             clients,
             inference_params: params_for_args,
-            retry_config: &self.retries,
+            models: models.models,
+            visited_models: &mut visited_models,
         };
 
         // Refactored function call using the struct
@@ -193,6 +196,7 @@ impl Variant for DiclConfig {
         })?;
 
         // Actually run the inference
+        let visited_models = HashSet::new();
         let (inference_result_stream, mut model_used_info) = infer_model_request_stream(
             request,
             self.model.clone(),
@@ -200,7 +204,8 @@ impl Variant for DiclConfig {
             function,
             clients,
             params_for_args,
-            self.retries,
+            models.models,
+            visited_models,
         )
         .await?;
 

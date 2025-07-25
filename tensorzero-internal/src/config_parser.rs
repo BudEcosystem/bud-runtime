@@ -32,6 +32,10 @@ use crate::variant::mixture_of_n::UninitializedMixtureOfNConfig;
 use crate::variant::{Variant, VariantConfig};
 use std::error::Error as StdError;
 
+#[cfg(test)]
+#[path = "config_parser_fallback_tests.rs"]
+mod fallback_tests;
+
 tokio::task_local! {
     /// When set, we skip performing credential validation in model providers
     /// This is used when running in e2e test mode, and by the 'evaluations' binary
@@ -447,6 +451,8 @@ impl<'c> Config<'c> {
                             routing: embedding_config.routing,
                             providers,
                             endpoints,
+                            fallback_models: None,
+                            retry_config: None,
                             rate_limits: None, // Embedding models don't have rate limits in this conversion
                         };
                         (name, model_config)
@@ -610,6 +616,9 @@ impl<'c> Config<'c> {
             model.validate(model_name)?;
         }
 
+        // Validate model fallback chains for cycles and existence
+        self.validate_model_fallback_chains(&models)?;
+
         // Embedding models are now part of the unified model table, validated above
 
         // Validate each tool
@@ -621,6 +630,163 @@ impl<'c> Config<'c> {
                 .into());
             }
         }
+        Ok(())
+    }
+
+    /// Validate model fallback chains for cycles and existence
+    fn validate_model_fallback_chains(&self, models: &ModelTable) -> Result<(), Error> {
+        use crate::error::ErrorDetails;
+        use std::collections::{HashMap, HashSet};
+
+        // First, validate that all fallback models exist
+        for (model_name, model) in models.iter_static_models() {
+            if let Some(ref fallback_models) = model.fallback_models {
+                for fallback_model in fallback_models {
+                    if models.validate(fallback_model).is_err() {
+                        return Err(ErrorDetails::FallbackModelNotFound {
+                            model_name: model_name.to_string(),
+                            fallback_model: fallback_model.to_string(),
+                        }
+                        .into());
+                    }
+                }
+            }
+        }
+
+        // Build a map of all models and their fallback chains using Arc<str> for efficiency
+        let mut fallback_map: HashMap<Arc<str>, Vec<Arc<str>>> = HashMap::new();
+
+        for (model_name, model) in models.iter_static_models() {
+            if let Some(ref fallback_models) = model.fallback_models {
+                fallback_map.insert(model_name.clone(), fallback_models.clone());
+            }
+        }
+
+        // Check each model's fallback chain for cycles
+        for (model_name, _) in models.iter_static_models() {
+            let mut visited = HashSet::new();
+            let mut path = Vec::new();
+            let mut path_set = HashSet::new();
+
+            if let Err(cycle_path) = self.check_fallback_cycle_optimized(
+                model_name,
+                &fallback_map,
+                &mut visited,
+                &mut path,
+                &mut path_set,
+            ) {
+                return Err(ErrorDetails::CircularFallbackDetected {
+                    chain: cycle_path.iter().map(|s| s.to_string()).collect(),
+                }
+                .into());
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Simple wrapper for tests - converts String types to Arc<str> for the optimized method
+    #[cfg(test)]
+    fn check_fallback_cycle(
+        &self,
+        current_model: &str,
+        fallback_map: &HashMap<String, Vec<String>>,
+        visited: &mut HashSet<String>,
+        path: &mut Vec<String>,
+    ) -> Result<(), Vec<String>> {
+        // Convert to Arc<str> types for the optimized method
+        let arc_fallback_map: HashMap<Arc<str>, Vec<Arc<str>>> = fallback_map
+            .iter()
+            .map(|(k, v)| {
+                (
+                    k.as_str().into(),
+                    v.iter().map(|s| s.as_str().into()).collect(),
+                )
+            })
+            .collect();
+
+        let mut arc_visited: HashSet<Arc<str>> =
+            visited.iter().map(|s| s.as_str().into()).collect();
+
+        let mut arc_path: Vec<Arc<str>> = path.iter().map(|s| s.as_str().into()).collect();
+
+        let mut arc_path_set: HashSet<Arc<str>> = arc_path.iter().cloned().collect();
+
+        let current_model_arc: Arc<str> = current_model.into();
+
+        match self.check_fallback_cycle_optimized(
+            &current_model_arc,
+            &arc_fallback_map,
+            &mut arc_visited,
+            &mut arc_path,
+            &mut arc_path_set,
+        ) {
+            Ok(()) => {
+                // Update the original collections
+                visited.clear();
+                visited.extend(arc_visited.iter().map(|s| s.to_string()));
+                path.clear();
+                path.extend(arc_path.iter().map(|s| s.to_string()));
+                Ok(())
+            }
+            Err(cycle_path) => Err(cycle_path.iter().map(|s| s.to_string()).collect()),
+        }
+    }
+
+    /// Optimized cycle detection using Arc<str> and efficient data structures
+    #[expect(clippy::only_used_in_recursion)]
+    fn check_fallback_cycle_optimized(
+        &self,
+        current_model: &Arc<str>,
+        fallback_map: &HashMap<Arc<str>, Vec<Arc<str>>>,
+        visited: &mut HashSet<Arc<str>>,
+        path: &mut Vec<Arc<str>>,
+        path_set: &mut HashSet<Arc<str>>,
+    ) -> Result<(), Vec<Arc<str>>> {
+        // Check for cycle using the path set for O(1) lookup
+        if path_set.contains(current_model) {
+            // Find the cycle start for reporting
+            if let Some(cycle_start) = path.iter().position(|m| m == current_model) {
+                let mut cycle_path = path[cycle_start..].to_vec();
+                cycle_path.push(current_model.clone());
+                return Err(cycle_path);
+            } else {
+                // This should never happen if path_set is kept in sync with path
+                // But if it does, return the whole path as the cycle
+                let mut cycle_path = path.clone();
+                cycle_path.push(current_model.clone());
+                return Err(cycle_path);
+            }
+        }
+
+        // If we've already fully explored this model, skip it
+        if visited.contains(current_model) {
+            return Ok(());
+        }
+
+        // Add to current path and path set
+        path.push(current_model.clone());
+        path_set.insert(current_model.clone());
+
+        // Check all fallback models for this model
+        if let Some(fallback_models) = fallback_map.get(current_model) {
+            for fallback_model in fallback_models {
+                // Recursively check for cycles in fallback model
+                self.check_fallback_cycle_optimized(
+                    fallback_model,
+                    fallback_map,
+                    visited,
+                    path,
+                    path_set,
+                )?;
+            }
+        }
+
+        // Remove from current path and path set, mark as visited
+        path.pop();
+        path_set.remove(current_model);
+        visited.insert(current_model.clone());
+
         Ok(())
     }
 
