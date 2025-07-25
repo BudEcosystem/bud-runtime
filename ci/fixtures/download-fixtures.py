@@ -48,101 +48,104 @@ def calculate_etag(file_path):
         md5s = []
         with open(file_path, "rb") as f:
             while True:
-                part = f.read(PART_SIZE)
-                if not part:
+                chunk = f.read(PART_SIZE)
+                if not chunk:
                     break
-                md5s.append(hashlib.md5(part).hexdigest())
-        
-        # Concatenate and hash
-        combined = "".join(md5s)
-        final_hash = hashlib.md5(combined.encode()).hexdigest()
-        return f"{final_hash}-{len(md5s)}"
+                md5s.append(hashlib.md5(chunk).digest())
+
+        # Calculate MD5 of concatenated part MD5s
+        combined_md5 = hashlib.md5(b"".join(md5s)).hexdigest()
+        return f"{combined_md5}-{num_parts}"
 
 
-def download_file(filename):
-    """Download a single fixture file if it doesn't exist or has wrong checksum."""
-    local_path = S3_FIXTURES_DIR / filename
-    remote_url = f"{R2_BUCKET}/{filename}"
-    
-    print(f"Checking {filename}...")
-    
-    # Get remote ETag
+def get_remote_etag(filename):
+    """Get ETag from R2 bucket."""
     try:
-        head_response = requests.head(remote_url, timeout=10)
-        head_response.raise_for_status()
-        remote_etag = head_response.headers.get("etag", "").strip('"')
-    except requests.RequestException as e:
-        print(f"Failed to get remote info for {filename}: {e}")
-        return False
-    
-    # Check if local file exists and has correct checksum
-    if local_path.exists():
-        local_etag = calculate_etag(local_path)
-        if local_etag == remote_etag:
-            print(f"✓ {filename} is up to date")
-            return True
-        else:
-            print(f"✗ {filename} checksum mismatch (local: {local_etag}, remote: {remote_etag})")
-    else:
-        print(f"- {filename} doesn't exist locally")
-    
-    # Download the file
-    try:
-        print(f"Downloading {filename}...")
-        response = requests.get(remote_url, timeout=60)
+        response = requests.head(f"{R2_BUCKET}/{filename}", timeout=30)
         response.raise_for_status()
-        
-        # Ensure directory exists
-        local_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        # Write file
-        with open(local_path, "wb") as f:
-            f.write(response.content)
-        
-        # Verify checksum
-        local_etag = calculate_etag(local_path)
-        if local_etag == remote_etag:
-            print(f"✓ Successfully downloaded {filename}")
-            return True
-        else:
-            print(f"✗ Checksum verification failed for {filename}")
-            local_path.unlink()  # Remove corrupted file
-            return False
-            
+        return response.headers.get("ETag", "").strip('"')
+    except requests.RequestException as e:
+        print(f"Failed to get remote ETag for {filename}: {e}")
+        raise
+
+
+def download_file(filename, remote_etag):
+    """Download file from R2 bucket."""
+    url = f"{R2_BUCKET}/{filename}"
+    try:
+        response = requests.get(url, stream=True, timeout=300)
+        response.raise_for_status()
+
+        local_file = S3_FIXTURES_DIR / filename
+        print(f"  Downloading {filename}...")
+
+        with open(local_file, "wb") as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
+
+        print(f"  Verifying {filename}...")
+        local_etag = calculate_etag(local_file)
+        if local_etag != remote_etag:
+            local_file.unlink()  # Remove corrupted file
+            raise Exception(
+                f"ETag mismatch after downloading: {local_etag} != {remote_etag}"
+            )
+        print(f"  ✓ {filename} downloaded and verified successfully")
     except requests.RequestException as e:
         print(f"Failed to download {filename}: {e}")
-        return False
+        raise
+    except Exception as e:
+        print(f"Error processing {filename}: {e}")
+        raise
 
 
 def main():
-    """Download all fixture files."""
-    print("Downloading ClickHouse test fixtures...")
+    print("Starting fixture download process...")
     
-    # Create fixtures directory if it doesn't exist
-    S3_FIXTURES_DIR.mkdir(parents=True, exist_ok=True)
+    # Create s3-fixtures directory if it doesn't exist
+    S3_FIXTURES_DIR.mkdir(exist_ok=True)
+
+    def process_fixture(fixture):
+        try:
+            local_file = S3_FIXTURES_DIR / fixture
+            print(f"Processing {fixture}...")
+            remote_etag = get_remote_etag(fixture)
+
+            if not local_file.exists():
+                print(f"Downloading {fixture} (file doesn't exist locally)")
+                download_file(fixture, remote_etag)
+                return True
+
+            local_etag = calculate_etag(local_file)
+
+            if local_etag != remote_etag:
+                print(f"Downloading {fixture} (ETag mismatch)")
+                print(f"Local ETag: {local_etag}")
+                print(f"Remote ETag: {remote_etag}")
+                download_file(fixture, remote_etag)
+                return True
+            else:
+                print(f"Skipping {fixture} (up to date)")
+                return True
+        except Exception as e:
+            print(f"Error processing {fixture}: {e}")
+            return False
+
+    # Use ThreadPoolExecutor to download files in parallel
+    print(f"Processing {len(FIXTURES)} fixture files...")
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(executor.map(process_fixture, FIXTURES))
     
-    # Download files in parallel
-    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-        futures = {executor.submit(download_file, filename): filename for filename in FIXTURES}
-        
-        success_count = 0
-        for future in concurrent.futures.as_completed(futures):
-            filename = futures[future]
-            try:
-                if future.result():
-                    success_count += 1
-            except Exception as e:
-                print(f"Exception downloading {filename}: {e}")
+    success_count = sum(results)
+    print(f"\nCompleted: {success_count}/{len(FIXTURES)} files processed successfully")
     
-    print(f"\nDownload complete: {success_count}/{len(FIXTURES)} files successful")
-    
-    if success_count == len(FIXTURES):
-        print("All fixtures downloaded successfully!")
-        return 0
-    else:
+    if success_count < len(FIXTURES):
         print("Some fixtures failed to download!")
-        return 1
+        exit(1)
+    else:
+        print("All fixtures processed successfully!")
+        exit(0)
 
 
 if __name__ == "__main__":
-    exit(main())
+    main()
