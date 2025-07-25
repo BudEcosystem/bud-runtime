@@ -71,6 +71,7 @@ export default function AddUser() {
   const { closeDrawer } = useDrawer();
   const { userDetails, addUser, createdUser, setCreatedUser } = useUsers();
   const [userRole, setUserRole] = useState(userDetails?.role || []);
+  const [userType, setUserType] = useState("client");
 
   const handlePasswordChange = (password: string) => {
     setGeneratedPassword(password);
@@ -78,8 +79,8 @@ export default function AddUser() {
 
 
   useEffect(() => {
-    setFormData((prev) => ({ ...prev, role: userRole }))
-  }, [userRole]);
+    setFormData((prev) => ({ ...prev, role: userRole, user_type: userType }))
+  }, [userRole, userType]);
 
   const primaryTableData = [
     {
@@ -186,7 +187,7 @@ export default function AddUser() {
 
 
   const handleSubmit = async() => {
-    if (!formData.name || !formData.email || !formData.role) {
+    if (!formData?.name || !formData?.email || !formData?.role) {
       errorToast('Please fill in all required fields');
       return;
     }
@@ -194,6 +195,7 @@ export default function AddUser() {
       ...formData,
       password: generatedPassword,
       permissions: selectedPermissions,
+      user_type: userType,
     };
     setCreatedUser(data)
     try {
@@ -334,6 +336,64 @@ export default function AddUser() {
                         />
                       );
                     }}
+                  />
+                </ConfigProvider>
+              </div>
+            </div>
+            <div
+              className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0] mt-[1.4rem]`}
+            >
+              <div className="w-full">
+                <Text_12_300_EEEEEE className="absolute h-[3px] bg-[#0d0d0d] top-[0rem] left-[.75rem] px-[0.025rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap bg-[#0d0d0d] pl-[.35rem] pr-[.55rem]">
+                  User Type
+                  <b className="text-[#FF4D4F]">*</b>
+                  <CustomPopover title="Select user type (Admin or Client)" >
+                    <Image
+                      src="/images/info.png"
+                      preview={false}
+                      alt="info"
+                      style={{ width: '.75rem', height: '.75rem' }}
+                    />
+                  </CustomPopover>
+                </Text_12_300_EEEEEE>
+              </div>
+              <div className="custom-select-two w-full rounded-[6px] relative">
+                <ConfigProvider
+                  theme={{
+                    token: {
+                      colorTextPlaceholder: '#808080',
+                    },
+                    components: {
+                      Select: {
+                        // multipleItemHeightSM: 16
+                      }
+                    }
+                  }}
+                >
+                  <Select
+                    suffixIcon={
+                      <Image
+                      src="/images/icons/dropD.png"
+                      preview={false}
+                      alt="info"
+                      style={{ width: 'auto', height: 'auto' }}
+                    />
+                    }
+                    placeholder="Select User Type"
+                    style={{
+                      backgroundColor: "transparent",
+                      color: "#EEEEEE",
+                      border: "0.5px solid #757575",
+                      width: "100%",
+                    }}
+                    size="large"
+                    className="drawerInp !bg-[transparent] text-[#EEEEEE] font-[300] text-[.75rem] shadow-none w-full indent-[.5rem] border-0 outline-0 hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] outline-none"
+                    options={[
+                      { label: "Client", value: "client" },
+                      { label: "Admin", value: "admin" },
+                    ]}
+                    value={userType} // Controlled state
+                    onChange={(value) => setUserType(value)}
                   />
                 </ConfigProvider>
               </div>

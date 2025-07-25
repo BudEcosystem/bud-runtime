@@ -13,7 +13,7 @@ import { successToast } from "./../../../components/toast";
 import { useLoader } from "src/context/appContext";
 import { PermissionEnum, useUser } from "src/stores/useUser";
 import { Button, Popover, Table, TableProps, Image, ConfigProvider, Select } from "antd";
-import { Text_12_300_EEEEEE, Text_12_400_EEEEEE } from "@/components/ui/text";
+import { Text_12_300_EEEEEE, Text_12_400_EEEEEE, Text_12_400_757575 } from "@/components/ui/text";
 import NoDataFount from "@/components/ui/noDataFount";
 import { PrimaryButton, SecondaryButton } from "@/components/ui/bud/form/Buttons";
 import PageHeader from "@/components/ui/pageHeader";
@@ -46,6 +46,7 @@ interface User {
   status: string;
   id: string;
   color: string;
+  user_type?: string;
   action?: any;
 }
 
@@ -67,6 +68,11 @@ export default function UserManagement() {
   const [pageSize, setPageSize] = useState(10);
   const totalItems = 100;
 
+  // Separate states for admin and client users
+  const [activeTab, setActiveTab] = useState<'client' | 'admin'>('client');
+  const [adminCurrentPage, setAdminCurrentPage] = useState(1);
+  const [clientCurrentPage, setClientCurrentPage] = useState(1);
+  
   const { users, totalUsers, getUsers, getUsersDetails, userDetails, getUsersPermissions, userPermissions } = useUsers();
   const [tempFilter, setTempFilter] = useState<any>({});
   const [filter, setFilter] = useState<
@@ -109,18 +115,20 @@ export default function UserManagement() {
   const load = useCallback(async (filter) => {
     if (hasPermission(PermissionEnum.UserManage)) {
       showLoader();
-      await getUsers({
-        page: currentPage,
+      const params = {
+        page: activeTab === 'admin' ? adminCurrentPage : clientCurrentPage,
         limit: pageSize,
         name: filter.name,
         email: filter.email,
         role: filter.role,
         status: filter.status,
         order_by: '-created_at',
-      });
+        user_type: activeTab,
+      };
+      await getUsers(params);
       hideLoader();
     }
-  }, [currentPage, pageSize, getUsers]);
+  }, [activeTab, adminCurrentPage, clientCurrentPage, pageSize, getUsers]);
 
   useEffect(() => {
     if (isMounted) {
@@ -129,7 +137,7 @@ export default function UserManagement() {
       }, 1000);
     }
     // load(filter);
-  }, [currentPage, pageSize, getUsers, isMounted]);
+  }, [activeTab, adminCurrentPage, clientCurrentPage, pageSize, getUsers, isMounted]);
 
   useEffect(() => {
     if (filterReset) {
@@ -211,8 +219,16 @@ export default function UserManagement() {
   ];
 
   const handlePageChange = (currentPage, pageSize) => {
-    setCurrentPage(currentPage);
+    if (activeTab === 'admin') {
+      setAdminCurrentPage(currentPage);
+    } else {
+      setClientCurrentPage(currentPage);
+    }
     setPageSize(pageSize);
+  };
+
+  const getCurrentPage = () => {
+    return activeTab === 'admin' ? adminCurrentPage : clientCurrentPage;
   };
 
   useEffect(() => {
@@ -393,43 +409,76 @@ export default function UserManagement() {
           />
         </div>
         {hasPermission(PermissionEnum.UserManage) ?
-          <div className="pt-4 tablePadding userTable relative CommonCustomPagination">
-            <Table<User>
-              columns={columns}
-              // pagination={false}
-              pagination={{
-                className: 'small-pagination',
-                current: currentPage,
-                pageSize: pageSize,
-                total: totalUsers,
-                onChange: handlePageChange,
-                showSizeChanger: true,
-                pageSizeOptions: ['5', '10', '20', '50'],
-              }}
-              dataSource={users}
-              bordered={false}
-              footer={null}
-              virtual
-              onRow={(record, rowIndex) => {
-                return {
-                  onClick: async event => {
-                    event.stopPropagation();
-                    if (hasPermission(PermissionEnum.UserManage) && record.status == "active") {
-                      openUserPermissions(record)
+          <div className="pt-4">
+            {/* Tab Navigation */}
+            <div className="flex mb-4 border-b border-[#1F1F1F]">
+              <button
+                onClick={() => setActiveTab('client')}
+                className={`px-4 py-2 text-sm font-medium transition-colors ${
+                  activeTab === 'client'
+                    ? 'text-[#EEEEEE] border-b-2 border-[#D1B854]'
+                    : 'text-[#757575] hover:text-[#EEEEEE]'
+                }`}
+              >
+                Client Users
+              </button>
+              <button
+                onClick={() => setActiveTab('admin')}
+                className={`px-4 py-2 text-sm font-medium transition-colors ${
+                  activeTab === 'admin'
+                    ? 'text-[#EEEEEE] border-b-2 border-[#D1B854]'
+                    : 'text-[#757575] hover:text-[#EEEEEE]'
+                }`}
+              >
+                Admin Users
+              </button>
+            </div>
+            
+            {/* User Count Display */}
+            <div className="mb-4 px-4">
+              <Text_12_400_757575>
+                Showing {totalUsers} {activeTab === 'admin' ? 'Admin' : 'Client'} Users
+              </Text_12_400_757575>
+            </div>
+            
+            {/* Users Table */}
+            <div className="tablePadding userTable relative CommonCustomPagination">
+              <Table<User>
+                columns={columns}
+                pagination={{
+                  className: 'small-pagination',
+                  current: getCurrentPage(),
+                  pageSize: pageSize,
+                  total: totalUsers,
+                  onChange: handlePageChange,
+                  showSizeChanger: true,
+                  pageSizeOptions: ['5', '10', '20', '50'],
+                }}
+                dataSource={users}
+                bordered={false}
+                footer={null}
+                virtual
+                onRow={(record, rowIndex) => {
+                  return {
+                    onClick: async event => {
+                      event.stopPropagation();
+                      if (hasPermission(PermissionEnum.UserManage) && record.status == "active") {
+                        openUserPermissions(record)
+                      }
                     }
                   }
-                }
-              }}
-              showSorterTooltip={false}
-              locale={{
-                emptyText: (
-                  <NoDataFount
-                    classNames="h-[20vh]"
-                    textMessage={`No Users`}
-                  />
-                ),
-              }}
-            />
+                }}
+                showSorterTooltip={false}
+                locale={{
+                  emptyText: (
+                    <NoDataFount
+                      classNames="h-[20vh]"
+                      textMessage={`No ${activeTab === 'admin' ? 'Admin' : 'Client'} Users`}
+                    />
+                  ),
+                }}
+              />
+            </div>
           </div>
           : <>
             <NoAccess textMessage="You do not have access to view user management, please ask admin to give you access to manage users." />
