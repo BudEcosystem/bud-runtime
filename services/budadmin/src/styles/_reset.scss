@@ -1,0 +1,56 @@
+html,
+body {
+  font-size: 16px;
+}
+
+
+@media only screen and (min-width: 1440px) {
+
+  html,
+  body {
+    // font-size: 16px;
+    font-size: 17px;
+    
+  }
+}
+
+@media only screen and (min-width: 1680px) {
+
+  html,
+  body {
+    // font-size: 16px;
+    font-size: 20px;
+  }
+}
+
+@media only screen and (min-width: 1920px) {
+
+  html,
+  body {
+    // font-size: 16px;
+    font-size: 22px;
+  }
+}
+
+@media only screen and (min-width: 2400px) {
+
+  html,
+  body {
+    // font-size: 20px;
+    font-size: 28px;
+  }
+}
+
+@media only screen and (max-width: 768px) {
+  html,
+  body {
+    font-size: 14px;
+  }
+}
+
+// @media only screen and (max-width: 1280px) {
+//   html,
+//   body {
+//     font-size: 12px;
+//   }
+// }

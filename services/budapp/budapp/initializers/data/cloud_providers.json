@@ -1,0 +1,413 @@
+[
+  {
+    "name": "AWS",
+    "unique_id": "aws",
+    "logo_url": "icons/providers/cloud-providers/aws.png",
+    "description": "Amazon Web Services",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "access_key_id": {
+          "type": "string",
+          "label": "Access Key ID",
+          "description": "Enter your AWS Access Key ID",
+          "required": true
+        },
+        "secret_access_key": {
+          "type": "string",
+          "label": "Secret Access Key",
+          "description": "Enter your AWS Secret Access Key",
+          "required": true
+        }
+      },
+      "required": ["access_key_id", "secret_access_key"]
+    }
+  },
+  {
+    "name": "Google Cloud",
+    "unique_id": "gcp",
+    "logo_url": "icons/providers/cloud-providers/gcp.png",
+    "description": "Google Cloud Platform",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "project_id": {
+          "type": "string",
+          "label": "Project ID",
+          "description": "Enter your GCP Project ID",
+          "required": true
+        },
+        "service_account_key": {
+          "type": "string",
+          "label": "Service Account Key",
+          "description": "Enter your Service Account JSON key content",
+          "required": true,
+          "multiline": true
+        }
+      },
+      "required": ["project_id", "service_account_key"]
+    }
+  },
+  {
+    "name": "Azure",
+    "unique_id": "azure",
+    "description": "Microsoft Azure",
+    "logo_url": "icons/providers/cloud-providers/azure.png",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "client_id": {
+          "type": "string",
+          "label": "Client ID",
+          "description": "Enter your Client ID",
+          "required": true
+        },
+        "client_secret": {
+          "type": "string",
+          "label": "Client Secret",
+          "description": "Enter your Client Secret",
+          "required": true
+        },
+        "tenant_id": {
+          "type": "string",
+          "label": "Tenant ID",
+          "description": "Enter your Tenant ID",
+          "required": true
+        },
+        "subscription_id": {
+          "type": "string",
+          "label": "Subscription ID",
+          "description": "Enter your Subscription ID",
+          "required": true
+        }
+      },
+      "required": ["client_id", "client_secret", "tenant_id", "subscription_id"]
+    }
+  },
+  {
+    "name": "Oracle Cloud",
+    "unique_id": "oracle",
+    "logo_url": "icons/providers/cloud-providers/oracle.png",
+    "description": "Oracle Cloud Infrastructure",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "user_ocid": {
+          "type": "string",
+          "label": "User OCID",
+          "description": "Enter your User OCID",
+          "required": true
+        },
+        "tenancy_ocid": {
+          "type": "string",
+          "label": "Tenancy OCID",
+          "description": "Enter your Tenancy OCID",
+          "required": true
+        },
+        "fingerprint": {
+          "type": "string",
+          "label": "Fingerprint",
+          "description": "Enter your API Key Fingerprint",
+          "required": true
+        },
+        "private_key": {
+          "type": "string",
+          "label": "Private Key",
+          "description": "Enter your Private Key content",
+          "required": true,
+          "multiline": true
+        },
+        "region": {
+          "type": "string",
+          "label": "Region",
+          "description": "Enter your OCI Region (e.g., us-ashburn-1)",
+          "required": true
+        }
+      },
+      "required": ["user_ocid", "tenancy_ocid", "fingerprint", "private_key", "region"]
+    }
+  },
+  {
+    "name": "Lambda",
+    "unique_id": "lambda",
+    "logo_url": "icons/providers/cloud-providers/lambda.png",
+    "description": "AWS Lambda Serverless Computing",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "access_key_id": {
+          "type": "string",
+          "label": "Access Key ID",
+          "description": "Enter your AWS Access Key ID",
+          "required": true
+        },
+        "secret_access_key": {
+          "type": "string",
+          "label": "Secret Access Key",
+          "description": "Enter your AWS Secret Access Key",
+          "required": true
+        },
+        "region": {
+          "type": "string",
+          "label": "Region",
+          "description": "Enter your AWS Region (e.g., us-east-1)",
+          "required": true
+        }
+      },
+      "required": ["access_key_id", "secret_access_key", "region"]
+    }
+  },
+  {
+    "name": "RunPod",
+    "unique_id": "runpod",
+    "logo_url": "icons/providers/cloud-providers/runpod.png",
+    "description": "RunPod GPU Cloud Computing",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "api_key": {
+          "type": "string",
+          "label": "API Key",
+          "description": "Enter your RunPod API Key",
+          "required": true
+        }
+      },
+      "required": ["api_key"]
+    }
+  },
+  {
+    "name": "Kubernetes",
+    "unique_id": "kubernetes",
+    "logo_url": "icons/providers/cloud-providers/kubernetes.png",
+    "description": "Kubernetes Container Orchestration",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "kubeconfig": {
+          "type": "string",
+          "label": "Kubeconfig",
+          "description": "Enter your Kubernetes config content",
+          "required": true,
+          "multiline": true
+        },
+        "namespace": {
+          "type": "string",
+          "label": "Namespace",
+          "description": "Enter your default namespace (optional)",
+          "required": false
+        }
+      },
+      "required": ["kubeconfig"]
+    }
+  },
+  {
+    "name": "FluidStack",
+    "unique_id": "fluidstack",
+    "logo_url": "icons/providers/cloud-providers/fluidstack.png",
+    "description": "FluidStack GPU Cloud",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "api_key": {
+          "type": "string",
+          "label": "API Key",
+          "description": "Enter your FluidStack API Key",
+          "required": true
+        }
+      },
+      "required": ["api_key"]
+    }
+  },
+  {
+    "name": "Vast.ai",
+    "unique_id": "vast_ai",
+    "logo_url": "icons/providers/cloud-providers/vast.png",
+    "description": "Vast.ai GPU Rental Platform",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "api_key": {
+          "type": "string",
+          "label": "API Key",
+          "description": "Enter your Vast.ai API Key",
+          "required": true
+        }
+      },
+      "required": ["api_key"]
+    }
+  },
+  {
+    "name": "Cudo Compute",
+    "unique_id": "cudo",
+    "logo_url": "icons/providers/cloud-providers/cudo.png",
+    "description": "Cudo Compute Cloud Platform",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "api_key": {
+          "type": "string",
+          "label": "API Key",
+          "description": "Enter your Cudo Compute API Key",
+          "required": true
+        },
+        "project_id": {
+          "type": "string",
+          "label": "Project ID",
+          "description": "Enter your Project ID",
+          "required": true
+        }
+      },
+      "required": ["api_key", "project_id"]
+    }
+  },
+  {
+    "name": "Paperspace",
+    "unique_id": "paperspace",
+    "logo_url": "icons/providers/cloud-providers/paperspace.png",
+    "description": "Paperspace GPU Cloud",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "api_key": {
+          "type": "string",
+          "label": "API Key",
+          "description": "Enter your Paperspace API Key",
+          "required": true
+        }
+      },
+      "required": ["api_key"]
+    }
+  },
+  {
+    "name": "DigitalOcean",
+    "unique_id": "digitalocean",
+    "logo_url": "icons/providers/cloud-providers/digitalocean.png",
+    "description": "DigitalOcean Cloud Platform",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "access_token": {
+          "type": "string",
+          "label": "Access Token",
+          "description": "Enter your DigitalOcean Personal Access Token",
+          "required": true
+        }
+      },
+      "required": ["access_token"]
+    }
+  },
+  {
+    "name": "Cloudflare",
+    "unique_id": "cloudflare",
+    "logo_url": "icons/providers/cloud-providers/cf.png",
+    "description": "Cloudflare Edge Computing",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "label": "Email",
+          "description": "Enter your Cloudflare account email",
+          "required": true
+        },
+        "api_key": {
+          "type": "string",
+          "label": "Global API Key",
+          "description": "Enter your Cloudflare Global API Key",
+          "required": true
+        },
+        "account_id": {
+          "type": "string",
+          "label": "Account ID",
+          "description": "Enter your Cloudflare Account ID",
+          "required": false
+        }
+      },
+      "required": ["email", "api_key"]
+    }
+  },
+  {
+    "name": "Samsung Cloud",
+    "unique_id": "samsung",
+    "logo_url": "icons/providers/cloud-providers/samsung.png",
+    "description": "Samsung Cloud Services",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "client_id": {
+          "type": "string",
+          "label": "Client ID",
+          "description": "Enter your Samsung Cloud Client ID",
+          "required": true
+        },
+        "client_secret": {
+          "type": "string",
+          "label": "Client Secret",
+          "description": "Enter your Samsung Cloud Client Secret",
+          "required": true
+        }
+      },
+      "required": ["client_id", "client_secret"]
+    }
+  },
+  {
+    "name": "IBM Cloud",
+    "unique_id": "ibm_cloud",
+    "logo_url": "icons/providers/cloud-providers/ibm.png",
+    "description": "IBM Cloud Platform",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "api_key": {
+          "type": "string",
+          "label": "API Key",
+          "description": "Enter your IBM Cloud API Key",
+          "required": true
+        },
+        "region": {
+          "type": "string",
+          "label": "Region",
+          "description": "Enter your IBM Cloud Region (e.g., us-south)",
+          "required": true
+        }
+      },
+      "required": ["api_key", "region"]
+    }
+  },
+  {
+    "name": "VMware vSphere",
+    "unique_id": "vmware",
+    "logo_url": "icons/providers/cloud-providers/vmware.png",
+    "description": "VMware vSphere Virtualization Platform",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "vcenter_host": {
+          "type": "string",
+          "label": "vCenter Host",
+          "description": "Enter your vCenter Server hostname or IP",
+          "required": true
+        },
+        "username": {
+          "type": "string",
+          "label": "Username",
+          "description": "Enter your vSphere username",
+          "required": true
+        },
+        "password": {
+          "type": "string",
+          "label": "Password",
+          "description": "Enter your vSphere password",
+          "required": true
+        },
+        "datacenter": {
+          "type": "string",
+          "label": "Datacenter",
+          "description": "Enter your vSphere datacenter name",
+          "required": false
+        }
+      },
+      "required": ["vcenter_host", "username", "password"]
+    }
+  }
+]
