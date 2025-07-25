@@ -1,0 +1,65 @@
+[gateway]
+bind_address = "0.0.0.0:3000"
+
+[models."llama-v3p2-3b-instruct"]
+routing = ["fireworks"]
+endpoints = ["chat"]
+
+[models."llama-v3p2-3b-instruct".providers.fireworks]
+type = "fireworks"
+model_name = "accounts/fireworks/models/llama-v3p2-3b-instruct"
+
+[models."llama-v3p1-70b-instruct"]
+routing = ["fireworks"]
+endpoints = ["chat"]
+
+[models."llama-v3p1-70b-instruct".providers.fireworks]
+type = "fireworks"
+model_name = "accounts/fireworks/models/llama-v3p1-70b-instruct"
+
+[models."llama-v3p1-8b-instruct"]
+routing = ["fireworks"]
+endpoints = ["chat"]
+
+[models."llama-v3p1-8b-instruct".providers.fireworks]
+type = "fireworks"
+model_name = "accounts/fireworks/models/llama-v3p1-8b-instruct"
+
+# Model with reasoning capabilities
+[models."deepseek-r1"]
+routing = ["fireworks"]
+endpoints = ["chat"]
+
+[models."deepseek-r1".providers.fireworks]
+type = "fireworks"
+model_name = "accounts/fireworks/models/deepseek-r1"
+
+# Embedding model
+[models."nomic-embed-text-v1_5"]
+routing = ["fireworks"]
+endpoints = ["embedding"]
+
+[models."nomic-embed-text-v1_5".providers.fireworks]
+type = "fireworks"
+model_name = "nomic-ai/nomic-embed-text-v1.5"
+
+# Audio models (Whisper)
+[models."whisper-v3"]
+routing = ["fireworks"]
+endpoints = ["audio_transcription", "audio_translation"]
+
+[models."whisper-v3".providers.fireworks]
+type = "fireworks"
+model_name = "whisper-v3"
+
+[models."whisper-v3-turbo"]
+routing = ["fireworks"]
+endpoints = ["audio_transcription", "audio_translation"]
+
+[models."whisper-v3-turbo".providers.fireworks]
+type = "fireworks"
+model_name = "whisper-v3-turbo"
+
+# Note: Image generation models are supported by Fireworks but use an async workflow API
+# that returns a request_id instead of images directly. This is not currently compatible
+# with TensorZero's synchronous image generation interface.

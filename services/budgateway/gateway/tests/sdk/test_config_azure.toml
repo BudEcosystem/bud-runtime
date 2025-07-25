@@ -1,0 +1,108 @@
+# Azure SDK Integration Test Configuration
+# This file configures TensorZero to work with Azure OpenAI Service
+
+[gateway]
+bind_address = "0.0.0.0:3001"
+debug = true
+
+[gateway.authentication]
+enabled = false
+
+# Azure OpenAI Chat Models
+[models."gpt-35-turbo-azure"]
+routing = ["azure"]
+endpoints = ["chat"]
+
+[models."gpt-35-turbo-azure".providers.azure]
+type = "azure"
+deployment_id = "gpt-35-turbo"  # Your Azure deployment name
+endpoint = "https://your-resource.openai.azure.com/"  # Replace with your Azure endpoint
+api_key_location = "env::AZURE_OPENAI_API_KEY"
+
+[models."gpt-4-azure"]
+routing = ["azure"]
+endpoints = ["chat"]
+
+[models."gpt-4-azure".providers.azure]
+type = "azure"
+deployment_id = "gpt-4"  # Your Azure deployment name
+endpoint = "https://your-resource.openai.azure.com/"  # Replace with your Azure endpoint
+api_key_location = "env::AZURE_OPENAI_API_KEY"
+
+# Azure with structured outputs support
+[models."gpt-4o-azure"]
+routing = ["azure"]
+endpoints = ["chat"]
+
+[models."gpt-4o-azure".providers.azure]
+type = "azure"
+deployment_id = "gpt-4o"  # Your Azure deployment name
+endpoint = "https://your-resource.openai.azure.com/"  # Replace with your Azure endpoint
+api_key_location = "env::AZURE_OPENAI_API_KEY"
+
+# Azure OpenAI Embedding Models
+[models."text-embedding-ada-002-azure"]
+routing = ["azure-embedding"]
+endpoints = ["embedding"]
+
+[models."text-embedding-ada-002-azure".providers.azure-embedding]
+type = "azure"
+deployment_id = "text-embedding-ada-002"  # Your Azure deployment name
+endpoint = "https://your-resource.openai.azure.com/"  # Replace with your Azure endpoint
+api_key_location = "env::AZURE_OPENAI_API_KEY"
+
+# Azure with extra_body configuration for SDK-specific parameters
+[models."gpt-35-turbo-azure-extra"]
+routing = ["azure-extra"]
+endpoints = ["chat"]
+
+[models."gpt-35-turbo-azure-extra".providers.azure-extra]
+type = "azure"
+deployment_id = "gpt-35-turbo"
+endpoint = "https://your-resource.openai.azure.com/"
+api_key_location = "env::AZURE_OPENAI_API_KEY"
+# Example extra_body for Azure-specific parameters
+extra_body = { dataSources = [], logprobs = true }
+
+# Dynamic credentials test
+[models."gpt-35-turbo-azure-dynamic"]
+routing = ["azure-dynamic"]
+endpoints = ["chat"]
+
+[models."gpt-35-turbo-azure-dynamic".providers.azure-dynamic]
+type = "azure"
+deployment_id = "gpt-35-turbo"
+endpoint = "https://your-resource.openai.azure.com/"
+api_key_location = "dynamic::azure_api_key"
+
+# Azure Audio Models
+[models."whisper-1-azure"]
+routing = ["azure-audio"]
+endpoints = ["audio_transcription", "audio_translation"]
+
+[models."whisper-1-azure".providers.azure-audio]
+type = "azure"
+deployment_id = "whisper-1"  # Your Azure deployment name
+endpoint = "https://your-resource.openai.azure.com/"  # Replace with your Azure endpoint
+api_key_location = "env::AZURE_OPENAI_API_KEY"
+
+[models."tts-1-azure"]
+routing = ["azure-tts"]
+endpoints = ["text_to_speech"]
+
+[models."tts-1-azure".providers.azure-tts]
+type = "azure"
+deployment_id = "tts-1"  # Your Azure deployment name
+endpoint = "https://your-resource.openai.azure.com/"  # Replace with your Azure endpoint
+api_key_location = "env::AZURE_OPENAI_API_KEY"
+
+# Azure Image Generation Models
+[models."dall-e-3-azure"]
+routing = ["azure-image"]
+endpoints = ["image_generation"]
+
+[models."dall-e-3-azure".providers.azure-image]
+type = "azure"
+deployment_id = "dall-e-3"  # Your Azure deployment name
+endpoint = "https://your-resource.openai.azure.com/"  # Replace with your Azure endpoint
+api_key_location = "env::AZURE_OPENAI_API_KEY"

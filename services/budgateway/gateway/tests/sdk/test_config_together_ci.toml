@@ -1,0 +1,138 @@
+# Together AI CI test configuration
+# Uses dummy providers for predictable testing without API keys
+
+[gateway]
+bind_address = "0.0.0.0:3001"
+debug = true
+
+[gateway.authentication]
+enabled = false
+
+[gateway.observability]
+enabled = false
+
+# === Together AI Models with Dummy Provider ===
+# All these models work with OpenAI SDK through /v1/chat/completions
+
+# Latest Llama models
+[models."meta-llama/Llama-3.3-70B-Instruct-Turbo"]
+routing = ["dummy"]
+endpoints = ["chat"]
+
+[models."meta-llama/Llama-3.3-70B-Instruct-Turbo".providers.dummy]
+type = "dummy"
+model_name = "test"
+
+[models."meta-llama/Llama-3.2-3B-Instruct-Turbo"]
+routing = ["dummy"]
+endpoints = ["chat"]
+
+[models."meta-llama/Llama-3.2-3B-Instruct-Turbo".providers.dummy]
+type = "dummy"
+model_name = "test"
+
+[models."meta-llama/Llama-3.1-8B-Instruct-Turbo"]
+routing = ["dummy"]
+endpoints = ["chat"]
+
+[models."meta-llama/Llama-3.1-8B-Instruct-Turbo".providers.dummy]
+type = "dummy"
+model_name = "test"
+
+# Qwen models
+[models."Qwen/Qwen2.5-72B-Instruct-Turbo"]
+routing = ["dummy"]
+endpoints = ["chat"]
+
+[models."Qwen/Qwen2.5-72B-Instruct-Turbo".providers.dummy]
+type = "dummy"
+model_name = "test"
+
+# Mistral models
+[models."mistralai/Mixtral-8x7B-Instruct-v0.1"]
+routing = ["dummy"]
+endpoints = ["chat"]
+
+[models."mistralai/Mixtral-8x7B-Instruct-v0.1".providers.dummy]
+type = "dummy"
+model_name = "test"
+
+# DeepSeek models
+[models."deepseek-ai/deepseek-v2.5"]
+routing = ["dummy"]
+endpoints = ["chat"]
+
+[models."deepseek-ai/deepseek-v2.5".providers.dummy]
+type = "dummy"
+model_name = "test"
+
+# === Together AI Multimodal Models with Dummy Provider ===
+# Embedding models
+[models."together-bge-base"]
+routing = ["dummy"]
+endpoints = ["embedding"]
+
+[models."together-bge-base".providers.dummy]
+type = "dummy"
+model_name = "test"
+
+[models."together-m2-bert"]
+routing = ["dummy"]
+endpoints = ["embedding"]
+
+[models."together-m2-bert".providers.dummy]
+type = "dummy"
+model_name = "test"
+
+# Image generation models
+[models."flux-schnell"]
+routing = ["dummy"]
+endpoints = ["image_generation"]
+
+[models."flux-schnell".providers.dummy]
+type = "dummy"
+model_name = "test"
+
+# Text-to-speech models
+[models."together-tts"]
+routing = ["dummy"]
+endpoints = ["text_to_speech"]
+
+[models."together-tts".providers.dummy]
+type = "dummy"
+model_name = "test"
+
+# === Comparison models from other providers ===
+# For cross-provider testing
+
+[models."gpt-3.5-turbo"]
+routing = ["dummy"]
+endpoints = ["chat"]
+
+[models."gpt-3.5-turbo".providers.dummy]
+type = "dummy"
+model_name = "test"
+
+[models."claude-3-haiku-20240307"]
+routing = ["dummy"]
+endpoints = ["chat"]
+
+[models."claude-3-haiku-20240307".providers.dummy]
+type = "dummy"
+model_name = "test"
+
+[models."claude-3-5-sonnet-20241022"]
+routing = ["dummy"]
+endpoints = ["chat"]
+
+[models."claude-3-5-sonnet-20241022".providers.dummy]
+type = "dummy"
+model_name = "test"
+
+[models."text-embedding-3-small"]
+routing = ["dummy"]
+endpoints = ["embedding"]
+
+[models."text-embedding-3-small".providers.dummy]
+type = "dummy"
+model_name = "test"

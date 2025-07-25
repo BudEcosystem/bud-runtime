@@ -1,0 +1,130 @@
+[gateway]
+bind_address = "0.0.0.0:3001"
+debug = true
+
+[gateway.authentication]
+enabled = false
+
+[models."gpt-3.5-turbo"]
+routing = ["openai"]
+endpoints = ["chat"]
+
+[models."gpt-3.5-turbo".providers.openai]
+type = "openai"
+model_name = "gpt-3.5-turbo"
+api_key_location = "env::OPENAI_API_KEY"
+
+[models."gpt-4"]
+routing = ["openai"]
+endpoints = ["chat"]
+
+[models."gpt-4".providers.openai]
+type = "openai"
+model_name = "gpt-4"
+api_key_location = "env::OPENAI_API_KEY"
+
+[models."text-embedding-ada-002"]
+routing = ["openai"]
+endpoints = ["embedding"]
+
+[models."text-embedding-ada-002".providers.openai]
+type = "openai"
+model_name = "text-embedding-ada-002"
+api_key_location = "env::OPENAI_API_KEY"
+
+[models."text-embedding-3-small"]
+routing = ["openai"]
+endpoints = ["embedding"]
+
+[models."text-embedding-3-small".providers.openai]
+type = "openai"
+model_name = "text-embedding-3-small"
+api_key_location = "env::OPENAI_API_KEY"
+
+[models."omni-moderation-latest"]
+routing = ["openai"]
+endpoints = ["moderation"]
+
+[models."omni-moderation-latest".providers.openai]
+type = "openai"
+model_name = "omni-moderation-latest"
+api_key_location = "env::OPENAI_API_KEY"
+
+[models."whisper-1"]
+routing = ["openai"]
+endpoints = ["audio_transcription", "audio_translation"]
+
+[models."whisper-1".providers.openai]
+type = "openai"
+model_name = "whisper-1"
+api_key_location = "env::OPENAI_API_KEY"
+
+[models."tts-1"]
+routing = ["openai"]
+endpoints = ["text_to_speech"]
+
+[models."tts-1".providers.openai]
+type = "openai"
+model_name = "tts-1"
+api_key_location = "env::OPENAI_API_KEY"
+
+[models."tts-1-hd"]
+routing = ["openai"]
+endpoints = ["text_to_speech"]
+
+[models."tts-1-hd".providers.openai]
+type = "openai"
+model_name = "tts-1-hd"
+api_key_location = "env::OPENAI_API_KEY"
+
+[models."dall-e-2"]
+routing = ["openai"]
+endpoints = ["image_generation", "image_edit", "image_variation"]
+
+[models."dall-e-2".providers.openai]
+type = "openai"
+model_name = "dall-e-2"
+api_key_location = "env::OPENAI_API_KEY"
+
+[models."dall-e-3"]
+routing = ["openai"]
+endpoints = ["image_generation"]
+
+[models."dall-e-3".providers.openai]
+type = "openai"
+model_name = "dall-e-3"
+api_key_location = "env::OPENAI_API_KEY"
+
+[models."gpt-image-1"]
+routing = ["openai"]
+endpoints = ["image_generation", "image_edit"]
+
+[models."gpt-image-1".providers.openai]
+type = "openai"
+model_name = "gpt-image-1"
+[models."gpt-4o-realtime-preview"]
+routing = ["openai"]
+endpoints = ["realtime_session", "realtime_transcription"]
+
+[models."gpt-4o-realtime-preview".providers.openai]
+type = "openai"
+model_name = "gpt-4o-realtime-preview"
+api_key_location = "env::OPENAI_API_KEY"
+
+[models."gpt-4o-realtime-preview-2024-12-17"]
+routing = ["openai"]
+endpoints = ["realtime_session"]
+
+[models."gpt-4o-realtime-preview-2024-12-17".providers.openai]
+type = "openai"
+model_name = "gpt-4o-realtime-preview-2024-12-17"
+api_key_location = "env::OPENAI_API_KEY"
+
+[models."gpt-4o-mini-realtime-preview"]
+routing = ["openai"]
+endpoints = ["realtime_session", "realtime_transcription"]
+
+[models."gpt-4o-mini-realtime-preview".providers.openai]
+type = "openai"
+model_name = "gpt-4o-mini-realtime-preview"
+api_key_location = "env::OPENAI_API_KEY"

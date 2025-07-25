@@ -1,0 +1,102 @@
+[gateway]
+bind_address = "0.0.0.0:3001"
+debug = true
+
+[gateway.authentication]
+enabled = false
+
+[gateway.observability]
+enabled = false
+
+# Chat models using dummy provider
+[models."gpt-3.5-turbo"]
+routing = ["dummy"]
+endpoints = ["chat"]
+
+[models."gpt-3.5-turbo".providers.dummy]
+type = "dummy"
+model_name = "json"  # Returns JSON responses
+
+[models."gpt-4"]
+routing = ["dummy"]
+endpoints = ["chat"]
+
+[models."gpt-4".providers.dummy]
+type = "dummy"
+model_name = "test"  # Returns default chat responses
+
+# Embedding models using dummy provider
+[models."text-embedding-ada-002"]
+routing = ["dummy"]
+endpoints = ["embedding"]
+
+[models."text-embedding-ada-002".providers.dummy]
+type = "dummy"
+model_name = "embed"
+
+[models."text-embedding-3-small"]
+routing = ["dummy"]
+endpoints = ["embedding"]
+
+[models."text-embedding-3-small".providers.dummy]
+type = "dummy"
+model_name = "embed"
+
+# Moderation model using dummy provider
+[models."omni-moderation-latest"]
+routing = ["dummy"]
+endpoints = ["moderation"]
+
+[models."omni-moderation-latest".providers.dummy]
+type = "dummy"
+model_name = "moderate"
+
+# Audio models using dummy provider
+[models."whisper-1"]
+routing = ["dummy"]
+endpoints = ["audio_transcription", "audio_translation"]
+
+[models."whisper-1".providers.dummy]
+type = "dummy"
+model_name = "whisper"
+
+[models."tts-1"]
+routing = ["dummy"]
+endpoints = ["text_to_speech"]
+
+[models."tts-1".providers.dummy]
+type = "dummy"
+model_name = "tts"
+
+[models."tts-1-hd"]
+routing = ["dummy"]
+endpoints = ["text_to_speech"]
+
+[models."tts-1-hd".providers.dummy]
+type = "dummy"
+model_name = "tts"
+
+# Image models using dummy provider
+[models."dall-e-2"]
+routing = ["dummy"]
+endpoints = ["image_generation", "image_edit", "image_variation"]
+
+[models."dall-e-2".providers.dummy]
+type = "dummy"
+model_name = "image"
+
+[models."dall-e-3"]
+routing = ["dummy"]
+endpoints = ["image_generation"]
+
+[models."dall-e-3".providers.dummy]
+type = "dummy"
+model_name = "image"
+
+[models."gpt-image-1"]
+routing = ["dummy"]
+endpoints = ["image_generation", "image_edit"]
+
+[models."gpt-image-1".providers.dummy]
+type = "dummy"
+model_name = "image"

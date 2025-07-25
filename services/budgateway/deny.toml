@@ -1,0 +1,22 @@
+# cargo-deny
+
+[bans]
+deny = [
+    { name = "native-tls" },
+    # We normally ban openssl, but rdkafka requires it for SASL support
+    # So we'll handle this as a special case
+]
+skip = [
+    # AWS SDK dependencies pull in different versions
+    { name = "crypto-bigint" }
+]
+
+[advisories]
+ignore = [
+    "RUSTSEC-2024-0436", # We don't care that 'paste' is unmaintained
+    "RUSTSEC-2023-0071", # RSA Marvin Attack - timing side channel. We only use RSA for decrypting API keys from Redis in a trusted environment
+]
+
+[licenses]
+version = 2
+allow = ["Unicode-3.0", "Apache-2.0", "MIT", "CDLA-Permissive-2.0", "ISC", "CC0-1.0", "Apache-2.0 WITH LLVM-exception", "BSD-3-Clause", "Zlib", "MIT-0", "OpenSSL", "BSD-2-Clause"]

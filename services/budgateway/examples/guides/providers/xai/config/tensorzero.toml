@@ -1,0 +1,13 @@
+[models.grok_2_1212]
+routing = ["xai"]
+
+[models.grok_2_1212.providers.xai]
+type = "xai"
+model_name = "grok-2-1212"
+
+[functions.my_function_name]
+type = "chat"
+
+[functions.my_function_name.variants.my_variant_name]
+type = "chat_completion"
+model = "grok_2_1212"

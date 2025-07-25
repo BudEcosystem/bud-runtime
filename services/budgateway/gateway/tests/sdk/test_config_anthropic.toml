@@ -1,0 +1,75 @@
+[gateway]
+bind_address = "0.0.0.0:3001"
+debug = true
+
+[gateway.authentication]
+enabled = false
+
+# Claude 3 Opus - Most capable model
+[models."claude-3-opus-20240229"]
+routing = ["anthropic"]
+endpoints = ["chat"]
+
+[models."claude-3-opus-20240229".providers.anthropic]
+type = "anthropic"
+model_name = "claude-3-opus-20240229"
+api_key_location = "env::ANTHROPIC_API_KEY"
+
+# Claude 3 Sonnet - Balanced model
+[models."claude-3-sonnet-20240229"]
+routing = ["anthropic"]
+endpoints = ["chat"]
+
+[models."claude-3-sonnet-20240229".providers.anthropic]
+type = "anthropic"
+model_name = "claude-3-sonnet-20240229"
+api_key_location = "env::ANTHROPIC_API_KEY"
+
+# Claude 3 Haiku - Fast model
+[models."claude-3-haiku-20240307"]
+routing = ["anthropic"]
+endpoints = ["chat"]
+
+[models."claude-3-haiku-20240307".providers.anthropic]
+type = "anthropic"
+model_name = "claude-3-haiku-20240307"
+api_key_location = "env::ANTHROPIC_API_KEY"
+
+# Claude 3.5 Sonnet - Latest model
+[models."claude-3-5-sonnet-20241022"]
+routing = ["anthropic"]
+endpoints = ["chat"]
+
+[models."claude-3-5-sonnet-20241022".providers.anthropic]
+type = "anthropic"
+model_name = "claude-3-5-sonnet-20241022"
+api_key_location = "env::ANTHROPIC_API_KEY"
+
+# Claude 3.5 Haiku - Latest fast model
+[models."claude-3-5-haiku-20241022"]
+routing = ["anthropic"]
+endpoints = ["chat"]
+
+[models."claude-3-5-haiku-20241022".providers.anthropic]
+type = "anthropic"
+model_name = "claude-3-5-haiku-20241022"
+api_key_location = "env::ANTHROPIC_API_KEY"
+
+# Legacy models
+[models."claude-2.1"]
+routing = ["anthropic"]
+endpoints = ["chat"]
+
+[models."claude-2.1".providers.anthropic]
+type = "anthropic"
+model_name = "claude-2.1"
+api_key_location = "env::ANTHROPIC_API_KEY"
+
+[models."claude-instant-1.2"]
+routing = ["anthropic"]
+endpoints = ["chat"]
+
+[models."claude-instant-1.2".providers.anthropic]
+type = "anthropic"
+model_name = "claude-instant-1.2"
+api_key_location = "env::ANTHROPIC_API_KEY"

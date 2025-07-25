@@ -1,0 +1,65 @@
+# Example configuration demonstrating Fireworks multimodal capabilities
+
+[gateway]
+version = "0.1.0"
+authentication = false
+
+# Embedding model
+[models."nomic-embed-fireworks"]
+routing = ["fireworks"]
+endpoints = ["embedding"]
+
+[models."nomic-embed-fireworks".providers.fireworks]
+type = "fireworks"
+model_name = "nomic-ai/nomic-embed-text-v1.5"
+
+# Image generation models
+[models."stable-diffusion-xl-fireworks"]
+routing = ["fireworks"]
+endpoints = ["image_generation"]
+
+[models."stable-diffusion-xl-fireworks".providers.fireworks]
+type = "fireworks"
+model_name = "stable-diffusion-xl"
+
+[models."flux-schnell-fireworks"]
+routing = ["fireworks"]
+endpoints = ["image_generation"]
+
+[models."flux-schnell-fireworks".providers.fireworks]
+type = "fireworks"
+model_name = "flux-schnell"
+
+# Audio transcription models
+[models."whisper-v3-fireworks"]
+routing = ["fireworks"]
+endpoints = ["audio_transcription", "audio_translation"]
+
+[models."whisper-v3-fireworks".providers.fireworks]
+type = "fireworks"
+model_name = "whisper-v3"
+
+[models."whisper-v3-turbo-fireworks"]
+routing = ["fireworks"]
+endpoints = ["audio_transcription", "audio_translation"]
+
+[models."whisper-v3-turbo-fireworks".providers.fireworks]
+type = "fireworks"
+model_name = "whisper-v3-turbo"
+
+# Chat model for completeness
+[models."llama-3-70b-fireworks"]
+routing = ["fireworks"]
+endpoints = ["chat"]
+
+[models."llama-3-70b-fireworks".providers.fireworks]
+type = "fireworks"
+model_name = "accounts/fireworks/models/llama-v3p1-70b-instruct"
+
+# Metrics configuration (optional)
+[metrics]
+enable = true
+format = "json"
+
+# Environment:
+# FIREWORKS_API_KEY=your_api_key_here

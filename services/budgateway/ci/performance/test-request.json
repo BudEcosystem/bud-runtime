@@ -1,0 +1,13 @@
+{
+  "function_name": "function1",
+  "variant_name": "variant1",
+  "input": {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Is Santa real?"
+      }
+    ]
+  },
+  "stream": false
+}

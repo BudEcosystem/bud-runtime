@@ -1,0 +1,16 @@
+name: Build Gateway Container
+
+on:
+  workflow_call:
+
+jobs:
+  build-gateway-container:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      - name: Build `gateway` container
+        run: |
+          docker build -f gateway/Dockerfile . -t tensorzero/gateway:sha-${{ github.sha }}

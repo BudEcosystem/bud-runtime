@@ -1,0 +1,67 @@
+# Example configuration for Mistral embedding and moderation models
+
+[gateway]
+bind_address = "0.0.0.0:3000"
+
+[models."mistral-embed"]
+# Configuration for Mistral's embedding model
+routing = ["mistral"]
+endpoints = ["embedding"]
+
+[models."mistral-embed".providers.mistral]
+type = "mistral"
+model_name = "mistral-embed"
+# API key can be provided via environment variable
+api_key_location = { env = "MISTRAL_API_KEY" }
+
+[models."ministral-8b-2410"]
+# Configuration for moderation using Mistral's chat model
+# Note: Mistral doesn't have a dedicated moderation model,
+# so we use a chat model with moderation prompting
+routing = ["mistral"]
+endpoints = ["moderation"]
+
+[models."ministral-8b-2410".providers.mistral]
+type = "mistral"
+model_name = "ministral-8b-2410"
+api_key_location = { env = "MISTRAL_API_KEY" }
+
+# Example of a multi-purpose model that supports both chat and moderation
+[models."mistral-large-2411"]
+routing = ["mistral"]
+endpoints = ["chat", "moderation"]
+
+[models."mistral-large-2411".providers.mistral]
+type = "mistral"
+model_name = "mistral-large-2411"
+api_key_location = { env = "MISTRAL_API_KEY" }
+
+# Example with fallback configuration
+[models."embedding-with-fallback"]
+routing = ["mistral", "openai"]
+endpoints = ["embedding"]
+
+[models."embedding-with-fallback".providers.mistral]
+type = "mistral"
+model_name = "mistral-embed"
+api_key_location = { env = "MISTRAL_API_KEY" }
+
+[models."embedding-with-fallback".providers.openai]
+type = "openai"
+model_name = "text-embedding-3-small"
+api_key_location = { env = "OPENAI_API_KEY" }
+
+# Example moderation with fallback
+[models."moderation-with-fallback"]
+routing = ["mistral", "openai"]
+endpoints = ["moderation"]
+
+[models."moderation-with-fallback".providers.mistral]
+type = "mistral"
+model_name = "ministral-8b-2410"
+api_key_location = { env = "MISTRAL_API_KEY" }
+
+[models."moderation-with-fallback".providers.openai]
+type = "openai"
+model_name = "omni-moderation-latest"
+api_key_location = { env = "OPENAI_API_KEY" }

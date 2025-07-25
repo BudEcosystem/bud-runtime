@@ -1,0 +1,73 @@
+# Together AI CI test configuration
+# Uses OpenAI provider with minimal setup for CI testing
+
+[gateway]
+bind_address = "0.0.0.0:3001"
+debug = true
+
+[gateway.authentication]
+enabled = false
+
+[gateway.observability]
+enabled = false
+
+# === Together AI Models with OpenAI Provider ===
+# Using OpenAI provider as a stand-in for testing routing
+
+# Chat models
+[models."meta-llama/Llama-3.3-70B-Instruct-Turbo"]
+routing = ["openai"]
+endpoints = ["chat"]
+
+[models."meta-llama/Llama-3.3-70B-Instruct-Turbo".providers.openai]
+type = "openai"
+model_name = "gpt-3.5-turbo"
+api_key_location = "env::OPENAI_API_KEY"
+
+[models."meta-llama/Llama-3.1-8B-Instruct-Turbo"]
+routing = ["openai"]
+endpoints = ["chat"]
+
+[models."meta-llama/Llama-3.1-8B-Instruct-Turbo".providers.openai]
+type = "openai"
+model_name = "gpt-3.5-turbo"
+api_key_location = "env::OPENAI_API_KEY"
+
+# Embedding models
+[models."together-bge-base"]
+routing = ["openai"]
+endpoints = ["embedding"]
+
+[models."together-bge-base".providers.openai]
+type = "openai"
+model_name = "text-embedding-3-small"
+api_key_location = "env::OPENAI_API_KEY"
+
+[models."together-m2-bert"]
+routing = ["openai"]
+endpoints = ["embedding"]
+
+[models."together-m2-bert".providers.openai]
+type = "openai"
+model_name = "text-embedding-3-small"
+api_key_location = "env::OPENAI_API_KEY"
+
+# Image generation models
+[models."flux-schnell"]
+routing = ["openai"]
+endpoints = ["image_generation"]
+
+[models."flux-schnell".providers.openai]
+type = "openai"
+model_name = "dall-e-2"
+api_key_location = "env::OPENAI_API_KEY"
+
+# Text-to-speech models
+[models."together-tts"]
+routing = ["openai"]
+endpoints = ["text_to_speech"]
+
+[models."together-tts".providers.openai]
+type = "openai"
+model_name = "tts-1"
+api_key_location = "env::OPENAI_API_KEY"

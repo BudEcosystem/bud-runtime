@@ -1,0 +1,88 @@
+# Azure SDK CI Test Configuration (using dummy provider)
+# This file configures TensorZero to simulate Azure OpenAI for CI testing
+
+[gateway]
+bind_address = "0.0.0.0:3001"
+debug = true
+
+[gateway.authentication]
+enabled = false
+
+# Dummy models that simulate Azure OpenAI behavior
+[models."gpt-35-turbo-azure"]
+routing = ["dummy"]
+endpoints = ["chat"]
+
+[models."gpt-35-turbo-azure".providers.dummy]
+type = "dummy"
+model_name = "gpt-35-turbo-azure"
+
+[models."gpt-4-azure"]
+routing = ["dummy"]
+endpoints = ["chat"]
+
+[models."gpt-4-azure".providers.dummy]
+type = "dummy"
+model_name = "gpt-4-azure"
+
+[models."gpt-4o-azure"]
+routing = ["dummy"]
+endpoints = ["chat"]
+
+[models."gpt-4o-azure".providers.dummy]
+type = "dummy"
+model_name = "gpt-4o-azure"
+
+[models."text-embedding-ada-002-azure"]
+routing = ["dummy"]
+endpoints = ["embedding"]
+
+[models."text-embedding-ada-002-azure".providers.dummy]
+type = "dummy"
+model_name = "text-embedding-ada-002-azure"
+
+# Extra body configuration test
+[models."gpt-35-turbo-azure-extra"]
+routing = ["dummy"]
+endpoints = ["chat"]
+
+[models."gpt-35-turbo-azure-extra".providers.dummy]
+type = "dummy"
+model_name = "gpt-35-turbo-azure-extra"
+# For dummy provider, extra_body needs to be an array format
+# In real Azure config, this would be: extra_body = { dataSources = [], logprobs = true }
+
+# Dynamic credentials test
+[models."gpt-35-turbo-azure-dynamic"]
+routing = ["dummy"]
+endpoints = ["chat"]
+
+[models."gpt-35-turbo-azure-dynamic".providers.dummy]
+type = "dummy"
+model_name = "gpt-35-turbo-azure-dynamic"
+
+# Azure Audio Models (Dummy for CI)
+[models."whisper-1-azure"]
+routing = ["dummy"]
+endpoints = ["audio_transcription", "audio_translation"]
+
+[models."whisper-1-azure".providers.dummy]
+type = "dummy"
+model_name = "whisper-1-azure"
+
+[models."tts-1-azure"]
+routing = ["dummy"]
+endpoints = ["text_to_speech"]
+
+[models."tts-1-azure".providers.dummy]
+type = "dummy"
+model_name = "tts-1-azure"
+
+# Azure Image Generation Models (Dummy for CI)
+[models."dall-e-3-azure"]
+routing = ["dummy"]
+endpoints = ["image_generation"]
+
+[models."dall-e-3-azure".providers.dummy]
+type = "dummy"
+model_name = "dall-e-3-azure"

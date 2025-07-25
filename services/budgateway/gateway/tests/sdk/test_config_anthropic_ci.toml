@@ -1,0 +1,66 @@
+[gateway]
+bind_address = "0.0.0.0:3001"
+debug = true
+
+[gateway.authentication]
+enabled = false
+
+[gateway.observability]
+enabled = false
+
+# Claude models using dummy provider for CI testing
+[models."claude-3-opus-20240229"]
+routing = ["dummy"]
+endpoints = ["chat"]
+
+[models."claude-3-opus-20240229".providers.dummy]
+type = "dummy"
+model_name = "json"  # Returns JSON responses
+
+[models."claude-3-sonnet-20240229"]
+routing = ["dummy"]
+endpoints = ["chat"]
+
+[models."claude-3-sonnet-20240229".providers.dummy]
+type = "dummy"
+model_name = "test"  # Returns default chat responses
+
+[models."claude-3-haiku-20240307"]
+routing = ["dummy"]
+endpoints = ["chat"]
+
+[models."claude-3-haiku-20240307".providers.dummy]
+type = "dummy"
+model_name = "streaming"  # Returns streaming responses
+
+[models."claude-3-5-sonnet-20241022"]
+routing = ["dummy"]
+endpoints = ["chat"]
+
+[models."claude-3-5-sonnet-20241022".providers.dummy]
+type = "dummy"
+model_name = "tool_use"  # Returns tool use responses
+
+[models."claude-3-5-haiku-20241022"]
+routing = ["dummy"]
+endpoints = ["chat"]
+
+[models."claude-3-5-haiku-20241022".providers.dummy]
+type = "dummy"
+model_name = "test"  # Returns default chat responses
+
+[models."claude-2.1"]
+routing = ["dummy"]
+endpoints = ["chat"]
+
+[models."claude-2.1".providers.dummy]
+type = "dummy"
+model_name = "test"  # Returns default chat responses
+
+[models."claude-instant-1.2"]
+routing = ["dummy"]
+endpoints = ["chat"]
+
+[models."claude-instant-1.2".providers.dummy]
+type = "dummy"
+model_name = "streaming"  # Returns streaming responses

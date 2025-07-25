@@ -1,0 +1,54 @@
+# Example configuration demonstrating standard model name support
+# for both authenticated and unauthenticated access
+
+[gateway]
+bind_address = "0.0.0.0:3000"
+
+[gateway.authentication]
+# Set to false to allow unauthenticated access with standard model names
+# Default is true (authentication required)
+enabled = false
+
+# Define models with user-friendly names
+[models."o4-mini"]
+routing = ["openai"]
+endpoints = ['responses']
+
+[models."o4-mini".providers.openai]
+type = "openai"
+model_name = "o4-mini"
+
+
+# Usage examples:
+# 
+# 1. Direct model access (no authentication required with this config):
+#    curl -X POST http://localhost:3000/v1/chat/completions \
+#      -H "Content-Type: application/json" \
+#      -d '{
+#        "model": "gpt-3.5-turbo",
+#        "messages": [{"role": "user", "content": "Hello!"}]
+#      }'
+#
+# 2. Function access (still requires prefix):
+#    curl -X POST http://localhost:3000/v1/chat/completions \
+#      -H "Content-Type: application/json" \
+#      -d '{
+#        "model": "tensorzero::function_name::summarize",
+#        "messages": [{"role": "user", "content": "Summarize this text..."}]
+#      }'
+#
+# 3. Embedding access:
+#    curl -X POST http://localhost:3000/v1/embeddings \
+#      -H "Content-Type: application/json" \
+#      -d '{
+#        "model": "text-embedding-ada-002",
+#        "input": "Hello, world!"
+#      }'
+#
+# 4. Backward compatibility - prefixed names still work:
+#    curl -X POST http://localhost:3000/v1/chat/completions \
+#      -H "Content-Type: application/json" \
+#      -d '{
+#        "model": "tensorzero::model_name::gpt-3.5-turbo",
+#        "messages": [{"role": "user", "content": "Hello!"}]
+#      }'
