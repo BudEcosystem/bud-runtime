@@ -1,0 +1,58 @@
+---
+- name: Fetch Quantization Status from Kubernetes Cluster
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars_files:
+    - vars/common.yaml
+    
+  roles:
+    - create_kubeconfig
+
+  tasks:
+    - name: Check if namespace exists
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Namespace
+        name: "{{ namespace }}"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: namespace_info
+
+    - name: Fail if namespace doesn't exist
+      fail:
+        msg: "Namespace '{{ namespace }}' does not exist"
+      when: namespace_info.resources | length == 0
+    
+    - name: Get Job status from Kubernetes
+      kubernetes.core.k8s_info:
+        api_version: batch/v1
+        kind: Job
+        namespace: "{{ namespace }}"
+        name: "quantization-job"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: job_status
+      failed_when: job_status.resources | length == 0
+
+    - name: Extract Job status
+      set_fact:
+        job_data: "{{ job_status.resources[0].status }}"
+      
+    - name: Get quantization status from ConfigMap
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: ConfigMap
+        namespace: "{{ namespace }}"
+        name: "quantization-progress"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: quantization_status_configmap
+      failed_when: quantization_status_configmap.resources | length == 0
+
+    - name: Extract quantization data
+      set_fact:
+        quantization_data: "{{ quantization_status_configmap.resources[0].data }}"
+
+    

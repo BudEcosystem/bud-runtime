@@ -1,0 +1,13 @@
+# Service
+budmicroframe @ git+https://github.com/BudEcosystem/bud-microframe.git
+
+# Core
+transformers >= 4.44.0
+llm-benchmark @ git+https://github.com/BudEcosystem/llm-benchmark.git
+deap >= 1.4.1
+
+# ML
+xgboost == 2.1.1
+scikit-learn == 1.5.2
+tpot == 0.12.2
+joblib >= 1.4.2

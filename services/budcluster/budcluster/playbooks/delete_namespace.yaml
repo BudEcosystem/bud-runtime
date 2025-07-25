@@ -1,0 +1,33 @@
+---
+- name: Delete BudServe Runtime Containers
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars_files:
+    - vars/common.yaml
+  vars:
+    chart_path: "{{ charts_dir }}/bud_runtime_container"
+    release_name: "{{ runtime_release_name | default('bud-runtime') }}"
+  roles:
+    - create_kubeconfig
+
+  tasks:
+    - name: Delete Namespace
+      kubernetes.core.k8s:
+        state: absent
+        name: "{{ namespace }}"
+        kind: Namespace
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+    - name: Verify Namespace Deletion
+      kubernetes.core.k8s_info:
+        kind: Namespace
+        name: "{{ namespace }}"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: namespace_info
+      failed_when: namespace_info.resources | length > 0
+      retries: 5
+      delay: 30
+      until: namespace_info.resources | length == 0

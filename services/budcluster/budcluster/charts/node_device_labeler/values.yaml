@@ -1,0 +1,33 @@
+# Default values for node-device-labeler
+nameOverride: ""
+fullnameOverride: ""
+platform: "kubernetes"
+
+image:
+  repository: budimages.azurecr.io/budecosystem/node-device-labeler:latest
+  pullPolicy: IfNotPresent
+
+imagePullSecrets:
+  name: bud-registry-secret
+  auth: {} # replaced with the actual auth
+
+serviceAccount:
+  create: true
+  name: ""
+
+rbac:
+  create: true
+
+deviceChecks:
+  gpu:
+    enabled: true
+    label: "device.kubernetes.io/type=cuda"
+  hpu:
+    enabled: true
+    label: "device.kubernetes.io/type=hpu"
+  cpu_amx:
+    enabled: true
+    label: "device.kubernetes.io/type=cpu-amx"
+  cpu:
+    enabled: true
+    label: "device.kubernetes.io/type=cpu" 

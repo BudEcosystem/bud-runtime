@@ -1,0 +1,4 @@
+
+nfs:
+  server: ''
+  path: /exports

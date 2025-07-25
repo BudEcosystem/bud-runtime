@@ -1,0 +1,68 @@
+---
+- name: Deploy BudServe Runtime Containers
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars_files:
+    - vars/common.yaml
+
+  vars:
+    chart_path: "{{ charts_dir }}/bud_runtime_container"
+    release_name: "{{ runtime_release_name | default('bud-runtime-container') }}"
+  roles:
+    - create_kubeconfig
+
+  tasks:
+    - name: Delete the model transfer pod
+      kubernetes.core.k8s:
+        state: absent
+        kind: Pod
+        label_selectors:
+          - "app=model-transfer"
+        namespace: "{{ namespace }}"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+    - name: Deploy Runtime Containers using Helm
+      kubernetes.core.helm:
+        release_name: "{{ release_name }}"
+        chart_ref: "{{ chart_path }}"
+        release_namespace: "{{ namespace }}"
+        create_namespace: true
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+        values:
+          namespace: "{{ namespace }}"
+          modelName: "{{ model_name }}"
+          nodes: "{{ nodes }}"
+          platform: "{{ platform }}"
+          ingressHost: "{{ ingress_host }}"
+          containerPort: "{{ container_port | int }}"
+          adapters: "{{ adapters }}"
+          hfToken: "{{ hf_token }}"
+          imagePullSecrets:
+            auth: "{{ image_pull_secrets }}"
+          volumeType: "{{ volume_type }}"
+          nfs:
+            server: "{{ nfs_server }}"
+          podscaler: "{{ podscaler }}"
+      register: helm_result
+      failed_when: helm_result.failed
+
+    - name: Wait for all runtime pods to be ready
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: "{{ namespace }}"
+        label_selectors:
+          - app in ({{ nodes | map(attribute='name') | join(',') }})
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: runtime_pods
+      retries: 10
+      delay: 15
+      until: >
+        runtime_pods is defined and
+        runtime_pods.resources is defined and
+        runtime_pods.resources | selectattr('status.phase', 'equalto', 'Running') | 
+        list | length == runtime_pods.resources | length
+      when: not helm_result.failed

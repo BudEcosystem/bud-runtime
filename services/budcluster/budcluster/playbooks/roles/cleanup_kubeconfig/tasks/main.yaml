@@ -1,0 +1,5 @@
+- name: Ensure kubeconfig file is deleted
+  ansible.builtin.file:
+    path: "{{ kubeconfig_path }}"
+    state: absent
+  when: kubeconfig_path is defined

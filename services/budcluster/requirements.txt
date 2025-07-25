@@ -1,0 +1,32 @@
+# Service/Clients
+dapr >= 1.13.0
+ujson >= 5.10.0
+dapr-ext-workflow
+
+# API
+fastapi >= 0.111.1
+uvicorn >= 0.30.3
+pydantic >= 2.8.2
+pydantic-settings >= 2.3.4
+aiohttp >= 3.9.3
+kubernetes >= 31.0.0
+python-multipart >= 0.0.12
+
+# Utils
+structlog >= 24.4.0
+cachetools >= 5.4.0
+pyyaml >=6.0.2
+python-dotenv >= 1.0.1
+
+# DB
+SQLAlchemy >= 2.0.36
+sqlalchemy-utils >= 0.41.2
+psycopg >= 3.2.3
+psycopg-binary >= 3.2.3
+alembic >= 1.13.3
+alembic-postgresql-enum >= 1.3.0
+sqlalchemy[asyncio]
+psycopg2-binary
+
+# Deployment
+ansible_runner

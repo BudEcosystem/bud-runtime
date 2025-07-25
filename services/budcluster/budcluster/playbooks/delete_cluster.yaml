@@ -1,0 +1,208 @@
+---
+- name: Delete cluster
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars_files:
+    - vars/common.yaml
+  vars:
+    release_name: "{{ runtime_release_name | default('bud-runtime') }}"
+    namespace: "bud-system"
+    storageclass_name: "nfs-storage-class"
+    clusterrole_name: "nfs-client-provisioner-runner"
+    clusterrolebinding_name: "run-nfs-client-provisioner"
+  roles:
+    - create_kubeconfig
+
+  tasks:
+    - name: Delete StorageClass
+      kubernetes.core.k8s:
+        state: absent
+        name: "{{ storageclass_name }}"
+        kind: StorageClass
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+
+    - name: Delete ClusterRole
+      kubernetes.core.k8s:
+        state: absent
+        name: "{{ clusterrole_name }}"
+        kind: ClusterRole
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+
+    - name: Delete ClusterRoleBinding
+      kubernetes.core.k8s:
+        state: absent
+        name: "{{ clusterrolebinding_name }}"
+        kind: ClusterRoleBinding
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+
+    - name: Remove Aibrix core components
+      kubernetes.core.k8s:
+        state: absent
+        src: https://github.com/BudEcosystem/aibrix/releases/download/0.2.0/aibrix-core-v0.2.0.yaml
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+
+    - name: Remove Aibrix dependencies
+      kubernetes.core.k8s:
+        state: absent
+        src: https://github.com/BudEcosystem/aibrix/releases/download/0.2.0/aibrix-dependency-v0.2.0.yaml
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+
+    - name: Delete all pods in namespace
+      kubernetes.core.k8s:
+        state: absent
+        kind: Pod
+        namespace: "{{ namespace }}"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+
+    - name: Delete all PVCs in namespace
+      kubernetes.core.k8s:
+        state: absent
+        kind: PersistentVolumeClaim
+        namespace: "{{ namespace }}"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+
+    - name: Delete Namespace
+      kubernetes.core.k8s:
+        state: absent
+        name: "{{ namespace }}"
+        kind: Namespace
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+
+    - name: Verify Namespace Deletion
+      kubernetes.core.k8s_info:
+        kind: Namespace
+        name: "{{ namespace }}"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: namespace_info
+      retries: 5
+      delay: 30
+      until: namespace_info.resources | length == 0
+      failed_when: namespace_info.resources | length > 0
+      ignore_errors: true  # Allows playbook to continue in case namespace deletion is stuck
+
+    - name: Get stuck pods in namespace
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: "{{ namespace }}"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: stuck_pods
+      when: namespace_info.resources | length > 0
+      ignore_errors: true
+
+    - name: Remove Pod finalizers
+      kubernetes.core.k8s_json_patch:
+        kind: Pod
+        namespace: "{{ namespace }}"
+        name: "{{ item.metadata.name }}"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+        patch:
+          - op: replace
+            path: /metadata/finalizers
+            value: []
+        type: merge
+      loop: "{{ stuck_pods.resources | default([]) }}"
+      when: stuck_pods.resources | length > 0
+      ignore_errors: true
+
+    - name: Get stuck PVCs in namespace
+      kubernetes.core.k8s_info:
+        kind: PersistentVolumeClaim
+        namespace: "{{ namespace }}"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: stuck_pvcs
+      when: namespace_info.resources | length > 0
+      ignore_errors: true
+
+    - name: Remove PVC finalizers
+      kubernetes.core.k8s_json_patch:
+        kind: PersistentVolumeClaim
+        namespace: "{{ namespace }}"
+        name: "{{ item.metadata.name }}"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+        patch:
+          - op: replace
+            path: /metadata/finalizers
+            value: []
+        type: merge
+      loop: "{{ stuck_pvcs.resources | default([]) }}"
+      when: stuck_pvcs.resources | length > 0
+      ignore_errors: true
+
+    - name: Force delete stuck PVCs
+      kubernetes.core.k8s:
+        state: absent
+        kind: PersistentVolumeClaim
+        namespace: "{{ namespace }}"
+        name: "{{ item.metadata.name }}"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+        force: yes
+      loop: "{{ stuck_pvcs.resources | default([]) }}"
+      when: stuck_pvcs.resources | length > 0
+      ignore_errors: true
+
+    - name: Force delete stuck pods
+      kubernetes.core.k8s:
+        state: absent
+        api_version: v1
+        kind: Pod
+        namespace: "{{ namespace }}"
+        name: "{{ item.metadata.name }}"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+        force: yes
+        grace_period: 0
+      loop: "{{ stuck_pods.resources | default([]) }}"
+      when: stuck_pods.resources | length > 0
+      ignore_errors: true
+
+    - name: Remove finalizers from namespace if stuck
+      kubernetes.core.k8s_json_patch:
+        kind: Namespace
+        name: "{{ namespace }}"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+        patch:
+          - op: replace
+            path: /metadata/finalizers
+            value: []
+      when: namespace_info.resources | length > 0
+      ignore_errors: true
+
+    - name: Delete Namespace Again
+      kubernetes.core.k8s:
+        state: absent
+        name: "{{ namespace }}"
+        kind: Namespace
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+        delete_options:
+          gracePeriodSeconds: 0
+        force: true
+
+    - name: Verify Namespace Deletion Again
+      kubernetes.core.k8s_info:
+        kind: Namespace
+        name: "{{ namespace }}"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: namespace_info
+      retries: 5
+      delay: 60
+      until: namespace_info.resources | length == 0
+      failed_when: namespace_info.resources | length > 0

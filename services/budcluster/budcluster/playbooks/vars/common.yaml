@@ -1,0 +1,7 @@
+---
+# kubeconfig_path: "/tmp/kubeconfig.yml"
+namespace: "bud-system"
+ansible_python_interpreter: /usr/local/bin/python
+validate_certs: true
+helm_timeout: 1800s
+charts_dir: "charts"

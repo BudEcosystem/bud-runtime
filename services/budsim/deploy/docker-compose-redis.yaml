@@ -1,0 +1,24 @@
+services:
+  budsim-redis:
+    container_name: budserve-$NAMESPACE-$APP_NAME-redis
+    image: redis:alpine
+    ports:
+      - "$REDIS_PORT:$REDIS_PORT"
+    command:
+      - /bin/sh
+      - -c
+      - redis-server --requirepass "${SECRETS_REDIS_PASSWORD:?SECRETS_REDIS_PASSWORD variable is not set}" --port ${REDIS_PORT}
+    sysctls:
+      net.core.somaxconn: 1024
+    healthcheck:
+      test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
+    volumes:
+      - budsim_redis_data:/data
+    networks:
+      - budsim-network
+volumes:
+  budsim_redis_data:
+networks:
+  budsim-network:
+    name: budserve-$NAMESPACE-$APP_NAME
+    driver: bridge

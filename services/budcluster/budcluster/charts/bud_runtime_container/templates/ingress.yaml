@@ -1,0 +1,34 @@
+# {{- if eq .Values.platform "kubernetes" }}
+# apiVersion: traefik.io/v1alpha1
+# kind: Middleware
+# metadata:
+#   name: {{ .Values.chartName }}
+#   namespace: {{ .Values.namespace }}
+# spec:
+#   stripPrefix:
+#     prefixes:
+#     - /{{ .Values.namespace }}
+#     forceSlash: true
+
+# ---
+# apiVersion: networking.k8s.io/v1
+# kind: Ingress
+# metadata:
+#   name: {{ .Values.chartName }}
+#   namespace: {{ .Values.namespace }}
+#   annotations:
+#     traefik.ingress.kubernetes.io/router.entrypoints: web
+#     traefik.ingress.kubernetes.io/router.middlewares: "{{ .Values.namespace }}-{{ .Values.chartName }}@kubernetescrd"
+# spec:
+#   rules:
+#   - host:
+#     http:
+#       paths:
+#       - path: /{{ .Values.namespace }}
+#         pathType: Prefix
+#         backend:
+#           service:
+#             name: {{ .Values.chartName }}
+#             port:
+#               number: {{ .Values.containerPort }}
+# {{- end }}

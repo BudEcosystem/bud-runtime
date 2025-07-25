@@ -1,0 +1,6 @@
+apiVersion: v2
+name: model-transfer
+description: A Helm chart to create a transfer pod and PVC
+type: application
+version: 0.1.0
+appVersion: "1.0"

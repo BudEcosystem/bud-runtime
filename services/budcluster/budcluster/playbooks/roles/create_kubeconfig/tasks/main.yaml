@@ -1,0 +1,16 @@
+---
+- name: Create a temporary kubeconfig file
+  ansible.builtin.tempfile:
+    state: file
+    suffix: "-{{ inventory_hostname }}.yaml"
+  register: temp_kubeconfig
+
+- name: Store kubeconfig path as a fact
+  ansible.builtin.set_fact:
+    kubeconfig_path: "{{ temp_kubeconfig.path }}"
+    cacheable: no 
+
+- name: Create a temporary kubeconfig file
+  ansible.builtin.copy:
+    content: "{{ kubeconfig_content | to_nice_yaml }}"
+    dest: "{{ kubeconfig_path }}"

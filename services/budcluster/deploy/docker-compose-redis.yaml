@@ -1,0 +1,22 @@
+services:
+  redis:
+    container_name: bud-mf-$NAMESPACE-redis
+    image: redis:alpine
+    ports:
+      - "$REDIS_PORT:$REDIS_PORT"
+    command:
+      - /bin/sh
+      - -c
+      - redis-server --requirepass "${SECRETS_REDIS_PASSWORD:?REDIS_PASSWORD variable is not set}" --port ${REDIS_PORT}
+    sysctls:
+      net.core.somaxconn: 1024
+    healthcheck:
+      test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
+    volumes:
+      - redis_data:/data
+    # networks:
+    #   - bud-microframe-nw
+    # network_mode: "host"
+
+volumes:
+  redis_data:

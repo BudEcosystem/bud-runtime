@@ -1,0 +1,44 @@
+---
+- name: Apply Security Context Constraints to Runtime Containers
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars_files:
+    - vars/common.yaml
+
+  roles:
+    - create_kubeconfig
+
+  tasks:
+    - name: Apply SecurityContextConstraints
+      kubernetes.core.k8s:
+        state: present
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+        definition:
+          apiVersion: security.openshift.io/v1
+          kind: SecurityContextConstraints
+          metadata:
+            name: privileged
+          allowPrivilegedContainer: true
+          allowPrivilegeEscalation: true
+          runAsUser:
+            type: RunAsAny
+          runAsGroup:
+            type: RunAsAny
+          fsGroup:
+            type: RunAsAny
+          users:
+            - "system:serviceaccount:{{ namespace }}:default"
+      register: scc_result
+
+    - name: Display SCC Status
+      debug:
+        msg: "SecurityContextConstraints successfully applied for namespace: {{ namespace }}"
+      when: scc_result is success
+
+    - name: Wait for a moment to ensure SCC is applied
+      pause:
+        seconds: 5
+      when: scc_result is changed 
