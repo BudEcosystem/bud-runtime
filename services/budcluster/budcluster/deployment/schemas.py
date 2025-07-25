@@ -106,7 +106,9 @@ class LocalDeploymentCreateRequest(CloudEventBase, CommonDeploymentParams, RunBe
     target_ttft: Optional[int] = None
     target_e2e_latency: Optional[int] = None
     target_throughput_per_user: Optional[int] = None
+    credential_id: Optional[UUID] = None
     namespace: Optional[str] = None
+    provider: Optional[str] = None
 
 
 class CloudDeploymentCreateRequest(CloudEventBase, CommonDeploymentParams, RunBenchmarkParams):
