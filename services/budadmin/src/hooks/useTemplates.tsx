@@ -40,7 +40,7 @@ export const useDeploymentTemplates = create<{
             const updatedListData = listData.map((item: any) => ({
                 ...item,
             }));
-    
+
             set({ deploymentTemplates: updatedListData });
         } catch (error) {
             console.error("Error fetching templates:", error);

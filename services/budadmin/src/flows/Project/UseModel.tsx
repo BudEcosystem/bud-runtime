@@ -37,11 +37,11 @@ export default function UseModel() {
   const getEndpointConfig = () => {
     // Get model name from various sources
     const modelName = drawerProps?.endpoint?.name || drawerProps?.name || clusterDetails?.name;
-    
+
     // Get supported endpoints from drawerProps.endpoint (from endpoints list API) or fallback to model supported_endpoints
     const endpointSupportedEndpoints = drawerProps?.endpoint?.supported_endpoints; // This is an array from the endpoints API
     const modelSupportedEndpoints = drawerProps?.endpoint?.model?.supported_endpoints || clusterDetails?.model?.supported_endpoints; // This is an object from model data
-    
+
     // Default to chat endpoint
     let endpoint = 'v1/chat/completions';
     let payloadExample: any = {
@@ -167,7 +167,7 @@ export default function UseModel() {
   --form 'model="${payloadExample.model}"' \\
   --form 'response_format="json"'`;
     }
-    
+
     // Standard JSON payload
     return `curl --location '${apiUrl}' \\
   --header 'Authorization: Bearer {API_KEY_HERE}' \\
@@ -254,7 +254,7 @@ fetch('${apiUrl}', {
   const [selectedCode, setSelectedCode] = useState("curl");
   const [selectedText, setSelectedText] = useState(codeSnippets[selectedCode]);
   const [copyText, setCopiedText] = useState<string>('Copy');
-  
+
   // Update selected text when endpoint changes
   useEffect(() => {
     setSelectedText(codeSnippets[selectedCode]);
@@ -287,7 +287,7 @@ fetch('${apiUrl}', {
   return (
     <BudForm
       data={{}}
-      
+
     >
       <BudWraperBox>
         <BudDrawerLayout>

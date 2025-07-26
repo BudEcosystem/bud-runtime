@@ -38,7 +38,6 @@ from sqlalchemy.orm import Session
 
 from ..commons.config import app_settings
 from ..engine_ops import (
-    get_compatible_engine_image,
     get_compatible_engines,
     get_engine_args_and_envs,
 )
@@ -64,9 +63,8 @@ dapr_workflow = DaprWorkflow()
 
 
 class SimulationService:
-
     @staticmethod
-    def get_eta(current_step: str, cluster_count: int, step_time: int=None):
+    def get_eta(current_step: str, cluster_count: int, step_time: int = None):
         """Calculate the estimated time to completion for workflow steps.
 
         This method calculates the estimated time for the current step and remaining steps
@@ -80,18 +78,13 @@ class SimulationService:
         Returns:
             int: The estimated time in minutes for the current step.
         """
-        step_times = {
-            "validation": 0.1,
-            "performance_estimation": 0.5,
-            "ranking": 0.2
-        }
+        step_times = {"validation": 0.1, "performance_estimation": 0.5, "ranking": 0.2}
 
         # Define the order of steps
         step_order = ["validation", "performance_estimation", "ranking"]
 
-        #Apply scaling factor
+        # Apply scaling factor
         step_times["performance_estimation"] = int(step_times["performance_estimation"] * cluster_count)
-
 
         if step_time is not None:
             step_times[current_step] = step_time
@@ -262,7 +255,11 @@ class SimulationService:
 
         top_k_configs = [
             EvaluationResult(
-                config={"model": pretrained_model_uri, "quantization_method": quantization_method, "quantization_type": quantization_type},
+                config={
+                    "model": pretrained_model_uri,
+                    "quantization_method": quantization_method,
+                    "quantization_type": quantization_type,
+                },
                 kv_cache_memory=512,
                 ttft=0,
                 e2e_latency=0,
@@ -270,10 +267,12 @@ class SimulationService:
                 concurrency=1,
                 fitness=(0, 0, 0),
                 error_rate=0,
-                cost_per_million_tokens=cost_calculator.get_quantization_cost(pretrained_model_uri, quantization_method, device_config),
+                cost_per_million_tokens=cost_calculator.get_quantization_cost(
+                    pretrained_model_uri, quantization_method, device_config
+                ),
             )
         ]
-        
+
         device_config["device_id"] = device_config.pop("id", str(uuid.uuid4()))
         device_config["device_type"] = device_config.pop("type")
         device_config["device_name"] = device_config.pop("name", device_config["device_id"])
@@ -363,14 +362,14 @@ class SimulationService:
             cluster_info = SimulationService.validate_cluster_info(cluster_info.data.decode("utf-8"))
 
             # Filter out inactive nodes in each cluster
-            # Only include nodes that are explicitly marked as active (status=True) 
+            # Only include nodes that are explicitly marked as active (status=True)
             # and not in problematic states
             for cluster in cluster_info:
                 active_nodes = []
                 for node in cluster.get("nodes", []):
                     # Check if node has an explicit status
                     node_status = node.get("status")
-                    
+
                     # Skip nodes that are:
                     # - Explicitly marked as inactive (status=False)
                     # - Missing status information (safer to exclude)
@@ -380,7 +379,7 @@ class SimulationService:
                         node_condition = node.get("condition", "").lower()
                         if node_condition not in ["notready", "unschedulable", "underpressure"]:
                             active_nodes.append(node)
-                    
+
                 cluster["nodes"] = active_nodes
 
             if cluster_id:
@@ -396,10 +395,12 @@ class SimulationService:
                     clusters_with_nodes.append(cluster)
                 else:
                     logger.warning(f"Cluster {cluster['id']} has no available nodes after filtering")
-            
+
             if not clusters_with_nodes:
-                raise ValueError("No clusters with available nodes found. All nodes are either inactive, tainted, or in problematic states.")
-            
+                raise ValueError(
+                    "No clusters with available nodes found. All nodes are either inactive, tainted, or in problematic states."
+                )
+
             # Log summary of available resources
             total_nodes = sum(len(cluster.get("nodes", [])) for cluster in clusters_with_nodes)
             logger.info(f"Found {len(clusters_with_nodes)} clusters with {total_nodes} available nodes for simulation")
@@ -606,7 +607,9 @@ class SimulationService:
                 results = [future.result() for future in results]  # type: ignore
 
             notification_req.payload.content = NotificationContent(
-                title="Generated best configurations for each cluster" if cluster_id is None else "Generated best configurations for the cluster",
+                title="Generated best configurations for each cluster"
+                if cluster_id is None
+                else "Generated best configurations for the cluster",
                 message="All performance metrics are estimated",
                 status=WorkflowStatus.COMPLETED,
             )
@@ -669,8 +672,12 @@ class SimulationService:
         recommendations = []
 
         notification_req.payload.content = NotificationContent(
-            title="Ranking the clusters based on performance" if cluster_id is None else "Ranking the configurations based on performance",
-            message="Finding the most suitable clusters based on performance metrics" if cluster_id is None else "Finding the most suitable configurations based on performance metrics",
+            title="Ranking the clusters based on performance"
+            if cluster_id is None
+            else "Ranking the configurations based on performance",
+            message="Finding the most suitable clusters based on performance metrics"
+            if cluster_id is None
+            else "Finding the most suitable configurations based on performance metrics",
             status=WorkflowStatus.STARTED,
         )
         dapr_workflow.publish_notification(
@@ -718,7 +725,9 @@ class SimulationService:
                 recommendations.append(item.model_dump(mode="json") if serialize else item)
 
             notification_req.payload.content = NotificationContent(
-                title="Ranked the clusters based on performance" if cluster_id is None else "Ranked the configurations based on performance",
+                title="Ranked the clusters based on performance"
+                if cluster_id is None
+                else "Ranked the configurations based on performance",
                 message=f"Found {len(recommendations)} suitable cluster(s)",
                 status=WorkflowStatus.COMPLETED,
             )
@@ -792,7 +801,9 @@ class SimulationService:
         topk_engine_configs = self.get_topk_engine_configs_per_cluster(
             workflow_id, request, compatible_engines, cluster_info, notification_request, cluster_id=request.cluster_id
         )
-        recommendations = self.rank_configs(workflow_id, request, topk_engine_configs, notification_request, cluster_id=request.cluster_id)
+        recommendations = self.rank_configs(
+            workflow_id, request, topk_engine_configs, notification_request, cluster_id=request.cluster_id
+        )
 
         response.recommendations = recommendations
 
@@ -823,6 +834,7 @@ class SimulationService:
         limit: int = 1,
         session: Optional[Session] = None,
     ) -> PaginatedResponse[ClusterMetrics]:
+        """Get top-k cluster recommendations based on performance metrics."""
         results, total_count = SimulationResultsCRUD().fetch_topk_configs_by_cluster(
             workflow_id=workflow_id,
             cluster_id=cluster_id,
@@ -896,6 +908,7 @@ class SimulationService:
     def greedy_search_deployment_config(
         simulation_results: List[SimulationResultsSchema], target_concurrency: int = None
     ) -> DeploymentConfigurationResponse:
+        """Perform greedy search for optimal deployment configuration."""
         nodes = {}
         device_ids = set()
         config = DeploymentConfigurationResponse(
@@ -991,6 +1004,7 @@ class SimulationService:
     def optimal_search_deployment_config(
         simulation_results: List[SimulationResultsSchema], target_concurrency: int = None
     ) -> DeploymentConfigurationResponse:
+        """Perform optimal search for deployment configuration."""
         target_concurrency = target_concurrency or simulation_results[0].target_concurrency
 
         device_args_and_envs = {}
@@ -1151,6 +1165,7 @@ class SimulationService:
         request: DeploymentConfigurationRequest,
         session: Optional[Session] = None,
     ) -> DeploymentConfigurationResponse:
+        """Get deployment configurations based on request parameters."""
         if request.feedback:
             try:
                 SimulationResultsCRUD().update_feedback(request.feedback, session)

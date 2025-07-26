@@ -51,7 +51,7 @@ async def test_delete_cloud_model_endpoint_immediate_deletion():
     mock_project = MagicMock()
     mock_project.id = project_id
     mock_project.name = "test-project"
-    
+
     mock_model = MagicMock()
     mock_model.id = model_id
     mock_model.provider_type = ModelProviderTypeEnum.CLOUD_MODEL
@@ -59,10 +59,10 @@ async def test_delete_cloud_model_endpoint_immediate_deletion():
     mock_model.provider_id = provider_id
     mock_model.source = "openai"
     mock_model.uri = "gpt-4"
-    
+
     mock_provider = MagicMock()
     mock_provider.icon = "provider-icon"
-    
+
     mock_endpoint = MagicMock()
     mock_endpoint.id = endpoint_id
     mock_endpoint.project_id = project_id
@@ -100,14 +100,14 @@ async def test_delete_cloud_model_endpoint_immediate_deletion():
     mock_workflow_service.retrieve_or_create_workflow.return_value = mock_workflow
     mock_credential_service.update_proxy_cache.return_value = None
     mock_notify_service.send_notification.return_value = None
-    
+
     # Update the workflow status to COMPLETED when it's updated
     async def mock_update_workflow(workflow, updates):
         if "status" in updates:
             workflow.status = updates["status"]
         return workflow
     mock_workflow_manager.update_by_fields.side_effect = mock_update_workflow
-    
+
     # Mock Redis operations
     service.delete_model_from_proxy_cache = AsyncMock(return_value=None)
 
@@ -182,7 +182,7 @@ async def test_delete_regular_model_endpoint_workflow_deletion():
     mock_project = MagicMock()
     mock_project.id = project_id
     mock_project.name = "test-project"
-    
+
     mock_model = MagicMock()
     mock_model.id = model_id
     mock_model.provider_type = ModelProviderTypeEnum.HUGGING_FACE
@@ -190,13 +190,13 @@ async def test_delete_regular_model_endpoint_workflow_deletion():
     mock_model.provider_id = provider_id
     mock_model.source = "huggingface"
     mock_model.uri = "model-uri"
-    
+
     mock_provider = MagicMock()
     mock_provider.icon = "provider-icon"
-    
+
     mock_cluster = MagicMock()
     mock_cluster.cluster_id = cluster_id
-    
+
     mock_endpoint = MagicMock()
     mock_endpoint.id = endpoint_id
     mock_endpoint.project_id = project_id
@@ -234,7 +234,7 @@ async def test_delete_regular_model_endpoint_workflow_deletion():
     mock_credential_service.update_proxy_cache.return_value = None
     mock_workflow_step_manager.insert_one.return_value = None
     mock_workflow_manager.update_by_fields.return_value = mock_workflow
-    
+
     # Mock Redis and cluster operations
     service.delete_model_from_proxy_cache = AsyncMock(return_value=None)
     service._perform_bud_cluster_delete_endpoint_request = AsyncMock(return_value={
@@ -308,7 +308,7 @@ async def test_delete_cloud_model_endpoint_with_cluster_follows_workflow():
     mock_project = MagicMock()
     mock_project.id = project_id
     mock_project.name = "test-project"
-    
+
     mock_model = MagicMock()
     mock_model.id = model_id
     mock_model.provider_type = ModelProviderTypeEnum.CLOUD_MODEL
@@ -316,13 +316,13 @@ async def test_delete_cloud_model_endpoint_with_cluster_follows_workflow():
     mock_model.provider_id = provider_id
     mock_model.source = "openai"
     mock_model.uri = "gpt-4"
-    
+
     mock_provider = MagicMock()
     mock_provider.icon = "provider-icon"
-    
+
     mock_cluster = MagicMock()
     mock_cluster.cluster_id = cluster_id
-    
+
     mock_endpoint = MagicMock()
     mock_endpoint.id = endpoint_id
     mock_endpoint.project_id = project_id
@@ -360,7 +360,7 @@ async def test_delete_cloud_model_endpoint_with_cluster_follows_workflow():
     mock_credential_service.update_proxy_cache.return_value = None
     mock_workflow_step_manager.insert_one.return_value = None
     mock_workflow_manager.update_by_fields.return_value = mock_workflow
-    
+
     # Mock Redis and cluster operations
     service.delete_model_from_proxy_cache = AsyncMock(return_value=None)
     service._perform_bud_cluster_delete_endpoint_request = AsyncMock(return_value={

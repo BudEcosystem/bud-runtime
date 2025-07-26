@@ -10,7 +10,6 @@ from sqlalchemy import (
     Enum,
     Float,
     ForeignKey,
-    Integer,
     PrimaryKeyConstraint,
     String,
     Text,
@@ -20,7 +19,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Session, relationship
 from sqlalchemy.sql import func
 
-from ..commons.constants import ModelDownloadStatus, ModelExtractionStatus, LeaderboardDataOrigin
+from ..commons.constants import LeaderboardDataOrigin, ModelDownloadStatus, ModelExtractionStatus
 
 
 logger = logging.get_logger(__name__)

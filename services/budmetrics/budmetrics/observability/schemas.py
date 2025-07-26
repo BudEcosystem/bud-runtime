@@ -1,7 +1,7 @@
+import ipaddress
 from datetime import datetime
 from typing import Any, Dict, Literal, Optional, Union
 from uuid import UUID
-import ipaddress
 
 from budmicroframe.commons.schemas import CloudEventBase, ResponseBase
 from fastapi.responses import ORJSONResponse
@@ -56,9 +56,7 @@ class MetricsData(BaseModel):
     model_id: Optional[UUID] = None
     project_id: Optional[UUID] = None
     endpoint_id: Optional[UUID] = None
-    data: dict[
-        MetricType, Union[CountMetric, TimeMetric, PerformanceMetric, CacheMetric]
-    ]
+    data: dict[MetricType, Union[CountMetric, TimeMetric, PerformanceMetric, CacheMetric]]
 
 
 class PeriodBin(BaseModel):
@@ -72,9 +70,7 @@ class ObservabilityMetricsRequest(BaseModel):
     to_date: Optional[datetime] = None
     frequency_unit: Literal["hour", "day", "week", "month", "quarter", "year"] = "day"
     frequency_interval: Optional[int] = None
-    filters: Optional[
-        dict[Literal["model", "project", "endpoint"], Union[list[UUID], UUID]]
-    ] = None
+    filters: Optional[dict[Literal["model", "project", "endpoint"], Union[list[UUID], UUID]]] = None
     group_by: Optional[list[Literal["model", "project", "endpoint"]]] = None
     return_delta: bool = True
     fill_time_gaps: bool = True
@@ -83,6 +79,7 @@ class ObservabilityMetricsRequest(BaseModel):
     @field_validator("frequency_interval")
     @classmethod
     def validate_frequency_interval(cls, v: Optional[int]) -> Optional[int]:
+        """Validate that frequency_interval is at least 1."""
         if v is not None and v < 1:
             raise ValueError("frequency_interval must be at least 1")
         return v
@@ -90,6 +87,7 @@ class ObservabilityMetricsRequest(BaseModel):
     @field_validator("to_date")
     @classmethod
     def validate_to_date(cls, v: Optional[datetime], info) -> Optional[datetime]:
+        """Validate that to_date is after from_date."""
         if v is None:
             return v
         from_date = info.data.get("from_date")
@@ -100,6 +98,7 @@ class ObservabilityMetricsRequest(BaseModel):
     @field_validator("filters")
     @classmethod
     def validate_filters(cls, v: Optional[dict]) -> Optional[dict]:
+        """Validate that filter values are not empty."""
         if v is None:
             return v
         for key, value in v.items():
@@ -112,6 +111,7 @@ class ObservabilityMetricsRequest(BaseModel):
     @field_validator("topk")
     @classmethod
     def validate_topk(cls, v: Optional[int]) -> Optional[int]:
+        """Validate that topk is at least 1."""
         if v is not None and v < 1:
             raise ValueError("topk must be at least 1")
         return v
@@ -123,9 +123,7 @@ class ObservabilityMetricsRequest(BaseModel):
             if not self.group_by:
                 raise ValueError("topk requires group_by to be specified")
             if self.filters:
-                raise ValueError(
-                    "topk is ignored when filters are specified and should not be used together"
-                )
+                raise ValueError("topk is ignored when filters are specified and should not be used together")
         return self
 
 
@@ -193,18 +191,20 @@ class InferenceDetailsMetrics(CloudEventBase):
     @field_validator("request_ip")
     @classmethod
     def validate_ip(cls, v: Optional[str]) -> Optional[str]:
+        """Validate IPv4 address format."""
         if v is None:
             return v
         try:
             # Validate IPv4 address format
             ipaddress.IPv4Address(v)
             return v
-        except ipaddress.AddressValueError:
-            raise ValueError(f"Invalid IPv4 address: {v}")
+        except ipaddress.AddressValueError as err:
+            raise ValueError(f"Invalid IPv4 address: {v}") from err
 
     @field_validator("cost")
     @classmethod
     def validate_cost(cls, v: Optional[float]) -> Optional[float]:
+        """Validate that cost is not negative."""
         if v is not None and v < 0:
             raise ValueError("Cost cannot be negative")
         return v
@@ -213,7 +213,5 @@ class InferenceDetailsMetrics(CloudEventBase):
     def validate_timestamps(self) -> "InferenceDetailsMetrics":
         """Ensure request_forward_time is not before request_arrival_time."""
         if self.request_forward_time < self.request_arrival_time:
-            raise ValueError(
-                "request_forward_time cannot be before request_arrival_time"
-            )
+            raise ValueError("request_forward_time cannot be before request_arrival_time")
         return self

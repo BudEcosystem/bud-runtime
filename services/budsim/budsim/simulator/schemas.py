@@ -24,8 +24,10 @@ from typing import Any, Dict, List, Optional
 
 from budmicroframe.commons.schemas import CloudEventBase, ResponseBase
 from budmicroframe.commons.types import lowercase_string
-from pydantic import BaseModel, Field, RootModel, model_validator, validator
+from pydantic import BaseModel, Field, RootModel, model_validator
+
 from budsim.commons.config import app_settings
+
 
 class Device(BaseModel):
     name: str
@@ -76,6 +78,7 @@ class ClusterRecommendationRequest(CloudEventBase):
 
     @model_validator(mode="before")
     def validate_pretrained_model_uri(cls, values):
+        """Validate and process the pretrained model URI."""
         if not values.get("pretrained_model_uri"):
             raise ValueError("pretrained_model_uri is required")
         if not values.get("is_proprietary_model"):
@@ -86,6 +89,7 @@ class ClusterRecommendationRequest(CloudEventBase):
 
     @model_validator(mode="before")
     def validate_target_metrics(cls, values):
+        """Validate target metrics for non-proprietary models."""
         if not values.get("is_proprietary_model") and any(
             v is None
             for v in (
@@ -121,6 +125,7 @@ class SimulationMetrics(BaseModel):
     cost_per_million_tokens: float
 
     def reset(self):
+        """Reset all metrics to zero."""
         self.concurrency = 0
         self.ttft = 0
         self.throughput_per_user = 0
@@ -135,6 +140,7 @@ class ClusterMetrics(BaseModel):
     quantized_metrics: Optional[SimulationMetrics] = None
 
     def reset(self):
+        """Reset cluster metrics."""
         self.metrics.reset()
         self.quantized_metrics.reset() if self.quantized_metrics else None
 

@@ -351,7 +351,7 @@ class LocalModelDownloadService:
                         logger.debug(
                             f"[{i}/{total_files}] {progress:.1f}% | "
                             f"Extracted: {filename} "
-                            f"({file_size / (1024*1024):.2f} MB)"
+                            f"({file_size / (1024 * 1024):.2f} MB)"
                         )
 
                     except Exception as e:
@@ -583,7 +583,7 @@ class LocalModelDownloadService:
                     progress = (transferred_size / total_size) * 100
 
                     logger.debug(
-                        "Progress: [%d/%d] %.1f%% | " "Transferred: %.2f MB",
+                        "Progress: [%d/%d] %.1f%% | Transferred: %.2f MB",
                         file_count,
                         total_files,
                         progress,

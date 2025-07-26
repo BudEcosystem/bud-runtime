@@ -16,13 +16,14 @@
 
 """Manages application and secret configurations, utilizing environment variables and Dapr's configuration store for syncing."""
 
+from typing import Optional
+
 from budmicroframe.commons.config import (
     BaseAppConfig,
     BaseSecretsConfig,
     register_settings,
 )
 from pydantic import Field
-from typing import Optional
 
 from ..__about__ import __version__
 
@@ -43,12 +44,8 @@ class AppConfig(BaseAppConfig):
     clickhouse_port: int = Field(..., alias="CLICKHOUSE_PORT")
     clickhouse_dbname: str = Field("bud", alias="CLICKHOUSE_DB_NAME")
 
-    clickhouse_enable_query_cache: bool = Field(
-        False, alias="CLICKHOUSE_ENABLE_QUERY_CACHE"
-    )
-    clickhouse_enable_connection_warmup: bool = Field(
-        False, alias="CLICKHOUSE_ENABLE_CONNECTION_WARMUP"
-    )
+    clickhouse_enable_query_cache: bool = Field(False, alias="CLICKHOUSE_ENABLE_QUERY_CACHE")
+    clickhouse_enable_connection_warmup: bool = Field(False, alias="CLICKHOUSE_ENABLE_CONNECTION_WARMUP")
 
 
 class SecretsConfig(BaseSecretsConfig):

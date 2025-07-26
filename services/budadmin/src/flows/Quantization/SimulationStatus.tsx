@@ -13,9 +13,9 @@ export default function SimulationStatus() {
     const { openDrawerWithStep, closeDrawer } = useDrawer();
     const { currentWorkflow } = useDeployModel();
     const { getRecommendedClusterById } = useCluster();
-    const [isFailed, setIsFailed] = React.useState(false);  
+    const [isFailed, setIsFailed] = React.useState(false);
     const [showAlert, setShowAlert] = React.useState(false);
-    
+
 
     const handleBack = () => {
         if (isFailed) {
@@ -26,7 +26,7 @@ export default function SimulationStatus() {
     }
 
     return (
-        <BudForm 
+        <BudForm
             data={{}}
             backText={isFailed ? "Back" : "Cancel"}
             onBack={handleBack}>

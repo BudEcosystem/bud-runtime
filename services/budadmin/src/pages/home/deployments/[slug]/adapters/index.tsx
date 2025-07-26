@@ -106,12 +106,12 @@ const load = useCallback(async () => {
               onClick={async (event) => {
                 event.stopPropagation();
                 // Pass adapter data in a format similar to endpoint
-                openDrawer('use-model', { 
+                openDrawer('use-model', {
                   endpoint: {
                     name: record.name,
                     model: record.model,
                     // Adapters might not have supported_endpoints, so we'll rely on model.supported_endpoints
-                  } 
+                  }
                 });
               }}
             >

@@ -21,7 +21,7 @@ export default function LabelJSONInput(props: LabelJSONInputProps) {
 
   const [valid, setValid] = React.useState(true);
   const [localValue, setLocalValue] = React.useState(props.value || '');
-  
+
   const validateJSON = (value: string) => {
     try {
       JSON.parse(value);

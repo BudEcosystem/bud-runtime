@@ -6,7 +6,7 @@
 
   vars_files:
     - vars/common.yaml
-  
+
   vars:
     chart_path: "{{ charts_dir }}/litellm_container"
     release_name: "{{ litellm_release_name | default('litellm-container') }}"
@@ -48,6 +48,6 @@
       retries: 10
       delay: 15
       until: >
-        runtime_pods is defined and runtime_pods.resources | selectattr('status.phase', 'equalto', 'Running') | 
+        runtime_pods is defined and runtime_pods.resources | selectattr('status.phase', 'equalto', 'Running') |
         list | length == runtime_pods.resources | length
       when: not helm_result.failed

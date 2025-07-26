@@ -46,8 +46,6 @@ app = configure_app(app_settings, secrets_settings, lifespan=lifespan)
 # minimum_size: Only compress responses larger than this number of bytes (1KB)
 # compresslevel: 1-9, where 1 is fastest/least compression, 9 is slowest/most compression
 # 6 is a good balance between speed and compression ratio for API responses
-app.add_middleware(
-    CompressMiddleware, minimum_size=1000, zstd_level=4, brotli_quality=4, gzip_level=4
-)
+app.add_middleware(CompressMiddleware, minimum_size=1000, zstd_level=4, brotli_quality=4, gzip_level=4)
 
 app.include_router(observability_router)

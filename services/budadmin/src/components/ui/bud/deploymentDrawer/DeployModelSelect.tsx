@@ -40,7 +40,7 @@ function DeployModelSelect({
   emptyComponent?: React.ReactNode;
 }) {
   const [selectAllModels, setSelectAllModels] = useState<boolean>(false);
-  
+
   const { openDrawer } = useDrawer();
   const tagsFilteredModels = filteredModels?.filter((model) => {
     if (selectedTags.length === 0) {

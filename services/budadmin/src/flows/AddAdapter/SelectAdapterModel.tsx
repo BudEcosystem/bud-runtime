@@ -28,7 +28,7 @@ export const SelectAdapterModel = () => {
     const [models, setModels] = React.useState([]);
     const [search, setSearch] = React.useState("");
     const [selectedModel, setSelectedModel] = React.useState(null);
-    
+
     const router = useRouter();
     const projectId = router.query.projectId as string;
 

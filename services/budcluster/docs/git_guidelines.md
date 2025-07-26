@@ -55,7 +55,7 @@ By using semantic versioning, you can automate version increments based on the c
     <type>[optional scope]: <description>
 
     [optional body]
-    
+
     [optional footer(s)]
    ```
 
@@ -66,7 +66,7 @@ By using semantic versioning, you can automate version increments based on the c
       ```text
       feat: allow provided config object to extend other configs
 
-      BREAKING CHANGE: `extends` key in config file is now used for extending other config files 
+      BREAKING CHANGE: `extends` key in config file is now used for extending other config files
       ```
     - Commit message with ! to draw attention to breaking change
 
@@ -102,10 +102,10 @@ By using semantic versioning, you can automate version increments based on the c
 
       Introduce a request id and a reference to latest request. Dismiss
       incoming responses other than from latest request.
-        
+
       Remove timeouts which were used to mitigate the racing issue but are
       obsolete now.
-        
+
       Reviewed-by: Z
       Refs: #123
       ```

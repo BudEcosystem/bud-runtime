@@ -11,7 +11,7 @@ export function useEndPoints() {
     const storedAccessKey = localStorage.getItem('access_key');
     if(!apiKey) apiKey = storedKey || "";
     if(!accessKey) accessKey = storedAccessKey || "";
-    
+
     const result = await getEndpoints(page, limit, apiKey, accessKey);
     if (Array.isArray(result)) {
       setEndpoints(result);

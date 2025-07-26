@@ -1,5 +1,5 @@
 {{- range .Values.nodes }}
-{{- $node := . }} 
+{{- $node := . }}
 {{- range .devices }}
 ---
 apiVersion: apps/v1

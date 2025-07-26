@@ -7,9 +7,8 @@ on:
 jobs:
   lint-test-secure:
     defaults:
-    defaults:
-          run:
-            working-directory: ./services/budapp
+      run:
+        working-directory: ./services/budapp
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -52,8 +51,8 @@ jobs:
     needs: lint-test-secure
     runs-on: ubuntu-latest
     defaults:
-          run:
-            working-directory: ./services/budapp
+      run:
+        working-directory: ./services/budapp
 
     steps:
       - name: Checkout repository

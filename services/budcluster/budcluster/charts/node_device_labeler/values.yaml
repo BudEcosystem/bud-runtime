@@ -30,4 +30,4 @@ deviceChecks:
     label: "device.kubernetes.io/type=cpu-amx"
   cpu:
     enabled: true
-    label: "device.kubernetes.io/type=cpu" 
+    label: "device.kubernetes.io/type=cpu"

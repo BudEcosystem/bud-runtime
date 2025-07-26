@@ -96,7 +96,7 @@ const LineChart: React.FC<LineChartProps> = ({ data }) => {
                         type: 'line',
                         lineStyle: {
                             color: lineChartData?.color,
-                            width: 1, 
+                            width: 1,
                         },
                         smooth: lineChartData?.smooth,
                         showSymbol: false

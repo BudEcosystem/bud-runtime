@@ -25,14 +25,14 @@ export default function SelectFallbackDeployment() {
   const [selectedDeployment, setSelectedDeployment] = useState<IEndPoint | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const { endPoints, getEndPoints, loading } = useEndPoints();
-  
+
   // Get current deployment ID from drawer props
   const currentDeploymentId = drawerProps?.currentDeploymentId;
-  
+
   // Extract project ID from router
-  const projectId = router.query.projectId || 
-    (router.asPath.includes('/projects/') 
-      ? router.asPath.split('/projects/')[1]?.split('/')[0] 
+  const projectId = router.query.projectId ||
+    (router.asPath.includes('/projects/')
+      ? router.asPath.split('/projects/')[1]?.split('/')[0]
       : null);
 
   useEffect(() => {
@@ -56,12 +56,12 @@ export default function SelectFallbackDeployment() {
         }
       }
     };
-    
+
     // Debounce search
     const timer = setTimeout(() => {
       loadDeployments();
     }, searchValue ? 300 : 0);
-    
+
     return () => clearTimeout(timer);
   }, [projectId, searchValue, getEndPoints]);
 
@@ -78,7 +78,7 @@ export default function SelectFallbackDeployment() {
       errorToast(`Cannot select deployment with status: ${deployment.status}. Only running deployments can be used as fallbacks.`);
     }
   };
-  
+
   const handleConfirmSelection = () => {
     if (selectedDeployment && drawerProps?.onSelect) {
       drawerProps.onSelect(selectedDeployment);
@@ -101,7 +101,7 @@ export default function SelectFallbackDeployment() {
             classNames="pt-[.8rem]"
             descriptionClass="pt-[.3rem]"
           />
-          
+
           <DrawerCard>
             <div className="mb-4">
               <SearchHeaderInput
@@ -112,7 +112,7 @@ export default function SelectFallbackDeployment() {
                 classNames="border border-[.5px] border-[#757575]"
               />
             </div>
-            
+
             <div className="flex items-center justify-between">
               <div className="flex items-center justify-start gap-[.2rem]">
                 <Text_12_400_757575>
@@ -122,7 +122,7 @@ export default function SelectFallbackDeployment() {
               </div>
             </div>
           </DrawerCard>
-          
+
           <div className="">
             {loading ? (
               <div className="flex justify-center items-center py-8">
@@ -135,7 +135,7 @@ export default function SelectFallbackDeployment() {
               <div className="flex justify-center items-center min-h-[4rem] py-8">
                 <div className="text-center">
                   <Text_12_300_EEEEEE className="text-[#FF6B6B]">{loadError}</Text_12_300_EEEEEE>
-                  <button 
+                  <button
                     onClick={() => {
                       setLoadError(null);
                       if (projectId) {
@@ -164,24 +164,24 @@ export default function SelectFallbackDeployment() {
                   key={deployment.id}
                   onClick={() => handleDeploymentSelect(deployment)}
                   className={`py-[.85rem] px-[1.4rem] border-b-[0.5px] border-t-[0.5px] flex-row flex items-start ${
-                    deployment.status !== 'running' 
+                    deployment.status !== 'running'
                       ? 'opacity-50 cursor-not-allowed border-t-[transparent] border-b-[#1F1F1F]'
-                      : selectedDeployment?.id === deployment.id 
-                        ? 'bg-[#FFFFFF0A] border-[#965CDE] border-t-[#965CDE] cursor-pointer hover:shadow-lg' 
+                      : selectedDeployment?.id === deployment.id
+                        ? 'bg-[#FFFFFF0A] border-[#965CDE] border-t-[#965CDE] cursor-pointer hover:shadow-lg'
                         : 'border-t-[transparent] border-b-[#1F1F1F] hover:border-t-[.5px] hover:border-[#757575] hover:bg-[#FFFFFF03] cursor-pointer hover:shadow-lg'
                   }`}
                 >
                   <div className="mr-[1rem] flex flex-col justify-center">
                     <div className="bg-[#1F1F1F] w-[2.6875rem] h-[2.6875rem] rounded-[.52rem] flex justify-center items-center grow-0 shrink-0">
-                      <IconOnlyRender 
-                        icon={deployment.model?.icon} 
-                        model={deployment.model} 
-                        type={deployment.model?.provider_type} 
-                        imageSize={27} 
+                      <IconOnlyRender
+                        icon={deployment.model?.icon}
+                        model={deployment.model}
+                        type={deployment.model?.provider_type}
+                        imageSize={27}
                       />
                     </div>
                   </div>
-                  
+
                   <div className="flex-auto max-w-[87%]">
                     <div className="flex items-center justify-between max-w-[100%]">
                       <div className="flex justify-start items-center gap-[.6rem] pb-[0.625rem]">

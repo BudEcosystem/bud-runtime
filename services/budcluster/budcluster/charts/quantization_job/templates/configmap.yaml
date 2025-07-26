@@ -6,4 +6,4 @@ metadata:
     {{- include "quantization-job.labels" . | nindent 4 }}
 data:
   quantization-config.yml: |
-    {{- toYaml .Values.quantizationConfig | nindent 4 }} 
+    {{- toYaml .Values.quantizationConfig | nindent 4 }}

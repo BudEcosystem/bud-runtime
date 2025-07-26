@@ -1,13 +1,12 @@
 import asyncio
-import re
-from bs4 import BeautifulSoup
+
 from crawl4ai import AsyncWebCrawler
+from crawl4ai.async_crawler_strategy import AsyncPlaywrightCrawlerStrategy
 from crawl4ai.extraction_strategy import LLMExtractionStrategy
 from pydantic import BaseModel, Field
-from crawl4ai.chunking_strategy import RegexChunking
-from crawl4ai.async_crawler_strategy import AsyncPlaywrightCrawlerStrategy
 
 from budmodel.commons.config import get_secrets_config
+
 
 # Get API key from configuration
 secrets = get_secrets_config()

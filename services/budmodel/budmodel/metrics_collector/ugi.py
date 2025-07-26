@@ -1,6 +1,7 @@
 import asyncio
-from pyppeteer import launch
 import json
+
+from pyppeteer import launch
 
 
 async def get_ugi_leaderboard():

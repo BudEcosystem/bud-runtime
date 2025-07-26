@@ -39,7 +39,7 @@ interface DeploymentSettings {
 const DeploymentSettings: React.FC = () => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
-  const [saveLoading, setSaveLoading] = useState(false);  
+  const [saveLoading, setSaveLoading] = useState(false);
   const [selectedDeployment, setSelectedDeployment] = useState<any>(null);
   const [isRateLimitEnabled, setIsRateLimitEnabled] = useState(false);
   const { getEndpointSettings, updateEndpointSettings, endPoints, getEndPoints } = useEndPoints();
@@ -47,11 +47,11 @@ const DeploymentSettings: React.FC = () => {
   const { contextHolder, openConfirm } = useConfirmAction();
   const router = useRouter();
   const { deploymentId } = router.query;
-  
+
   // Extract project ID from the route
-  const projectId = router.query.projectId || 
-    (router.asPath.includes('/projects/') 
-      ? router.asPath.split('/projects/')[1]?.split('/')[0] 
+  const projectId = router.query.projectId ||
+    (router.asPath.includes('/projects/')
+      ? router.asPath.split('/projects/')[1]?.split('/')[0]
       : null);
 
   const [settings, setSettings] = useState<DeploymentSettings>({
@@ -84,7 +84,7 @@ const DeploymentSettings: React.FC = () => {
         });
       }
     };
-    
+
     fetchFallbackDeploymentDetails();
   }, [settings.fallback_config?.fallback_models, projectId]);
 
@@ -103,7 +103,7 @@ const DeploymentSettings: React.FC = () => {
     // Load existing settings when component mounts
     const loadSettings = async () => {
       if (!deploymentId) return;
-      
+
       setLoading(true);
       try {
         const response = await getEndpointSettings(deploymentId as string);
@@ -170,7 +170,7 @@ const DeploymentSettings: React.FC = () => {
               errors: ['At least one rate limit value is required when rate limiting is enabled']
             },
             {
-              name: 'requests_per_minute', 
+              name: 'requests_per_minute',
               errors: ['At least one rate limit value is required when rate limiting is enabled']
             },
             {
@@ -181,7 +181,7 @@ const DeploymentSettings: React.FC = () => {
           return;
         }
       }
-      
+
       openConfirm({
         message: 'Save Deployment Settings',
         description: 'Are you sure you want to save these deployment settings? This will affect how your deployment handles requests.',
@@ -264,12 +264,12 @@ const DeploymentSettings: React.FC = () => {
     setSelectedDeployment(deployment);
     form.setFieldValue('fallback_deployment_id', deployment.id);
   };
-  
+
   const clearDeploymentSelection = () => {
     setSelectedDeployment(null);
     form.setFieldValue('fallback_deployment_id', '');
   };
-  
+
   const openDeploymentDrawer = () => {
     // Update router query to include projectId if it's not there
     if (projectId && !router.query.projectId) {
@@ -278,7 +278,7 @@ const DeploymentSettings: React.FC = () => {
         query: { ...router.query, projectId }
       }, undefined, { shallow: true });
     }
-    
+
     openDrawerWithStep('select-fallback-deployment', {
       onSelect: handleDeploymentSelect,
       currentDeploymentId: deploymentId,
@@ -322,7 +322,7 @@ const DeploymentSettings: React.FC = () => {
         </div>
       </div>
 
-      <BudFormContext.Provider 
+      <BudFormContext.Provider
         value={{
           form: form,
           submittable: true,
@@ -367,7 +367,7 @@ const DeploymentSettings: React.FC = () => {
                 />
               </CustomPopover>
             </div>
-            
+
             <Switch
               size="small"
               className="[&_.ant-switch-checked]:bg-[#965CDE]"
@@ -446,7 +446,7 @@ const DeploymentSettings: React.FC = () => {
                     {({ getFieldValue }) => {
                       const algorithm = getFieldValue('algorithm');
                       if (algorithm !== 'token_bucket') return null;
-                      
+
                       return (
                         <TextInput
                           name="burst_size"
@@ -483,20 +483,20 @@ const DeploymentSettings: React.FC = () => {
           </div>
 
           <Form.Item name="fallback_deployment_id">
-            <div className="space-y-3">              
+            <div className="space-y-3">
               {selectedDeployment ? (
                 <div className="py-[.85rem] px-[1.4rem] border border-[#1F1F1F] bg-[#101010] rounded-[.4rem] flex-row flex items-start">
                   <div className="mr-[1rem] flex flex-col justify-center">
                     <div className="bg-[#1F1F1F] w-[2.6875rem] h-[2.6875rem] rounded-[.52rem] flex justify-center items-center grow-0 shrink-0">
-                      <IconOnlyRender 
-                        icon={selectedDeployment.model?.icon} 
-                        model={selectedDeployment.model} 
-                        type={selectedDeployment.model?.provider_type} 
-                        imageSize={27} 
+                      <IconOnlyRender
+                        icon={selectedDeployment.model?.icon}
+                        model={selectedDeployment.model}
+                        type={selectedDeployment.model?.provider_type}
+                        imageSize={27}
                       />
                     </div>
                   </div>
-                  
+
                   <div className="flex-auto">
                     <div className="flex items-center justify-between max-w-[100%]">
                       <div className="flex justify-start items-center gap-[.6rem] pb-[0.625rem]">
@@ -546,7 +546,7 @@ const DeploymentSettings: React.FC = () => {
                   Select Deployment
                 </Button>
               )}
-              
+
               {selectedDeployment && (
                 <Button
                   type="text"
@@ -596,7 +596,7 @@ const DeploymentSettings: React.FC = () => {
                 label="Max Delay (seconds)"
                 placeholder="Optional (0.1-60 seconds)"
                 rules={[
-                  { 
+                  {
                     validator: (_, value) => {
                       if (!value) return Promise.resolve(); // Allow empty values
                       const num = parseFloat(value);

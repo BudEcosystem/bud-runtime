@@ -60,8 +60,8 @@ class LeaderboardBase(BaseModel):
     """Leaderboard base schema."""
 
     # APAC Eval Leaderboard fields
-    lc_win_rate: float | None = None  
-    win_rate: float | None = None  
+    lc_win_rate: float | None = None
+    win_rate: float | None = None
 
     # Berkeley Leaderboard fields
     bcfl: float | None = None
@@ -79,10 +79,10 @@ class LeaderboardBase(BaseModel):
     summarization: float | None = None
 
     # UGI Leaderboard fields (with _score suffixes)
-    ugi_score: float | None = None  
-    w_10_score: float | None = None 
+    ugi_score: float | None = None
+    w_10_score: float | None = None
     # i_10_score: str | None = None  # TODO: Uncomment this column when scraper bug is fixed
-    unruly_score: float | None = None 
+    unruly_score: float | None = None
     internet_score: float | None = None
     # stats_score: str | None = None  # TODO: Uncomment this column when scraper bug is fixed
     # writing_score: str | None = None  # TODO: Uncomment this column when scraper bug is fixed
@@ -101,12 +101,13 @@ class LeaderboardBase(BaseModel):
     # Chatbot Arena Leaderboard fields
     lmsys_areana: int | None = None
 
-    #LLM Stats Leaderboard fields
+    # LLM Stats Leaderboard fields
     gpqa: float | None = None
     mmlu: float | None = None
     mmlu_pro: float | None = None
     drop: float | None = None
     humaneval: float | None = None
+
 
 class LeaderboardCreate(BaseModel):
     """Leaderboard create schema."""
@@ -184,7 +185,7 @@ class LeaderboardResponse(BaseModel):
     """Leaderboard response schema."""
 
     # APAC Eval Leaderboard fields
-    lc_win_rate: float | None = None  
+    lc_win_rate: float | None = None
 
     # Berkeley Leaderboard fields
     bcfl: float | None = None
@@ -202,7 +203,7 @@ class LeaderboardResponse(BaseModel):
     summarization: float | None = None
 
     # UGI Leaderboard fields (with _score suffixes)
-    ugi_score: float | None = None  
+    ugi_score: float | None = None
 
     # VLLM Leaderboard fields
     mmbench: float | None = None
@@ -244,6 +245,8 @@ class LeaderboardModelCompareResponse(SuccessResponse):
     """Leaderboard model compare response schema."""
 
     leaderboards: list[dict] = []
+
+
 class LeaderboardResponse(BaseModel):
     """Leaderboard response schema."""
 
@@ -260,10 +263,8 @@ class LeaderboardModelUrisResponse(BaseModel):
     uri: str
     benchmarks: List[LeaderboardResponse]
 
+
 class LeaderboardModelUrisListResponse(SuccessResponse):
     """Leaderboard model compare response schema."""
 
     leaderboards: List[LeaderboardModelUrisResponse]
-
-
-

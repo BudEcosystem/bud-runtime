@@ -63,11 +63,13 @@ class ModelExtractionStatus(StrEnum):
     COMPLETED = auto()
     PARTIAL = auto()
 
+
 class LeaderboardDataOrigin(StrEnum):
     """Source of leaderboard data."""
 
     SCRAPED = auto()
     README_LLM = auto()
+
 
 LEADERBOARD_FIELDS = Literal[
     "lc_win_rate",
@@ -99,7 +101,7 @@ description (key - description - String, Max 3-4 Sentences): Read the source doc
 advantages (key - advantages [List of strings]): Read the model description and evals carefully to identify explicitly stated strengths and capabilities. Look for phrases like ‘excels at,’ ‘strong in,’ or specific improvements (e.g., larger context window). List each advantage as a complete statement with supporting details, using only facts from the source. For evals, note benchmarks, scores, and what they measure (e.g., GSM8K → math reasoning). Translate results into real-world skills, mentioning limitations where stated. Avoid assumptions, comparisons, or unsupported claims — rely strictly on the provided data.
 disadvantages (key - disadvantages [List of strings]): Carefully read the model description and evals to identify explicitly stated limitations or weaknesses. Look for words like ‘limitation,’ ‘drawback,’ or ‘weakness’ and categorize them (e.g., technical limits, performance issues, safety concerns). In evals, flag low scores: As an example: GSM8K < 50 means poor math skills, MMLU < 60 suggests weak factual reasoning. List each disadvantage as a clear, standalone point with exact wording or paraphrased text — no assumptions or exaggerations. Only document what’s directly provided, and avoid conclusions beyond the source data.
 usecases (key: usecases [List of strings]): Read the model description and evals to find suitable use cases. Look for features, architecture details, and benchmark results. For example, a high score on HellaSwag (70) suggests strong natural language understanding for creative writing or content generation. A moderate MMLU score (50) indicates potential for general knowledge tasks, while a GSM8K score of 40 suggests some mathematical reasoning ability. List practical applications directly based on these strengths, without making assumptions beyond the data provided.
-evals: (key evals (List of dictionaries)): Find any evals available in the description and extract them with their values. For example: MMLU: 50, GSM8K: 40, HellaSwag: 70, etc. format - {"name": "MMLU", "score": 50}. Ensure that score is a number and also ensure that the value is extracted appropriately for the given model based on the table structure. 
+evals: (key evals (List of dictionaries)): Find any evals available in the description and extract them with their values. For example: MMLU: 50, GSM8K: 40, HellaSwag: 70, etc. format - {"name": "MMLU", "score": 50}. Ensure that score is a number and also ensure that the value is extracted appropriately for the given model based on the table structure.
 
 Sample JSON Structure for one model is given below:
 {
@@ -249,7 +251,7 @@ Create a JSON with the keys and answers to the questions given above and follow 
 }
 </json>
 
-LICENSE: 
+LICENSE:
 
 """
 

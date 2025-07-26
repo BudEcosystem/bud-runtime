@@ -86,13 +86,13 @@ LICENSE_QA_PROMPT = """
                     1. **Read the provided license content carefully** to ensure you understand the terms.
                     2. **Reason through the content** to logically deduce the answer to the question.
                     3. **Answer the question** with either "YES" or "NO", depending on whether the license terms allow or disallow the condition.
-                    4. **Provide a clear explanation (1-2 sentences)** justifying your answer. 
+                    4. **Provide a clear explanation (1-2 sentences)** justifying your answer.
                         - If you answer "YES", explain why the action or condition is allowed.
                         - If you answer "NO", explain why the action or condition is restricted or prohibited.
 
                     ### Output Format:
                     Your response should be structured as follows in Markdown:
-                    
+
                     **Answer**: YES/NO
                     **Description**: Explaination for the answer
 

@@ -27,7 +27,7 @@
    ```bash
    # Install runtime dependencies
    pip install -r requirements.txt
-   
+
    # Install development dependencies
    pip install -r requirements-dev.txt
    pip install -r requirements-test.txt
@@ -44,7 +44,7 @@
    ```bash
    # Start ClickHouse
    docker-compose -f deploy/docker-compose-clickhouse.yaml up -d
-   
+
    # Or use the convenience script
    ./deploy/start_dev.sh
    ```
@@ -116,12 +116,12 @@ async def process_metrics(
     to_date: Optional[datetime] = None,
 ) -> dict[str, Any]:
     """Process metrics for the given time range.
-    
+
     Args:
         metrics: List of metric names to process
         from_date: Start date for processing
         to_date: End date (defaults to current time)
-        
+
     Returns:
         Dictionary containing processed metrics
     """
@@ -194,7 +194,7 @@ class TestQueryBuilder:
     @pytest.fixture
     def query_builder(self):
         return QueryBuilder(performance_metrics=None)
-    
+
     def test_simple_query(self, query_builder):
         query, fields = query_builder.build_query(
             metrics=["request_count"],
@@ -202,7 +202,7 @@ class TestQueryBuilder:
             to_date=datetime(2024, 1, 31, tzinfo=UTC),
             frequency_unit="day"
         )
-        
+
         assert "SELECT" in query
         assert "request_count" in query
         assert len(fields) > 0
@@ -228,7 +228,7 @@ async def test_analytics_endpoint():
                 "frequency_unit": "day"
             }
         )
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["object"] == "observability_metrics"
@@ -342,7 +342,7 @@ class MetricType(str, Enum):
    # In scripts/migrations/add_new_column.py
    async def migrate():
        await client.execute_query("""
-           ALTER TABLE ModelInferenceDetails 
+           ALTER TABLE ModelInferenceDetails
            ADD COLUMN new_field String DEFAULT ''
        """)
    ```
@@ -355,7 +355,7 @@ class MetricType(str, Enum):
 
 1. **Identify slow queries**
    ```sql
-   SELECT 
+   SELECT
        query,
        query_duration_ms,
        read_rows,
@@ -385,7 +385,7 @@ class MetricType(str, Enum):
    ```python
    class MyRequest(BaseModel):
        field: str
-       
+
    class MyResponse(BaseModel):
        result: str
    ```

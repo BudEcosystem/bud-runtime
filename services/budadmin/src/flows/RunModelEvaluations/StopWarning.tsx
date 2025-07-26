@@ -43,7 +43,7 @@ export default function StopWarning() {
               You&apos;re about to stop evaluations
               </Text_14_400_EEEEEE>
               <Text_12_400_757575 className="text-left leading-[1.11rem]">
-              If you choose to cancel evaluations are you sure you want to continue? 
+              If you choose to cancel evaluations are you sure you want to continue?
               </Text_12_400_757575>
             </div>
           </div>

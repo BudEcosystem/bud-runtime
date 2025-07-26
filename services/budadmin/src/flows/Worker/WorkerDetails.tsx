@@ -142,7 +142,7 @@ export default function WorkerDetails() {
         setWorkerLogs(logs);
       });
     }
-    
+
   }, [selectedWorker]);
 
 
@@ -342,11 +342,11 @@ export default function WorkerDetails() {
                           }
                         </Text_26_400_EEEEEE>
                         <div className="flex bg-[#122F1140] rounded-md items-center px-[.45rem] mb-[.1rem] h-[1.35rem] mt-[0.35rem]">
-                          {wrokerMetrics.cpu_metrics && Object.keys(wrokerMetrics.cpu_metrics).length > 0 ? 
+                          {wrokerMetrics.cpu_metrics && Object.keys(wrokerMetrics.cpu_metrics).length > 0 ?
                             (() => {
                               const values = Object.values(wrokerMetrics.cpu_metrics)
                                 .filter((value): value is number => value !== null);
-                              
+
                               if (values.length === 0) {
                                 return (
                                   <>
@@ -367,7 +367,7 @@ export default function WorkerDetails() {
                               const average = values.reduce((sum, value) => sum + value, 0) / values.length;
                               const firstValue = values[0];
                               const percentageChange = ((average - firstValue) / firstValue) * 100;
-                              
+
                               return (
                                 <>
                                   <span className={`font-[400] text-[0.8125rem] leading-[100%] ${percentageChange >= 0 ? 'text-[#479D5F]' : 'text-[#D74D4D]'}`}>
@@ -449,8 +449,8 @@ export default function WorkerDetails() {
                       <span className="text-[1rem]">0</span>
                     </Text_24_400_EEEEEE>
                     }
-                  
-                  
+
+
                 </Text_24_400_EEEEEE>,
                 val2: <Text_9_400_EEEEEE>This week</Text_9_400_EEEEEE>
               }} />

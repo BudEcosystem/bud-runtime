@@ -9,4 +9,3 @@ parameters:
   onDelete: delete
 reclaimPolicy: Delete
 volumeBindingMode: Immediate
-

@@ -131,7 +131,7 @@ const GeneratePassPopup: React.FC<GeneratePassPopupProps> = ({
 
       New Password: ${password}
       Username: ${userEmail}
-      
+
       Click this link to login: https://bud.studio`);
   };
   const onCopy = async () => {
@@ -238,5 +238,3 @@ const GeneratePassPopup: React.FC<GeneratePassPopupProps> = ({
 };
 
 export default GeneratePassPopup;
-
-

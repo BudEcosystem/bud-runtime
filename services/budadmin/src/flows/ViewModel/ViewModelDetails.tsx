@@ -44,7 +44,7 @@ export default function ViewModel() {
     // if (key != '1') {
     //   closeExpandedStep();
     // }
-    
+
     closeExpandedStep();
     if( key == '5') {
       setToAdapter(true);

@@ -55,7 +55,7 @@ export default function DeployModel() {
           return;
         }
 
-        // TODO Check 
+        // TODO Check
         if (selectedModel?.provider_type === "cloud_model") {
           return openDrawerWithStep("deploy-model-credential-select");
         }

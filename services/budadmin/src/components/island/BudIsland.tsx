@@ -159,7 +159,7 @@ const BudIsland: React.FC = () => {
     // }
     // else
     if (lastNotification?.data?.status === 'STARTED') {
-        // In Progress 
+        // In Progress
         statusRender = <svg width="10" height="11" viewBox="0 0 10 11" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M7.73504 5.8681C7.18044 5.8681 7.18044 5.03015 7.73504 5.03015H9.58333C10.1379 5.03015 10.1379 5.8681 9.58333 5.8681H7.73504Z" fill="#EEEEEE" />
             <path d="M6.63903 3.20764C6.24468 3.60199 6.84852 4.20583 7.23037 3.81148L8.53657 2.50529C8.93092 2.11094 8.33958 1.5196 7.94523 1.91395L6.63903 3.20764Z" fill="#EEEEEE" />
@@ -317,4 +317,3 @@ export default function BudIslandProvider() {
         // </NovuProvider>
     );
 }
-

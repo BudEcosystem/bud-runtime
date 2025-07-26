@@ -133,7 +133,7 @@ export default function CreateRoute() {
                 },
               ]}
             />
-            
+
             <Form.Item name="strategy">
               <div className="budRadioGroup">
                 <InfoLabel

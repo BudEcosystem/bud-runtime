@@ -68,7 +68,7 @@ export const useCredentials = create<{
         SetExpiry?: string;
         SetMaxBudget?: any;
     };
-    
+
     editProjectCredentialDetails: {
         SetExpiry?: string;
         SetMaxBudget?: any;

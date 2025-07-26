@@ -324,7 +324,7 @@ async def realtime_conversation():
         "Authorization": f"Bearer {client_secret}",
         "Sec-WebSocket-Protocol": "realtime"
     }
-    
+
     async with websockets.connect(uri, extra_headers=headers) as websocket:
         # Send audio input
         with open("audio_input.raw", "rb") as f:
@@ -333,31 +333,31 @@ async def realtime_conversation():
                 "type": "input_audio_buffer.append",
                 "audio": base64.b64encode(audio_data).decode()
             }))
-        
+
         # Commit audio buffer
         await websocket.send(json.dumps({
             "type": "input_audio_buffer.commit"
         }))
-        
+
         # Create response
         await websocket.send(json.dumps({
             "type": "response.create"
         }))
-        
+
         # Handle server events
         while True:
             message = await websocket.recv()
             event = json.loads(message)
-            
+
             if event["type"] == "response.audio.delta":
                 # Process audio chunk
                 audio_chunk = base64.b64decode(event["delta"])
                 # Play or save audio chunk
-                
+
             elif event["type"] == "response.text.delta":
                 # Process text chunk
                 print(event["delta"], end="", flush=True)
-                
+
             elif event["type"] == "response.done":
                 break
 
@@ -431,18 +431,18 @@ async function startConversation() {
       case 'response.text.delta':
         process.stdout.write(event.delta);
         break;
-      
+
       case 'response.audio.delta':
         // Handle audio data
         const audioChunk = Buffer.from(event.delta, 'base64');
         // Play or save audio
         break;
-      
+
       case 'response.done':
         console.log('\nResponse complete');
         ws.close();
         break;
-      
+
       case 'error':
         console.error('Error:', event.error.message);
         break;
@@ -469,19 +469,19 @@ async function getSessionCredentials() {
 // Browser WebSocket connection
 async function startVoiceChat() {
   const { clientSecret, wsUrl } = await getSessionCredentials();
-  
+
   const ws = new WebSocket(wsUrl, ['realtime']);
   ws.binaryType = 'arraybuffer';
 
   // Get user media
   const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
   const mediaRecorder = new MediaRecorder(stream);
-  
+
   mediaRecorder.ondataavailable = async (event) => {
     if (event.data.size > 0) {
       const arrayBuffer = await event.data.arrayBuffer();
       const base64Audio = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-      
+
       ws.send(JSON.stringify({
         type: 'input_audio_buffer.append',
         audio: base64Audio
@@ -497,14 +497,14 @@ async function startVoiceChat() {
         input_audio_transcription: { enabled: true }
       }
     }));
-    
+
     // Start recording
     mediaRecorder.start(100); // Send chunks every 100ms
   };
 
   ws.onmessage = (event) => {
     const data = JSON.parse(event.data);
-    
+
     if (data.type === 'response.audio.delta') {
       // Play audio chunk
       playAudioChunk(data.delta);

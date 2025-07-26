@@ -35,7 +35,7 @@ export default function NewProject() {
   useEffect(() => {
     getProjectTags()
   }, []);
-  
+
   useEffect(() => {
     fetchList();
   }, [projectTags]);

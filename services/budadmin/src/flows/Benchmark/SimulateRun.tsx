@@ -61,7 +61,7 @@ hardware configuration. We have usually noticed less than 8% accuracy difference
                         openDrawerWithStep("Benchmarking-Progress")
                       }
                     })
-                  
+
                 }}
                 classNames="px-[.6rem]"
                 text="Simulate"

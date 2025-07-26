@@ -80,7 +80,7 @@ const mapFrequency = (oldFrequency: string): 'hour' | 'day' | 'week' | 'month' =
 // Map old metrics parameter to new metrics array
 const mapMetrics = (oldMetrics?: string | null): string[] => {
   if (!oldMetrics) return ['request_count'];
-  
+
   switch (oldMetrics) {
     case 'overall':
       return ['request_count'];
@@ -126,12 +126,12 @@ export const convertToObservabilityRequest = (params: {
 
   // Handle filters
   request.filters = {};
-  
+
   // Add project_id filter if provided
   if (params.project_id) {
     request.filters.project = [params.project_id];
   }
-  
+
   // Add other filters from filter_conditions
   if (params.filter_conditions && params.filter_conditions.length > 0) {
     if (params.filter_by === 'project' && !params.project_id) {
@@ -142,7 +142,7 @@ export const convertToObservabilityRequest = (params: {
       request.filters.endpoint = params.filter_conditions[0];
     }
   }
-  
+
   // Remove empty filters object if no filters were added
   if (Object.keys(request.filters).length === 0) {
     delete request.filters;
@@ -183,9 +183,9 @@ export const convertObservabilityResponse = (
         },
       };
     }
-    
+
     if (oldMetrics === 'throughput' || oldMetrics === 'latency' || oldMetrics === 'ttft') {
-      const metricKey = oldMetrics === 'throughput' ? 'throughput_metrics' : 
+      const metricKey = oldMetrics === 'throughput' ? 'throughput_metrics' :
                        oldMetrics === 'latency' ? 'latency_metrics' : 'ttft_metrics';
       return {
         [metricKey]: {
@@ -198,7 +198,7 @@ export const convertObservabilityResponse = (
         },
       };
     }
-    
+
     if (oldMetrics === 'queuing_time') {
       return {
         queuing_time_metrics: {
@@ -211,7 +211,7 @@ export const convertObservabilityResponse = (
         },
       };
     }
-    
+
     if (oldMetrics === 'concurrency') {
       return {
         concurrency_metrics: {
@@ -224,7 +224,7 @@ export const convertObservabilityResponse = (
         },
       };
     }
-    
+
     if (oldMetrics === 'global') {
       return {
         global_metrics: {
@@ -236,7 +236,7 @@ export const convertObservabilityResponse = (
         },
       };
     }
-    
+
     // Default empty response
     return {
       overall_metrics: {
@@ -249,7 +249,7 @@ export const convertObservabilityResponse = (
       },
     };
   }
-  
+
   const metricsArray = mapMetrics(oldMetrics);
   const primaryMetric = metricsArray[0];
 
@@ -261,7 +261,7 @@ export const convertObservabilityResponse = (
   // When we have multiple periods (for delta calculation), only use the first half for display
   // The API returns data sorted with latest at index 0
   const periodsToDisplay = response.items.length >= 2 ? Math.ceil(response.items.length / 2) : response.items.length;
-  
+
   // Process only the display periods (latest half of the data)
   for (let i = 0; i < periodsToDisplay; i++) {
     const timePeriod = response.items[i];
@@ -330,7 +330,7 @@ export const convertObservabilityResponse = (
       },
       items: response.items.slice(0, periodsToDisplay).map((timePeriod) => ({
         time_period: timePeriod.time_period,
-        items: (timePeriod.items && Array.isArray(timePeriod.items)) 
+        items: (timePeriod.items && Array.isArray(timePeriod.items))
           ? timePeriod.items.map((item) => {
               const metricData = item.data[primaryMetric];
               return {
@@ -371,11 +371,11 @@ const convertTokenMetricsResponse = (response: ObservabilityMetricsResponse): an
     const firstItem = response.items[0].items[0];
     const inputMetricData = firstItem.data.input_token;
     const outputMetricData = firstItem.data.output_token;
-    
+
     if (inputMetricData?.delta_percent !== undefined) {
       inputDeltaPercentage = inputMetricData.delta_percent;
     }
-    
+
     if (outputMetricData?.delta_percent !== undefined) {
       outputDeltaPercentage = outputMetricData.delta_percent;
     }
@@ -423,10 +423,10 @@ const convertPerformanceMetricsResponse = (
       timePeriod.items.forEach((item) => {
         const entityName = item.project_name || item.model_name || item.endpoint_name || item.model_id || item.project_id || item.endpoint_id || 'Unknown';
         const metricData = item.data[metricType];
-        
+
         let value = 0;
         let delta = metricData?.delta_percent || 0;
-        
+
         if (metricType === 'throughput') {
           value = metricData?.avg || metricData?.avg_throughput || metricData?.value || 0;
         } else if (metricType === 'latency') {
@@ -434,16 +434,16 @@ const convertPerformanceMetricsResponse = (
         } else if (metricType === 'ttft') {
           value = metricData?.avg || metricData?.avg_ttft_ms || metricData?.value || 0;
         }
-        
+
         if (!summaryMap.has(entityName)) {
           summaryMap.set(entityName, { total: 0, count: 0, delta: 0 });
         }
-        
+
         const summary = summaryMap.get(entityName)!;
         summary.total += value;
         summary.count += 1;
         summary.delta = delta; // Use the latest delta
-        
+
         overallTotal += value;
         overallCount += 1;
       });
@@ -545,10 +545,10 @@ const convertGlobalMetricsResponse = (response: ObservabilityMetricsResponse): a
   // Calculate total value and delta across all items and time periods
   let totalValue = 0;
   let deltaPercentage = 0;
-  
+
   // When we have multiple periods (for delta calculation), only use the first half for display
   const periodsToDisplay = response.items.length >= 2 ? Math.ceil(response.items.length / 2) : response.items.length;
-  
+
   // For weekly view with daily data, calculate week-over-week change
   if (response.items.length >= 14) {
     // Items are sorted with newest first (index 0)
@@ -562,7 +562,7 @@ const convertGlobalMetricsResponse = (response: ObservabilityMetricsResponse): a
         });
       }
     }
-    
+
     // Last week: items from index 7 to 13
     let lastWeekTotal = 0;
     for (let i = 7; i < 14; i++) {
@@ -573,7 +573,7 @@ const convertGlobalMetricsResponse = (response: ObservabilityMetricsResponse): a
         });
       }
     }
-    
+
     // Calculate week-over-week percentage change
     if (lastWeekTotal > 0) {
       deltaPercentage = ((thisWeekTotal - lastWeekTotal) / lastWeekTotal) * 100;
@@ -581,7 +581,7 @@ const convertGlobalMetricsResponse = (response: ObservabilityMetricsResponse): a
       // If last week was 0 but this week has data, show 100% increase
       deltaPercentage = 100;
     }
-    
+
     totalValue = thisWeekTotal;
   } else {
     // For other cases, get delta from API response if available
@@ -592,7 +592,7 @@ const convertGlobalMetricsResponse = (response: ObservabilityMetricsResponse): a
         deltaPercentage = metricData.delta_percent;
       }
     }
-    
+
     // Sum only the display periods
     for (let i = 0; i < periodsToDisplay; i++) {
       const timePeriod = response.items[i];
@@ -603,7 +603,7 @@ const convertGlobalMetricsResponse = (response: ObservabilityMetricsResponse): a
       }
     }
   }
-  
+
   return {
     global_metrics: {
       summary_metrics: {

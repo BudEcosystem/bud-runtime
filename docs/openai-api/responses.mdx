@@ -311,42 +311,42 @@ class ResponsesAPI:
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
         }
-    
+
     def create_response(self, model, input_text, **kwargs):
         data = {
             "model": model,
             "input": input_text,
             **kwargs
         }
-        
+
         response = requests.post(
             f"{self.base_url}/v1/responses",
             headers=self.headers,
             json=data
         )
         return response.json()
-    
+
     def create_conversation(self, model, messages):
         """Create a multi-turn conversation"""
         response_id = None
         responses = []
-        
+
         for message in messages:
             data = {
                 "model": model,
                 "input": message
             }
-            
+
             if response_id:
                 data["previous_response_id"] = response_id
-            
-            response = self.create_response(model, message, 
+
+            response = self.create_response(model, message,
                                           previous_response_id=response_id)
             responses.append(response)
             response_id = response["id"]
-        
+
         return responses
-    
+
     def stream_response(self, model, input_text, **kwargs):
         """Stream response with SSE"""
         data = {
@@ -355,14 +355,14 @@ class ResponsesAPI:
             "stream": True,
             **kwargs
         }
-        
+
         response = requests.post(
             f"{self.base_url}/v1/responses",
             headers=self.headers,
             json=data,
             stream=True
         )
-        
+
         for line in response.iter_lines():
             if line:
                 line = line.decode('utf-8')
@@ -402,7 +402,7 @@ for chunk in api.stream_response("gpt-4o", "Write a short story"):
 with open("image.jpg", "rb") as f:
     import base64
     image_data = base64.b64encode(f.read()).decode()
-    
+
     response = api.create_response(
         "gpt-4o-vision",
         [
@@ -485,7 +485,7 @@ class ResponsesAPI {
         message,
         responseId ? { previous_response_id: responseId } : {}
       );
-      
+
       responses.push(response);
       responseId = response.id;
     }
@@ -537,7 +537,7 @@ const toolResponse = await api.createResponse(
 // Handle tool calls
 if (toolResponse.output.tool_calls?.length > 0) {
   for (const toolCall of toolResponse.output.tool_calls) {
-    console.log(`Calling ${toolCall.function.name} with:`, 
+    console.log(`Calling ${toolCall.function.name} with:`,
                 JSON.parse(toolCall.function.arguments));
   }
 }

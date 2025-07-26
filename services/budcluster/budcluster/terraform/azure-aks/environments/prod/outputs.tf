@@ -33,4 +33,4 @@ output "vnet_name" {
 output "subnet_ids" {
   description = "Map of subnet names to IDs"
   value       = module.aks_cluster.subnet_ids
-} 
+}

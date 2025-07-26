@@ -11,7 +11,7 @@ def test_performance_benchmark_cloud():
     )
     benchmark_result = performance_benchmark.run_performance_test()
     print(benchmark_result)
-    
+
 def test_performance_benchmark_local():
     performance_benchmark = DeploymentPerformance(
         deployment_url="http://20.244.107.114:10701/bud-test-b966a4f6/v1",

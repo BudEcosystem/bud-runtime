@@ -13,8 +13,8 @@ import { useDeployModel } from "src/stores/useDeployModel";
 export const AdapterStatus = () => {
     const { openDrawerWithStep, closeDrawer } = useDrawer();
     const { currentWorkflow, cancelQuantizationDeployment } = useDeployModel();
-    
-    const [isFailed, setIsFailed] = React.useState(false);  
+
+    const [isFailed, setIsFailed] = React.useState(false);
     const [showAlert, setShowAlert] = React.useState(false);
 
     const handleBack = () => {
@@ -25,7 +25,7 @@ export const AdapterStatus = () => {
         }
     }
 
-    return <BudForm 
+    return <BudForm
     data={{}}
     backText={isFailed ? "Back" : "Cancel"}
     onBack={handleBack}
@@ -55,7 +55,7 @@ export const AdapterStatus = () => {
         />
         </BudDrawerLayout>}
         <CommonStatus
-        
+
             workflowId={currentWorkflow?.workflow_id}
             events_field_id="adapter_deployment_events"
             success_payload_type="add_adapter"

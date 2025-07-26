@@ -100,7 +100,7 @@ const AddClusterPopup: React.FC<AddClusterPopupProps> = ({
       }
       if (!formData?.type) {
         newErrors.type = "Cluster type is required";
-      } 
+      }
       if((!formData.configuration || formData?.configuration?.length <= 0) && !errors.configuration) {
         newErrors.configuration = "Configuration file is required";
       }

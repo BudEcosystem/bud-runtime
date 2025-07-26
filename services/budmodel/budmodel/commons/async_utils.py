@@ -136,8 +136,8 @@ async def get_param_range(num_params: int) -> tuple[int, int]:
 
         logger.debug(
             f"Model has {num_params_in_thousands:.2f}K params, "
-            f"using +/-{range_size/1000:.1f}K range: "
-            f"{min_num_params/1000:.2f}K to {max_num_params/1000:.2f}K"
+            f"using +/-{range_size / 1000:.1f}K range: "
+            f"{min_num_params / 1000:.2f}K to {max_num_params / 1000:.2f}K"
         )
         return min_num_params, max_num_params
 

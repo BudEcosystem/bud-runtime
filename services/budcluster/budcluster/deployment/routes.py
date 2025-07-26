@@ -32,7 +32,6 @@ from .schemas import (
     DeleteWorkerRequest,
     DeploymentCreateRequest,
     DeployQuantizationRequest,
-    PodLogs,
     WorkerDetailResponse,
     WorkerInfo,
     WorkerInfoFilter,
@@ -475,7 +474,7 @@ async def deploy_quantization(
         status.HTTP_500_INTERNAL_SERVER_ERROR: {
             "model": ErrorResponse,
             "description": "Internal server error",
-        }
+        },
     },
     description="Add adapter",
     tags=["Adapter"],

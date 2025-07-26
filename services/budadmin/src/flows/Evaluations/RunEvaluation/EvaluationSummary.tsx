@@ -55,7 +55,7 @@ export default function EvaluationSummary() {
       tags: ["safety", "ethics", "harmful content"]
     }
   ];
-  
+
   // Mock selected model data - replace with actual data from store
   const selectedModel: Model = {
     id: "model-1",
@@ -110,7 +110,7 @@ export default function EvaluationSummary() {
     eval_verified: false,
     created_at: new Date().toISOString()
   };
-  
+
   const [search, setSearch] = React.useState("");
   const [deploymentSpecs, detDeploymentSpecs] = React.useState<SpecificationTableItemProps[]>([
     {

@@ -37,9 +37,9 @@ from .schemas import (
     ModelExtractionRequest,
     ModelExtractionResponse,
     ModelInfo,
+    ModelscanETAObserverRequest,
     ModelSecurityScanRequest,
     ModelSecurityScanResponse,
-    ModelscanETAObserverRequest,
 )
 from .services import (
     LicenseFAQService,
@@ -303,7 +303,6 @@ class ModelSecurityScanWorkflows:
 
     def __call__(self, request: ModelSecurityScanRequest, workflow_id: Optional[str] = None):
         """Schedule the model security scan workflow."""
-
         selected_workflow_id = str(workflow_id or uuid.uuid4())
         eta = ModelSecurityScanService.calculate_initial_eta(
             workflow_id=selected_workflow_id, model_path=request.model_path

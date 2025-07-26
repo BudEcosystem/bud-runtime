@@ -28,11 +28,11 @@ export default function ChatPage() {
       setHasHydrated(hydrated);
     }
   }, []);
-  
+
 
   useEffect(() => {
     if (!hasHydrated) return;
-    
+
     hideLoader();
     if (activeChatList.length === 0) {
       createNewChat();

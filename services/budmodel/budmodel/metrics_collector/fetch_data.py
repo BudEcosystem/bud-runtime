@@ -1,5 +1,6 @@
 import asyncio
 import json
+
 from crawl4ai import AsyncWebCrawler
 from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
 

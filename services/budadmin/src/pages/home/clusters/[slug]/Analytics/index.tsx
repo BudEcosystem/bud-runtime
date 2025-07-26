@@ -32,8 +32,8 @@ const Analytics : React.FC<GeneralProps> = ({ cluster_id }) => {
                 </div>
             ) : (
                  <iframe src={dashboardUrl} className="w-full h-[80vh] rounded" />
-               
-                
+
+
             )}
         </div>
     )

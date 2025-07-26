@@ -55,7 +55,7 @@ const EvaluationSumary = () => {
       .filter(deployment => selectedDeployments.includes(deployment.id))
       .map(deployment => ({
         name: deployment.name,
-        value: deployment.id === 1 
+        value: deployment.id === 1
           ? [0.8, 0.7, 0.9, 0.6, 0.85, 0.75]
           : deployment.id === 2
           ? [0.6, 0.8, 0.7, 0.9, 0.65, 0.8]
@@ -63,13 +63,13 @@ const EvaluationSumary = () => {
         color: deployment.color,
         areaStyle: {
           color: new echarts.graphic.RadialGradient(0.5, 0.5, 1, [
-            { 
+            {
               color: deployment.color + '66', // 40% opacity in hex
-              offset: 0 
+              offset: 0
             },
-            { 
+            {
               color: deployment.color + '1A', // 10% opacity in hex
-              offset: 1 
+              offset: 1
             },
           ]),
         },
@@ -82,19 +82,19 @@ const EvaluationSumary = () => {
     yAxis: ["Model 5", "Model 4", "Model 3", "Model 2", "Model 1"],
     data: [
       // Model 5
-      [0, 0, 19.8] as [number, number, number], [1, 0, 19.7] as [number, number, number], [2, 0, 25.0] as [number, number, number], [3, 0, 30.3] as [number, number, number], [4, 0, 33.4] as [number, number, number], [5, 0, 36.3] as [number, number, number], 
+      [0, 0, 19.8] as [number, number, number], [1, 0, 19.7] as [number, number, number], [2, 0, 25.0] as [number, number, number], [3, 0, 30.3] as [number, number, number], [4, 0, 33.4] as [number, number, number], [5, 0, 36.3] as [number, number, number],
       [6, 0, 38.2] as [number, number, number], [7, 0, 39.3] as [number, number, number], [8, 0, 34.0] as [number, number, number], [9, 0, 30.0] as [number, number, number], [10, 0, 21.3] as [number, number, number], [11, 0, 17.9] as [number, number, number],
       // Model 4
-      [0, 1, 2.7] as [number, number, number], [1, 1, 5.1] as [number, number, number], [2, 1, 10.3] as [number, number, number], [3, 1, 16.7] as [number, number, number], [4, 1, 21.8] as [number, number, number], [5, 1, 24.9] as [number, number, number], 
+      [0, 1, 2.7] as [number, number, number], [1, 1, 5.1] as [number, number, number], [2, 1, 10.3] as [number, number, number], [3, 1, 16.7] as [number, number, number], [4, 1, 21.8] as [number, number, number], [5, 1, 24.9] as [number, number, number],
       [6, 1, 27.5] as [number, number, number], [7, 1, 27.0] as [number, number, number], [8, 1, 21.7] as [number, number, number], [9, 1, 15.6] as [number, number, number], [10, 1, 8.2] as [number, number, number], [11, 1, 3.3] as [number, number, number],
       // Model 3
-      [0, 2, -0.4] as [number, number, number], [1, 2, 1.2] as [number, number, number], [2, 2, 5.5] as [number, number, number], [3, 2, 11.0] as [number, number, number], [4, 2, 16.0] as [number, number, number], [5, 2, 19.1] as [number, number, number], 
+      [0, 2, -0.4] as [number, number, number], [1, 2, 1.2] as [number, number, number], [2, 2, 5.5] as [number, number, number], [3, 2, 11.0] as [number, number, number], [4, 2, 16.0] as [number, number, number], [5, 2, 19.1] as [number, number, number],
       [6, 2, 21.3] as [number, number, number], [7, 2, 20.7] as [number, number, number], [8, 2, 15.9] as [number, number, number], [9, 2, 10.4] as [number, number, number], [10, 2, 4.9] as [number, number, number], [11, 2, 0.7] as [number, number, number],
       // Model 2
-      [0, 3, -3.4] as [number, number, number], [1, 3, -2.3] as [number, number, number], [2, 3, 1.3] as [number, number, number], [3, 3, 5.4] as [number, number, number], [4, 3, 10.2] as [number, number, number], [5, 3, 13.4] as [number, number, number], 
+      [0, 3, -3.4] as [number, number, number], [1, 3, -2.3] as [number, number, number], [2, 3, 1.3] as [number, number, number], [3, 3, 5.4] as [number, number, number], [4, 3, 10.2] as [number, number, number], [5, 3, 13.4] as [number, number, number],
       [6, 3, 15.4] as [number, number, number], [7, 3, 15.0] as [number, number, number], [8, 3, 11.0] as [number, number, number], [9, 3, 6.1] as [number, number, number], [10, 3, 1.8] as [number, number, number], [11, 3, -1.9] as [number, number, number],
       // Model 1
-      [0, 4, -24.6] as [number, number, number], [1, 4, -20.0] as [number, number, number], [2, 4, -15.1] as [number, number, number], [3, 4, -4.4] as [number, number, number], [4, 4, -2.0] as [number, number, number], [5, 4, 3.0] as [number, number, number], 
+      [0, 4, -24.6] as [number, number, number], [1, 4, -20.0] as [number, number, number], [2, 4, -15.1] as [number, number, number], [3, 4, -4.4] as [number, number, number], [4, 4, -2.0] as [number, number, number], [5, 4, 3.0] as [number, number, number],
       [6, 4, 7.0] as [number, number, number], [7, 4, 5.0] as [number, number, number], [8, 4, -2.0] as [number, number, number], [9, 4, -8.0] as [number, number, number], [10, 4, -12.0] as [number, number, number], [11, 4, -20.0] as [number, number, number],
     ] as [number, number, number][],
     min: -30,
@@ -180,8 +180,8 @@ const EvaluationSumary = () => {
                   <div
                     key={deployment.id}
                     className={`flex items-center gap-2 py-[8px] px-[10px] rounded-[8px] cursor-pointer transition-all ${
-                      isSelected 
-                        ? 'bg-[rgba(255,255,255,0.03)]' 
+                      isSelected
+                        ? 'bg-[rgba(255,255,255,0.03)]'
                         : 'hover:bg-[rgba(255,255,255,0.02)]'
                     }`}
                     onClick={() => handleDeploymentToggle(deployment.id)}
@@ -192,8 +192,8 @@ const EvaluationSumary = () => {
                         {deployment.name}
                       </Text_14_400_EEEEEE>
                     </div>
-                    <div 
-                      className="w-2 h-2 rounded-full" 
+                    <div
+                      className="w-2 h-2 rounded-full"
                       style={{ backgroundColor: deployment.color }}
                     />
                     <div className="w-3 h-3 opacity-0 hover:opacity-100 transition-opacity">
@@ -219,8 +219,8 @@ const EvaluationSumary = () => {
                 <div
                   key={trait}
                   className={`flex items-center gap-2 py-[8px] px-[10px] rounded-[8px] cursor-pointer transition-all ${
-                    selectedTrait === trait 
-                      ? 'bg-[rgba(255,255,255,0.03)]' 
+                    selectedTrait === trait
+                      ? 'bg-[rgba(255,255,255,0.03)]'
                       : 'hover:bg-[rgba(255,255,255,0.02)]'
                   }`}
                   onClick={() => handleTraitClick(trait)}

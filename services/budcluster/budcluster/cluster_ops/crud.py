@@ -95,10 +95,10 @@ class ClusterDataManager(BaseDataManager):
 
     async def get_all_clusters_by_status(self, statuses: List) -> List[ClusterModel]:
         """Get all clusters by status list.
-        
+
         Args:
             statuses: List of cluster statuses to filter by
-            
+
         Returns:
             List of clusters matching the given statuses
         """

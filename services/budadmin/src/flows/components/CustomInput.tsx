@@ -27,7 +27,7 @@ function CustomInput(props: BudInputProps) {
   return (
     <Form.Item name={props.name} rules={props.rules} className="mb-0"  hasFeedback>
       <div className={`floating-textarea ${props.ClassNames}`}>
-        <FloatLabel 
+        <FloatLabel
           classNames={`mx-[.2rem] floatingLabel`}
           label={<InfoLabel
           required={props.rules.some((rule: any) => rule.required)}

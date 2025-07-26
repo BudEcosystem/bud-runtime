@@ -327,7 +327,7 @@ POST /evaluations/batch
     },
     {
       "name": "llama-2-13b",
-      "provider": "huggingface", 
+      "provider": "huggingface",
       "model_id": "meta-llama/Llama-2-13b-hf"
     }
   ],
@@ -408,17 +408,17 @@ class CustomBenchmark(BaseBenchmark):
     def __init__(self, config):
         super().__init__()
         self.config = config
-        
+
     def load_dataset(self):
         # Load your custom dataset
         return dataset
-        
+
     def evaluate_sample(self, model, sample):
         # Evaluate single sample
         response = model.generate(sample['input'])
         score = self.compute_score(response, sample['expected'])
         return {'score': score, 'response': response}
-        
+
     def compute_metrics(self, results):
         # Compute aggregate metrics
         accuracy = sum(r['score'] for r in results) / len(results)

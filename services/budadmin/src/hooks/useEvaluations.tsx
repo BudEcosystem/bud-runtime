@@ -134,7 +134,7 @@ export const useEvaluations = create<{
     try {
       // Build query parameters
       const params = new URLSearchParams();
-      
+
       if (payload?.page) params.append('page', payload.page.toString());
       if (payload?.limit) params.append('limit', payload.limit.toString());
       if (payload?.name) params.append('name', payload.name);
@@ -144,7 +144,7 @@ export const useEvaluations = create<{
 
       const queryString = params.toString();
       const url = `${tempApiBaseUrl}/experiments/datasets${queryString ? `?${queryString}` : ''}`;
-      
+
       const response: any = await AppRequest.Get(url);
       set({ evaluationsList: response.data.datasets });
       set({ evaluationsListTotal: response.data.total_record });
@@ -168,9 +168,9 @@ export const useEvaluations = create<{
 
       const queryString = params.toString();
       const url = `${tempApiBaseUrl}/experiments/traits${queryString ? `?${queryString}` : ''}`;
-      
+
       const response: any = await AppRequest.Get(url);
-      
+
       // Remove datasets field from each trait
       const traitsWithoutDatasets: TraitSimple[] = response.data.traits.map((trait: TraitWithDatasets) => ({
         id: trait.id,
@@ -179,7 +179,7 @@ export const useEvaluations = create<{
         category: trait.category,
         exps_ids: trait.exps_ids
       }));
-      
+
       set({ traitsList: traitsWithoutDatasets });
     } catch (error) {
       console.error("Error fetching evaluations:", error);
@@ -193,7 +193,7 @@ export const useEvaluations = create<{
     try {
       // Build query parameters
       const params = new URLSearchParams();
-      
+
       if (payload?.page) params.append('page', payload.page.toString());
       if (payload?.limit) params.append('limit', payload.limit.toString());
       if (payload?.search) params.append('search', payload.search);
@@ -209,11 +209,11 @@ export const useEvaluations = create<{
       const queryString = params.toString();
       const url = `${tempApiBaseUrl}/experiments/`;
       // const url = `${tempApiBaseUrl}/experiments${queryString ? `?${queryString}` : ''}`;
-      
+
       const response: any = await AppRequest.Get(url);
       set({ experimentsList: response.data.experiments || response.data || [] });
       set({ experimentsListTotal: response.data.total || response.total || 0 });
-      
+
       return response.data;
     } catch (error) {
       console.error("Error fetching experiments:", error);

@@ -84,7 +84,7 @@ class TestAnalyticsEndpoint:
         from uuid import uuid4
         project_id = uuid4()
         model_id = uuid4()
-        
+
         payload = {
             "metrics": ["request_count", "success_request"],
             "from_date": "2024-01-01T00:00:00Z",
@@ -111,7 +111,7 @@ class TestAnalyticsEndpoint:
         project_id = uuid4()
         model_id = uuid4()
         endpoint_id = uuid4()
-        
+
         payload = {
             "filters": {
                 "project": str(project_id),
@@ -306,7 +306,7 @@ class TestAddMetricsEndpoint:
         """Test basic metrics ingestion."""
         # Prepare inference data
         inference_entries = SAMPLE_BULK_INFERENCE_DATA[:5]
-        
+
         # Create bulk event with proper cloud event structure
         bulk_event_data = create_bulk_cloud_event(inference_entries)
 
@@ -337,7 +337,7 @@ class TestAddMetricsEndpoint:
         """Test metrics ingestion with duplicates."""
         # Prepare inference data
         inference_entries = SAMPLE_BULK_INFERENCE_DATA[:3]
-        
+
         # Create bulk event with proper cloud event structure
         bulk_event_data = create_bulk_cloud_event(inference_entries)
 
@@ -413,7 +413,7 @@ class TestAddMetricsEndpoint:
         """Test handling of service errors during ingestion."""
         # Prepare inference data
         inference_entries = SAMPLE_BULK_INFERENCE_DATA[:3]
-        
+
         # Create bulk event with proper cloud event structure
         bulk_event_data = create_bulk_cloud_event(inference_entries)
 
@@ -424,7 +424,7 @@ class TestAddMetricsEndpoint:
 
         response = client.post("/observability/add", json=bulk_event_data)
         assert response.status_code == 500
-        
+
         data = response.json()
         assert "error" in data["message"].lower()
 
@@ -433,7 +433,7 @@ class TestAddMetricsEndpoint:
         """Test metrics ingestion with large batch."""
         # Use all available test data for large batch
         inference_entries = SAMPLE_BULK_INFERENCE_DATA
-        
+
         # Create bulk event with proper cloud event structure
         bulk_event_data = create_bulk_cloud_event(inference_entries)
 
@@ -455,7 +455,7 @@ class TestAddMetricsEndpoint:
         """Test add metrics response structure."""
         # Prepare inference data
         inference_entries = SAMPLE_BULK_INFERENCE_DATA[:3]
-        
+
         # Create bulk event with proper cloud event structure
         bulk_event_data = create_bulk_cloud_event(inference_entries)
 
@@ -475,14 +475,14 @@ class TestAddMetricsEndpoint:
         assert "message" in data
         assert "param" in data
         assert "summary" in data["param"]
-        
+
         # Check summary structure
         summary = data["param"]["summary"]
         assert "total_entries" in summary
         assert "successfully_inserted" in summary
         assert "duplicates_skipped" in summary
         assert "validation_failures" in summary
-        
+
         # Verify values
         assert summary["total_entries"] == 3
         assert summary["successfully_inserted"] == 3
@@ -509,7 +509,7 @@ class TestConcurrentRequests:
         # Setup the app and use the ASGI transport
         app = FastAPI()
         app.include_router(observability_router)
-        
+
         payload = {
             "filters": {"project": str(uuid4())},
             "from_date": "2024-01-01T00:00:00Z",

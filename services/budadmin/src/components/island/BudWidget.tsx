@@ -65,7 +65,7 @@ export function BudWidget({ data, index }: { data?: WorkflowListItem , index: nu
     let title: React.ReactNode = currentStep?.title || activeProgress?.title || flow?.title;
 
     if (data?.progress?.steps?.find((step) => step.id === 'ranking') && data.current_step === 6) {
-        // Special case 
+        // Special case
         title = data?.progress?.recommended_cluster_count > 0 ? 'Choose Cluster' : 'Cluster Not Found';
     }
     else if (inProgressSteps.includes(step?.id) && data.progress) {
@@ -80,16 +80,16 @@ export function BudWidget({ data, index }: { data?: WorkflowListItem , index: nu
     useEffect(() => {
         console.log('data.workflow_type', data.workflow_type)
     }, [data.workflow_type]);
-  
+
     useEffect(() => {
         console.log('flowMapping', flowMapping)
     }, [flowMapping]);
-    
-    
+
+
     // useEffect(() => {
     //     console.log('index', index)
     // }, [index]);
-    
+
     useEffect(() => {
         console.log('flow', flow)
     }, [flow]);

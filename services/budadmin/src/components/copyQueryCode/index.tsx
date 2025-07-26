@@ -8,7 +8,7 @@ const CopyQuery = ({ Data, RenderItem, triggerClassNames }: any) => {
   const getEndpointConfig = () => {
     const supportedEndpoints = Data?.endpoint?.model?.supported_endpoints;
     const modelName = Data?.endpoint?.model?.name || "";
-    
+
     // Default to chat endpoint
     let endpoint = 'v1/chat/completions';
     let payloadExample: any = {
@@ -73,9 +73,9 @@ const CopyQuery = ({ Data, RenderItem, triggerClassNames }: any) => {
     // Use the base URL without any endpoint path appended
     const baseUrl = process.env.NEXT_PUBLIC_COPY_CODE_API_BASE_URL || process.env.NEXT_PUBLIC_BASE_URL || '';
     const apiUrl = `${baseUrl}${endpoint}`;
-    
+
     let curl: string, python: string, js: string;
-    
+
     // Special handling for audio transcription (file upload)
     if (endpoint.includes('audio/transcriptions')) {
       curl = `curl --location '${apiUrl}' \\
@@ -83,7 +83,7 @@ const CopyQuery = ({ Data, RenderItem, triggerClassNames }: any) => {
                   --form 'file=@"/path/to/audio.mp3"' \\
                   --form 'model="${payloadExample.model}"' \\
                   --form 'response_format="json"'`;
-      
+
       python = `import requests
 
                     url = "${apiUrl}"
@@ -98,7 +98,7 @@ const CopyQuery = ({ Data, RenderItem, triggerClassNames }: any) => {
 
                     response = requests.post(url, headers=headers, files=files, data=data)
                     print(response.text)`;
-      
+
       js = `const formData = new FormData();
                 formData.append('file', fileInput.files[0]); // fileInput is your file input element
                 formData.append('model', '${payloadExample.model}');
@@ -120,7 +120,7 @@ const CopyQuery = ({ Data, RenderItem, triggerClassNames }: any) => {
                   --header 'Authorization: Bearer {API_KEY_HERE}' \\
                   --header 'Content-Type: application/json' \\
                   --data '${JSON.stringify(payloadExample, null, 2)}'`;
-      
+
       python = `import requests
                     import json
 
@@ -133,7 +133,7 @@ const CopyQuery = ({ Data, RenderItem, triggerClassNames }: any) => {
 
                     response = requests.post(url, headers=headers, data=payload)
                     print(response.text)`;
-      
+
       js = `const data = ${JSON.stringify(payloadExample, null, 2)};
 
                 fetch('${apiUrl}', {

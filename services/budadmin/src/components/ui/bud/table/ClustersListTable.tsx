@@ -246,5 +246,3 @@ function ClustersListTable() {
 };
 
 export default ClustersListTable;
-
-

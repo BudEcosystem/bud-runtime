@@ -621,7 +621,7 @@
       "license_url": "https://www.databricks.com/legal/open-model-license",
       "potential_names": [
             "Databricks Open Model"
-        ]  
+        ]
     },
     {
       "license_id": "deepseek",
@@ -629,7 +629,7 @@
       "license_url": "https://github.com/deepseek-ai/DeepSeek-V3/blob/main/LICENSE-MODEL",
       "potential_names": [
             "deepseek-license","DeepSeek License","DeepSeek"
-        ]  
+        ]
     },
     {
       "license_id": "Amazon",
@@ -649,21 +649,21 @@
         "license_name":"Propriatary",
         "license_url":"https://policies.google.com/terms",
         "potential_names":[]
-  
+
     },
     {
         "license_id": "Openai",
         "license_name":"Propriatary",
         "license_url":"https://openai.com/policies/terms-of-use",
         "potential_names":[]
-  
+
     },
     {
         "license_id": "Cohere",
         "license_name":"Propriatary",
         "license_url":"https://cohere.com/terms-of-use",
         "potential_names":[]
-  
+
     },
     {
         "license_id": "mistral ai",
@@ -677,35 +677,35 @@
         "license_name":"Propriatary",
         "license_url":"https://www.reka.ai/terms-of-use",
         "potential_names":[]
-  
+
     },
     {
         "license_id": "Zhipu AI",
         "license_name":"Propriatary",
         "license_url":"https://bigmodel.cn/dev/howuse/serviceagreement",
         "potential_names":["Zhipu"]
-  
+
     },
     {
         "license_id": "xAI",
         "license_name":"Propriatary",
         "license_url":"https://x.ai/legal/terms-of-service",
         "potential_names":[]
-  
+
     },
     {
         "license_id": "Meta",
         "license_name":"Non Commercial",
         "license_url":"https://ai.meta.com/resources/models-and-libraries/spiritlm-license-for-request/",
         "potential_names":[]
-  
+
     },
     {
         "license_id": "Alibaba",
         "license_name":"Propriatary",
         "license_url":"",
         "potential_names":[]
-  
+
     }
 
 ]

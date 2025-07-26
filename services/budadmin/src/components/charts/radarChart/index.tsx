@@ -102,7 +102,7 @@ const RadarChart: React.FC<RadarChartProps> = ({ data }) => {
             z-index: 9999;
           `,
           formatter: (params: any) => {
-            const values = params.value.map((val: number, idx: number) => 
+            const values = params.value.map((val: number, idx: number) =>
               `${radarChartData.indicators[idx].name}: ${val}`
             ).join('<br/>');
             return `

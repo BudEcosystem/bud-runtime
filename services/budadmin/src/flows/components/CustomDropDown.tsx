@@ -16,7 +16,7 @@ interface CustomDropDownProps {
 const CustomDropDown: React.FC<CustomDropDownProps> = ({
   isDisabled,
   children,
-  items = [], 
+  items = [],
   classNames,
   parentClassNames,
   buttonContent,
@@ -43,7 +43,7 @@ const CustomDropDown: React.FC<CustomDropDownProps> = ({
       }}
     >
        <style>{customStyles}</style>
-      <ConfigProvider 
+      <ConfigProvider
       theme={{ token: {}, components: { Dropdown: {} } }}
       >
         <Dropdown

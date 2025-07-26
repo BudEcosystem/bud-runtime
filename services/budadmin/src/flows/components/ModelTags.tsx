@@ -160,7 +160,7 @@ function ModelTags(props: ModelTagsProps) {
                     }} />
                 </div>}
             />}
-            
+
             {/* {props.model?.modality && !props.hideModality && <Tags
                 key={'modality'}
                 name={props.model.modality}

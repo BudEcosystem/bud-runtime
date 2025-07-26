@@ -30,7 +30,7 @@ export default function AdditionalSettings() {
       onBack={async () => {
         openDrawerWithStep('select-use-case')
       }}
-    
+
       onNext={async ()=> {
         openDrawerWithStep('select-model-for-evaluation')
       }}
@@ -42,7 +42,7 @@ export default function AdditionalSettings() {
             description="Description for Additional Settings"
           />
           <DrawerCard classNames="">
-            
+
             <TextInput
               name="requests"
               label={'Concurrent Requests'}
@@ -53,7 +53,7 @@ export default function AdditionalSettings() {
               formItemClassnames="mb-[.45rem]"
               infoText={'Enter Requests count'}
             />
-            
+
           </DrawerCard>
         </BudDrawerLayout>
       </BudWraperBox>

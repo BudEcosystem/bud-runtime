@@ -32,7 +32,7 @@ export default function ModelQuantisation() {
       value: 'value 2',
       label: 'value 2',
     },
-    
+
   ]
 
   return (

@@ -44,7 +44,7 @@ const ResetPasswordPage = ({ onSubmit }: ResetPasswordProps) => {
   useEffect(() => {
     setMounted(true);
   }, []);
-  
+
   useEffect(() => {
     getUser()
   }, []);

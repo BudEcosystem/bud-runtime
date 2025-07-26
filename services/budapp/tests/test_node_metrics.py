@@ -11,8 +11,8 @@ def main():
     )
     node_metrics = prometheus_client.get_node_metrics()
     print(node_metrics)
-    
-    
+
+
 
 if __name__ == "__main__":
     main()

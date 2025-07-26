@@ -112,7 +112,7 @@ npm run dev
 npm run lint
 npm run build
 
-# Production server  
+# Production server
 npm run start
 ```
 
@@ -244,7 +244,7 @@ Each service requires `.env` file (copy from `.env.sample`):
 
 #### Python Backend Services (budapp, budcluster, budsim, budmodel, budmetrics, budnotify, ask-bud)
 - **API Layer**: Routes in `*_routes.py` (budapp) or `routes.py` (other services)
-- **Business Logic**: Services in `services.py` 
+- **Business Logic**: Services in `services.py`
 - **Data Access**: CRUD operations in `crud.py`
 - **Database Models**: SQLAlchemy models in `models.py`
 - **Data Validation**: Pydantic schemas in `schemas.py`
@@ -287,10 +287,10 @@ Main chart (`infra/helm/bud/`) includes:
 
 ### Cloud Providers
 - **Azure**: Primary cloud with AKS clusters via Terraform modules
-- **AWS**: EKS support via Terraform modules  
+- **AWS**: EKS support via Terraform modules
 - **On-premises**: OpenShift support via Ansible playbooks
 
-### Deployment Workflow  
+### Deployment Workflow
 1. **Infrastructure Provisioning**: Terraform/Ansible automation via budcluster
 2. **Cluster Registration**: Validation and credential encryption via budcluster
 3. **Model Registration**: Metadata and licensing via budmodel

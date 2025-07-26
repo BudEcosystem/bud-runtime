@@ -1,12 +1,14 @@
+import hashlib
 import json
+import os
+import shutil
 import subprocess
+import tempfile
+from uuid import uuid4
+
 from ..cluster_ops.terrafrom import TerraformClusterManager
 from ..cluster_ops.terrafrom_schemas import AWSConfig
-import tempfile
-import shutil
-import os
-import hashlib
-from uuid import uuid4
+
 
 class AWSEksManager(TerraformClusterManager):
     """AWSEksManager Class For Managing AWS EKS Clusters."""
@@ -18,7 +20,6 @@ class AWSEksManager(TerraformClusterManager):
 
     def _copy_terraform_files(self) -> None:
         """Create Terraform files for AWS EKS cluster."""
-
         prefix = f"{hashlib.md5(self.config.cluster_name.encode()).hexdigest()}"
         self.temp_dir = tempfile.mkdtemp(prefix=prefix)
         self.unique_state_name = f"{prefix}-eks-{uuid4()}"  # TODO: change this to more identifiable one

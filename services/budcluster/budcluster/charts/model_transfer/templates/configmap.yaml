@@ -9,4 +9,4 @@ data:
   MINIO_SECRET_KEY: "{{ $.Values.minio.secretKey }}"
   MINIO_BUCKET: "{{ $.Values.minio.bucket }}"
   MINIO_SECURE: "{{ $.Values.minio.secure }}"
-  LOCAL_PATH: "/data/models-registry" 
+  LOCAL_PATH: "/data/models-registry"

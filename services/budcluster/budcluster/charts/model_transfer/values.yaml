@@ -7,7 +7,7 @@ pvcSize: 10
 imagePullSecrets:
   name: bud-registry-secret
   auth: {} # replaced with the actual auth
-  
+
 operation: "download"
 minio:
   endpoint: ""

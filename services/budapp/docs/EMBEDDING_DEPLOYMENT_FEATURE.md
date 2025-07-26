@@ -65,7 +65,7 @@ The system supports 10 different endpoint types via `ModelEndpointEnum`:
 1. **CHAT** (`/v1/chat/completions`) - Chat completions
 2. **EMBEDDING** (`/v1/embeddings`) - Vector embeddings
 
-Supported to be added 
+Supported to be added
 
 1. **IMAGE_GENERATION** (`/v1/images/generations`) - Image generation
 2. **AUDIO_TRANSCRIPTION** (`/v1/audio/transcriptions`) - Speech-to-text

@@ -6,7 +6,7 @@
 
   vars_files:
     - vars/common.yaml
-  
+
   vars:
     chart_path: "{{ charts_dir }}/tensorzero"
     release_name: "{{ tensorzero_release_name | default('tensorzero-gateway') }}"
@@ -44,6 +44,6 @@
       retries: 10
       delay: 15
       until: >
-        gateway_pods is defined and gateway_pods.resources | selectattr('status.phase', 'equalto', 'Running') | 
+        gateway_pods is defined and gateway_pods.resources | selectattr('status.phase', 'equalto', 'Running') |
         list | length == gateway_pods.resources | length
       when: not helm_result.failed

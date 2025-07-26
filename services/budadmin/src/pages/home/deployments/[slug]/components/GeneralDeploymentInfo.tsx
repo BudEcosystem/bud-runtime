@@ -61,7 +61,7 @@ function GeneralDeploymentInfo({ switchTab }: { switchTab: (key: string) => void
               <div className="flex items-center justify-start w-full">
                 <div className="flex items-center justify-start flex-wrap	gap-[.6rem]">
                   <ModelTags hideEndPoints maxTags={3} model={clusterDetails?.model}
-                  // showExternalLink showLicense 
+                  // showExternalLink showLicense
                   />
                 </div>
               </div>

@@ -15,9 +15,9 @@ export default function DeploymentStatus() {
     const { openDrawerWithStep, closeDrawer } = useDrawer();
     const { currentWorkflow, cancelQuantizationDeployment } = useDeployModel();
     const { getRecommendedClusterById } = useCluster();
-    const [isFailed, setIsFailed] = React.useState(false);  
+    const [isFailed, setIsFailed] = React.useState(false);
     const [showAlert, setShowAlert] = React.useState(false);
-    
+
 
     const handleBack = () => {
         if (isFailed) {
@@ -27,7 +27,7 @@ export default function DeploymentStatus() {
         }
     }
 
-    return <BudForm 
+    return <BudForm
     data={{}}
     backText={isFailed ? "Back" : "Cancel"}
     onBack={handleBack}
@@ -57,7 +57,7 @@ export default function DeploymentStatus() {
         />
         </BudDrawerLayout>}
         <CommonStatus
-        
+
             workflowId={currentWorkflow?.workflow_id}
             events_field_id="quantization_deployment_events"
             success_payload_type="deploy_quantization"

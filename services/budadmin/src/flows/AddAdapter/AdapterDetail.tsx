@@ -19,7 +19,7 @@ export const AdapterDetail = () => {
     const { updateAdapterDetailWorkflow, adapterWorkflow, setAdapterWorkflow, currentWorkflow } = useDeployModel();
     const router = useRouter();
     const projectId = router.query.projectId as string;
-    
+
     useEffect(() => {
         if (!currentWorkflow) {
             return

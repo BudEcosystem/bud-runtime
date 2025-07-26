@@ -278,7 +278,7 @@ export const sendModelRequest = async (request: ModelRequest) => {
     ...request.parameters,
     stream: request.stream,
   })
-  
+
   return response.data
 }
 ```
@@ -540,7 +540,7 @@ describe('ChatInterface', () => {
 
   it('renders chat interface correctly', () => {
     render(<ChatInterface {...mockProps} />)
-    
+
     expect(screen.getByPlaceholderText('Type your message...')).toBeInTheDocument()
     expect(screen.getByText('Send')).toBeInTheDocument()
   })
@@ -548,13 +548,13 @@ describe('ChatInterface', () => {
   it('sends message when form is submitted', async () => {
     const mockSendMessage = jest.fn()
     render(<ChatInterface {...mockProps} onSendMessage={mockSendMessage} />)
-    
+
     const input = screen.getByPlaceholderText('Type your message...')
     const sendButton = screen.getByText('Send')
-    
+
     fireEvent.change(input, { target: { value: 'Hello, world!' } })
     fireEvent.click(sendButton)
-    
+
     await waitFor(() => {
       expect(mockSendMessage).toHaveBeenCalledWith('Hello, world!')
     })

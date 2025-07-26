@@ -26,7 +26,7 @@ export default function TagsList(
 ) {
     const { data: tags } = props;
     return tags?.map((tag, index) => (
-        <Tags 
+        <Tags
             key={index}
             // key={tag.name}
             name={tag.name}

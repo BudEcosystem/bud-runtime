@@ -1,9 +1,9 @@
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy import create_engine
 from datetime import datetime
-from models import Sources, SourceTypeOptions, GitRemoteOptions
-from sqlalchemy.orm import declarative_base
-import os
+
+from models import GitRemoteOptions, Sources, SourceTypeOptions
+from sqlalchemy import create_engine
+from sqlalchemy.orm import declarative_base, sessionmaker
+
 
 # Set up the PostgreSQL database engine (update with your connection details)
 DATABASE_URL = "postgresql://root:root@localhost:5444/bud"

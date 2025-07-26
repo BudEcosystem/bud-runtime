@@ -16,9 +16,9 @@ const FileViewer: React.FC<FileViewerProps> = ({ fileUrl }) => {
         const contentType = res.headers.get('Content-Type') || '';
         console.log('Content-Type:', contentType);
         if (!res.ok) throw new Error('Failed to fetch file');
-  
+
         const url = fileUrl || '';
-  
+
         // Use URL extension fallback if contentType is useless
         if (contentType.startsWith('image/')) {
           setFileType('image');
@@ -46,12 +46,12 @@ const FileViewer: React.FC<FileViewerProps> = ({ fileUrl }) => {
         setFileType('error');
       }
     };
-  
+
     if (fileUrl) {
       fetchFileType();
     }
   }, [fileUrl]);
-  
+
 
   if (fileType === 'image') {
     return <img src={blobUrl} alt="Image Preview" className="max-w-full h-auto rounded" />;

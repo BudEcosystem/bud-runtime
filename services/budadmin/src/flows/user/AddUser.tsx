@@ -200,10 +200,10 @@ export default function AddUser() {
       const response = await addUser(data); // Wait for API response
       if (response) {
         successToast('User added successfully');
-        openDrawerWithStep('add-user-details'); 
+        openDrawerWithStep('add-user-details');
       }
     } catch (error) {
-      errorToast('Failed to add user'); 
+      errorToast('Failed to add user');
     }
   };
 
@@ -213,10 +213,10 @@ export default function AddUser() {
       }}
       onNext={(formData) => {
         handleSubmit()
-        
+
       }}
       nextText="Save"
-     
+
     >
       <BudWraperBox classNames="mt-[2.2rem]">
         <BudDrawerLayout>
@@ -253,8 +253,8 @@ export default function AddUser() {
               placeholder="Enter Email"
               rules={[
                 { required: true, message: "Please enter email" },
-                { 
-                  pattern: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/, 
+                {
+                  pattern: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
                   message: "Please enter a valid email address"
                 }
               ]}

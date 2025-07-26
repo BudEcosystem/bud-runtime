@@ -48,15 +48,15 @@ const getStorageName = () => {
     // Check for URL parameters
     const urlParams = new URLSearchParams(window.location.search);
     const storageParam = urlParams.get('storage');
-    
+
     if (storageParam) {
       return storageParam;
     }
   }
-  
+
   // Check for environment variable (works on both server and client)
   const envStorage = process.env.NEXT_PUBLIC_STORAGE_NAME;
-  
+
   // Use the env variable if available, otherwise fall back to default
   return envStorage || 'chat-storage';
 };
@@ -74,7 +74,7 @@ export const useChatStore = create<ChatStore>()(
         return useChatStore.getState().activeChatList.find((chat: Session) => chat.id === id);
       },
       setDeployment: (chatId: string, deployment: Endpoint) => set((state) => ({
-        activeChatList: state.activeChatList.map((chat: Session) => 
+        activeChatList: state.activeChatList.map((chat: Session) =>
           chat.id === chatId ? { ...chat, selectedDeployment: deployment as unknown as Endpoint } : chat
         )
       })),
@@ -85,7 +85,7 @@ export const useChatStore = create<ChatStore>()(
         return newState;
       }),
       updateChat: (chat: Session) => set((state) => ({
-        activeChatList: state.activeChatList.map((c: Session) => 
+        activeChatList: state.activeChatList.map((c: Session) =>
           c.id === chat.id ? chat : c
         )
       })),
@@ -97,19 +97,19 @@ export const useChatStore = create<ChatStore>()(
         return { activeChatList: updatedChatList };
       }),
       disableChat: (chatId: string) => set((state) => ({
-        activeChatList: state.activeChatList.map((chat: Session) => 
+        activeChatList: state.activeChatList.map((chat: Session) =>
           chat.id === chatId ? { ...chat, active: false } : chat
         )
       })),
       enableChat: (chatId: string) => set((state) => ({
-        activeChatList: state.activeChatList.map((chat: Session) => 
+        activeChatList: state.activeChatList.map((chat: Session) =>
           chat.id === chatId ? { ...chat, active: true } : chat
         )
       })),
       syncWithServer: async () => {
         // Check if user is signed in (you'll need to implement this check)
         const isSignedIn = false; // Replace with actual auth check
-        
+
         if (isSignedIn) {
           try {
             const chats = get().activeChatList;
@@ -124,7 +124,7 @@ export const useChatStore = create<ChatStore>()(
         }
       },
       messages: {},
-      
+
       addMessage: (chatId: string, message: SavedMessage) => set((state) => ({
         messages: {
           ...state.messages,
@@ -156,7 +156,7 @@ export const useChatStore = create<ChatStore>()(
       setFeedback: (chatId: string, messageId: string, feedback: string) => set((state) => ({
         messages: {
           ...state.messages,
-          [chatId]: state.messages[chatId].map((message: SavedMessage) => 
+          [chatId]: state.messages[chatId].map((message: SavedMessage) =>
             message.id === messageId ? { ...message, feedback: feedback } : message
           )
         }
@@ -186,11 +186,11 @@ export const useChatStore = create<ChatStore>()(
       })),
 
       updateSettingPreset: (settings: Settings) => set((state) => ({
-        settingPresets: state.settingPresets.map((preset: Settings) => 
+        settingPresets: state.settingPresets.map((preset: Settings) =>
           preset.id === settings.id ? settings : preset
         )
       })),
-      
+
       notes: [],
       setNotes: (notes: Note[]) => set((state) => ({
         notes: notes
@@ -201,7 +201,7 @@ export const useChatStore = create<ChatStore>()(
       })),
 
       updateNote: (note: Note) => set((state) => ({
-        notes: state.notes.map((n: Note) => 
+        notes: state.notes.map((n: Note) =>
           n.id === note.id ? note : n
         )
       })),

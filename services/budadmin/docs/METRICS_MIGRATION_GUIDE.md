@@ -33,14 +33,14 @@ The following endpoints have been migrated to use `/metrics/analytics`:
 - **Action Required**: Determine if cache metrics will be available through observability API
 
 ### 3. Inference Quality Metrics
-- **Current**: 
+- **Current**:
   - `POST /metrics/analytics/inference-quality/{deploymentId}`
   - `POST /metrics/analytics/inference-quality-prompts/{id}/{scoreType}`
 - **Used In**: `useEndPoint.tsx`
 - **Action Required**: These specialized metrics may need custom handling
 
 ### 4. Cluster Metrics
-- **Current**: 
+- **Current**:
   - `GET /clusters/{id}/metrics`
   - `GET /clusters/{id}/node-metrics`
   - `GET /clusters/{id}/grafana-dashboard`

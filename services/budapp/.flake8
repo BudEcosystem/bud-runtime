@@ -1,7 +1,7 @@
 [flake8]
 max-line-length = 119
 extend-ignore = E203, W503, E501, F401, F821, F811, W291, W292, W293, E302, E303, E305, E402, E231, F541
-exclude = 
+exclude =
     .git,
     __pycache__,
     .pytest_cache,

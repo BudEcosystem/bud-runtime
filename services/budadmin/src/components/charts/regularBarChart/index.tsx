@@ -120,5 +120,3 @@ const RegularBarChart: React.FC<RegularBarChartProps> = ({ data }) => {
 };
 
 export default RegularBarChart;
-
-

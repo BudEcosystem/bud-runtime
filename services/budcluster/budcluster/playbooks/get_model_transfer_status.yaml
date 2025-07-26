@@ -19,7 +19,7 @@
         validate_certs: "{{ validate_certs }}"
       register: pod_info
       failed_when: pod_info.resources | length == 0
-    
+
     - name: Get ConfigMap data
       kubernetes.core.k8s_info:
         api_version: v1

@@ -160,7 +160,7 @@ pytest tests/performance/ -v
 # Run only unit tests
 pytest -m unit
 
-# Run only integration tests  
+# Run only integration tests
 pytest -m integration
 
 # Run only performance tests
@@ -215,7 +215,7 @@ pytest -m performance
 The test suite includes performance benchmarks for:
 
 - **Query Building**: 100 complex queries < 1 second
-- **Cache Operations**: 1,000 set/get operations < 1 second  
+- **Cache Operations**: 1,000 set/get operations < 1 second
 - **Concurrent Processing**: 50 requests < 2 seconds
 - **Large Dataset**: 10,000 records < 1 second
 - **Memory Usage**: Cache size management under load
@@ -247,23 +247,23 @@ from unittest.mock import Mock, AsyncMock
 
 class TestNewFeature:
     \"\"\"Test cases for new feature.\"\"\"
-    
+
     @pytest.fixture
     def mock_dependency(self):
         \"\"\"Mock external dependencies.\"\"\"
         return Mock()
-    
+
     def test_basic_functionality(self, mock_dependency):
         \"\"\"Test basic feature functionality.\"\"\"
         # Arrange
-        # Act  
+        # Act
         # Assert
         pass
-    
+
     def test_edge_cases(self, mock_dependency):
         \"\"\"Test edge cases and error conditions.\"\"\"
         pass
-    
+
     @pytest.mark.asyncio
     async def test_async_functionality(self, mock_dependency):
         \"\"\"Test async functionality.\"\"\"
@@ -285,7 +285,7 @@ class TestNewFeature:
 # Verbose output
 pytest -v -s
 
-# Stop on first failure  
+# Stop on first failure
 pytest -x
 
 # Run specific test

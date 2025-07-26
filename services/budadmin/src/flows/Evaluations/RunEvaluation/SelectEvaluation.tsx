@@ -51,9 +51,9 @@ export default function SelectEvaluation() {
   const [search, setSearch] = React.useState("");
   const [selectedEvaluation, setSelectedEvaluation] = React.useState<Evaluation | null>(null);
   const { openDrawerWithStep } = useDrawer();
-  
-  const filteredEvaluations = mockEvaluations.filter((evaluation) => 
-    evaluation.name.toLowerCase().includes(search.toLowerCase()) || 
+
+  const filteredEvaluations = mockEvaluations.filter((evaluation) =>
+    evaluation.name.toLowerCase().includes(search.toLowerCase()) ||
     evaluation.description?.toLowerCase().includes(search.toLowerCase()) ||
     evaluation.tags?.some(tag => tag.toLowerCase().includes(search.toLowerCase()))
   );

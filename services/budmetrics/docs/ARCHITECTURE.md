@@ -173,7 +173,7 @@ class CTEDefinition:
 **Example: Concurrent Requests CTE**
 ```sql
 WITH concurrent_counts AS (
-    SELECT 
+    SELECT
         request_arrival_time,
         project_id,
         COUNT(*) as concurrent_count
@@ -214,8 +214,8 @@ toDate(request_arrival_time)  # Daily
 
 # Custom interval (aligns to from_date)
 toDateTime(
-    toUnixTimestamp('2024-01-01 00:00:00') + 
-    floor((toUnixTimestamp(request_arrival_time) - 
+    toUnixTimestamp('2024-01-01 00:00:00') +
+    floor((toUnixTimestamp(request_arrival_time) -
            toUnixTimestamp('2024-01-01 00:00:00')) / 604800) * 604800
 )  # 7-day intervals starting from 2024-01-01
 ```
@@ -267,7 +267,7 @@ The API returns a nested structure optimized for time series data:
 ### Analytics Query Flow
 
 1. **Request Reception**: API validates request parameters
-2. **Query Building**: 
+2. **Query Building**:
    - Select appropriate metric definitions
    - Build CTEs if needed
    - Apply filters and grouping

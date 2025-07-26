@@ -51,7 +51,7 @@ export default function BenchmarkingProgress() {
             classNames="pt-[.8rem] pb-[1.2rem]"
             descriptionClass="pt-[.3rem]"
           />
-          
+
         </BudDrawerLayout> */}
         <CommonStatus
             workflowId={currentWorkflow?.workflow_id}

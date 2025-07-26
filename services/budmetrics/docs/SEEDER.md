@@ -49,7 +49,7 @@ The seeder maintains proper relationships:
 
 1. **Projects → Endpoints**: One-to-Many
    - Each project can have multiple endpoints
-   
+
 2. **Models → Endpoints**: One-to-Many
    - Each model can have multiple endpoints
    - Each endpoint belongs to exactly one model

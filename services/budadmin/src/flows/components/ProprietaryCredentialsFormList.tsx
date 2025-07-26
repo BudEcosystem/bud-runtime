@@ -28,7 +28,7 @@ function CredentialsItem({ data, selected, onSelect }: {
       [key]: !prev[key],
     }));
   };
-  
+
 
   useEffect(() => {
     const decryptData = async () => {
@@ -57,7 +57,7 @@ function CredentialsItem({ data, selected, onSelect }: {
         setCopiedText("Failed to copy");
       });
   };
-  
+
   return (
     <div className={`px-[1.4rem] border-b-[1px] border-b-[#FFFFFF08] border-t-[1px] border-t-[transparent] hover:border-t-[#757575] hover:border-b-[#757575]
         ${open

@@ -70,7 +70,7 @@ class CTEDefinition:
 
 ```sql
 WITH model_stats AS (
-    SELECT 
+    SELECT
         model_id,
         COUNT(*) as total_requests,
         AVG(response_time_ms) as avg_latency
@@ -84,11 +84,11 @@ WITH model_stats AS (
 
 ```python
 cte_template = """
-    SELECT 
+    SELECT
         {group_columns},
         COUNT(*) as concurrent_count
     FROM ModelInferenceDetails
-    WHERE request_arrival_time >= '{from_date}' 
+    WHERE request_arrival_time >= '{from_date}'
       AND request_arrival_time <= '{to_date}'
       {filters}
     GROUP BY {group_columns}
@@ -107,7 +107,7 @@ Uses ClickHouse's built-in functions:
 # Daily buckets
 toDate(request_arrival_time)
 
-# Weekly buckets  
+# Weekly buckets
 toStartOfWeek(request_arrival_time)
 
 # Monthly buckets
@@ -120,8 +120,8 @@ Aligns to a specific start date:
 ```python
 # 7-day intervals starting from 2024-01-01
 toDateTime(
-    toUnixTimestamp('2024-01-01 00:00:00') + 
-    floor((toUnixTimestamp(request_arrival_time) - 
+    toUnixTimestamp('2024-01-01 00:00:00') +
+    floor((toUnixTimestamp(request_arrival_time) -
            toUnixTimestamp('2024-01-01 00:00:00')) / 604800) * 604800
 )
 ```
@@ -151,7 +151,7 @@ def _get_my_new_metric_definitions(
     from_date: Optional[datetime] = None,
     to_date: Optional[datetime] = None,
 ) -> list[MetricDefinition]:
-    
+
     # Define the primary metric
     metric = MetricDefinition(
         metrics_name="my_new_metric",
@@ -160,14 +160,14 @@ def _get_my_new_metric_definitions(
         select_alias="avg_custom",
         topk_sort_order="DESC"  # Higher is better
     )
-    
+
     # Add delta metrics if requested
     metric_delta = []
     if incl_delta:
         metric_delta = self._get_metrics_trend_definitions(
             "avg_custom", time_period_bin_alias, group_by_fields
         )
-    
+
     return [metric, *metric_delta]
 ```
 
@@ -193,27 +193,27 @@ def _get_concurrent_requests_metrics_definitions(self, ...):
         for field in group_by_fields:
             col_name = field.split(".")[-1]
             group_by_columns.append(col_name)
-    
+
     # Create template CTE
     cte_template = f"""
-        SELECT 
+        SELECT
             {', '.join(group_by_columns)},
             COUNT(*) as concurrent_count
         FROM ModelInferenceDetails
-        WHERE request_arrival_time >= '{{from_date}}' 
+        WHERE request_arrival_time >= '{{from_date}}'
           AND request_arrival_time <= '{{to_date}}'
           {{filters}}
         GROUP BY {', '.join(group_by_columns)}
         HAVING COUNT(*) > 1
     """
-    
+
     cte_def = CTEDefinition(
         name="concurrent_counts",
         query=cte_template,
         base_tables=["ModelInferenceDetails"],
         is_template=True
     )
-    
+
     # Define the metric using the CTE
     metric = MetricDefinition(
         metrics_name="concurrent_requests",
@@ -222,7 +222,7 @@ def _get_concurrent_requests_metrics_definitions(self, ...):
         select_alias="max_concurrent_requests",
         cte_definition=cte_def
     )
-    
+
     return [metric]
 ```
 
@@ -253,11 +253,11 @@ Filters are constructed with proper escaping:
 ```python
 def _get_filter_conditions(self, ...):
     conditions = []
-    
+
     # Date filters
     conditions.append(f"request_arrival_time >= '{from_date}'")
     conditions.append(f"request_arrival_time <= '{to_date}'")
-    
+
     # Entity filters
     if filters:
         for key, value in filters.items():
@@ -267,7 +267,7 @@ def _get_filter_conditions(self, ...):
                 )
             else:
                 conditions.append(f"{column} = '{value}'")
-    
+
     return conditions
 ```
 
@@ -280,8 +280,8 @@ TopK filtering limits results to top entities:
 topk_entities AS (
     SELECT project_id
     FROM (
-        SELECT 
-            project_id, 
+        SELECT
+            project_id,
             SUM(request_count) as rank_value
         FROM ModelInferenceDetails
         WHERE [conditions]
@@ -372,7 +372,7 @@ SET log_query_threads = 1;
 SELECT ...
 
 -- Check system.query_log
-SELECT 
+SELECT
     query,
     query_duration_ms,
     read_rows,
@@ -389,7 +389,7 @@ WHERE query_id = 'your-query-id'
 ```python
 # Use lagInFrame for previous period
 lagInFrame(metric, 1, metric) OVER (
-    PARTITION BY group_fields 
+    PARTITION BY group_fields
     ORDER BY time_bucket ASC
 ) AS previous_metric
 ```
@@ -428,7 +428,7 @@ def test_request_count_metric():
         incl_delta=True,
         group_by_fields=["mid.project_id"]
     )
-    
+
     assert len(metrics) == 4  # Base + 3 delta metrics
     assert metrics[0].select_alias == "request_count"
 ```
@@ -444,7 +444,7 @@ async def test_analytics_query():
         frequency_unit="day",
         group_by=["project"]
     )
-    
+
     # Verify query structure
     assert "WITH" in query or "SELECT" in query
     assert "GROUP BY" in query
@@ -456,9 +456,9 @@ async def test_analytics_query():
 ```python
 async def test_query_performance():
     start = time.time()
-    
+
     result = await client.execute_query(query)
-    
+
     duration = time.time() - start
     assert duration < 1.0  # Should complete in under 1 second
     assert len(result) > 0

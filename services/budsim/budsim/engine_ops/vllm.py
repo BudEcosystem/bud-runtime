@@ -49,7 +49,7 @@ _TEXT_GENERATION_MODELS = {
     "GPTNeoXForCausalLM": ("gpt_neox", "GPTNeoXForCausalLM"),
     "GraniteForCausalLM": ("granite", "GraniteForCausalLM"),
     "GraniteMoeForCausalLM": ("granitemoe", "GraniteMoeForCausalLM"),
-    "GraniteMoeSharedForCausalLM": ("granitemoeshared", "GraniteMoeSharedForCausalLM"),   # noqa: E501
+    "GraniteMoeSharedForCausalLM": ("granitemoeshared", "GraniteMoeSharedForCausalLM"),  # noqa: E501
     "GritLM": ("gritlm", "GritLM"),
     "Grok1ModelForCausalLM": ("grok1", "Grok1ForCausalLM"),
     "InternLMForCausalLM": ("llama", "LlamaForCausalLM"),
@@ -118,7 +118,8 @@ _EMBEDDING_MODELS = {
     "LlamaModel": ("llama", "LlamaForCausalLM"),
     **{
         # Multiple models share the same architecture, so we include them all
-        k: (mod, arch) for k, (mod, arch) in _TEXT_GENERATION_MODELS.items()
+        k: (mod, arch)
+        for k, (mod, arch) in _TEXT_GENERATION_MODELS.items()
         if arch == "LlamaForCausalLM"
     },
     "MistralModel": ("llama", "LlamaForCausalLM"),
@@ -142,10 +143,8 @@ _EMBEDDING_MODELS = {
 
 _CROSS_ENCODER_MODELS = {
     "BertForSequenceClassification": ("bert", "BertForSequenceClassification"),
-    "RobertaForSequenceClassification": ("roberta",
-                                         "RobertaForSequenceClassification"),
-    "XLMRobertaForSequenceClassification": ("roberta",
-                                            "RobertaForSequenceClassification"),
+    "RobertaForSequenceClassification": ("roberta", "RobertaForSequenceClassification"),
+    "XLMRobertaForSequenceClassification": ("roberta", "RobertaForSequenceClassification"),
 }
 
 _MULTIMODAL_MODELS = {
@@ -160,8 +159,8 @@ _MULTIMODAL_MODELS = {
     "GLM4VForCausalLM": ("glm4v", "GLM4VForCausalLM"),
     "H2OVLChatModel": ("h2ovl", "H2OVLChatModel"),
     "InternVLChatModel": ("internvl", "InternVLChatModel"),
-    "Idefics3ForConditionalGeneration":("idefics3","Idefics3ForConditionalGeneration"),
-    "SmolVLMForConditionalGeneration": ("smolvlm","SmolVLMForConditionalGeneration"),  # noqa: E501
+    "Idefics3ForConditionalGeneration": ("idefics3", "Idefics3ForConditionalGeneration"),
+    "SmolVLMForConditionalGeneration": ("smolvlm", "SmolVLMForConditionalGeneration"),  # noqa: E501
     "KimiVLForConditionalGeneration": ("kimi_vl", "KimiVLForConditionalGeneration"),  # noqa: E501
     "LlavaForConditionalGeneration": ("llava", "LlavaForConditionalGeneration"),
     "LlavaNextForConditionalGeneration": ("llava_next", "LlavaNextForConditionalGeneration"),  # noqa: E501
@@ -421,7 +420,7 @@ class EngineArgs(BaseEngineArgs):
             # return "cuda" if value == "cpu" else "cpu"
             return value
         return random.choice(["cpu", "cuda", "hpu"])
-    
+
     @staticmethod
     def get_quantization(value: Optional[str] = None) -> str:
         """Retrieve the quantization.
@@ -431,7 +430,7 @@ class EngineArgs(BaseEngineArgs):
         # choices = ["INT8", "INT4", "FP8"]
         # if value is not None:
         #     return random.choice([choice for choice in choices if choice != value])
-        return 'compressed-tensors'
+        return "compressed-tensors"
 
     def get_properties(self) -> Dict[str, Any]:
         """Dynamically creates a map of property names and their corresponding random generator functions from the default_factory."""
@@ -442,7 +441,7 @@ class EngineArgs(BaseEngineArgs):
             "enable_prefix_caching",
             "attention_backend",
             "pipeline_parallel_size",
-            "quantization"
+            "quantization",
         ]
         return super()._get_properties(properties_to_skip)
 
@@ -473,44 +472,44 @@ class EngineCompatibility(BaseEngineCompatibility):
     def check_cpu_compatibility(self, engine_args: Dict[str, Any]) -> bool:
         """Check if the engine args/envs combinations are compatible with CPU."""
         if engine_args.get("attention_backend") is not None:
-            assert (
-                engine_args.get("attention_backend") == "TORCH_SDPA"
-            ), f"attention_backend {engine_args.get('attention_backend')} is not compatible with CPU."
+            assert engine_args.get("attention_backend") == "TORCH_SDPA", (
+                f"attention_backend {engine_args.get('attention_backend')} is not compatible with CPU."
+            )
 
         if engine_args.get("pipeline_parallel_size", 1) is not None:
-            assert (
-                engine_args.get("pipeline_parallel_size", 1) == 1
-            ), f"pipeline_parallel_size {engine_args.get('pipeline_parallel_size')} is not compatible with CPU."
+            assert engine_args.get("pipeline_parallel_size", 1) == 1, (
+                f"pipeline_parallel_size {engine_args.get('pipeline_parallel_size')} is not compatible with CPU."
+            )
 
         if engine_args.get("kv_cache_dtype") is not None:
-            assert (
-                engine_args.get("kv_cache_dtype") == "auto"
-            ), f"kv_cache_dtype {engine_args.get('kv_cache_dtype')} is not compatible with CPU."
+            assert engine_args.get("kv_cache_dtype") == "auto", (
+                f"kv_cache_dtype {engine_args.get('kv_cache_dtype')} is not compatible with CPU."
+            )
 
         if engine_args.get("distributed_executor_backend") is not None:
-            assert (
-                engine_args.get("distributed_executor_backend") == "mp"
-            ), f"distributed_executor_backend {engine_args.get('distributed_executor_backend')} is not compatible with CPU."
+            assert engine_args.get("distributed_executor_backend") == "mp", (
+                f"distributed_executor_backend {engine_args.get('distributed_executor_backend')} is not compatible with CPU."
+            )
 
         if engine_args.get("enable_chunked_prefill") is not None:
-            assert not engine_args.get(
-                "enable_chunked_prefill"
-            ), f"enable_chunked_prefill {engine_args.get('enable_chunked_prefill')} is not compatible with CPU."
+            assert not engine_args.get("enable_chunked_prefill"), (
+                f"enable_chunked_prefill {engine_args.get('enable_chunked_prefill')} is not compatible with CPU."
+            )
 
         if engine_args.get("enable_prefix_caching") is not None:
-            assert not engine_args.get(
-                "enable_prefix_caching"
-            ), f"enable_prefix_caching {engine_args.get('enable_prefix_caching')} is not compatible with CPU."
+            assert not engine_args.get("enable_prefix_caching"), (
+                f"enable_prefix_caching {engine_args.get('enable_prefix_caching')} is not compatible with CPU."
+            )
 
         if engine_args.get("enforce_eager") is not None:
-            assert engine_args.get(
-                "enforce_eager"
-            ), f"enforce_eager {engine_args.get('enforce_eager')} is not compatible with CPU."
+            assert engine_args.get("enforce_eager"), (
+                f"enforce_eager {engine_args.get('enforce_eager')} is not compatible with CPU."
+            )
 
         if engine_args.get("max_context_len_to_capture") is not None:
-            assert engine_args.get(
-                "max_context_len_to_capture"
-            ), f"max_context_len_to_capture {engine_args.get('max_context_len_to_capture')} is not compatible with CPU."
+            assert engine_args.get("max_context_len_to_capture"), (
+                f"max_context_len_to_capture {engine_args.get('max_context_len_to_capture')} is not compatible with CPU."
+            )
 
         return True
 
@@ -554,10 +553,11 @@ class EngineCompatibility(BaseEngineCompatibility):
             ), f"block_size {engine_args.get('block_size')} is not compatible with FLASH_ATTN."
 
         if engine_args.get("num_scheduler_steps") is not None:
-            assert (
-                int(engine_args.get("num_scheduler_steps", 1)) <= 1
-                or not (engine_args.get("enable_chunked_prefill") or engine_args.get("enable_prefix_caching"))
-            ), f"num_scheduler_steps {engine_args.get('num_scheduler_steps')} is not compatible with chunked prefill or prefix caching."
+            assert int(engine_args.get("num_scheduler_steps", 1)) <= 1 or not (
+                engine_args.get("enable_chunked_prefill") or engine_args.get("enable_prefix_caching")
+            ), (
+                f"num_scheduler_steps {engine_args.get('num_scheduler_steps')} is not compatible with chunked prefill or prefix caching."
+            )
 
         logger.debug("Engine args and envs are compatible.")
         return True

@@ -110,7 +110,7 @@ export const useSimulation = create<{
 
     getSimulations: (parms: GetsimulationParams) => void;
     fetchSimulations: (params: GetsimulationParams) => Promise<Simulation[]>;
-    
+
 }>((set, get) => ({
     filters: {},
     totalPages: 0,
@@ -162,6 +162,6 @@ export const useSimulation = create<{
         set({ simulations: updatedListData, filters: params });
     },
 
-    
+
 
 }));

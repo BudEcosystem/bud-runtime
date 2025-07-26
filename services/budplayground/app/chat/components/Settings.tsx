@@ -337,7 +337,7 @@ export default function SettingsList({chatId}: {chatId: string}) {
                     </div>
                 ),
             },
-            
+
             {
               title: "Structured Output",
               description: "JSON settings",
@@ -373,7 +373,7 @@ export default function SettingsList({chatId}: {chatId: string}) {
         ];
         setComponents(components);
     }
-    
+
 
     return (
         <div className="relative flex flex-col w-full h-full overflow-y-auto pb-[5rem] pt-[1rem] px-[1rem]">

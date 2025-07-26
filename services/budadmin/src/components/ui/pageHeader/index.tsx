@@ -44,7 +44,7 @@ const PageHeader: React.FC<pageHeaderProps> = ({
           )}
         </div>
         <Flex align="center">
-        
+
           {rightComponent}
           {buttonLabel && (
             <Flex align={'center'} justify={'end'} className="">

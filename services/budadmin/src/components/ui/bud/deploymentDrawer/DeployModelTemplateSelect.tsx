@@ -91,7 +91,7 @@ function DeployModelTemplateSelect() {
       // setSelectedTemplate(currentWorkflow.workflow_steps.template);
     }
   }, [currentWorkflow]);
-  
+
   useEffect(() => {
     console.log("currentWorkflow", currentWorkflow);
   }, [currentWorkflow]);

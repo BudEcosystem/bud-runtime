@@ -11,7 +11,7 @@ Fetch the issue description:
 
 Research the repository:
 – Examine the current repository’s structure, existing issues, and documentation. – Look for any CONTRIBUTING.md, ISSUE_TEMPLATE.md, or similar files that might contain guidelines for creating issues. – Note the project’s coding style, naming conventions, and any specific requirements for submitting issues.
-– Review the requirements with the current repo and identify if any of the existing features can be extended to implement the mentioned requirements. 
+– Review the requirements with the current repo and identify if any of the existing features can be extended to implement the mentioned requirements.
 
 Research best practices:
 – Search for current best practices in writing GitHub issues, focusing on clarity, completeness, and actionability. – Look for examples of well-written issues in popular open-source projects for inspiration.

@@ -1,13 +1,11 @@
-import asyncio
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.future import select
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy import desc
 from datetime import datetime
-import json
+
+from sqlalchemy import desc
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
 
 # Import Models, Sources, and get_db_uri from your models definition
-from .models import Models, Sources, get_db_uri
+from .models import Models, Sources
 
 
 # TODO: Use the PSQL service for db management and keep the models in the target modules

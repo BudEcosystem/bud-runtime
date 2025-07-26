@@ -39,80 +39,80 @@ adhere to industry standards for quality and security.
 ## ⛓️ Application Structure
 
 ```markdown
-bud-microframe-<name>/  
-├── .dpar/                             # Directory for Dapr-specific configurations.  
-│   ├── components/                    # Dapr components directory for service bindings, pub-sub, etc.  
-│   │   ├── local-secretstore.yaml     # Configuration for local secret management.  
-│   │   ├── configstore.yaml           # Configuration for storing application settings.  
-│   │   ├── ....                       # Additional Dapr component configurations.  
-│   ├── appconfig-dev.yaml             # Dapr configuration for development environment.  
-├── deploy/                            # Directory for deployment-related scripts and configurations.  
-│   ├── docker-compose-dev.yaml        # Docker Compose file for setting up development environment.  
-│   ├── docker-compose-redis.yaml      # Docker Compose file specifically for Redis setup.  
-│   ├── Dockerfile                     # Dockerfile for building the Docker image for the service.  
-│   ├── start_dev.sh                   # Script to start the development environment.  
-│   ├── ....                           # Additional deployment-related scripts or configurations.  
-├── docs/                              # Directory for documentation (Sphinx, Markdown, etc.).  
-├── <name>/                            # Main application directory.  
-│   ├── commons/                       # Shared utilities and common modules.  
-│   │   ├── __init__.py                # Initializes the commons module.  
-│   │   ├── config.py                  # Configuration management utilities.  
-│   │   ├── constants.py               # Constant values used across the application.  
-│   │   ├── schemas.py                 # Standard Pydantic models and data validation schemas.  
-│   │   ├── exceptions.py              # Custom exceptions used in the application.  
-│   │   ├── async_utils.py             # Asynchronous utility functions.  
-│   │   ├── logging.py                 # Logging setup and configuration.  
-│   │   ├── ....                       # Additional common utilities or modules.  
-│   ├── core/                          # Core functionalities and main services.  
-│   │   ├── __init__.py                # Initializes the core module.  
+bud-microframe-<name>/
+├── .dpar/                             # Directory for Dapr-specific configurations.
+│   ├── components/                    # Dapr components directory for service bindings, pub-sub, etc.
+│   │   ├── local-secretstore.yaml     # Configuration for local secret management.
+│   │   ├── configstore.yaml           # Configuration for storing application settings.
+│   │   ├── ....                       # Additional Dapr component configurations.
+│   ├── appconfig-dev.yaml             # Dapr configuration for development environment.
+├── deploy/                            # Directory for deployment-related scripts and configurations.
+│   ├── docker-compose-dev.yaml        # Docker Compose file for setting up development environment.
+│   ├── docker-compose-redis.yaml      # Docker Compose file specifically for Redis setup.
+│   ├── Dockerfile                     # Dockerfile for building the Docker image for the service.
+│   ├── start_dev.sh                   # Script to start the development environment.
+│   ├── ....                           # Additional deployment-related scripts or configurations.
+├── docs/                              # Directory for documentation (Sphinx, Markdown, etc.).
+├── <name>/                            # Main application directory.
+│   ├── commons/                       # Shared utilities and common modules.
+│   │   ├── __init__.py                # Initializes the commons module.
+│   │   ├── config.py                  # Configuration management utilities.
+│   │   ├── constants.py               # Constant values used across the application.
+│   │   ├── schemas.py                 # Standard Pydantic models and data validation schemas.
+│   │   ├── exceptions.py              # Custom exceptions used in the application.
+│   │   ├── async_utils.py             # Asynchronous utility functions.
+│   │   ├── logging.py                 # Logging setup and configuration.
+│   │   ├── ....                       # Additional common utilities or modules.
+│   ├── core/                          # Core functionalities and main services.
+│   │   ├── __init__.py                # Initializes the core module.
 │   │   ├── routes.py                  # API route definitions.
-│   │   ├── meta_routes.py             # API route definitions for metadata endpoints.  
+│   │   ├── meta_routes.py             # API route definitions for metadata endpoints.
 │   │   ├── sync_routes.py             # API route definitions for sync endpoints.
-│   │   ├── schemas.py                 # Pydantic models and data validation schemas.  
-│   │   ├── services.py                # Core service logic and business rules.  
-│   │   ├── ....                       # Additional core functionalities.  
-│   ├── module_a/                      # Specific module or feature A.  
-│   │   ├── __init__.py                # Initializes module A.  
-│   │   ├── models.py                  # Data models specific to module A.  
-│   │   ├── routes.py                  # API routes related to module A.  
-│   │   ├── schemas.py                 # Validation schemas for module A.  
-│   │   ├── ....                       # Additional code specific to module A.  
-│   ├── module_b/                      # Specific module or feature B.  
-│   │   ├── __init__.py                # Initializes module B.  
-│   │   ├── models.py                  # Data models specific to module B.  
-│   │   ├── routes.py                  # API routes related to module B.  
-│   │   ├── schemas.py                 # Validation schemas for module B.  
-│   │   ├── ....                       # Additional code specific to module B.  
-│   ├── shared/                        # Shared components between modules.  
-│   │   ├── __init__.py                # Initializes the shared module.  
-│   │   ├── dapr_service.py            # Service wrapper for Dapr interactions.  
-│   │   ├── ....                       # Additional shared services or utilities.  
-│   ├── __about__.py                   # Metadata about the project (e.g., version, author).  
-│   ├── __init__.py                    # Initializes the main application module.  
-│   ├── py.typed                       # Marker file indicating the package uses type hints.  
-│   └── main.py                        # Entry point for the application.  
-├── tests/                             # Directory for unit and integration tests.  
-│   ├── conftest.py                    # Test configuration and fixtures.  
-│   ├── module_a/                      # Tests related to module A.  
-│   ├── module_b/                      # Tests related to module B.  
-│   ├── ....                           # Additional test scripts.  
-|   └── profiling/                     # Scripts for application memory & time benchmarking and load testing.  
-├── scripts/                           # Utility scripts for managing the project.  
-│   ├── del_configs.sh                 # Script to delete specific configurations.  
-│   ├── update_configs.sh              # Script to update configurations.  
-│   ├── ....                           # Additional utility scripts.  
-├── sample.secrets.json                # Sample file for managing secrets (should not be used in production).  
-├── .dockerignore                      # Specifies files and directories to ignore when creating a Docker image.  
-├── .commitlintrc.yaml                 # Configuration for commit message linting.  
-├── .pre-commit-config.yaml            # Configuration for pre-commit hooks.  
-├── .gitignore                         # Specifies files and directories to ignore in Git.  
-├── setup.py                           # Script for installing the package.  
-├── pyproject.toml                     # Project metadata and configuration file.  
-├── requirements.txt                   # Production dependencies for the project.  
-├── requirements-dev.txt               # Development dependencies for the project.  
-├── requirements-lint.txt              # Linting dependencies for the project.  
-├── requirements-test.txt              # Testing dependencies for the project.  
-├── LICENSE                            # License file for the project.  
+│   │   ├── schemas.py                 # Pydantic models and data validation schemas.
+│   │   ├── services.py                # Core service logic and business rules.
+│   │   ├── ....                       # Additional core functionalities.
+│   ├── module_a/                      # Specific module or feature A.
+│   │   ├── __init__.py                # Initializes module A.
+│   │   ├── models.py                  # Data models specific to module A.
+│   │   ├── routes.py                  # API routes related to module A.
+│   │   ├── schemas.py                 # Validation schemas for module A.
+│   │   ├── ....                       # Additional code specific to module A.
+│   ├── module_b/                      # Specific module or feature B.
+│   │   ├── __init__.py                # Initializes module B.
+│   │   ├── models.py                  # Data models specific to module B.
+│   │   ├── routes.py                  # API routes related to module B.
+│   │   ├── schemas.py                 # Validation schemas for module B.
+│   │   ├── ....                       # Additional code specific to module B.
+│   ├── shared/                        # Shared components between modules.
+│   │   ├── __init__.py                # Initializes the shared module.
+│   │   ├── dapr_service.py            # Service wrapper for Dapr interactions.
+│   │   ├── ....                       # Additional shared services or utilities.
+│   ├── __about__.py                   # Metadata about the project (e.g., version, author).
+│   ├── __init__.py                    # Initializes the main application module.
+│   ├── py.typed                       # Marker file indicating the package uses type hints.
+│   └── main.py                        # Entry point for the application.
+├── tests/                             # Directory for unit and integration tests.
+│   ├── conftest.py                    # Test configuration and fixtures.
+│   ├── module_a/                      # Tests related to module A.
+│   ├── module_b/                      # Tests related to module B.
+│   ├── ....                           # Additional test scripts.
+|   └── profiling/                     # Scripts for application memory & time benchmarking and load testing.
+├── scripts/                           # Utility scripts for managing the project.
+│   ├── del_configs.sh                 # Script to delete specific configurations.
+│   ├── update_configs.sh              # Script to update configurations.
+│   ├── ....                           # Additional utility scripts.
+├── sample.secrets.json                # Sample file for managing secrets (should not be used in production).
+├── .dockerignore                      # Specifies files and directories to ignore when creating a Docker image.
+├── .commitlintrc.yaml                 # Configuration for commit message linting.
+├── .pre-commit-config.yaml            # Configuration for pre-commit hooks.
+├── .gitignore                         # Specifies files and directories to ignore in Git.
+├── setup.py                           # Script for installing the package.
+├── pyproject.toml                     # Project metadata and configuration file.
+├── requirements.txt                   # Production dependencies for the project.
+├── requirements-dev.txt               # Development dependencies for the project.
+├── requirements-lint.txt              # Linting dependencies for the project.
+├── requirements-test.txt              # Testing dependencies for the project.
+├── LICENSE                            # License file for the project.
 └── README.md                          # Project overview and documentation.
 ```
 

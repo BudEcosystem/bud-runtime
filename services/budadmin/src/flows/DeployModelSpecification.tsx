@@ -38,7 +38,7 @@ export default function DeployModelSpecification() {
             }
             return;
           }
-          
+
           // For local models, continue with cluster finding
           const result = await updateDeploymentSpecification();
           if (result) {

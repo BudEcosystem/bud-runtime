@@ -71,7 +71,7 @@ export default function SelectModelForNewEvaluation() {
             <ModelFilter
               search={search}
               setSearch={setSearch}
-              
+
             />
           </DeployModelSelect>
         </BudDrawerLayout>

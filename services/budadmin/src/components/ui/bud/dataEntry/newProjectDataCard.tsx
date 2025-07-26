@@ -23,7 +23,7 @@ const NewProjectCardData: React.FC = (props: {
       </div>
       <div className="flex items-center justify-start gap-[.5rem] mt-[1.4rem]">
         <div className="text-[#EC7575] text-[.75rem] leading-[100%] font-[400] p-[.5rem] rounded-[6px] bg-[#861A1A33]">Development</div>
-        <div className="text-[#D1B854] text-[.75rem] leading-[100%] font-[400] p-[.5rem] rounded-[6px] bg-[#423A1A40]">Testing</div> 
+        <div className="text-[#D1B854] text-[.75rem] leading-[100%] font-[400] p-[.5rem] rounded-[6px] bg-[#423A1A40]">Testing</div>
       </div>
     </div>
   );

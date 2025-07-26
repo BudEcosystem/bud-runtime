@@ -12,7 +12,7 @@ def mock_config(monkeypatch):
     monkeypatch.setenv("JWT_SECRET_KEY", "test_jwt_secret")
     monkeypatch.setenv("REDIS_PASSWORD", "test_redis_password")
     monkeypatch.setenv("REDIS_URI", "redis://localhost:6379")
-    
+
     mock_settings = Mock()
     # Add any required attributes that your code might access
     mock_settings.POSTGRES_USER = "test_user"
@@ -26,12 +26,12 @@ def mock_config(monkeypatch):
     mock_settings.BUD_SIMULATOR_APP_ID = "simulator-app"
     mock_settings.BUD_METRICS_APP_ID = "metrics-app"
     mock_settings.BUD_NOTIFY_APP_ID = "notify-app"
-    
+
     # Add required secret values
     mock_settings.JWT_SECRET_KEY = "test_jwt_secret"
     mock_settings.REDIS_PASSWORD = "test_redis_password"
     mock_settings.REDIS_URI = "redis://localhost:6379"
-    
+
     with patch('budapp.commons.config.app_settings', mock_settings):
         yield mock_settings
 
@@ -48,11 +48,11 @@ def metrics_fetcher(mock_logger, mock_config):
         from budapp.cluster_ops.utils import ClusterMetricsFetcher
         return ClusterMetricsFetcher(prometheus_url="http://135.233.178.158:9090")
 
-@pytest.mark.asyncio 
+@pytest.mark.asyncio
 async def test_get_cluster_metrics(metrics_fetcher, mock_logger):
     # Test with empty cluster ID
     result = await metrics_fetcher.get_cluster_metrics(cluster_id="", time_range="today", metric_type="all")
-    
+
     import json
     print("\nCluster Metrics Result:")
     print(json.dumps(result, indent=4, sort_keys=True))
@@ -64,8 +64,8 @@ async def test_get_cluster_metrics(metrics_fetcher, mock_logger):
             print("\nMetrics saved to cluster_metrics.json")
         except Exception as e:
             print(f"\nError saving metrics to JSON: {e}")
-    
-    
+
+
     # assert result is None
     # mock_logger.error.assert_called_with("Cluster ID is required to fetch cluster metrics")
 

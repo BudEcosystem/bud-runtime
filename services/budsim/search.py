@@ -1,9 +1,11 @@
+from os import path as osp
+from os import walk
+
 import joblib
-from os import walk, path as osp
 
 
 base_path = "./cache/pretrained_models"
-for root, dirs, files in walk(base_path):
+for root, _dirs, files in walk(base_path):
     for file in files:
         if not file.endswith(".pkl"):
             continue

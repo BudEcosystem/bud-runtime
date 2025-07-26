@@ -40,4 +40,3 @@ export function CopyText(props: { text: string }) {
     </div>
   );
 }
-

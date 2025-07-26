@@ -25,7 +25,7 @@ type ClusterTagsProps = {
 
 function ClusterTags(props: ClusterTagsProps) {
     const [showMore, setShowMore] = React.useState(false)
-    
+
     if (!props.cluster) return null
 
     const tags: TagListeItem[] = [

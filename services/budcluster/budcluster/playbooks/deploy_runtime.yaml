@@ -63,6 +63,6 @@
       until: >
         runtime_pods is defined and
         runtime_pods.resources is defined and
-        runtime_pods.resources | selectattr('status.phase', 'equalto', 'Running') | 
+        runtime_pods.resources | selectattr('status.phase', 'equalto', 'Running') |
         list | length == runtime_pods.resources | length
       when: not helm_result.failed

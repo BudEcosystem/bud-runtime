@@ -122,7 +122,7 @@ EXPECTED_QUERY_PATTERNS = {
 def get_mock_clickhouse_response(metric_type: str, num_periods: int = 5) -> List[Dict[str, Any]]:
     """Generate mock ClickHouse response data for different metric types."""
     base_date = datetime(2024, 1, 1, tzinfo=timezone.utc)
-    
+
     if metric_type == "request_count":
         return [
             {
