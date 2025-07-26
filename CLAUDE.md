@@ -321,3 +321,9 @@ Available in Nix shell:
 - `sops` for secret encryption and GitOps workflows
 - `openssl` for crypto key generation (budcluster)
 - `yaml-language-server` for YAML validation and linting
+
+
+### Claude dev guidelines
+
+- Use sub agents when ever required
+- Use the stack-keeper agent to plan the development task and distribute to respective agents.
