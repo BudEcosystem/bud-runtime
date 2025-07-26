@@ -3,8 +3,6 @@ members = [
     "tensorzero-internal",
     "tensorzero-internal/tests/mock-inference-provider",
     "gateway",
-    "clients/rust",
-    "clients/python",
     "provider-proxy",
     "evaluations",
     "tensorzero-derive",

@@ -29,7 +29,8 @@ use cursorzero::{
 };
 use git2::Repository;
 use serde_json::json;
-use tensorzero::{ClientBuilder, ClientBuilderMode, FeedbackParams};
+// TODO: This example needs to be updated to work without the removed client SDK
+// use tensorzero::{ClientBuilder, ClientBuilderMode, FeedbackParams};
 use tensorzero_internal::clickhouse::ClickHouseConnectionInfo;
 use tensorzero_internal::inference::types::ContentBlockChatOutput;
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
@@ -62,11 +63,13 @@ async fn main() -> Result<()> {
     let commit_interval = get_commit_timestamp_and_parent_timestamp(&commit)?;
     let diffs = get_diff_by_file(&repo, &commit)?;
     let mut diff_trees: HashMap<PathBuf, Vec<TreeInfo>> = HashMap::new();
-    let client = ClientBuilder::new(ClientBuilderMode::HTTPGateway {
-        url: args.gateway_url,
-    })
-    .build()
-    .await?;
+    // TODO: This example needs to be updated to work without the removed client SDK
+    // let client = ClientBuilder::new(ClientBuilderMode::HTTPGateway {
+    //     url: args.gateway_url,
+    // })
+    // .build()
+    // .await?;
+    return Err(anyhow::anyhow!("This example needs to be updated to work without the removed client SDK"));
     for (file, diffs) in diffs {
         for diff in diffs {
             let Some(ext) = file.extension().and_then(|ext| ext.to_str()) else {
@@ -165,45 +168,47 @@ async fn main() -> Result<()> {
             let Some(best_ted_info) = best_ted_info.as_ref() else {
                 continue;
             };
+            // TODO: This needs to be updated to work without the removed client SDK
             // Send the minimum TED to TensorZero as feedback.
-            client
-                .feedback(FeedbackParams {
-                    inference_id: Some(inference_id),
-                    metric_name: "min_ted".to_string(),
-                    value: json!(best_ted_info.min_ted),
-                    tags: HashMap::new(),
-                    episode_id: None,
-                    internal: false,
-                    dryrun: None,
-                })
-                .await?;
-            client
-                .feedback(FeedbackParams {
-                    inference_id: Some(inference_id),
-                    metric_name: "ted_ratio".to_string(),
-                    value: json!(best_ted_info.ted_ratio),
-                    tags: HashMap::new(),
-                    episode_id: None,
-                    internal: false,
-                    dryrun: None,
-                })
-                .await?;
+            // client
+            //     .feedback(FeedbackParams {
+            //         inference_id: Some(inference_id),
+            //         metric_name: "min_ted".to_string(),
+            //         value: json!(best_ted_info.min_ted),
+            //         tags: HashMap::new(),
+            //         episode_id: None,
+            //         internal: false,
+            //         dryrun: None,
+            //     })
+            //     .await?;
+            // client
+            //     .feedback(FeedbackParams {
+            //         inference_id: Some(inference_id),
+            //         metric_name: "ted_ratio".to_string(),
+            //         value: json!(best_ted_info.ted_ratio),
+            //         tags: HashMap::new(),
+            //         episode_id: None,
+            //         internal: false,
+            //         dryrun: None,
+            //     })
+            //     .await?;
 
             if let Some(min_ted_source) = &best_ted_info.min_ted_source {
-                client
-                    .feedback(FeedbackParams {
-                        inference_id: Some(inference_id),
-                        metric_name: "demonstration".to_string(),
-                        value: serde_json::Value::String(min_ted_source.clone()),
-                        tags: HashMap::from_iter([(
-                            "cursorzero_demonstration_kind".to_string(),
-                            "raw".to_string(),
-                        )]),
-                        episode_id: None,
-                        internal: false,
-                        dryrun: None,
-                    })
-                    .await?;
+                // TODO: This needs to be updated to work without the removed client SDK
+                // client
+                //     .feedback(FeedbackParams {
+                //         inference_id: Some(inference_id),
+                //         metric_name: "demonstration".to_string(),
+                //         value: serde_json::Value::String(min_ted_source.clone()),
+                //         tags: HashMap::from_iter([(
+                //             "cursorzero_demonstration_kind".to_string(),
+                //             "raw".to_string(),
+                //         )]),
+                //         episode_id: None,
+                //         internal: false,
+                //         dryrun: None,
+                //     })
+                //     .await?;
 
                 let original_inference = inferences_by_id.get(&inference_id).ok_or_else(|| {
                     anyhow::anyhow!("Inference not found in inferences_by_id: {inference_id}")
@@ -220,20 +225,21 @@ async fn main() -> Result<()> {
                 let updated_cursor_output =
                     output_text.replace(&String::from_utf8(tree_info.src)?, min_ted_source);
 
-                client
-                    .feedback(FeedbackParams {
-                        inference_id: Some(inference_id),
-                        metric_name: "demonstration".to_string(),
-                        value: serde_json::Value::String(updated_cursor_output),
-                        tags: HashMap::from_iter([(
-                            "cursorzero_demonstration_kind".to_string(),
-                            "replaced".to_string(),
-                        )]),
-                        episode_id: None,
-                        internal: false,
-                        dryrun: None,
-                    })
-                    .await?;
+                // TODO: This needs to be updated to work without the removed client SDK
+                // client
+                //     .feedback(FeedbackParams {
+                //         inference_id: Some(inference_id),
+                //         metric_name: "demonstration".to_string(),
+                //         value: serde_json::Value::String(updated_cursor_output),
+                //         tags: HashMap::from_iter([(
+                //             "cursorzero_demonstration_kind".to_string(),
+                //             "replaced".to_string(),
+                //         )]),
+                //         episode_id: None,
+                //         internal: false,
+                //         dryrun: None,
+                //     })
+                //     .await?;
             }
             num_feedbacks_sent += 1;
         }

@@ -1,6 +1,6 @@
 use anyhow::{bail, Result};
 use serde_json::Value;
-use tensorzero::InferenceResponse;
+use tensorzero_internal::endpoints::inference::InferenceResponse;
 use tensorzero_internal::endpoints::datasets::Datapoint;
 
 pub(super) fn run_exact_match_evaluator(
@@ -39,7 +39,7 @@ mod tests {
 
     use super::*;
     use serde_json::json;
-    use tensorzero::Role;
+    use tensorzero_internal::inference::types::Role;
     use tensorzero_internal::{
         endpoints::{
             datasets::{ChatInferenceDatapoint, JsonInferenceDatapoint},
