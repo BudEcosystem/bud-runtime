@@ -103,6 +103,7 @@ repos:
       - id: commitlint
         stages: [commit-msg]
         additional_dependencies: ['@commitlint/config-conventional']
+        args: ['--config', '.commitlintrc.js']
 
   # Security scanning for Python dependencies
   - repo: local
