@@ -12,7 +12,7 @@ use tensorzero_internal::evaluations::{
     LLMJudgeOutputType,
 };
 use tensorzero_internal::inference::types::{
-    ContentBlockChatOutput, File, Input, InputMessage, InputMessageContent, JsonInferenceOutput, 
+    ContentBlockChatOutput, File, Input, InputMessage, InputMessageContent, JsonInferenceOutput,
     Role, TextKind,
 };
 use tensorzero_internal::tool::DynamicToolParams;
@@ -417,7 +417,6 @@ mod tests {
     use super::*;
 
     use serde_json::json;
-    use tensorzero_internal::inference::types::{File, Role};
     use tensorzero_internal::endpoints::datasets::ChatInferenceDatapoint;
     use tensorzero_internal::endpoints::datasets::JsonInferenceDatapoint;
     use tensorzero_internal::endpoints::inference::ChatInferenceResponse;
@@ -426,10 +425,10 @@ mod tests {
     use tensorzero_internal::evaluations::LLMJudgeOptimize;
     use tensorzero_internal::inference::types::ResolvedInput;
     use tensorzero_internal::inference::types::Usage;
-    use tensorzero_internal::tool::ToolCallInput;
+    use tensorzero_internal::inference::types::{File, Role};
+    use tensorzero_internal::tool::{ToolCall, ToolCallInput};
     use tensorzero_internal::{
         inference::types::{ContentBlockChatOutput, Text, Thought},
-        tool::ToolCallInput,
         tool::{ToolCallOutput, ToolResult},
     };
 
@@ -797,12 +796,10 @@ mod tests {
 
         // Test with ToolCall, ToolResult, etc. (should pass through)
         let content = vec![
-            InputMessageContent::ToolCall(ToolCallInput {
-                name: Some("tool".to_string()),
-                arguments: Some(json!({"arg": "value"})),
+            InputMessageContent::ToolCall(ToolCall {
+                name: "tool".to_string(),
+                arguments: json!({"arg": "value"}).to_string(),
                 id: "toolid".to_string(),
-                raw_name: None,
-                raw_arguments: None,
             }),
             InputMessageContent::ToolResult(ToolResult {
                 name: "tool".to_string(),

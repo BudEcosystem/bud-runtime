@@ -321,3 +321,6 @@ Available in Nix shell:
 - `sops` for secret encryption and GitOps workflows
 - `openssl` for crypto key generation (budcluster)
 - `yaml-language-server` for YAML validation and linting
+
+
+Note: Make sure to update CLAUDE.md if you come across anything new related to architecture, testing, development etc which might be helpful for future development process.

@@ -10,14 +10,14 @@ use helpers::{get_cache_options, get_tool_params_args};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use stats::{EvaluationError, EvaluationInfo, EvaluationStats, EvaluationUpdate};
+use tensorzero_internal::cache::CacheEnabledMode;
+use tensorzero_internal::config_parser::MetricConfigOptimize;
 use tensorzero_internal::endpoints::inference::{
     InferenceOutput, InferenceParams, InferenceResponse, Params as InferenceRequestParams,
 };
+use tensorzero_internal::evaluations::{EvaluationConfig, EvaluatorConfig};
 use tensorzero_internal::inference::types::Input;
 use tensorzero_internal::tool::DynamicToolParams;
-use tensorzero_internal::cache::CacheEnabledMode;
-use tensorzero_internal::config_parser::MetricConfigOptimize;
-use tensorzero_internal::evaluations::{EvaluationConfig, EvaluatorConfig};
 use tensorzero_internal::{
     clickhouse::ClickHouseConnectionInfo, config_parser::Config, endpoints::datasets::Datapoint,
     function::FunctionConfig,
@@ -32,11 +32,11 @@ pub mod helpers;
 pub mod stats;
 
 // Helper function to convert ResolvedInput to Input
-fn resolved_input_to_input(resolved_input: &tensorzero_internal::inference::types::ResolvedInput) -> Input {
-    use tensorzero_internal::inference::types::{
-        InputMessage, InputMessageContent, TextKind,
-    };
-    
+fn resolved_input_to_input(
+    resolved_input: &tensorzero_internal::inference::types::ResolvedInput,
+) -> Input {
+    use tensorzero_internal::inference::types::{InputMessage, InputMessageContent, TextKind};
+
     let messages = resolved_input.messages.iter().map(|msg| {
         let content = msg.content.iter().map(|content_block| {
             match content_block {
@@ -68,13 +68,13 @@ fn resolved_input_to_input(resolved_input: &tensorzero_internal::inference::type
                 }
             }
         }).collect();
-        
+
         InputMessage {
             role: msg.role,
             content,
         }
     }).collect();
-    
+
     Input {
         system: resolved_input.system.clone(),
         messages,
@@ -156,7 +156,9 @@ pub async fn run_evaluation(
             (gateway_url, http_client)
         }
         None => {
-            bail!("Embedded gateway mode is not currently supported. Please provide a --gateway-url.");
+            bail!(
+                "Embedded gateway mode is not currently supported. Please provide a --gateway-url."
+            );
         }
     };
     let clients = Arc::new(Clients {
@@ -201,7 +203,7 @@ pub async fn run_evaluation(
         let datapoint = Arc::new(datapoint);
         let datapoint_id = datapoint.id();
         let abort_handle = join_set.spawn(async move {
-            let input = Arc::new(resolved_input_to_input(&datapoint.input()));
+            let input = Arc::new(resolved_input_to_input(datapoint.input()));
             let inference_response = Arc::new(
                 infer_datapoint(InferDatapointParams {
                     clients: &clients_clone,
@@ -472,13 +474,20 @@ pub struct ThrottledTensorZeroClient {
 
 impl ThrottledTensorZeroClient {
     pub fn new(gateway_url: Url, http_client: reqwest::Client, semaphore: Semaphore) -> Self {
-        Self { gateway_url, http_client, semaphore }
+        Self {
+            gateway_url,
+            http_client,
+            semaphore,
+        }
     }
 
     async fn inference(&self, params: InferenceRequestParams) -> Result<InferenceOutput> {
-        let _permit = self.semaphore.acquire().await
+        let _permit = self
+            .semaphore
+            .acquire()
+            .await
             .map_err(|_| anyhow!("Failed to acquire semaphore"))?;
-        
+
         // Convert params to JSON manually since Params doesn't implement Serialize
         let params_json = serde_json::json!({
             "function_name": params.function_name,
@@ -499,23 +508,33 @@ impl ThrottledTensorZeroClient {
             "extra_body": {},  // Simplified for evaluations
             "extra_headers": {},  // Simplified for evaluations
         });
-        
-        let response = self.http_client
+
+        let response = self
+            .http_client
             .post(self.gateway_url.join("/inference")?)
             .json(&params_json)
             .send()
             .await?;
-        
+
         if !response.status().is_success() {
-            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
             bail!("Inference request failed: {}", error_text);
         }
-        
+
         let inference_response: InferenceResponse = response.json().await?;
         Ok(InferenceOutput::NonStreaming(inference_response))
     }
 
-    async fn feedback(&self, metric_name: String, value: Value, inference_id: Uuid, tags: HashMap<String, String>) -> Result<()> {
+    async fn feedback(
+        &self,
+        metric_name: String,
+        value: Value,
+        inference_id: Uuid,
+        tags: HashMap<String, String>,
+    ) -> Result<()> {
         let feedback_params = serde_json::json!({
             "metric_name": metric_name,
             "value": value,
@@ -524,18 +543,22 @@ impl ThrottledTensorZeroClient {
             "internal": true,
             "tags": tags
         });
-        
-        let response = self.http_client
+
+        let response = self
+            .http_client
             .post(self.gateway_url.join("/feedback")?)
             .json(&feedback_params)
             .send()
             .await?;
-        
+
         if !response.status().is_success() {
-            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
             bail!("Feedback request failed: {}", error_text);
         }
-        
+
         Ok(())
     }
 }

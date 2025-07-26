@@ -3,13 +3,13 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use serde_json::Value;
-use tensorzero_internal::endpoints::inference::InferenceResponse;
-use tensorzero_internal::inference::types::Input;
 use tensorzero_internal::cache::CacheEnabledMode;
 use tensorzero_internal::endpoints::datasets::Datapoint;
+use tensorzero_internal::endpoints::inference::InferenceResponse;
 use tensorzero_internal::evaluations::{
     get_evaluator_metric_name, EvaluationConfig, EvaluatorConfig,
 };
+use tensorzero_internal::inference::types::Input;
 
 mod exact_match;
 use exact_match::run_exact_match_evaluator;
@@ -110,10 +110,7 @@ pub(crate) async fn evaluate_inference(
                             match clients
                                 .tensorzero_client
                                 .feedback(
-                                    get_evaluator_metric_name(
-                                        &evaluation_name,
-                                        &evaluator_name,
-                                    ),
+                                    get_evaluator_metric_name(&evaluation_name, &evaluator_name),
                                     value.clone(),
                                     inference_response.inference_id(),
                                     tags,

@@ -1,7 +1,7 @@
 use anyhow::{bail, Result};
 use serde_json::Value;
-use tensorzero_internal::endpoints::inference::InferenceResponse;
 use tensorzero_internal::endpoints::datasets::Datapoint;
+use tensorzero_internal::endpoints::inference::InferenceResponse;
 
 pub(super) fn run_exact_match_evaluator(
     inference_response: &InferenceResponse,

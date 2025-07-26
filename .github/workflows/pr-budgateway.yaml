@@ -323,8 +323,8 @@ jobs:
           echo "P99 latency with rate limiting: ${P99}ms"
           
           # Ensure rate limiting doesn't exceed threshold
-          if [ $(awk -v p99="$P99" 'BEGIN { print (p99 > 1.5) }') -eq 1 ]; then
-              echo "❌ Error: P99 latency with rate limiting exceeds 1.5ms threshold"
+          if [ $(awk -v p99="$P99" 'BEGIN { print (p99 > 1) }') -eq 1 ]; then
+              echo "❌ Error: P99 latency with rate limiting exceeds 1ms threshold"
               exit 1
           else
               echo "✅ P99 latency with rate limiting is within acceptable limits"
