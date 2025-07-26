@@ -80,7 +80,8 @@ jobs:
       - name: Test (Rust)
         run: |
           cd ${{ env.WORKING_DIR }}
-          cargo test-unit
+          # Skip the redis_client tests that require ClickHouse
+          cargo nextest run --lib --bins --profile default
 
   clickhouse-tests:
     name: ClickHouse Tests
