@@ -20,9 +20,6 @@ jobs:
   validate:
     name: Validate (Rust Checks)
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ${{ env.WORKING_DIR }}
 
     steps:
       - uses: actions/checkout@v4
@@ -35,6 +32,10 @@ jobs:
 
       - name: Print Rust version
         run: rustc --version
+        
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ${{ env.WORKING_DIR }} -> target
         
       - name: Cache cargo bin directory
         uses: actions/cache@v4
@@ -61,19 +62,25 @@ jobs:
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
       - name: Build (Rust)
-        run: cargo build --workspace --verbose
+        run: |
+          cd ${{ env.WORKING_DIR }}
+          cargo build --workspace --verbose
 
       - name: Lint (Rust)
         run: |
+          cd ${{ env.WORKING_DIR }}
           cargo fmt -- --check
           cargo hack clippy --all-targets --each-feature -- -D warnings
 
       - name: Run cargo-deny
-        run: cargo deny check
+        run: |
+          cd ${{ env.WORKING_DIR }}
+          cargo deny check
 
       - name: Test (Rust)
         run: |
-          cargo nextest run --lib --bins ${{ vars.CARGO_NEXTEST_EXTRA_ARGS }}
+          cd ${{ env.WORKING_DIR }}
+          cargo test-unit
 
   clickhouse-tests:
     name: ClickHouse Tests
