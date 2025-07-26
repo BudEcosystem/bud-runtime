@@ -363,8 +363,25 @@ class SimulationService:
             cluster_info = SimulationService.validate_cluster_info(cluster_info.data.decode("utf-8"))
 
             # Filter out inactive nodes in each cluster
+            # Only include nodes that are explicitly marked as active (status=True) 
+            # and not in problematic states
             for cluster in cluster_info:
-                cluster["nodes"] = [node for node in cluster.get("nodes", []) if node.get("status", True)]
+                active_nodes = []
+                for node in cluster.get("nodes", []):
+                    # Check if node has an explicit status
+                    node_status = node.get("status")
+                    
+                    # Skip nodes that are:
+                    # - Explicitly marked as inactive (status=False)
+                    # - Missing status information (safer to exclude)
+                    # - In problematic states (NotReady, Unschedulable, UnderPressure)
+                    if node_status is True:
+                        # Additional check for node condition if available
+                        node_condition = node.get("condition", "").lower()
+                        if node_condition not in ["notready", "unschedulable", "underpressure"]:
+                            active_nodes.append(node)
+                    
+                cluster["nodes"] = active_nodes
 
             if cluster_id:
                 cluster_info = [cluster for cluster in cluster_info if cluster["id"] == str(cluster_id)]
@@ -372,7 +389,22 @@ class SimulationService:
             if not len(cluster_info):
                 raise ValueError("Cluster info is required to run the simulation")
 
-            return cluster_info
+            # Validate that clusters have available nodes after filtering
+            clusters_with_nodes = []
+            for cluster in cluster_info:
+                if len(cluster.get("nodes", [])) > 0:
+                    clusters_with_nodes.append(cluster)
+                else:
+                    logger.warning(f"Cluster {cluster['id']} has no available nodes after filtering")
+            
+            if not clusters_with_nodes:
+                raise ValueError("No clusters with available nodes found. All nodes are either inactive, tainted, or in problematic states.")
+            
+            # Log summary of available resources
+            total_nodes = sum(len(cluster.get("nodes", [])) for cluster in clusters_with_nodes)
+            logger.info(f"Found {len(clusters_with_nodes)} clusters with {total_nodes} available nodes for simulation")
+
+            return clusters_with_nodes
         except ValidationError as e:
             logger.exception("Error validating cluster info: %s", str(e))
             notification_req.payload.content = NotificationContent(
@@ -389,12 +421,21 @@ class SimulationService:
             raise e
         except Exception as e:
             logger.exception("Error getting cluster info: %s", str(e))
-            notification_req.payload.content = NotificationContent(
-                title="No clusters found" if cluster_id is None else "The cluster is not available",
-                message="Fix: Go to cluster management to add clusters",
-                status=WorkflowStatus.FAILED,
-                primary_action="retry",
-            )
+            # Provide more specific error message for node availability issues
+            if "No clusters with available nodes found" in str(e):
+                notification_req.payload.content = NotificationContent(
+                    title="No available nodes in cluster",
+                    message="All nodes are inactive, tainted, or in problematic states. Please check cluster health.",
+                    status=WorkflowStatus.FAILED,
+                    primary_action="retry",
+                )
+            else:
+                notification_req.payload.content = NotificationContent(
+                    title="No clusters found" if cluster_id is None else "The cluster is not available",
+                    message="Fix: Go to cluster management to add clusters",
+                    status=WorkflowStatus.FAILED,
+                    primary_action="retry",
+                )
             dapr_workflow.publish_notification(
                 workflow_id=workflow_id,
                 notification=notification_req,
