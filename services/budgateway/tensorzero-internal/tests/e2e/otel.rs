@@ -3,14 +3,14 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use crate::client_stubs::{
-    ClientInferenceParams, ClientInput, ClientInputMessage, ClientInputMessageContent,
-    InferenceOutput,
-};
 use opentelemetry::{KeyValue, SpanId, Value};
 use opentelemetry_sdk::{
     error::OTelSdkResult,
     trace::{SpanData, SpanExporter},
+};
+use tensorzero::{
+    ClientInferenceParams, ClientInput, ClientInputMessage, ClientInputMessageContent,
+    InferenceOutput,
 };
 use tensorzero_internal::inference::types::Role;
 use tensorzero_internal::inference::types::TextKind;

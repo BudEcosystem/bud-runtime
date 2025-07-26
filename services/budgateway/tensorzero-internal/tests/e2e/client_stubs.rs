@@ -21,7 +21,7 @@ pub struct ClientInferenceParams {
     pub stream: Option<bool>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ClientInput {
     pub system: Option<serde_json::Value>,
     pub messages: Vec<ClientInputMessage>,
@@ -51,7 +51,6 @@ pub enum CacheEnabledMode {
     Off,
 }
 
-#[derive(Debug, Clone)]
 pub enum InferenceOutput {
     NonStreaming(InferenceResponse),
     Streaming(

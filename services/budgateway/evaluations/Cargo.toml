@@ -26,6 +26,7 @@ indicatif = "0.17.11"
 reqwest = { workspace = true }
 
 [dev-dependencies]
+tensorzero = { path = "../clients/rust", features = ["e2e_tests"] }
 
 [lints]
 workspace = true

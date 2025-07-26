@@ -1,9 +1,9 @@
 #![expect(clippy::print_stdout)]
 use std::collections::HashMap;
 
-use crate::client_stubs::{ClientInput, ClientInputMessage, ClientInputMessageContent};
 use reqwest::{Client, StatusCode};
 use serde_json::{json, Value};
+use tensorzero::{ClientInput, ClientInputMessage, ClientInputMessageContent};
 use tensorzero_internal::cache::{CacheEnabledMode, CacheOptions};
 use tensorzero_internal::config_parser::ProviderTypesConfig;
 use tensorzero_internal::embeddings::{
@@ -1664,7 +1664,7 @@ pub async fn test_parallel_tool_use_default_true_inference_request() {
 #[tokio::test]
 #[tracing_test::traced_test]
 async fn test_log_dropped_thought() {
-    use crate::client_stubs::ClientInferenceParams;
+    use tensorzero::ClientInferenceParams;
     use tensorzero_internal::inference::types::Role;
     use tensorzero_internal::inference::types::{TextKind, Thought};
 
