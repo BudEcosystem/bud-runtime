@@ -44,6 +44,7 @@ class ObservabilityMetricsService:
     """
 
     def __init__(self, config: Optional[ClickHouseConfig] = None):
+        """Initialize the observability service with optional configuration."""
         # Lazy initialization
         self._clickhouse_client: Optional[ClickHouseClient] = None
         self._performance_metrics: Optional[PerformanceMetrics] = None
@@ -70,16 +71,19 @@ class ObservabilityMetricsService:
 
     @property
     def clickhouse_client(self):
+        """Get the ClickHouse client instance."""
         self._ensure_initialized()
         return self._clickhouse_client
 
     @property
     def query_builder(self):
+        """Get the query builder instance."""
         self._ensure_initialized()
         return self._query_builder
 
     @property
     def performance_metrics(self):
+        """Get the performance metrics instance."""
         self._ensure_initialized()
         return self._performance_metrics
 
@@ -366,7 +370,7 @@ class ObservabilityMetricsService:
             if check_gap_filled:
                 # Check if any group field has a zero UUID
                 is_gap_filled = False
-                for group_field, idx in group_field_indices.items():
+                for _group_field, idx in group_field_indices.items():
                     if row[idx] == self._ZERO_UUID:
                         is_gap_filled = True
                         break

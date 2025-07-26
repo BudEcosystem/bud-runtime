@@ -85,6 +85,7 @@ class WorkflowRunsCRUD(CRUDMixin[WorkflowRunsSchema, None, None]):
     __model__ = WorkflowRunsSchema
 
     def __init__(self):
+        """Initialize the WorkflowRunsCRUD instance with the WorkflowRunsSchema model."""
         super().__init__(model=self.__model__)
 
 
@@ -92,11 +93,13 @@ class WorkflowStepsCRUD(CRUDMixin[WorkflowStepsSchema, None, None]):
     __model__ = WorkflowStepsSchema
 
     def __init__(self):
+        """Initialize the WorkflowStepsCRUD instance with the WorkflowStepsSchema model."""
         super().__init__(model=self.__model__)
 
 
 class WorkflowCRUD:
     def __init__(self):
+        """Initialize WorkflowCRUD with CRUD instances for workflow runs and steps."""
         self.workflow_runs_crud = WorkflowRunsCRUD()
         self.workflow_steps_crud = WorkflowStepsCRUD()
 
@@ -108,6 +111,15 @@ class WorkflowCRUD:
         input_data: Dict[str, Any],
         workflow_steps: Optional[List[WorkflowStep]] = None,
     ) -> None:
+        """Add a new workflow run to the database with optional steps.
+
+        Args:
+            workflow_id: Unique identifier for the workflow run.
+            workflow_name: Name of the workflow being executed.
+            status: Current status of the workflow.
+            input_data: Input data for the workflow.
+            workflow_steps: Optional list of workflow steps to initialize.
+        """
         try:
             workflow_run = WorkflowRunsSchema(
                 workflow_id=workflow_id, workflow_name=workflow_name, status=status.value, input=input_data
@@ -125,6 +137,15 @@ class WorkflowCRUD:
             logger.error("Failed to add new workflow run %s: %s", workflow_id, str(e))
 
     def update_workflow_progress(self, workflow_id: str, notification: NotificationRequest) -> None:
+        """Update workflow progress based on notification request.
+
+        Args:
+            workflow_id: Unique identifier for the workflow run.
+            notification: Notification request containing status update information.
+
+        Returns:
+            bool: Whether to skip notification based on current state.
+        """
         workflow_or_step_status = notification.payload.content.status.value
         notification_hash = notification.get_hash()
         skip_notification = False
@@ -211,6 +232,12 @@ class DaprWorkflow(WorkflowCRUD, metaclass=singleton.Singleton):
         dapr_grpc_or_http_port: Optional[int] = None,
         dapr_api_token: Optional[str] = None,
     ) -> None:
+        """Initialize DaprWorkflow with runtime configuration.
+
+        Args:
+            dapr_grpc_or_http_port: Optional Dapr gRPC or HTTP port. Defaults to app settings.
+            dapr_api_token: Optional Dapr API token. Defaults to secrets settings.
+        """
         super().__init__()
 
         app_settings = get_app_settings()
@@ -236,6 +263,7 @@ class DaprWorkflow(WorkflowCRUD, metaclass=singleton.Singleton):
         self.start_workflow_runtime()
 
     def start_workflow_runtime(self) -> None:
+        """Start the workflow runtime if not already running."""
         if not self.is_running:
             self.workflow_runtime.start()
             self.wf_client = DaprWorkflowClient(host="127.0.0.1", port=self.dapr_grpc_or_http_port)
@@ -302,6 +330,15 @@ class DaprWorkflow(WorkflowCRUD, metaclass=singleton.Singleton):
         target_name: Optional[str] = None,
         is_replaying: bool = False,
     ) -> None:
+        """Publish a notification for a workflow event.
+
+        Args:
+            workflow_id: Unique identifier for the workflow.
+            notification: The notification request to publish.
+            target_topic_name: Optional target topic name for direct publishing.
+            target_name: Optional target service name for direct publishing.
+            is_replaying: Whether this is a replay of a previous notification.
+        """
         skip_notification = self.update_workflow_progress(workflow_id, notification)
         if skip_notification:
             logger.info("Skipping notification for %s:%s", notification.payload.type, notification.payload.event)
@@ -391,6 +428,14 @@ class DaprWorkflow(WorkflowCRUD, metaclass=singleton.Singleton):
                 raise err
 
     async def does_workflow_exist(self, workflow_id: Union[str, uuid.UUID]) -> bool:
+        """Check if a workflow exists by its ID.
+
+        Args:
+            workflow_id: The unique identifier of the workflow.
+
+        Returns:
+            bool: True if the workflow exists, False otherwise.
+        """
         workflow_id = str(workflow_id)
         try:
             await self.get_workflow_details(workflow_id, fetch_payloads=False, skip_logs=True)
@@ -411,6 +456,21 @@ class DaprWorkflow(WorkflowCRUD, metaclass=singleton.Singleton):
         target_name: Optional[str] = None,
         exists_ok: bool = False,
     ) -> None:
+        """Schedule a new workflow for execution.
+
+        Args:
+            workflow_name: Name of the registered workflow to execute.
+            workflow_input: Input data for the workflow.
+            workflow_id: Optional unique identifier for the workflow instance.
+            workflow_steps: Optional list of workflow steps to initialize.
+            eta: Estimated time of arrival/completion.
+            target_topic_name: Optional topic for publishing workflow metadata.
+            target_name: Optional service name for publishing workflow metadata.
+            exists_ok: Whether to allow scheduling if workflow already exists.
+
+        Returns:
+            WorkflowMetadataResponse or ErrorResponse depending on the result.
+        """
         workflow = self.registered_workflows.get(workflow_name)
         if not workflow:
             raise ValueError(f"Workflow {workflow_name} is not registered")
@@ -482,6 +542,14 @@ class DaprWorkflow(WorkflowCRUD, metaclass=singleton.Singleton):
             return ErrorResponse(message="Workflow orchestration failed", code=500)
 
     async def stop_workflow(self, workflow_id: Union[str, uuid.UUID]) -> None:
+        """Stop a running workflow.
+
+        Args:
+            workflow_id: The unique identifier of the workflow to stop.
+
+        Returns:
+            SuccessResponse or ErrorResponse depending on the result.
+        """
         workflow_id = str(workflow_id)
         try:
             wf_state = await self.get_workflow_details(workflow_id, fetch_payloads=False, skip_logs=True)
@@ -534,6 +602,14 @@ class DaprWorkflow(WorkflowCRUD, metaclass=singleton.Singleton):
                 return ErrorResponse(message="Failed to stop workflow", code=500)
 
     async def pause_workflow(self, workflow_id: Union[str, uuid.UUID]) -> None:
+        """Pause a running workflow.
+
+        Args:
+            workflow_id: The unique identifier of the workflow to pause.
+
+        Returns:
+            SuccessResponse or ErrorResponse depending on the result.
+        """
         workflow_id = str(workflow_id)
         try:
             wf_state = await self.get_workflow_details(workflow_id, fetch_payloads=False)
@@ -592,6 +668,14 @@ class DaprWorkflow(WorkflowCRUD, metaclass=singleton.Singleton):
                 return ErrorResponse(message="Failed to pause workflow", code=500)
 
     async def resume_workflow(self, workflow_id: Union[str, uuid.UUID]) -> None:
+        """Resume a paused workflow.
+
+        Args:
+            workflow_id: The unique identifier of the workflow to resume.
+
+        Returns:
+            SuccessResponse or ErrorResponse depending on the result.
+        """
         workflow_id = str(workflow_id)
         try:
             wf_state = await self.get_workflow_details(workflow_id, fetch_payloads=False)
@@ -646,6 +730,14 @@ class DaprWorkflow(WorkflowCRUD, metaclass=singleton.Singleton):
                 return ErrorResponse(message="Failed to resume workflow", code=500)
 
     async def restart_workflow(self, workflow_id: Union[str, uuid.UUID]) -> None:
+        """Restart a workflow by stopping and re-scheduling it.
+
+        Args:
+            workflow_id: The unique identifier of the workflow to restart.
+
+        Returns:
+            SuccessResponse or ErrorResponse depending on the result.
+        """
         workflow_id = str(workflow_id)
         workflow = self.workflow_runs_crud.fetch_one(conditions={"workflow_id": workflow_id})
         if not workflow:

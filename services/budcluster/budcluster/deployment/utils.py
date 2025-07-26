@@ -5,7 +5,7 @@ from ..commons.constants import HTTP_STATUS_ERROR_MESSAGES, LITELLM_EXCEPTION_ME
 
 
 def extract_litellm_exception_type(raw_error_message: str) -> str:
-    """Extracts the LiteLLM exception type from a raw error message.
+    """Extract the LiteLLM exception type from a raw error message.
 
     For example, given:
       "litellm.NotFoundError: OpenAIException - Error code: 404 - {...}"
@@ -25,7 +25,9 @@ def extract_litellm_exception_type(raw_error_message: str) -> str:
 
 
 def format_litellm_error_message(error_input) -> str:
-    """Accepts an error (as a string containing extra text or as a dict), extracts the error JSON if necessary,
+    """Accept an error and return only the user-friendly error message.
+
+    Accepts an error (as a string containing extra text or as a dict), extracts the error JSON if necessary,
     and returns only the user-friendly error message.
     """
     # If error_input is a string, attempt to extract the JSON part.

@@ -143,6 +143,7 @@ def get_valid_config() -> Crawl4aiConfig:
 
 @common_profiler
 async def profile_crawler(url: str, config: Crawl4aiConfig) -> List[Dict[str, Any]]:
+    """Profile the crawler performance for a given URL and configuration."""
     crawler = Crawl4aiCrawler(url)
     return await crawler.extract_data(config)
 

@@ -184,10 +184,12 @@ def get_compatible_engines(model_name: str, proprietary_only: bool = False) -> L
 
 
 def get_compatible_engine_image(engine_name: str, device: str) -> Optional[str]:
+    """Get the compatible engine image for a given engine and device."""
     engine_compatibility = get_engine_compatibility_checks(engine_name)()
     return engine_compatibility.check_device_compatibility(device)
 
 
 def get_engine_max_concurrency(engine_name: str) -> int:
+    """Get the maximum concurrency supported by the engine."""
     engine_args = get_engine_args(engine_name)
     return getattr(engine_args, "get_max_concurrency", lambda: None)()

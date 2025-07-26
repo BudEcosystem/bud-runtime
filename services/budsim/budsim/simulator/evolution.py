@@ -340,6 +340,7 @@ class Evolution:
     def apply_quantization_performance(
         self, ttft: float, throughput_per_user: float, e2e_latency: float
     ) -> Tuple[float, float, float]:
+        """Apply quantization performance scaling to metrics."""
         scale = 1.0
         if self.dtype == "bf16":
             scale = 1.0

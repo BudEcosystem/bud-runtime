@@ -77,6 +77,7 @@ class BenchmarkPredictor:
         )
 
     def load_model(self, model_path: str) -> None:
+        """Load a model from the specified path."""
         if lock.acquire(timeout=60):
             try:
                 model = joblib.load(model_path)

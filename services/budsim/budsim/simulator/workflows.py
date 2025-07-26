@@ -30,11 +30,13 @@ class SimulationWorkflows:
     @dapr_workflow.register_activity
     @staticmethod
     def get_topk_engine_configs(ctx: wf.WorkflowActivityContext, kwargs: Dict[str, Any]) -> Dict[str, Any]:
+        """Get top-k engine configurations."""
         return SimulationService.get_topk_engine_configs(**kwargs)
 
     @dapr_workflow.register_activity
     @staticmethod
     def get_topk_proprietary_engine_configs(ctx: wf.WorkflowActivityContext, kwargs: Dict[str, Any]) -> Dict[str, Any]:
+        """Get top-k proprietary engine configurations."""
         return SimulationService.get_topk_proprietary_engine_configs(**kwargs)
 
     @dapr_workflow.register_activity
@@ -42,23 +44,27 @@ class SimulationWorkflows:
     def get_topk_quantization_engine_configs(
         ctx: wf.WorkflowActivityContext, kwargs: Dict[str, Any]
     ) -> Dict[str, Any]:
+        """Get top-k quantization engine configurations."""
         return SimulationService.get_topk_quantization_engine_configs(**kwargs)
 
     @dapr_workflow.register_activity
     @staticmethod
     def get_available_clusters(ctx: wf.WorkflowActivityContext, kwargs: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Get available clusters."""
         notification_request = NotificationRequest(**kwargs.pop("notification_request"))
         return SimulationService.get_available_clusters(**kwargs, notification_request=notification_request)
 
     @dapr_workflow.register_activity
     @staticmethod
     def get_compatible_engines(ctx: wf.WorkflowActivityContext, kwargs: Dict[str, Any]) -> List[Tuple[str, str]]:
+        """Get compatible engines for the given configuration."""
         notification_request = NotificationRequest(**kwargs.pop("notification_request"))
         return SimulationService.get_compatible_engines(**kwargs, notification_request=notification_request)
 
     @dapr_workflow.register_workflow
     @staticmethod
     def get_topk_engine_configs_per_cluster(ctx: wf.WorkflowActivityContext, kwargs: Dict[str, Any]):
+        """Get top-k engine configurations per cluster."""
         workflow_id = kwargs.pop("workflow_id")
         request = ClusterRecommendationRequest(**kwargs.pop("request"))
         cluster_info = kwargs.pop("cluster_info")
@@ -143,6 +149,7 @@ class SimulationWorkflows:
     @dapr_workflow.register_activity
     @staticmethod
     def rank_configs(ctx: wf.WorkflowActivityContext, kwargs: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Rank configurations based on performance metrics."""
         notification_request = NotificationRequest(**kwargs.pop("notification_request"))
         request = ClusterRecommendationRequest(**kwargs.pop("request"))
         return SimulationService().rank_configs(
@@ -155,6 +162,7 @@ class SimulationWorkflows:
     @dapr_workflow.register_workflow
     @staticmethod
     def run_simulation(ctx: wf.DaprWorkflowContext, payload: Dict[str, Any]):
+        """Run the simulation workflow."""
         logger.info("Is workflow replaying: %s", ctx.is_replaying)
 
         workflow_name = "get_cluster_recommendations"
@@ -240,6 +248,7 @@ class SimulationWorkflows:
         return response.model_dump(mode="json")
 
     def __call__(self, request: ClusterRecommendationRequest, workflow_id: Optional[str] = None):
+        """Schedule and execute the simulation workflow."""
         response = dapr_workflow.schedule_workflow(
             workflow_name="run_simulation",
             workflow_input=request.model_dump(mode="json"),

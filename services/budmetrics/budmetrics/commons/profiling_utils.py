@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import logging
 import time
 from functools import wraps
@@ -14,6 +15,7 @@ class PerformanceMetrics:
     """Track performance metrics for queries and operations."""
 
     def __init__(self):
+        """Initialize performance metrics tracking."""
         self.metrics = {
             "query_execution": [],
             "query_building": [],
@@ -145,11 +147,17 @@ class PerformanceLogger:
     _initialized = False
 
     def __new__(cls):
+        """Create or return the singleton instance."""
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
 
     def __init__(self, interval_seconds: int = 10):
+        """Initialize the performance logger.
+
+        Args:
+            interval_seconds: Interval between metric logs (default: 10).
+        """
         # Only initialize once
         if PerformanceLogger._initialized:
             return
@@ -205,10 +213,8 @@ class PerformanceLogger:
         self._running = False
         if self._task:
             self._task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._task
-            except asyncio.CancelledError:
-                pass
             logger.info("Performance logger stopped")
 
     def get_metrics(self) -> Optional[PerformanceMetrics]:

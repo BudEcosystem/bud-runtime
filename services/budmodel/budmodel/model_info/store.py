@@ -199,16 +199,14 @@ class ModelStore:
         Returns:
             bool: True if the removal was successful, False otherwise
         """
-        delete_object_list = list(
-            map(
-                lambda x: DeleteObject(x.object_name),
-                self.client.list_objects(
-                    bucket_name,
-                    prefix,
-                    recursive=recursive,
-                ),
+        delete_object_list = [
+            DeleteObject(x.object_name)
+            for x in self.client.list_objects(
+                bucket_name,
+                prefix,
+                recursive=recursive,
             )
-        )
+        ]
 
         # Remove the objects
         try:
@@ -230,8 +228,9 @@ class ModelStore:
         return True
 
     def download_folder(self, prefix: str, local_destination: str) -> List[str]:
-        """Downloads all objects in the bucket with the given prefix,
-        preserving the same folder structure.
+        """Download all objects in the bucket with the given prefix.
+
+        Preserves the same folder structure.
 
         Args:
             prefix (str): The prefix (folder path) in the bucket to download.
@@ -329,7 +328,7 @@ class ModelStore:
     def download_file(
         self, object_path: str, local_destination: str, bucket_name: str = app_settings.minio_bucket
     ) -> Optional[Tuple[str, int]]:
-        """Downloads a single object from the bucket to the local destination.
+        """Download a single object from the bucket to the local destination.
 
         Args:
             object_path (str): The full path of the object in the bucket.
@@ -371,7 +370,7 @@ class ModelStore:
 
 
 def measure_minio_upload_speed(file_size_mb: int = 20) -> float:
-    """Measure MinIO upload speed by uploading test files twice
+    """Measure MinIO upload speed by uploading test files twice.
 
     Args:
         endpoint: MinIO endpoint
@@ -446,7 +445,7 @@ def measure_minio_upload_speed(file_size_mb: int = 20) -> float:
 
 
 def measure_minio_download_speed(file_size_mb: int = 100) -> float:
-    """Measure MinIO download speed by downloading test files
+    """Measure MinIO download speed by downloading test files.
 
     Args:
         file_size_mb: Size of test file in MB

@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 # =================== Base Models ===================
 class TagsModel(BaseModel):
-    """Base model for resource tags"""
+    """Base model for resource tags."""
 
     Environment: str
     Project: str
@@ -14,6 +14,7 @@ class TagsModel(BaseModel):
     ManagedBy: str = "Bud"
 
     def to_dict(self) -> Dict[str, str]:
+        """Convert the model to a dictionary."""
         return self.model_dump(exclude_none=True)
 
 
@@ -42,7 +43,7 @@ class TagsModel(BaseModel):
 
 # Cloud Specific Model
 class AzureConfig(BaseModel):
-    """Azure specific configuration model"""
+    """Azure specific configuration model."""
 
     # Credentails
     subscription_id: str
@@ -59,7 +60,7 @@ class AzureConfig(BaseModel):
 
 
 class AWSConfig(BaseModel):
-    """AWS specific configuration model"""
+    """AWS specific configuration model."""
 
     # Credentails
     access_key: str

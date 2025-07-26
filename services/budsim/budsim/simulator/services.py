@@ -834,6 +834,7 @@ class SimulationService:
         limit: int = 1,
         session: Optional[Session] = None,
     ) -> PaginatedResponse[ClusterMetrics]:
+        """Get top-k cluster recommendations based on performance metrics."""
         results, total_count = SimulationResultsCRUD().fetch_topk_configs_by_cluster(
             workflow_id=workflow_id,
             cluster_id=cluster_id,
@@ -907,6 +908,7 @@ class SimulationService:
     def greedy_search_deployment_config(
         simulation_results: List[SimulationResultsSchema], target_concurrency: int = None
     ) -> DeploymentConfigurationResponse:
+        """Perform greedy search for optimal deployment configuration."""
         nodes = {}
         device_ids = set()
         config = DeploymentConfigurationResponse(
@@ -1002,6 +1004,7 @@ class SimulationService:
     def optimal_search_deployment_config(
         simulation_results: List[SimulationResultsSchema], target_concurrency: int = None
     ) -> DeploymentConfigurationResponse:
+        """Perform optimal search for deployment configuration."""
         target_concurrency = target_concurrency or simulation_results[0].target_concurrency
 
         device_args_and_envs = {}
@@ -1162,6 +1165,7 @@ class SimulationService:
         request: DeploymentConfigurationRequest,
         session: Optional[Session] = None,
     ) -> DeploymentConfigurationResponse:
+        """Get deployment configurations based on request parameters."""
         if request.feedback:
             try:
                 SimulationResultsCRUD().update_feedback(request.feedback, session)
