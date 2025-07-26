@@ -4,12 +4,13 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+use crate::client_stubs::{
+    ClientInferenceParams, ClientInput, ClientInputMessage, ClientInputMessageContent,
+    DynamicEvaluationRunParams, FeedbackParams, InferenceOutput,
+};
 use crate::providers::common::{make_embedded_gateway, make_http_gateway};
 use serde_json::json;
-use tensorzero::{
-    ClientInferenceParams, ClientInput, ClientInputMessage, ClientInputMessageContent,
-    DynamicEvaluationRunParams, FeedbackParams, InferenceOutput, Role,
-};
+use tensorzero_internal::inference::types::Role;
 use tensorzero_internal::{
     clickhouse::test_helpers::{
         get_clickhouse, select_chat_inference_clickhouse, select_dynamic_evaluation_run_clickhouse,

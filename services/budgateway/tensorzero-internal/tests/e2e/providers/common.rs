@@ -13,15 +13,15 @@ use base64::prelude::*;
 use futures::StreamExt;
 use object_store::path::Path;
 
+use crate::client_stubs::{
+    CacheParamsOptions, ClientInferenceParams, ClientInput, ClientInputMessage,
+    ClientInputMessageContent, InferenceOutput, InferenceResponse,
+};
 use rand::Rng;
 use reqwest::{Client, StatusCode};
 use reqwest_eventsource::{Event, RequestBuilderExt};
 use serde_json::{json, Value};
 use std::future::IntoFuture;
-use tensorzero::{
-    CacheParamsOptions, ClientInferenceParams, ClientInput, ClientInputMessage,
-    ClientInputMessageContent, InferenceOutput, InferenceResponse,
-};
 
 use tensorzero_internal::endpoints::object_storage::{
     get_object_handler, ObjectResponse, PathParams,
@@ -92,8 +92,8 @@ pub struct E2ETestProviders {
     pub shorthand_inference: Vec<E2ETestProvider>,
 }
 
-pub async fn make_http_gateway() -> tensorzero::Client {
-    tensorzero::ClientBuilder::new(tensorzero::ClientBuilderMode::HTTPGateway {
+pub async fn make_http_gateway() -> crate::client_stubs::Client {
+    crate::client_stubs::ClientBuilder::new(crate::client_stubs::ClientBuilderMode::HTTPGateway {
         url: get_gateway_endpoint("/"),
     })
     .build()
@@ -101,38 +101,44 @@ pub async fn make_http_gateway() -> tensorzero::Client {
     .unwrap()
 }
 
-pub async fn make_embedded_gateway() -> tensorzero::Client {
+pub async fn make_embedded_gateway() -> crate::client_stubs::Client {
     let mut config_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     config_path.push("tests/e2e/tensorzero.toml");
-    tensorzero::ClientBuilder::new(tensorzero::ClientBuilderMode::EmbeddedGateway {
-        config_file: Some(config_path),
-        clickhouse_url: Some(CLICKHOUSE_URL.clone()),
-        timeout: None,
-    })
+    crate::client_stubs::ClientBuilder::new(
+        crate::client_stubs::ClientBuilderMode::EmbeddedGateway {
+            config_file: Some(config_path),
+            clickhouse_url: Some(CLICKHOUSE_URL.clone()),
+            timeout: None,
+        },
+    )
     .build()
     .await
     .unwrap()
 }
 
-pub async fn make_embedded_gateway_no_config() -> tensorzero::Client {
-    tensorzero::ClientBuilder::new(tensorzero::ClientBuilderMode::EmbeddedGateway {
-        config_file: None,
-        clickhouse_url: Some(CLICKHOUSE_URL.clone()),
-        timeout: None,
-    })
+pub async fn make_embedded_gateway_no_config() -> crate::client_stubs::Client {
+    crate::client_stubs::ClientBuilder::new(
+        crate::client_stubs::ClientBuilderMode::EmbeddedGateway {
+            config_file: None,
+            clickhouse_url: Some(CLICKHOUSE_URL.clone()),
+            timeout: None,
+        },
+    )
     .build()
     .await
     .unwrap()
 }
 
-pub async fn make_embedded_gateway_with_config(config: &str) -> tensorzero::Client {
+pub async fn make_embedded_gateway_with_config(config: &str) -> crate::client_stubs::Client {
     let tmp_config = tempfile::NamedTempFile::new().unwrap();
     std::fs::write(tmp_config.path(), config).unwrap();
-    tensorzero::ClientBuilder::new(tensorzero::ClientBuilderMode::EmbeddedGateway {
-        config_file: Some(tmp_config.path().to_owned()),
-        clickhouse_url: Some(CLICKHOUSE_URL.clone()),
-        timeout: None,
-    })
+    crate::client_stubs::ClientBuilder::new(
+        crate::client_stubs::ClientBuilderMode::EmbeddedGateway {
+            config_file: Some(tmp_config.path().to_owned()),
+            clickhouse_url: Some(CLICKHOUSE_URL.clone()),
+            timeout: None,
+        },
+    )
     .build()
     .await
     .unwrap()
@@ -409,7 +415,7 @@ macro_rules! generate_provider_tests {
             }
         }
 
-        async fn test_dynamic_tool_use_inference_request(client: tensorzero::Client) {
+        async fn test_dynamic_tool_use_inference_request(client: crate::client_stubs::Client) {
             let providers = $func().await.dynamic_tool_use_inference;
             for provider in providers {
                 test_dynamic_tool_use_inference_request_with_provider(provider, &client).await;
@@ -417,7 +423,7 @@ macro_rules! generate_provider_tests {
         }
         $crate::make_gateway_test_functions!(test_dynamic_tool_use_inference_request);
 
-        async fn test_dynamic_tool_use_streaming_inference_request(client: tensorzero::Client) {
+        async fn test_dynamic_tool_use_streaming_inference_request(client: crate::client_stubs::Client) {
             let providers = $func().await.dynamic_tool_use_inference;
             for provider in providers {
                 test_dynamic_tool_use_streaming_inference_request_with_provider(provider, &client).await;
@@ -875,7 +881,7 @@ pub async fn test_image_inference_with_provider_s3_compatible(
     toml: &str,
     bucket_name: &str,
     prefix: &str,
-) -> (tensorzero::Client, String, StoragePath) {
+) -> (crate::client_stubs::Client, String, StoragePath) {
     let expected_key =
         format!("{prefix}observability/files/08bfa764c6dc25e658bab2b8039ddb494546c3bc5523296804efc4cab604df5d.png");
 
@@ -1002,7 +1008,7 @@ pub async fn test_base64_pdf_inference_with_provider_and_store(
     kind: &StorageKind,
     config_toml: &str,
     prefix: &str,
-) -> (tensorzero::Client, StoragePath) {
+) -> (crate::client_stubs::Client, StoragePath) {
     let episode_id = Uuid::now_v7();
 
     let pdf_data = BASE64_STANDARD.encode(DEEPSEEK_PAPER_PDF);
@@ -1064,7 +1070,7 @@ pub async fn test_base64_image_inference_with_provider_and_store(
     kind: &StorageKind,
     config_toml: &str,
     prefix: &str,
-) -> (tensorzero::Client, StoragePath) {
+) -> (crate::client_stubs::Client, StoragePath) {
     let episode_id = Uuid::now_v7();
 
     let image_data = BASE64_STANDARD.encode(FERRIS_PNG);
@@ -7752,21 +7758,21 @@ pub async fn test_tool_multi_turn_streaming_inference_request_with_provider(
 
 pub async fn test_dynamic_tool_use_inference_request_with_provider(
     provider: E2ETestProvider,
-    client: &tensorzero::Client,
+    client: &crate::client_stubs::Client,
 ) {
     let episode_id = Uuid::now_v7();
 
-    let response = client.inference(tensorzero::ClientInferenceParams {
+    let response = client.inference(ClientInferenceParams {
         function_name: Some("basic_test".to_string()),
         model_name: None,
         variant_name: Some(provider.variant_name.clone()),
         episode_id: Some(episode_id),
-        input: tensorzero::ClientInput {
+        input: ClientInput {
             system: Some(json!({"assistant_name": "Dr. Mehta"})),
-            messages: vec![tensorzero::ClientInputMessage {
+            messages: vec![ClientInputMessage {
                 role: Role::User,
                 content: vec![
-                    tensorzero::ClientInputMessageContent::Text(
+                    ClientInputMessageContent::Text(
                         TextKind::Text {
                             text: "What is the weather like in Tokyo (in Celsius)? Use the provided `get_temperature` tool. Do not say anything else, just call the function.".to_string()
                         }
@@ -8056,7 +8062,7 @@ pub async fn check_dynamic_tool_use_inference_response(
 
 pub async fn test_dynamic_tool_use_streaming_inference_request_with_provider(
     provider: E2ETestProvider,
-    client: &tensorzero::Client,
+    client: &crate::client_stubs::Client,
 ) {
     // OpenAI O1 doesn't support streaming responses
     if provider.model_provider_name == "openai" && provider.model_name.starts_with("o1") {
@@ -8067,16 +8073,16 @@ pub async fn test_dynamic_tool_use_streaming_inference_request_with_provider(
 
     let input_function_name = "basic_test";
 
-    let stream = client.inference(tensorzero::ClientInferenceParams {
+    let stream = client.inference(ClientInferenceParams {
         function_name: Some(input_function_name.to_string()),
         model_name: None,
         variant_name: Some(provider.variant_name.clone()),
         episode_id: Some(episode_id),
-        input: tensorzero::ClientInput {
+        input: ClientInput {
             system: Some(json!({"assistant_name": "Dr. Mehta"})),
-            messages: vec![tensorzero::ClientInputMessage {
+            messages: vec![ClientInputMessage {
                 role: Role::User,
-                content: vec![tensorzero::ClientInputMessageContent::Text(TextKind::Text { text: "What is the weather like in Tokyo (in Celsius)? Use the provided `get_temperature` tool. Do not say anything else, just call the function.".to_string() })],
+                content: vec![ClientInputMessageContent::Text(TextKind::Text { text: "What is the weather like in Tokyo (in Celsius)? Use the provided `get_temperature` tool. Do not say anything else, just call the function.".to_string() })],
             }],
         },
         stream: Some(true),

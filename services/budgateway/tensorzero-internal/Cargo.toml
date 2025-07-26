@@ -7,9 +7,8 @@ license.workspace = true
 
 
 [features]
-# Forward this feature to the Rust client, so that the embedded gateway
-# has the `e2e_tests` feature enabled when we run our e2e tests
-e2e_tests = ["tensorzero/e2e_tests"]
+# Feature for e2e tests
+e2e_tests = []
 pyo3 = ["dep:pyo3"]
 
 [[test]]
@@ -126,7 +125,6 @@ dashmap = "6.1.0"
 [dev-dependencies]
 tempfile = "3.20.0"
 tracing-test = { workspace = true }
-tensorzero = { path = "../clients/rust" }
 paste = "1.0.15"
 aws-sdk-s3 = { version = "1.87.0", default-features = false, features = [
     "behavior-version-latest",

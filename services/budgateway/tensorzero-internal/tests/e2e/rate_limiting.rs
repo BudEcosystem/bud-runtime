@@ -1,4 +1,8 @@
+use crate::client_stubs::{
+    ClientInferenceParams, ClientInput, ClientInputMessage, ClientInputMessageContent,
+};
 use crate::providers::common::make_embedded_gateway_with_config;
+use tensorzero_internal::inference::types::Role;
 use tokio::time::{sleep, Duration};
 
 #[tokio::test]
@@ -43,11 +47,11 @@ model = "dummy"
 
     // First two requests should succeed
     for i in 0..2 {
-        let input = tensorzero::ClientInput {
+        let input = ClientInput {
             system: None,
-            messages: vec![tensorzero::ClientInputMessage {
-                role: tensorzero::Role::User,
-                content: vec![tensorzero::ClientInputMessageContent::Text(
+            messages: vec![ClientInputMessage {
+                role: Role::User,
+                content: vec![ClientInputMessageContent::Text(
                     tensorzero_internal::inference::types::TextKind::Text {
                         text: format!("Test request {i}"),
                     },
@@ -55,7 +59,7 @@ model = "dummy"
             }],
         };
 
-        let params = tensorzero::ClientInferenceParams {
+        let params = ClientInferenceParams {
             function_name: Some("rate_limit_test".to_string()),
             input,
             episode_id: None,
@@ -69,11 +73,11 @@ model = "dummy"
     }
 
     // Third request should be rate limited
-    let input = tensorzero::ClientInput {
+    let input = ClientInput {
         system: None,
-        messages: vec![tensorzero::ClientInputMessage {
-            role: tensorzero::Role::User,
-            content: vec![tensorzero::ClientInputMessageContent::Text(
+        messages: vec![ClientInputMessage {
+            role: Role::User,
+            content: vec![ClientInputMessageContent::Text(
                 tensorzero_internal::inference::types::TextKind::Text {
                     text: "This should be rate limited".to_string(),
                 },
@@ -81,7 +85,7 @@ model = "dummy"
         }],
     };
 
-    let params = tensorzero::ClientInferenceParams {
+    let params = ClientInferenceParams {
         function_name: Some("rate_limit_test".to_string()),
         input,
         episode_id: None,
@@ -140,11 +144,11 @@ model = "dummy"
     let client = make_embedded_gateway_with_config(config_content).await;
 
     // First request should succeed
-    let input = tensorzero::ClientInput {
+    let input = ClientInput {
         system: None,
-        messages: vec![tensorzero::ClientInputMessage {
-            role: tensorzero::Role::User,
-            content: vec![tensorzero::ClientInputMessageContent::Text(
+        messages: vec![ClientInputMessage {
+            role: Role::User,
+            content: vec![ClientInputMessageContent::Text(
                 tensorzero_internal::inference::types::TextKind::Text {
                     text: "First request".to_string(),
                 },
@@ -152,7 +156,7 @@ model = "dummy"
         }],
     };
 
-    let params = tensorzero::ClientInferenceParams {
+    let params = ClientInferenceParams {
         function_name: Some("rate_limit_test".to_string()),
         input,
         episode_id: None,
@@ -165,11 +169,11 @@ model = "dummy"
     assert!(result.is_ok());
 
     // Second request might be rate limited (depends on Redis availability)
-    let input = tensorzero::ClientInput {
+    let input = ClientInput {
         system: None,
-        messages: vec![tensorzero::ClientInputMessage {
-            role: tensorzero::Role::User,
-            content: vec![tensorzero::ClientInputMessageContent::Text(
+        messages: vec![ClientInputMessage {
+            role: Role::User,
+            content: vec![ClientInputMessageContent::Text(
                 tensorzero_internal::inference::types::TextKind::Text {
                     text: "Should be rate limited".to_string(),
                 },
@@ -177,7 +181,7 @@ model = "dummy"
         }],
     };
 
-    let params = tensorzero::ClientInferenceParams {
+    let params = ClientInferenceParams {
         function_name: Some("rate_limit_test".to_string()),
         input,
         episode_id: None,
@@ -193,11 +197,11 @@ model = "dummy"
         sleep(Duration::from_millis(1100)).await;
 
         // Request should succeed after recovery
-        let input = tensorzero::ClientInput {
+        let input = ClientInput {
             system: None,
-            messages: vec![tensorzero::ClientInputMessage {
-                role: tensorzero::Role::User,
-                content: vec![tensorzero::ClientInputMessageContent::Text(
+            messages: vec![ClientInputMessage {
+                role: Role::User,
+                content: vec![ClientInputMessageContent::Text(
                     tensorzero_internal::inference::types::TextKind::Text {
                         text: "Should succeed after recovery".to_string(),
                     },
@@ -205,7 +209,7 @@ model = "dummy"
             }],
         };
 
-        let params = tensorzero::ClientInferenceParams {
+        let params = ClientInferenceParams {
             function_name: Some("rate_limit_test".to_string()),
             input,
             episode_id: None,
@@ -296,11 +300,11 @@ model = "dummy2"
     // Model 1 should have lower rate limit
     let mut model1_success = 0;
     for i in 0..5 {
-        let input = tensorzero::ClientInput {
+        let input = ClientInput {
             system: None,
-            messages: vec![tensorzero::ClientInputMessage {
-                role: tensorzero::Role::User,
-                content: vec![tensorzero::ClientInputMessageContent::Text(
+            messages: vec![ClientInputMessage {
+                role: Role::User,
+                content: vec![ClientInputMessageContent::Text(
                     tensorzero_internal::inference::types::TextKind::Text {
                         text: format!("Test model 1 request {i}"),
                     },
@@ -308,7 +312,7 @@ model = "dummy2"
             }],
         };
 
-        let params = tensorzero::ClientInferenceParams {
+        let params = ClientInferenceParams {
             function_name: Some("test1".to_string()),
             input,
             episode_id: None,
@@ -325,11 +329,11 @@ model = "dummy2"
     // Model 2 should have higher rate limit
     let mut model2_success = 0;
     for i in 0..5 {
-        let input = tensorzero::ClientInput {
+        let input = ClientInput {
             system: None,
-            messages: vec![tensorzero::ClientInputMessage {
-                role: tensorzero::Role::User,
-                content: vec![tensorzero::ClientInputMessageContent::Text(
+            messages: vec![ClientInputMessage {
+                role: Role::User,
+                content: vec![ClientInputMessageContent::Text(
                     tensorzero_internal::inference::types::TextKind::Text {
                         text: format!("Test model 2 request {i}"),
                     },
@@ -337,7 +341,7 @@ model = "dummy2"
             }],
         };
 
-        let params = tensorzero::ClientInferenceParams {
+        let params = ClientInferenceParams {
             function_name: Some("test2".to_string()),
             input,
             episode_id: None,
@@ -392,11 +396,11 @@ model = "dummy"
 
     // All requests should succeed when rate limiting is disabled
     for i in 0..10 {
-        let input = tensorzero::ClientInput {
+        let input = ClientInput {
             system: None,
-            messages: vec![tensorzero::ClientInputMessage {
-                role: tensorzero::Role::User,
-                content: vec![tensorzero::ClientInputMessageContent::Text(
+            messages: vec![ClientInputMessage {
+                role: Role::User,
+                content: vec![ClientInputMessageContent::Text(
                     tensorzero_internal::inference::types::TextKind::Text {
                         text: format!("Test request {i}"),
                     },
@@ -404,7 +408,7 @@ model = "dummy"
             }],
         };
 
-        let params = tensorzero::ClientInferenceParams {
+        let params = ClientInferenceParams {
             function_name: Some("test".to_string()),
             input,
             episode_id: None,

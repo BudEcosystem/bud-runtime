@@ -1,0 +1,445 @@
+name: PR Review - Budgateway
+
+on:
+  merge_group:
+  pull_request:
+    paths:
+      - 'services/budgateway/**'
+      - '.github/workflows/pr-budgateway.yaml'
+    branches: 
+      - main
+      - master
+      - develop
+
+env:
+  FORCE_COLOR: 1
+  WORKING_DIR: ./services/budgateway
+  TENSORZERO_CLICKHOUSE_URL: "http://chuser:chpassword@localhost:8123/tensorzero"
+
+jobs:
+  validate:
+    name: Validate (Rust Checks)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ env.WORKING_DIR }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # We deliberately install our MSRV here (rather than 'stable') to ensure that everything compiles with that version
+      - name: Install Rust 1.85.0
+        run: |
+          rustup install 1.85.0 --component clippy,rustfmt
+          rustup default 1.85.0
+
+      - name: Print Rust version
+        run: rustc --version
+        
+      - name: Cache cargo bin directory
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: cargo-tools-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-tools-${{ runner.os }}-
+            
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsasl2-dev
+          
+      - name: Install cargo-nextest, cargo-deny, and cargo-hack
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          cargo install cargo-nextest --version 0.9.100 --locked || echo "cargo-nextest already installed"
+          cargo install cargo-deny --locked || echo "cargo-deny already installed"
+          cargo install cargo-hack --locked || echo "cargo-hack already installed"
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Build (Rust)
+        run: cargo build --workspace --verbose
+
+      - name: Lint (Rust)
+        run: |
+          cargo fmt -- --check
+          cargo hack clippy --all-targets --each-feature -- -D warnings
+
+      - name: Run cargo-deny
+        run: cargo deny check
+
+      - name: Test (Rust)
+        run: |
+          cargo test-unit ${{ vars.CARGO_NEXTEST_EXTRA_ARGS }}
+
+  clickhouse-tests:
+    name: ClickHouse Tests
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.clickhouse_version.allow_failure }}
+    strategy:
+      matrix:
+        clickhouse_version:
+          - tag: "25.2-alpine"
+            prefix: "25.2"
+            allow_failure: false
+          - tag: "latest-alpine"
+            prefix: ""
+            allow_failure: true
+    defaults:
+      run:
+        working-directory: ${{ env.WORKING_DIR }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ${{ env.WORKING_DIR }} -> target
+      - run: df -h
+      - name: "Free up disk space"
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+
+      - name: Cache cargo bin directory
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: cargo-tools-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-tools-${{ runner.os }}-
+
+      - run: df -h
+      
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsasl2-dev
+          
+      - name: Install cargo-nextest
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          cargo install cargo-nextest --version 0.9.100 --locked || echo "cargo-nextest already installed"
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/0.6.17/install.sh | sh
+
+      - name: Download ClickHouse fixtures
+        run: uv run ./ci/fixtures/download-fixtures.py
+
+      - name: Set up environment variables for E2E tests
+        run: |
+          echo "TENSORZERO_CLICKHOUSE_URL=http://chuser:chpassword@localhost:8123/tensorzero_e2e_tests" >> $GITHUB_ENV
+          echo "TENSORZERO_REDIS_URL=redis://localhost:6379" >> $GITHUB_ENV
+
+      - name: Launch ClickHouse and Redis containers for E2E tests
+        run: TENSORZERO_CLICKHOUSE_VERSION=${{ matrix.clickhouse_version.tag }} docker compose -f tensorzero-internal/tests/e2e/docker-compose.yml up clickhouse redis --wait
+
+      - name: Check ClickHouse version
+        run: |
+          CLICKHOUSE_VERSION=$(curl -s "http://localhost:8123/query?user=chuser&password=chpassword" --data-binary "SELECT version()")
+          echo "Detected ClickHouse version: $CLICKHOUSE_VERSION"
+          echo "$CLICKHOUSE_VERSION" | grep -q "${{ matrix.clickhouse_version.prefix }}" || echo "WARNING: ClickHouse version does not match expected ${{ matrix.clickhouse_version.prefix }}"
+
+      - name: Build the gateway for E2E tests
+        run: cargo build-e2e
+
+      - name: Launch the gateway for E2E tests
+        run: |
+          cargo run-e2e > e2e_logs.txt 2>&1 &
+            count=0
+            max_attempts=10
+            while ! curl -s -f http://localhost:3000/health >/dev/null 2>&1; do
+              echo "Waiting for gateway to be healthy..."
+              sleep 1
+              count=$((count + 1))
+              if [ $count -ge $max_attempts ]; then
+                echo "Gateway failed to become healthy after $max_attempts attempts"
+                exit 1
+              fi
+            done
+          echo "GATEWAY_PID=$!" >> $GITHUB_ENV
+
+      - name: Test (Rust)
+        run: cargo test-e2e-no-creds
+
+      - name: Print e2e logs
+        if: always()
+        run: cat e2e_logs.txt
+
+  build-gateway-container:
+    name: Build Gateway Container
+    uses: ./.github/workflows/build-gateway-container.yml
+
+  sdk-integration-tests:
+    name: SDK Integration Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ env.WORKING_DIR }}
+    
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ${{ env.WORKING_DIR }} -> target
+          
+      - name: Cache cargo bin directory
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: cargo-tools-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-tools-${{ runner.os }}-
+            
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsasl2-dev
+          
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+          
+      - name: Create .env file for SDK tests
+        run: |
+          cd gateway/tests/sdk
+          echo "TENSORZERO_BASE_URL=http://localhost:3001" > .env
+          echo "OPENAI_API_KEY=dummy-key-for-testing" >> .env
+          
+      - name: Build the gateway for SDK tests
+        run: cargo build --release --bin gateway --features e2e_tests
+        
+      - name: Launch the gateway for SDK tests
+        run: |
+          cargo run --release --bin gateway --features e2e_tests -- --config-file gateway/tests/sdk/test_config_unified_ci.toml > sdk_gateway_logs.txt 2>&1 &
+          GATEWAY_PID=$!
+          echo "GATEWAY_PID=$GATEWAY_PID" >> $GITHUB_ENV
+          
+          # Wait for gateway to be healthy
+          count=0
+          max_attempts=30
+          while ! curl -s -f http://localhost:3001/health >/dev/null 2>&1; do
+            echo "Waiting for gateway to be healthy..."
+            sleep 1
+            count=$((count + 1))
+            if [ $count -ge $max_attempts ]; then
+              echo "Gateway failed to become healthy after $max_attempts attempts"
+              cat sdk_gateway_logs.txt
+              exit 1
+            fi
+          done
+          echo "Gateway is healthy and ready for SDK tests"
+          
+      - name: Run SDK integration tests
+        run: |
+          cd gateway/tests/sdk
+          # Run all CI tests including universal SDK tests
+          ./run_tests.sh --mode ci
+          
+      - name: Run Universal SDK compatibility tests
+        run: |
+          cd gateway/tests/sdk
+          # Run universal SDK tests specifically
+          ./run_tests.sh --provider universal
+          
+      - name: Print gateway logs
+        if: always()
+        run: cat sdk_gateway_logs.txt
+        
+      - name: Cleanup gateway process
+        if: always()
+        run: |
+          if [ ! -z "$GATEWAY_PID" ]; then
+            kill $GATEWAY_PID || true
+          fi
+
+  performance-test:
+    name: Performance Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ env.WORKING_DIR }}
+    
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ${{ env.WORKING_DIR }} -> target
+          
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsasl2-dev jq netcat-openbsd
+          
+      - name: Install vegeta
+        run: |
+          wget https://github.com/tsenart/vegeta/releases/download/v12.11.1/vegeta_12.11.1_linux_amd64.tar.gz
+          tar xzf vegeta_12.11.1_linux_amd64.tar.gz
+          sudo mv vegeta /usr/local/bin/
+          vegeta -version
+          
+      - name: Build for performance test
+        run: cargo build --release --bin gateway --bin mock-inference-provider
+        
+      - name: Run performance test
+        run: |
+          export TENSORZERO_REDIS_URL="redis://localhost:6379"
+          ./ci/performance/run-performance-test-ci.sh
+          
+      - name: Check P99 latency threshold
+        run: |
+          P99=$(jq -r '.latencies."99th"' performance-results.json | awk '{print $1/1000000}')
+          echo "P99 latency with rate limiting: ${P99}ms"
+          
+          # Ensure rate limiting doesn't exceed threshold
+          if [ $(awk -v p99="$P99" 'BEGIN { print (p99 > 1) }') -eq 1 ]; then
+              echo "❌ Error: P99 latency with rate limiting exceeds 1ms threshold"
+              exit 1
+          else
+              echo "✅ P99 latency with rate limiting is within acceptable limits"
+          fi
+          
+      - name: Upload performance results
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-results-${{ github.sha }}
+          path: ${{ env.WORKING_DIR }}/performance-results.json
+          retention-days: 30
+          
+      - name: Download baseline performance results
+        id: baseline
+        continue-on-error: true
+        run: |
+          # Try to download the most recent performance results from main
+          gh run list \
+            --branch main \
+            --workflow pr-budgateway.yaml \
+            --status success \
+            --limit 10 \
+            --json databaseId,conclusion \
+            --jq '.[] | select(.conclusion=="success") | .databaseId' | \
+          while read -r run_id; do
+            echo "Checking run $run_id for performance artifacts..."
+            if gh run download "$run_id" \
+              --name "performance-results-*" \
+              --dir baseline-results 2>/dev/null; then
+              echo "Found baseline results from run $run_id"
+              # Find the downloaded file
+              BASELINE_FILE=$(find baseline-results -name "performance-results.json" -type f | head -1)
+              if [ -n "$BASELINE_FILE" ]; then
+                cp "$BASELINE_FILE" baseline-performance.json
+                echo "baseline_found=true" >> $GITHUB_OUTPUT
+                break
+              fi
+            fi
+          done
+        env:
+          GH_TOKEN: ${{ github.token }}
+          
+      - name: Compare performance results
+        if: steps.baseline.outputs.baseline_found == 'true'
+        id: compare
+        continue-on-error: true
+        run: |
+          python ci/performance/compare-performance.py baseline-performance.json performance-results.json > performance-report.md
+          COMPARISON_EXIT_CODE=$?
+          
+          # Save the report
+          cat performance-report.md
+          
+          # Set output for PR comment
+          {
+            echo 'report<<EOF'
+            cat performance-report.md
+            echo 'EOF'
+          } >> $GITHUB_OUTPUT
+          
+          exit $COMPARISON_EXIT_CODE
+          
+      - name: Comment PR with performance results
+        if: github.event_name == 'pull_request' && steps.baseline.outputs.baseline_found == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const report = `${{ steps.compare.outputs.report }}`;
+            
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const botComment = comments.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('## 📊 Performance Test Results')
+            );
+            
+            const commentBody = report || '## 📊 Performance Test Results\n\n⚠️ Performance comparison failed. Check the workflow logs for details.';
+            
+            if (botComment) {
+              // Update existing comment
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: commentBody,
+              });
+            } else {
+              // Create new comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: commentBody,
+              });
+            }
+
+  # Note: The original workflow includes clickhouse-tests-cloud job for merge_group events
+  # This would require cloud credentials to be set up in the main repository
+
+  check-all-general-jobs-passed:
+    name: Check All Jobs Passed
+    if: always()
+    needs:
+      [
+        validate,
+        clickhouse-tests,
+        sdk-integration-tests,
+        performance-test
+      ]
+    runs-on: ubuntu-latest
+    steps:
+      - if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: exit 1

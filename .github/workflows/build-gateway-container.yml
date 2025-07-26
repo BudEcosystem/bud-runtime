@@ -1,0 +1,39 @@
+name: Build Gateway Container
+
+on:
+  workflow_call:
+
+env:
+  WORKING_DIR: ./services/budgateway
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ env.WORKING_DIR }}
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        
+      - name: Build gateway container
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ env.WORKING_DIR }}
+          file: ${{ env.WORKING_DIR }}/gateway/Dockerfile
+          push: false
+          load: true
+          tags: budgateway:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          
+      - name: Test gateway container starts
+        run: |
+          docker run -d --name test-gateway -p 3000:3000 budgateway:${{ github.sha }}
+          sleep 5
+          curl -f http://localhost:3000/health || (docker logs test-gateway && exit 1)
+          docker stop test-gateway
+          docker rm test-gateway
