@@ -73,7 +73,7 @@ jobs:
 
       - name: Test (Rust)
         run: |
-          cargo test-unit ${{ vars.CARGO_NEXTEST_EXTRA_ARGS }}
+          cargo nextest run --lib --bins ${{ vars.CARGO_NEXTEST_EXTRA_ARGS }}
 
   clickhouse-tests:
     name: ClickHouse Tests
