@@ -93,7 +93,7 @@ pub struct E2ETestProviders {
 }
 
 pub async fn make_http_gateway() -> tensorzero::Client {
-    tensorzero::ClientBuilder::new(tensorzero::ClientBuilderMode::HTTPGateway {
+    ClientBuilder::new(ClientBuilderMode::HTTPGateway {
         url: get_gateway_endpoint("/"),
     })
     .build()
@@ -104,7 +104,7 @@ pub async fn make_http_gateway() -> tensorzero::Client {
 pub async fn make_embedded_gateway() -> tensorzero::Client {
     let mut config_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     config_path.push("tests/e2e/tensorzero.toml");
-    tensorzero::ClientBuilder::new(tensorzero::ClientBuilderMode::EmbeddedGateway {
+    ClientBuilder::new(ClientBuilderMode::EmbeddedGateway {
         config_file: Some(config_path),
         clickhouse_url: Some(CLICKHOUSE_URL.clone()),
         timeout: None,
@@ -115,7 +115,7 @@ pub async fn make_embedded_gateway() -> tensorzero::Client {
 }
 
 pub async fn make_embedded_gateway_no_config() -> tensorzero::Client {
-    tensorzero::ClientBuilder::new(tensorzero::ClientBuilderMode::EmbeddedGateway {
+    ClientBuilder::new(ClientBuilderMode::EmbeddedGateway {
         config_file: None,
         clickhouse_url: Some(CLICKHOUSE_URL.clone()),
         timeout: None,
@@ -128,7 +128,7 @@ pub async fn make_embedded_gateway_no_config() -> tensorzero::Client {
 pub async fn make_embedded_gateway_with_config(config: &str) -> tensorzero::Client {
     let tmp_config = tempfile::NamedTempFile::new().unwrap();
     std::fs::write(tmp_config.path(), config).unwrap();
-    tensorzero::ClientBuilder::new(tensorzero::ClientBuilderMode::EmbeddedGateway {
+    ClientBuilder::new(ClientBuilderMode::EmbeddedGateway {
         config_file: Some(tmp_config.path().to_owned()),
         clickhouse_url: Some(CLICKHOUSE_URL.clone()),
         timeout: None,

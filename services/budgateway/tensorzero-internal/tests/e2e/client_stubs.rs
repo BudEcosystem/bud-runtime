@@ -1,6 +1,8 @@
 // Temporary stubs for removed client types to allow E2E tests to compile
 // TODO: These E2E tests need to be rewritten to work without the client SDK
 
+#![allow(dead_code)]
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -72,7 +74,7 @@ impl InferenceResponse {
     }
 
     pub fn episode_id(&self) -> uuid::Uuid {
-        self.episode_id.unwrap_or_else(|| uuid::Uuid::new_v4())
+        self.episode_id.unwrap_or_else(uuid::Uuid::new_v4)
     }
 }
 
