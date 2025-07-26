@@ -1,13 +1,19 @@
-name: Build and Push Nightly Docker Image
+name: "BudApp: Build and Push Nightly Docker Image"
 
 on:
   push:
+    paths:
+      - 'services/budapp/**'
     branches:
-      - main
+      - master
 
 jobs:
   lint-test-secure:
     runs-on: ubuntu-latest
+    defaults:
+          run:
+            working-directory: ./services/budapp
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -48,6 +54,9 @@ jobs:
   build-and-push:
     needs: lint-test-secure
     runs-on: ubuntu-latest
+    defaults:
+          run:
+            working-directory: ./services/budapp
 
     steps:
       - name: Checkout code
@@ -77,5 +86,5 @@ jobs:
         with:
           context: .
           push: true
-          file: ./deploy/Dockerfile
+          file: ./services/budapp/deploy/Dockerfile
           tags: budstudio/budapp:nightly

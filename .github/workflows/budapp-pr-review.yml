@@ -1,8 +1,10 @@
-name: PR Review
+name: "BudAdmin: PR Review"
 
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+    paths:
+      - 'services/budapp/**'
 
 env:
   PYTHON_VERSION: "3.11"
@@ -10,7 +12,11 @@ env:
 jobs:
   pre-commit:
     name: Pre-commit Checks
+    defaults:
+          run:
+            working-directory: ./services/budapp
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -44,6 +50,10 @@ jobs:
   lint:
     name: Lint Code
     runs-on: ubuntu-latest
+    defaults:
+          run:
+            working-directory: ./services/budapp
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -89,6 +99,10 @@ jobs:
   security:
     name: Security Scan
     runs-on: ubuntu-latest
+    defaults:
+          run:
+            working-directory: ./services/budapp
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -120,6 +134,10 @@ jobs:
   test:
     name: Run Tests
     runs-on: ubuntu-latest
+    defaults:
+          run:
+            working-directory: ./services/budapp
+
     services:
       postgres:
         image: postgres:15
@@ -245,6 +263,10 @@ jobs:
   dependency-check:
     name: Check Dependencies
     runs-on: ubuntu-latest
+    defaults:
+          run:
+            working-directory: ./services/budapp
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -268,8 +290,12 @@ jobs:
   pr-status:
     name: PR Review Status
     runs-on: ubuntu-latest
+    defaults:
+          run:
+            working-directory: ./services/budapp
     needs: [pre-commit, lint, security, test, dependency-check]
     if: always()
+
     steps:
       - name: Check job results
         run: |
