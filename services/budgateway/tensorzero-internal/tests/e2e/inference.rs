@@ -1,3 +1,7 @@
+use crate::client_stubs::{
+    ClientBuilder, ClientBuilderMode, ClientInferenceParams, ClientInput, ClientInputMessage,
+    ClientInputMessageContent, InferenceOutput, InferenceResponse,
+};
 use crate::{
     otel::{
         attrs_to_map, build_span_map, install_capturing_otel_exporter, CapturingOtelExporter,
@@ -12,10 +16,6 @@ use opentelemetry_sdk::trace::SpanData;
 use reqwest::{Client, StatusCode};
 use reqwest_eventsource::{Event, RequestBuilderExt};
 use serde_json::{json, Value};
-use crate::client_stubs::{
-    ClientBuilder, ClientBuilderMode, ClientInferenceParams, ClientInput, ClientInputMessage,
-    ClientInputMessageContent, InferenceOutput, InferenceResponse,
-};
 use tensorzero_internal::{
     endpoints::inference::ChatInferenceResponse,
     inference::{

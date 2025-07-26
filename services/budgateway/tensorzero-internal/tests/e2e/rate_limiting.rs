@@ -1,5 +1,7 @@
+use crate::client_stubs::{
+    ClientInferenceParams, ClientInput, ClientInputMessage, ClientInputMessageContent,
+};
 use crate::providers::common::make_embedded_gateway_with_config;
-use crate::client_stubs::{ClientInput, ClientInputMessage, ClientInputMessageContent, ClientInferenceParams};
 use tensorzero_internal::inference::types::Role;
 use tokio::time::{sleep, Duration};
 

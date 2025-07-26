@@ -8,12 +8,12 @@ use reqwest_eventsource::Event;
 use reqwest_eventsource::RequestBuilderExt;
 use serde_json::json;
 use serde_json::Value;
-use tensorzero_internal::inference::types::Role;
 use tensorzero_internal::clickhouse::test_helpers::{
     get_clickhouse, select_chat_inference_clickhouse, select_inference_tags_clickhouse,
     select_json_inference_clickhouse, select_model_inference_clickhouse,
 };
 use tensorzero_internal::inference::types::ContentBlockOutput;
+use tensorzero_internal::inference::types::Role;
 use tensorzero_internal::inference::types::{ContentBlock, RequestMessage};
 use uuid::Uuid;
 

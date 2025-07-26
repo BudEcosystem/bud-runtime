@@ -1,9 +1,9 @@
 #![expect(clippy::print_stdout)]
 use std::collections::HashMap;
 
+use crate::client_stubs::{ClientInput, ClientInputMessage, ClientInputMessageContent};
 use reqwest::{Client, StatusCode};
 use serde_json::{json, Value};
-use crate::client_stubs::{ClientInput, ClientInputMessage, ClientInputMessageContent};
 use tensorzero_internal::cache::{CacheEnabledMode, CacheOptions};
 use tensorzero_internal::config_parser::ProviderTypesConfig;
 use tensorzero_internal::embeddings::{

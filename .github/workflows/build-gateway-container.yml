@@ -25,6 +25,7 @@ jobs:
           context: ${{ env.WORKING_DIR }}
           file: ${{ env.WORKING_DIR }}/gateway/Dockerfile
           push: false
+          load: true
           tags: budgateway:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

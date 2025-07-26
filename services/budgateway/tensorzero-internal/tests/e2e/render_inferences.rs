@@ -1,7 +1,9 @@
+use crate::client_stubs::{
+    StorageKind, StoragePath, StoredChatInference, StoredInference, StoredJsonInference, Tool,
+};
 use object_store::path::Path;
 use serde_json::json;
 use std::collections::HashMap;
-use crate::client_stubs::{StorageKind, StoragePath, StoredChatInference, StoredInference, StoredJsonInference, Tool};
 use tensorzero_internal::inference::types::Role;
 use tensorzero_internal::{
     inference::types::{

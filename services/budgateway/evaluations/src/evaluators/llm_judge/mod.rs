@@ -426,7 +426,7 @@ mod tests {
     use tensorzero_internal::inference::types::ResolvedInput;
     use tensorzero_internal::inference::types::Usage;
     use tensorzero_internal::inference::types::{File, Role};
-    use tensorzero_internal::tool::{ToolCall, ToolCallInput};
+    use tensorzero_internal::tool::ToolCall;
     use tensorzero_internal::{
         inference::types::{ContentBlockChatOutput, Text, Thought},
         tool::{ToolCallOutput, ToolResult},

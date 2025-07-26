@@ -13,15 +13,15 @@ use base64::prelude::*;
 use futures::StreamExt;
 use object_store::path::Path;
 
+use crate::client_stubs::{
+    CacheParamsOptions, ClientInferenceParams, ClientInput, ClientInputMessage,
+    ClientInputMessageContent, InferenceOutput, InferenceResponse,
+};
 use rand::Rng;
 use reqwest::{Client, StatusCode};
 use reqwest_eventsource::{Event, RequestBuilderExt};
 use serde_json::{json, Value};
 use std::future::IntoFuture;
-use crate::client_stubs::{
-    CacheParamsOptions, ClientInferenceParams, ClientInput, ClientInputMessage,
-    ClientInputMessageContent, InferenceOutput, InferenceResponse,
-};
 
 use tensorzero_internal::endpoints::object_storage::{
     get_object_handler, ObjectResponse, PathParams,
@@ -104,22 +104,26 @@ pub async fn make_http_gateway() -> crate::client_stubs::Client {
 pub async fn make_embedded_gateway() -> crate::client_stubs::Client {
     let mut config_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     config_path.push("tests/e2e/tensorzero.toml");
-    crate::client_stubs::ClientBuilder::new(crate::client_stubs::ClientBuilderMode::EmbeddedGateway {
-        config_file: Some(config_path),
-        clickhouse_url: Some(CLICKHOUSE_URL.clone()),
-        timeout: None,
-    })
+    crate::client_stubs::ClientBuilder::new(
+        crate::client_stubs::ClientBuilderMode::EmbeddedGateway {
+            config_file: Some(config_path),
+            clickhouse_url: Some(CLICKHOUSE_URL.clone()),
+            timeout: None,
+        },
+    )
     .build()
     .await
     .unwrap()
 }
 
 pub async fn make_embedded_gateway_no_config() -> crate::client_stubs::Client {
-    crate::client_stubs::ClientBuilder::new(crate::client_stubs::ClientBuilderMode::EmbeddedGateway {
-        config_file: None,
-        clickhouse_url: Some(CLICKHOUSE_URL.clone()),
-        timeout: None,
-    })
+    crate::client_stubs::ClientBuilder::new(
+        crate::client_stubs::ClientBuilderMode::EmbeddedGateway {
+            config_file: None,
+            clickhouse_url: Some(CLICKHOUSE_URL.clone()),
+            timeout: None,
+        },
+    )
     .build()
     .await
     .unwrap()
@@ -128,11 +132,13 @@ pub async fn make_embedded_gateway_no_config() -> crate::client_stubs::Client {
 pub async fn make_embedded_gateway_with_config(config: &str) -> crate::client_stubs::Client {
     let tmp_config = tempfile::NamedTempFile::new().unwrap();
     std::fs::write(tmp_config.path(), config).unwrap();
-    crate::client_stubs::ClientBuilder::new(crate::client_stubs::ClientBuilderMode::EmbeddedGateway {
-        config_file: Some(tmp_config.path().to_owned()),
-        clickhouse_url: Some(CLICKHOUSE_URL.clone()),
-        timeout: None,
-    })
+    crate::client_stubs::ClientBuilder::new(
+        crate::client_stubs::ClientBuilderMode::EmbeddedGateway {
+            config_file: Some(tmp_config.path().to_owned()),
+            clickhouse_url: Some(CLICKHOUSE_URL.clone()),
+            timeout: None,
+        },
+    )
     .build()
     .await
     .unwrap()

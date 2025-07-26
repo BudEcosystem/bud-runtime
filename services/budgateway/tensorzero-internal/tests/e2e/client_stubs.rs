@@ -6,19 +6,24 @@ use serde_json::Value;
 use std::collections::HashMap;
 use tensorzero_internal::inference::types::Role;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ClientInferenceParams {
-    pub function_name: String,
+    pub function_name: Option<String>,
     pub variant_name: Option<String>,
+    pub model_name: Option<String>,
     pub input: ClientInput,
     pub cache_options: Option<CacheParamsOptions>,
     pub tags: Option<HashMap<String, Value>>,
     pub dynamic_tool_params: Option<Value>,
     pub output_schema: Option<Value>,
+    pub episode_id: Option<uuid::Uuid>,
+    pub dryrun: Option<bool>,
+    pub stream: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClientInput {
+    pub system: Option<serde_json::Value>,
     pub messages: Vec<ClientInputMessage>,
 }
 
@@ -31,7 +36,7 @@ pub struct ClientInputMessage {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum ClientInputMessageContent {
-    Text { text: String },
+    Text(tensorzero_internal::inference::types::TextKind),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -49,7 +54,9 @@ pub enum CacheEnabledMode {
 #[derive(Debug, Clone)]
 pub enum InferenceOutput {
     NonStreaming(InferenceResponse),
-    Streaming(Box<dyn futures::Stream<Item = Result<ContentBlockChunk, anyhow::Error>> + Send + Unpin>),
+    Streaming(
+        Box<dyn futures::Stream<Item = Result<ContentBlockChunk, anyhow::Error>> + Send + Unpin>,
+    ),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -58,6 +65,16 @@ pub struct InferenceResponse {
     pub episode_id: Option<uuid::Uuid>,
     pub variant_name: String,
     pub output: Vec<ContentBlockOutput>,
+}
+
+impl InferenceResponse {
+    pub fn inference_id(&self) -> uuid::Uuid {
+        self.inference_id
+    }
+
+    pub fn episode_id(&self) -> uuid::Uuid {
+        self.episode_id.unwrap_or_else(|| uuid::Uuid::new_v4())
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -100,7 +117,10 @@ pub struct FeedbackParams;
 pub struct Client;
 
 impl Client {
-    pub async fn inference(&self, _params: ClientInferenceParams) -> Result<InferenceOutput, anyhow::Error> {
+    pub async fn inference(
+        &self,
+        _params: ClientInferenceParams,
+    ) -> Result<InferenceOutput, anyhow::Error> {
         panic!("E2E tests using the removed client SDK are not functional. These tests need to be rewritten to use HTTP requests directly.");
     }
 }
@@ -109,7 +129,9 @@ impl Client {
 pub struct ClientBuilder;
 
 pub enum ClientBuilderMode {
-    HTTPGateway { url: String },
+    HTTPGateway {
+        url: String,
+    },
     EmbeddedGateway {
         config_file: Option<std::path::PathBuf>,
         clickhouse_url: Option<String>,
@@ -121,7 +143,7 @@ impl ClientBuilder {
     pub fn new(_mode: ClientBuilderMode) -> Self {
         ClientBuilder
     }
-    
+
     pub async fn build(self) -> Result<Client, anyhow::Error> {
         Ok(Client)
     }
