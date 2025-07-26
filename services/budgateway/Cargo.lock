@@ -3545,6 +3545,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "pyo3-async-runtimes"
+version = "0.24.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd0b83dc42f9d41f50d38180dad65f0c99763b65a3ff2a81bf351dd35a1df8bf"
+dependencies = [
+ "futures",
+ "once_cell",
+ "pin-project-lite",
+ "pyo3",
+ "tokio",
+]
+
+[[package]]
 name = "pyo3-build-config"
 version = "0.24.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4649,6 +4662,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "tensorzero"
+version = "0.1.0"
+dependencies = [
+ "async-stream",
+ "clap",
+ "futures",
+ "git2",
+ "lazy_static",
+ "object_store",
+ "pyo3",
+ "reqwest",
+ "reqwest-eventsource",
+ "secrecy",
+ "serde",
+ "serde-untagged",
+ "serde_json",
+ "serde_path_to_error",
+ "tensorzero-derive",
+ "tensorzero-internal",
+ "thiserror 2.0.12",
+ "tokio",
+ "tokio-stream",
+ "tracing",
+ "tracing-subscriber",
+ "tracing-test",
+ "url",
+ "uuid",
+]
+
+[[package]]
 name = "tensorzero-derive"
 version = "0.1.0"
 dependencies = [
@@ -4742,6 +4785,25 @@ dependencies = [
  "tracing-opentelemetry-instrumentation-sdk",
  "tracing-subscriber",
  "tracing-test",
+ "url",
+ "uuid",
+]
+
+[[package]]
+name = "tensorzero-python"
+version = "2025.5.9"
+dependencies = [
+ "futures",
+ "pyo3",
+ "pyo3-async-runtimes",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "serde_path_to_error",
+ "tensorzero",
+ "tensorzero-internal",
+ "tokio",
+ "tracing",
  "url",
  "uuid",
 ]
