@@ -692,7 +692,7 @@ mod tests {
     #[cfg(feature = "e2e_tests")]
     async fn test_model_credential_store_initialization() {
         let config = Arc::new(Config::default());
-        let app_state = AppStateData::new(config).await.unwrap();
+        let app_state = AppStateData::new_with_clickhouse(config, None).await.unwrap();
 
         // Verify credential store is initialized empty
         let store = app_state.model_credential_store.read().unwrap(); // Test code can panic
@@ -703,7 +703,7 @@ mod tests {
     #[cfg(feature = "e2e_tests")]
     async fn test_model_credential_store_operations() {
         let config = Arc::new(Config::default());
-        let app_state = AppStateData::new(config).await.unwrap();
+        let app_state = AppStateData::new_with_clickhouse(config, None).await.unwrap();
 
         // Add a credential
         {
