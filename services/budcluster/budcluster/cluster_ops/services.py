@@ -383,6 +383,55 @@ class ClusterOpsService:
         response = await UpdateClusterStatusWorkflow().__call__(str(cluster_id))
         return response
 
+    @classmethod
+    async def trigger_periodic_node_status_update(cls) -> Union[SuccessResponse, ErrorResponse]:
+        """Trigger node status update for all active clusters.
+        
+        This method is called by a periodic job to keep cluster node information
+        up-to-date in the state store.
+        
+        Returns:
+            SuccessResponse: If updates were triggered successfully
+            ErrorResponse: If there was an error triggering updates
+        """
+        from .workflows import UpdateClusterStatusWorkflow
+        
+        try:
+            # Get all active clusters from database
+            with DBSession() as session:
+                active_clusters = await ClusterDataManager(session).get_all_clusters_by_status(
+                    [ClusterStatusEnum.AVAILABLE, ClusterStatusEnum.NOT_AVAILABLE]
+                )
+            
+            logger.info(f"Found {len(active_clusters)} active clusters for node status update")
+            
+            # Trigger update workflow for each cluster
+            update_count = 0
+            failed_count = 0
+            
+            for cluster in active_clusters:
+                try:
+                    logger.debug(f"Triggering node status update for cluster {cluster.id}")
+                    await UpdateClusterStatusWorkflow().__call__(str(cluster.id))
+                    update_count += 1
+                except Exception as e:
+                    logger.error(f"Failed to trigger update for cluster {cluster.id}: {e}")
+                    failed_count += 1
+            
+            message = f"Triggered node status update for {update_count} clusters"
+            if failed_count > 0:
+                message += f" ({failed_count} failed)"
+            
+            logger.info(message)
+            return SuccessResponse(
+                message=message,
+                param={"total": len(active_clusters), "updated": update_count, "failed": failed_count}
+            )
+            
+        except Exception as e:
+            logger.exception("Failed to trigger periodic node status update")
+            return ErrorResponse(message=f"Failed to trigger periodic node status update: {str(e)}")
+
 
 class ClusterService(SessionMixin):
     async def _get_cluster(self, cluster_id: UUID, missing_ok: bool = False) -> ClusterModel:

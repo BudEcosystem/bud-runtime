@@ -41,7 +41,6 @@ from budmicroframe.shared.dapr_workflow import DaprWorkflow
 # # from ..commons.database import SessionLocal
 from budmicroframe.shared.psql_service import DBSession
 from fastapi import BackgroundTasks
-from pydantic import ValidationError
 
 from ..cluster_ops.crud import ClusterDataManager
 from ..cluster_ops.models import Cluster as ClusterModel
@@ -60,7 +59,6 @@ from .schemas import (
     DeleteWorkerRequest,
     DeploymentCreateRequest,
     DeployQuantizationRequest,
-    LocalDeploymentCreateRequest,
     UpdateDeploymentStatusRequest,
     WorkerData,
     WorkerInfo,
@@ -147,6 +145,41 @@ class DeploymentService(SessionMixin):
             {"id": cluster_id}, missing_ok=missing_ok
         )
 
+    def _is_cloud_deployment(self, deployment: DeploymentCreateRequest) -> bool:
+        """Determine if deployment is for cloud model based on provider and credential_id.
+
+        Args:
+            deployment: The deployment request object
+
+        Returns:
+            bool: True if this is a cloud deployment, False for local deployment
+        """
+        # Cloud deployment indicators:
+        # 1. Provider is explicitly a cloud provider (not HUGGING_FACE, URL, DISK)
+        # 2. Credential ID is required and provided for cloud models
+
+        cloud_providers = {"OPENAI", "ANTHROPIC", "AZURE_OPENAI", "BEDROCK", "COHERE", "GROQ"}
+        local_providers = {"HUGGING_FACE", "URL", "DISK"}
+
+        if deployment.provider:
+            provider_upper = deployment.provider.upper()
+            if provider_upper in cloud_providers:
+                logger.debug(f"Detected cloud provider: {deployment.provider}")
+                return True
+            elif provider_upper in local_providers:
+                logger.debug(f"Detected local provider: {deployment.provider}")
+                return False
+
+        # Fallback: If credential_id is provided and required, it's likely a cloud deployment
+        # But for local models (especially HuggingFace), credential_id can be None
+        if deployment.credential_id is not None:
+            logger.debug("Credential ID provided - checking if cloud deployment")
+            # Additional validation could be added here to check if credential is for cloud service
+            return deployment.provider not in local_providers if deployment.provider else True
+
+        logger.debug("No cloud provider detected and no credential_id - treating as local deployment")
+        return False
+
     async def create_deployment(
         self, deployment: DeploymentCreateRequest
     ) -> Union[WorkflowMetadataResponse, ErrorResponse]:
@@ -167,12 +200,19 @@ class DeploymentService(SessionMixin):
 
         from .workflows import CreateDeploymentWorkflow, CreateCloudDeploymentWorkflow  # noqa: I001
 
-        try:
-            # identify whether the deployment request is for local model or cloud model
-            LocalDeploymentCreateRequest.model_validate(deployment.model_dump(mode="json", exclude_none=True))
-            response = await CreateDeploymentWorkflow().__call__(deployment)
-        except ValidationError:
+        # Determine deployment type based on provider and credential_id
+        is_cloud_deployment = self._is_cloud_deployment(deployment)
+
+        logger.info(f"Deployment type detection - Provider: {deployment.provider}, "
+                   f"Credential ID: {deployment.credential_id}, "
+                   f"Cloud deployment: {is_cloud_deployment}")
+
+        if is_cloud_deployment:
+            logger.info("Routing to cloud deployment workflow")
             response = await CreateCloudDeploymentWorkflow().__call__(deployment)
+        else:
+            logger.info("Routing to local deployment workflow")
+            response = await CreateDeploymentWorkflow().__call__(deployment)
 
         return response
 
