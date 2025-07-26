@@ -19,8 +19,8 @@ use reqwest_eventsource::{Event, RequestBuilderExt};
 use serde_json::{json, Value};
 use std::future::IntoFuture;
 use tensorzero::{
-    CacheParamsOptions, ClientInferenceParams, ClientInput, ClientInputMessage,
-    ClientInputMessageContent, InferenceOutput, InferenceResponse,
+    CacheParamsOptions, ClientBuilder, ClientBuilderMode, ClientInferenceParams, ClientInput,
+    ClientInputMessage, ClientInputMessageContent, InferenceOutput, InferenceResponse,
 };
 
 use tensorzero_internal::endpoints::object_storage::{
@@ -93,7 +93,7 @@ pub struct E2ETestProviders {
 }
 
 pub async fn make_http_gateway() -> tensorzero::Client {
-    tensorzero::ClientBuilder::new(tensorzero::ClientBuilderMode::HTTPGateway {
+    ClientBuilder::new(ClientBuilderMode::HTTPGateway {
         url: get_gateway_endpoint("/"),
     })
     .build()
@@ -104,7 +104,7 @@ pub async fn make_http_gateway() -> tensorzero::Client {
 pub async fn make_embedded_gateway() -> tensorzero::Client {
     let mut config_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     config_path.push("tests/e2e/tensorzero.toml");
-    tensorzero::ClientBuilder::new(tensorzero::ClientBuilderMode::EmbeddedGateway {
+    ClientBuilder::new(ClientBuilderMode::EmbeddedGateway {
         config_file: Some(config_path),
         clickhouse_url: Some(CLICKHOUSE_URL.clone()),
         timeout: None,
@@ -115,7 +115,7 @@ pub async fn make_embedded_gateway() -> tensorzero::Client {
 }
 
 pub async fn make_embedded_gateway_no_config() -> tensorzero::Client {
-    tensorzero::ClientBuilder::new(tensorzero::ClientBuilderMode::EmbeddedGateway {
+    ClientBuilder::new(ClientBuilderMode::EmbeddedGateway {
         config_file: None,
         clickhouse_url: Some(CLICKHOUSE_URL.clone()),
         timeout: None,
@@ -128,7 +128,7 @@ pub async fn make_embedded_gateway_no_config() -> tensorzero::Client {
 pub async fn make_embedded_gateway_with_config(config: &str) -> tensorzero::Client {
     let tmp_config = tempfile::NamedTempFile::new().unwrap();
     std::fs::write(tmp_config.path(), config).unwrap();
-    tensorzero::ClientBuilder::new(tensorzero::ClientBuilderMode::EmbeddedGateway {
+    ClientBuilder::new(ClientBuilderMode::EmbeddedGateway {
         config_file: Some(tmp_config.path().to_owned()),
         clickhouse_url: Some(CLICKHOUSE_URL.clone()),
         timeout: None,
@@ -7756,17 +7756,17 @@ pub async fn test_dynamic_tool_use_inference_request_with_provider(
 ) {
     let episode_id = Uuid::now_v7();
 
-    let response = client.inference(tensorzero::ClientInferenceParams {
+    let response = client.inference(ClientInferenceParams {
         function_name: Some("basic_test".to_string()),
         model_name: None,
         variant_name: Some(provider.variant_name.clone()),
         episode_id: Some(episode_id),
-        input: tensorzero::ClientInput {
+        input: ClientInput {
             system: Some(json!({"assistant_name": "Dr. Mehta"})),
-            messages: vec![tensorzero::ClientInputMessage {
+            messages: vec![ClientInputMessage {
                 role: Role::User,
                 content: vec![
-                    tensorzero::ClientInputMessageContent::Text(
+                    ClientInputMessageContent::Text(
                         TextKind::Text {
                             text: "What is the weather like in Tokyo (in Celsius)? Use the provided `get_temperature` tool. Do not say anything else, just call the function.".to_string()
                         }
@@ -8067,16 +8067,16 @@ pub async fn test_dynamic_tool_use_streaming_inference_request_with_provider(
 
     let input_function_name = "basic_test";
 
-    let stream = client.inference(tensorzero::ClientInferenceParams {
+    let stream = client.inference(ClientInferenceParams {
         function_name: Some(input_function_name.to_string()),
         model_name: None,
         variant_name: Some(provider.variant_name.clone()),
         episode_id: Some(episode_id),
-        input: tensorzero::ClientInput {
+        input: ClientInput {
             system: Some(json!({"assistant_name": "Dr. Mehta"})),
-            messages: vec![tensorzero::ClientInputMessage {
+            messages: vec![ClientInputMessage {
                 role: Role::User,
-                content: vec![tensorzero::ClientInputMessageContent::Text(TextKind::Text { text: "What is the weather like in Tokyo (in Celsius)? Use the provided `get_temperature` tool. Do not say anything else, just call the function.".to_string() })],
+                content: vec![ClientInputMessageContent::Text(TextKind::Text { text: "What is the weather like in Tokyo (in Celsius)? Use the provided `get_temperature` tool. Do not say anything else, just call the function.".to_string() })],
             }],
         },
         stream: Some(true),

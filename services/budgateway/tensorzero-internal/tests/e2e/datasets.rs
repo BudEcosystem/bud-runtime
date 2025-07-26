@@ -4,13 +4,16 @@ use std::time::Duration;
 
 use reqwest::{Client, StatusCode};
 use serde_json::{json, Value};
-use tensorzero::{ChatInferenceDatapoint, JsonInferenceDatapoint, Role};
 use tensorzero_internal::{
     clickhouse::test_helpers::{
         select_chat_dataset_clickhouse, select_json_dataset_clickhouse, stale_datapoint_clickhouse,
     },
     endpoints::datasets::{DatapointKind, CLICKHOUSE_DATETIME_FORMAT},
     inference::types::{ContentBlockChatOutput, ResolvedInputMessageContent},
+};
+use tensorzero_internal::{
+    endpoints::datasets::{ChatInferenceDatapoint, JsonInferenceDatapoint},
+    inference::types::Role,
 };
 use uuid::Uuid;
 

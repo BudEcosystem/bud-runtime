@@ -30,6 +30,7 @@ Follow these steps to review the code and run the tests:
    - Analyze the modifications and additions to the codebase.
    - Identify potential issues, such as logic errors, performance problems, or security vulnerabilities.
    - Note any new functions or modules that may require additional testing.
+   - Review any PR comments by other users
 
 4. Execute the tests:
    - Based on the GitHub workflow and Cargo config, determine the appropriate test commands to run.

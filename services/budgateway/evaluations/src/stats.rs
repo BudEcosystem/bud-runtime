@@ -4,7 +4,7 @@ use anyhow::Result;
 use indicatif::ProgressBar;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tensorzero::InferenceResponse;
+use tensorzero_internal::endpoints::inference::InferenceResponse;
 use tensorzero_internal::{endpoints::datasets::Datapoint, evaluations::EvaluatorConfig};
 use uuid::Uuid;
 

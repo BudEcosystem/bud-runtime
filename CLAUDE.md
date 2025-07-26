@@ -323,6 +323,8 @@ Available in Nix shell:
 - `yaml-language-server` for YAML validation and linting
 
 
+Note: Make sure to update CLAUDE.md if you come across anything new related to architecture, testing, development etc which might be helpful for future development process.
+
 ### Claude dev guidelines
 
 - Use sub agents when ever required
