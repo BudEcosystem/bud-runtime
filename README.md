@@ -5,7 +5,7 @@
 [![Next.js](https://img.shields.io/badge/Next.js-14+-black.svg)](https://nextjs.org/)
 [![Kubernetes](https://img.shields.io/badge/kubernetes-1.25+-blue.svg)](https://kubernetes.io/)
 
-A comprehensive multi-service platform for AI/ML model deployment, optimization, and cluster management. Bud Stack provides intelligent infrastructure automation, performance optimization, and seamless model deployment across multi-cloud environments.
+A comprehensive inference stack for GenAI deployment, optimization and scaling.  Bud Stack provides intelligent infrastructure automation, performance optimization, and seamless model deployment across multi-cloud/multi-hardware environments.
 
 ## 🚀 Features
 

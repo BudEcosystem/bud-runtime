@@ -1,15 +1,20 @@
-name: Build and Push Nightly Docker Image
+name: "BudAdmin: Build and Push Nightly Docker Image"
 
 on:
   push:
+    push:
+      - 'services/budadmin/**'
     branches:
-      - main
+      - master
 
 jobs:
   verify:
     name: Verify Code Quality
     runs-on: ubuntu-latest
     continue-on-error: true
+    defaults:
+          run:
+            working-directory: ./services/budadmin
 
     steps:
       - name: Checkout code
@@ -60,5 +65,5 @@ jobs:
         with:
           context: .
           push: true
-          file: ./Dockerfile
+          file: ./services/budadmin/Dockerfile
           tags: budstudio/bud-dashboard:nightly
