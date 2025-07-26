@@ -516,7 +516,7 @@ describe('ModelCard', () => {
 
   it('renders model information correctly', () => {
     render(<ModelCard model={mockModel} />)
-    
+
     expect(screen.getByText('llama-2-7b')).toBeInTheDocument()
     expect(screen.getByText('deployed')).toBeInTheDocument()
     expect(screen.getByText('production')).toBeInTheDocument()
@@ -525,7 +525,7 @@ describe('ModelCard', () => {
   it('handles click events', () => {
     const onClickMock = jest.fn()
     render(<ModelCard model={mockModel} onClick={onClickMock} />)
-    
+
     screen.getByRole('button').click()
     expect(onClickMock).toHaveBeenCalledWith(mockModel)
   })

@@ -40,7 +40,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     localStorage.removeItem('token');
     localStorage.removeItem('access_key');
     const endpointResult = await getEndPoints({ page: 1, limit: 25, apiKey: key, accessKey: accessKey });
-    
+
     if(Array.isArray(endpointResult)){
       if(key) setApiKey(key);
       if(accessKey) setAccessKey(accessKey);

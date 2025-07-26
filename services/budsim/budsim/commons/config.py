@@ -53,9 +53,10 @@ class AppConfig(BaseAppConfig):
     generation_count: int = Field(50, alias="GENERATION_COUNT")
 
     model_registry_dir: str = Field(..., alias="MODEL_REGISTRY_DIR")
-    
-    #Bud Connect
+
+    # Bud Connect
     bud_connect_url: str = Field(..., alias="BUD_CONNECT_URL")
+
 
 class SecretsConfig(BaseSecretsConfig):
     name: str = __version__.split("@")[0]

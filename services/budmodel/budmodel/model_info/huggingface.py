@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import arxiv
-import json
 import requests
 from budmicroframe.commons import logging
 from budmicroframe.shared.dapr_service import DaprService
@@ -33,17 +32,24 @@ from ..commons.config import app_settings
 from ..commons.constants import LOCAL_MIN_SIZE_GB, ModelDownloadStatus
 from ..commons.helpers import safe_delete
 from .base import BaseModelInfo
-
 from .download_history import DownloadHistory
 from .exceptions import HubDownloadException, RepoAccessException, SpaceNotAvailableException
+from .license import HuggingFaceLicenseExtractor
 from .parser import (
     extract_model_card_details,
     get_hf_repo_readme,
-    get_license_details,
     get_model_analysis,
 )
-from .schemas import EmbeddingConfig, LicenseInfo, LLMConfig, ModelArchitecture, ModelDerivatives, ModelInfo, PaperInfo, VisionConfig
-from .license import HuggingFaceLicenseExtractor
+from .schemas import (
+    EmbeddingConfig,
+    LicenseInfo,
+    LLMConfig,
+    ModelArchitecture,
+    ModelDerivatives,
+    ModelInfo,
+    PaperInfo,
+    VisionConfig,
+)
 
 
 logger = logging.get_logger(__name__)
@@ -51,7 +57,9 @@ logger = logging.get_logger(__name__)
 
 class HuggingFaceModelInfo(BaseModelInfo):
     @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path: str, token: Optional[str] = None) -> Tuple[ModelInfo, List[Dict]]:
+    def from_pretrained(
+        cls, pretrained_model_name_or_path: str, token: Optional[str] = None
+    ) -> Tuple[ModelInfo, List[Dict]]:
         """Load a model from Hugging Face Hub."""
         hf_repo_readme = get_hf_repo_readme(pretrained_model_name_or_path, token)
         model_analysis = get_model_analysis(hf_repo_readme)
@@ -120,7 +128,9 @@ class HuggingFaceModelInfo(BaseModelInfo):
                 type=license_details.type,
                 description=license_details.description,
                 suitability=license_details.suitability,
-            ) if license_details else None,
+            )
+            if license_details
+            else None,
             logo_url=hf_author,
             # NOTE: commented out perplexity integration
             # use_cases=usecase_info.get("usecases", []),
@@ -196,9 +206,7 @@ class HuggingFaceModelInfo(BaseModelInfo):
         except hf_hub_errors.GatedRepoError as e:
             logger.exception("Gated repo for %s: %s", pretrained_model_name_or_path, e)
         except hf_hub_errors.EntryNotFoundError as e:
-            logger.warning(
-                "Config file %s not found for %s: %s", filename, pretrained_model_name_or_path, e
-            )
+            logger.warning("Config file %s not found for %s: %s", filename, pretrained_model_name_or_path, e)
         except Exception as e:
             logger.exception(
                 "Failed to download config file %s for %s: %s", filename, pretrained_model_name_or_path, e
@@ -248,7 +256,9 @@ class HuggingFaceModelInfo(BaseModelInfo):
             model_architecture.text_config = cls.parse_llm_model_config(config)
             modality = "llm"
 
-        filepath = cls.download_hf_repo_file(pretrained_model_name_or_path, filename="1_Pooling/config.json", token=token)
+        filepath = cls.download_hf_repo_file(
+            pretrained_model_name_or_path, filename="1_Pooling/config.json", token=token
+        )
         if filepath is not None:
             with open(filepath, "r") as fp:
                 pooling_config = json.load(fp)
@@ -291,7 +301,7 @@ class HuggingFaceModelInfo(BaseModelInfo):
             "n_positions"
         )
         text_config_model.vocab_size = _text_config.get("vocab_size")
-        torch_dtype = _text_config.get("torch_dtype")    
+        torch_dtype = _text_config.get("torch_dtype")
         if torch_dtype is not None and not isinstance(torch_dtype, str):
             torch_dtype = str(torch_dtype)
         text_config_model.torch_dtype = torch_dtype
@@ -314,9 +324,7 @@ class HuggingFaceModelInfo(BaseModelInfo):
 
     @staticmethod
     def parse_embedding_model_config(pooling_config: Dict[str, Any]) -> Dict[str, Any]:
-        return EmbeddingConfig(
-            embedding_dimension=pooling_config.get("word_embedding_dimension")
-        )
+        return EmbeddingConfig(embedding_dimension=pooling_config.get("word_embedding_dimension"))
 
     @staticmethod
     def get_llm_model_weights_info(pretrained_model_name_or_path: str, config: AutoConfig) -> Dict[str, Any]:

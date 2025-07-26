@@ -22,7 +22,7 @@ def test_get_node_info(config: dict):
     kubernetes_cluster_handler = KubernetesHandler(config)
     node_info = kubernetes_cluster_handler.get_node_info()
     print(node_info)
-    
+
 def test_get_node_status(config: dict):
     kubernetes_cluster_handler = KubernetesHandler(config)
     node_info = kubernetes_cluster_handler.get_node_status()

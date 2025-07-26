@@ -68,7 +68,7 @@ const EditClusterPopup: React.FC<EditClusterPopupProps> = ({
   };
 
   const handleSubmit = () => {
-    let data = {name: formData.name} 
+    let data = {name: formData.name}
     if (isFormValid()) {
       onSubmit(data);
     }
@@ -145,5 +145,3 @@ const EditClusterPopup: React.FC<EditClusterPopupProps> = ({
 };
 
 export default EditClusterPopup;
-
-

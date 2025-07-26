@@ -1,10 +1,11 @@
 import asyncio
+import logging
 import time
 from functools import wraps
 from typing import Any, Literal, Optional
-import logging
 
 from budmetrics.commons.config import app_settings
+
 
 logger = logging.getLogger(__name__)
 
@@ -37,9 +38,7 @@ class PerformanceMetrics:
         if operation in self.metrics:
             self.metrics[operation].append(record)
 
-    def increment_counter(
-        self, counter: Literal["cache_hits", "cache_misses", "total_queries"]
-    ):
+    def increment_counter(self, counter: Literal["cache_hits", "cache_misses", "total_queries"]):
         """Increment a counter metric."""
         if counter in self.metrics:
             self.metrics[counter] += 1
@@ -58,26 +57,15 @@ class PerformanceMetrics:
                     "avg_ms": sum(durations) / len(durations),
                     "min_ms": min(durations),
                     "max_ms": max(durations),
-                    "p50_ms": (
-                        sorted(durations)[len(durations) // 2] if durations else 0
-                    ),
-                    "p95_ms": (
-                        sorted(durations)[int(len(durations) * 0.95)]
-                        if durations
-                        else 0
-                    ),
-                    "p99_ms": (
-                        sorted(durations)[int(len(durations) * 0.99)]
-                        if durations
-                        else 0
-                    ),
+                    "p50_ms": (sorted(durations)[len(durations) // 2] if durations else 0),
+                    "p95_ms": (sorted(durations)[int(len(durations) * 0.95)] if durations else 0),
+                    "p99_ms": (sorted(durations)[int(len(durations) * 0.99)] if durations else 0),
                 }
 
         summary["cache"] = {
             "hits": self.metrics["cache_hits"],
             "misses": self.metrics["cache_misses"],
-            "hit_rate": self.metrics["cache_hits"]
-            / max(1, self.metrics["cache_hits"] + self.metrics["cache_misses"]),
+            "hit_rate": self.metrics["cache_hits"] / max(1, self.metrics["cache_hits"] + self.metrics["cache_misses"]),
         }
         summary["total_queries"] = self.metrics["total_queries"]
 
@@ -103,17 +91,13 @@ def profile_async(operation_name: str):
                             # First arg is usually the query
                             query = str(args[0])[:100]  # Truncate long queries
                             metadata["query_preview"] = query
-                        self.performance_metrics.record_timing(
-                            operation_name, duration, metadata
-                        )
+                        self.performance_metrics.record_timing(operation_name, duration, metadata)
 
                     return result
                 except Exception as e:
                     duration = time.time() - start_time
                     if getattr(self, "performance_metrics", None) is not None:
-                        self.performance_metrics.record_timing(
-                            operation_name, duration, {"error": str(e)}
-                        )
+                        self.performance_metrics.record_timing(operation_name, duration, {"error": str(e)})
                     raise
             else:
                 return await func(self, *args, **kwargs)
@@ -138,17 +122,13 @@ def profile_sync(operation_name: str):
                     # Record metrics if instance has performance_metrics
                     if getattr(self, "performance_metrics", None) is not None:
                         metadata = {"args_count": len(args)}
-                        self.performance_metrics.record_timing(
-                            operation_name, duration, metadata
-                        )
+                        self.performance_metrics.record_timing(operation_name, duration, metadata)
 
                     return result
                 except Exception as e:
                     duration = time.time() - start_time
                     if getattr(self, "performance_metrics", None) is not None:
-                        self.performance_metrics.record_timing(
-                            operation_name, duration, {"error": str(e)}
-                        )
+                        self.performance_metrics.record_timing(operation_name, duration, {"error": str(e)})
                     raise
             else:
                 return func(self, *args, **kwargs)

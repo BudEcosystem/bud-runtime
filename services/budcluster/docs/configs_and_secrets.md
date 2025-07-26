@@ -189,4 +189,3 @@ it provides the exact structure needed for setting up secrets in the production 
 
 By following these practices, you can ensure that your application's secrets are managed securely and efficiently,
 reducing the risk of exposure and maintaining compliance with best practices.
-

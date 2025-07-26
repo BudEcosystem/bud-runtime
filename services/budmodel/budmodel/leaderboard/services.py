@@ -18,19 +18,19 @@
 
 import json
 import re
-from typing import List
 from collections import defaultdict
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
-from datetime import datetime, timezone, timedelta
-from sqlalchemy import UUID
+from typing import List
+
 from budmicroframe.commons import logging
+from sqlalchemy import UUID
 
 from budmodel.commons.config import app_settings  # noqa
 
 from ..commons.async_utils import get_param_range
-from ..commons.constants import CrawlerType
+from ..commons.constants import CrawlerType, LeaderboardDataOrigin
 from ..commons.exceptions import CrawlerException, SourceParserException
-from ..commons.constants import LeaderboardDataOrigin
 from ..model_info.models import ModelInfoCRUD
 from .crud import LeaderboardCRUD, SourceCRUD
 from .parser import ModelInfoEnricher, SourceParserFactory
@@ -63,10 +63,9 @@ class LeaderboardService:
 
             # Check if the source should be extracted
             last_extracted_at = db_source.last_extracted_at
-            should_extract = (
-                last_extracted_at is None or
-                datetime.utcnow().replace(tzinfo=timezone.utc) - last_extracted_at >= timedelta(days=7)
-            )
+            should_extract = last_extracted_at is None or datetime.utcnow().replace(
+                tzinfo=timezone.utc
+            ) - last_extracted_at >= timedelta(days=7)
 
             if not should_extract:
                 logger.info("Skipping source %s (last extracted at: %s)", db_source.name, last_extracted_at)
@@ -133,14 +132,22 @@ class LeaderboardService:
                     else:
                         logger.debug("No enrichment occurred for uri %s, skipping model info update", model_info.uri)
 
-                    #format leaderboard data
-                    formatted_scraped_leaderboard_data = LeaderboardService().format_scraped_leaderboard_data(leaderboard_data, db_model_info.id, db_source.id)
-                    formatted_llm_leaderboard_data = LeaderboardService().format_llm_leaderboard_data(enriched_model_evals, db_model_info.id)
+                    # format leaderboard data
+                    formatted_scraped_leaderboard_data = LeaderboardService().format_scraped_leaderboard_data(
+                        leaderboard_data, db_model_info.id, db_source.id
+                    )
+                    formatted_llm_leaderboard_data = LeaderboardService().format_llm_leaderboard_data(
+                        enriched_model_evals, db_model_info.id
+                    )
 
-                    scraped_normalised_eval_names = {item.normalised_eval_name for item in formatted_scraped_leaderboard_data}
+                    scraped_normalised_eval_names = {
+                        item.normalised_eval_name for item in formatted_scraped_leaderboard_data
+                    }
                     # Filter llm_read items only if their eval_name is not already in scraped
                     final_leaderboard_data = formatted_scraped_leaderboard_data + [
-                        item for item in formatted_llm_leaderboard_data if item.normalised_eval_name not in scraped_normalised_eval_names
+                        item
+                        for item in formatted_llm_leaderboard_data
+                        if item.normalised_eval_name not in scraped_normalised_eval_names
                     ]
                     with LeaderboardCRUD() as crud:
                         crud.update_or_insert_leaderboards(db_model_info.id, final_leaderboard_data)
@@ -181,52 +188,55 @@ class LeaderboardService:
                             enriched_info.extraction_status,
                         )
                     except Exception as e:
-                        logger.exception("Failed to insert data for uri %s: %s", model_info_dict.get("uri"), str(e)) 
+                        logger.exception("Failed to insert data for uri %s: %s", model_info_dict.get("uri"), str(e))
 
-                    #format leaderboard data
-                    formatted_scraped_leaderboard_data = LeaderboardService().format_scraped_leaderboard_data(leaderboard_data, db_model_info.id, db_source.id)
-                    formatted_llm_leaderboard_data = LeaderboardService().format_llm_leaderboard_data(enriched_model_evals, db_model_info.id)
+                    # format leaderboard data
+                    formatted_scraped_leaderboard_data = LeaderboardService().format_scraped_leaderboard_data(
+                        leaderboard_data, db_model_info.id, db_source.id
+                    )
+                    formatted_llm_leaderboard_data = LeaderboardService().format_llm_leaderboard_data(
+                        enriched_model_evals, db_model_info.id
+                    )
 
-                    scraped_normalised_eval_names = {item.normalised_eval_name for item in formatted_scraped_leaderboard_data}
+                    scraped_normalised_eval_names = {
+                        item.normalised_eval_name for item in formatted_scraped_leaderboard_data
+                    }
                     # Filter llm_read items only if their eval_name is not already in scraped
                     final_leaderboard_data = formatted_scraped_leaderboard_data + [
-                        item for item in formatted_llm_leaderboard_data if item.normalised_eval_name not in scraped_normalised_eval_names
+                        item
+                        for item in formatted_llm_leaderboard_data
+                        if item.normalised_eval_name not in scraped_normalised_eval_names
                     ]
                     with LeaderboardCRUD() as crud:
                         crud.update_or_insert_leaderboards(db_model_info.id, final_leaderboard_data)
                         logger.debug("Leaderboard data updated/inserted for model %s", db_model_info.uri)
 
-
             # Update the `last_extracted_at` timestamp for the source
-            SourceCRUD().update(
-                data={"last_extracted_at": datetime.utcnow()},
-                conditions={"id": db_source.id}
-            )
+            SourceCRUD().update(data={"last_extracted_at": datetime.utcnow()}, conditions={"id": db_source.id})
 
             logger.info("Upserted leaderboard from source %s", db_source.name)
         logger.info("Upserted leaderboard from all sources")
 
     @staticmethod
     def format_scraped_leaderboard_data(
-        leaderboard_data: dict,
-        model_info_id: UUID,
-        source_id: UUID
+        leaderboard_data: dict, model_info_id: UUID, source_id: UUID
     ) -> list[LeaderboardCreate]:
-        """
-        Convert old-style leaderboard dictionary to a list of row dicts
+        """Convert old-style leaderboard dictionary to a list of row dicts
         compatible with the new schema.
         """
         formatted_leaderboard_data = []
         for metric_name, score in leaderboard_data.items():
             if score is not None:
-                row = LeaderboardCreate(**{
-                    "eval_name": LeaderboardService().prettify_eval_name(metric_name),
-                    "normalised_eval_name": LeaderboardService().normalize_eval_name(metric_name),
-                    "eval_score": score,
-                    "model_info_id": model_info_id,
-                    "source_id": source_id,
-                    "data_origin": LeaderboardDataOrigin.SCRAPED,
-                })
+                row = LeaderboardCreate(
+                    **{
+                        "eval_name": LeaderboardService().prettify_eval_name(metric_name),
+                        "normalised_eval_name": LeaderboardService().normalize_eval_name(metric_name),
+                        "eval_score": score,
+                        "model_info_id": model_info_id,
+                        "source_id": source_id,
+                        "data_origin": LeaderboardDataOrigin.SCRAPED,
+                    }
+                )
                 formatted_leaderboard_data.append(row)
         return formatted_leaderboard_data
 
@@ -242,31 +252,29 @@ class LeaderboardService:
                 eval_score=item["score"],
                 model_info_id=model_info_id,
                 data_origin=LeaderboardDataOrigin.README_LLM,
-                source_id=None
+                source_id=None,
             )
             for item in data
         ]
 
     @staticmethod
     def prettify_eval_name(name: str) -> str:
-        """
-        Converts raw LLM name to a display-friendly format:
+        """Converts raw LLM name to a display-friendly format:
         - Removes non-alphanumeric characters
         - Replaces separators with a space
         - Capitalizes each word
         """
-        name = re.sub(r'[_\-]+', ' ', name)            # underscores/dashes → space
-        name = re.sub(r'[^\w\s]', '', name)            # remove non-word characters
-        return ' '.join(word.capitalize() for word in name.split())
-    
+        name = re.sub(r"[_\-]+", " ", name)  # underscores/dashes → space
+        name = re.sub(r"[^\w\s]", "", name)  # remove non-word characters
+        return " ".join(word.capitalize() for word in name.split())
+
     @staticmethod
     def normalize_eval_name(name: str) -> str:
-        """
-        Converts name to normalized format:
+        """Converts name to normalized format:
         - Lowercase
         - Removes all special characters and spaces
         """
-        return re.sub(r'[\W_]+', '', name).lower()
+        return re.sub(r"[\W_]+", "", name).lower()
 
     @staticmethod
     def build_leaderboard_result(model_row, current_eval_names, model_benchmarks):
@@ -301,7 +309,6 @@ class LeaderboardService:
             "average_score": avg_score,
         }
 
-
     async def get_leaderboard_table(self, model_uri: str, limit: int) -> List[dict]:
         """Get the leaderboard table.
 
@@ -320,7 +327,7 @@ class LeaderboardService:
             return []
 
         # Fetch leaderboard for respective model info
-        current_leaderboard, _ = LeaderboardCRUD().fetch_many( conditions={"model_info_id": db_model_info.id})
+        current_leaderboard, _ = LeaderboardCRUD().fetch_many(conditions={"model_info_id": db_model_info.id})
 
         if not current_leaderboard:
             logger.warning("No leaderboard found for uri %s", model_uri)
@@ -341,10 +348,8 @@ class LeaderboardService:
         limit = limit - 1
 
         # Fetch raw leaderboard data
-        benchmarks, current_eval_names, top_models = (
-            LeaderboardCRUD().get_leaderboard_with_current_model(
-                db_model_info.id, min_num_params, max_num_params, limit
-            )
+        benchmarks, current_eval_names, top_models = LeaderboardCRUD().get_leaderboard_with_current_model(
+            db_model_info.id, min_num_params, max_num_params, limit
         )
 
         if not benchmarks:
@@ -373,25 +378,26 @@ class LeaderboardService:
 
         return results
 
-
     @staticmethod
     async def _parse_single_leaderboard_result(db_model_info, leaderboard_entries) -> dict:
         """Parse database results into LeaderboardResponse schema."""
         model_architecture = db_model_info.architecture or {}
         num_params = model_architecture.get("num_params")
         model_info = ModelParamsResponse(uri=db_model_info.uri, num_params=num_params).model_dump()
-        
+
         result = {
             "model_info": model_info,
         }
         benchmarks = []
         for entry in leaderboard_entries:
             if entry.eval_score is not None:
-                benchmarks.append({
-                    "eval_name": entry.normalised_eval_name,
-                    "eval_score": entry.eval_score,
-                    "eval_label": entry.eval_name,
-                })
+                benchmarks.append(
+                    {
+                        "eval_name": entry.normalised_eval_name,
+                        "eval_score": entry.eval_score,
+                        "eval_label": entry.eval_name,
+                    }
+                )
         result["benchmarks"] = benchmarks
         return result if len(benchmarks) > 0 else {}
 
@@ -412,9 +418,7 @@ class LeaderboardService:
 
         return db_leaderboards
 
-    async def get_model_evals_by_uris(
-        self, model_uris: List[str]
-    ) -> LeaderboardModelUrisListResponse:
+    async def get_model_evals_by_uris(self, model_uris: List[str]) -> LeaderboardModelUrisListResponse:
         """Get the leaderboards for the given model URIs.
 
         Args:
@@ -430,20 +434,19 @@ class LeaderboardService:
         model_map = {}
         for uri, eval_name, normalised_eval_name, eval_score in db_leaderboards:
             if uri not in model_map:
-                model_map[uri] = {
-                    "uri": uri,
-                    "benchmarks": []
+                model_map[uri] = {"uri": uri, "benchmarks": []}
+            model_map[uri]["benchmarks"].append(
+                {
+                    "eval_label": eval_name,
+                    "eval_score": eval_score,
+                    "eval_name": normalised_eval_name,
                 }
-            model_map[uri]["benchmarks"].append({
-                "eval_label": eval_name,
-                "eval_score": eval_score,
-                "eval_name": normalised_eval_name,
-            })
+            )
         return model_map.values()
+
 
 if __name__ == "__main__":
     import asyncio
-    import uuid
 
     leaderboard_service = LeaderboardService()
     asyncio.run(leaderboard_service.upsert_leaderboard_from_all_sources())
@@ -485,5 +488,5 @@ if __name__ == "__main__":
 #     with LeaderboardCRUD() as crud:
 #         crud.update_or_insert_leaderboards(uuid.UUID("88da5a26-b666-4dd1-94b0-39a82cbe76b0"), leaderboard_data)
 #         logger.debug("Leaderboard data inserted for model")
-    # Command to run leaderboard scraper
-    # xvfb-run python3 -m budmodel.leaderboard.services
+# Command to run leaderboard scraper
+# xvfb-run python3 -m budmodel.leaderboard.services

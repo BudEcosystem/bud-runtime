@@ -25,7 +25,7 @@ export default function AddWorker() {
   const { openDrawerWithStep } = useDrawer();
   const router = useRouter();
   const projectId = router.query.projectId as string;
-  
+
   return (
     <BudForm
       data={{

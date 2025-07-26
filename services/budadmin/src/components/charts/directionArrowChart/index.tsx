@@ -48,7 +48,7 @@ const DirectionArrowChart: React.FC<DirectionArrowChartProps> = ({
       },
       series: [
         {
-          data, 
+          data,
           type: 'line',
           lineStyle: {
             color: '#9462D5',
@@ -58,7 +58,7 @@ const DirectionArrowChart: React.FC<DirectionArrowChartProps> = ({
           markPoint: {
             data: [
               {
-                coord: [lastIndex, lastValue], 
+                coord: [lastIndex, lastValue],
               },
             ],
           },
@@ -79,7 +79,7 @@ const DirectionArrowChart: React.FC<DirectionArrowChartProps> = ({
         const secondLastIndex = data.length - 2;
         const lastCoord = chartInstance.convertToPixel('grid', [categories[lastIndex], data[lastIndex]]);
         const secondLastCoord = chartInstance.convertToPixel('grid', [categories[secondLastIndex], data[secondLastIndex]]);
-        
+
         const deltaX = lastCoord[0] - secondLastCoord[0]; // x2 - x1
         const deltaY = lastCoord[1] - secondLastCoord[1]; // y2 - y1
 
@@ -90,7 +90,7 @@ const DirectionArrowChart: React.FC<DirectionArrowChartProps> = ({
 
         return angleInDegrees;
     };
-  
+
     const angleInDegrees = getCoordinatesAndAngle();
 
     // Update the chart with the new angle

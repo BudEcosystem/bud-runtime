@@ -173,7 +173,7 @@ def get_compatible_engines(model_name: str, proprietary_only: bool = False) -> L
     # return compatible_engines
     config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
     for arch in config.architectures:
-        compatible_engines =  fetch_compatible_engines(model_architecture=arch)
+        compatible_engines = fetch_compatible_engines(model_architecture=arch)
         logger.info(f"Compatible engines: {compatible_engines}")
         if compatible_engines:
             return compatible_engines

@@ -1,7 +1,7 @@
 API_KEY = "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"
 
+
 import requests
-import json
 
 
 # Function to call Perplexity's chat completion API to extract leaderboard data

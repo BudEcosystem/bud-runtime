@@ -33,6 +33,7 @@ from budmicroframe.commons.schemas import (
 )
 from budmicroframe.shared.dapr_service import DaprService
 from budmicroframe.shared.dapr_workflow import DaprWorkflow
+from minio.error import S3Error
 
 from ..commons.async_utils import validate_url_exists
 from ..commons.config import app_settings
@@ -72,8 +73,6 @@ from .license import LicenseExtractor
 from .local_model import LocalModelDownloadService, LocalModelExtraction
 from .models import ModelInfoCRUD
 from .schemas import (
-    CloudModelExtractionRequest,
-    CloudModelExtractionResponse,
     LicenseFAQRequest,
     LicenseFAQResponse,
     ModelExtractionETAObserverRequest,
@@ -83,9 +82,7 @@ from .schemas import (
     ModelSecurityScanRequest,
     ModelSecurityScanResponse,
 )
-
-from .store import ModelStore, measure_minio_upload_speed, measure_minio_download_speed
-from minio.error import S3Error
+from .store import ModelStore, measure_minio_download_speed, measure_minio_upload_speed
 
 
 logger = logging.get_logger(__name__)
@@ -1220,10 +1217,7 @@ class ModelSecurityScanService:
 
     @staticmethod
     def download_model_from_minio(prefix: str, local_destination: str, workflow_id: Optional[str] = None) -> List[str]:
-        """
-        Downloads all files under a prefix using `download_file` and sets only `start_time` in state store.
-        """
-
+        """Downloads all files under a prefix using `download_file` and sets only `start_time` in state store."""
         store = ModelStore(model_download_dir=app_settings.model_download_dir)
         store_client = store.get_client()
         downloaded_files = []
@@ -1283,7 +1277,6 @@ class ModelSecurityScanService:
     @staticmethod
     def calculate_initial_eta(workflow_id: str, model_path: str):
         """Calculate the initial ETA for the security scan process."""
-
         steps_order = ["minio_download", "security_scan"]
 
         state_store_data = {
@@ -1838,7 +1831,6 @@ class SecurityScanETAObserver:
     @staticmethod
     def calculate_model_download_eta(state_store_data: Dict[str, Any]):
         """Calculate the ETA for model download."""
-
         total_size = state_store_data["steps_data"]["minio_download"]["total_size"]
         downloaded_size = state_store_data["steps_data"]["minio_download"]["downloaded_size"]
         start_time_utc = state_store_data["steps_data"]["minio_download"]["start_time"]
@@ -1864,7 +1856,6 @@ class SecurityScanETAObserver:
     @staticmethod
     def calculate_security_scan_eta(state_store_data: Dict[str, Any]):
         """Calculate the ETA for security scan."""
-
         eta = state_store_data["steps_data"]["security_scan"]["eta"]
         logger.debug("Security scan workflow ETA: %s", eta)
         return math.ceil(eta)

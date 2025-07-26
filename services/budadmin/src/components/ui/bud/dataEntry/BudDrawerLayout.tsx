@@ -1,7 +1,7 @@
 
 export interface BudProps {
   children: React.ReactNode;
-  classNames?: any 
+  classNames?: any
 }
 
 export function BudDrawerLayout(props: BudProps) {

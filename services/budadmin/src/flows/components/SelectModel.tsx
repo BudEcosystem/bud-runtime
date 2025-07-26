@@ -245,8 +245,3 @@ function SelectModel() {
 }
 
 export default SelectModel;
-
-
-
-
-

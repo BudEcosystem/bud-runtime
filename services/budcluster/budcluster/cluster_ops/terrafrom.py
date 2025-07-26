@@ -1,4 +1,3 @@
-import json
 import os
 import subprocess
 import sys
@@ -17,7 +16,7 @@ class TerraformClusterManager(ABC):
         """Create terraform.tfvars file."""
         pass
 
-    def init(self,state_name: str):
+    def init(self, state_name: str):
         """Initialize Terraform."""
         try:
             # Prepare Terraform files
@@ -52,14 +51,14 @@ class TerraformClusterManager(ABC):
             cwd = os.path.join(str(self.temp_dir), "environments", "prod")
 
             process = subprocess.Popen(
-                        ["terraform", "init"] + backend_config,
-                        cwd=cwd,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.STDOUT,
-                        text=True,
-                        env=env,
-                        bufsize=1,
-                    )
+                ["terraform", "init"] + backend_config,
+                cwd=cwd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                env=env,
+                bufsize=1,
+            )
 
             # Stream output in real-time
             output = []

@@ -233,7 +233,7 @@ tofu apply
 ### Production Considerations
 
 - Configure persistent volumes for databases
-- Setup TLS certificates for secure communication  
+- Setup TLS certificates for secure communication
 - Configure backup strategies for PostgreSQL and ClickHouse
 - Setup monitoring and alerting with the LGTM stack
 - Configure multi-tenant Keycloak realms

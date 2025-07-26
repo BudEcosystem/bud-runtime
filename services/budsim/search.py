@@ -1,5 +1,7 @@
+from os import path as osp
+from os import walk
+
 import joblib
-from os import walk, path as osp
 
 
 base_path = "./cache/pretrained_models"

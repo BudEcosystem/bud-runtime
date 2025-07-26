@@ -42,11 +42,11 @@ def mock_env_vars():
         "BUD_METRICS_APP_ID": "metrics-app",
         "BUD_NOTIFY_APP_ID": "notify-app"
     }
-    
+
     # Actually set the environment variables
     for key, value in test_env_vars.items():
         os.environ[key] = value
-    
+
     yield
 
     # Clean up after tests

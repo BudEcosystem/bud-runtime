@@ -24,8 +24,10 @@ from typing import Any, Dict, List, Optional
 
 from budmicroframe.commons.schemas import CloudEventBase, ResponseBase
 from budmicroframe.commons.types import lowercase_string
-from pydantic import BaseModel, Field, RootModel, model_validator, validator
+from pydantic import BaseModel, Field, RootModel, model_validator
+
 from budsim.commons.config import app_settings
+
 
 class Device(BaseModel):
     name: str

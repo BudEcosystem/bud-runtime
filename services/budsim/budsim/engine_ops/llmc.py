@@ -1,5 +1,3 @@
-
-
 from dataclasses import Field
 from typing import Any, Dict, Optional
 
@@ -46,8 +44,8 @@ _MODELS = {
     # "VitForCausalLM": ("vit", "VitForCausalLM"),
 }
 
-class EngineArgs(BaseEngineArgs):
 
+class EngineArgs(BaseEngineArgs):
     target_device: str = Field(
         description="The target device.",
         alias="env_TARGET_DEVICE",
@@ -75,7 +73,4 @@ class EngineCompatibility(BaseEngineCompatibility):
 
     def check_device_compatibility(self, device: str) -> Optional[str]:
         """Check if the device is compatible with LiteLLM scheduler."""
-        return {
-            "cpu": app_settings.quantization_cpu_image,
-            "cuda": app_settings.quantization_cuda_image
-        }.get(device)
+        return {"cpu": app_settings.quantization_cpu_image, "cuda": app_settings.quantization_cuda_image}.get(device)

@@ -699,7 +699,7 @@ const Dashboard = () => {
                     <Flex className="mb-[.2rem] items-end">
                       <span className="text-[2.375rem] text-[#EEEEEE] leading-[100%] font-[400]">{totalRequests?.global_metrics?.summary_metrics?.total_value ? formatNumber(totalRequests?.global_metrics?.summary_metrics?.total_value).value : 0}<span className="text-[#757575] leading-[100%]">{formatNumber(totalRequests?.global_metrics?.summary_metrics?.total_value).suffix}</span></span>
                       <Flex className="ml-[.7rem] mb-[.4rem]">
-                        {totalRequests?.global_metrics?.summary_metrics?.delta_percentage >= 0 ? 
+                        {totalRequests?.global_metrics?.summary_metrics?.delta_percentage >= 0 ?
                         <Image
                           preview={false}
                           width={13}
@@ -1021,7 +1021,7 @@ const Dashboard = () => {
                 <>
                   {/* <div className="flex justify-start items-start	mt-[1.5rem] gap-[.7rem]">
                     <div className={`flex flex-col border pt-[.2rem] pb-[.5rem] px-[.6rem] rounded-md`}
-                      style={{ 
+                      style={{
                         backgroundColor: getChromeColorHex('#ffff00', .05),
                         borderColor: getChromeColorHex('#ffff00', .5)
                       }}
@@ -1046,8 +1046,8 @@ const Dashboard = () => {
                       </div>
                     </div>
                     <div className={`flex flex-col border pt-[.2rem] pb-[.5rem] px-[.6rem] rounded-md`}
-                      style={{ 
-                        backgroundColor: getChromeColorHex('#33FF57', .05), 
+                      style={{
+                        backgroundColor: getChromeColorHex('#33FF57', .05),
                         borderColor: getChromeColorHex('#33FF57', .5)
                       }}
                     >

@@ -38,7 +38,7 @@ const ModelSuccessCard: React.FC = () => {
     //   setShowConfirm(true);
     // } else {
     //   setShowConfirm(false);
-    // }   
+    // }
   }, [currentWorkflow]);
 
   return (

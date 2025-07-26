@@ -61,7 +61,7 @@ export async function POST(req: Request) {
 
   const startTime = Date.now();
   let ttft = 0;
-  let itls: number[] = []
+  const itls: number[] = []
   let most_recent_time = startTime
 
   return createDataStreamResponse({

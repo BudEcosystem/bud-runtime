@@ -27,7 +27,7 @@ export default function AddUserDetails() {
   const findAccess = (type: any) => {
     const hasManage = createdUser?.permissions?.find((p: any) => p.name === type + ':manage')?.has_permission;
     const hasView = createdUser?.permissions?.find((p: any) => p.name === type + ':view')?.has_permission;
-    
+
     if (hasManage) return 'Manage';
     if (hasView) return 'View';
     return 'Nill';

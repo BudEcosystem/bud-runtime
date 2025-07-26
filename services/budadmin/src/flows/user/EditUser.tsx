@@ -227,7 +227,7 @@ export default function EditUser() {
       ...localPermissions,
       global_scopes: updatedPermissions
     });
-    
+
     // Then make API call
     setUsersPermissions(userDetails.id, updatedPermissions);
   };

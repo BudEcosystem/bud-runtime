@@ -1,10 +1,11 @@
 import asyncio
 import math
+from collections import defaultdict
 from typing import Optional
 from uuid import UUID
-from collections import defaultdict
 
 from budmicroframe.commons import logging
+
 from budmetrics.commons.config import app_settings, secrets_settings
 from budmetrics.commons.profiling_utils import PerformanceMetrics, profile_sync
 from budmetrics.observability.models import (
@@ -23,24 +24,25 @@ from budmetrics.observability.schemas import (
     TimeMetric,
 )
 
+
 logger = logging.get_logger(__name__)
 
 
 class ObservabilityMetricsService:
     """Main service class for observability metrics operations.
-    
+
     This service orchestrates the flow of analytics queries and metrics ingestion:
     - Coordinates with QueryBuilder to construct SQL queries
     - Manages ClickHouse client connections and query execution
     - Processes and formats query results
     - Handles metrics ingestion with deduplication
-    
+
     The service implements performance optimizations including:
     - Efficient result processing with minimal memory allocation
     - Gap-filled row detection for time series data
     - Batch processing for metrics ingestion
     """
-    
+
     def __init__(self, config: Optional[ClickHouseConfig] = None):
         # Lazy initialization
         self._clickhouse_client: Optional[ClickHouseClient] = None
@@ -59,12 +61,8 @@ class ObservabilityMetricsService:
             self.clickhouse_client_config.user = secrets_settings.clickhouse_user
             self.clickhouse_client_config.password = secrets_settings.clickhouse_password
             # Set configuration from app settings
-            self.clickhouse_client_config.enable_query_cache = (
-                app_settings.clickhouse_enable_query_cache
-            )
-            self.clickhouse_client_config.enable_connection_warmup = (
-                app_settings.clickhouse_enable_connection_warmup
-            )
+            self.clickhouse_client_config.enable_query_cache = app_settings.clickhouse_enable_query_cache
+            self.clickhouse_client_config.enable_connection_warmup = app_settings.clickhouse_enable_connection_warmup
             self._clickhouse_client = ClickHouseClient(self.clickhouse_client_config)
             # Performance metrics are only available in debug mode
             self._performance_metrics = self._clickhouse_client.performance_metrics
@@ -169,40 +167,26 @@ class ObservabilityMetricsService:
 
         # Add count metric processors
         for metric_name, config in count_metric_configs.items():
-            processors[metric_name] = (
-                lambda row, indices, delta_map, percent_map, cfg=config: (
-                    self._process_count_metric(
-                        row, indices, delta_map, percent_map, cfg
-                    )
-                )
+            processors[metric_name] = lambda row, indices, delta_map, percent_map, cfg=config: (
+                self._process_count_metric(row, indices, delta_map, percent_map, cfg)
             )
 
         # Add time metric processors
         for metric_name, config in time_metric_configs.items():
-            processors[metric_name] = (
-                lambda row, indices, delta_map, percent_map, cfg=config: (
-                    self._process_time_metric(row, indices, delta_map, percent_map, cfg)
-                )
+            processors[metric_name] = lambda row, indices, delta_map, percent_map, cfg=config: (
+                self._process_time_metric(row, indices, delta_map, percent_map, cfg)
             )
 
         # Add performance metric processors
         for metric_name, config in performance_metric_configs.items():
-            processors[metric_name] = (
-                lambda row, indices, delta_map, percent_map, cfg=config: (
-                    self._process_performance_metric(
-                        row, indices, delta_map, percent_map, cfg
-                    )
-                )
+            processors[metric_name] = lambda row, indices, delta_map, percent_map, cfg=config: (
+                self._process_performance_metric(row, indices, delta_map, percent_map, cfg)
             )
 
         # Add cache metric processors
         for metric_name, config in cache_metric_configs.items():
-            processors[metric_name] = (
-                lambda row, indices, delta_map, percent_map, cfg=config: (
-                    self._process_cache_metric(
-                        row, indices, delta_map, percent_map, cfg
-                    )
-                )
+            processors[metric_name] = lambda row, indices, delta_map, percent_map, cfg=config: (
+                self._process_cache_metric(row, indices, delta_map, percent_map, cfg)
             )
 
         return processors
@@ -238,9 +222,7 @@ class ObservabilityMetricsService:
         if count_field in percent_map:
             percent_idx = field_indices[percent_map[count_field]]
             if row[percent_idx] is not None:
-                metric_obj.delta_percent = self._sanitize_delta_percent(
-                    row[percent_idx]
-                )
+                metric_obj.delta_percent = self._sanitize_delta_percent(row[percent_idx])
 
         return config["output_key"], metric_obj
 
@@ -261,15 +243,11 @@ class ObservabilityMetricsService:
         if time_field in percent_map:
             percent_idx = field_indices[percent_map[time_field]]
             if row[percent_idx] is not None:
-                metric_obj.delta_percent = self._sanitize_delta_percent(
-                    row[percent_idx]
-                )
+                metric_obj.delta_percent = self._sanitize_delta_percent(row[percent_idx])
 
         return config["output_key"], metric_obj
 
-    def _process_performance_metric(
-        self, row, field_indices, delta_map, percent_map, config
-    ):
+    def _process_performance_metric(self, row, field_indices, delta_map, percent_map, config):
         """Process performance-based metrics with optional percentiles."""
         avg_idx = field_indices.get(config["avg_field"], -1)
         avg_value = row[avg_idx] if avg_idx >= 0 else 0.0
@@ -297,9 +275,7 @@ class ObservabilityMetricsService:
         if avg_field in percent_map:
             percent_idx = field_indices[percent_map[avg_field]]
             if row[percent_idx] is not None:
-                metric_obj.delta_percent = self._sanitize_delta_percent(
-                    row[percent_idx]
-                )
+                metric_obj.delta_percent = self._sanitize_delta_percent(row[percent_idx])
 
         return config["output_key"], metric_obj
 
@@ -329,9 +305,7 @@ class ObservabilityMetricsService:
         if hit_rate_field in percent_map:
             percent_idx = field_indices[percent_map[hit_rate_field]]
             if row[percent_idx] is not None:
-                metric_obj.delta_percent = self._sanitize_delta_percent(
-                    row[percent_idx]
-                )
+                metric_obj.delta_percent = self._sanitize_delta_percent(row[percent_idx])
 
         return config["output_key"], metric_obj
 
@@ -437,9 +411,7 @@ class ObservabilityMetricsService:
 
         return result_bins
 
-    async def get_metrics(
-        self, request: ObservabilityMetricsRequest
-    ) -> ObservabilityMetricsResponse:
+    async def get_metrics(self, request: ObservabilityMetricsRequest) -> ObservabilityMetricsResponse:
         """Get metrics based on the request.
 
         Args:
@@ -471,14 +443,10 @@ class ObservabilityMetricsService:
             raise RuntimeError(f"Failed to execute metrics query: {str(e)}") from e
 
         # Process results
-        period_bins = self._process_query_results(
-            results, field_order, request.metrics, request.group_by
-        )
+        period_bins = self._process_query_results(results, field_order, request.metrics, request.group_by)
 
         # Return response
-        return ObservabilityMetricsResponse(
-            object="observability_metrics", items=period_bins
-        )
+        return ObservabilityMetricsResponse(object="observability_metrics", items=period_bins)
 
     async def get_metrics_batch(
         self, requests: list[ObservabilityMetricsRequest]
@@ -529,22 +497,16 @@ class ObservabilityMetricsService:
 
         # Check for existing inference_ids
         existing_check_query = f"""
-        SELECT inference_id 
-        FROM ModelInferenceDetails 
-        WHERE inference_id IN ({','.join([f"'{id}'" for id in inference_ids])})
+        SELECT inference_id
+        FROM ModelInferenceDetails
+        WHERE inference_id IN ({",".join([f"'{id}'" for id in inference_ids])})
         """
 
-        existing_records = await self.clickhouse_client.execute_query(
-            existing_check_query
-        )
-        existing_ids = (
-            {str(row[0]) for row in existing_records} if existing_records else set()
-        )
+        existing_records = await self.clickhouse_client.execute_query(existing_check_query)
+        existing_ids = {str(row[0]) for row in existing_records} if existing_records else set()
 
         # Filter out records with existing inference_ids
-        new_records = [
-            record for record in batch_data if str(record[0]) not in existing_ids
-        ]
+        new_records = [record for record in batch_data if str(record[0]) not in existing_ids]
         duplicate_ids = list(existing_ids)
 
         if not new_records:
@@ -557,9 +519,7 @@ class ObservabilityMetricsService:
             }
 
         if len(new_records) < len(batch_data):
-            logger.info(
-                f"Filtered out {len(batch_data) - len(new_records)} duplicate records"
-            )
+            logger.info(f"Filtered out {len(batch_data) - len(new_records)} duplicate records")
 
         # Build VALUES clause using raw SQL similar to simple_seeder
         values = []

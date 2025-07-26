@@ -32,4 +32,3 @@ class SaveRegistryException(Exception):
     """Exception raised when the model cannot be saved to the registry."""
 
     pass
-

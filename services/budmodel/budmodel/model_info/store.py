@@ -415,7 +415,7 @@ def measure_minio_upload_speed(file_size_mb: int = 20) -> float:
         TEST_COUNT = 1
         speeds = []
         for i in range(TEST_COUNT):
-            logger.info(f"\nRunning test {i+1}/{TEST_COUNT}")
+            logger.info(f"\nRunning test {i + 1}/{TEST_COUNT}")
 
             # Upload file and measure time
             start_time = time.time()
@@ -427,7 +427,7 @@ def measure_minio_upload_speed(file_size_mb: int = 20) -> float:
             speed = file_size_bytes / duration  # bytes/s
             speeds.append(speed)
 
-            logger.info(f"Test {i+1} Speed: {speed:.2f} bytes/s")
+            logger.info(f"Test {i + 1} Speed: {speed:.2f} bytes/s")
 
             # Clean up uploaded file
             client.remove_object(app_settings.minio_bucket, f"test_upload_{i}.bin")
@@ -490,7 +490,7 @@ def measure_minio_download_speed(file_size_mb: int = 100) -> float:
         TEST_COUNT = 1
         speeds = []
         for i in range(TEST_COUNT):
-            logger.info(f"\nRunning download test {i+1}/{TEST_COUNT}")
+            logger.info(f"\nRunning download test {i + 1}/{TEST_COUNT}")
 
             # Download file and measure time
             start_time = time.time()
@@ -502,7 +502,7 @@ def measure_minio_download_speed(file_size_mb: int = 100) -> float:
             speed = file_size_bytes / duration  # bytes/s
             speeds.append(speed)
 
-            logger.info(f"Test {i+1} Download Speed: {speed:.2f} bytes/s")
+            logger.info(f"Test {i + 1} Download Speed: {speed:.2f} bytes/s")
 
             # Clean up downloaded file
             if os.path.exists(download_file):

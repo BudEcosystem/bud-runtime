@@ -55,16 +55,16 @@ class BenchmarkPredictor:
             pretrained_models_dir, engine, device, "regressor_mean_end_to_end_latency_s.pkl"
         )
 
-        assert osp.exists(
-            pretrained_models_dir
-        ), f"Pretrained models directory does not exist: {pretrained_models_dir}"
+        assert osp.exists(pretrained_models_dir), (
+            f"Pretrained models directory does not exist: {pretrained_models_dir}"
+        )
         assert osp.isfile(mean_ttft_model_path), f"Mean TTFT model for {engine} on {device} does not exist"
-        assert osp.isfile(
-            op_tput_puser_model_path
-        ), f"Output Token Throughput per User model for {engine} on {device} does not exist"
-        assert osp.isfile(
-            e2e_latency_model_path
-        ), f"Mean End to End Latency model for {engine} on {device} does not exist"
+        assert osp.isfile(op_tput_puser_model_path), (
+            f"Output Token Throughput per User model for {engine} on {device} does not exist"
+        )
+        assert osp.isfile(e2e_latency_model_path), (
+            f"Mean End to End Latency model for {engine} on {device} does not exist"
+        )
 
         self.mean_ttft_pipeline, self.mean_ttft_scaler, self.mean_ttft_features = self.load_model(mean_ttft_model_path)
 

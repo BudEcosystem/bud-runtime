@@ -125,9 +125,9 @@ class EngineCompatibility(BaseEngineCompatibility):
     def check_args_compatibility(self, engine_args: Dict[str, Any]) -> bool:
         """Check the compatibility of the engine args/envs combinations."""
         if engine_args.get("tensor_parallel_size", 1) > 1:
-            assert engine_args.get(
-                "disable_custom_all_reduce"
-            ), "disable_custom_all_reduce must be set to True when tensor_parallel_size > 1."
+            assert engine_args.get("disable_custom_all_reduce"), (
+                "disable_custom_all_reduce must be set to True when tensor_parallel_size > 1."
+            )
 
         return True
 

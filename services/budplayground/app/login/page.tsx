@@ -23,7 +23,7 @@ export default function Login() {
         // Get access_key from URL parameters
         const params = new URLSearchParams(window.location.search);
         const accessKey = params.get('access_token');
-        
+
         if (accessKey) {
             // setKey(accessKey);
             // Automatically validate the access key
@@ -61,7 +61,7 @@ export default function Login() {
               style={{ width: "8em" }}
               className="w-[6.6em] h-auto relative z-10"
             />
-            
+
             <div className="relative z-10 logo-text line-clamp-2 text-[2.25em] 2xl:text-[2.5rem] 1680px:text-[2.4rem] text-white open-sans tracking-[.0rem] leading-[4rem]">
             <strong>Bud Studio.</strong> <br /> Any Model in Any Cloud, with Any hardware.
             </div>

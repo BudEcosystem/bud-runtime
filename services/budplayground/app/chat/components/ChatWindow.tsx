@@ -61,8 +61,8 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
     },
   });
 
-  
-  
+
+
   useEffect(() => {
     if (messages.length > 0) {
       const currentLastMessage = messages.length > 1 ? messages[messages.length - 2] : messages[messages.length - 1];
@@ -72,7 +72,7 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
     }
   }, [messages]);
 
-  
+
 
   const createNewChat = () => {
     const newChatPayload = {
@@ -103,7 +103,7 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
   };
 
   const handleFinish = (
-    message: Message, 
+    message: Message,
     { usage, finishReason }: { usage: Usage; finishReason: string },
   ) => {
 
@@ -116,7 +116,7 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
       updatedChat.name = input;
     }
     updateChat(updatedChat);
-    
+
     const promptMessage: SavedMessage = {
       id: lastMessageRef.current,
       content: promptRef.current || input,
@@ -145,12 +145,12 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
   const handleEdit = (content: string, message: Message) => {
     console.log('handleEdit - setting prompt to:', message);
     message.content = content;
-    
+
     promptRef.current = content;
     deleteMessageAfter(chat.id, message.id)
 
     const list = getMessages(chat.id)
-    
+
     setMessages(list)
     append(message)
   }
@@ -185,7 +185,7 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
               </span>
             </div>
             <button className="group flex items-center flex-row gap-[.4rem] h-[1.375rem] text-[#B3B3B3] text-[300] text-[.625rem] font-[400] p-[.35rem] bg-[#FFFFFF08] rounded-[0.375rem] border-[1px] border-[#1F1F1F] hover:bg-[#965CDE] hover:text-[#FFFFFF] cursor-pointer" onClick={createNewChat}>
-              
+
               <div className="w-[1rem] h-[1rem] transform scale-[.6] mr-[-.2rem]  flex justify-center items-center cursor-pointer group text-[#B3B3B3] group-hover:text-[#FFFFFF]">
                 <Tooltip title="Create a new chat">
                   <svg
@@ -223,7 +223,7 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
             isSingleChat={isSingleChat}
           />
         </Header>
-        <Content 
+        <Content
           className="overflow-hidden overflow-y-auto hide-scrollbar"
           ref={contentRef}
         >
@@ -249,7 +249,7 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
                   // height={"150px"}
                   className="relative z-9 mt-[-8.5rem]"
                   />
-                  
+
                   <div className="relative z-10 Open-Sans text-[1.575rem] mt-[-18.5rem]">
                     Select a model to get started
                   </div>
@@ -262,8 +262,8 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
             {error && (
               <div className="mt-4">
                 <div
-                  className="text-[#FF0000] text-[.75rem] font-[400] 
-                
+                  className="text-[#FF0000] text-[.75rem] font-[400]
+
                 "
                 >
                   {error.message}
@@ -290,7 +290,7 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
             handleSubmit={(e) => {
               // setSubmitInput(e);
               handleSubmit(e);
-              
+
               // Use smooth scrolling with scrollTo
               setTimeout(() => {
                 if (contentRef.current) {

@@ -166,5 +166,3 @@ const BarChart: React.FC<BarChartProps> = ({ data }) => {
 };
 
 export default BarChart;
-
-

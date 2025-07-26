@@ -373,15 +373,15 @@ class UserColorEnum(Enum):
 
 class UserTypeEnum(StrEnum):
     """Enumeration of user types in the system.
-    
+
     This enum defines the different types of users that can exist in the application.
     It helps differentiate between administrative users and regular client users.
-    
+
     Attributes:
         ADMIN: Administrative user with elevated privileges.
         CLIENT: Regular client user with standard privileges.
     """
-    
+
     ADMIN = auto()
     CLIENT = auto()
 

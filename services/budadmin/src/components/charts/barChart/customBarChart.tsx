@@ -334,4 +334,3 @@ const TokenMetricsChart: React.FC<TokenMetricsChartProps> = ({ data, extraChartD
 };
 
 export default TokenMetricsChart;
-

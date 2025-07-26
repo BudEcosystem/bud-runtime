@@ -33,28 +33,28 @@ class TestDeploymentTypeDetection:
     def test_cloud_provider_detection(self):
         """Test that cloud providers are correctly detected."""
         cloud_providers = ["OPENAI", "ANTHROPIC", "AZURE_OPENAI", "BEDROCK", "COHERE", "GROQ"]
-        
+
         for provider in cloud_providers:
             deployment = DeploymentCreateRequest(
                 **self.base_deployment_data,
                 provider=provider,
                 credential_id=uuid4()
             )
-            
+
             result = self.service._is_cloud_deployment(deployment)
             assert result is True, f"Provider {provider} should be detected as cloud deployment"
 
     def test_local_provider_detection(self):
         """Test that local providers are correctly detected as local."""
         local_providers = ["HUGGING_FACE", "URL", "DISK"]
-        
+
         for provider in local_providers:
             deployment = DeploymentCreateRequest(
                 **self.base_deployment_data,
                 provider=provider,
                 credential_id=None  # Local providers can have None credential_id
             )
-            
+
             result = self.service._is_cloud_deployment(deployment)
             assert result is False, f"Provider {provider} should be detected as local deployment"
 
@@ -65,7 +65,7 @@ class TestDeploymentTypeDetection:
             provider="HUGGING_FACE",
             credential_id=uuid4()  # HF token for private models
         )
-        
+
         result = self.service._is_cloud_deployment(deployment)
         assert result is False, "HuggingFace with credential_id should still be local deployment"
 
@@ -79,14 +79,14 @@ class TestDeploymentTypeDetection:
             ("Hugging_Face", False),
             ("HUGGING_FACE", False),
         ]
-        
+
         for provider, expected_cloud in test_cases:
             deployment = DeploymentCreateRequest(
                 **self.base_deployment_data,
                 provider=provider,
                 credential_id=uuid4() if expected_cloud else None
             )
-            
+
             result = self.service._is_cloud_deployment(deployment)
             assert result is expected_cloud, f"Provider {provider} cloud detection failed"
 
@@ -97,7 +97,7 @@ class TestDeploymentTypeDetection:
             provider=None,
             credential_id=uuid4()
         )
-        
+
         result = self.service._is_cloud_deployment(deployment)
         assert result is True, "Deployment with credential_id but no provider should default to cloud"
 
@@ -108,7 +108,7 @@ class TestDeploymentTypeDetection:
             provider=None,
             credential_id=None
         )
-        
+
         result = self.service._is_cloud_deployment(deployment)
         assert result is False, "Deployment with no provider and no credential_id should default to local"
 
@@ -119,7 +119,7 @@ class TestDeploymentTypeDetection:
             provider="UNKNOWN_PROVIDER",
             credential_id=uuid4()
         )
-        
+
         result = self.service._is_cloud_deployment(deployment)
         assert result is True, "Unknown provider with credential_id should default to cloud"
 
@@ -130,7 +130,7 @@ class TestDeploymentTypeDetection:
             provider="UNKNOWN_PROVIDER",
             credential_id=None
         )
-        
+
         result = self.service._is_cloud_deployment(deployment)
         assert result is False, "Unknown provider without credential_id should default to local"
 
@@ -159,10 +159,10 @@ if __name__ == "__main__":
     # Run tests directly
     test_instance = TestDeploymentTypeDetection()
     test_instance.setup_method()
-    
+
     # Run all test methods
     test_methods = [method for method in dir(test_instance) if method.startswith('test_')]
-    
+
     print("Running deployment type detection tests...")
     for method_name in test_methods:
         try:
@@ -171,5 +171,5 @@ if __name__ == "__main__":
             print(f"✓ {method_name}")
         except Exception as e:
             print(f"✗ {method_name}: {e}")
-    
+
     print("Tests completed!")

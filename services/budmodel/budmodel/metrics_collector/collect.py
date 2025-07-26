@@ -1,14 +1,12 @@
 import importlib
 import json
-import asyncio
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+
 from sqlalchemy.future import select
-from sqlalchemy.orm import sessionmaker
-from budmodel.metrics_collector.fetch_data import extract_data
-from sqlalchemy import Column, String
-import os
+
 # from budmodel.models import get_db_uri
 from budmodel.commons import logging
+from budmodel.metrics_collector.fetch_data import extract_data
+
 
 logger = logging.get_logger(__name__)
 
@@ -65,7 +63,7 @@ async def insert_or_update_models_from_sources():
                         data_with_source = {"source_id": source.id, **data}
 
                         # Dynamically add missing columns
-                        for key in data_with_source.keys():
+                        for key in data_with_source:
                             if key not in current_columns:
                                 logger.info(f"Adding missing column '{key}' to Models table.")
                                 async with async_engine.begin() as conn:

@@ -31,7 +31,7 @@ cp .env.sample .env  # Edit with your values
 # Start development environment (includes PostgreSQL, Redis, Dapr)
 ./deploy/start_dev.sh --build
 
-# Stop development environment  
+# Stop development environment
 ./deploy/stop_dev.sh
 
 # Run without rebuilding
@@ -72,7 +72,7 @@ python scripts/initialize_db.py
 
 ### Service Structure
 - **API Layer**: FastAPI routes in `*/routes.py` files
-- **Business Logic**: Services in `*/services.py` files  
+- **Business Logic**: Services in `*/services.py` files
 - **Data Access**: CRUD operations in `*/crud.py` files
 - **Database Models**: SQLAlchemy models in `*/models.py` files
 - **Workflows**: Dapr workflows in `*/workflows.py` files
@@ -114,7 +114,7 @@ Dapr components are defined in `.dapr/components/` and configured via environmen
 
 1. **Register Cluster**: Add cluster credentials to database
 2. **Deploy Collectors**: Install node info collectors to detect hardware
-3. **Transfer Model**: Copy model from registry to cluster storage  
+3. **Transfer Model**: Copy model from registry to cluster storage
 4. **Deploy Runtime**: Create runtime deployment with appropriate resources
 5. **Run Benchmarks**: Execute performance tests
 

@@ -33,7 +33,7 @@ export default function AdvancedSettings() {
         { label: "Per Group", value: "per_group" },
         { label: "Per Token", value: "per_token" },
         ];
-    
+
     useEffect(() => {
         console.log(quantizationWorkflow)
         if(!quantizationWorkflow?.weight){
@@ -56,8 +56,8 @@ export default function AdvancedSettings() {
         }
         setQuantizationWorkflow({ ...quantizationWorkflow })
     }, [])
-    
-    
+
+
     const handleChange = (type: string, name: string, value: any) => {
         console.log(quantizationWorkflow)
         form.setFieldsValue({ [name]: value });
@@ -77,7 +77,7 @@ export default function AdvancedSettings() {
     }
 
     const handleNext = async () => {
-        
+
         const result = await updateQuantizationAdvanced(quantizationWorkflow.weight, quantizationWorkflow.activation);
         if (!result) {
             return;

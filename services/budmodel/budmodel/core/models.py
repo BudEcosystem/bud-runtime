@@ -1,9 +1,6 @@
-from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, Text, Enum, DateTime, Float, Boolean
-from sqlalchemy.orm import relationship, declarative_base
-import enum
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy.orm import declarative_base, relationship
 from sqlalchemy.sql import func
-import os
-import json
 
 
 def get_db_uri():

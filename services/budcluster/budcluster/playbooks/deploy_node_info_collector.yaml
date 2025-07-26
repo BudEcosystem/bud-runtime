@@ -36,10 +36,10 @@
 
     - name: Count nodes with device labels
       set_fact:
-        nodes_with_device_labels: "{{ existing_nodes.resources | 
+        nodes_with_device_labels: "{{ existing_nodes.resources |
           selectattr('metadata.labels', 'defined') |
-          map(attribute='metadata.labels') | 
-          selectattr('device.kubernetes.io/type', 'defined') | 
+          map(attribute='metadata.labels') |
+          selectattr('device.kubernetes.io/type', 'defined') |
           list | length }}"
         total_nodes: "{{ existing_nodes.resources | length }}"
       when: existing_nodes is succeeded
@@ -52,7 +52,7 @@
     - name: Skip node labeling if all nodes are already labeled
       debug:
         msg: "All {{ total_nodes }} nodes already have device labels. Skipping node labeler deployment."
-      when: 
+      when:
         - existing_nodes is succeeded
         - not need_node_labeling
         - skip_healthy_components
@@ -109,7 +109,7 @@
         state: absent
         kubeconfig: "{{ kubeconfig_path }}"
         validate_certs: "{{ validate_certs }}"
-      when: 
+      when:
         - need_node_labeling | default(true)
         - nodes.resources | map(attribute='metadata.labels') | map('dict2items') | flatten | selectattr('key', 'equalto', 'device.kubernetes.io/type') | list | length == labeler_pods.resources | length
 
@@ -138,7 +138,7 @@
     - name: Determine NodeInfo Collector deployment action
       set_fact:
         nodeinfo_needs_deployment: >-
-          {{ nodeinfo_helm_info.failed or 
+          {{ nodeinfo_helm_info.failed or
              nodeinfo_helm_info.status is not defined or
              nodeinfo_helm_info.status.status | default('') != 'deployed' or
              nodeinfo_pods_check.resources | default([]) | selectattr('status.phase', 'ne', 'Running') | list | length > 0 or
@@ -148,7 +148,7 @@
     - name: Skip NodeInfo Collector if already deployed and healthy
       debug:
         msg: "NodeInfo Collector is already deployed and healthy. Skipping deployment."
-      when: 
+      when:
         - not nodeinfo_needs_deployment
         - skip_healthy_components
 
@@ -228,7 +228,7 @@
     - name: Determine NFS Provisioner deployment action
       set_fact:
         nfs_needs_deployment: >-
-          {{ nfs_helm_info.failed or 
+          {{ nfs_helm_info.failed or
              nfs_helm_info.status is not defined or
              nfs_helm_info.status.status | default('') != 'deployed' or
              nfs_storage_class.failed or
@@ -244,7 +244,7 @@
     - name: Skip NFS Provisioner if already deployed and healthy
       debug:
         msg: "NFS Provisioner is already deployed with storage class 'nfs-client'. Skipping deployment."
-      when: 
+      when:
         - not nfs_needs_deployment
         - skip_healthy_components
 
@@ -355,7 +355,7 @@
     - name: Determine Prometheus Stack deployment action
       set_fact:
         prometheus_needs_deployment: >-
-          {{ prometheus_helm_info.failed or 
+          {{ prometheus_helm_info.failed or
              prometheus_helm_info.status is not defined or
              prometheus_helm_info.status.status | default('') != 'deployed' or
              (prometheus_helm_info.status.chart | default('') != 'kube-prometheus-stack-68.3.0' and update_existing_components) or
@@ -372,14 +372,14 @@
     - name: Show Prometheus Stack current version
       debug:
         msg: "Current Prometheus Stack version: {{ prometheus_helm_info.status.chart | default('not installed') }}"
-      when: 
+      when:
         - prometheus_helm_info is succeeded
         - prometheus_helm_info.status is defined
 
     - name: Skip Prometheus Stack if already deployed and healthy
       debug:
         msg: "Prometheus Stack is already deployed ({{ prometheus_helm_info.status.chart | default('unknown version') }}) and healthy. Skipping deployment."
-      when: 
+      when:
         - not prometheus_needs_deployment
         - skip_healthy_components
 
@@ -473,7 +473,7 @@
       retries: 6
       delay: 20
       until: >
-        prometheus_operator_status is defined and 
+        prometheus_operator_status is defined and
         prometheus_operator_status.resources | length > 0 and
         prometheus_operator_status.resources[0].status.readyReplicas is defined and
         prometheus_operator_status.resources[0].status.readyReplicas > 0
@@ -490,7 +490,7 @@
       retries: 6
       delay: 20
       until: >
-        kube_state_metrics_status is defined and 
+        kube_state_metrics_status is defined and
         kube_state_metrics_status.resources | length > 0 and
         kube_state_metrics_status.resources[0].status.readyReplicas is defined and
         kube_state_metrics_status.resources[0].status.readyReplicas > 0
@@ -507,7 +507,7 @@
       retries: 6
       delay: 20
       until: >
-        prometheus_sts is defined and 
+        prometheus_sts is defined and
         prometheus_sts.resources[0].status.readyReplicas is defined and
         prometheus_sts.resources[0].status.readyReplicas > 0
       when: prometheus_needs_deployment | default(true)
@@ -525,7 +525,7 @@
     - name: Report node-exporter rollout progress
       debug:
         msg: >
-          Node-exporter rollout progress: 
+          Node-exporter rollout progress:
           {{ node_exporter_ds.resources[0].status.numberReady | default(0) }}/{{ node_exporter_ds.resources[0].status.desiredNumberScheduled | default(0) }} nodes ready.
           This will continue in the background.
       when: node_exporter_ds is defined and node_exporter_ds.resources | length > 0
@@ -553,7 +553,7 @@
     - name: Determine Kepler deployment action
       set_fact:
         kepler_needs_deployment: >-
-          {{ kepler_helm_info.failed or 
+          {{ kepler_helm_info.failed or
              kepler_helm_info.status is not defined or
              kepler_helm_info.status.status | default('') != 'deployed' or
              kepler_ds_check.failed or
@@ -567,10 +567,10 @@
     - name: Skip Kepler if already deployed and healthy
       debug:
         msg: >
-          Kepler is already deployed and healthy. 
+          Kepler is already deployed and healthy.
           Running on {{ kepler_ds_check.resources[0].status.numberReady | default(0) }}/{{ kepler_ds_check.resources[0].status.desiredNumberScheduled | default(0) }} nodes.
           Skipping deployment.
-      when: 
+      when:
         - not kepler_needs_deployment
         - skip_healthy_components
         - kepler_ds_check is succeeded
@@ -624,12 +624,12 @@
     - name: Calculate ready nodes that can run Kepler
       set_fact:
         # Count nodes that are Ready and schedulable
-        ready_schedulable_nodes: "{{ cluster_nodes.resources | 
-          selectattr('status.conditions', 'defined') | 
+        ready_schedulable_nodes: "{{ cluster_nodes.resources |
+          selectattr('status.conditions', 'defined') |
           rejectattr('spec.unschedulable', 'defined') |
-          map(attribute='status.conditions') | 
-          map('selectattr', 'type', 'equalto', 'Ready') | 
-          map('selectattr', 'status', 'equalto', 'True') | 
+          map(attribute='status.conditions') |
+          map('selectattr', 'type', 'equalto', 'Ready') |
+          map('selectattr', 'status', 'equalto', 'True') |
           map('list') | select('length') | list | length }}"
       when: kepler_needs_deployment | default(true)
 
@@ -657,7 +657,7 @@
       retries: 12
       delay: 30
       until: >
-        kepler_status is defined and 
+        kepler_status is defined and
         kepler_status.resources[0].status.numberReady is defined and
         (kepler_status.resources[0].status.numberReady >= [ready_schedulable_nodes | int * 0.5, 1] | max | int or
          kepler_status.resources[0].status.numberUnavailable | default(0) == 0)
@@ -666,7 +666,7 @@
     - name: Report Kepler rollout progress
       debug:
         msg: >
-          Kepler rollout progress: 
+          Kepler rollout progress:
           {{ kepler_status.resources[0].status.numberReady | default(0) }}/{{ kepler_status.resources[0].status.desiredNumberScheduled | default(0) }} pods ready
           ({{ ready_schedulable_nodes }} nodes are currently schedulable).
           Waited for 50% of schedulable nodes. Deployment will continue in the background for remaining nodes.
@@ -699,7 +699,7 @@
           ========== Deployment Summary ==========
           Cluster: {{ cluster_name | default('unknown') }}
           Namespace: {{ namespace }}
-          
+
           Components:
           - Node Device Labeler: {{ deployment_summary.node_labeler }}
           - NodeInfo Collector: {{ deployment_summary.nodeinfo_collector }}
@@ -707,7 +707,7 @@
           - Prometheus Stack: {{ deployment_summary.prometheus_stack }}
           - Kepler: {{ deployment_summary.kepler }}
           - Aibrix: {{ deployment_summary.aibrix }}
-          
+
           Configuration Options:
           - Skip Healthy Components: {{ skip_healthy_components }}
           - Update Existing: {{ update_existing_components }}
@@ -717,4 +717,3 @@
     - name: Cleanup kubeconfig file
       ansible.builtin.include_role:
         name: cleanup_kubeconfig
-      

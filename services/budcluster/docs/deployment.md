@@ -122,7 +122,7 @@ for every project, and here’s how to get it right:
   ```dockerfile
   include:
     - ./docker-compose-redis.yaml
-  
+
   services:
     ...
   ```

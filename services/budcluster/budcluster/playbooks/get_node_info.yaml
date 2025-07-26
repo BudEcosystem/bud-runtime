@@ -6,7 +6,7 @@
 
   vars_files:
     - vars/common.yaml
-    
+
   roles:
     - create_kubeconfig
 

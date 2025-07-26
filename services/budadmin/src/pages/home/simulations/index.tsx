@@ -141,7 +141,7 @@ export default function Simulations() {
     console.log("filter", filter);
     load(filter);
   }, [currentPage, pageSize, getUsers]);
-  
+
   useEffect(() => {
     if(filterReset) {
       applyFilter()
@@ -181,7 +181,7 @@ export default function Simulations() {
     // openDrawer('add-user');
     // openDrawer('run-new-sumulation')
   }, []);
- 
+
 
 
   const simulation = [{
@@ -256,7 +256,7 @@ export default function Simulations() {
       sorter: (a, b) => a.createdOn.localeCompare(b.createdOn),
       sortIcon: SortIcon,
     },
-    
+
   ];
 
   return (
@@ -277,7 +277,7 @@ export default function Simulations() {
               <>
                 <SearchHeaderInput placeholder="Search by name or email" searchValue={
                   filter.name || filter.email || ""
-                } 
+                }
                 setSearchValue={(value) => {
                   setFilter({ ...filter, email: value, name: value });
                 }} />

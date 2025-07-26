@@ -2,20 +2,6 @@ import asyncio
 import uuid
 from typing import Any, Callable, Dict, List, Optional, Union
 
-from dapr.conf import settings as dapr_settings
-from dapr.ext.workflow import (
-    DaprWorkflowClient,
-    WorkflowRuntime,
-)
-from dapr.ext.workflow import (
-    WorkflowStatus as DaprWorkflowStatus,
-)
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
-from sqlalchemy.dialects.postgresql import JSONB, UUID
-from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session, relationship
-from sqlalchemy.sql import func
-
 from budmicroframe.commons import logging, singleton
 from budmicroframe.commons.config import get_app_settings, get_secrets_settings
 from budmicroframe.commons.constants import WorkflowStatus
@@ -29,6 +15,14 @@ from budmicroframe.commons.schemas import (
 from budmicroframe.shared.dapr_service import DaprService
 from budmicroframe.shared.dapr_workflow import WorkflowRunsSchema, WorkflowStepsSchema
 from budmicroframe.shared.psql_service import CRUDMixin
+from dapr.conf import settings as dapr_settings
+from dapr.ext.workflow import (
+    DaprWorkflowClient,
+    WorkflowRuntime,
+)
+from dapr.ext.workflow import (
+    WorkflowStatus as DaprWorkflowStatus,
+)
 
 
 logger = logging.get_logger(__name__)
@@ -179,12 +173,25 @@ class WorkflowCRUD:
 
         try:
             if step:
-                logger.debug("Workflow step found for %s:%s, %s:%s, %s", workflow_id, step.step_id, notification_hash, step.status, step.notification_status)
+                logger.debug(
+                    "Workflow step found for %s:%s, %s:%s, %s",
+                    workflow_id,
+                    step.step_id,
+                    notification_hash,
+                    step.status,
+                    step.notification_status,
+                )
                 skip_notification = update_notification_status(step)
                 step.status = workflow_or_step_status
                 self.workflow_steps_crud.update(data=step, conditions={"id": step.id})
             else:
-                logger.debug("Workflow run found for %s, %s:%s, %s", workflow_id, notification_hash, run.status, run.notification_status)
+                logger.debug(
+                    "Workflow run found for %s, %s:%s, %s",
+                    workflow_id,
+                    notification_hash,
+                    run.status,
+                    run.notification_status,
+                )
                 skip_notification = update_notification_status(run)
                 if notification.payload.event == "results":
                     run.output = notification.payload.content.result

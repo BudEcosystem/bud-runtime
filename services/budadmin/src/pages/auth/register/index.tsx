@@ -20,7 +20,7 @@ export default function Register() {
   var registerData;
   const prepareRegister = ()=> {
     if (password != confirmPassword) {
-      
+
     }
     registerData = {
       'name': firstName + lasttName,
@@ -185,7 +185,7 @@ export default function Register() {
               <div className="whoAmI h-[5.2em] mb-[1em] flex justify-start align-middle border border-[#414141] rounded-lg p-[.6em]">
                 <div className="IcnWrap border border-[#414141] rounded-lg	w-[3.35em] h-[3.35em] p-[0.8em] m-[.25em]">
                   <Image
-                  
+
                   src="/icons/single.png"
                   width={20}
                   height={20}
@@ -201,7 +201,7 @@ export default function Register() {
               <div className="whoAmI h-[5.2em] flex justify-start align-middle border border-[#414141] rounded-lg p-[.6em]">
                 <div className="IcnWrap border border-[#414141] rounded-lg		w-[3.35em] h-[3.35em] p-[0.8em] m-[.25em]">
                   <Image
-                  
+
                   src="/icons/double.png"
                   width={20}
                   height={20}

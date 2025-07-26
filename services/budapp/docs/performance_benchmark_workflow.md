@@ -701,7 +701,7 @@ Sample Response :
 }
 ```
 
-# Fetch input-distribution of a benchmark with evaluation method dataset 
+# Fetch input-distribution of a benchmark with evaluation method dataset
 
 API: POST /benchmark/dataset/input-distribution
 
@@ -748,7 +748,7 @@ Sample Response :
 }
 ```
 
-# Fetch output-distribution of a benchmark with evaluation method dataset 
+# Fetch output-distribution of a benchmark with evaluation method dataset
 
 API: POST /benchmark/dataset/output-distribution
 

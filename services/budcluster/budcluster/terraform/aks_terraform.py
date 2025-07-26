@@ -1,12 +1,14 @@
+import hashlib
 import json
+import os
+import shutil
 import subprocess
+import tempfile
+from uuid import uuid4
+
 from ..cluster_ops.terrafrom import TerraformClusterManager
 from ..cluster_ops.terrafrom_schemas import AzureConfig
-import tempfile
-import shutil
-import os
-import hashlib
-from uuid import uuid4
+
 
 class AzureAksManager(TerraformClusterManager):
     """AzureAksManager Class For Managing Azure AKS Clusters."""
@@ -18,10 +20,9 @@ class AzureAksManager(TerraformClusterManager):
 
     def _copy_terraform_files(self) -> None:
         """Create Terraform files for Azure AKS cluster."""
-
         prefix = f"{hashlib.md5(self.config.cluster_name.encode()).hexdigest()}"
         self.temp_dir = tempfile.mkdtemp(prefix=prefix)
-        self.unique_state_name = f"{prefix}-aks-{uuid4()}" # TODO : change this to more identifiable one
+        self.unique_state_name = f"{prefix}-aks-{uuid4()}"  # TODO : change this to more identifiable one
 
         # Get the absolute path to the templates directory
         current_dir = os.path.dirname(os.path.abspath(__file__))

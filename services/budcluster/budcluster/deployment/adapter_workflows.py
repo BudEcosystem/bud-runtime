@@ -1,4 +1,3 @@
-
 import asyncio
 import json
 import time
@@ -13,7 +12,6 @@ from budmicroframe.commons.constants import WorkflowStatus
 from budmicroframe.commons.schemas import (
     ErrorResponse,
     NotificationContent,
-    NotificationPayload,
     NotificationRequest,
     SuccessResponse,
     WorkflowMetadataResponse,
@@ -32,7 +30,7 @@ from ..commons.utils import (
     save_workflow_status_in_statestore,
     update_workflow_data_in_statestore,
 )
-from .schemas import AdapterRequest, DeployAdapterActivityRequest, TransferModelRequest, UpdateAdapterStatusRequest
+from .schemas import AdapterRequest, DeployAdapterActivityRequest, TransferModelRequest
 from .services import AdapterService, DeploymentService
 from .workflows import CreateDeploymentWorkflow
 
@@ -41,8 +39,8 @@ logger = logging.get_logger(__name__)
 
 dapr_workflows = DaprWorkflow()
 
-class AdapterWorkflow:
 
+class AdapterWorkflow:
     @dapr_workflows.register_activity
     @staticmethod
     def deploy_adapter(ctx: wf.WorkflowActivityContext, deploy_adapter_request: str):
@@ -86,9 +84,7 @@ class AdapterWorkflow:
                     return workflow_status
                 response = SuccessResponse(
                     message="Adapter deployed successfully",
-                    param={
-                        "status": status
-                    },
+                    param={"status": status},
                 )
             else:
                 response = ErrorResponse(message="Failed to deploy adapter", code=HTTPStatus.BAD_REQUEST.value)
@@ -115,7 +111,9 @@ class AdapterWorkflow:
         notification_req = notification_request.model_copy(deep=True)
 
         # notify activity ETA
-        AdapterService.publish_eta(notification_req, add_adapter_request_json, instance_id, "verify_cluster_connection")
+        AdapterService.publish_eta(
+            notification_req, add_adapter_request_json, instance_id, "verify_cluster_connection"
+        )
 
         # fetch cluster details from db
         with DBSession() as session:
@@ -187,7 +185,9 @@ class AdapterWorkflow:
             target_name=add_adapter_request_json.source,
         )
 
-        AdapterService.publish_eta(notification_req, add_adapter_request_json, instance_id, "transfer_adapter_to_cluster")
+        AdapterService.publish_eta(
+            notification_req, add_adapter_request_json, instance_id, "transfer_adapter_to_cluster"
+        )
 
         simulator_config = []
         with DaprService() as dapr_service:
@@ -257,7 +257,7 @@ class AdapterWorkflow:
             platform=platform,
             adapters=add_adapter_request_json.adapters,
             endpoint_name=add_adapter_request_json.endpoint_name,
-            ingress_url=add_adapter_request_json.ingress_url
+            ingress_url=add_adapter_request_json.ingress_url,
         )
         deploy_adapter_result = yield ctx.call_activity(
             AdapterWorkflow.deploy_adapter, input=deploy_adapter_activity_request.model_dump_json()
@@ -301,7 +301,9 @@ class AdapterWorkflow:
         cluster_config = json.loads(cluster_config)
         deployment_handler = DeploymentHandler(config=cluster_config)
         logger.info(f"within adapter workflow: {add_adapter_request_json.adapter_name}")
-        adapter_status = deployment_handler.get_adapter_status(add_adapter_request_json.adapter_name, add_adapter_request_json.ingress_url)
+        adapter_status = deployment_handler.get_adapter_status(
+            add_adapter_request_json.adapter_name, add_adapter_request_json.ingress_url
+        )
         logger.info(f"adapter status: {adapter_status}")
 
         if not adapter_status:
@@ -352,9 +354,9 @@ class AdapterWorkflow:
             target_name=add_adapter_request_json.source,
         )
 
-
-
-    def __call__(self, request: AdapterRequest, workflow_id: Optional[str] = None) -> Union[WorkflowMetadataResponse, ErrorResponse]:
+    def __call__(
+        self, request: AdapterRequest, workflow_id: Optional[str] = None
+    ) -> Union[WorkflowMetadataResponse, ErrorResponse]:
         """Schedule the workflow to add an adapter."""
         workflow_id = str(workflow_id or uuid.uuid4())
         workflow_name = "add_adapter"
@@ -379,10 +381,10 @@ class AdapterWorkflow:
                 id="adapter_status",
                 title="Adapter status",
                 description="Check the adapter status",
-            )
+            ),
         ]
 
-        #TODO: update eta
+        # TODO: update eta
         response = dapr_workflows.schedule_workflow(
             workflow_name=workflow_name,
             workflow_input=workflow_input,
@@ -459,7 +461,7 @@ class DeleteAdapterWorkflow:
             platform=platform,
             adapters=delete_adapter_request_json.adapters,
             endpoint_name=delete_adapter_request_json.endpoint_name,
-            ingress_url=delete_adapter_request_json.ingress_url
+            ingress_url=delete_adapter_request_json.ingress_url,
         )
         deploy_adapter_result = yield ctx.call_activity(
             AdapterWorkflow.deploy_adapter, input=deploy_adapter_activity_request.model_dump_json()
@@ -512,7 +514,10 @@ class DeleteAdapterWorkflow:
         )
 
         return
-    def __call__(self, request: AdapterRequest, workflow_id: Optional[str] = None) -> Union[WorkflowMetadataResponse, ErrorResponse]:
+
+    def __call__(
+        self, request: AdapterRequest, workflow_id: Optional[str] = None
+    ) -> Union[WorkflowMetadataResponse, ErrorResponse]:
         """Schedule the workflow to delete an adapter."""
         workflow_id = str(workflow_id or uuid.uuid4())
         workflow_name = "delete_adapter"
@@ -525,7 +530,7 @@ class DeleteAdapterWorkflow:
             )
         ]
 
-        #TODO: update eta
+        # TODO: update eta
         response = dapr_workflows.schedule_workflow(
             workflow_name=workflow_name,
             workflow_input=workflow_input,

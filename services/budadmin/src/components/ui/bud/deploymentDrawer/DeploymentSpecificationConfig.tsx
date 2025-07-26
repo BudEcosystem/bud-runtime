@@ -217,7 +217,7 @@ const DeploymentSpecificationConfig: React.FC = (props: {}) => {
                     }}
                     onBlur={(e) => {
                       let value = parseInt(e.target.value, 10) || 0;
-                  
+
                       // If value is below 30, reset it to 30
                       if (value < 30) {
                         setDeploymentSpecification({
@@ -306,7 +306,7 @@ const DeploymentSpecificationConfig: React.FC = (props: {}) => {
                     }}
                     onBlur={(e) => {
                       let value = parseInt(e.target.value, 10) || 0;
-                  
+
                       // If value is below 30, reset it to 30
                       if (value < 10) {
                         setDeploymentSpecification({
@@ -373,7 +373,7 @@ const DeploymentSpecificationConfig: React.FC = (props: {}) => {
                         }}
                         onBlur={(e) => {
                           let value = parseInt(e.target.value) || 0;
-                      
+
                           // If value is less than 50, reset it to 50
                           if (value < 5) {
                             setDeploymentSpecification({
@@ -450,7 +450,7 @@ const DeploymentSpecificationConfig: React.FC = (props: {}) => {
                         }}
                         onBlur={(e) => {
                           let value = parseInt(e.target.value) || 0;
-                      
+
                           // If value is less than 5, reset it to 5
                           if (value < 5) {
                             setDeploymentSpecification({
@@ -512,7 +512,7 @@ const DeploymentSpecificationConfig: React.FC = (props: {}) => {
                         }}
                         onBlur={(e) => {
                           let value = parseInt(e.target.value) || 0;
-                      
+
                           // If value is less than 50, reset it to 50
                           if (value < 50) {
                             setDeploymentSpecification({
@@ -586,7 +586,7 @@ const DeploymentSpecificationConfig: React.FC = (props: {}) => {
                         }}
                         onBlur={(e) => {
                           let value = parseInt(e.target.value) || 0;
-                      
+
                           // If value is less than 5, reset it to 5
                           if (value < 300) {
                             setDeploymentSpecification({
@@ -648,7 +648,7 @@ const DeploymentSpecificationConfig: React.FC = (props: {}) => {
                         }}
                         onBlur={(e) => {
                           let value = parseInt(e.target.value) || 0;
-                      
+
                           // If value is less than 50, reset it to 50
                           if (value < 1) {
                             setDeploymentSpecification({
@@ -722,7 +722,7 @@ const DeploymentSpecificationConfig: React.FC = (props: {}) => {
                         }}
                         onBlur={(e) => {
                           let value = parseInt(e.target.value) || 0;
-                      
+
                           // If value is less than 5, reset it to 5
                           if (value < 1) {
                             setDeploymentSpecification({

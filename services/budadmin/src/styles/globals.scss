@@ -96,12 +96,12 @@ body {
   .text-balance {
     text-wrap: balance;
   }
-  
+
   .no-scrollbar {
     -ms-overflow-style: none;  /* IE and Edge */
     scrollbar-width: none;  /* Firefox */
   }
-  
+
   .no-scrollbar::-webkit-scrollbar {
     display: none;  /* Chrome, Safari and Opera */
   }
@@ -3602,7 +3602,7 @@ html {
 
 // custom scrollbar
 
-// custom datepicker 
+// custom datepicker
 .ant-picker .ant-picker-input {
   input::placeholder {
     color: #808080;
@@ -3655,7 +3655,7 @@ html {
   color: #EEEEEE;
 }
 
-// custom datepicker 
+// custom datepicker
 
 // switch
 .ant-switch {

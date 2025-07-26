@@ -55,14 +55,8 @@ class CostCalculator:
 
     def get_quantization_cost(self, model: str, method: str, device_config: Dict[str, Any]) -> float:
         """Calculate the cost of quantization for a given model."""
-        time_per_method = {
-            "RTN": 10,
-            "AWQ": 20
-        }
-        device_multiplier = {
-            "cpu": 1,
-            "cuda": 4
-        }
+        time_per_method = {"RTN": 10, "AWQ": 20}
+        device_multiplier = {"cpu": 1, "cuda": 4}
 
         method_time = time_per_method[method] if method in time_per_method else time_per_method["AWQ"]
         quantization_time_in_hour = method_time * device_multiplier[device_config["type"]] / 60

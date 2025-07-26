@@ -310,5 +310,3 @@ function DeploymentListTable() {
 };
 
 export default DeploymentListTable;
-
-

@@ -22,7 +22,7 @@ from budmicroframe.commons.schemas import (
 )
 from budmicroframe.shared.dapr_service import DaprService
 
-#from .dapr_workflow import DaprWorkflow
+# from .dapr_workflow import DaprWorkflow
 from budmicroframe.shared.dapr_workflow import DaprWorkflow
 
 # from ..commons.database import SessionLocal
@@ -49,7 +49,6 @@ from .schemas import (
     DeleteCluster,
     DetermineClusterPlatformRequest,
     FetchClusterInfo,
-    PlatformEnum,
     VerifyClusterConnection,
 )
 from .services import ClusterOpsService, ClusterService
@@ -103,9 +102,7 @@ class RegisterClusterWorkflow:
             # Get cluster server url
             server_url = asyncio.run(get_cluster_server_url(cluster_config))
             if not hostname:
-                response = ErrorResponse(
-                    message="Failed to get cluster hostname", code=HTTPStatus.BAD_REQUEST.value
-                )
+                response = ErrorResponse(message="Failed to get cluster hostname", code=HTTPStatus.BAD_REQUEST.value)
             else:
                 update_workflow_data_in_statestore(
                     str(workflow_id),
@@ -322,12 +319,10 @@ class RegisterClusterWorkflow:
             response = ErrorResponse(message="Fetching cluster info failed", code=HTTPStatus.BAD_REQUEST.value)
         return response.model_dump(mode="json")
 
-    @dapr_workflows.register_activity #type: ignore
+    @dapr_workflows.register_activity  # type: ignore
     @staticmethod
     def get_cloud_provider_credentials(ctx: wf.WorkflowActivityContext, cloud_provider_request: str) -> dict:
-        """
-        Process and validate the cloud provider credentials.
-        """
+        """Process and validate the cloud provider credentials."""
         logger = logging.get_logger("GetCloudProviderCredentials")
         workflow_id = ctx.workflow_id
         task_id = ctx.task_id
@@ -346,13 +341,13 @@ class RegisterClusterWorkflow:
                 case "azure":
                     required_fields = ["subscription_id", "tenant_id", "client_id", "client_secret"]
                     for field in required_fields:
-                        if field not in create_cluster_request_json.config_credentials: # type: ignore
+                        if field not in create_cluster_request_json.config_credentials:  # type: ignore
                             raise ValueError(f"Missing required credential field: {field}")
                     config = AzureConfig(
-                        subscription_id=create_cluster_request_json.config_credentials["subscription_id"], # type: ignore
-                        tenant_id=create_cluster_request_json.config_credentials["tenant_id"], # type: ignore
-                        client_id=create_cluster_request_json.config_credentials["client_id"], # type: ignore
-                        client_secret=create_cluster_request_json.config_credentials["client_secret"], # type: ignore
+                        subscription_id=create_cluster_request_json.config_credentials["subscription_id"],  # type: ignore
+                        tenant_id=create_cluster_request_json.config_credentials["tenant_id"],  # type: ignore
+                        client_id=create_cluster_request_json.config_credentials["client_id"],  # type: ignore
+                        client_secret=create_cluster_request_json.config_credentials["client_secret"],  # type: ignore
                         cluster_name=create_cluster_request_json.name,
                         cluster_location=create_cluster_request_json.region,
                         resource_group_name=f"{create_cluster_request_json.name}-bud-inc",
@@ -360,37 +355,37 @@ class RegisterClusterWorkflow:
                             Environment="Production",
                             Project="Bud Managed Inference Cluster",
                             Owner="Bud Ecosystem",
-                            ManagedBy="Bud"
-                        )
+                            ManagedBy="Bud",
+                        ),
                     )
 
                 case "aws":
                     required_fields = ["access_key_id", "secret_access_key"]
                     for field in required_fields:
-                        if field not in create_cluster_request_json.config_credentials: # type: ignore
+                        if field not in create_cluster_request_json.config_credentials:  # type: ignore
                             raise ValueError(f"Missing required credential field: {field}")
                     config = AWSConfig(
-                        access_key=create_cluster_request_json.config_credentials["access_key_id"], # type: ignore
-                        secret_key=create_cluster_request_json.config_credentials["secret_access_key"], # type: ignore
-                        region=create_cluster_request_json.region ,# type: ignore
+                        access_key=create_cluster_request_json.config_credentials["access_key_id"],  # type: ignore
+                        secret_key=create_cluster_request_json.config_credentials["secret_access_key"],  # type: ignore
+                        region=create_cluster_request_json.region,  # type: ignore
                         cluster_name=create_cluster_request_json.name,
                         vpc_name=f"{create_cluster_request_json.name}-bud-inc",
                         tags=TagsModel(
                             Environment="Production",
                             Project="Bud Managed Inference Cluster",
                             Owner="Bud Ecosystem",
-                            ManagedBy="Bud"
-                        )
+                            ManagedBy="Bud",
+                        ),
                     )
                 case _:
                     raise ValueError("Unsupported provider")
 
-            return SuccessResponse( # type: ignore
+            return SuccessResponse(  # type: ignore
                 message="Cloud provider credentials validated successfully",
                 param={
-                    "provider": create_cluster_request_json.cloud_provider_unique_id, # type: ignore
-                    "config": config.model_dump(mode="json") # type: ignore
-                }
+                    "provider": create_cluster_request_json.cloud_provider_unique_id,  # type: ignore
+                    "config": config.model_dump(mode="json"),  # type: ignore
+                },
             ).model_dump(mode="json")
         except Exception as e:
             logger.error(f"Error processing cloud provider credentials: {e}", exc_info=True)
@@ -398,10 +393,10 @@ class RegisterClusterWorkflow:
             logger.error(f"Traceback ++++: {traceback.format_exc()}")
             return ErrorResponse(
                 message=f"Error processing cloud provider credentials: {str(e)}",
-                code=HTTPStatus.INTERNAL_SERVER_ERROR.value
+                code=HTTPStatus.INTERNAL_SERVER_ERROR.value,
             ).model_dump(mode="json")
 
-    @dapr_workflows.register_activity #type: ignore
+    @dapr_workflows.register_activity  # type: ignore
     @staticmethod
     def create_cloud_provider_cluster(ctx: wf.WorkflowActivityContext, cloud_provider_config: str) -> dict:
         """Create a Kubernetes cluster in the cloud provider."""
@@ -409,8 +404,6 @@ class RegisterClusterWorkflow:
         workflow_id = ctx.workflow_id
         task_id = ctx.task_id
         logger.info(f"Creating cloud provider cluster for workflow_id: {workflow_id} and task_id: {task_id}")
-
-
 
         try:
             # Check if workflow has been terminated
@@ -440,7 +433,6 @@ class RegisterClusterWorkflow:
                 case _:
                     raise ValueError(f"Unsupported provider: {provider}")
 
-
             # Initialize Terraform
             prefix = f"{hashlib.md5(tf_config.cluster_name.encode()).hexdigest()}"
             init_result = tf_manager.init(prefix)
@@ -449,7 +441,7 @@ class RegisterClusterWorkflow:
                 logger.error(f"Terraform init failed: {init_result.stdout}")
                 return ErrorResponse(
                     message="Failed to initialize Terraform for cloud cluster creation",
-                    code=HTTPStatus.INTERNAL_SERVER_ERROR.value
+                    code=HTTPStatus.INTERNAL_SERVER_ERROR.value,
                 ).model_dump(mode="json")
 
             # Create a plan
@@ -458,7 +450,7 @@ class RegisterClusterWorkflow:
                 logger.error(f"Terraform plan failed: {plan_result.stdout}")
                 return ErrorResponse(
                     message="Failed to create a Terraform init for cloud cluster creation",
-                    code=HTTPStatus.INTERNAL_SERVER_ERROR.value
+                    code=HTTPStatus.INTERNAL_SERVER_ERROR.value,
                 ).model_dump(mode="json")
 
             # Apply the plan to create the cluster
@@ -467,7 +459,7 @@ class RegisterClusterWorkflow:
                 logger.error(f"Terraform apply failed: {apply_result.stdout}")
                 return ErrorResponse(
                     message="Failed to apply Terraform plan for cloud cluster creation",
-                    code=HTTPStatus.INTERNAL_SERVER_ERROR.value
+                    code=HTTPStatus.INTERNAL_SERVER_ERROR.value,
                 ).model_dump(mode="json")
 
             # Get the outputs
@@ -476,7 +468,7 @@ class RegisterClusterWorkflow:
                 logger.error("Failed to get Terraform outputs")
                 return ErrorResponse(
                     message="Failed to get Terraform outputs after cluster creation",
-                    code=HTTPStatus.INTERNAL_SERVER_ERROR.value
+                    code=HTTPStatus.INTERNAL_SERVER_ERROR.value,
                 ).model_dump(mode="json")
 
             # Store the terraform directory path in the workflow data for cleanup
@@ -484,23 +476,18 @@ class RegisterClusterWorkflow:
             workflow_data["terraform_dir"] = tf_manager.temp_dir
             update_workflow_data_in_statestore(str(workflow_id), workflow_data)
 
-            return SuccessResponse( # type: ignore
+            return SuccessResponse(  # type: ignore
                 message="Cloud cluster created successfully",
-                param={
-                    "provider": provider,
-                    "terraform_outputs": outputs,
-                    "cluster_name": tf_config.cluster_name
-                }
+                param={"provider": provider, "terraform_outputs": outputs, "cluster_name": tf_config.cluster_name},
             ).model_dump(mode="json")
 
         except Exception as e:
             logger.error(f"Error creating cloud provider cluster: {e}")
             return ErrorResponse(
-                message=f"Error creating cloud provider cluster: {str(e)}",
-                code=HTTPStatus.INTERNAL_SERVER_ERROR.value
+                message=f"Error creating cloud provider cluster: {str(e)}", code=HTTPStatus.INTERNAL_SERVER_ERROR.value
             ).model_dump(mode="json")
 
-    @dapr_workflows.register_workflow #type: ignore
+    @dapr_workflows.register_workflow  # type: ignore
     @staticmethod
     def register_cluster(ctx: wf.DaprWorkflowContext, add_cluster_request: str):
         """Execute the workflow to register a cluster.
@@ -525,20 +512,20 @@ class RegisterClusterWorkflow:
 
         # Set workflow data
         update_workflow_data_in_statestore(
-               instance_id,
-               {
-                   "status": WorkflowStatus.RUNNING.value,
-                   "namespace": "bud-system",
-                   "cluster_config_dict": add_cluster_request_json.config_dict,
-                   "enable_master_node": add_cluster_request_json.enable_master_node,
-                   "ingress_url": str(add_cluster_request_json.ingress_url),
-                   "name": add_cluster_request_json.name,
-                   "credential_id": add_cluster_request_json.credential_id,
-                   "cloud_provider_id": add_cluster_request_json.provider_id,
-                   "region": add_cluster_request_json.region,
-                   "cluster_type": add_cluster_request_json.cluster_type,
-                   "cloud_provider_unique_id": add_cluster_request_json.cloud_provider_unique_id
-               },
+            instance_id,
+            {
+                "status": WorkflowStatus.RUNNING.value,
+                "namespace": "bud-system",
+                "cluster_config_dict": add_cluster_request_json.config_dict,
+                "enable_master_node": add_cluster_request_json.enable_master_node,
+                "ingress_url": str(add_cluster_request_json.ingress_url),
+                "name": add_cluster_request_json.name,
+                "credential_id": add_cluster_request_json.credential_id,
+                "cloud_provider_id": add_cluster_request_json.provider_id,
+                "region": add_cluster_request_json.region,
+                "cluster_type": add_cluster_request_json.cluster_type,
+                "cloud_provider_unique_id": add_cluster_request_json.cloud_provider_unique_id,
+            },
         )
 
         # Set up notification
@@ -567,7 +554,7 @@ class RegisterClusterWorkflow:
         eta_minutes = 10 if add_cluster_request_json.cluster_type == "CLOUD" else 5
         notification_req.payload.content = NotificationContent(
             title="Estimated time to completion",
-            message=f"{eta_minutes*10}",
+            message=f"{eta_minutes * 10}",
             status=WorkflowStatus.RUNNING,
         )
         dapr_workflows.publish_notification(
@@ -592,7 +579,8 @@ class RegisterClusterWorkflow:
                 region=add_cluster_request_json.region,
                 credentials=add_cluster_request_json.credentials,
                 cluster_type=add_cluster_request_json.cluster_type,
-                cloud_provider_unique_id=add_cluster_request_json.cloud_provider_unique_id or "" # For Cloud Request value will be always present
+                cloud_provider_unique_id=add_cluster_request_json.cloud_provider_unique_id
+                or "",  # For Cloud Request value will be always present
             )
 
             # Step 1: Get and validate cloud provider credentials
@@ -604,25 +592,25 @@ class RegisterClusterWorkflow:
 
             # Notification
             if get_credentials_result.get("code", HTTPStatus.OK.value) != HTTPStatus.OK.value:
-                        notification_req.payload.event = "get_cloud_provider_credentials"
-                        notification_req.payload.content = NotificationContent(
-                            title="Cloud provider credentials validation failed",
-                            message=get_credentials_result["message"],
-                            status=WorkflowStatus.FAILED,
-                        )
-                        dapr_workflows.publish_notification(
-                            workflow_id=instance_id,
-                            notification=notification_req,
-                            target_topic_name=add_cluster_request_json.source_topic,
-                            target_name=add_cluster_request_json.source,
-                        )
-                        return
+                notification_req.payload.event = "get_cloud_provider_credentials"
+                notification_req.payload.content = NotificationContent(
+                    title="Cloud provider credentials validation failed",
+                    message=get_credentials_result["message"],
+                    status=WorkflowStatus.FAILED,
+                )
+                dapr_workflows.publish_notification(
+                    workflow_id=instance_id,
+                    notification=notification_req,
+                    target_topic_name=add_cluster_request_json.source_topic,
+                    target_name=add_cluster_request_json.source,
+                )
+                return
 
             # Update ETA
             notification_req.payload.event = "eta"
             notification_req.payload.content = NotificationContent(
                 title="Estimated time to completion",
-                message=f"{9*10}",
+                message=f"{9 * 10}",
                 status=WorkflowStatus.RUNNING,
             )
             dapr_workflows.publish_notification(
@@ -706,16 +694,12 @@ class RegisterClusterWorkflow:
             # Store it in workflow data for later use
             update_workflow_data_in_statestore(
                 str(instance_id),
-                {
-                    "ingress_url": aks_host,
-                    "cluster_config_dict": kube_config
-                },
+                {"ingress_url": aks_host, "cluster_config_dict": kube_config},
             )
 
             # Update the variable
             add_cluster_request_json.configuration = kube_config
             add_cluster_request_json.ingress_url = aks_host
-
 
             # Job Complited
             notification_req.payload.event = "create_cloud_provider_cluster"
@@ -731,7 +715,6 @@ class RegisterClusterWorkflow:
                 target_name=add_cluster_request_json.source,
             )
 
-
             # Set platform to Kubernetes for cloud clusters
             determine_cluster_platform_result = {
                 "code": HTTPStatus.OK.value,
@@ -740,7 +723,7 @@ class RegisterClusterWorkflow:
                     "cluster_platform": ClusterPlatformEnum.KUBERNETES,
                     "hostname": aks_host,
                     "server_url": aks_host,
-                }
+                },
             }
 
             # Update workflow data with platform info
@@ -757,7 +740,7 @@ class RegisterClusterWorkflow:
             notification_req.payload.event = "eta"
             notification_req.payload.content = NotificationContent(
                 title="Estimated time to completion",
-                message=f"{5*10}",
+                message=f"{5 * 10}",
                 status=WorkflowStatus.RUNNING,
             )
             dapr_workflows.publish_notification(
@@ -769,8 +752,7 @@ class RegisterClusterWorkflow:
 
             # Verification
             verify_cluster_connection_request = VerifyClusterConnection(
-                cluster_config=kube_config,
-                platform=ClusterPlatformEnum.KUBERNETES
+                cluster_config=kube_config, platform=ClusterPlatformEnum.KUBERNETES
             )
 
         else:
@@ -820,7 +802,7 @@ class RegisterClusterWorkflow:
             notification_req.payload.event = "eta"
             notification_req.payload.content = NotificationContent(
                 title="Estimated time to completion",
-                message=f"{4*10}",
+                message=f"{4 * 10}",
                 status=WorkflowStatus.RUNNING,
             )
             dapr_workflows.publish_notification(
@@ -873,7 +855,7 @@ class RegisterClusterWorkflow:
             notification_req.payload.event = "eta"
             notification_req.payload.content = NotificationContent(
                 title="Estimated time to completion",
-                message=f"{3*10}",
+                message=f"{3 * 10}",
                 status=WorkflowStatus.RUNNING,
             )
             dapr_workflows.publish_notification(
@@ -928,12 +910,11 @@ class RegisterClusterWorkflow:
             target_name=add_cluster_request_json.source,
         )
 
-
         # notify activity ETA
         notification_req.payload.event = "eta"
         notification_req.payload.content = NotificationContent(
             title="Estimated time to completion",
-            message=f"{2*10}",
+            message=f"{2 * 10}",
             status=WorkflowStatus.RUNNING,
         )
         dapr_workflows.publish_notification(
@@ -988,12 +969,11 @@ class RegisterClusterWorkflow:
             target_name=add_cluster_request_json.source,
         )
 
-
         # notify activity ETA
         notification_req.payload.event = "eta"
         notification_req.payload.content = NotificationContent(
             title="Estimated time to completion",
-            message=f"{1*10}",
+            message=f"{1 * 10}",
             status=WorkflowStatus.RUNNING,
         )
         dapr_workflows.publish_notification(
@@ -1002,7 +982,6 @@ class RegisterClusterWorkflow:
             target_topic_name=add_cluster_request_json.source_topic,
             target_name=add_cluster_request_json.source,
         )
-
 
         # fetch the cluster info
         fetch_cluster_info_request = FetchClusterInfo(
@@ -1056,7 +1035,7 @@ class RegisterClusterWorkflow:
         )
 
         logger.info(f"::CLOUD:: Cluster info fetching successful {fetch_cluster_info_result}")
-        logger.info(f'::CLOUD:: Cluster info fetching successful {fetch_cluster_info_result["param"]["result"]}')
+        logger.info(f"::CLOUD:: Cluster info fetching successful {fetch_cluster_info_result['param']['result']}")
 
         notification_req.payload.event = "results"
         notification_req.payload.content = NotificationContent(
@@ -1067,7 +1046,7 @@ class RegisterClusterWorkflow:
         )
         workflow_status = check_workflow_status_in_statestore(instance_id)
         if workflow_status:
-            #TODO:  Update this for CLOUD Platform too
+            # TODO:  Update this for CLOUD Platform too
 
             asyncio.run(ClusterOpsService.delete_node_info_from_statestore(str(add_cluster_request_json.id)))
             return workflow_status
@@ -1092,15 +1071,12 @@ class RegisterClusterWorkflow:
             target_name=add_cluster_request_json.source,
         )
 
-
         return
 
-    @dapr_workflows.register_activity #type: ignore
+    @dapr_workflows.register_activity  # type: ignore
     @staticmethod
     def get_kube_config(ctx: wf.WorkflowActivityContext, cluster_info: str) -> dict:
-        """
-        Get the kubeconfig for the created cloud cluster
-        """
+        """Get the kubeconfig for the created cloud cluster"""
         logger = logging.get_logger("GetKubeConfig")
         workflow_id = ctx.workflow_id
         task_id = ctx.task_id
@@ -1123,7 +1099,7 @@ class RegisterClusterWorkflow:
                 if not kube_config:
                     return ErrorResponse(
                         message="Kubeconfig not found in terraform outputs",
-                        code=HTTPStatus.INTERNAL_SERVER_ERROR.value
+                        code=HTTPStatus.INTERNAL_SERVER_ERROR.value,
                     ).model_dump(mode="json")
 
                 # Store the kubeconfig in the workflow data
@@ -1141,6 +1117,7 @@ class RegisterClusterWorkflow:
                         server_url = kube_config_dict["clusters"][0].get("cluster", {}).get("server")
                         if server_url:
                             from urllib.parse import urlparse
+
                             parsed_url = urlparse(server_url)
                             hostname = parsed_url.hostname
                 except:
@@ -1161,28 +1138,23 @@ class RegisterClusterWorkflow:
                         "provider": provider,
                         "configuration": kube_config,
                         "hostname": hostname,
-                        "server_url": server_url
-                    }
+                        "server_url": server_url,
+                    },
                 ).model_dump(mode="json")
             else:
                 return ErrorResponse(
-                    message=f"Unsupported cloud provider: {provider}",
-                    code=HTTPStatus.BAD_REQUEST.value
+                    message=f"Unsupported cloud provider: {provider}", code=HTTPStatus.BAD_REQUEST.value
                 ).model_dump(mode="json")
         except Exception as e:
             logger.error(f"Error getting kubeconfig: {e}")
             return ErrorResponse(
-                message=f"Error getting kubeconfig: {str(e)}",
-                code=HTTPStatus.INTERNAL_SERVER_ERROR.value
+                message=f"Error getting kubeconfig: {str(e)}", code=HTTPStatus.INTERNAL_SERVER_ERROR.value
             ).model_dump(mode="json")
 
     async def __call__(
         self, request: ClusterCreateRequest, workflow_id: Optional[str] = None
     ) -> Union[WorkflowMetadataResponse, ErrorResponse]:
-        """
-        Entry point for registering a cluster, handling both on-premises and cloud deployments.
-        """
-
+        """Entry point for registering a cluster, handling both on-premises and cloud deployments."""
         logger = logging.get_logger("RegisterClusterCall")
         workflow_id = str(workflow_id or uuid.uuid4())
 
@@ -1197,7 +1169,7 @@ class RegisterClusterWorkflow:
                 cluster_request = ClusterCreateRequest(
                     name=request.name,
                     enable_master_node=False,  # Cloud clusters don't need master node flag
-                    ingress_url= "",
+                    ingress_url="",
                     credential_id=request.credential_id,
                     provider_id=request.provider_id,
                     region=request.region,
@@ -1361,12 +1333,10 @@ class DeleteClusterWorkflow:
             )
         return response.model_dump(mode="json")
 
-
     @dapr_workflows.register_workflow
     @staticmethod
     def delete_cluster(ctx: wf.DaprWorkflowContext, delete_cluster_request: str):
-        """
-        Execute the workflow to delete a cluster.
+        """Execute the workflow to delete a cluster.
 
         This workflow supports both cloud and on-premises cluster deletions.
         For cloud clusters, it calls the cloud provider’s Terraform destroy command.
@@ -1409,7 +1379,7 @@ class DeleteClusterWorkflow:
         notification_req.payload.event = "eta"
         notification_req.payload.content = NotificationContent(
             title="Estimated time to completion",
-            message=f"{1*10}",
+            message=f"{1 * 10}",
             status=WorkflowStatus.RUNNING,
         )
         dapr_workflows.publish_notification(
@@ -1421,7 +1391,6 @@ class DeleteClusterWorkflow:
 
         # Cloud Branchout
         if delete_cluster_request_json.cluster_type == "CLOUD":
-
             # Get The Provider UniqueID
             cloud_event_payload = delete_cluster_request_json.cloud_payload_dict
             cloud_provider_id = cloud_event_payload.get("provider_unique_id", None)
@@ -1461,13 +1430,15 @@ class DeleteClusterWorkflow:
                             client_secret=credentials.get("client_secret"),
                             cluster_name=cloud_event_payload.get("name", ""),
                             cluster_location=cloud_event_payload.get("region", ""),
-                            resource_group_name=cloud_event_payload.get("resource_group_name", f"{cloud_event_payload.get('name', '')}-bud-inc"),
+                            resource_group_name=cloud_event_payload.get(
+                                "resource_group_name", f"{cloud_event_payload.get('name', '')}-bud-inc"
+                            ),
                             tags=TagsModel(
                                 Environment="Production",
                                 Project="Bud Managed Inference Cluster",
                                 Owner="Bud Ecosystem",
-                                ManagedBy="Bud"
-                            )
+                                ManagedBy="Bud",
+                            ),
                         )
 
                         # Create the Azure Terraform manager instance.
@@ -1481,7 +1452,7 @@ class DeleteClusterWorkflow:
                             logger.error(f"Terraform init failed: {init_result.stdout}")
                             return ErrorResponse(
                                 message="Failed to initialize Terraform for cloud cluster creation",
-                                code=HTTPStatus.INTERNAL_SERVER_ERROR.value
+                                code=HTTPStatus.INTERNAL_SERVER_ERROR.value,
                             ).model_dump(mode="json")
 
                         # Run Terraform destroy for the Azure cluster.
@@ -1502,7 +1473,7 @@ class DeleteClusterWorkflow:
                             )
                             return ErrorResponse(
                                 message="Cloud cluster deletion failed on Azure",
-                                code=HTTPStatus.INTERNAL_SERVER_ERROR.value
+                                code=HTTPStatus.INTERNAL_SERVER_ERROR.value,
                             ).model_dump(mode="json")
                         # else:
                         #     logger.info("Cloud cluster deletion successful on Azure")
@@ -1527,13 +1498,15 @@ class DeleteClusterWorkflow:
                             secret_key=cloud_event_payload.get("secret_access_key"),
                             region=cloud_event_payload.get("region", ""),
                             cluster_name=cloud_event_payload.get("name", ""),
-                            vpc_name=cloud_event_payload.get("vpc_name", f"{cloud_event_payload.get('name', '')}-bud-inc"),
+                            vpc_name=cloud_event_payload.get(
+                                "vpc_name", f"{cloud_event_payload.get('name', '')}-bud-inc"
+                            ),
                             tags=TagsModel(
                                 Environment="Production",
                                 Project="Bud Managed Inference Cluster",
                                 Owner="Bud Ecosystem",
-                                ManagedBy="Bud"
-                            )
+                                ManagedBy="Bud",
+                            ),
                         )
                         # Create the AWS Terraform manager instance.
                         aws_tf_manager = AWSEksManager(aws_config)
@@ -1544,7 +1517,7 @@ class DeleteClusterWorkflow:
                             logger.error(f"Terraform init failed: {init_result.stdout}")
                             return ErrorResponse(
                                 message="Failed to initialize Terraform for cloud cluster creation",
-                                code=HTTPStatus.INTERNAL_SERVER_ERROR.value
+                                code=HTTPStatus.INTERNAL_SERVER_ERROR.value,
                             ).model_dump(mode="json")
 
                         # Run Terraform destroy for the AWS cluster.
@@ -1565,7 +1538,7 @@ class DeleteClusterWorkflow:
                             )
                             return ErrorResponse(
                                 message="Cloud cluster deletion failed on AWS",
-                                code=HTTPStatus.INTERNAL_SERVER_ERROR.value
+                                code=HTTPStatus.INTERNAL_SERVER_ERROR.value,
                             ).model_dump(mode="json")
                         # else:
                         #     logger.info("Cloud cluster deletion successful on AWS")
@@ -1600,7 +1573,7 @@ class DeleteClusterWorkflow:
                 )
                 return ErrorResponse(
                     message=f"Error deleting cloud provider resources: {str(e)}",
-                    code=HTTPStatus.INTERNAL_SERVER_ERROR.value
+                    code=HTTPStatus.INTERNAL_SERVER_ERROR.value,
                 ).model_dump(mode="json")
 
         else:

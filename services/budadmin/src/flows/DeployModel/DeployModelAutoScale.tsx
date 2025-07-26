@@ -125,9 +125,9 @@ export default function DeployModelAutoScale() {
                 src="/icons/customArrow.png"
                 preview={false}
                 alt="info"
-                style={{ 
-                  width: '0.65rem', 
-                  height: 'auto', 
+                style={{
+                  width: '0.65rem',
+                  height: 'auto',
                   marginTop: '0.1rem',
                   transform: advancedSettings ? 'rotate(180deg)' : 'rotate(0deg)',
                   transition: 'transform 0.5s ease'
@@ -135,7 +135,7 @@ export default function DeployModelAutoScale() {
               />
             </div>
           </DrawerCard>
-          
+
           {advancedSettings && <DrawerCard>
             <TextInput
                 name="scaleUpTolerance"

@@ -1,7 +1,8 @@
-from .models import ModelDownloadHistory, ModelDownloadHistoryCRUD
-from ..commons.constants import ModelDownloadStatus
-from ..commons.config import app_settings
 from sqlalchemy import func
+
+from ..commons.config import app_settings
+from ..commons.constants import ModelDownloadStatus
+from .models import ModelDownloadHistory, ModelDownloadHistoryCRUD
 
 
 class DownloadHistory:

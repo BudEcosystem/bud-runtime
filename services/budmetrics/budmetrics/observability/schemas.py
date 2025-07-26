@@ -1,7 +1,7 @@
+import ipaddress
 from datetime import datetime
 from typing import Any, Dict, Literal, Optional, Union
 from uuid import UUID
-import ipaddress
 
 from budmicroframe.commons.schemas import CloudEventBase, ResponseBase
 from fastapi.responses import ORJSONResponse
@@ -56,9 +56,7 @@ class MetricsData(BaseModel):
     model_id: Optional[UUID] = None
     project_id: Optional[UUID] = None
     endpoint_id: Optional[UUID] = None
-    data: dict[
-        MetricType, Union[CountMetric, TimeMetric, PerformanceMetric, CacheMetric]
-    ]
+    data: dict[MetricType, Union[CountMetric, TimeMetric, PerformanceMetric, CacheMetric]]
 
 
 class PeriodBin(BaseModel):
@@ -72,9 +70,7 @@ class ObservabilityMetricsRequest(BaseModel):
     to_date: Optional[datetime] = None
     frequency_unit: Literal["hour", "day", "week", "month", "quarter", "year"] = "day"
     frequency_interval: Optional[int] = None
-    filters: Optional[
-        dict[Literal["model", "project", "endpoint"], Union[list[UUID], UUID]]
-    ] = None
+    filters: Optional[dict[Literal["model", "project", "endpoint"], Union[list[UUID], UUID]]] = None
     group_by: Optional[list[Literal["model", "project", "endpoint"]]] = None
     return_delta: bool = True
     fill_time_gaps: bool = True
@@ -123,9 +119,7 @@ class ObservabilityMetricsRequest(BaseModel):
             if not self.group_by:
                 raise ValueError("topk requires group_by to be specified")
             if self.filters:
-                raise ValueError(
-                    "topk is ignored when filters are specified and should not be used together"
-                )
+                raise ValueError("topk is ignored when filters are specified and should not be used together")
         return self
 
 
@@ -213,7 +207,5 @@ class InferenceDetailsMetrics(CloudEventBase):
     def validate_timestamps(self) -> "InferenceDetailsMetrics":
         """Ensure request_forward_time is not before request_arrival_time."""
         if self.request_forward_time < self.request_arrival_time:
-            raise ValueError(
-                "request_forward_time cannot be before request_arrival_time"
-            )
+            raise ValueError("request_forward_time cannot be before request_arrival_time")
         return self

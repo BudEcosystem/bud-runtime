@@ -500,11 +500,11 @@ class ProductionConfig:
     # Connection pool
     pool_min_size: int = 5
     pool_max_size: int = 50
-    
+
     # Query settings
     query_timeout: int = 60
     max_concurrent_queries: int = 20
-    
+
     # Cache settings
     enable_query_cache: bool = True
     query_cache_ttl: int = 300
@@ -566,7 +566,7 @@ OPTIMIZE TABLE ModelInferenceDetails FINAL;
 CHECK TABLE ModelInferenceDetails;
 
 -- View table size
-SELECT 
+SELECT
     table,
     formatReadableSize(sum(bytes)) AS size,
     sum(rows) AS rows
@@ -588,7 +588,7 @@ GROUP BY table;
 2. **Slow Queries**
    ```sql
    -- Find slow queries
-   SELECT 
+   SELECT
        query,
        query_duration_ms,
        memory_usage

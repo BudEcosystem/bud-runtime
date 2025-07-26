@@ -332,7 +332,7 @@ const General: React.FC<GeneralProps> = ({ data, goToAdapter }) => {
           </div>
           <div className="hR mt-[1.5rem]"></div>
         </div>
-        
+
         {data?.strengths?.length > 0 && (
           <>
             <div className="pt-[1.5rem] mb-[1.4rem]">

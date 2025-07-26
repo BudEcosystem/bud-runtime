@@ -230,7 +230,7 @@ export const useProjects = create<
         globalSelectedProject: {
           ...response.data?.project,
           endpoints_count: response.data?.endpoints_count,
-        }, 
+        },
       });
       successToast(response.message);
     } catch (error) {
@@ -310,14 +310,14 @@ export const useProjects = create<
       // Convert old params to new observability format
       const observabilityRequest = convertToObservabilityRequest(params);
       const response: any = await AppRequest.Post(`${tempApiBaseUrl}/metrics/analytics`, observabilityRequest);
-      
+
       // Convert response to old format for backward compatibility
       const convertedData = convertObservabilityResponse(
         response.data as ObservabilityMetricsResponse,
         params.metrics,
         params.filter_by
       );
-      
+
       set({ projectMetricsData: convertedData });
       return convertedData;
     } catch (error) {
@@ -329,14 +329,14 @@ export const useProjects = create<
       // Convert old params to new observability format
       const observabilityRequest = convertToObservabilityRequest(params);
       const response: any = await AppRequest.Post(`${tempApiBaseUrl}/metrics/analytics`, observabilityRequest);
-      
+
       // Convert response to old format for backward compatibility
       const convertedData = convertObservabilityResponse(
         response.data as ObservabilityMetricsResponse,
         params.metrics,
         params.filter_by
       );
-      
+
       set({ averageMetricsData: convertedData });
       return convertedData;
     } catch (error) {
@@ -348,14 +348,14 @@ export const useProjects = create<
       // Convert old params to new observability format
       const observabilityRequest = convertToObservabilityRequest(params);
       const response: any = await AppRequest.Post(`${tempApiBaseUrl}/metrics/analytics`, observabilityRequest);
-      
+
       // Convert response to old format for backward compatibility
       const convertedData = convertObservabilityResponse(
         response.data as ObservabilityMetricsResponse,
         params.metrics,
         params.filter_by
       );
-      
+
       set({ concurrentMetricsData: convertedData });
       return convertedData;
     } catch (error) {
@@ -367,14 +367,14 @@ export const useProjects = create<
       // Convert old params to new observability format
       const observabilityRequest = convertToObservabilityRequest(params);
       const response: any = await AppRequest.Post(`${tempApiBaseUrl}/metrics/analytics`, observabilityRequest);
-      
+
       // Convert response to old format for backward compatibility
       const convertedData = convertObservabilityResponse(
         response.data as ObservabilityMetricsResponse,
         params.metrics,
         params.filter_by
       );
-      
+
       set({ ttftMetricsData: convertedData });
       return convertedData;
     } catch (error) {
@@ -386,14 +386,14 @@ export const useProjects = create<
       // Convert old params to new observability format
       const observabilityRequest = convertToObservabilityRequest(params);
       const response: any = await AppRequest.Post(`${tempApiBaseUrl}/metrics/analytics`, observabilityRequest);
-      
+
       // Convert response to old format for backward compatibility
       const convertedData = convertObservabilityResponse(
         response.data as ObservabilityMetricsResponse,
         params.metrics,
         params.filter_by
       );
-      
+
       set({ latencyMetricsData: convertedData });
       return convertedData;
     } catch (error) {
@@ -405,14 +405,14 @@ export const useProjects = create<
       // Convert old params to new observability format
       const observabilityRequest = convertToObservabilityRequest(params);
       const response: any = await AppRequest.Post(`${tempApiBaseUrl}/metrics/analytics`, observabilityRequest);
-      
+
       // Convert response to old format for backward compatibility
       const convertedData = convertObservabilityResponse(
         response.data as ObservabilityMetricsResponse,
         params.metrics,
         params.filter_by
       );
-      
+
       set({ throughputMetricsData: convertedData });
       return convertedData;
     } catch (error) {
@@ -420,5 +420,5 @@ export const useProjects = create<
     }
   },
 
-  
+
 }));

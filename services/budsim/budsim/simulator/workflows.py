@@ -39,7 +39,9 @@ class SimulationWorkflows:
 
     @dapr_workflow.register_activity
     @staticmethod
-    def get_topk_quantization_engine_configs(ctx: wf.WorkflowActivityContext, kwargs: Dict[str, Any]) -> Dict[str, Any]:
+    def get_topk_quantization_engine_configs(
+        ctx: wf.WorkflowActivityContext, kwargs: Dict[str, Any]
+    ) -> Dict[str, Any]:
         return SimulationService.get_topk_quantization_engine_configs(**kwargs)
 
     @dapr_workflow.register_activity

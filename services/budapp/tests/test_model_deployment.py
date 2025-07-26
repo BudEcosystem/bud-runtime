@@ -91,11 +91,11 @@ async def test_create_endpoint_directly_for_cloud_model():
         mock_model_manager_instance = MagicMock()
         mock_model_manager_instance.retrieve_by_fields = AsyncMock(return_value=mock_model)
         mock_model_manager.return_value = mock_model_manager_instance
-        
+
         mock_cloud_model_manager_instance = MagicMock()
         mock_cloud_model_manager_instance.retrieve_by_fields = AsyncMock(return_value=mock_cloud_model)
         mock_cloud_model_manager.return_value = mock_cloud_model_manager_instance
-        
+
         mock_endpoint_manager_instance = MagicMock()
         mock_endpoint_manager_instance.insert_one = AsyncMock(return_value=mock_endpoint)
         mock_endpoint_manager.return_value = mock_endpoint_manager_instance

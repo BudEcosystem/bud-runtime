@@ -407,10 +407,10 @@ async def get_cluster_config(
 @cluster_router.post("/periodic-node-status-update")
 async def periodic_node_status_update():
     """Periodic job endpoint to update node status for all active clusters.
-    
-    This endpoint is triggered by a Dapr cron binding to keep the cluster 
+
+    This endpoint is triggered by a Dapr cron binding to keep the cluster
     node information in sync with the actual cluster state.
-    
+
     Returns:
         SuccessResponse: A response object indicating success.
         ErrorResponse: A response object containing the error message.
@@ -422,5 +422,5 @@ async def periodic_node_status_update():
     except Exception as e:
         logger.exception("Error in periodic node status update: %s", str(e))
         response = ErrorResponse(message="Error in periodic node status update", code=500)
-    
+
     return response.to_http_response()

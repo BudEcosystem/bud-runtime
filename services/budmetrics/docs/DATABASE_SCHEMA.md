@@ -59,17 +59,17 @@ SETTINGS index_granularity = 8192;
 -- ORDER BY (project_id, model_id, endpoint_id, request_arrival_time, inference_id)
 
 -- Additional indexes for query optimization
-ALTER TABLE ModelInferenceDetails 
+ALTER TABLE ModelInferenceDetails
 ADD INDEX idx_project_timestamp (project_id, request_arrival_time) TYPE minmax GRANULARITY 1;
 
-ALTER TABLE ModelInferenceDetails 
+ALTER TABLE ModelInferenceDetails
 ADD INDEX idx_model_timestamp (model_id, request_arrival_time) TYPE minmax GRANULARITY 1;
 
-ALTER TABLE ModelInferenceDetails 
+ALTER TABLE ModelInferenceDetails
 ADD INDEX idx_endpoint_timestamp (endpoint_id, request_arrival_time) TYPE minmax GRANULARITY 1;
 
-ALTER TABLE ModelInferenceDetails 
-ADD INDEX idx_project_model_endpoint_timestamp 
+ALTER TABLE ModelInferenceDetails
+ADD INDEX idx_project_model_endpoint_timestamp
     (project_id, model_id, endpoint_id, request_arrival_time) TYPE minmax GRANULARITY 1;
 ```
 
@@ -96,10 +96,10 @@ CREATE TABLE ModelInference
     output String,
     cached Bool DEFAULT false,
     finish_reason Nullable(Enum8(
-        'stop' = 1, 
-        'length' = 2, 
-        'tool_call' = 3, 
-        'content_filter' = 4, 
+        'stop' = 1,
+        'length' = 2,
+        'tool_call' = 3,
+        'content_filter' = 4,
         'unknown' = 5
     ))
 )
@@ -277,7 +277,7 @@ SETTINGS index_granularity = 8192
 -- Good: Uses partition
 WHERE request_arrival_time >= '2024-01-01'
 
--- Bad: Scans all partitions  
+-- Bad: Scans all partitions
 WHERE toYear(request_arrival_time) = 2024
 ```
 
@@ -306,7 +306,7 @@ SELECT ... FROM filtered_data
 #### Use Approximate Functions
 ```sql
 -- Faster for large datasets
-SELECT 
+SELECT
     quantile(0.99)(cost) AS p99_cost,  -- Exact
     quantileTDigest(0.99)(cost) AS p99_cost_approx  -- Approximate but faster
 ```
@@ -317,7 +317,7 @@ SELECT
 
 ```sql
 -- View partitions
-SELECT 
+SELECT
     partition,
     name,
     rows,
@@ -329,7 +329,7 @@ WHERE table = 'ModelInferenceDetails'
 ORDER BY partition DESC;
 
 -- Drop old partitions
-ALTER TABLE ModelInferenceDetails 
+ALTER TABLE ModelInferenceDetails
 DROP PARTITION '202301';  -- Drops January 2023 data
 ```
 
@@ -337,7 +337,7 @@ DROP PARTITION '202301';  -- Drops January 2023 data
 
 ```sql
 -- Add TTL to automatically delete old data
-ALTER TABLE ModelInferenceDetails 
+ALTER TABLE ModelInferenceDetails
 MODIFY TTL request_arrival_time + INTERVAL 6 MONTH;
 ```
 
@@ -358,35 +358,35 @@ python scripts/migrate_clickhouse.py --include-model-inference
 
 #### Adding Columns
 ```sql
-ALTER TABLE ModelInferenceDetails 
+ALTER TABLE ModelInferenceDetails
 ADD COLUMN new_field String DEFAULT '' AFTER cost;
 ```
 
 #### Adding Indexes
 ```sql
-ALTER TABLE ModelInferenceDetails 
+ALTER TABLE ModelInferenceDetails
 ADD INDEX idx_new_field (new_field) TYPE bloom_filter GRANULARITY 1;
 ```
 
 #### Changing Data Types
 ```sql
 -- Create new column
-ALTER TABLE ModelInferenceDetails 
+ALTER TABLE ModelInferenceDetails
 ADD COLUMN cost_new Decimal(10, 4);
 
 -- Migrate data
-ALTER TABLE ModelInferenceDetails 
+ALTER TABLE ModelInferenceDetails
 UPDATE cost_new = toDecimal64(cost, 4) WHERE 1;
 
 -- Swap columns
-ALTER TABLE ModelInferenceDetails 
+ALTER TABLE ModelInferenceDetails
 RENAME COLUMN cost TO cost_old;
 
-ALTER TABLE ModelInferenceDetails 
+ALTER TABLE ModelInferenceDetails
 RENAME COLUMN cost_new TO cost;
 
 -- Drop old column
-ALTER TABLE ModelInferenceDetails 
+ALTER TABLE ModelInferenceDetails
 DROP COLUMN cost_old;
 ```
 
