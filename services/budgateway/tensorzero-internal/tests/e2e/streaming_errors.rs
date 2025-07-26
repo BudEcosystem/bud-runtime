@@ -1,9 +1,10 @@
 use futures::StreamExt;
 use serde_json::json;
-use tensorzero::{
+use crate::client_stubs::{
     Client, ClientInferenceParams, ClientInput, ClientInputMessage, ClientInputMessageContent,
-    InferenceOutput, InferenceResponseChunk, Role,
+    InferenceOutput, InferenceResponseChunk,
 };
+use tensorzero_internal::inference::types::Role;
 use tensorzero_internal::inference::types::TextKind;
 
 use crate::{

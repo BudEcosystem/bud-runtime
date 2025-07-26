@@ -9,7 +9,7 @@ use reqwest_eventsource::RequestBuilderExt;
 use serde_json::json;
 use serde_json::Value;
 use std::time::Duration;
-use tensorzero::ContentBlockChunk;
+use tensorzero_internal::inference::types::ContentBlockChunk;
 use tensorzero_internal::cache::cache_lookup_streaming;
 use tensorzero_internal::cache::start_cache_write_streaming;
 use tensorzero_internal::cache::NonStreamingCacheData;

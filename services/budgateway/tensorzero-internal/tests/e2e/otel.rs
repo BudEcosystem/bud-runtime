@@ -8,10 +8,11 @@ use opentelemetry_sdk::{
     error::OTelSdkResult,
     trace::{SpanData, SpanExporter},
 };
-use tensorzero::{
+use crate::client_stubs::{
     ClientInferenceParams, ClientInput, ClientInputMessage, ClientInputMessageContent,
-    InferenceOutput, Role,
+    InferenceOutput,
 };
+use tensorzero_internal::inference::types::Role;
 use tensorzero_internal::inference::types::TextKind;
 use tensorzero_internal::observability::build_opentelemetry_layer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
