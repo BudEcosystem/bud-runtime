@@ -98,7 +98,7 @@ setup(
         "License :: OSI Approved :: Apache Software License",
         "Operating System :: OS Independent",
         "Environment :: Console",
-        "Framework :: PytestProgramming Language :: Python :: 3",
+        "Framework :: Pytest", "Programming Language :: Python :: 3",
     ]
     + [f"Programming Language :: Python :: 3.{i}" for i in range(8, version_range_max)],
 )
