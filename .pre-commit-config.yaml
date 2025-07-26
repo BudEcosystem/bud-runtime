@@ -41,22 +41,27 @@ repos:
 
   # Python linting and formatting (for all Python services)
   - repo: https://github.com/astral-sh/ruff-pre-commit
+    # Ruff version.
     rev: v0.12.2
     hooks:
-      # Run the formatter (always fix formatting)
-      - id: ruff-format
-        types_or: [python, pyi, jupyter]
-        files: ^services/(budapp|budcluster|budsim|budmodel|budmetrics|budnotify|ask-bud|budeval)/
-      # Run the linter (only import sorting and basic syntax checks)
+      # Run the linter.
       - id: ruff
         types_or: [python, pyi, jupyter]
-        args: [--fix, --select=I,F401,F402,F403,F405]
+        args: [--fix]
         files: ^services/(budapp|budcluster|budsim|budmodel|budmetrics|budnotify|ask-bud|budeval)/
         exclude: |
           (?x)^(
               services/budcluster/budcluster/cluster_ops/workflows\.py|
               services/budmetrics/budmetrics/observability/models\.py
           )$
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    # Ruff version.
+    rev: v0.12.2
+    hooks:
+      # Run the formatter.
+      - id: ruff-format
+        types_or: [python, pyi, jupyter]
+        files: ^services/(budapp|budcluster|budsim|budmodel|budmetrics|budnotify|ask-bud|budeval)/
 
   # Rust formatting and linting (for budgateway)
   - repo: local
