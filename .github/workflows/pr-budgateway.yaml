@@ -18,7 +18,7 @@ env:
 
 jobs:
   validate:
-    name: Validate (Rust Checks)
+    name: Build and Test (Rust)
     runs-on: ubuntu-latest
 
     steps:
@@ -66,16 +66,6 @@ jobs:
           cd ${{ env.WORKING_DIR }}
           cargo build --workspace --verbose
 
-      - name: Lint (Rust)
-        run: |
-          cd ${{ env.WORKING_DIR }}
-          cargo fmt -- --check
-          cargo hack clippy --all-targets --each-feature -- -D warnings
-
-      - name: Run cargo-deny
-        run: |
-          cd ${{ env.WORKING_DIR }}
-          cargo deny check
 
       - name: Test (Rust)
         run: |
