@@ -1,4 +1,4 @@
-name: "BudApp: PR Review"
+name: "PR Review - BudApp"
 
 on:
   pull_request:

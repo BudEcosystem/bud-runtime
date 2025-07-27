@@ -1,4 +1,4 @@
-name: PR Review - Budgateway
+name: "PR Review - Budgateway"
 
 on:
   merge_group:

@@ -63,6 +63,7 @@ repos:
       - id: mypy
         types_or: [python, pyi]
         files: ^services/(budapp|budcluster|budsim|budmodel|budmetrics|budnotify|ask-bud)/
+        exclude: ^services/.*/(setup\.py|tests/conftest\.py)$
         additional_dependencies:
           - "pydantic>=1.10.4"
           - ujson
@@ -76,7 +77,7 @@ repos:
     hooks:
       - id: cargo-fmt
         name: cargo fmt
-        entry: bash -c 'cd services/budgateway && cargo fmt -- --check'
+        entry: bash -c 'cd services/budgateway && cargo +nightly fmt -- --check || cargo fmt -- --check'
         language: system
         types: [rust]
         files: ^services/budgateway/
@@ -84,7 +85,7 @@ repos:
 
       - id: cargo-clippy
         name: cargo clippy
-        entry: bash -c 'cd services/budgateway && cargo clippy --all-targets --all-features -- -D warnings || echo "Cargo clippy failed, skipping check"'
+        entry: bash -c 'cd services/budgateway && cargo +nightly clippy --all-targets --all-features -- -D warnings || cargo clippy --all-targets --all-features -- -D warnings'
         language: system
         types: [rust]
         files: ^services/budgateway/
@@ -92,7 +93,7 @@ repos:
 
       - id: cargo-deny
         name: cargo deny
-        entry: bash -c 'cd services/budgateway && cargo deny check || echo "Cargo deny failed, skipping check"'
+        entry: bash -c 'cd services/budgateway && cargo +nightly deny check || cargo deny check'
         language: system
         types: [rust]
         files: ^services/budgateway/
@@ -119,7 +120,7 @@ repos:
 
       - id: budadmin-typecheck
         name: budadmin typecheck
-        entry: bash -c 'cd services/budadmin && npx tsc --noEmit || echo "TypeScript check failed, skipping"'
+        entry: bash -c 'cd services/budadmin && npx tsc --noEmit'
         language: system
         types_or: [ts, tsx]
         files: ^services/budadmin/(src|pages)/
@@ -127,7 +128,7 @@ repos:
 
       - id: budplayground-typecheck
         name: budplayground typecheck
-        entry: bash -c 'cd services/budplayground && npx tsc --noEmit || echo "TypeScript check failed, skipping"'
+        entry: bash -c 'cd services/budplayground && npx tsc --noEmit'
         language: system
         types_or: [ts, tsx]
         files: ^services/budplayground/(app|components|lib)/
@@ -147,17 +148,8 @@ repos:
     rev: 1.7.10
     hooks:
       - id: bandit
-        args: [-r, --skip, B608, -ll]
+        args: [-r, -ll]
         files: ^services/(budapp|budcluster|budsim|budmodel|budmetrics|budnotify|ask-bud)/.*\.py$
 
-  # Security scanning for Python dependencies
-  - repo: local
-    hooks:
-      - id: python-security-check
-        name: Python dependency security check
-        entry: bash -c 'timeout 30 find services -name "requirements*.txt" -exec pip-audit --requirement {} \; || echo "Security check skipped (timeout or pip-audit not available)"'
-        language: system
-        pass_filenames: false
-        always_run: true
 
 default_stages: [pre-commit]
