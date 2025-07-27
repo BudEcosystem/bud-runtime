@@ -1664,7 +1664,8 @@ pub async fn test_parallel_tool_use_default_true_inference_request() {
 #[tokio::test]
 #[tracing_test::traced_test]
 async fn test_log_dropped_thought() {
-    use tensorzero::{ClientInferenceParams, Role};
+    use tensorzero::ClientInferenceParams;
+    use tensorzero_internal::inference::types::Role;
     use tensorzero_internal::inference::types::{TextKind, Thought};
 
     use super::common::make_embedded_gateway_no_config;

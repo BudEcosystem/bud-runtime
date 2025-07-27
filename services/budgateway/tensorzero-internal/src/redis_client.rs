@@ -434,19 +434,14 @@ impl RedisClient {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "e2e_tests"))]
 mod tests {
-    #[cfg(feature = "e2e_tests")]
     use super::*;
-    #[cfg(feature = "e2e_tests")]
     use crate::config_parser::{Config, ProviderTypesConfig};
-    #[cfg(feature = "e2e_tests")]
     use crate::gateway_util::AppStateData;
-    #[cfg(feature = "e2e_tests")]
     use std::sync::Arc;
 
     #[tokio::test]
-    #[cfg(feature = "e2e_tests")]
     async fn test_parse_models_with_api_key() {
         // Create a mock AppStateData with credential store
         let config = Arc::new(Config::default());
@@ -480,7 +475,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "e2e_tests")]
     async fn test_parse_real_world_model_with_api_key() {
         // Test with the exact JSON structure from the error log
         let config = Arc::new(Config::default());
@@ -517,7 +511,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "e2e_tests")]
     async fn test_parse_models_without_api_key() {
         let config = Arc::new(Config::default());
         let app_state = AppStateData::new(config).await.unwrap();
@@ -551,7 +544,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "e2e_tests")]
     async fn test_parse_multiple_models_with_mixed_api_keys() {
         let config = Arc::new(Config::default());
         let app_state = AppStateData::new(config).await.unwrap();
@@ -612,7 +604,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "e2e_tests")]
     async fn test_parse_model_with_encrypted_api_key() {
         use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
         use rsa::pkcs1::EncodeRsaPrivateKey;
