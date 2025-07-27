@@ -51,7 +51,6 @@ repos:
         files: ^services/(budapp|budcluster|budsim|budmodel|budmetrics|budnotify|ask-bud|budeval)/
         exclude: |
           (?x)^(
-              services/budcluster/budcluster/cluster_ops/workflows\.py|
               services/budmetrics/budmetrics/observability/models\.py
           )$
   - repo: https://github.com/astral-sh/ruff-pre-commit

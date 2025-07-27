@@ -34,7 +34,7 @@ export default function LoadModel(props: LoadModelProps) {
         document.documentElement.scrollLeft = document.documentElement.clientWidth;
 
         getEndPoints({ page: 1, limit: 25, apiKey: "" });
-    }, []);
+    }, [getEndPoints]);
 
     useEffect(() => {
 

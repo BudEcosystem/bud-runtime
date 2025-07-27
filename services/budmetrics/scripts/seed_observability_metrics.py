@@ -596,11 +596,14 @@ class ObservabilityMetricsSeeder:
         }
 
         try:
-            async with aiohttp.ClientSession() as session, session.post(
-                analytics_url,
-                json=analytics_request,
-                headers={"Content-Type": "application/json"},
-            ) as response:
+            async with (
+                aiohttp.ClientSession() as session,
+                session.post(
+                    analytics_url,
+                    json=analytics_request,
+                    headers={"Content-Type": "application/json"},
+                ) as response,
+            ):
                 if response.status == 200:
                     result = await response.json()
 

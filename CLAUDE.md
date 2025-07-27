@@ -185,7 +185,7 @@ nix develop  # Enter development shell with k3d, kubectl, helm, opentofu, azure-
 9. **AI Assistance**: ask-bud provides intelligent cluster and performance analysis
 
 ### Key Technologies
-- **Python 3.8+** with FastAPI and budmicroframe for REST APIs
+- **Python 3.10+** with FastAPI and budmicroframe for REST APIs
 - **Rust** for high-performance gateway service (budgateway)
 - **SQLAlchemy + Alembic** for PostgreSQL ORM and migrations
 - **ClickHouse** for time-series analytics (budmetrics)

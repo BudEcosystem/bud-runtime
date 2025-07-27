@@ -568,9 +568,10 @@ class EndpointService(SessionMixin):
             logger.debug(
                 f"Performing update endpoint status request. payload: {payload}, endpoint: {update_cluster_endpoint}"
             )
-            async with aiohttp.ClientSession() as session, session.post(
-                update_cluster_endpoint, json=payload
-            ) as response:
+            async with (
+                aiohttp.ClientSession() as session,
+                session.post(update_cluster_endpoint, json=payload) as response,
+            ):
                 response_data = await response.json()
                 if response.status != 200 or response_data.get("object") == "error":
                     logger.error(f"Failed to update endpoint status: {response.status} {response_data}")
@@ -719,9 +720,10 @@ class EndpointService(SessionMixin):
             "accept": "application/json",
         }
 
-        async with aiohttp.ClientSession() as session, session.get(
-            get_worker_logs_endpoint, headers=headers
-        ) as response:
+        async with (
+            aiohttp.ClientSession() as session,
+            session.get(get_worker_logs_endpoint, headers=headers) as response,
+        ):
             response_data = await response.json()
             if response.status != 200 or response_data.get("object") == "error":
                 error_message = response_data.get("message", "Failed to get endpoint worker logs")
@@ -742,9 +744,10 @@ class EndpointService(SessionMixin):
             "accept": "application/json",
         }
 
-        async with aiohttp.ClientSession() as session, session.get(
-            get_worker_logs_endpoint, headers=headers
-        ) as response:
+        async with (
+            aiohttp.ClientSession() as session,
+            session.get(get_worker_logs_endpoint, headers=headers) as response,
+        ):
             response_data = await response.json()
             if response.status != 200 or response_data.get("object") == "error":
                 error_message = response_data.get("message", "Failed to get endpoint worker metrics history")
@@ -825,9 +828,10 @@ class EndpointService(SessionMixin):
         while True:
             try:
                 payload = {"namespace": namespace, "cluster_id": cluster_id, "page": page, "limit": PAGE_LIMIT}
-                async with aiohttp.ClientSession() as session, session.get(
-                    get_workers_endpoint, params=payload
-                ) as response:
+                async with (
+                    aiohttp.ClientSession() as session,
+                    session.get(get_workers_endpoint, params=payload) as response,
+                ):
                     bud_cluster_response = await response.json()
                     logger.debug("bud_cluster_response: %s", bud_cluster_response)
 
@@ -972,9 +976,10 @@ class EndpointService(SessionMixin):
             logger.debug(
                 f"Performing update endpoint status request. payload: {payload}, endpoint: {delete_worker_endpoint}"
             )
-            async with aiohttp.ClientSession() as session, session.delete(
-                delete_worker_endpoint, json=payload
-            ) as response:
+            async with (
+                aiohttp.ClientSession() as session,
+                session.delete(delete_worker_endpoint, json=payload) as response,
+            ):
                 response_data = await response.json()
                 if response.status != 200 or response_data.get("object") == "error":
                     logger.error(f"Failed to delete worker: {response.status} {response_data}")

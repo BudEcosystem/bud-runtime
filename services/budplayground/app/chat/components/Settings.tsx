@@ -103,13 +103,13 @@ export default function SettingsList({chatId}: {chatId: string}) {
             setSettings(currentSettingPreset);
         }
 
-    }, [hasHydrated]);
+    }, [hasHydrated, addSettingPreset, currentSettingPreset, setCurrentSettingPreset, settingPresets.length]);
 
     useEffect(() => {
         if (settingPresets.length > 0) {
             initComponents();
         }
-    }, [settings]);
+    }, [settings, initComponents, settingPresets.length]);
 
     const handleAddPreset = (name: string) => {
         if (!name) return;
@@ -321,6 +321,7 @@ export default function SettingsList({chatId}: {chatId: string}) {
                                             closeIcon={
                                                 <Image
                                                     src="icons/close.svg"
+                                                    alt="Close"
                                                     preview={false}
                                                     className="!w-[.625rem] !h-[.625rem]"
                                                 />

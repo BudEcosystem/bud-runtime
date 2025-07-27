@@ -31,7 +31,7 @@ export default function Login() {
         } else {
           hideLoader();
         }
-    }, []);
+    }, [handleAdd, hideLoader]);
 
     const handleAdd = async (accessKey?: string) => {
         if(!accessKey) {

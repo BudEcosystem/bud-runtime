@@ -127,9 +127,10 @@ class BudNotifyService:
         logger.debug(f"Sending notification with payload {payload}")
 
         try:
-            async with aiohttp.ClientSession() as session, session.post(
-                self.notification_endpoint, json=payload
-            ) as response:
+            async with (
+                aiohttp.ClientSession() as session,
+                session.post(self.notification_endpoint, json=payload) as response,
+            ):
                 response_data = await response.json()
                 if response.status != 200:
                     logger.error(f"Failed to send notification: {response.status} {response_data}")

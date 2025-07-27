@@ -24,7 +24,7 @@ export default function Home() {
         if(!isLoading){
             hideLoader();
         }
-    }, [apiKey, isLoading]);
+    }, [apiKey, isLoading, hideLoader, router]);
 
     return <div>
         Welcome to the chat

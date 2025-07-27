@@ -22,7 +22,7 @@ export default function BlurModal(props: BlurModalProps) {
         left: rect.left + window.scrollX - 160,
       });
     }
-  }, [props.open])
+  }, [props.open, props.ref])
   return (
       <Modal
         rootClassName=""

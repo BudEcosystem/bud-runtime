@@ -34,6 +34,7 @@ export default function InlineSelect(props: InlineSelectProps) {
               closeIcon={
                 <Image
                   src="icons/close.svg"
+                  alt="Close"
                   preview={false}
                   className="!w-[.625rem] !h-[.625rem]"
                 />
