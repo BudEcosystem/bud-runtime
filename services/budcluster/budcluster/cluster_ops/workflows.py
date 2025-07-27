@@ -84,7 +84,6 @@ class RegisterClusterWorkflow:
             determine_cluster_platform_request
         )
         cluster_config = json.loads(determine_cluster_platform_request_json.cluster_config)  # configuration string
-        enable_master_node = determine_cluster_platform_request_json.enable_master_node
         response: Union[SuccessResponse, ErrorResponse]
         try:
             cluster_platform = asyncio.run(
@@ -1076,7 +1075,7 @@ class RegisterClusterWorkflow:
     @dapr_workflows.register_activity  # type: ignore
     @staticmethod
     def get_kube_config(ctx: wf.WorkflowActivityContext, cluster_info: str) -> dict:
-        """Get the kubeconfig for the created cloud cluster"""
+        """Get the kubeconfig for the created cloud cluster."""
         logger = logging.get_logger("GetKubeConfig")
         workflow_id = ctx.workflow_id
         task_id = ctx.task_id
@@ -1120,7 +1119,7 @@ class RegisterClusterWorkflow:
 
                             parsed_url = urlparse(server_url)
                             hostname = parsed_url.hostname
-                except:
+                except Exception:
                     # Fall back to standard naming convention if parsing fails
                     cluster_name = cluster_info_dict["param"].get("cluster_name", "aks-cluster")
                     hostname = f"{cluster_name}.azmk8s.io"

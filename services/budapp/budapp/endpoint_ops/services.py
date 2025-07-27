@@ -2412,7 +2412,7 @@ class EndpointService(SessionMixin):
         Raises:
             ClientException: If endpoint not found or validation fails
         """
-        from .schemas import DeploymentSettingsConfig, UpdateDeploymentSettingsRequest
+        from .schemas import DeploymentSettingsConfig
 
         # Retrieve endpoint
         endpoint_manager = EndpointDataManager(self.session)

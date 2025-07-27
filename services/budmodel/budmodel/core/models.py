@@ -4,6 +4,7 @@ from sqlalchemy.sql import func
 
 
 def get_db_uri():
+    """Get database URI."""
     # with open('secrets.json') as f:
     #     secrets = json.load(f)
     #     uri =  secrets.get("db_uri")

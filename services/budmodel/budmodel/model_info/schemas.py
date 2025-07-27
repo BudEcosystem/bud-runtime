@@ -74,6 +74,8 @@ class EmbeddingConfig(BaseModel):
 
 class ModelArchitecture(BaseModel):
     class Config:
+        """Configuration class for ModelArchitecture."""
+
         protected_namespaces = ()
 
     type: Optional[str] = None

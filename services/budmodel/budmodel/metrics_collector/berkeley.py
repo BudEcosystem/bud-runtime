@@ -4,6 +4,11 @@ from pyppeteer import launch
 
 
 async def get_gorilla_leaderboard():
+    """Fetch leaderboard data from Berkeley Gorilla.
+
+    Returns:
+        Extracted leaderboard data from Berkeley Gorilla website.
+    """
     browser = await launch(headless=True, args=["--no-sandbox"])
     page = await browser.newPage()
     await page.goto(

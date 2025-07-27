@@ -217,7 +217,7 @@ class TimeSeriesHelper:
 
 @dataclass
 class CTEDefinition:
-    """Definition for a Common Table Expression"""
+    """Definition for a Common Table Expression."""
 
     name: str
     query: str  # Can contain placeholders like {from_date}, {to_date}, {filters}, {group_columns}

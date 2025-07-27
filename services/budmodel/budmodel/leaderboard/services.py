@@ -221,8 +221,9 @@ class LeaderboardService:
     def format_scraped_leaderboard_data(
         leaderboard_data: dict, model_info_id: UUID, source_id: UUID
     ) -> list[LeaderboardCreate]:
-        """Convert old-style leaderboard dictionary to a list of row dicts
-        compatible with the new schema.
+        """Convert old-style leaderboard dictionary to a list of row dicts.
+
+        Compatible with the new schema.
         """
         formatted_leaderboard_data = []
         for metric_name, score in leaderboard_data.items():
@@ -245,6 +246,7 @@ class LeaderboardService:
         data: List[dict],
         model_info_id: UUID,
     ) -> List[LeaderboardCreate]:
+        """Format LLM leaderboard data."""
         return [
             LeaderboardCreate(
                 eval_name=LeaderboardService().prettify_eval_name(item["name"]),
@@ -259,10 +261,11 @@ class LeaderboardService:
 
     @staticmethod
     def prettify_eval_name(name: str) -> str:
-        """Converts raw LLM name to a display-friendly format:
+        """Convert raw LLM name to a display-friendly format.
+
         - Removes non-alphanumeric characters
         - Replaces separators with a space
-        - Capitalizes each word
+        - Capitalizes each word.
         """
         name = re.sub(r"[_\-]+", " ", name)  # underscores/dashes → space
         name = re.sub(r"[^\w\s]", "", name)  # remove non-word characters
@@ -270,9 +273,10 @@ class LeaderboardService:
 
     @staticmethod
     def normalize_eval_name(name: str) -> str:
-        """Converts name to normalized format:
+        """Convert name to normalized format.
+
         - Lowercase
-        - Removes all special characters and spaces
+        - Removes all special characters and spaces.
         """
         return re.sub(r"[\W_]+", "", name).lower()
 

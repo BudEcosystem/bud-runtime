@@ -34,7 +34,6 @@ from budmicroframe.shared.dapr_service import DaprService
 
 from ..commons.config import app_settings
 from ..commons.constants import ModelDownloadStatus
-from ..commons.directory_utils import DirectoryOperations
 from ..commons.exceptions import (
     Aria2Exception,
     CompressionException,
@@ -196,8 +195,6 @@ class LocalModelDownloadService:
         """
         source_path = os.path.join(app_settings.add_model_dir, uri)
         destination = os.path.join(app_settings.model_download_dir, directory_name)
-
-        directory_operations = DirectoryOperations()
 
         # Calculate free space
         free_space_gb = DownloadHistory.get_available_space()

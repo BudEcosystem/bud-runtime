@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """ClickHouse migration script for bud-serve-metrics.
+
 Run this script to create required tables in ClickHouse.
 """
 
@@ -54,6 +55,13 @@ def get_clickhouse_config() -> ClickHouseConfig:
 
 class ClickHouseMigration:
     def __init__(self, include_model_inference: bool = False, max_retries: int = 30, retry_delay: int = 2):
+        """Initialize the ClickHouse migration.
+
+        Args:
+            include_model_inference: Whether to include ModelInference table creation
+            max_retries: Maximum number of connection retries
+            retry_delay: Delay between retries in seconds
+        """
         self.include_model_inference = include_model_inference
         self.max_retries = max_retries
         self.retry_delay = retry_delay
@@ -88,7 +96,7 @@ class ClickHouseMigration:
                         logger.warning(f"Failed to close ClickHouse client during retry: {close_exc}")
                 else:
                     logger.error(f"ClickHouse failed to become ready after {self.max_retries} attempts")
-                    raise Exception(f"ClickHouse connection failed: {e}")
+                    raise Exception(f"ClickHouse connection failed: {e}") from e
 
         return False
 
@@ -248,6 +256,7 @@ class ClickHouseMigration:
 
 
 async def main():
+    """Run the ClickHouse migration script."""
     parser = argparse.ArgumentParser(description="ClickHouse migration script for bud-serve-metrics")
     parser.add_argument(
         "--include-model-inference",

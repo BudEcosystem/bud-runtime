@@ -1,4 +1,3 @@
-import html
 import json
 import math
 import os
@@ -25,7 +24,7 @@ from huggingface_hub import (
     snapshot_download,
 )
 from huggingface_hub import errors as hf_hub_errors
-from lxml import html
+from lxml import html as lxml_html
 from transformers import AutoConfig
 
 from ..commons.config import app_settings
@@ -201,6 +200,7 @@ class HuggingFaceModelInfo(BaseModelInfo):
 
     @staticmethod
     def download_hf_repo_file(pretrained_model_name_or_path, filename, token):
+        """Download a specific file from HuggingFace repository."""
         try:
             return hf_hub_download(pretrained_model_name_or_path, filename=filename, token=token)
         except hf_hub_errors.GatedRepoError as e:
@@ -324,6 +324,7 @@ class HuggingFaceModelInfo(BaseModelInfo):
 
     @staticmethod
     def parse_embedding_model_config(pooling_config: Dict[str, Any]) -> Dict[str, Any]:
+        """Parse embedding model configuration from pooling config."""
         return EmbeddingConfig(embedding_dimension=pooling_config.get("word_embedding_dimension"))
 
     @staticmethod
@@ -789,6 +790,7 @@ class HuggingfaceUtils:
 
     @staticmethod
     def scrap_hf_logo(hf_url):
+        """Scrape HuggingFace logo from the given URL."""
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
         }
@@ -800,7 +802,7 @@ class HuggingfaceUtils:
             response = requests.get(hf_url, headers=headers)
             response.raise_for_status()  # Raise an exception for HTTP errors
             # Parse the HTML content
-            tree = html.fromstring(response.content)
+            tree = lxml_html.fromstring(response.content)
             # Try to get the image using the XPath
             xpath_selector = "/html/body/div/main/header/div/div[1]/div[1]/img"
             img_elements = tree.xpath(xpath_selector)
@@ -827,7 +829,8 @@ class HuggingfaceUtils:
 
     @staticmethod
     def get_org_name(hf_uri: str, token: Optional[str] = None) -> Optional[str]:
-        """Extracts the organization name from the Hugging Face URI.
+        """Extract the organization name from the Hugging Face URI.
+
         Handles exceptions gracefully.
         """
         api = HfApi(token=token)
@@ -852,7 +855,7 @@ class HuggingfaceUtils:
 
     @staticmethod
     def get_hf_logo(hf_uri: str, token: Optional[str] = None) -> str:
-        """Saves the HF organization logo locally if not already saved.
+        """Save the HF organization logo locally if not already saved.
 
         - Checks if the logo is already saved.
         - If not, scrapes and saves it.

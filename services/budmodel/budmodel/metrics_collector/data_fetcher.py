@@ -6,6 +6,7 @@ from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
 
 
 async def extract_data():
+    """Extract leaderboard data from web page using CSS selectors."""
     # Define the extraction schema to target the new container
     schema = {
         "name": "leaderboard",

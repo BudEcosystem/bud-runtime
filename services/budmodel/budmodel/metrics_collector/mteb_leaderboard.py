@@ -4,6 +4,11 @@ from pyppeteer import launch
 
 
 async def get_table_rows():
+    """Fetch table rows from MTEB leaderboard.
+
+    Returns:
+        Extracted table rows from MTEB leaderboard website.
+    """
     browser = await launch(headless=True, args=["--no-sandbox"])
     page = await browser.newPage()
 

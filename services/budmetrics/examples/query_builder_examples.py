@@ -18,7 +18,7 @@ from budmetrics.observability.models import QueryBuilder
 
 
 def example_1_basic_query():
-    """Example 1: Basic request count query."""
+    """Demonstrate basic request count query."""
     print("\n=== Example 1: Basic Query ===")
 
     # Create query builder
@@ -38,7 +38,7 @@ def example_1_basic_query():
 
 
 def example_2_multiple_metrics_with_grouping():
-    """Example 2: Multiple metrics with grouping and filtering."""
+    """Demonstrate multiple metrics with grouping and filtering."""
     print("\n=== Example 2: Multiple Metrics with Grouping ===")
 
     qb = QueryBuilder(performance_metrics=None)
@@ -61,7 +61,7 @@ def example_2_multiple_metrics_with_grouping():
 
 
 def example_3_topk_query():
-    """Example 3: TopK query to get top entities."""
+    """Demonstrate TopK query to get top entities."""
     print("\n=== Example 3: TopK Query ===")
 
     qb = QueryBuilder(performance_metrics=None)
@@ -81,7 +81,7 @@ def example_3_topk_query():
 
 
 def example_4_concurrent_requests():
-    """Example 4: Concurrent requests with CTE."""
+    """Demonstrate concurrent requests with CTE."""
     print("\n=== Example 4: Concurrent Requests ===")
 
     qb = QueryBuilder(performance_metrics=None)
@@ -100,7 +100,7 @@ def example_4_concurrent_requests():
 
 
 def example_5_custom_intervals():
-    """Example 5: Custom time intervals with alignment."""
+    """Demonstrate custom time intervals with alignment."""
     print("\n=== Example 5: Custom Intervals ===")
 
     qb = QueryBuilder(performance_metrics=None)
@@ -135,7 +135,7 @@ def example_5_custom_intervals():
 
 
 def example_6_performance_metrics():
-    """Example 6: Performance metrics with percentiles."""
+    """Demonstrate performance metrics with percentiles."""
     print("\n=== Example 6: Performance Metrics ===")
 
     qb = QueryBuilder(performance_metrics=None)
@@ -155,7 +155,7 @@ def example_6_performance_metrics():
 
 
 def example_7_token_metrics():
-    """Example 7: Token metrics for cost analysis."""
+    """Demonstrate token metrics for cost analysis."""
     print("\n=== Example 7: Token Metrics ===")
 
     qb = QueryBuilder(performance_metrics=None)
@@ -175,7 +175,7 @@ def example_7_token_metrics():
 
 
 def example_8_cache_metrics():
-    """Example 8: Cache performance metrics."""
+    """Demonstrate cache performance metrics."""
     print("\n=== Example 8: Cache Metrics ===")
 
     qb = QueryBuilder(performance_metrics=None)
@@ -194,7 +194,7 @@ def example_8_cache_metrics():
 
 
 def example_9_complex_filtering():
-    """Example 9: Complex filtering with multiple conditions."""
+    """Demonstrate complex filtering with multiple conditions."""
     print("\n=== Example 9: Complex Filtering ===")
 
     qb = QueryBuilder(performance_metrics=None)
@@ -223,7 +223,7 @@ def example_9_complex_filtering():
 
 
 def example_10_all_metrics():
-    """Example 10: Query with all available metrics."""
+    """Demonstrate query with all available metrics."""
     print("\n=== Example 10: All Metrics ===")
 
     qb = QueryBuilder(performance_metrics=None)

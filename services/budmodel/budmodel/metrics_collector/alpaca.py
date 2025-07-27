@@ -4,6 +4,11 @@ from pyppeteer import launch
 
 
 async def get_alpaca_eval_leaderboard():
+    """Fetch leaderboard data from Alpaca Eval.
+
+    Returns:
+        Extracted leaderboard data from Alpaca Eval website.
+    """
     browser = await launch(headless=True, args=["--no-sandbox"])
     page = await browser.newPage()
     await page.goto("https://tatsu-lab.github.io/alpaca_eval/", {"waitUntil": "networkidle2", "timeout": 600000})

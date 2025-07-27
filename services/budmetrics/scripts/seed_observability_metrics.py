@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Seeder script for observability metrics using the /add endpoint.
+
 This script generates and posts test data to the observability/add endpoint.
 Optionally, it can also seed the ModelInference table directly.
 """
@@ -42,6 +43,13 @@ class ObservabilityMetricsSeeder:
         seed_model_inference: bool = False,
         direct_db: bool = False,
     ):
+        """Initialize the observability metrics seeder.
+
+        Args:
+            base_url: Base URL of the API
+            seed_model_inference: Whether to seed ModelInference table
+            direct_db: Whether to use direct DB for ModelInferenceDetails
+        """
         self.base_url = base_url
         self.endpoint_url = f"{base_url}/observability/add"
         self.seed_model_inference = seed_model_inference
@@ -324,7 +332,7 @@ class ObservabilityMetricsSeeder:
         batch_data = []
         inference_ids = []
 
-        for i in range(batch_size):
+        for _ in range(batch_size):
             # Generate inference_id that will be shared between both tables
             inference_id = uuid4()
             inference_ids.append(inference_id)
@@ -588,31 +596,30 @@ class ObservabilityMetricsSeeder:
         }
 
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    analytics_url,
-                    json=analytics_request,
-                    headers={"Content-Type": "application/json"},
-                ) as response:
-                    if response.status == 200:
-                        result = await response.json()
+            async with aiohttp.ClientSession() as session, session.post(
+                analytics_url,
+                json=analytics_request,
+                headers={"Content-Type": "application/json"},
+            ) as response:
+                if response.status == 200:
+                    result = await response.json()
 
-                        # Count total requests from all time periods
-                        total_requests = 0
-                        for period in result.get("items", []):
-                            for item in period.get("items", []):
-                                request_count = item.get("data", {}).get("request_count", {}).get("count", 0)
-                                total_requests += request_count
+                    # Count total requests from all time periods
+                    total_requests = 0
+                    for period in result.get("items", []):
+                        for item in period.get("items", []):
+                            request_count = item.get("data", {}).get("request_count", {}).get("count", 0)
+                            total_requests += request_count
 
-                        logger.info(f"  Total records in ModelInferenceDetails: {total_requests:,}")
-                        logger.info(f"  Expected records (inserted): {self.total_inserted:,}")
+                    logger.info(f"  Total records in ModelInferenceDetails: {total_requests:,}")
+                    logger.info(f"  Expected records (inserted): {self.total_inserted:,}")
 
-                        if total_requests >= self.total_inserted:
-                            logger.info("  ✓ Verification successful!")
-                        else:
-                            logger.warning("  ⚠ Found fewer records than expected")
+                    if total_requests >= self.total_inserted:
+                        logger.info("  ✓ Verification successful!")
                     else:
-                        logger.error(f"  Failed to verify: HTTP {response.status}")
+                        logger.warning("  ⚠ Found fewer records than expected")
+                else:
+                    logger.error(f"  Failed to verify: HTTP {response.status}")
 
         except Exception as e:
             logger.error(f"  Verification error: {e}")
@@ -655,7 +662,7 @@ class ObservabilityMetricsSeeder:
 
 
 async def main():
-    """Main function to run the seeder."""
+    """Run the seeder."""
     parser = argparse.ArgumentParser(description="Seed observability metrics via the /add API endpoint")
     parser.add_argument(
         "--url",

@@ -96,16 +96,8 @@ class OpenAIModelFee(BaseModel):
 
 
 async def crawl_huggingface_leaderboard():
+    """Crawl the Hugging Face leaderboard for model data."""
     print("here_______")
-    # JavaScript to click a "Load More" button if present
-    js_code = """
-    const loadMoreButton = Array.from(document.querySelectorAll('button')).find(button => button.textContent.includes('Load More'));
-    if (loadMoreButton) {
-        loadMoreButton.click();
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds for content to load
-    }
-    """
-
     # Wait function to ensure necessary content is loaded on the page
     wait_for = """
     () => {

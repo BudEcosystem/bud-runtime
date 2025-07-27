@@ -6,6 +6,18 @@ from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
 
 
 async def extract_data(url, schema, wait_for="", js_code="", css_base_selector=""):
+    """Extract data from web page using provided schema and configuration.
+
+    Args:
+        url: Target URL to crawl.
+        schema: Extraction schema for CSS selectors.
+        wait_for: CSS selector to wait for before extraction.
+        js_code: JavaScript code to execute on page.
+        css_base_selector: Base CSS selector for extraction.
+
+    Returns:
+        Extracted data in JSON format.
+    """
     extraction_strategy = JsonCssExtractionStrategy(schema, verbose=True)
 
     async def on_execution_started_hook(page):

@@ -2,6 +2,7 @@ import requests
 
 
 def get_files_huggingface_space(space_url, pattern_start, pattern_end):
+    """Get files from a Hugging Face space."""
     # Construct the API URL by appending '/tree/main' to the base space_url
     api_url = f"{space_url.rstrip('/')}/tree/main"
 

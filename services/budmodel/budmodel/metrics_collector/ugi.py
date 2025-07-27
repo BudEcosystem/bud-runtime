@@ -5,6 +5,11 @@ from pyppeteer import launch
 
 
 async def get_ugi_leaderboard():
+    """Fetch leaderboard data from UGI.
+
+    Returns:
+        Extracted leaderboard data from UGI website.
+    """
     browser = await launch(headless=True, args=["--no-sandbox"])
     page = await browser.newPage()
     await page.goto(

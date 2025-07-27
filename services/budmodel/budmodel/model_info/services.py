@@ -1217,7 +1217,7 @@ class ModelSecurityScanService:
 
     @staticmethod
     def download_model_from_minio(prefix: str, local_destination: str, workflow_id: Optional[str] = None) -> List[str]:
-        """Downloads all files under a prefix using `download_file` and sets only `start_time` in state store."""
+        """Download all files under a prefix using `download_file` and set only `start_time` in state store."""
         store = ModelStore(model_download_dir=app_settings.model_download_dir)
         store_client = store.get_client()
         downloaded_files = []
@@ -1249,7 +1249,7 @@ class ModelSecurityScanService:
             except Exception as e:
                 logger.exception("Statestore unavailable or error occurred while getting state: %s", e)
 
-        for index, object_name in enumerate(object_names):
+        for _index, object_name in enumerate(object_names):
             relative_path = object_name[len(prefix) :].lstrip("/")
             local_file_path = os.path.join(local_destination, relative_path)
 
@@ -1867,6 +1867,7 @@ class SecurityScanETAObserver:
         target_topic_name: Optional[str] = None,
         target_name: Optional[str] = None,
     ) -> int:
+        """Calculate estimated time of arrival for workflow completion."""
         try:
             # Get the state store data
             state_store_key = f"eta_{workflow_id}"

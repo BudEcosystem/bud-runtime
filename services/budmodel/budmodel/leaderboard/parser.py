@@ -328,7 +328,7 @@ class AlpacaSourceParser(BaseSourceMixin):
 
     @staticmethod
     async def parse_entry(entry: Dict[str, Any]) -> Dict[str, Any]:
-        """Implementation of required abstract method."""
+        """Implement required abstract method."""
         return entry
 
     @staticmethod
@@ -397,7 +397,7 @@ class AlpacaSourceParser(BaseSourceMixin):
 
     @staticmethod
     def parse_alpacasource_csv(csv_url):
-        """Extracts the alpaca source data from CSV URL."""
+        """Extract the alpaca source data from CSV URL."""
         import numpy as np
         import pandas as pd
 
@@ -428,7 +428,7 @@ class UGISourceParser(BaseSourceMixin):
 
     @staticmethod
     async def parse_entry(entry: Dict[str, Any]) -> Dict[str, Any]:
-        """Parses an entry from the UGI source."""
+        """Parse an entry from the UGI source."""
         provider_url = None
         website_url = None
 
@@ -466,7 +466,7 @@ class LLMStatsSourceParser(BaseSourceMixin):
 
     @staticmethod
     async def parse_entry(entry: Dict[str, Any]) -> Dict[str, Any]:
-        """Parses an entry from the UGI source."""
+        """Parse an entry from the UGI source."""
         provider_url = None
         license_details = None
         website_url = None
@@ -500,10 +500,7 @@ class LLMStatsSourceParser(BaseSourceMixin):
             uri_path = urlparse(model_link).path.lstrip("/")
             uri_norm = re.sub(r"[^a-z0-9]", "", uri_path.lower())
 
-            if model_norm and model_norm in uri_norm:
-                uri = uri_path
-            else:
-                uri = entry["model"]
+            uri = uri_path if model_norm and model_norm in uri_norm else entry["model"]
 
             provider_type = "hugging_face"
             provider_url = model_link
@@ -516,10 +513,7 @@ class LLMStatsSourceParser(BaseSourceMixin):
                     num_params=entry.get("num_params"),
                     text_config=LLMConfig(context_length=entry.get("max_input_tokens")),
                 )
-        if entry["license"] != "Proprietary":
-            input_license = entry.get("license")
-        else:
-            input_license = entry.get("organization")
+        input_license = entry.get("license") if entry["license"] != "Proprietary" else entry.get("organization")
 
         license_details = upsert_license_details(input_license)
 

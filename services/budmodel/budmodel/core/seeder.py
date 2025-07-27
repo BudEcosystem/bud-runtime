@@ -19,6 +19,7 @@ Base = declarative_base()
 
 # Function to seed the database with Sources
 def seed_sources():
+    """Seed the database with source data."""
     # Sample data to seed
     sources_data = [
         {
