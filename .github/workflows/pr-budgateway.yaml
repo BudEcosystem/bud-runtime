@@ -81,7 +81,7 @@ jobs:
         run: |
           cd ${{ env.WORKING_DIR }}
           # Skip the redis_client tests that require ClickHouse
-          cargo nextest run --lib --bins --profile default
+          unset TENSORZERO_CLICKHOUSE_URL && cargo test-unit
 
   clickhouse-tests:
     name: ClickHouse Tests
