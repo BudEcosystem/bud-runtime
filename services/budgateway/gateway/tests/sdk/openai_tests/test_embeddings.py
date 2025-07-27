@@ -13,13 +13,10 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # Clients
 tensorzero_client = OpenAI(
-    base_url=f"{TENSORZERO_BASE_URL}/v1",
-    api_key=TENSORZERO_API_KEY
+    base_url=f"{TENSORZERO_BASE_URL}/v1", api_key=TENSORZERO_API_KEY
 )
 
-openai_client = OpenAI(
-    api_key=OPENAI_API_KEY
-)
+openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
 
 class TestEmbeddings:
@@ -31,9 +28,7 @@ class TestEmbeddings:
 
         # TensorZero request
         tz_response = tensorzero_client.embeddings.create(
-            model="text-embedding-ada-002",
-            input=text,
-            encoding_format="float"
+            model="text-embedding-ada-002", input=text, encoding_format="float"
         )
 
         # Verify response structure
@@ -49,16 +44,10 @@ class TestEmbeddings:
 
     def test_batch_embeddings(self):
         """Test batch text embeddings"""
-        texts = [
-            "First text to embed",
-            "Second text to embed",
-            "Third text to embed"
-        ]
+        texts = ["First text to embed", "Second text to embed", "Third text to embed"]
 
         response = tensorzero_client.embeddings.create(
-            model="text-embedding-ada-002",
-            input=texts,
-            encoding_format="float"
+            model="text-embedding-ada-002", input=texts, encoding_format="float"
         )
 
         assert len(response.data) == 3
@@ -71,16 +60,11 @@ class TestEmbeddings:
         """Test different embedding models"""
         text = "Test embedding"
 
-        models = [
-            ("text-embedding-ada-002", 1536),
-            ("text-embedding-3-small", 1536)
-        ]
+        models = [("text-embedding-ada-002", 1536), ("text-embedding-3-small", 1536)]
 
         for model, expected_dim in models:
             response = tensorzero_client.embeddings.create(
-                model=model,
-                input=text,
-                encoding_format="float"
+                model=model, input=text, encoding_format="float"
             )
 
             assert response.model == model
@@ -96,7 +80,7 @@ class TestEmbeddings:
             model="text-embedding-3-small",
             input=text,
             dimensions=512,
-            encoding_format="float"
+            encoding_format="float",
         )
 
         # TensorZero returns full dimensions (1536) regardless of dimensions parameter
@@ -106,14 +90,12 @@ class TestEmbeddings:
         """Test handling of empty input"""
         with pytest.raises(Exception):
             tensorzero_client.embeddings.create(
-                model="text-embedding-ada-002",
-                input=""
+                model="text-embedding-ada-002", input=""
             )
 
         with pytest.raises(Exception):
             tensorzero_client.embeddings.create(
-                model="text-embedding-ada-002",
-                input=[]
+                model="text-embedding-ada-002", input=[]
             )
 
     def test_large_batch_embeddings(self):
@@ -122,9 +104,7 @@ class TestEmbeddings:
         texts = [f"This is test text number {i}" for i in range(50)]
 
         response = tensorzero_client.embeddings.create(
-            model="text-embedding-ada-002",
-            input=texts,
-            encoding_format="float"
+            model="text-embedding-ada-002", input=texts, encoding_format="float"
         )
 
         assert len(response.data) == 50
@@ -138,13 +118,11 @@ class TestEmbeddings:
             "Text with émojis 🚀🎉",
             "Text with special chars: @#$%^&*()",
             "Multi-line\ntext\nwith\nbreaks",
-            "Unicode: 你好世界"
+            "Unicode: 你好世界",
         ]
 
         response = tensorzero_client.embeddings.create(
-            model="text-embedding-ada-002",
-            input=texts,
-            encoding_format="float"
+            model="text-embedding-ada-002", input=texts, encoding_format="float"
         )
 
         assert len(response.data) == len(texts)
@@ -156,13 +134,11 @@ class TestEmbeddings:
         texts = [
             "The cat sat on the mat",
             "The cat is sitting on the mat",
-            "The weather is nice today"
+            "The weather is nice today",
         ]
 
         response = tensorzero_client.embeddings.create(
-            model="text-embedding-ada-002",
-            input=texts,
-            encoding_format="float"
+            model="text-embedding-ada-002", input=texts, encoding_format="float"
         )
 
         # Calculate cosine similarity
@@ -188,9 +164,7 @@ class TestEmbeddings:
 
         # Default format (float)
         response_float = tensorzero_client.embeddings.create(
-            model="text-embedding-ada-002",
-            input=text,
-            encoding_format="float"
+            model="text-embedding-ada-002", input=text, encoding_format="float"
         )
 
         assert isinstance(response_float.data[0].embedding[0], float)
@@ -201,16 +175,13 @@ class TestEmbeddings:
         from openai import AsyncOpenAI
 
         async_client = AsyncOpenAI(
-            base_url=f"{TENSORZERO_BASE_URL}/v1",
-            api_key=TENSORZERO_API_KEY
+            base_url=f"{TENSORZERO_BASE_URL}/v1", api_key=TENSORZERO_API_KEY
         )
 
         text = "Async embedding test"
 
         response = await async_client.embeddings.create(
-            model="text-embedding-ada-002",
-            input=text,
-            encoding_format="float"
+            model="text-embedding-ada-002", input=text, encoding_format="float"
         )
 
         assert len(response.data[0].embedding) == 1536
@@ -225,15 +196,12 @@ class TestEmbeddings:
 
         # Get embedding from TensorZero
         tz_response = tensorzero_client.embeddings.create(
-            model="text-embedding-ada-002",
-            input=text,
-            encoding_format="float"
+            model="text-embedding-ada-002", input=text, encoding_format="float"
         )
 
         # Get embedding from OpenAI directly
         oai_response = openai_client.embeddings.create(
-            model="text-embedding-ada-002",
-            input=text
+            model="text-embedding-ada-002", input=text
         )
 
         # Embeddings should be identical

@@ -56,7 +56,7 @@ const LoginPage = ({ onSubmit }: LoginPageModalProps) => {
       email: "",
       password: "",
     });
-  }, []);
+  }, [form]);
 
 
   if (!mounted) {

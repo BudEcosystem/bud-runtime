@@ -48,11 +48,6 @@ repos:
       - id: ruff
         types_or: [python, pyi, jupyter]
         args: [--fix]
-        files: ^services/(budapp|budcluster|budsim|budmodel|budmetrics|budnotify|ask-bud|budeval)/
-        exclude: |
-          (?x)^(
-              services/budmetrics/budmetrics/observability/models\.py
-          )$
   - repo: https://github.com/astral-sh/ruff-pre-commit
     # Ruff version.
     rev: v0.12.2
@@ -60,7 +55,6 @@ repos:
       # Run the formatter.
       - id: ruff-format
         types_or: [python, pyi, jupyter]
-        files: ^services/(budapp|budcluster|budsim|budmodel|budmetrics|budnotify|ask-bud|budeval)/
 
   # Rust formatting and linting (for budgateway)
   - repo: local

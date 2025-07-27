@@ -17,10 +17,7 @@ TENSORZERO_BASE_URL = os.getenv("TENSORZERO_BASE_URL", "http://localhost:3001")
 TENSORZERO_API_KEY = os.getenv("TENSORZERO_API_KEY", "test-api-key")
 
 # Universal OpenAI client that works with Together AI models
-client = OpenAI(
-    base_url=f"{TENSORZERO_BASE_URL}/v1",
-    api_key=TENSORZERO_API_KEY
-)
+client = OpenAI(base_url=f"{TENSORZERO_BASE_URL}/v1", api_key=TENSORZERO_API_KEY)
 
 
 class TestTogetherModelsViaOpenAISDK:
@@ -41,7 +38,7 @@ class TestTogetherModelsViaOpenAISDK:
             response = client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": f"Hello from {model}"}],
-                max_tokens=50
+                max_tokens=50,
             )
 
             assert response.choices[0].message.content is not None
@@ -54,7 +51,7 @@ class TestTogetherModelsViaOpenAISDK:
         response = client.chat.completions.create(
             model="meta-llama/Llama-3.3-70B-Instruct-Turbo",
             messages=[{"role": "user", "content": "What's special about Llama 3.3?"}],
-            max_tokens=100
+            max_tokens=100,
         )
 
         assert response.choices[0].message.content is not None
@@ -64,7 +61,7 @@ class TestTogetherModelsViaOpenAISDK:
         response = client.chat.completions.create(
             model="meta-llama/Llama-3.2-3B-Instruct-Turbo",
             messages=[{"role": "user", "content": "Hello from Llama 3.2"}],
-            max_tokens=50
+            max_tokens=50,
         )
 
         assert response.choices[0].message.content is not None
@@ -76,7 +73,7 @@ class TestTogetherModelsViaOpenAISDK:
             model="meta-llama/Llama-3.1-8B-Instruct-Turbo",
             messages=[{"role": "user", "content": "Count to 5"}],
             max_tokens=50,
-            stream=True
+            stream=True,
         )
 
         chunks = []
@@ -96,9 +93,9 @@ class TestTogetherModelsViaOpenAISDK:
             model="Qwen/Qwen2.5-72B-Instruct-Turbo",
             messages=[
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": "Hello, what platform are you on?"}
+                {"role": "user", "content": "Hello, what platform are you on?"},
             ],
-            max_tokens=100
+            max_tokens=100,
         )
 
         assert response.choices[0].message.content is not None
@@ -114,7 +111,7 @@ class TestTogetherModelsViaOpenAISDK:
             model=model,
             messages=[{"role": "user", "content": "What is 2+2?"}],
             max_tokens=20,
-            temperature=0.0
+            temperature=0.0,
         )
 
         # High temperature (more creative)
@@ -122,7 +119,7 @@ class TestTogetherModelsViaOpenAISDK:
             model=model,
             messages=[{"role": "user", "content": "Tell me a creative fact"}],
             max_tokens=50,
-            temperature=1.0
+            temperature=1.0,
         )
 
         assert response_low.choices[0].message.content is not None
@@ -133,13 +130,11 @@ class TestTogetherModelsViaOpenAISDK:
         messages = [
             {"role": "user", "content": "My favorite color is blue"},
             {"role": "assistant", "content": "That's nice! Blue is a calming color."},
-            {"role": "user", "content": "What's my favorite color?"}
+            {"role": "user", "content": "What's my favorite color?"},
         ]
 
         response = client.chat.completions.create(
-            model="deepseek-ai/deepseek-v2.5",
-            messages=messages,
-            max_tokens=50
+            model="deepseek-ai/deepseek-v2.5", messages=messages, max_tokens=50
         )
 
         assert response.choices[0].message.content is not None
@@ -151,10 +146,13 @@ class TestTogetherModelsViaOpenAISDK:
         response = client.chat.completions.create(
             model="meta-llama/Llama-3.3-70B-Instruct-Turbo",
             messages=[
-                {"role": "user", "content": "Return a JSON object with name and age fields"}
+                {
+                    "role": "user",
+                    "content": "Return a JSON object with name and age fields",
+                }
             ],
             max_tokens=100,
-            response_format={"type": "json_object"}
+            response_format={"type": "json_object"},
         )
 
         assert response.choices[0].message.content is not None
@@ -167,7 +165,7 @@ class TestTogetherModelsViaOpenAISDK:
         response = client.chat.completions.create(
             model="meta-llama/Llama-3.2-3B-Instruct-Turbo",
             messages=[{"role": "user", "content": "Tell me a very long story"}],
-            max_tokens=10
+            max_tokens=10,
         )
 
         assert response.choices[0].message.content is not None
@@ -175,9 +173,9 @@ class TestTogetherModelsViaOpenAISDK:
         assert len(response.choices[0].message.content) > 0
 
         # Verify finish_reason if available
-        if hasattr(response.choices[0], 'finish_reason'):
+        if hasattr(response.choices[0], "finish_reason"):
             # Could be 'length' if truncated due to max_tokens
-            assert response.choices[0].finish_reason in ['stop', 'length', None]
+            assert response.choices[0].finish_reason in ["stop", "length", None]
 
     def test_together_tool_calling(self):
         """Test tool calling with Together AI models that support it."""
@@ -192,21 +190,23 @@ class TestTogetherModelsViaOpenAISDK:
                         "properties": {
                             "location": {
                                 "type": "string",
-                                "description": "The city and state"
+                                "description": "The city and state",
                             }
                         },
-                        "required": ["location"]
-                    }
-                }
+                        "required": ["location"],
+                    },
+                },
             }
         ]
 
         response = client.chat.completions.create(
             model="meta-llama/Llama-3.3-70B-Instruct-Turbo",
-            messages=[{"role": "user", "content": "What's the weather in San Francisco?"}],
+            messages=[
+                {"role": "user", "content": "What's the weather in San Francisco?"}
+            ],
             tools=tools,
             tool_choice="auto",
-            max_tokens=150
+            max_tokens=150,
         )
 
         assert response.choices[0].message is not None
@@ -224,14 +224,14 @@ class TestTogetherVsOtherProviders:
         providers_and_models = [
             ("gpt-3.5-turbo", "OpenAI"),
             ("claude-3-haiku-20240307", "Anthropic"),
-            ("meta-llama/Llama-3.1-8B-Instruct-Turbo", "Together")
+            ("meta-llama/Llama-3.1-8B-Instruct-Turbo", "Together"),
         ]
 
         for model, provider in providers_and_models:
             response = client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": test_message}],
-                max_tokens=50
+                max_tokens=50,
             )
 
             assert response.choices[0].message.content is not None
@@ -243,7 +243,7 @@ class TestTogetherVsOtherProviders:
         models = [
             "gpt-3.5-turbo",  # OpenAI
             "claude-3-haiku-20240307",  # Anthropic
-            "meta-llama/Llama-3.2-3B-Instruct-Turbo"  # Together
+            "meta-llama/Llama-3.2-3B-Instruct-Turbo",  # Together
         ]
 
         for model in models:
@@ -251,7 +251,7 @@ class TestTogetherVsOtherProviders:
                 model=model,
                 messages=[{"role": "user", "content": "Count to 3"}],
                 max_tokens=30,
-                stream=True
+                stream=True,
             )
 
             chunks = []
@@ -271,7 +271,7 @@ class TestTogetherEdgeCases:
             client.chat.completions.create(
                 model="meta-llama/Llama-3.1-8B-Instruct-Turbo",
                 messages=[],
-                max_tokens=50
+                max_tokens=50,
             )
 
     def test_very_long_input(self):
@@ -281,7 +281,7 @@ class TestTogetherEdgeCases:
         response = client.chat.completions.create(
             model="Qwen/Qwen2.5-72B-Instruct-Turbo",
             messages=[{"role": "user", "content": long_message}],
-            max_tokens=50
+            max_tokens=50,
         )
 
         assert response.choices[0].message.content is not None
@@ -293,7 +293,7 @@ class TestTogetherEdgeCases:
         response = client.chat.completions.create(
             model="mistralai/Mixtral-8x7B-Instruct-v0.1",
             messages=[{"role": "user", "content": special_message}],
-            max_tokens=50
+            max_tokens=50,
         )
 
         assert response.choices[0].message.content is not None
@@ -306,7 +306,7 @@ class TestTogetherEdgeCases:
             response = client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": f"Request number {i}"}],
-                max_tokens=20
+                max_tokens=20,
             )
 
             assert response.choices[0].message.content is not None

@@ -282,7 +282,7 @@ const TokenMetricsChart: React.FC<TokenMetricsChartProps> = ({ data, extraChartD
         myChart.dispose();
       };
     }
-  }, [barChartData]);
+  }, [barChartData, legendSelection]);
 
   // Handler to toggle series visibility and update legend selection state
   const handleToggleSeries = (seriesName: string) => {

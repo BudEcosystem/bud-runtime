@@ -17,10 +17,7 @@ TENSORZERO_BASE_URL = os.getenv("TENSORZERO_BASE_URL", "http://localhost:3001")
 TENSORZERO_API_KEY = os.getenv("TENSORZERO_API_KEY", "test-api-key")
 
 # Universal OpenAI client
-client = OpenAI(
-    base_url=f"{TENSORZERO_BASE_URL}/v1",
-    api_key=TENSORZERO_API_KEY
-)
+client = OpenAI(base_url=f"{TENSORZERO_BASE_URL}/v1", api_key=TENSORZERO_API_KEY)
 
 
 class TestTogetherModelsCI:
@@ -41,7 +38,7 @@ class TestTogetherModelsCI:
             response = client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": "Test"}],
-                max_tokens=10
+                max_tokens=10,
             )
 
             # Verify response structure
@@ -57,7 +54,7 @@ class TestTogetherModelsCI:
             model="meta-llama/Llama-3.1-8B-Instruct-Turbo",
             messages=[{"role": "user", "content": "Test streaming"}],
             max_tokens=50,
-            stream=True
+            stream=True,
         )
 
         chunks_received = 0
@@ -76,7 +73,7 @@ class TestTogetherModelsCI:
         response = client.chat.completions.create(
             model="meta-llama/Llama-3.3-70B-Instruct-Turbo",
             messages=[{"role": "user", "content": "Test model name parsing"}],
-            max_tokens=20
+            max_tokens=20,
         )
 
         assert response.model == "meta-llama/Llama-3.3-70B-Instruct-Turbo"
@@ -87,14 +84,14 @@ class TestTogetherModelsCI:
         test_cases = [
             ("gpt-3.5-turbo", "OpenAI"),
             ("claude-3-haiku-20240307", "Anthropic"),
-            ("meta-llama/Llama-3.2-3B-Instruct-Turbo", "Together")
+            ("meta-llama/Llama-3.2-3B-Instruct-Turbo", "Together"),
         ]
 
         for model, provider_name in test_cases:
             response = client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": f"Test {provider_name}"}],
-                max_tokens=20
+                max_tokens=20,
             )
 
             assert response.model == model
@@ -112,15 +109,13 @@ class TestTogetherModelsCI:
             model=model,
             messages=[{"role": "user", "content": "Test"}],
             max_tokens=20,
-            temperature=0.7
+            temperature=0.7,
         )
         assert response.choices[0].message.content is not None
 
         # Test max_tokens
         response = client.chat.completions.create(
-            model=model,
-            messages=[{"role": "user", "content": "Test"}],
-            max_tokens=5
+            model=model, messages=[{"role": "user", "content": "Test"}], max_tokens=5
         )
         assert response.choices[0].message.content is not None
 
@@ -129,9 +124,9 @@ class TestTogetherModelsCI:
             model=model,
             messages=[
                 {"role": "system", "content": "You are helpful"},
-                {"role": "user", "content": "Test"}
+                {"role": "user", "content": "Test"},
             ],
-            max_tokens=20
+            max_tokens=20,
         )
         assert response.choices[0].message.content is not None
 
@@ -142,7 +137,7 @@ class TestTogetherModelsCI:
             client.chat.completions.create(
                 model="invalid-together-model",
                 messages=[{"role": "user", "content": "Test"}],
-                max_tokens=10
+                max_tokens=10,
             )
 
         # Should get an error (model not found)
@@ -153,13 +148,11 @@ class TestTogetherModelsCI:
         messages = [
             {"role": "user", "content": "My name is Alice"},
             {"role": "assistant", "content": "Hello Alice!"},
-            {"role": "user", "content": "What's my name?"}
+            {"role": "user", "content": "What's my name?"},
         ]
 
         response = client.chat.completions.create(
-            model="deepseek-ai/deepseek-v2.5",
-            messages=messages,
-            max_tokens=30
+            model="deepseek-ai/deepseek-v2.5", messages=messages, max_tokens=30
         )
 
         assert response.choices[0].message.content is not None
@@ -170,34 +163,34 @@ class TestTogetherModelsCI:
         response = client.chat.completions.create(
             model="mistralai/Mixtral-8x7B-Instruct-v0.1",
             messages=[{"role": "user", "content": "Test response format"}],
-            max_tokens=20
+            max_tokens=20,
         )
 
         # Check OpenAI response structure
-        assert hasattr(response, 'id')
-        assert hasattr(response, 'object')
+        assert hasattr(response, "id")
+        assert hasattr(response, "object")
         assert response.object == "chat.completion"
-        assert hasattr(response, 'created')
-        assert hasattr(response, 'model')
-        assert hasattr(response, 'choices')
-        assert hasattr(response, 'usage')
+        assert hasattr(response, "created")
+        assert hasattr(response, "model")
+        assert hasattr(response, "choices")
+        assert hasattr(response, "usage")
 
         # Check choice structure
         choice = response.choices[0]
-        assert hasattr(choice, 'index')
-        assert hasattr(choice, 'message')
-        assert hasattr(choice, 'finish_reason')
+        assert hasattr(choice, "index")
+        assert hasattr(choice, "message")
+        assert hasattr(choice, "finish_reason")
 
         # Check message structure
         message = choice.message
-        assert hasattr(message, 'role')
+        assert hasattr(message, "role")
         assert message.role == "assistant"
-        assert hasattr(message, 'content')
+        assert hasattr(message, "content")
 
         # Check usage structure
-        assert hasattr(response.usage, 'prompt_tokens')
-        assert hasattr(response.usage, 'completion_tokens')
-        assert hasattr(response.usage, 'total_tokens')
+        assert hasattr(response.usage, "prompt_tokens")
+        assert hasattr(response.usage, "completion_tokens")
+        assert hasattr(response.usage, "total_tokens")
 
 
 if __name__ == "__main__":

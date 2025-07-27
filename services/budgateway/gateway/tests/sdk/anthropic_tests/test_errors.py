@@ -25,7 +25,7 @@ class TestAnthropicErrors(BaseSDKTest):
         return Anthropic(
             base_url=cls.base_url,
             api_key=cls.api_key,
-            default_headers={"anthropic-version": "2023-06-01"}
+            default_headers={"anthropic-version": "2023-06-01"},
         )
 
     def _health_check(self, client):
@@ -33,7 +33,7 @@ class TestAnthropicErrors(BaseSDKTest):
         client.messages.create(
             model="claude-3-haiku-20240307",
             messages=[{"role": "user", "content": "Hi"}],
-            max_tokens=10
+            max_tokens=10,
         )
 
     def test_invalid_model(self):
@@ -44,7 +44,7 @@ class TestAnthropicErrors(BaseSDKTest):
             client.messages.create(
                 model="invalid-model-name",
                 messages=[{"role": "user", "content": "Hello"}],
-                max_tokens=50
+                max_tokens=50,
             )
 
         # Should get a model not found error
@@ -60,7 +60,7 @@ class TestAnthropicErrors(BaseSDKTest):
         with pytest.raises(TypeError) as exc_info:
             client.messages.create(
                 model="claude-3-haiku-20240307",
-                messages=[{"role": "user", "content": "Hello"}]
+                messages=[{"role": "user", "content": "Hello"}],
                 # max_tokens is missing
             )
 
@@ -76,8 +76,10 @@ class TestAnthropicErrors(BaseSDKTest):
         with pytest.raises(APIStatusError) as exc_info:
             client.messages.create(
                 model="claude-3-haiku-20240307",
-                messages=[{"role": "system", "content": "You are helpful"}],  # system role not allowed in messages
-                max_tokens=50
+                messages=[
+                    {"role": "system", "content": "You are helpful"}
+                ],  # system role not allowed in messages
+                max_tokens=50,
             )
 
         # Should get validation error with 400 status
@@ -91,9 +93,7 @@ class TestAnthropicErrors(BaseSDKTest):
 
         with pytest.raises(APIStatusError) as exc_info:
             client.messages.create(
-                model="claude-3-haiku-20240307",
-                messages=[],
-                max_tokens=50
+                model="claude-3-haiku-20240307", messages=[], max_tokens=50
             )
 
         # Should get validation error with 400 status
@@ -110,7 +110,7 @@ class TestAnthropicErrors(BaseSDKTest):
             client.messages.create(
                 model="claude-3-haiku-20240307",
                 messages=[{"role": "user", "content": "Hello"}],
-                max_tokens=1000000  # Way over any model's limit
+                max_tokens=1000000,  # Way over any model's limit
             )
 
         error_str = str(exc_info.value).lower()
@@ -126,21 +126,25 @@ class TestAnthropicErrors(BaseSDKTest):
                 model="claude-3-haiku-20240307",
                 messages=[{"role": "user", "content": "Hello"}],
                 max_tokens=50,
-                temperature=2.0  # Invalid: should be 0-1
+                temperature=2.0,  # Invalid: should be 0-1
             )
 
         error_str = str(exc_info.value).lower()
-        assert "temperature" in error_str or "invalid" in error_str or "range" in error_str
+        assert (
+            "temperature" in error_str or "invalid" in error_str or "range" in error_str
+        )
 
     def test_malformed_tool_schema(self):
         """Test with malformed tool schema."""
         client = self.get_client()
 
         # Invalid tool schema
-        tools = [{
-            "name": "bad_tool",
-            # Missing required fields like description and input_schema
-        }]
+        tools = [
+            {
+                "name": "bad_tool",
+                # Missing required fields like description and input_schema
+            }
+        ]
 
         # Could be ValueError from SDK or APIStatusError from gateway
         with pytest.raises((ValueError, APIStatusError)) as exc_info:
@@ -148,7 +152,7 @@ class TestAnthropicErrors(BaseSDKTest):
                 model="claude-3-5-sonnet-20241022",
                 messages=[{"role": "user", "content": "Use the tool"}],
                 tools=tools,
-                max_tokens=100
+                max_tokens=100,
             )
 
         # Should get validation error
@@ -163,7 +167,7 @@ class TestAnthropicErrors(BaseSDKTest):
         response = client.messages.create(
             model="claude-3-haiku-20240307",
             messages=[{"role": "user", "content": "Hello"}],
-            max_tokens=10
+            max_tokens=10,
         )
 
         assert isinstance(response, Message)
@@ -179,7 +183,7 @@ class TestAnthropicErrors(BaseSDKTest):
                 model="invalid-model",
                 messages=[{"role": "user", "content": "Hello"}],
                 max_tokens=50,
-                stream=True
+                stream=True,
             )
 
             # Try to consume the stream
@@ -193,14 +197,14 @@ class TestAnthropicErrors(BaseSDKTest):
             base_url=self.base_url,
             api_key=self.api_key,
             timeout=0.001,  # 1ms timeout - should fail
-            default_headers={"anthropic-version": "2023-06-01"}
+            default_headers={"anthropic-version": "2023-06-01"},
         )
 
         with pytest.raises(Exception) as exc_info:
             client.messages.create(
                 model="claude-3-haiku-20240307",
                 messages=[{"role": "user", "content": "Hello"}],
-                max_tokens=50
+                max_tokens=50,
             )
 
         # Should be a timeout error

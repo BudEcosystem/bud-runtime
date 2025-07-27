@@ -7,8 +7,6 @@ through TensorZero's OpenAI-compatible interface.
 
 import os
 import base64
-import json
-from typing import Optional
 import pytest
 from openai import OpenAI
 from dotenv import load_dotenv
@@ -23,10 +21,7 @@ TENSORZERO_API_KEY = os.getenv("TENSORZERO_API_KEY", "test-api-key")
 SKIP_TOGETHER_TESTS = os.getenv("SKIP_TOGETHER_TESTS", "false").lower() == "true"
 
 # Universal OpenAI client
-client = OpenAI(
-    base_url=f"{TENSORZERO_BASE_URL}/v1",
-    api_key=TENSORZERO_API_KEY
-)
+client = OpenAI(base_url=f"{TENSORZERO_BASE_URL}/v1", api_key=TENSORZERO_API_KEY)
 
 
 @pytest.mark.skipif(SKIP_TOGETHER_TESTS, reason="Together tests disabled")
@@ -39,21 +34,21 @@ class TestTogetherImageGeneration:
             model="flux-schnell",
             prompt="A serene mountain landscape at sunset with snow-capped peaks",
             n=1,
-            size="1024x1024"
+            size="1024x1024",
         )
 
         # Verify response structure
-        assert hasattr(response, 'created')
-        assert hasattr(response, 'data')
+        assert hasattr(response, "created")
+        assert hasattr(response, "data")
         assert len(response.data) == 1
 
         # Verify image data
         image_data = response.data[0]
-        assert hasattr(image_data, 'url') or hasattr(image_data, 'b64_json')
+        assert hasattr(image_data, "url") or hasattr(image_data, "b64_json")
 
-        if hasattr(image_data, 'url') and image_data.url:
-            assert image_data.url.startswith('http')
-        elif hasattr(image_data, 'b64_json') and image_data.b64_json:
+        if hasattr(image_data, "url") and image_data.url:
+            assert image_data.url.startswith("http")
+        elif hasattr(image_data, "b64_json") and image_data.b64_json:
             # Verify it's valid base64
             try:
                 base64.b64decode(image_data.b64_json)
@@ -66,13 +61,13 @@ class TestTogetherImageGeneration:
             model="flux-schnell",
             prompt="Abstract geometric patterns in vibrant colors",
             n=3,
-            size="512x512"
+            size="512x512",
         )
 
         assert len(response.data) == 3
 
         for i, image_data in enumerate(response.data):
-            assert hasattr(image_data, 'url') or hasattr(image_data, 'b64_json')
+            assert hasattr(image_data, "url") or hasattr(image_data, "b64_json")
 
     def test_flux_different_sizes(self):
         """Test different image sizes with FLUX."""
@@ -90,7 +85,7 @@ class TestTogetherImageGeneration:
                     model="flux-schnell",
                     prompt=f"Test image at {size} resolution",
                     n=1,
-                    size=size
+                    size=size,
                 )
 
                 assert len(response.data) == 1
@@ -106,14 +101,14 @@ class TestTogetherImageGeneration:
             prompt="A simple red circle on white background",
             n=1,
             size="256x256",
-            response_format="b64_json"
+            response_format="b64_json",
         )
 
         assert len(response.data) == 1
         image_data = response.data[0]
 
         # Should have base64 data
-        assert hasattr(image_data, 'b64_json')
+        assert hasattr(image_data, "b64_json")
         assert image_data.b64_json is not None
 
         # Verify it's valid base64
@@ -130,16 +125,16 @@ class TestTogetherImageGeneration:
             prompt="A blue square on yellow background",
             n=1,
             size="256x256",
-            response_format="url"
+            response_format="url",
         )
 
         assert len(response.data) == 1
         image_data = response.data[0]
 
         # Should have URL
-        assert hasattr(image_data, 'url')
+        assert hasattr(image_data, "url")
         if image_data.url:
-            assert image_data.url.startswith('http')
+            assert image_data.url.startswith("http")
 
     def test_flux_detailed_prompts(self):
         """Test image generation with detailed prompts."""
@@ -151,7 +146,6 @@ class TestTogetherImageGeneration:
             - Holographic advertisements
             - Steam rising from street vents
             Style: Cinematic, high detail, moody lighting""",
-
             """An enchanted forest clearing with:
             - Ancient twisted trees with glowing runes
             - Floating magical orbs of light
@@ -159,22 +153,18 @@ class TestTogetherImageGeneration:
             - Mystical fog swirling around tree roots
             - Bioluminescent flowers and mushrooms
             Art style: Fantasy illustration, ethereal atmosphere""",
-
             """A steampunk workshop interior featuring:
             - Brass gears and copper pipes on walls
             - Victorian-era machinery with steam
             - Leather-bound books on wooden shelves
             - Intricate clockwork mechanisms
             - Warm gaslight illumination
-            Rendering: Detailed, industrial aesthetic"""
+            Rendering: Detailed, industrial aesthetic""",
         ]
 
         for prompt in detailed_prompts:
             response = client.images.generate(
-                model="flux-schnell",
-                prompt=prompt,
-                n=1,
-                size="1024x1024"
+                model="flux-schnell", prompt=prompt, n=1, size="1024x1024"
             )
 
             assert len(response.data) == 1
@@ -189,16 +179,13 @@ class TestTogetherImageGeneration:
             "pencil sketch, black and white, artistic",
             "watercolor painting, soft colors, artistic blur",
             "digital art, anime style, cel shaded",
-            "3D render, pixar style, cartoon"
+            "3D render, pixar style, cartoon",
         ]
 
         for style in styles:
             prompt = f"{base_subject}, {style}"
             response = client.images.generate(
-                model="flux-schnell",
-                prompt=prompt,
-                n=1,
-                size="512x512"
+                model="flux-schnell", prompt=prompt, n=1, size="512x512"
             )
 
             assert len(response.data) == 1
@@ -210,17 +197,14 @@ class TestTogetherImageGeneration:
             "A sunset over the ocean",
             "Northern lights in the arctic",
             "A thunderstorm over plains",
-            "A rainbow after rain"
+            "A rainbow after rain",
         ]
 
         # Generate one image for each prompt
         responses = []
         for prompt in prompts:
             response = client.images.generate(
-                model="flux-schnell",
-                prompt=prompt,
-                n=1,
-                size="512x512"
+                model="flux-schnell", prompt=prompt, n=1, size="512x512"
             )
             responses.append(response)
 
@@ -236,16 +220,13 @@ class TestTogetherImageGeneration:
             "Tokyo street with 日本語 signs",
             "Math equation: E=mc² written on blackboard",
             "Computer code: print('Hello, World!') on screen",
-            "Emoji art: 🌟✨🎨 magical theme"
+            "Emoji art: 🌟✨🎨 magical theme",
         ]
 
         for prompt in special_prompts:
             try:
                 response = client.images.generate(
-                    model="flux-schnell",
-                    prompt=prompt,
-                    n=1,
-                    size="512x512"
+                    model="flux-schnell", prompt=prompt, n=1, size="512x512"
                 )
                 assert len(response.data) == 1
             except Exception as e:
@@ -265,7 +246,7 @@ class TestTogetherImageGenerationAdvanced:
             Right side: The same location 100 years ago as farmland
             Divided by a glowing temporal rift in the center""",
             n=1,
-            size="1024x1024"
+            size="1024x1024",
         )
 
         assert len(response.data) == 1
@@ -283,7 +264,7 @@ class TestTogetherImageGenerationAdvanced:
             - Wildflowers in the foreground
             Style: Serene, calming, no people, no buildings, no vehicles""",
             n=1,
-            size="1024x1024"
+            size="1024x1024",
         )
 
         assert len(response.data) == 1
@@ -295,16 +276,13 @@ class TestTogetherImageGenerationAdvanced:
             "Trompe-l'oeil style, optical illusion",
             "Pointillism technique, dots of color",
             "Sfumato technique, soft transitions",
-            "Impasto technique, thick paint texture"
+            "Impasto technique, thick paint texture",
         ]
 
         for technique in techniques:
             prompt = f"A still life of fruit using {technique}"
             response = client.images.generate(
-                model="flux-schnell",
-                prompt=prompt,
-                n=1,
-                size="512x512"
+                model="flux-schnell", prompt=prompt, n=1, size="512x512"
             )
 
             assert len(response.data) == 1
@@ -316,15 +294,12 @@ class TestTogetherImageGenerationAdvanced:
             "Wide angle landscape with 16mm lens, f/8, everything in focus",
             "Macro photography of a flower, extreme close-up, bokeh background",
             "Long exposure night photography, light trails, 30 second exposure",
-            "Tilt-shift photography of a city, miniature effect"
+            "Tilt-shift photography of a city, miniature effect",
         ]
 
         for prompt in camera_prompts:
             response = client.images.generate(
-                model="flux-schnell",
-                prompt=prompt,
-                n=1,
-                size="768x768"
+                model="flux-schnell", prompt=prompt, n=1, size="768x768"
             )
 
             assert len(response.data) == 1
@@ -335,16 +310,16 @@ class TestTogetherImageGenerationAdvanced:
             "A knight approaching a dark castle at dusk",
             "The same knight entering the castle gates",
             "The knight discovering a magical artifact inside",
-            "The knight emerging victorious at dawn"
+            "The knight emerging victorious at dawn",
         ]
 
         generated_images = []
         for i, frame in enumerate(story_frames):
             response = client.images.generate(
                 model="flux-schnell",
-                prompt=f"Frame {i+1}: {frame}, consistent character design, medieval fantasy style",
+                prompt=f"Frame {i + 1}: {frame}, consistent character design, medieval fantasy style",
                 n=1,
-                size="512x512"
+                size="512x512",
             )
 
             assert len(response.data) == 1
@@ -361,32 +336,29 @@ class TestTogetherImageGenerationErrors:
         """Test with non-existent model."""
         with pytest.raises(Exception) as exc_info:
             client.images.generate(
-                model="flux-invalid-model",
-                prompt="Test prompt",
-                n=1
+                model="flux-invalid-model", prompt="Test prompt", n=1
             )
 
-        assert "not found" in str(exc_info.value).lower() or "invalid" in str(exc_info.value).lower()
+        assert (
+            "not found" in str(exc_info.value).lower()
+            or "invalid" in str(exc_info.value).lower()
+        )
 
     def test_empty_prompt(self):
         """Test with empty prompt."""
         with pytest.raises(Exception) as exc_info:
-            client.images.generate(
-                model="flux-schnell",
-                prompt="",
-                n=1
-            )
+            client.images.generate(model="flux-schnell", prompt="", n=1)
 
         assert exc_info.value is not None
 
     def test_invalid_size(self):
         """Test with invalid size."""
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(Exception):
             client.images.generate(
                 model="flux-schnell",
                 prompt="Test image",
                 n=1,
-                size="123x456"  # Non-standard size
+                size="123x456",  # Non-standard size
             )
 
         # Might fail or use closest valid size
@@ -398,7 +370,7 @@ class TestTogetherImageGenerationErrors:
             response = client.images.generate(
                 model="flux-schnell",
                 prompt="Test image",
-                n=10  # Might exceed limit
+                n=10,  # Might exceed limit
             )
             # If it succeeds, verify we got images
             assert len(response.data) <= 10
@@ -413,7 +385,7 @@ class TestTogetherImageGenerationErrors:
                 model="flux-schnell",
                 prompt="Test image",
                 n=1,
-                response_format="invalid_format"
+                response_format="invalid_format",
             )
             # Should default to url or b64_json
             assert len(response.data) == 1
@@ -425,9 +397,7 @@ class TestTogetherImageGenerationErrors:
         """Test using chat model for image generation."""
         with pytest.raises(Exception) as exc_info:
             client.images.generate(
-                model="meta-llama/Llama-3.1-8B-Instruct-Turbo",
-                prompt="Test image",
-                n=1
+                model="meta-llama/Llama-3.1-8B-Instruct-Turbo", prompt="Test image", n=1
             )
 
         # Should fail because it's not an image model
@@ -443,24 +413,21 @@ class TestTogetherImageGenerationQuality:
         specific_prompts = [
             {
                 "prompt": "A red cube on a blue background",
-                "expected": ["red", "cube", "blue", "background"]
+                "expected": ["red", "cube", "blue", "background"],
             },
             {
                 "prompt": "Three yellow circles arranged horizontally",
-                "expected": ["three", "yellow", "circles", "horizontal"]
+                "expected": ["three", "yellow", "circles", "horizontal"],
             },
             {
                 "prompt": "A green triangle pointing upward",
-                "expected": ["green", "triangle", "upward"]
-            }
+                "expected": ["green", "triangle", "upward"],
+            },
         ]
 
         for test_case in specific_prompts:
             response = client.images.generate(
-                model="flux-schnell",
-                prompt=test_case["prompt"],
-                n=1,
-                size="512x512"
+                model="flux-schnell", prompt=test_case["prompt"], n=1, size="512x512"
             )
 
             assert len(response.data) == 1
@@ -475,10 +442,7 @@ class TestTogetherImageGenerationQuality:
         images = []
         for subject in subjects:
             response = client.images.generate(
-                model="flux-schnell",
-                prompt=f"{subject}, {style}",
-                n=1,
-                size="512x512"
+                model="flux-schnell", prompt=f"{subject}, {style}", n=1, size="512x512"
             )
             images.append(response.data[0])
 

@@ -3,7 +3,6 @@
 import json
 import os
 import sys
-from typing import Any, Dict
 
 import pytest
 from anthropic import Anthropic
@@ -27,7 +26,7 @@ class TestAnthropicContentTypes(BaseSDKTest):
         return Anthropic(
             base_url=cls.base_url,
             api_key=cls.api_key,
-            default_headers={"anthropic-version": "2023-06-01"}
+            default_headers={"anthropic-version": "2023-06-01"},
         )
 
     def _health_check(self, client):
@@ -35,7 +34,7 @@ class TestAnthropicContentTypes(BaseSDKTest):
         client.messages.create(
             model="claude-3-haiku-20240307",
             messages=[{"role": "user", "content": "Hi"}],
-            max_tokens=10
+            max_tokens=10,
         )
 
     def test_multimodal_text_only(self):
@@ -45,14 +44,16 @@ class TestAnthropicContentTypes(BaseSDKTest):
         # Anthropic supports content as a list of blocks
         response = client.messages.create(
             model="claude-3-haiku-20240307",
-            messages=[{
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": "Hello"},
-                    {"type": "text", "text": " World!"}
-                ]
-            }],
-            max_tokens=50
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Hello"},
+                        {"type": "text", "text": " World!"},
+                    ],
+                }
+            ],
+            max_tokens=50,
         )
 
         assert isinstance(response, Message)
@@ -63,41 +64,46 @@ class TestAnthropicContentTypes(BaseSDKTest):
         """Test tool use functionality."""
         client = self.get_client()
 
-        tools = [{
-            "name": "get_weather",
-            "description": "Get the current weather in a given location",
-            "input_schema": {
-                "type": "object",
-                "properties": {
-                    "location": {
-                        "type": "string",
-                        "description": "The city and state, e.g. San Francisco, CA"
+        tools = [
+            {
+                "name": "get_weather",
+                "description": "Get the current weather in a given location",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "location": {
+                            "type": "string",
+                            "description": "The city and state, e.g. San Francisco, CA",
+                        },
+                        "unit": {
+                            "type": "string",
+                            "enum": ["celsius", "fahrenheit"],
+                            "description": "The unit for temperature",
+                        },
                     },
-                    "unit": {
-                        "type": "string",
-                        "enum": ["celsius", "fahrenheit"],
-                        "description": "The unit for temperature"
-                    }
+                    "required": ["location"],
                 },
-                "required": ["location"]
             }
-        }]
+        ]
 
         response = client.messages.create(
             model="claude-3-5-sonnet-20241022",  # Tool use works best with newer models
-            messages=[{
-                "role": "user",
-                "content": "What's the weather like in New York?"
-            }],
+            messages=[
+                {"role": "user", "content": "What's the weather like in New York?"}
+            ],
             tools=tools,
-            max_tokens=200
+            max_tokens=200,
         )
 
         assert isinstance(response, Message)
         # Response might contain tool use blocks
-        has_tool_use = any(isinstance(block, ToolUseBlock) for block in response.content)
+        has_tool_use = any(
+            isinstance(block, ToolUseBlock) for block in response.content
+        )
         if has_tool_use:
-            tool_block = next(block for block in response.content if isinstance(block, ToolUseBlock))
+            tool_block = next(
+                block for block in response.content if isinstance(block, ToolUseBlock)
+            )
             assert tool_block.name == "get_weather"
             assert "location" in tool_block.input
 
@@ -105,64 +111,68 @@ class TestAnthropicContentTypes(BaseSDKTest):
         """Test tool use with tool response."""
         client = self.get_client()
 
-        tools = [{
-            "name": "calculate",
-            "description": "Perform basic arithmetic calculations",
-            "input_schema": {
-                "type": "object",
-                "properties": {
-                    "expression": {
-                        "type": "string",
-                        "description": "The mathematical expression to evaluate"
-                    }
+        tools = [
+            {
+                "name": "calculate",
+                "description": "Perform basic arithmetic calculations",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "expression": {
+                            "type": "string",
+                            "description": "The mathematical expression to evaluate",
+                        }
+                    },
+                    "required": ["expression"],
                 },
-                "required": ["expression"]
             }
-        }]
+        ]
 
         # First message asking to use the tool
-        messages = [{
-            "role": "user",
-            "content": "What is 15 * 37?"
-        }]
+        messages = [{"role": "user", "content": "What is 15 * 37?"}]
 
         response1 = client.messages.create(
             model="claude-3-5-sonnet-20241022",
             messages=messages,
             tools=tools,
-            max_tokens=200
+            max_tokens=200,
         )
 
         # If the model used a tool, we can simulate the tool response
         if any(isinstance(block, ToolUseBlock) for block in response1.content):
-            tool_block = next(block for block in response1.content if isinstance(block, ToolUseBlock))
+            tool_block = next(
+                block for block in response1.content if isinstance(block, ToolUseBlock)
+            )
 
             # Add assistant's tool use to conversation
-            messages.append({
-                "role": "assistant",
-                "content": response1.content
-            })
+            messages.append({"role": "assistant", "content": response1.content})
 
             # Add tool result
-            messages.append({
-                "role": "user",
-                "content": [{
-                    "type": "tool_result",
-                    "tool_use_id": tool_block.id,
-                    "content": "555"  # 15 * 37 = 555
-                }]
-            })
+            messages.append(
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": tool_block.id,
+                            "content": "555",  # 15 * 37 = 555
+                        }
+                    ],
+                }
+            )
 
             # Get final response
             response2 = client.messages.create(
-                model="claude-3-5-sonnet-20241022",
-                messages=messages,
-                max_tokens=200
+                model="claude-3-5-sonnet-20241022", messages=messages, max_tokens=200
             )
 
             assert isinstance(response2, Message)
             # Response should mention the result
-            full_text = "".join(block.text for block in response2.content if isinstance(block, TextBlock))
+            full_text = "".join(
+                block.text
+                for block in response2.content
+                if isinstance(block, TextBlock)
+            )
             assert "555" in full_text
 
     def test_json_mode(self):
@@ -171,11 +181,13 @@ class TestAnthropicContentTypes(BaseSDKTest):
 
         response = client.messages.create(
             model="claude-3-haiku-20240307",
-            messages=[{
-                "role": "user",
-                "content": "Return a JSON object with name='test' and value=123. Only return valid JSON."
-            }],
-            max_tokens=100
+            messages=[
+                {
+                    "role": "user",
+                    "content": "Return a JSON object with name='test' and value=123. Only return valid JSON.",
+                }
+            ],
+            max_tokens=100,
         )
 
         assert isinstance(response, Message)
@@ -199,10 +211,8 @@ class TestAnthropicContentTypes(BaseSDKTest):
         response = client.messages.create(
             model="claude-3-haiku-20240307",
             system="You are a helpful assistant. Always be concise.",
-            messages=[
-                {"role": "user", "content": "What is Python?"}
-            ],
-            max_tokens=100
+            messages=[{"role": "user", "content": "What is Python?"}],
+            max_tokens=100,
         )
 
         assert isinstance(response, Message)
@@ -221,13 +231,14 @@ class TestAnthropicContentTypes(BaseSDKTest):
         messages = [
             {"role": "user", "content": f"Remember this text: {long_text}"},
             {"role": "assistant", "content": "I'll remember the text you provided."},
-            {"role": "user", "content": "How many times did I repeat 'This is a test' in my first message?"}
+            {
+                "role": "user",
+                "content": "How many times did I repeat 'This is a test' in my first message?",
+            },
         ]
 
         response = client.messages.create(
-            model="claude-3-haiku-20240307",
-            messages=messages,
-            max_tokens=100
+            model="claude-3-haiku-20240307", messages=messages, max_tokens=100
         )
 
         assert isinstance(response, Message)

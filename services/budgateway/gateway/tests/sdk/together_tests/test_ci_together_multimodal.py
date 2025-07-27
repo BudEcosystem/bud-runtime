@@ -17,10 +17,7 @@ TENSORZERO_BASE_URL = os.getenv("TENSORZERO_BASE_URL", "http://localhost:3001")
 TENSORZERO_API_KEY = os.getenv("TENSORZERO_API_KEY", "test-api-key")
 
 # Universal OpenAI client
-client = OpenAI(
-    base_url=f"{TENSORZERO_BASE_URL}/v1",
-    api_key=TENSORZERO_API_KEY
-)
+client = OpenAI(base_url=f"{TENSORZERO_BASE_URL}/v1", api_key=TENSORZERO_API_KEY)
 
 
 class TestTogetherMultimodalCI:
@@ -30,14 +27,11 @@ class TestTogetherMultimodalCI:
         """Test that Together embedding models are properly routed."""
         embedding_models = [
             "together-bge-base",  # BAAI/bge-base-en-v1.5
-            "together-m2-bert",   # togethercomputer/m2-bert-80M-8k-retrieval
+            "together-m2-bert",  # togethercomputer/m2-bert-80M-8k-retrieval
         ]
 
         for model in embedding_models:
-            response = client.embeddings.create(
-                model=model,
-                input="Test embedding"
-            )
+            response = client.embeddings.create(model=model, input="Test embedding")
 
             # Verify response structure
             assert response.model == model
@@ -50,16 +44,9 @@ class TestTogetherMultimodalCI:
 
     def test_together_embeddings_batch_ci(self):
         """Test batch embeddings with Together models."""
-        texts = [
-            "First test document",
-            "Second test document",
-            "Third test document"
-        ]
+        texts = ["First test document", "Second test document", "Third test document"]
 
-        response = client.embeddings.create(
-            model="together-bge-base",
-            input=texts
-        )
+        response = client.embeddings.create(model="together-bge-base", input=texts)
 
         assert len(response.data) == len(texts)
         for i, embedding_data in enumerate(response.data):
@@ -69,16 +56,13 @@ class TestTogetherMultimodalCI:
     def test_together_image_generation_routing_ci(self):
         """Test that Together image generation models are properly routed."""
         response = client.images.generate(
-            model="flux-schnell",
-            prompt="A simple test image",
-            n=1,
-            size="512x512"
+            model="flux-schnell", prompt="A simple test image", n=1, size="512x512"
         )
 
         # Verify response structure
         assert len(response.data) == 1
         # Dummy provider should return URL format by default
-        assert hasattr(response.data[0], 'url')
+        assert hasattr(response.data[0], "url")
 
     def test_together_image_generation_params_ci(self):
         """Test image generation parameters with Together models."""
@@ -87,10 +71,7 @@ class TestTogetherMultimodalCI:
 
         for size in sizes:
             response = client.images.generate(
-                model="flux-schnell",
-                prompt=f"Test image at {size}",
-                n=1,
-                size=size
+                model="flux-schnell", prompt=f"Test image at {size}", n=1, size=size
             )
 
             assert len(response.data) == 1
@@ -98,22 +79,17 @@ class TestTogetherMultimodalCI:
     def test_together_image_multiple_ci(self):
         """Test generating multiple images."""
         response = client.images.generate(
-            model="flux-schnell",
-            prompt="Multiple test images",
-            n=3,
-            size="512x512"
+            model="flux-schnell", prompt="Multiple test images", n=3, size="512x512"
         )
 
         assert len(response.data) == 3
         for i, image_data in enumerate(response.data):
-            assert hasattr(image_data, 'url')
+            assert hasattr(image_data, "url")
 
     def test_together_tts_routing_ci(self):
         """Test that Together TTS models are properly routed."""
         response = client.audio.speech.create(
-            model="together-tts",
-            voice="alloy",
-            input="Test text to speech"
+            model="together-tts", voice="alloy", input="Test text to speech"
         )
 
         # Dummy provider returns mock audio data
@@ -127,9 +103,7 @@ class TestTogetherMultimodalCI:
 
         for voice in voices:
             response = client.audio.speech.create(
-                model="together-tts",
-                voice=voice,
-                input=f"Testing voice: {voice}"
+                model="together-tts", voice=voice, input=f"Testing voice: {voice}"
             )
 
             assert response.content is not None
@@ -149,7 +123,7 @@ class TestTogetherMultimodalCI:
             response = client.audio.speech.create(
                 model="together-tts",
                 voice=voice,
-                input=f"Testing Together voice: {voice}"
+                input=f"Testing Together voice: {voice}",
             )
 
             assert response.content is not None
@@ -160,11 +134,10 @@ class TestTogetherMultimodalCI:
         # 1. Generate text
         chat_response = client.chat.completions.create(
             model="meta-llama/Llama-3.1-8B-Instruct-Turbo",
-            messages=[{
-                "role": "user",
-                "content": "Describe a sunset in one sentence."
-            }],
-            max_tokens=50
+            messages=[
+                {"role": "user", "content": "Describe a sunset in one sentence."}
+            ],
+            max_tokens=50,
         )
 
         description = chat_response.choices[0].message.content
@@ -172,8 +145,7 @@ class TestTogetherMultimodalCI:
 
         # 2. Create embedding
         embedding_response = client.embeddings.create(
-            model="together-bge-base",
-            input=description
+            model="together-bge-base", input=description
         )
 
         assert len(embedding_response.data) == 1
@@ -181,19 +153,14 @@ class TestTogetherMultimodalCI:
 
         # 3. Generate image from description
         image_response = client.images.generate(
-            model="flux-schnell",
-            prompt=description,
-            n=1,
-            size="512x512"
+            model="flux-schnell", prompt=description, n=1, size="512x512"
         )
 
         assert len(image_response.data) == 1
 
         # 4. Convert to speech
         tts_response = client.audio.speech.create(
-            model="together-tts",
-            voice="nova",
-            input=description
+            model="together-tts", voice="nova", input=description
         )
 
         assert tts_response.content is not None
@@ -204,38 +171,33 @@ class TestTogetherMultimodalCI:
 
         # Together embedding
         together_response = client.embeddings.create(
-            model="together-bge-base",
-            input=test_text
+            model="together-bge-base", input=test_text
         )
 
         # OpenAI embedding (also using dummy in CI)
         openai_response = client.embeddings.create(
-            model="text-embedding-3-small",
-            input=test_text
+            model="text-embedding-3-small", input=test_text
         )
 
         # Both should have same response structure
         assert together_response.object == openai_response.object == "list"
         assert len(together_response.data) == len(openai_response.data) == 1
-        assert together_response.data[0].object == openai_response.data[0].object == "embedding"
+        assert (
+            together_response.data[0].object
+            == openai_response.data[0].object
+            == "embedding"
+        )
 
     def test_together_multimodal_error_handling_ci(self):
         """Test error handling for multimodal operations."""
         # Test embedding with empty input
         with pytest.raises(Exception):
-            client.embeddings.create(
-                model="together-bge-base",
-                input=[]
-            )
+            client.embeddings.create(model="together-bge-base", input=[])
 
         # Test image generation with empty prompt
         # Note: Dummy provider may not validate empty prompts
         try:
-            response = client.images.generate(
-                model="flux-schnell",
-                prompt="",
-                n=1
-            )
+            response = client.images.generate(model="flux-schnell", prompt="", n=1)
             # If no exception, at least verify we got a response
             assert response is not None
         except Exception:
@@ -246,9 +208,7 @@ class TestTogetherMultimodalCI:
         # Note: Dummy provider may not validate empty input
         try:
             response = client.audio.speech.create(
-                model="together-tts",
-                voice="alloy",
-                input=""
+                model="together-tts", voice="alloy", input=""
             )
             # If no exception, at least verify we got a response
             assert response is not None

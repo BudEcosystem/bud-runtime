@@ -5,12 +5,8 @@ These tests use dummy providers and don't require real API keys.
 """
 
 import asyncio
-import json
-import os
-import pytest
 import sys
 from openai import OpenAI, AsyncOpenAI
-from typing import Dict, Any
 
 # Fireworks-specific parameters that can be passed via extra_body
 FIREWORKS_PARAMS = {
@@ -19,17 +15,13 @@ FIREWORKS_PARAMS = {
     "min_p": 0.1,
     "repetition_penalty": 1.1,
     "top_a": 0.9,
-
     # Reasoning model parameters
     "reasoning_effort": "medium",
-
     # Mirostat parameters
     "mirostat_lr": 0.1,
     "mirostat_target": 5.0,
-
     # Performance parameters
     "draft_token_count": 5,
-
     # Context handling
     "prompt_truncate_len": 1000,
     "context_length_exceeded_behavior": "truncate",
@@ -70,7 +62,7 @@ def test_fireworks_with_extra_body():
             "top_k": 40,
             "repetition_penalty": 1.2,
             "prompt_truncate_len": 2000,
-        }
+        },
     )
 
     assert response.choices[0].message.content is not None
@@ -90,7 +82,7 @@ def test_fireworks_reasoning_model_params():
         extra_body={
             "reasoning_effort": "high",
             "top_k": 100,
-        }
+        },
     )
 
     assert response.choices[0].message.content is not None
@@ -109,7 +101,7 @@ def test_fireworks_all_params():
         messages=[{"role": "user", "content": "Test all parameters"}],
         temperature=0.8,
         max_tokens=100,
-        extra_body=FIREWORKS_PARAMS
+        extra_body=FIREWORKS_PARAMS,
     )
 
     assert response.choices[0].message.content is not None
@@ -138,7 +130,7 @@ def test_fireworks_with_mixed_params():
             "min_p": 0.05,
             "repetition_penalty": 1.05,
             "context_length_exceeded_behavior": "error",
-        }
+        },
     )
 
     assert response.choices[0].message.content is not None
@@ -159,7 +151,7 @@ def test_fireworks_streaming_with_params():
         extra_body={
             "top_k": 60,
             "draft_token_count": 10,
-        }
+        },
     )
 
     chunks = list(stream)
@@ -196,13 +188,13 @@ def test_extra_body_type_preservation():
         model="fireworks-llama-v3p1-8b-instruct",
         messages=[{"role": "user", "content": "Type test"}],
         extra_body={
-            "top_k": 50,                    # integer
-            "min_p": 0.1,                   # float
-            "reasoning_effort": "medium",    # string
-            "repetition_penalty": 1.0,       # float that could be integer
+            "top_k": 50,  # integer
+            "min_p": 0.1,  # float
+            "reasoning_effort": "medium",  # string
+            "repetition_penalty": 1.0,  # float that could be integer
             "context_length_exceeded_behavior": "truncate",  # string
-            "draft_token_count": 5,         # integer
-        }
+            "draft_token_count": 5,  # integer
+        },
     )
 
     assert response.choices[0].message.content is not None
@@ -224,7 +216,7 @@ async def test_async_fireworks_with_params():
             "top_k": 40,
             "mirostat_lr": 0.2,
             "mirostat_target": 4.0,
-        }
+        },
     )
 
     assert response.choices[0].message.content is not None
@@ -245,7 +237,7 @@ async def test_async_streaming_with_params():
         extra_body={
             "repetition_penalty": 1.15,
             "top_a": 0.85,
-        }
+        },
     )
 
     chunks = []
@@ -297,6 +289,7 @@ def main():
     except Exception as e:
         print(f"\n❌ Test failed: {e}")
         import traceback
+
         traceback.print_exc()
         return 1
 

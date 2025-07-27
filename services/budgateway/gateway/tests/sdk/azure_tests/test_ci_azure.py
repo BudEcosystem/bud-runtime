@@ -18,21 +18,18 @@ TENSORZERO_BASE_URL = os.getenv("TENSORZERO_BASE_URL", "http://localhost:3001")
 TENSORZERO_API_KEY = "dummy-api-key"  # CI uses dummy provider
 
 # OpenAI SDK client for Azure models
-openai_client = OpenAI(
-    base_url=f"{TENSORZERO_BASE_URL}/v1",
-    api_key=TENSORZERO_API_KEY
-)
+openai_client = OpenAI(base_url=f"{TENSORZERO_BASE_URL}/v1", api_key=TENSORZERO_API_KEY)
 
 
 class TestAzureSDKCI:
     """CI tests for Azure models through OpenAI SDK."""
+
     def test_azure_embeddings_ci(self):
         """Test embeddings with Azure models in CI using OpenAI SDK."""
         # Note: Azure SDK uses different URL patterns that TensorZero doesn't support
         # Using OpenAI SDK to test Azure models through TensorZero
         response = openai_client.embeddings.create(
-            model="text-embedding-ada-002-azure",
-            input="Test text"
+            model="text-embedding-ada-002-azure", input="Test text"
         )
 
         assert len(response.data) == 1
@@ -44,7 +41,7 @@ class TestAzureSDKCI:
         response = openai_client.chat.completions.create(
             model="gpt-35-turbo-azure",
             messages=[{"role": "user", "content": "Test OpenAI SDK"}],
-            max_tokens=10
+            max_tokens=10,
         )
 
         assert response.choices[0].message.content is not None
@@ -57,7 +54,7 @@ class TestAzureSDKCI:
             openai_client.chat.completions.create(
                 model="non-existent-model",
                 messages=[{"role": "user", "content": "Test"}],
-                max_tokens=10
+                max_tokens=10,
             )
 
         # Should raise an appropriate error
@@ -69,8 +66,7 @@ class TestAzureSDKCI:
         audio_data = b"dummy audio data"
 
         response = openai_client.audio.transcriptions.create(
-            model="whisper-1-azure",
-            file=("test.mp3", audio_data, "audio/mpeg")
+            model="whisper-1-azure", file=("test.mp3", audio_data, "audio/mpeg")
         )
 
         assert response.text is not None
@@ -82,8 +78,7 @@ class TestAzureSDKCI:
         audio_data = b"dummy audio data"
 
         response = openai_client.audio.translations.create(
-            model="whisper-1-azure",
-            file=("test.mp3", audio_data, "audio/mpeg")
+            model="whisper-1-azure", file=("test.mp3", audio_data, "audio/mpeg")
         )
 
         assert response.text is not None
@@ -94,7 +89,7 @@ class TestAzureSDKCI:
         response = openai_client.audio.speech.create(
             model="tts-1-azure",
             input="Hello, this is a test of Azure TTS.",
-            voice="alloy"
+            voice="alloy",
         )
 
         # Response should contain audio data
@@ -108,7 +103,7 @@ class TestAzureSDKCI:
             model="dall-e-3-azure",
             prompt="A beautiful sunset over mountains",
             n=1,
-            size="1024x1024"
+            size="1024x1024",
         )
 
         assert len(response.data) == 1
@@ -119,7 +114,7 @@ class TestAzureSDKCI:
         """Test batch embeddings with Azure models in CI using OpenAI SDK."""
         response = openai_client.embeddings.create(
             model="text-embedding-ada-002-azure",
-            input=["First text", "Second text", "Third text"]
+            input=["First text", "Second text", "Third text"],
         )
 
         assert len(response.data) == 3

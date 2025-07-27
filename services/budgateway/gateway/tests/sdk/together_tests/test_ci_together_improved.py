@@ -12,7 +12,7 @@ from openai import OpenAI
 # Use same pattern as existing tests
 client = OpenAI(
     base_url=os.getenv("TENSORZERO_BASE_URL", "http://localhost:3001") + "/v1",
-    api_key=os.getenv("TENSORZERO_API_KEY", "test-api-key")
+    api_key=os.getenv("TENSORZERO_API_KEY", "test-api-key"),
 )
 
 
@@ -24,7 +24,7 @@ class TestTogetherModelsCI:
         cls.together_models = [
             "meta-llama/Llama-3.3-70B-Instruct-Turbo",
             "meta-llama/Llama-3.2-3B-Instruct-Turbo",
-            "Qwen/Qwen2.5-72B-Instruct-Turbo"
+            "Qwen/Qwen2.5-72B-Instruct-Turbo",
         ]
         cls.embedding_models = ["together-bge-base", "together-m2-bert"]
 
@@ -34,7 +34,7 @@ class TestTogetherModelsCI:
             response = client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": f"Hello from {model}"}],
-                max_tokens=30
+                max_tokens=30,
             )
 
             # Verify all models responded
@@ -53,7 +53,7 @@ class TestTogetherModelsCI:
             model=model,
             messages=[{"role": "user", "content": "Count to 3"}],
             max_tokens=30,
-            stream=True
+            stream=True,
         )
 
         chunks_received = 0
@@ -77,7 +77,7 @@ class TestTogetherModelsCI:
             model=model,
             messages=[{"role": "user", "content": "What is 2+2?"}],
             max_tokens=20,
-            temperature=0.1
+            temperature=0.1,
         )
         assert response.choices[0].message.content is not None
 
@@ -85,7 +85,7 @@ class TestTogetherModelsCI:
         response = client.chat.completions.create(
             model=model,
             messages=[{"role": "user", "content": "Tell me a story"}],
-            max_tokens=5  # Very low to test truncation
+            max_tokens=5,  # Very low to test truncation
         )
         assert response.choices[0].message.content is not None
 
@@ -97,7 +97,7 @@ class TestTogetherModelsCI:
         response = client.chat.completions.create(
             model=model,
             messages=[{"role": "user", "content": "Test model name parsing"}],
-            max_tokens=20
+            max_tokens=20,
         )
 
         # Model name should be preserved exactly

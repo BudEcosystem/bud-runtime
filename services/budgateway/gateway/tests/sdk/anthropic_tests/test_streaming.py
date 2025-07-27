@@ -6,7 +6,6 @@ from typing import Any, Dict
 
 import pytest
 from anthropic import Anthropic, AsyncAnthropic
-from anthropic.types import Message, MessageStreamEvent
 from anthropic.types.message_start_event import MessageStartEvent
 from anthropic.types.content_block_start_event import ContentBlockStartEvent
 from anthropic.types.content_block_delta_event import ContentBlockDeltaEvent
@@ -32,7 +31,7 @@ class TestAnthropicStreaming(BaseStreamingTest):
         return Anthropic(
             base_url=cls.base_url,
             api_key=cls.api_key,
-            default_headers={"anthropic-version": "2023-06-01"}
+            default_headers={"anthropic-version": "2023-06-01"},
         )
 
     def _health_check(self, client):
@@ -40,7 +39,7 @@ class TestAnthropicStreaming(BaseStreamingTest):
         client.messages.create(
             model="claude-3-haiku-20240307",
             messages=[{"role": "user", "content": "Hi"}],
-            max_tokens=10
+            max_tokens=10,
         )
 
     def create_streaming_request(self, **kwargs) -> Dict[str, Any]:
@@ -49,7 +48,7 @@ class TestAnthropicStreaming(BaseStreamingTest):
             "model": kwargs.get("model", "claude-3-haiku-20240307"),
             "messages": kwargs.get("messages", []),
             "max_tokens": kwargs.get("max_tokens", 100),
-            "stream": True
+            "stream": True,
         }
 
         if "temperature" in kwargs:
@@ -62,14 +61,17 @@ class TestAnthropicStreaming(BaseStreamingTest):
     def validate_streaming_chunk(self, chunk: Any):
         """Validate a single streaming chunk."""
         # Anthropic uses different event types
-        assert isinstance(chunk, (
-            MessageStartEvent,
-            ContentBlockStartEvent,
-            ContentBlockDeltaEvent,
-            ContentBlockStopEvent,
-            MessageDeltaEvent,
-            MessageStopEvent
-        ))
+        assert isinstance(
+            chunk,
+            (
+                MessageStartEvent,
+                ContentBlockStartEvent,
+                ContentBlockDeltaEvent,
+                ContentBlockStopEvent,
+                MessageDeltaEvent,
+                MessageStopEvent,
+            ),
+        )
 
         # Each event type has specific fields
         if isinstance(chunk, MessageStartEvent):
@@ -91,7 +93,7 @@ class TestAnthropicStreaming(BaseStreamingTest):
             model="claude-3-haiku-20240307",
             messages=[{"role": "user", "content": "Count from 1 to 5"}],
             max_tokens=100,
-            stream=True
+            stream=True,
         )
 
         events_received = []
@@ -103,7 +105,7 @@ class TestAnthropicStreaming(BaseStreamingTest):
 
             # Collect text from delta events
             if isinstance(event, ContentBlockDeltaEvent):
-                if hasattr(event.delta, 'text'):
+                if hasattr(event.delta, "text"):
                     text_chunks.append(event.delta.text)
 
         # Should have received multiple events
@@ -129,12 +131,14 @@ class TestAnthropicStreaming(BaseStreamingTest):
             system="You are a helpful assistant who speaks in short sentences.",
             messages=[{"role": "user", "content": "Tell me about Python"}],
             max_tokens=100,
-            stream=True
+            stream=True,
         )
 
         text_chunks = []
         for event in stream:
-            if isinstance(event, ContentBlockDeltaEvent) and hasattr(event.delta, 'text'):
+            if isinstance(event, ContentBlockDeltaEvent) and hasattr(
+                event.delta, "text"
+            ):
                 text_chunks.append(event.delta.text)
 
         full_text = "".join(text_chunks)
@@ -149,7 +153,7 @@ class TestAnthropicStreaming(BaseStreamingTest):
             model="claude-3-haiku-20240307",
             messages=[{"role": "user", "content": "Count from 1 to 100"}],
             max_tokens=10,
-            stream=True
+            stream=True,
         )
 
         stop_event = None
@@ -169,7 +173,7 @@ class TestAnthropicStreaming(BaseStreamingTest):
             model="claude-3-haiku-20240307",
             messages=[{"role": "user", "content": "Say hello"}],
             max_tokens=50,
-            stream=True
+            stream=True,
         )
 
         message_start = None
@@ -188,19 +192,21 @@ class TestAnthropicStreaming(BaseStreamingTest):
         client = AsyncAnthropic(
             base_url=self.base_url,
             api_key=self.api_key,
-            default_headers={"anthropic-version": "2023-06-01"}
+            default_headers={"anthropic-version": "2023-06-01"},
         )
 
         stream = await client.messages.create(
             model="claude-3-haiku-20240307",
             messages=[{"role": "user", "content": "Count to 3"}],
             max_tokens=50,
-            stream=True
+            stream=True,
         )
 
         text_chunks = []
         async for event in stream:
-            if isinstance(event, ContentBlockDeltaEvent) and hasattr(event.delta, 'text'):
+            if isinstance(event, ContentBlockDeltaEvent) and hasattr(
+                event.delta, "text"
+            ):
                 text_chunks.append(event.delta.text)
 
         full_text = "".join(text_chunks)
@@ -216,9 +222,11 @@ class TestAnthropicStreaming(BaseStreamingTest):
 
         stream = client.messages.create(
             model="claude-3-haiku-20240307",
-            messages=[{"role": "user", "content": "Write a haiku about streaming data"}],
+            messages=[
+                {"role": "user", "content": "Write a haiku about streaming data"}
+            ],
             max_tokens=100,
-            stream=True
+            stream=True,
         )
 
         delta_count = 0
@@ -227,7 +235,7 @@ class TestAnthropicStreaming(BaseStreamingTest):
         for event in stream:
             if isinstance(event, ContentBlockDeltaEvent):
                 delta_count += 1
-                if hasattr(event.delta, 'text'):
+                if hasattr(event.delta, "text"):
                     text_chunks.append(event.delta.text)
 
         # Should have multiple delta events for a longer response

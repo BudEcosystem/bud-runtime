@@ -3,7 +3,7 @@
 import os
 import time
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 import pytest
 
@@ -65,8 +65,7 @@ class BaseChatTest(BaseSDKTest):
         """Test basic chat functionality."""
         client = self.get_client()
         request = self.create_chat_request(
-            messages=[{"role": "user", "content": "Hello, world!"}],
-            max_tokens=100
+            messages=[{"role": "user", "content": "Hello, world!"}], max_tokens=100
         )
         response = self._send_chat_request(client, request)
         self.validate_chat_response(response)
@@ -99,8 +98,7 @@ class BaseStreamingTest(BaseSDKTest):
         """Test basic streaming functionality."""
         client = self.get_client()
         request = self.create_streaming_request(
-            messages=[{"role": "user", "content": "Count to 5"}],
-            max_tokens=100
+            messages=[{"role": "user", "content": "Count to 5"}], max_tokens=100
         )
 
         chunks_received = 0
@@ -161,8 +159,7 @@ class BaseEmbeddingTest(BaseSDKTest):
         """Test basic embedding functionality."""
         client = self.get_client()
         request = self.create_embedding_request(
-            input="Hello, world!",
-            model="text-embedding-ada-002"
+            input="Hello, world!", model="text-embedding-ada-002"
         )
         response = self.send_embedding_request(client, request)
         self.validate_embedding_response(response)
@@ -171,8 +168,7 @@ class BaseEmbeddingTest(BaseSDKTest):
         """Test batch embedding functionality."""
         client = self.get_client()
         request = self.create_embedding_request(
-            input=["Hello", "World", "Test"],
-            model="text-embedding-ada-002"
+            input=["Hello", "World", "Test"], model="text-embedding-ada-002"
         )
         response = self.send_embedding_request(client, request)
         self.validate_embedding_response(response)

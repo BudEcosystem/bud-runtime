@@ -7,7 +7,6 @@ Follows the pattern established by test_audio.py and other endpoint tests.
 
 import os
 import pytest
-import tempfile
 import base64
 import subprocess
 from pathlib import Path
@@ -25,13 +24,10 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # Clients
 tensorzero_client = OpenAI(
-    base_url=f"{TENSORZERO_BASE_URL}/v1",
-    api_key=TENSORZERO_API_KEY
+    base_url=f"{TENSORZERO_BASE_URL}/v1", api_key=TENSORZERO_API_KEY
 )
 
-openai_client = OpenAI(
-    api_key=OPENAI_API_KEY
-) if OPENAI_API_KEY else None
+openai_client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 
 # Test image paths (fixtures are in the parent SDK directory)
 FIXTURES_DIR = Path(__file__).parent.parent / "fixtures" / "images"
@@ -48,11 +44,7 @@ def setup_module():
         print("Creating test images...")
         # Run the script from the parent SDK directory
         sdk_dir = Path(__file__).parent.parent
-        subprocess.run(
-            ["python", "create_test_images.py"],
-            cwd=sdk_dir,
-            check=True
-        )
+        subprocess.run(["python", "create_test_images.py"], cwd=sdk_dir, check=True)
 
 
 class TestImageGeneration:
@@ -64,12 +56,12 @@ class TestImageGeneration:
             model="dall-e-2",
             prompt="A simple red circle on a white background",
             n=1,
-            size="256x256"
+            size="256x256",
         )
 
-        assert hasattr(response, 'data')
+        assert hasattr(response, "data")
         assert len(response.data) == 1
-        assert hasattr(response.data[0], 'url') or hasattr(response.data[0], 'b64_json')
+        assert hasattr(response.data[0], "url") or hasattr(response.data[0], "b64_json")
 
     def test_basic_image_generation_dall_e_3(self):
         """Test basic image generation with DALL-E 3"""
@@ -77,29 +69,26 @@ class TestImageGeneration:
             model="dall-e-3",
             prompt="A futuristic city skyline at sunset",
             n=1,
-            size="1024x1024"
+            size="1024x1024",
         )
 
-        assert hasattr(response, 'data')
+        assert hasattr(response, "data")
         assert len(response.data) == 1
-        assert hasattr(response.data[0], 'url') or hasattr(response.data[0], 'b64_json')
+        assert hasattr(response.data[0], "url") or hasattr(response.data[0], "b64_json")
         # DALL-E 3 may include revised prompt
-        if hasattr(response.data[0], 'revised_prompt'):
+        if hasattr(response.data[0], "revised_prompt"):
             assert isinstance(response.data[0].revised_prompt, str)
 
     def test_image_generation_multiple_images_dall_e_2(self):
         """Test generating multiple images with DALL-E 2"""
         response = tensorzero_client.images.generate(
-            model="dall-e-2",
-            prompt="A blue square",
-            n=3,
-            size="256x256"
+            model="dall-e-2", prompt="A blue square", n=3, size="256x256"
         )
 
-        assert hasattr(response, 'data')
+        assert hasattr(response, "data")
         assert len(response.data) == 3
         for image_data in response.data:
-            assert hasattr(image_data, 'url') or hasattr(image_data, 'b64_json')
+            assert hasattr(image_data, "url") or hasattr(image_data, "b64_json")
 
     def test_image_generation_different_sizes_dall_e_2(self):
         """Test different image sizes with DALL-E 2"""
@@ -110,7 +99,7 @@ class TestImageGeneration:
                 model="dall-e-2",
                 prompt=f"A green triangle, {size} pixels",
                 n=1,
-                size=size
+                size=size,
             )
 
             assert len(response.data) == 1
@@ -124,7 +113,7 @@ class TestImageGeneration:
                 model="dall-e-3",
                 prompt=f"A minimalist landscape, {size} aspect ratio",
                 n=1,
-                size=size
+                size=size,
             )
 
             assert len(response.data) == 1
@@ -139,7 +128,7 @@ class TestImageGeneration:
                 prompt="A detailed architectural drawing",
                 n=1,
                 size="1024x1024",
-                quality=quality
+                quality=quality,
             )
 
             assert len(response.data) == 1
@@ -154,7 +143,7 @@ class TestImageGeneration:
                 prompt="A beautiful sunset over mountains",
                 n=1,
                 size="1024x1024",
-                style=style
+                style=style,
             )
 
             assert len(response.data) == 1
@@ -166,12 +155,12 @@ class TestImageGeneration:
             prompt="A yellow star",
             n=1,
             size="256x256",
-            response_format="url"
+            response_format="url",
         )
 
         assert len(response.data) == 1
-        assert hasattr(response.data[0], 'url')
-        assert response.data[0].url.startswith('http')
+        assert hasattr(response.data[0], "url")
+        assert response.data[0].url.startswith("http")
 
     def test_image_generation_response_format_b64_json(self):
         """Test base64 JSON response format"""
@@ -180,11 +169,11 @@ class TestImageGeneration:
             prompt="A purple heart",
             n=1,
             size="256x256",
-            response_format="b64_json"
+            response_format="b64_json",
         )
 
         assert len(response.data) == 1
-        assert hasattr(response.data[0], 'b64_json')
+        assert hasattr(response.data[0], "b64_json")
 
         # Verify it's valid base64
         b64_data = response.data[0].b64_json
@@ -201,7 +190,7 @@ class TestImageGeneration:
             model="gpt-image-1",
             prompt="A simple geometric pattern",
             n=1,
-            size="1024x1024"
+            size="1024x1024",
         )
 
         assert len(response.data) == 1
@@ -225,11 +214,7 @@ class TestImageGeneration:
         """Test error handling for invalid parameters"""
         # Test invalid model
         with pytest.raises(Exception):
-            tensorzero_client.images.generate(
-                model="invalid-model",
-                prompt="Test",
-                n=1
-            )
+            tensorzero_client.images.generate(model="invalid-model", prompt="Test", n=1)
 
         # Test invalid size for DALL-E 3
         with pytest.raises(Exception):
@@ -237,7 +222,7 @@ class TestImageGeneration:
                 model="dall-e-3",
                 prompt="Test",
                 n=1,
-                size="256x256"  # Not supported by DALL-E 3
+                size="256x256",  # Not supported by DALL-E 3
             )
 
         # Test too many images for DALL-E 3
@@ -245,7 +230,7 @@ class TestImageGeneration:
             tensorzero_client.images.generate(
                 model="dall-e-3",
                 prompt="Test",
-                n=2  # DALL-E 3 only supports n=1
+                n=2,  # DALL-E 3 only supports n=1
             )
 
     @pytest.mark.asyncio
@@ -254,15 +239,11 @@ class TestImageGeneration:
         from openai import AsyncOpenAI
 
         async_client = AsyncOpenAI(
-            base_url=f"{TENSORZERO_BASE_URL}/v1",
-            api_key=TENSORZERO_API_KEY
+            base_url=f"{TENSORZERO_BASE_URL}/v1", api_key=TENSORZERO_API_KEY
         )
 
         response = await async_client.images.generate(
-            model="dall-e-2",
-            prompt="A red bicycle",
-            n=1,
-            size="256x256"
+            model="dall-e-2", prompt="A red bicycle", n=1, size="256x256"
         )
 
         assert len(response.data) == 1
@@ -284,11 +265,11 @@ class TestImageEdit:
                 image=image_file,
                 prompt="Add a bright yellow sun in the top right corner",
                 n=1,
-                size="512x512"
+                size="512x512",
             )
 
         assert len(response.data) == 1
-        assert hasattr(response.data[0], 'url') or hasattr(response.data[0], 'b64_json')
+        assert hasattr(response.data[0], "url") or hasattr(response.data[0], "b64_json")
 
     def test_image_edit_with_mask_dall_e_2(self):
         """Test image editing with mask"""
@@ -297,15 +278,17 @@ class TestImageEdit:
         if not TEST_IMAGE_PATH.exists() or not MASK_IMAGE_PATH.exists():
             pytest.skip("Test image or mask file not found")
 
-        with open(TEST_IMAGE_PATH, "rb") as image_file, \
-             open(MASK_IMAGE_PATH, "rb") as mask_file:
+        with (
+            open(TEST_IMAGE_PATH, "rb") as image_file,
+            open(MASK_IMAGE_PATH, "rb") as mask_file,
+        ):
             response = tensorzero_client.images.edit(
                 model="dall-e-2",
                 image=image_file,
                 mask=mask_file,
                 prompt="Fill the masked area with a rainbow pattern",
                 n=1,
-                size="512x512"
+                size="512x512",
             )
 
         assert len(response.data) == 1
@@ -323,7 +306,7 @@ class TestImageEdit:
                 image=image_file,
                 prompt="Add colorful flowers around the edges",
                 n=3,
-                size="512x512"
+                size="512x512",
             )
 
         assert len(response.data) == 3
@@ -344,7 +327,7 @@ class TestImageEdit:
                     image=image_file,
                     prompt=f"Resize and enhance for {size}",
                     n=1,
-                    size=size
+                    size=size,
                 )
 
             assert len(response.data) == 1
@@ -362,7 +345,7 @@ class TestImageEdit:
                 image=image_file,
                 prompt="Transform into a futuristic version",
                 n=1,
-                size="1024x1024"
+                size="1024x1024",
             )
 
         assert len(response.data) == 1
@@ -384,14 +367,14 @@ class TestImageEdit:
                     prompt="Add a border",
                     n=1,
                     size="512x512",
-                    response_format=response_format
+                    response_format=response_format,
                 )
 
             assert len(response.data) == 1
             if response_format == "url":
-                assert hasattr(response.data[0], 'url')
+                assert hasattr(response.data[0], "url")
             else:
-                assert hasattr(response.data[0], 'b64_json')
+                assert hasattr(response.data[0], "b64_json")
 
     def test_image_edit_error_handling(self):
         """Test error handling for image editing"""
@@ -406,7 +389,7 @@ class TestImageEdit:
                 tensorzero_client.images.edit(
                     model="dall-e-3",  # DALL-E 3 doesn't support editing
                     image=image_file,
-                    prompt="Test edit"
+                    prompt="Test edit",
                 )
 
     @pytest.mark.asyncio
@@ -420,8 +403,7 @@ class TestImageEdit:
         from openai import AsyncOpenAI
 
         async_client = AsyncOpenAI(
-            base_url=f"{TENSORZERO_BASE_URL}/v1",
-            api_key=TENSORZERO_API_KEY
+            base_url=f"{TENSORZERO_BASE_URL}/v1", api_key=TENSORZERO_API_KEY
         )
 
         with open(TEST_IMAGE_PATH, "rb") as image_file:
@@ -430,7 +412,7 @@ class TestImageEdit:
                 image=image_file,
                 prompt="Add a blue sky background",
                 n=1,
-                size="512x512"
+                size="512x512",
             )
 
         assert len(response.data) == 1
@@ -448,14 +430,11 @@ class TestImageVariation:
 
         with open(SIMPLE_SHAPE_PATH, "rb") as image_file:
             response = tensorzero_client.images.create_variation(
-                model="dall-e-2",
-                image=image_file,
-                n=1,
-                size="512x512"
+                model="dall-e-2", image=image_file, n=1, size="512x512"
             )
 
         assert len(response.data) == 1
-        assert hasattr(response.data[0], 'url') or hasattr(response.data[0], 'b64_json')
+        assert hasattr(response.data[0], "url") or hasattr(response.data[0], "b64_json")
 
     def test_image_variation_multiple_dall_e_2(self):
         """Test generating multiple variations"""
@@ -466,10 +445,7 @@ class TestImageVariation:
 
         with open(SIMPLE_SHAPE_PATH, "rb") as image_file:
             response = tensorzero_client.images.create_variation(
-                model="dall-e-2",
-                image=image_file,
-                n=4,
-                size="512x512"
+                model="dall-e-2", image=image_file, n=4, size="512x512"
             )
 
         assert len(response.data) == 4
@@ -486,10 +462,7 @@ class TestImageVariation:
         for size in sizes:
             with open(SIMPLE_SHAPE_PATH, "rb") as image_file:
                 response = tensorzero_client.images.create_variation(
-                    model="dall-e-2",
-                    image=image_file,
-                    n=1,
-                    size=size
+                    model="dall-e-2", image=image_file, n=1, size=size
                 )
 
             assert len(response.data) == 1
@@ -510,24 +483,20 @@ class TestImageVariation:
                     image=image_file,
                     n=1,
                     size="512x512",
-                    response_format=response_format
+                    response_format=response_format,
                 )
 
             assert len(response.data) == 1
             if response_format == "url":
-                assert hasattr(response.data[0], 'url')
+                assert hasattr(response.data[0], "url")
             else:
-                assert hasattr(response.data[0], 'b64_json')
+                assert hasattr(response.data[0], "b64_json")
 
     def test_image_variation_with_different_source_images(self):
         """Test variations with different source images"""
         setup_module()
 
-        test_images = [
-            SIMPLE_SHAPE_PATH,
-            SMALL_IMAGE_PATH,
-            TEST_IMAGE_PATH
-        ]
+        test_images = [SIMPLE_SHAPE_PATH, SMALL_IMAGE_PATH, TEST_IMAGE_PATH]
 
         for image_path in test_images:
             if not image_path.exists():
@@ -535,10 +504,7 @@ class TestImageVariation:
 
             with open(image_path, "rb") as image_file:
                 response = tensorzero_client.images.create_variation(
-                    model="dall-e-2",
-                    image=image_file,
-                    n=1,
-                    size="512x512"
+                    model="dall-e-2", image=image_file, n=1, size="512x512"
                 )
 
             assert len(response.data) == 1
@@ -556,7 +522,7 @@ class TestImageVariation:
                 tensorzero_client.images.create_variation(
                     model="dall-e-3",  # DALL-E 3 doesn't support variations
                     image=image_file,
-                    n=1
+                    n=1,
                 )
 
     @pytest.mark.asyncio
@@ -570,16 +536,12 @@ class TestImageVariation:
         from openai import AsyncOpenAI
 
         async_client = AsyncOpenAI(
-            base_url=f"{TENSORZERO_BASE_URL}/v1",
-            api_key=TENSORZERO_API_KEY
+            base_url=f"{TENSORZERO_BASE_URL}/v1", api_key=TENSORZERO_API_KEY
         )
 
         with open(SIMPLE_SHAPE_PATH, "rb") as image_file:
             response = await async_client.images.create_variation(
-                model="dall-e-2",
-                image=image_file,
-                n=1,
-                size="512x512"
+                model="dall-e-2", image=image_file, n=1, size="512x512"
             )
 
         assert len(response.data) == 1
@@ -596,10 +558,7 @@ class TestImageEndpointIntegration:
         if TEST_IMAGE_PATH.exists():
             with open(TEST_IMAGE_PATH, "rb") as image_file:
                 response = tensorzero_client.images.create_variation(
-                    model="dall-e-2",
-                    image=image_file,
-                    n=1,
-                    size="256x256"
+                    model="dall-e-2", image=image_file, n=1, size="256x256"
                 )
             assert len(response.data) == 1
 
@@ -608,10 +567,7 @@ class TestImageEndpointIntegration:
         if jpeg_path.exists():
             with open(jpeg_path, "rb") as image_file:
                 response = tensorzero_client.images.create_variation(
-                    model="dall-e-2",
-                    image=image_file,
-                    n=1,
-                    size="256x256"
+                    model="dall-e-2", image=image_file, n=1, size="256x256"
                 )
             assert len(response.data) == 1
 
@@ -629,7 +585,7 @@ class TestImageEndpointIntegration:
                     model="dall-e-2",
                     image=image_file,
                     prompt="Test",
-                    size="2048x2048"  # Not supported size
+                    size="2048x2048",  # Not supported size
                 )
 
     def test_prompt_length_validation(self):
@@ -639,31 +595,24 @@ class TestImageEndpointIntegration:
 
         with pytest.raises(Exception):
             tensorzero_client.images.generate(
-                model="dall-e-2",
-                prompt=long_prompt,
-                n=1,
-                size="256x256"
+                model="dall-e-2", prompt=long_prompt, n=1, size="256x256"
             )
 
     def test_concurrent_image_requests(self):
         """Test handling multiple concurrent image requests"""
         import concurrent.futures
-        import threading
 
         def generate_image(prompt_suffix):
             return tensorzero_client.images.generate(
                 model="dall-e-2",
                 prompt=f"A simple shape {prompt_suffix}",
                 n=1,
-                size="256x256"
+                size="256x256",
             )
 
         # Run multiple requests concurrently
         with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-            futures = [
-                executor.submit(generate_image, f"test {i}")
-                for i in range(3)
-            ]
+            futures = [executor.submit(generate_image, f"test {i}") for i in range(3)]
 
             results = [future.result() for future in futures]
 
@@ -679,13 +628,13 @@ class TestImageEndpointIntegration:
             tensorzero_client.images.edit(
                 model="dall-e-3",
                 image=open(TEST_IMAGE_PATH, "rb") if TEST_IMAGE_PATH.exists() else None,
-                prompt="Test edit"
+                prompt="Test edit",
             )
 
         with pytest.raises(Exception):
             tensorzero_client.images.create_variation(
                 model="dall-e-3",
-                image=open(TEST_IMAGE_PATH, "rb") if TEST_IMAGE_PATH.exists() else None
+                image=open(TEST_IMAGE_PATH, "rb") if TEST_IMAGE_PATH.exists() else None,
             )
 
 
@@ -703,7 +652,7 @@ class TestImagePerformance:
             model="dall-e-2",
             prompt="A simple test image for timing",
             n=1,
-            size="256x256"
+            size="256x256",
         )
         end_time = time.time()
 
@@ -719,13 +668,13 @@ class TestImagePerformance:
             model="dall-e-2",
             prompt="A collection of geometric shapes",
             n=5,
-            size="256x256"
+            size="256x256",
         )
 
         assert len(response.data) == 5
         # Verify each image is valid
         for image_data in response.data:
-            assert hasattr(image_data, 'url') or hasattr(image_data, 'b64_json')
+            assert hasattr(image_data, "url") or hasattr(image_data, "b64_json")
 
 
 if __name__ == "__main__":

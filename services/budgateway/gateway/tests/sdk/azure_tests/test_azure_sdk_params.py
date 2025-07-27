@@ -20,10 +20,7 @@ TENSORZERO_BASE_URL = os.getenv("TENSORZERO_BASE_URL", "http://localhost:3001")
 TENSORZERO_API_KEY = os.getenv("TENSORZERO_API_KEY", "test-api-key")
 
 # OpenAI SDK client for Azure models
-openai_client = OpenAI(
-    base_url=f"{TENSORZERO_BASE_URL}/v1",
-    api_key=TENSORZERO_API_KEY
-)
+openai_client = OpenAI(base_url=f"{TENSORZERO_BASE_URL}/v1", api_key=TENSORZERO_API_KEY)
 
 
 class TestAzureModels:
@@ -33,8 +30,10 @@ class TestAzureModels:
         """Test that OpenAI SDK works with Azure models."""
         response = openai_client.chat.completions.create(
             model="gpt-35-turbo-azure",
-            messages=[{"role": "user", "content": "Hello from OpenAI SDK to Azure model"}],
-            max_tokens=50
+            messages=[
+                {"role": "user", "content": "Hello from OpenAI SDK to Azure model"}
+            ],
+            max_tokens=50,
         )
 
         assert response.choices[0].message.content is not None
@@ -46,7 +45,7 @@ class TestAzureModels:
             model="gpt-35-turbo-azure",
             messages=[{"role": "user", "content": "Stream test"}],
             max_tokens=50,
-            stream=True
+            stream=True,
         )
 
         chunks = []
@@ -62,7 +61,7 @@ class TestAzureModels:
         """Test embeddings with Azure models via OpenAI SDK."""
         response = openai_client.embeddings.create(
             model="text-embedding-ada-002-azure",
-            input="Test embedding with Azure model"
+            input="Test embedding with Azure model",
         )
 
         assert len(response.data) == 1
@@ -71,28 +70,33 @@ class TestAzureModels:
 
     def test_azure_function_calling(self):
         """Test function calling with Azure models via OpenAI SDK."""
-        tools = [{
-            "type": "function",
-            "function": {
-                "name": "get_weather",
-                "description": "Get weather for a location",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "location": {"type": "string"},
-                        "unit": {"type": "string", "enum": ["celsius", "fahrenheit"]}
+        tools = [
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_weather",
+                    "description": "Get weather for a location",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "location": {"type": "string"},
+                            "unit": {
+                                "type": "string",
+                                "enum": ["celsius", "fahrenheit"],
+                            },
+                        },
+                        "required": ["location"],
                     },
-                    "required": ["location"]
-                }
+                },
             }
-        }]
+        ]
 
         response = openai_client.chat.completions.create(
             model="gpt-4-azure",
             messages=[{"role": "user", "content": "What's the weather in Paris?"}],
             tools=tools,
             tool_choice="auto",
-            max_tokens=100
+            max_tokens=100,
         )
 
         assert response.choices[0].message is not None
@@ -107,31 +111,35 @@ class TestAzureModels:
             model="gpt-4o-azure",  # Model that supports JSON mode
             messages=[
                 {"role": "system", "content": "Respond with valid JSON"},
-                {"role": "user", "content": "Give me user data with name and age"}
+                {"role": "user", "content": "Give me user data with name and age"},
             ],
             response_format={"type": "json_object"},
-            max_tokens=100
+            max_tokens=100,
         )
 
         assert response.choices[0].message.content is not None
         # Try to parse as JSON (dummy provider should return valid JSON)
         import json
+
         try:
             json.loads(response.choices[0].message.content)
         except json.JSONDecodeError:
             pytest.skip("Dummy provider returned non-JSON response")
 
-    @pytest.mark.parametrize("deployment_name,expected_model", [
-        ("gpt-35-turbo-azure", "gpt-35-turbo-azure"),
-        ("gpt-4-azure", "gpt-4-azure"),
-        ("gpt-4o-azure", "gpt-4o-azure"),
-    ])
+    @pytest.mark.parametrize(
+        "deployment_name,expected_model",
+        [
+            ("gpt-35-turbo-azure", "gpt-35-turbo-azure"),
+            ("gpt-4-azure", "gpt-4-azure"),
+            ("gpt-4o-azure", "gpt-4o-azure"),
+        ],
+    )
     def test_azure_model_names(self, deployment_name, expected_model):
         """Test that Azure model names are properly handled via OpenAI SDK."""
         response = openai_client.chat.completions.create(
             model=deployment_name,
             messages=[{"role": "user", "content": "Test model"}],
-            max_tokens=20
+            max_tokens=20,
         )
 
         assert response.model == expected_model
@@ -149,7 +157,7 @@ class TestAzureModels:
                 model=model,
                 messages=[{"role": "user", "content": test_message}],
                 max_tokens=50,
-                temperature=0
+                temperature=0,
             )
 
             assert response.choices[0].message.content is not None
@@ -159,6 +167,7 @@ class TestAzureModels:
         """Test audio transcription with Azure models via OpenAI SDK."""
         # Create a test audio file
         import io
+
         audio_data = b"test audio data for transcription"
         audio_file = io.BytesIO(audio_data)
         audio_file.name = "test_audio.mp3"
@@ -168,25 +177,24 @@ class TestAzureModels:
             file=audio_file,
             language="en",
             response_format="json",
-            temperature=0.5
+            temperature=0.5,
         )
 
         assert response.text is not None
         # With real Azure, language should match requested
-        if hasattr(response, 'language'):
+        if hasattr(response, "language"):
             assert response.language == "en"
 
     def test_azure_audio_translation(self):
         """Test audio translation with Azure models via OpenAI SDK."""
         import io
+
         audio_data = b"test audio data for translation"
         audio_file = io.BytesIO(audio_data)
         audio_file.name = "test_audio.mp3"
 
         response = openai_client.audio.translations.create(
-            model="whisper-1-azure",
-            file=audio_file,
-            response_format="json"
+            model="whisper-1-azure", file=audio_file, response_format="json"
         )
 
         assert response.text is not None
@@ -203,7 +211,7 @@ class TestAzureModels:
                 input=f"Testing voice: {voice}",
                 voice=voice,
                 response_format="mp3",
-                speed=1.0
+                speed=1.0,
             )
 
             audio_data = response.content
@@ -219,7 +227,7 @@ class TestAzureModels:
             size="1024x1024",
             quality="hd",
             style="vivid",
-            response_format="url"
+            response_format="url",
         )
 
         assert len(response.data) == 1
@@ -231,7 +239,7 @@ class TestAzureModels:
             prompt="A peaceful garden",
             n=1,
             size="1024x1024",
-            response_format="b64_json"
+            response_format="b64_json",
         )
 
         assert len(response_b64.data) == 1
@@ -244,13 +252,13 @@ class TestAzureModels:
             "First document about Azure",
             "Second document about OpenAI",
             "Third document about AI",
-            "Fourth document about cloud computing"
+            "Fourth document about cloud computing",
         ]
 
         response = openai_client.embeddings.create(
             model="text-embedding-ada-002-azure",
             input=texts,
-            encoding_format="base64"  # Azure supports base64 encoding
+            encoding_format="base64",  # Azure supports base64 encoding
         )
 
         assert len(response.data) == len(texts)
@@ -261,6 +269,7 @@ class TestAzureModels:
     def test_azure_extra_body_audio(self):
         """Test extra_body parameters with Azure audio models via OpenAI SDK."""
         import io
+
         audio_data = b"test audio data"
         audio_file = io.BytesIO(audio_data)
         audio_file.name = "test.mp3"
@@ -271,7 +280,7 @@ class TestAzureModels:
                 model="whisper-1-azure",
                 file=audio_file,
                 response_format="verbose_json",
-                timestamp_granularities=["word", "segment"]
+                timestamp_granularities=["word", "segment"],
             )
             assert response.text is not None
         except Exception as e:
@@ -283,8 +292,10 @@ class TestAzureModels:
         # Azure models work with content filtering
         response = openai_client.chat.completions.create(
             model="gpt-35-turbo-azure",
-            messages=[{"role": "user", "content": "Tell me a story about a helpful robot"}],
-            max_tokens=100
+            messages=[
+                {"role": "user", "content": "Tell me a story about a helpful robot"}
+            ],
+            max_tokens=100,
         )
 
         assert response.choices[0].message.content is not None

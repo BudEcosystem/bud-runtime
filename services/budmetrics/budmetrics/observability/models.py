@@ -1,19 +1,9 @@
 import asyncio
 import hashlib
-import logging
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-
-
-UTC = timezone.utc
 from enum import Enum
-
-
-class StrEnum(str, Enum):
-    pass
-
-
 from typing import Any, Literal, Optional, Union
 from uuid import UUID
 
@@ -28,6 +18,13 @@ from budmetrics.commons.profiling_utils import (
     profile_async,
     profile_sync,
 )
+
+
+UTC = timezone.utc
+
+
+class StrEnum(str, Enum):
+    pass
 
 
 logging.skip_module_warnings_and_logs(["asynch"])
@@ -81,26 +78,32 @@ class Frequency:
 
     @classmethod
     def hourly(cls) -> "Frequency":
+        """Create an hourly frequency."""
         return cls(None, FrequencyUnit.HOUR)
 
     @classmethod
     def daily(cls) -> "Frequency":
+        """Create a daily frequency."""
         return cls(None, FrequencyUnit.DAY)
 
     @classmethod
     def weekly(cls) -> "Frequency":
+        """Create a weekly frequency."""
         return cls(None, FrequencyUnit.WEEK)
 
     @classmethod
     def monthly(cls) -> "Frequency":
+        """Create a monthly frequency."""
         return cls(None, FrequencyUnit.MONTH)
 
     @classmethod
     def quarterly(cls) -> "Frequency":
+        """Create a quarterly frequency."""
         return cls(None, FrequencyUnit.QUARTER)
 
     @classmethod
     def yearly(cls) -> "Frequency":
+        """Create a yearly frequency."""
         return cls(None, FrequencyUnit.YEAR)
 
     @classmethod
@@ -133,6 +136,7 @@ class Frequency:
         return f"INTERVAL {value if order == 'asc' else -value} {unit_map[self.unit]}"
 
     def __str__(self) -> str:
+        """Return string representation of frequency."""
         return self.name
 
 
@@ -268,6 +272,7 @@ class QueryBuilder:
     }
 
     def __init__(self, performance_metrics: Optional[PerformanceMetrics] = None):
+        """Initialize TimeSeriesHelper with optional performance metrics."""
         self.time_helper = TimeSeriesHelper()
         self.performance_metrics = performance_metrics
 
@@ -1154,6 +1159,7 @@ class QueryCache:
     """Simple LRU cache for query results with TTL support."""
 
     def __init__(self, max_size: int = 1000, ttl: int = 300):
+        """Initialize LRU cache with max size and TTL."""
         self.max_size = max_size
         self.ttl = ttl
         self.cache: dict[str, tuple[Any, float]] = {}
@@ -1209,6 +1215,7 @@ class QueryCache:
 
 class ClickHouseClient:
     def __init__(self, config: Optional[ClickHouseConfig] = None):
+        """Initialize ClickHouse client with optional config."""
         self.config = config
         self._pool: Optional[asynch.Pool] = None
         self._semaphore: Optional[asyncio.Semaphore] = None
@@ -1218,6 +1225,7 @@ class ClickHouseClient:
         self.performance_metrics = performance_logger.get_metrics()
 
     async def initialize(self):
+        """Initialize the ClickHouse connection pool."""
         if self._initialized:
             return
 
@@ -1271,6 +1279,7 @@ class ClickHouseClient:
             await cursor.fetchall()
 
     async def close(self):
+        """Close the ClickHouse connection pool."""
         if self._pool:
             await self._pool.shutdown()
             self._initialized = False
@@ -1284,6 +1293,7 @@ class ClickHouseClient:
         with_column_types: bool = False,
         use_cache: bool = True,
     ) -> Union[list[tuple], tuple[list[tuple], Any]]:
+        """Execute a query against ClickHouse."""
         if not self._initialized:
             await self.initialize()
 
@@ -1350,6 +1360,7 @@ class ClickHouseClient:
             await cursor.execute(query, data)
 
     async def get_pool_stats(self) -> dict[str, Any]:
+        """Get connection pool statistics."""
         if not self._pool:
             return {"status": "not_initialized"}
 

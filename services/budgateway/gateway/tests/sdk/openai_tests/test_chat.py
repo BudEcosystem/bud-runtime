@@ -13,13 +13,10 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # Clients
 tensorzero_client = OpenAI(
-    base_url=f"{TENSORZERO_BASE_URL}/v1",
-    api_key=TENSORZERO_API_KEY
+    base_url=f"{TENSORZERO_BASE_URL}/v1", api_key=TENSORZERO_API_KEY
 )
 
-openai_client = OpenAI(
-    api_key=OPENAI_API_KEY
-)
+openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
 
 class TestChatCompletions:
@@ -29,15 +26,12 @@ class TestChatCompletions:
         """Test basic chat completion request"""
         messages = [
             {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": "Say 'Hello, World!' and nothing else."}
+            {"role": "user", "content": "Say 'Hello, World!' and nothing else."},
         ]
 
         # TensorZero request
         tz_response = tensorzero_client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=messages,
-            temperature=0,
-            max_tokens=20
+            model="gpt-3.5-turbo", messages=messages, temperature=0, max_tokens=20
         )
 
         # Verify response structure
@@ -57,13 +51,11 @@ class TestChatCompletions:
             {"role": "system", "content": "You are a math tutor."},
             {"role": "user", "content": "What is 2+2?"},
             {"role": "assistant", "content": "2+2 equals 4."},
-            {"role": "user", "content": "What about 3+3?"}
+            {"role": "user", "content": "What about 3+3?"},
         ]
 
         response = tensorzero_client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=messages,
-            temperature=0
+            model="gpt-3.5-turbo", messages=messages, temperature=0
         )
 
         assert response.choices[0].message.content
@@ -74,10 +66,7 @@ class TestChatCompletions:
         messages = [{"role": "user", "content": "Count from 1 to 5"}]
 
         stream = tensorzero_client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=messages,
-            stream=True,
-            temperature=0
+            model="gpt-3.5-turbo", messages=messages, stream=True, temperature=0
         )
 
         chunks = []
@@ -94,33 +83,32 @@ class TestChatCompletions:
         """Test function calling capability"""
         messages = [{"role": "user", "content": "What's the weather in San Francisco?"}]
 
-        tools = [{
-            "type": "function",
-            "function": {
-                "name": "get_weather",
-                "description": "Get the current weather in a location",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "location": {
-                            "type": "string",
-                            "description": "The city and state"
+        tools = [
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_weather",
+                    "description": "Get the current weather in a location",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "location": {
+                                "type": "string",
+                                "description": "The city and state",
+                            },
+                            "unit": {
+                                "type": "string",
+                                "enum": ["celsius", "fahrenheit"],
+                            },
                         },
-                        "unit": {
-                            "type": "string",
-                            "enum": ["celsius", "fahrenheit"]
-                        }
+                        "required": ["location"],
                     },
-                    "required": ["location"]
-                }
+                },
             }
-        }]
+        ]
 
         response = tensorzero_client.chat.completions.create(
-            model="gpt-4",
-            messages=messages,
-            tools=tools,
-            tool_choice="auto"
+            model="gpt-4", messages=messages, tools=tools, tool_choice="auto"
         )
 
         # Check if model decided to use a function
@@ -139,9 +127,7 @@ class TestChatCompletions:
 
         for model in models:
             response = tensorzero_client.chat.completions.create(
-                model=model,
-                messages=messages,
-                max_tokens=10
+                model=model, messages=messages, max_tokens=10
             )
             assert response.model == model
             assert response.choices[0].message.content
@@ -149,24 +135,22 @@ class TestChatCompletions:
     def test_error_handling(self):
         """Test error handling for invalid requests"""
         # Invalid model
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(Exception):
             tensorzero_client.chat.completions.create(
-                model="invalid-model",
-                messages=[{"role": "user", "content": "test"}]
+                model="invalid-model", messages=[{"role": "user", "content": "test"}]
             )
 
         # Empty messages
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(Exception):
             tensorzero_client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[]
+                model="gpt-3.5-turbo", messages=[]
             )
 
         # Invalid message format
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(Exception):
             tensorzero_client.chat.completions.create(
                 model="gpt-3.5-turbo",
-                messages=[{"content": "test"}]  # Missing role
+                messages=[{"content": "test"}],  # Missing role
             )
 
     def test_completion_parameters(self):
@@ -183,7 +167,7 @@ class TestChatCompletions:
             presence_penalty=0.5,
             # Removing untill tensorzero supports n parameter
             # n=2,  # Request 2 completions
-            stop=["\n\n"]
+            stop=["\n\n"],
         )
 
         # assert len(response.choices) == 2
@@ -197,17 +181,17 @@ class TestChatCompletions:
         from openai import AsyncOpenAI
 
         async_client = AsyncOpenAI(
-            base_url=f"{TENSORZERO_BASE_URL}/v1",
-            api_key=TENSORZERO_API_KEY
+            base_url=f"{TENSORZERO_BASE_URL}/v1", api_key=TENSORZERO_API_KEY
         )
 
         messages = [{"role": "user", "content": "Say 'async test'"}]
 
         response = await async_client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=messages,
-            max_tokens=10
+            model="gpt-3.5-turbo", messages=messages, max_tokens=10
         )
 
         assert response.choices[0].message.content
-        assert "async" in response.choices[0].message.content.lower() or "test" in response.choices[0].message.content.lower()
+        assert (
+            "async" in response.choices[0].message.content.lower()
+            or "test" in response.choices[0].message.content.lower()
+        )

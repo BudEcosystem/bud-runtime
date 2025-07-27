@@ -3,7 +3,6 @@ import pytest
 from openai import OpenAI
 from dotenv import load_dotenv
 import tempfile
-import json
 from pathlib import Path
 
 load_dotenv()
@@ -15,13 +14,10 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # Clients
 tensorzero_client = OpenAI(
-    base_url=f"{TENSORZERO_BASE_URL}/v1",
-    api_key=TENSORZERO_API_KEY
+    base_url=f"{TENSORZERO_BASE_URL}/v1", api_key=TENSORZERO_API_KEY
 )
 
-openai_client = OpenAI(
-    api_key=OPENAI_API_KEY
-)
+openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
 # Test audio file path
 AUDIO_SAMPLE_PATH = Path(__file__).parent / "fixtures" / "audio_samples" / "sample.mp3"
@@ -38,9 +34,7 @@ class TestAudioTranscription:
         with open(AUDIO_SAMPLE_PATH, "rb") as audio_file:
             # TensorZero request
             tz_response = tensorzero_client.audio.transcriptions.create(
-                model="whisper-1",
-                file=audio_file,
-                response_format="json"
+                model="whisper-1", file=audio_file, response_format="json"
             )
 
         # Verify response structure
@@ -59,7 +53,7 @@ class TestAudioTranscription:
                 response_format="json",
                 language="en",
                 prompt="This is a music file",
-                temperature=0.2
+                temperature=0.2,
             )
 
         assert isinstance(response.text, str)
@@ -76,23 +70,19 @@ class TestAudioTranscription:
                 if format_type == "text":
                     # For text format, the response is a string
                     response = tensorzero_client.audio.transcriptions.create(
-                        model="whisper-1",
-                        file=audio_file,
-                        response_format="text"
+                        model="whisper-1", file=audio_file, response_format="text"
                     )
                     assert isinstance(response, str)
                 else:
                     response = tensorzero_client.audio.transcriptions.create(
-                        model="whisper-1",
-                        file=audio_file,
-                        response_format=format_type
+                        model="whisper-1", file=audio_file, response_format=format_type
                     )
-                    assert hasattr(response, 'text')
+                    assert hasattr(response, "text")
 
                     if format_type == "verbose_json":
                         # Verbose format includes additional fields
-                        assert hasattr(response, 'duration')
-                        assert hasattr(response, 'language')
+                        assert hasattr(response, "duration")
+                        assert hasattr(response, "language")
 
     def test_transcription_with_timestamp_granularities(self):
         """Test transcription with timestamp granularities"""
@@ -104,13 +94,13 @@ class TestAudioTranscription:
                 model="whisper-1",
                 file=audio_file,
                 response_format="verbose_json",
-                timestamp_granularities=["word", "segment"]
+                timestamp_granularities=["word", "segment"],
             )
 
-        assert hasattr(response, 'text')
-        if hasattr(response, 'words'):
+        assert hasattr(response, "text")
+        if hasattr(response, "words"):
             assert isinstance(response.words, list)
-        if hasattr(response, 'segments'):
+        if hasattr(response, "segments"):
             assert isinstance(response.segments, list)
 
     @pytest.mark.asyncio
@@ -122,14 +112,12 @@ class TestAudioTranscription:
         from openai import AsyncOpenAI
 
         async_client = AsyncOpenAI(
-            base_url=f"{TENSORZERO_BASE_URL}/v1",
-            api_key=TENSORZERO_API_KEY
+            base_url=f"{TENSORZERO_BASE_URL}/v1", api_key=TENSORZERO_API_KEY
         )
 
         with open(AUDIO_SAMPLE_PATH, "rb") as audio_file:
             response = await async_client.audio.transcriptions.create(
-                model="whisper-1",
-                file=audio_file
+                model="whisper-1", file=audio_file
             )
 
         assert isinstance(response.text, str)
@@ -146,9 +134,7 @@ class TestAudioTranslation:
         with open(AUDIO_SAMPLE_PATH, "rb") as audio_file:
             # TensorZero request
             tz_response = tensorzero_client.audio.translations.create(
-                model="whisper-1",
-                file=audio_file,
-                response_format="json"
+                model="whisper-1", file=audio_file, response_format="json"
             )
 
         # Verify response structure
@@ -166,7 +152,7 @@ class TestAudioTranslation:
                 file=audio_file,
                 response_format="json",
                 prompt="Translate this audio to English",
-                temperature=0.2
+                temperature=0.2,
             )
 
         assert isinstance(response.text, str)
@@ -182,18 +168,14 @@ class TestAudioTranslation:
             with open(AUDIO_SAMPLE_PATH, "rb") as audio_file:
                 if format_type == "text":
                     response = tensorzero_client.audio.translations.create(
-                        model="whisper-1",
-                        file=audio_file,
-                        response_format="text"
+                        model="whisper-1", file=audio_file, response_format="text"
                     )
                     assert isinstance(response, str)
                 else:
                     response = tensorzero_client.audio.translations.create(
-                        model="whisper-1",
-                        file=audio_file,
-                        response_format=format_type
+                        model="whisper-1", file=audio_file, response_format=format_type
                     )
-                    assert hasattr(response, 'text')
+                    assert hasattr(response, "text")
 
 
 class TestTextToSpeech:
@@ -205,9 +187,7 @@ class TestTextToSpeech:
 
         # TensorZero request
         response = tensorzero_client.audio.speech.create(
-            model="tts-1",
-            voice="alloy",
-            input=text
+            model="tts-1", voice="alloy", input=text
         )
 
         # Response should be audio bytes
@@ -234,9 +214,7 @@ class TestTextToSpeech:
 
         for voice in voices:
             response = tensorzero_client.audio.speech.create(
-                model="tts-1",
-                voice=voice,
-                input=text
+                model="tts-1", voice=voice, input=text
             )
 
             audio_data = response.read()
@@ -249,10 +227,7 @@ class TestTextToSpeech:
 
         for audio_format in formats:
             response = tensorzero_client.audio.speech.create(
-                model="tts-1",
-                voice="alloy",
-                input=text,
-                response_format=audio_format
+                model="tts-1", voice="alloy", input=text, response_format=audio_format
             )
 
             audio_data = response.read()
@@ -265,10 +240,7 @@ class TestTextToSpeech:
 
         for speed in speeds:
             response = tensorzero_client.audio.speech.create(
-                model="tts-1",
-                voice="alloy",
-                input=text,
-                speed=speed
+                model="tts-1", voice="alloy", input=text, speed=speed
             )
 
             audio_data = response.read()
@@ -279,9 +251,7 @@ class TestTextToSpeech:
         text = "Testing high definition text to speech"
 
         response = tensorzero_client.audio.speech.create(
-            model="tts-1-hd",
-            voice="alloy",
-            input=text
+            model="tts-1-hd", voice="alloy", input=text
         )
 
         audio_data = response.read()
@@ -292,9 +262,7 @@ class TestTextToSpeech:
         long_text = " ".join(["This is a longer text for testing."] * 20)
 
         response = tensorzero_client.audio.speech.create(
-            model="tts-1",
-            voice="alloy",
-            input=long_text
+            model="tts-1", voice="alloy", input=long_text
         )
 
         audio_data = response.read()
@@ -306,14 +274,12 @@ class TestTextToSpeech:
             "Testing with numbers: 123, 456, 789",
             "Testing with punctuation! Question? Yes.",
             "Testing with emojis 🎉 (should be handled gracefully)",
-            "Testing with accents: café, naïve, résumé"
+            "Testing with accents: café, naïve, résumé",
         ]
 
         for text in texts:
             response = tensorzero_client.audio.speech.create(
-                model="tts-1",
-                voice="alloy",
-                input=text
+                model="tts-1", voice="alloy", input=text
             )
 
             audio_data = response.read()
@@ -325,16 +291,13 @@ class TestTextToSpeech:
         from openai import AsyncOpenAI
 
         async_client = AsyncOpenAI(
-            base_url=f"{TENSORZERO_BASE_URL}/v1",
-            api_key=TENSORZERO_API_KEY
+            base_url=f"{TENSORZERO_BASE_URL}/v1", api_key=TENSORZERO_API_KEY
         )
 
         text = "Async TTS test"
 
         response = await async_client.audio.speech.create(
-            model="tts-1",
-            voice="alloy",
-            input=text
+            model="tts-1", voice="alloy", input=text
         )
 
         audio_data = await response.aread()
@@ -346,17 +309,13 @@ class TestTextToSpeech:
         # Empty input
         with pytest.raises(Exception):
             tensorzero_client.audio.speech.create(
-                model="tts-1",
-                voice="alloy",
-                input=""
+                model="tts-1", voice="alloy", input=""
             )
 
         # Invalid voice
         with pytest.raises(Exception):
             tensorzero_client.audio.speech.create(
-                model="tts-1",
-                voice="invalid-voice",
-                input="Test"
+                model="tts-1", voice="invalid-voice", input="Test"
             )
 
         # Invalid speed
@@ -365,5 +324,5 @@ class TestTextToSpeech:
                 model="tts-1",
                 voice="alloy",
                 input="Test",
-                speed=5.0  # Max is 4.0
+                speed=5.0,  # Max is 4.0
             )

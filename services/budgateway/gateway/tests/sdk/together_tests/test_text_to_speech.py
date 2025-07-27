@@ -6,10 +6,7 @@ through TensorZero's OpenAI-compatible interface.
 """
 
 import os
-import io
-import wave
 import pytest
-from typing import Optional, List
 from openai import OpenAI
 from dotenv import load_dotenv
 
@@ -23,10 +20,7 @@ TENSORZERO_API_KEY = os.getenv("TENSORZERO_API_KEY", "test-api-key")
 SKIP_TOGETHER_TESTS = os.getenv("SKIP_TOGETHER_TESTS", "false").lower() == "true"
 
 # Universal OpenAI client
-client = OpenAI(
-    base_url=f"{TENSORZERO_BASE_URL}/v1",
-    api_key=TENSORZERO_API_KEY
-)
+client = OpenAI(base_url=f"{TENSORZERO_BASE_URL}/v1", api_key=TENSORZERO_API_KEY)
 
 
 def is_valid_audio(audio_bytes: bytes, format: str = "mp3") -> bool:
@@ -37,15 +31,17 @@ def is_valid_audio(audio_bytes: bytes, format: str = "mp3") -> bool:
     # Basic validation based on format
     if format == "mp3":
         # MP3 files often start with ID3 tag or FF FB/FF FA
-        return (audio_bytes.startswith(b'ID3') or
-                audio_bytes.startswith(b'\xff\xfb') or
-                audio_bytes.startswith(b'\xff\xfa'))
+        return (
+            audio_bytes.startswith(b"ID3")
+            or audio_bytes.startswith(b"\xff\xfb")
+            or audio_bytes.startswith(b"\xff\xfa")
+        )
     elif format == "wav":
         # WAV files start with RIFF
-        return audio_bytes.startswith(b'RIFF')
+        return audio_bytes.startswith(b"RIFF")
     elif format == "opus":
         # Opus in OGG container starts with OggS
-        return audio_bytes.startswith(b'OggS')
+        return audio_bytes.startswith(b"OggS")
 
     # For other formats or if unsure, just check it's not empty
     return len(audio_bytes) > 100
@@ -60,7 +56,7 @@ class TestTogetherTextToSpeech:
         response = client.audio.speech.create(
             model="together-tts",
             voice="alloy",
-            input="Hello, this is a test of Together AI text to speech."
+            input="Hello, this is a test of Together AI text to speech.",
         )
 
         # Get audio content
@@ -78,9 +74,7 @@ class TestTogetherTextToSpeech:
 
         for voice in standard_voices:
             response = client.audio.speech.create(
-                model="together-tts",
-                voice=voice,
-                input=f"{test_text}{voice}"
+                model="together-tts", voice=voice, input=f"{test_text}{voice}"
             )
 
             audio_content = response.content
@@ -109,15 +103,13 @@ class TestTogetherTextToSpeech:
             "storyteller lady",
             "princess",
             "doctor mischief",
-            "1920's radioman"
+            "1920's radioman",
         ]
 
         # Test a subset of voices to avoid too many API calls
         for voice in together_voices[:5]:
             response = client.audio.speech.create(
-                model="together-tts",
-                voice=voice,
-                input=f"Hello from {voice}"
+                model="together-tts", voice=voice, input=f"Hello from {voice}"
             )
 
             audio_content = response.content
@@ -133,15 +125,13 @@ class TestTogetherTextToSpeech:
             ("japanese woman conversational", "こんにちは、お元気ですか？"),
             ("british reading lady", "Good day, how do you do?"),
             ("australian customer support man", "G'day mate, how can I help you?"),
-            ("indian lady", "Namaste, how are you today?")
+            ("indian lady", "Namaste, how are you today?"),
         ]
 
         for voice, text in multilingual_tests[:3]:  # Test a few
             try:
                 response = client.audio.speech.create(
-                    model="together-tts",
-                    voice=voice,
-                    input=text
+                    model="together-tts", voice=voice, input=text
                 )
 
                 audio_content = response.content
@@ -158,7 +148,7 @@ class TestTogetherTextToSpeech:
             "aac": "aac",
             "flac": "flac",
             "wav": "wav",
-            "pcm": "pcm"
+            "pcm": "pcm",
         }
 
         test_text = "Testing audio format"
@@ -169,7 +159,7 @@ class TestTogetherTextToSpeech:
                     model="together-tts",
                     voice="nova",
                     input=test_text,
-                    response_format=format_name
+                    response_format=format_name,
                 )
 
                 audio_content = response.content
@@ -194,9 +184,7 @@ class TestTogetherTextToSpeech:
         """
 
         response = client.audio.speech.create(
-            model="together-tts",
-            voice="storyteller lady",
-            input=long_text
+            model="together-tts", voice="storyteller lady", input=long_text
         )
 
         audio_content = response.content
@@ -214,14 +202,12 @@ class TestTogetherTextToSpeech:
             "Time: 3:30 PM",
             "Date: 12/25/2024",
             "Hashtag: #AIVoice",
-            "URL: www.example.com"
+            "URL: www.example.com",
         ]
 
         for text in special_texts:
             response = client.audio.speech.create(
-                model="together-tts",
-                voice="alloy",
-                input=text
+                model="together-tts", voice="alloy", input=text
             )
 
             audio_content = response.content
@@ -231,11 +217,7 @@ class TestTogetherTextToSpeech:
     def test_tts_empty_input(self):
         """Test error handling for empty input."""
         with pytest.raises(Exception) as exc_info:
-            client.audio.speech.create(
-                model="together-tts",
-                voice="alloy",
-                input=""
-            )
+            client.audio.speech.create(model="together-tts", voice="alloy", input="")
 
         assert exc_info.value is not None
 
@@ -247,10 +229,7 @@ class TestTogetherTextToSpeech:
         for speed in speeds:
             try:
                 response = client.audio.speech.create(
-                    model="together-tts",
-                    voice="nova",
-                    input=test_text,
-                    speed=speed
+                    model="together-tts", voice="nova", input=test_text, speed=speed
                 )
 
                 audio_content = response.content
@@ -272,14 +251,12 @@ class TestTogetherTTSAdvanced:
             ("doctor mischief", "The experiment is ready to begin!"),
             ("1920's radioman", "This just in from the newsroom"),
             ("asmr lady", "Let's relax and take a deep breath"),
-            ("meditation lady", "Find your center and breathe deeply")
+            ("meditation lady", "Find your center and breathe deeply"),
         ]
 
         for voice, text in character_voices:
             response = client.audio.speech.create(
-                model="together-tts",
-                voice=voice,
-                input=text
+                model="together-tts", voice=voice, input=text
             )
 
             audio_content = response.content
@@ -292,14 +269,12 @@ class TestTogetherTTSAdvanced:
             ("customer support lady", "Hello! How can I assist you today?"),
             ("friendly sidekick", "Hey there! I've got your back!"),
             ("wise man", "Let me share some wisdom with you."),
-            ("laidback woman", "No worries, we'll figure it out together.")
+            ("laidback woman", "No worries, we'll figure it out together."),
         ]
 
         for voice, text in conversation:
             response = client.audio.speech.create(
-                model="together-tts",
-                voice=voice,
-                input=text
+                model="together-tts", voice=voice, input=text
             )
 
             assert response.content is not None
@@ -311,14 +286,12 @@ class TestTogetherTTSAdvanced:
             "Install via pip: pip install openai",
             "The function returns a List[Dict[str, Any]]",
             "HTTP status code: 200 OK",
-            "GPU memory: 24GB VRAM"
+            "GPU memory: 24GB VRAM",
         ]
 
         for text in technical_texts:
             response = client.audio.speech.create(
-                model="together-tts",
-                voice="pilot over intercom",
-                input=text
+                model="together-tts", voice="pilot over intercom", input=text
             )
 
             assert response.content is not None
@@ -329,14 +302,12 @@ class TestTogetherTTSAdvanced:
             ("meditation lady", "Peace and tranquility flow through you"),
             ("announcer man", "Ladies and gentlemen, welcome to the show!"),
             ("storyteller lady", "Let me tell you an amazing story"),
-            ("barbershop man", "How about that weather we're having?")
+            ("barbershop man", "How about that weather we're having?"),
         ]
 
         for voice, text in emotional_tests:
             response = client.audio.speech.create(
-                model="together-tts",
-                voice=voice,
-                input=text
+                model="together-tts", voice=voice, input=text
             )
 
             assert response.content is not None
@@ -348,15 +319,13 @@ class TestTogetherTTSAdvanced:
             "Our hero embarked on an epic journey.",
             "Along the way, they faced many challenges.",
             "But with courage and determination, they persevered.",
-            "Chapter 2: The Adventure Continues"
+            "Chapter 2: The Adventure Continues",
         ]
 
         audio_parts = []
         for part in story_parts:
             response = client.audio.speech.create(
-                model="together-tts",
-                voice="storyteller lady",
-                input=part
+                model="together-tts", voice="storyteller lady", input=part
             )
 
             audio_parts.append(response.content)
@@ -376,12 +345,13 @@ class TestTogetherTTSErrors:
         """Test with non-existent TTS model."""
         with pytest.raises(Exception) as exc_info:
             client.audio.speech.create(
-                model="invalid-tts-model",
-                voice="alloy",
-                input="Test"
+                model="invalid-tts-model", voice="alloy", input="Test"
             )
 
-        assert "not found" in str(exc_info.value).lower() or "invalid" in str(exc_info.value).lower()
+        assert (
+            "not found" in str(exc_info.value).lower()
+            or "invalid" in str(exc_info.value).lower()
+        )
 
     def test_invalid_voice(self):
         """Test with non-existent voice."""
@@ -389,7 +359,7 @@ class TestTogetherTTSErrors:
             response = client.audio.speech.create(
                 model="together-tts",
                 voice="non_existent_voice",
-                input="Test with invalid voice"
+                input="Test with invalid voice",
             )
             # Some providers might use a default voice
             assert response.content is not None
@@ -404,9 +374,7 @@ class TestTogetherTTSErrors:
 
         try:
             response = client.audio.speech.create(
-                model="together-tts",
-                voice="alloy",
-                input=very_long_text
+                model="together-tts", voice="alloy", input=very_long_text
             )
             # If it succeeds, verify we got audio
             assert response.content is not None
@@ -420,7 +388,7 @@ class TestTogetherTTSErrors:
             client.audio.speech.create(
                 model="meta-llama/Llama-3.1-8B-Instruct-Turbo",
                 voice="alloy",
-                input="Test"
+                input="Test",
             )
 
         # Should fail because it's not a TTS model
@@ -433,7 +401,7 @@ class TestTogetherTTSErrors:
                 model="together-tts",
                 voice="alloy",
                 input="Test audio",
-                response_format="unsupported_format"
+                response_format="unsupported_format",
             )
             # Might use default format
             assert response.content is not None
@@ -452,15 +420,13 @@ class TestTogetherTTSQuality:
         texts = [
             "Good morning, everyone.",
             "Welcome to today's presentation.",
-            "Thank you for your attention."
+            "Thank you for your attention.",
         ]
 
         audio_samples = []
         for text in texts:
             response = client.audio.speech.create(
-                model="together-tts",
-                voice=voice,
-                input=text
+                model="together-tts", voice=voice, input=text
             )
             audio_samples.append(response.content)
 
@@ -477,14 +443,12 @@ class TestTogetherTTSQuality:
             "The archaeologist discovered ancient hieroglyphics.",
             "Pseudonymous authors write anonymously.",
             "The sommelier recommended a Châteauneuf-du-Pape.",
-            "The colonel's yacht was moored at the quay."
+            "The colonel's yacht was moored at the quay.",
         ]
 
         for text in challenging_texts:
             response = client.audio.speech.create(
-                model="together-tts",
-                voice="newsman",
-                input=text
+                model="together-tts", voice="newsman", input=text
             )
 
             assert response.content is not None
@@ -498,14 +462,12 @@ class TestTogetherTTSQuality:
             "Pi equals 3.14159",
             "Item #42 costs $99.99",
             "The score was 3-2",
-            "Chapter 11, Section 3.2.1"
+            "Chapter 11, Section 3.2.1",
         ]
 
         for text in number_texts:
             response = client.audio.speech.create(
-                model="together-tts",
-                voice="announcer man",
-                input=text
+                model="together-tts", voice="announcer man", input=text
             )
 
             assert response.content is not None

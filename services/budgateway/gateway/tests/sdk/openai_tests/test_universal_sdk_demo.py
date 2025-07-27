@@ -22,15 +22,14 @@ TENSORZERO_API_KEY = os.getenv("TENSORZERO_API_KEY", "test-api-key")
 
 # Universal OpenAI client that works with ALL providers
 universal_client = OpenAI(
-    base_url=f"{TENSORZERO_BASE_URL}/v1",
-    api_key=TENSORZERO_API_KEY
+    base_url=f"{TENSORZERO_BASE_URL}/v1", api_key=TENSORZERO_API_KEY
 )
 
 # Native Anthropic client that only works with /v1/messages
 native_anthropic_client = Anthropic(
     base_url=TENSORZERO_BASE_URL,
     api_key=TENSORZERO_API_KEY,
-    default_headers={"anthropic-version": "2023-06-01"}
+    default_headers={"anthropic-version": "2023-06-01"},
 )
 
 
@@ -41,8 +40,10 @@ class TestUniversalSDKCompatibility:
         """✅ OpenAI SDK working with Anthropic models - Universal Compatibility!"""
         response = universal_client.chat.completions.create(
             model="claude-3-haiku-20240307",
-            messages=[{"role": "user", "content": "Hello from Anthropic model via OpenAI SDK"}],
-            max_tokens=50
+            messages=[
+                {"role": "user", "content": "Hello from Anthropic model via OpenAI SDK"}
+            ],
+            max_tokens=50,
         )
 
         # This works! OpenAI SDK + Anthropic model through /v1/chat/completions
@@ -55,8 +56,13 @@ class TestUniversalSDKCompatibility:
         """✅ OpenAI SDK working with Claude 3.5 Sonnet - Universal Compatibility!"""
         response = universal_client.chat.completions.create(
             model="claude-3-5-sonnet-20241022",
-            messages=[{"role": "user", "content": "Hello from Claude 3.5 Sonnet via OpenAI SDK"}],
-            max_tokens=50
+            messages=[
+                {
+                    "role": "user",
+                    "content": "Hello from Claude 3.5 Sonnet via OpenAI SDK",
+                }
+            ],
+            max_tokens=50,
         )
 
         # This works! OpenAI SDK + Claude 3.5 Sonnet through /v1/chat/completions
@@ -69,8 +75,10 @@ class TestUniversalSDKCompatibility:
         """✅ OpenAI SDK working with OpenAI models - Native usage!"""
         response = universal_client.chat.completions.create(
             model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": "Hello from OpenAI model via OpenAI SDK"}],
-            max_tokens=50
+            messages=[
+                {"role": "user", "content": "Hello from OpenAI model via OpenAI SDK"}
+            ],
+            max_tokens=50,
         )
 
         # This works! OpenAI SDK + OpenAI model through /v1/chat/completions
@@ -88,7 +96,7 @@ class TestNativeSDKSpecificEndpoints:
         response = native_anthropic_client.messages.create(
             model="claude-3-haiku-20240307",
             max_tokens=50,
-            messages=[{"role": "user", "content": "Hello from native Anthropic SDK"}]
+            messages=[{"role": "user", "content": "Hello from native Anthropic SDK"}],
         )
 
         # This works! Native Anthropic SDK through /v1/messages
@@ -115,21 +123,21 @@ class TestSDKArchitectureSummary:
         anthropic_via_openai = universal_client.chat.completions.create(
             model="claude-3-haiku-20240307",
             messages=[{"role": "user", "content": "Test 1: Anthropic via OpenAI SDK"}],
-            max_tokens=20
+            max_tokens=20,
         )
 
         # Test 2: OpenAI SDK + OpenAI model
         openai_via_openai = universal_client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": "Test 2: OpenAI via OpenAI SDK"}],
-            max_tokens=20
+            max_tokens=20,
         )
 
         # Test 3: Native Anthropic SDK + /v1/messages
         anthropic_via_native = native_anthropic_client.messages.create(
             model="claude-3-haiku-20240307",
             max_tokens=20,
-            messages=[{"role": "user", "content": "Test 3: Native Anthropic SDK"}]
+            messages=[{"role": "user", "content": "Test 3: Native Anthropic SDK"}],
         )
 
         # All should work
@@ -137,16 +145,16 @@ class TestSDKArchitectureSummary:
         assert openai_via_openai.choices[0].message.content is not None
         assert anthropic_via_native.content[0].text is not None
 
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("🏗️  ARCHITECTURE DEMONSTRATION COMPLETE")
-        print("="*60)
+        print("=" * 60)
         print("✅ OpenAI SDK + Anthropic models: WORKS (Universal)")
         print("✅ OpenAI SDK + OpenAI models: WORKS (Native)")
         print("✅ Native Anthropic SDK + /v1/messages: WORKS (Specific)")
-        print("="*60)
+        print("=" * 60)
         print("🎯 KEY INSIGHT: OpenAI SDK is UNIVERSAL!")
         print("   One SDK to rule them all providers! 🔥")
-        print("="*60)
+        print("=" * 60)
 
 
 if __name__ == "__main__":

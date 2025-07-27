@@ -14,7 +14,8 @@ from typing import List
 
 # Try to import numpy, but make it optional
 try:
-    import numpy as np
+    import numpy  # noqa: F401
+
     HAS_NUMPY = True
 except ImportError:
     HAS_NUMPY = False
@@ -29,10 +30,7 @@ TENSORZERO_API_KEY = os.getenv("TENSORZERO_API_KEY", "test-api-key")
 SKIP_TOGETHER_TESTS = os.getenv("SKIP_TOGETHER_TESTS", "false").lower() == "true"
 
 # Universal OpenAI client
-client = OpenAI(
-    base_url=f"{TENSORZERO_BASE_URL}/v1",
-    api_key=TENSORZERO_API_KEY
-)
+client = OpenAI(base_url=f"{TENSORZERO_BASE_URL}/v1", api_key=TENSORZERO_API_KEY)
 
 
 @pytest.mark.skipif(SKIP_TOGETHER_TESTS, reason="Together tests disabled")
@@ -43,10 +41,7 @@ class TestTogetherEmbeddings:
         """Test BGE base embedding model."""
         text = "The quick brown fox jumps over the lazy dog."
 
-        response = client.embeddings.create(
-            model="together-bge-base",
-            input=text
-        )
+        response = client.embeddings.create(model="together-bge-base", input=text)
 
         # Verify response structure
         assert response.object == "list"
@@ -71,10 +66,7 @@ class TestTogetherEmbeddings:
         """Test M2-BERT embedding model."""
         text = "Machine learning is transforming how we interact with technology."
 
-        response = client.embeddings.create(
-            model="together-m2-bert",
-            input=text
-        )
+        response = client.embeddings.create(model="together-m2-bert", input=text)
 
         assert response.model == "together-m2-bert"
         assert len(response.data) == 1
@@ -90,13 +82,10 @@ class TestTogetherEmbeddings:
             "Second document about machine learning",
             "Third document about deep learning",
             "Fourth document about neural networks",
-            "Fifth document about computer vision"
+            "Fifth document about computer vision",
         ]
 
-        response = client.embeddings.create(
-            model="together-bge-base",
-            input=texts
-        )
+        response = client.embeddings.create(model="together-bge-base", input=texts)
 
         # Verify batch response
         assert len(response.data) == len(texts)
@@ -117,21 +106,19 @@ class TestTogetherEmbeddings:
         similar_texts = [
             "The weather is sunny and warm today",
             "Today's weather is warm and sunny",
-            "It's a warm, sunny day"
+            "It's a warm, sunny day",
         ]
 
         different_text = "Machine learning algorithms process data"
 
         # Get embeddings for similar texts
         similar_response = client.embeddings.create(
-            model="together-bge-base",
-            input=similar_texts
+            model="together-bge-base", input=similar_texts
         )
 
         # Get embedding for different text
         different_response = client.embeddings.create(
-            model="together-bge-base",
-            input=different_text
+            model="together-bge-base", input=different_text
         )
 
         # Calculate cosine similarity without numpy
@@ -156,10 +143,7 @@ class TestTogetherEmbeddings:
     def test_empty_input_handling(self):
         """Test handling of empty input."""
         with pytest.raises(Exception) as exc_info:
-            client.embeddings.create(
-                model="together-bge-base",
-                input=""
-            )
+            client.embeddings.create(model="together-bge-base", input="")
 
         # Should raise an error for empty string
         assert exc_info.value is not None
@@ -171,12 +155,11 @@ class TestTogetherEmbeddings:
             "Mathematical: ∑(x²) = ∫f(x)dx",
             "Symbols: @#$%^&*()",
             "Emojis: 🚀🤖🎉🌟",
-            "Mixed: Hello_世界-2024 #AI"
+            "Mixed: Hello_世界-2024 #AI",
         ]
 
         response = client.embeddings.create(
-            model="together-bge-base",
-            input=special_texts
+            model="together-bge-base", input=special_texts
         )
 
         assert len(response.data) == len(special_texts)
@@ -186,15 +169,11 @@ class TestTogetherEmbeddings:
     def test_long_text_embedding(self):
         """Test embedding of long text."""
         # Create a long text (but within model limits)
-        long_text = " ".join([
-            "This is a sentence about artificial intelligence."
-            for _ in range(100)
-        ])
-
-        response = client.embeddings.create(
-            model="together-bge-base",
-            input=long_text
+        long_text = " ".join(
+            ["This is a sentence about artificial intelligence." for _ in range(100)]
         )
+
+        response = client.embeddings.create(model="together-bge-base", input=long_text)
 
         assert len(response.data) == 1
         assert len(response.data[0].embedding) == 768
@@ -205,15 +184,9 @@ class TestTogetherEmbeddings:
         text = "Deterministic embedding test"
 
         # Get embedding twice
-        response1 = client.embeddings.create(
-            model="together-bge-base",
-            input=text
-        )
+        response1 = client.embeddings.create(model="together-bge-base", input=text)
 
-        response2 = client.embeddings.create(
-            model="together-bge-base",
-            input=text
-        )
+        response2 = client.embeddings.create(model="together-bge-base", input=text)
 
         # Embeddings should be identical
         embedding1 = response1.data[0].embedding
@@ -227,7 +200,9 @@ class TestTogetherEmbeddings:
             return dot_product / (norm_a * norm_b)
 
         similarity = cosine_similarity(embedding1, embedding2)
-        assert similarity > 0.9999, f"Embeddings not deterministic: similarity={similarity}"
+        assert similarity > 0.9999, (
+            f"Embeddings not deterministic: similarity={similarity}"
+        )
 
     def test_mixed_language_embeddings(self):
         """Test embeddings for multiple languages."""
@@ -241,8 +216,7 @@ class TestTogetherEmbeddings:
         ]
 
         response = client.embeddings.create(
-            model="together-bge-base",
-            input=multilingual_texts
+            model="together-bge-base", input=multilingual_texts
         )
 
         assert len(response.data) == len(multilingual_texts)
@@ -264,8 +238,7 @@ class TestTogetherEmbeddings:
         for i, text in enumerate(edge_cases):
             try:
                 response = client.embeddings.create(
-                    model="together-bge-base",
-                    input=text
+                    model="together-bge-base", input=text
                 )
                 assert len(response.data) == 1
                 assert len(response.data[0].embedding) == 768
@@ -286,26 +259,24 @@ class TestTogetherEmbeddingApplications:
             "Machine learning models can predict future outcomes.",
             "The stock market closed higher today.",
             "Neural networks are inspired by biological neurons.",
-            "Coffee is one of the most popular beverages worldwide."
+            "Coffee is one of the most popular beverages worldwide.",
         ]
 
         # Get embeddings for documents
         doc_response = client.embeddings.create(
-            model="together-bge-base",
-            input=documents
+            model="together-bge-base", input=documents
         )
 
         # Search queries
         queries = [
             "programming languages",
             "artificial intelligence",
-            "financial markets"
+            "financial markets",
         ]
 
         # Get embeddings for queries
         query_response = client.embeddings.create(
-            model="together-bge-base",
-            input=queries
+            model="together-bge-base", input=queries
         )
 
         # Calculate cosine similarity without numpy
@@ -344,13 +315,10 @@ class TestTogetherEmbeddingApplications:
             # Food
             "Italian cuisine is known for pasta and pizza",
             "Japanese food emphasizes fresh ingredients",
-            "Mexican cuisine features spicy flavors"
+            "Mexican cuisine features spicy flavors",
         ]
 
-        response = client.embeddings.create(
-            model="together-bge-base",
-            input=texts
-        )
+        response = client.embeddings.create(model="together-bge-base", input=texts)
 
         # Get embeddings
         embeddings = [d.embedding for d in response.data]
@@ -371,10 +339,7 @@ class TestTogetherEmbeddingApplications:
 
         responses = []
         for _ in range(3):
-            response = client.embeddings.create(
-                model="together-bge-base",
-                input=text
-            )
+            response = client.embeddings.create(model="together-bge-base", input=text)
             responses.append(response)
 
         # All responses should have identical embeddings
@@ -391,19 +356,18 @@ class TestTogetherEmbeddingErrors:
         """Test with non-existent embedding model."""
         with pytest.raises(Exception) as exc_info:
             client.embeddings.create(
-                model="together-invalid-embedding-model",
-                input="Test text"
+                model="together-invalid-embedding-model", input="Test text"
             )
 
-        assert "not found" in str(exc_info.value).lower() or "invalid" in str(exc_info.value).lower()
+        assert (
+            "not found" in str(exc_info.value).lower()
+            or "invalid" in str(exc_info.value).lower()
+        )
 
     def test_empty_batch(self):
         """Test with empty batch input."""
         with pytest.raises(Exception) as exc_info:
-            client.embeddings.create(
-                model="together-bge-base",
-                input=[]
-            )
+            client.embeddings.create(model="together-bge-base", input=[])
 
         assert "empty" in str(exc_info.value).lower()
 
@@ -411,8 +375,7 @@ class TestTogetherEmbeddingErrors:
         """Test using chat model for embeddings."""
         with pytest.raises(Exception) as exc_info:
             client.embeddings.create(
-                model="meta-llama/Llama-3.1-8B-Instruct-Turbo",
-                input="Test text"
+                model="meta-llama/Llama-3.1-8B-Instruct-Turbo", input="Test text"
             )
 
         # Should fail because it's not an embedding model
@@ -425,8 +388,7 @@ class TestTogetherEmbeddingErrors:
 
         try:
             response = client.embeddings.create(
-                model="together-bge-base",
-                input=very_long_text
+                model="together-bge-base", input=very_long_text
             )
             # If it succeeds, verify truncation or handling
             assert len(response.data) == 1

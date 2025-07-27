@@ -1,12 +1,12 @@
 """Reusable test suites for SDK testing."""
 
-from typing import Any, List, Dict, Optional
+from typing import List, Optional
 from .utils import (
     create_universal_client,
     validate_chat_response,
     validate_embedding_response,
     validate_streaming_chunk,
-    UniversalTestData
+    UniversalTestData,
 )
 
 
@@ -31,9 +31,7 @@ class UniversalChatTestSuite:
         messages = UniversalTestData.get_basic_chat_messages()
 
         response = self.client.chat.completions.create(
-            model=test_model,
-            messages=messages,
-            max_tokens=50
+            model=test_model, messages=messages, max_tokens=50
         )
 
         validate_chat_response(response, self.provider_hint)
@@ -46,9 +44,7 @@ class UniversalChatTestSuite:
         messages = UniversalTestData.get_multi_turn_messages()
 
         response = self.client.chat.completions.create(
-            model=test_model,
-            messages=messages,
-            max_tokens=50
+            model=test_model, messages=messages, max_tokens=50
         )
 
         validate_chat_response(response, self.provider_hint)
@@ -60,9 +56,7 @@ class UniversalChatTestSuite:
         messages = UniversalTestData.get_system_prompt_messages()
 
         response = self.client.chat.completions.create(
-            model=test_model,
-            messages=messages,
-            max_tokens=50
+            model=test_model, messages=messages, max_tokens=50
         )
 
         validate_chat_response(response, self.provider_hint)
@@ -77,7 +71,7 @@ class UniversalChatTestSuite:
             model=test_model,
             messages=[{"role": "user", "content": "What is 2+2?"}],
             max_tokens=20,
-            temperature=0.0
+            temperature=0.0,
         )
         validate_chat_response(response_low, self.provider_hint)
 
@@ -86,7 +80,7 @@ class UniversalChatTestSuite:
             model=test_model,
             messages=[{"role": "user", "content": "Be creative"}],
             max_tokens=50,
-            temperature=1.0
+            temperature=1.0,
         )
         validate_chat_response(response_high, self.provider_hint)
 
@@ -99,7 +93,7 @@ class UniversalChatTestSuite:
         response = self.client.chat.completions.create(
             model=test_model,
             messages=[{"role": "user", "content": "Tell me a story"}],
-            max_tokens=10  # Very low to test truncation
+            max_tokens=10,  # Very low to test truncation
         )
 
         validate_chat_response(response, self.provider_hint)
@@ -129,7 +123,7 @@ class UniversalStreamingTestSuite:
             model=test_model,
             messages=[{"role": "user", "content": "Count to 5"}],
             max_tokens=50,
-            stream=True
+            stream=True,
         )
 
         chunks_received = 0
@@ -154,10 +148,15 @@ class UniversalStreamingTestSuite:
 
         stream = self.client.chat.completions.create(
             model=test_model,
-            messages=[{"role": "user", "content": "Be creative and tell me something interesting"}],
+            messages=[
+                {
+                    "role": "user",
+                    "content": "Be creative and tell me something interesting",
+                }
+            ],
             max_tokens=100,
             temperature=0.8,
-            stream=True
+            stream=True,
         )
 
         chunks = list(stream)
@@ -182,8 +181,7 @@ class UniversalEmbeddingTestSuite:
         test_model = model or self.models[0]
 
         response = self.client.embeddings.create(
-            model=test_model,
-            input="Test embedding text"
+            model=test_model, input="Test embedding text"
         )
 
         validate_embedding_response(response, expected_count=1)
@@ -195,10 +193,7 @@ class UniversalEmbeddingTestSuite:
         test_model = model or self.models[0]
         texts = UniversalTestData.get_embedding_texts()[:3]  # Use first 3 texts
 
-        response = self.client.embeddings.create(
-            model=test_model,
-            input=texts
-        )
+        response = self.client.embeddings.create(model=test_model, input=texts)
 
         validate_embedding_response(response, expected_count=len(texts))
         return response
@@ -209,13 +204,10 @@ class UniversalEmbeddingTestSuite:
         special_texts = [
             "Test with émojis 🚀🤖🌟",
             "Unicode: 你好世界",
-            "Special chars: <>&\"'\\n\\t"
+            "Special chars: <>&\"'\\n\\t",
         ]
 
-        response = self.client.embeddings.create(
-            model=test_model,
-            input=special_texts
-        )
+        response = self.client.embeddings.create(model=test_model, input=special_texts)
 
         validate_embedding_response(response, expected_count=len(special_texts))
         return response
@@ -237,7 +229,7 @@ class UniversalErrorTestSuite:
             self.client.chat.completions.create(
                 model="invalid-model-name-that-does-not-exist",
                 messages=[{"role": "user", "content": "Test"}],
-                max_tokens=10
+                max_tokens=10,
             )
 
         # Should get a model not found error
@@ -250,9 +242,7 @@ class UniversalErrorTestSuite:
 
         with pytest.raises(Exception) as exc_info:
             self.client.chat.completions.create(
-                model=self.models[0],
-                messages=[],
-                max_tokens=10
+                model=self.models[0], messages=[], max_tokens=10
             )
 
         assert exc_info.value is not None
@@ -268,7 +258,7 @@ class UniversalErrorTestSuite:
                 model=self.models[0],
                 messages=[{"role": "user", "content": "Test"}],
                 temperature=-1.0,  # Invalid
-                max_tokens=10
+                max_tokens=10,
             )
 
         # Test invalid max_tokens
@@ -276,5 +266,5 @@ class UniversalErrorTestSuite:
             self.client.chat.completions.create(
                 model=self.models[0],
                 messages=[{"role": "user", "content": "Test"}],
-                max_tokens=-10  # Invalid
+                max_tokens=-10,  # Invalid
             )

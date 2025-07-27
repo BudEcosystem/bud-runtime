@@ -17,10 +17,7 @@ TENSORZERO_BASE_URL = os.getenv("TENSORZERO_BASE_URL", "http://localhost:3001")
 TENSORZERO_API_KEY = os.getenv("TENSORZERO_API_KEY", "test-api-key")
 
 # Universal OpenAI client
-client = OpenAI(
-    base_url=f"{TENSORZERO_BASE_URL}/v1",
-    api_key=TENSORZERO_API_KEY
-)
+client = OpenAI(base_url=f"{TENSORZERO_BASE_URL}/v1", api_key=TENSORZERO_API_KEY)
 
 
 class TestTogetherModelsInUnifiedCI:
@@ -38,7 +35,7 @@ class TestTogetherModelsInUnifiedCI:
             response = client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": "Hello"}],
-                max_tokens=10
+                max_tokens=10,
             )
 
             assert response.model == model
@@ -51,7 +48,7 @@ class TestTogetherModelsInUnifiedCI:
             model="mistralai/Mixtral-8x7B-Instruct-v0.1",
             messages=[{"role": "user", "content": "Hi"}],
             max_tokens=20,
-            stream=True
+            stream=True,
         )
 
         chunks = 0
@@ -68,7 +65,7 @@ class TestTogetherModelsInUnifiedCI:
         test_models = [
             ("gpt-3.5-turbo", "OpenAI"),
             ("claude-3-haiku-20240307", "Anthropic"),
-            ("meta-llama/Llama-3.1-8B-Instruct-Turbo", "Together AI")
+            ("meta-llama/Llama-3.1-8B-Instruct-Turbo", "Together AI"),
         ]
 
         for model, provider in test_models:
@@ -76,7 +73,7 @@ class TestTogetherModelsInUnifiedCI:
             response = client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": "Say hello"}],
-                max_tokens=20
+                max_tokens=20,
             )
 
             assert response.model == model

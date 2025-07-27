@@ -7,8 +7,8 @@ with the only difference being the model name.
 
 import os
 import sys
+
 import pytest
-from typing import Dict, List, Tuple
 
 # Add parent directory to path for imports
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -16,7 +16,7 @@ parent_dir = os.path.dirname(current_dir)
 if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
-from common.utils import create_universal_client, validate_chat_response
+from common.utils import create_universal_client, validate_chat_response  # noqa: E402
 
 
 class TestCrossProviderComparison:
@@ -36,7 +36,7 @@ class TestCrossProviderComparison:
         provider_models = [
             ("OpenAI", "gpt-3.5-turbo"),
             ("Anthropic", "claude-3-haiku-20240307"),
-            ("Together", "meta-llama/Llama-3.2-3B-Instruct-Turbo")
+            ("Together", "meta-llama/Llama-3.2-3B-Instruct-Turbo"),
         ]
 
         results = {}
@@ -49,31 +49,38 @@ class TestCrossProviderComparison:
                 model=model,
                 messages=[
                     {"role": "system", "content": "You are a helpful assistant."},
-                    {"role": "user", "content": "What is the capital of France?"}
+                    {"role": "user", "content": "What is the capital of France?"},
                 ],
                 max_tokens=50,
-                temperature=0.1
+                temperature=0.1,
             )
 
             # IDENTICAL VALIDATION FOR ALL PROVIDERS
             validate_chat_response(response)
             assert response.model == model
-            assert "Paris" in response.choices[0].message.content or "paris" in response.choices[0].message.content.lower()
+            assert (
+                "Paris" in response.choices[0].message.content
+                or "paris" in response.choices[0].message.content.lower()
+            )
 
             results[provider_name] = {
                 "model": response.model,
                 "content": response.choices[0].message.content,
-                "usage": response.usage
+                "usage": response.usage,
             }
 
-            print(f"✅ {provider_name} ({model}): {response.choices[0].message.content[:50]}...")
+            print(
+                f"✅ {provider_name} ({model}): {response.choices[0].message.content[:50]}..."
+            )
 
         # All should have responded successfully
         assert len(results) == len(provider_models)
 
         # All should mention Paris
         for provider, result in results.items():
-            assert "paris" in result["content"].lower(), f"{provider} didn't mention Paris"
+            assert "paris" in result["content"].lower(), (
+                f"{provider} didn't mention Paris"
+            )
 
         return results
 
@@ -83,7 +90,7 @@ class TestCrossProviderComparison:
         provider_models = [
             ("OpenAI", "gpt-3.5-turbo"),
             ("Anthropic", "claude-3-haiku-20240307"),
-            ("Together", "meta-llama/Llama-3.1-8B-Instruct-Turbo")
+            ("Together", "meta-llama/Llama-3.1-8B-Instruct-Turbo"),
         ]
 
         streaming_results = {}
@@ -96,7 +103,7 @@ class TestCrossProviderComparison:
                 model=model,
                 messages=[{"role": "user", "content": "Count from 1 to 5"}],
                 max_tokens=50,
-                stream=True
+                stream=True,
             )
 
             chunks = []
@@ -113,10 +120,12 @@ class TestCrossProviderComparison:
             streaming_results[provider_name] = {
                 "chunk_count": len(chunks),
                 "content_length": len(full_content),
-                "content": full_content
+                "content": full_content,
             }
 
-            print(f"✅ {provider_name}: {len(chunks)} chunks, content: {full_content[:50]}...")
+            print(
+                f"✅ {provider_name}: {len(chunks)} chunks, content: {full_content[:50]}..."
+            )
 
         # All should have streamed successfully
         for provider, result in streaming_results.items():
@@ -131,7 +140,7 @@ class TestCrossProviderComparison:
         models = [
             "gpt-3.5-turbo",
             "claude-3-haiku-20240307",
-            "Qwen/Qwen2.5-72B-Instruct-Turbo"
+            "Qwen/Qwen2.5-72B-Instruct-Turbo",
         ]
 
         # Test various parameters with each model
@@ -140,15 +149,25 @@ class TestCrossProviderComparison:
             ("Low temperature", {"temperature": 0.1}),
             ("High temperature", {"temperature": 0.9}),
             ("Low max_tokens", {"max_tokens": 10}),
-            ("System prompt", {"messages": [
-                {"role": "system", "content": "You are a helpful assistant."},
-                {"role": "user", "content": "Hello!"}
-            ]}),
-            ("Multi-turn", {"messages": [
-                {"role": "user", "content": "My name is Alice"},
-                {"role": "assistant", "content": "Hello Alice!"},
-                {"role": "user", "content": "What's my name?"}
-            ]})
+            (
+                "System prompt",
+                {
+                    "messages": [
+                        {"role": "system", "content": "You are a helpful assistant."},
+                        {"role": "user", "content": "Hello!"},
+                    ]
+                },
+            ),
+            (
+                "Multi-turn",
+                {
+                    "messages": [
+                        {"role": "user", "content": "My name is Alice"},
+                        {"role": "assistant", "content": "Hello Alice!"},
+                        {"role": "user", "content": "What's my name?"},
+                    ]
+                },
+            ),
         ]
 
         results = {}
@@ -162,7 +181,7 @@ class TestCrossProviderComparison:
                 default_params = {
                     "model": model,
                     "messages": [{"role": "user", "content": "Test"}],
-                    "max_tokens": 30
+                    "max_tokens": 30,
                 }
 
                 # Override with test-specific parameters
@@ -174,7 +193,7 @@ class TestCrossProviderComparison:
                 validate_chat_response(response)
                 model_results[test_desc] = {
                     "success": True,
-                    "content_length": len(response.choices[0].message.content)
+                    "content_length": len(response.choices[0].message.content),
                 }
 
                 print(f"  ✅ {test_desc}: OK")
@@ -183,7 +202,9 @@ class TestCrossProviderComparison:
 
         # All models should handle all parameter tests
         for model, model_results in results.items():
-            assert len(model_results) == len(parameter_tests), f"{model} failed some parameter tests"
+            assert len(model_results) == len(parameter_tests), (
+                f"{model} failed some parameter tests"
+            )
             for test_desc, result in model_results.items():
                 assert result["success"], f"{model} failed {test_desc}"
 
@@ -192,7 +213,11 @@ class TestCrossProviderComparison:
     def test_error_handling_consistency(self):
         """Test that error handling is consistent across providers."""
 
-        models = ["gpt-3.5-turbo", "claude-3-haiku-20240307", "meta-llama/Llama-3.2-3B-Instruct-Turbo"]
+        models = [
+            "gpt-3.5-turbo",
+            "claude-3-haiku-20240307",
+            "meta-llama/Llama-3.2-3B-Instruct-Turbo",
+        ]
         error_results = {}
 
         for model in models:
@@ -202,9 +227,7 @@ class TestCrossProviderComparison:
             # Test 1: Empty messages
             try:
                 self.client.chat.completions.create(
-                    model=model,
-                    messages=[],
-                    max_tokens=10
+                    model=model, messages=[], max_tokens=10
                 )
                 model_errors["empty_messages"] = "No error raised"
             except Exception as e:
@@ -216,7 +239,7 @@ class TestCrossProviderComparison:
                     model=model,
                     messages=[{"role": "user", "content": "Test"}],
                     temperature=-1.0,
-                    max_tokens=10
+                    max_tokens=10,
                 )
                 model_errors["invalid_temperature"] = "No error raised"
             except Exception as e:
@@ -228,9 +251,13 @@ class TestCrossProviderComparison:
         # All models should raise errors for invalid inputs
         for model, errors in error_results.items():
             # Should raise error for empty messages
-            assert errors["empty_messages"] != "No error raised", f"{model} didn't raise error for empty messages"
+            assert errors["empty_messages"] != "No error raised", (
+                f"{model} didn't raise error for empty messages"
+            )
             # Should raise error for invalid temperature
-            assert errors["invalid_temperature"] != "No error raised", f"{model} didn't raise error for invalid temperature"
+            assert errors["invalid_temperature"] != "No error raised", (
+                f"{model} didn't raise error for invalid temperature"
+            )
 
         return error_results
 
@@ -246,36 +273,36 @@ class TestCrossProviderComparison:
             {
                 "provider": "OpenAI",
                 "model": "gpt-3.5-turbo",
-                "description": "OpenAI's flagship model"
+                "description": "OpenAI's flagship model",
             },
             {
                 "provider": "Anthropic",
                 "model": "claude-3-haiku-20240307",
-                "description": "Anthropic's fastest model"
+                "description": "Anthropic's fastest model",
             },
             {
                 "provider": "Together",
                 "model": "meta-llama/Llama-3.2-3B-Instruct-Turbo",
-                "description": "Meta's Llama model via Together"
+                "description": "Meta's Llama model via Together",
             },
             {
                 "provider": "Together",
                 "model": "Qwen/Qwen2.5-72B-Instruct-Turbo",
-                "description": "Qwen model via Together"
+                "description": "Qwen model via Together",
             },
             {
                 "provider": "Together",
                 "model": "mistralai/Mixtral-8x7B-Instruct-v0.1",
-                "description": "Mistral model via Together"
-            }
+                "description": "Mistral model via Together",
+            },
         ]
 
         universal_results = []
 
-        print("\n" + "="*80)
+        print("\n" + "=" * 80)
         print("UNIVERSAL SDK ARCHITECTURE PROOF")
         print("Same OpenAI SDK code works with ALL providers")
-        print("="*80)
+        print("=" * 80)
 
         for scenario in test_scenarios:
             provider = scenario["provider"]
@@ -292,10 +319,10 @@ class TestCrossProviderComparison:
                 model=model,  # <-- ONLY THIS CHANGES
                 messages=[
                     {"role": "system", "content": "You are a helpful AI assistant."},
-                    {"role": "user", "content": "What is artificial intelligence?"}
+                    {"role": "user", "content": "What is artificial intelligence?"},
                 ],
                 max_tokens=100,
-                temperature=0.7
+                temperature=0.7,
             )
 
             # IDENTICAL VALIDATION FOR ALL PROVIDERS
@@ -309,7 +336,7 @@ class TestCrossProviderComparison:
                 "success": True,
                 "content_preview": response.choices[0].message.content[:100] + "...",
                 "response_id": response.id,
-                "usage": response.usage.__dict__ if response.usage else None
+                "usage": response.usage.__dict__ if response.usage else None,
             }
 
             universal_results.append(result)
@@ -317,12 +344,14 @@ class TestCrossProviderComparison:
             print(f"✅ SUCCESS: {model}")
             print(f"Response preview: {result['content_preview']}")
 
-        print("\n" + "="*80)
+        print("\n" + "=" * 80)
         print("UNIVERSAL SDK ARCHITECTURE PROVEN!")
-        print(f"✅ {len(universal_results)} different models from {len(set(r['provider'] for r in universal_results))} providers")
+        print(
+            f"✅ {len(universal_results)} different models from {len(set(r['provider'] for r in universal_results))} providers"
+        )
         print("✅ Same OpenAI SDK code works perfectly with all of them")
         print("✅ Only model name changes - everything else identical")
-        print("="*80)
+        print("=" * 80)
 
         # Final assertion: All providers worked
         assert len(universal_results) == len(test_scenarios)

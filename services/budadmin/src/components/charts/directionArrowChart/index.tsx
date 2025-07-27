@@ -116,7 +116,7 @@ const DirectionArrowChart: React.FC<DirectionArrowChartProps> = ({
     return () => {
       chartInstance.dispose();
     };
-  }, [categories, data]); // Re-run when categories or data change
+  }, [categories, data, chartAdjust]); // Re-run when categories or data change
 
   return <div ref={chartRef}  style={{ width: '100%', height: '100%' }}  className={`${classNames}`}/>;
 };

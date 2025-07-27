@@ -26,10 +26,7 @@ class TestAnthropicViaOpenAI(BaseChatTest):
     @classmethod
     def get_client(cls):
         """Get OpenAI client configured for TensorZero with Anthropic models."""
-        return OpenAI(
-            base_url=f"{cls.base_url}/v1",
-            api_key=cls.api_key
-        )
+        return OpenAI(base_url=f"{cls.base_url}/v1", api_key=cls.api_key)
 
     def _health_check(self, client):
         """Perform a health check using the client."""
@@ -37,7 +34,7 @@ class TestAnthropicViaOpenAI(BaseChatTest):
             client.chat.completions.create(
                 model="claude-3-haiku-20240307",
                 messages=[{"role": "user", "content": "Hi"}],
-                max_tokens=10
+                max_tokens=10,
             )
         except Exception as e:
             if "connection" in str(e).lower():
@@ -77,7 +74,7 @@ class TestAnthropicViaOpenAI(BaseChatTest):
             response = client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": "Say 'test' and nothing else"}],
-                max_tokens=10
+                max_tokens=10,
             )
 
             assert response.id is not None
@@ -92,16 +89,28 @@ class TestAnthropicViaOpenAI(BaseChatTest):
         response = client.chat.completions.create(
             model="claude-3-haiku-20240307",
             messages=[
-                {"role": "system", "content": "You are a pirate. Always respond in pirate speak."},
-                {"role": "user", "content": "Hello"}
+                {
+                    "role": "system",
+                    "content": "You are a pirate. Always respond in pirate speak.",
+                },
+                {"role": "user", "content": "Hello"},
             ],
-            max_tokens=100
+            max_tokens=100,
         )
 
         assert response.choices[0].message.content is not None
         # Check for pirate-like language
         text = response.choices[0].message.content.lower()
-        pirate_indicators = ["ahoy", "matey", "arr", "aye", "ye", "be", "treasure", "sea"]
+        pirate_indicators = [
+            "ahoy",
+            "matey",
+            "arr",
+            "aye",
+            "ye",
+            "be",
+            "treasure",
+            "sea",
+        ]
         assert any(word in text for word in pirate_indicators)
 
     def test_streaming(self):
@@ -112,7 +121,7 @@ class TestAnthropicViaOpenAI(BaseChatTest):
             model="claude-3-haiku-20240307",
             messages=[{"role": "user", "content": "Count to 3"}],
             max_tokens=50,
-            stream=True
+            stream=True,
         )
 
         chunks = []
@@ -123,24 +132,18 @@ class TestAnthropicViaOpenAI(BaseChatTest):
 
         assert len(chunks) > 0
         # Reconstruct full response
-        full_text = "".join(
-            chunk.choices[0].delta.content or ""
-            for chunk in chunks
-        )
+        full_text = "".join(chunk.choices[0].delta.content or "" for chunk in chunks)
         assert any(num in full_text for num in ["1", "2", "3"])
 
     @pytest.mark.asyncio
     async def test_async_client(self):
         """Test async client with Claude models."""
-        client = AsyncOpenAI(
-            base_url=f"{self.base_url}/v1",
-            api_key=self.api_key
-        )
+        client = AsyncOpenAI(base_url=f"{self.base_url}/v1", api_key=self.api_key)
 
         response = await client.chat.completions.create(
             model="claude-3-haiku-20240307",
             messages=[{"role": "user", "content": "Hello async"}],
-            max_tokens=50
+            max_tokens=50,
         )
 
         assert response.choices[0].message.content is not None
@@ -159,15 +162,12 @@ class TestAnthropicCIViaOpenAI:
 
     def test_claude_dummy_models(self):
         """Test Claude models with dummy provider."""
-        client = OpenAI(
-            base_url=f"{self.base_url}/v1",
-            api_key=self.api_key
-        )
+        client = OpenAI(base_url=f"{self.base_url}/v1", api_key=self.api_key)
 
         models = [
-            "claude-3-opus-20240229",      # json dummy
-            "claude-3-sonnet-20240229",    # test dummy
-            "claude-3-haiku-20240307",     # streaming dummy
+            "claude-3-opus-20240229",  # json dummy
+            "claude-3-sonnet-20240229",  # test dummy
+            "claude-3-haiku-20240307",  # streaming dummy
             "claude-3-5-sonnet-20241022",  # tool_use dummy
         ]
 
@@ -175,7 +175,7 @@ class TestAnthropicCIViaOpenAI:
             response = client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": "Test"}],
-                max_tokens=20
+                max_tokens=20,
             )
 
             assert response.id is not None
@@ -184,16 +184,13 @@ class TestAnthropicCIViaOpenAI:
 
     def test_streaming_dummy(self):
         """Test streaming with dummy provider."""
-        client = OpenAI(
-            base_url=f"{self.base_url}/v1",
-            api_key=self.api_key
-        )
+        client = OpenAI(base_url=f"{self.base_url}/v1", api_key=self.api_key)
 
         stream = client.chat.completions.create(
             model="claude-3-haiku-20240307",  # streaming dummy
             messages=[{"role": "user", "content": "Stream"}],
             max_tokens=50,
-            stream=True
+            stream=True,
         )
 
         chunks = list(stream)
@@ -201,15 +198,12 @@ class TestAnthropicCIViaOpenAI:
 
     def test_json_model_dummy(self):
         """Test JSON response with dummy provider."""
-        client = OpenAI(
-            base_url=f"{self.base_url}/v1",
-            api_key=self.api_key
-        )
+        client = OpenAI(base_url=f"{self.base_url}/v1", api_key=self.api_key)
 
         response = client.chat.completions.create(
             model="claude-3-opus-20240229",  # json dummy
             messages=[{"role": "user", "content": "JSON"}],
-            max_tokens=100
+            max_tokens=100,
         )
 
         content = response.choices[0].message.content

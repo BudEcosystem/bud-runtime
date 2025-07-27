@@ -11,7 +11,7 @@ import tempfile
 # Initialize client
 client = OpenAI(
     base_url=os.getenv("TENSORZERO_BASE_URL", "http://localhost:3001") + "/v1",
-    api_key=os.getenv("OPENAI_API_KEY", "dummy-key")
+    api_key=os.getenv("OPENAI_API_KEY", "dummy-key"),
 )
 
 
@@ -21,8 +21,7 @@ class TestChatCompletions:
     def test_basic_chat(self):
         """Test basic chat completion"""
         response = client.chat.completions.create(
-            model="gpt-4",
-            messages=[{"role": "user", "content": "Hello"}]
+            model="gpt-4", messages=[{"role": "user", "content": "Hello"}]
         )
 
         assert response.id is not None
@@ -36,9 +35,7 @@ class TestChatCompletions:
     def test_streaming(self):
         """Test streaming chat completion"""
         stream = client.chat.completions.create(
-            model="gpt-4",
-            messages=[{"role": "user", "content": "Hello"}],
-            stream=True
+            model="gpt-4", messages=[{"role": "user", "content": "Hello"}], stream=True
         )
 
         chunks = list(stream)
@@ -52,23 +49,21 @@ class TestEmbeddings:
     def test_single_embedding(self):
         """Test single text embedding"""
         response = client.embeddings.create(
-            model="text-embedding-ada-002",
-            input="Hello world"
+            model="text-embedding-ada-002", input="Hello world"
         )
 
         assert response.object == "list"
         assert len(response.data) == 1
         assert response.data[0].object == "embedding"
-        assert len(response.data[0].embedding) == 1536  # Dummy provider returns 1536 dimensions
+        assert (
+            len(response.data[0].embedding) == 1536
+        )  # Dummy provider returns 1536 dimensions
         assert response.usage.total_tokens > 0
 
     def test_batch_embeddings(self):
         """Test batch embeddings"""
         texts = ["First text", "Second text", "Third text"]
-        response = client.embeddings.create(
-            model="text-embedding-ada-002",
-            input=texts
-        )
+        response = client.embeddings.create(model="text-embedding-ada-002", input=texts)
 
         assert len(response.data) == 3
         for i, embedding in enumerate(response.data):
@@ -82,8 +77,7 @@ class TestModeration:
     def test_safe_content(self):
         """Test moderation of safe content"""
         response = client.moderations.create(
-            model="omni-moderation-latest",
-            input="Hello, how are you today?"
+            model="omni-moderation-latest", input="Hello, how are you today?"
         )
 
         assert response.id is not None
@@ -95,7 +89,7 @@ class TestModeration:
         """Test moderation of content with keywords"""
         response = client.moderations.create(
             model="omni-moderation-latest",
-            input="This content contains harmful keywords"
+            input="This content contains harmful keywords",
         )
 
         assert len(response.results) == 1
@@ -118,10 +112,7 @@ class TestAudio:
     def test_transcription(self, audio_file):
         """Test audio transcription"""
         with open(audio_file, "rb") as f:
-            response = client.audio.transcriptions.create(
-                model="whisper-1",
-                file=f
-            )
+            response = client.audio.transcriptions.create(model="whisper-1", file=f)
 
         assert response.text == "This is a dummy transcription"
         assert hasattr(response, "language")
@@ -130,19 +121,14 @@ class TestAudio:
     def test_translation(self, audio_file):
         """Test audio translation"""
         with open(audio_file, "rb") as f:
-            response = client.audio.translations.create(
-                model="whisper-1",
-                file=f
-            )
+            response = client.audio.translations.create(model="whisper-1", file=f)
 
         assert response.text == "This is a dummy translation"
 
     def test_text_to_speech(self):
         """Test text-to-speech"""
         response = client.audio.speech.create(
-            model="tts-1",
-            voice="alloy",
-            input="Hello world"
+            model="tts-1", voice="alloy", input="Hello world"
         )
 
         # Response should contain audio data
@@ -167,9 +153,9 @@ class TestImages:
         import io
 
         # Create a simple test image
-        img = Image.new('RGB', (100, 100), color='red')
+        img = Image.new("RGB", (100, 100), color="red")
         img_bytes = io.BytesIO()
-        img.save(img_bytes, format='PNG')
+        img.save(img_bytes, format="PNG")
         img_bytes.seek(0)
 
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
@@ -183,16 +169,16 @@ class TestImages:
             prompt="A red circle",
             n=1,
             size="256x256",
-            response_format="b64_json"
+            response_format="b64_json",
         )
 
         assert len(response.data) == 1
         # Dummy provider returns URL by default or base64 if requested
-        if hasattr(response.data[0], 'b64_json') and response.data[0].b64_json:
+        if hasattr(response.data[0], "b64_json") and response.data[0].b64_json:
             assert response.data[0].b64_json is not None
         else:
-            assert hasattr(response.data[0], 'url')
-            assert response.data[0].url.startswith('https://example.com/dummy-image-')
+            assert hasattr(response.data[0], "url")
+            assert response.data[0].url.startswith("https://example.com/dummy-image-")
 
     def test_image_edit(self, image_file):
         """Test image editing"""
@@ -203,11 +189,11 @@ class TestImages:
                 prompt="Add a blue border",
                 n=1,
                 size="256x256",
-                response_format="b64_json"
+                response_format="b64_json",
             )
 
         assert len(response.data) == 1
-        assert hasattr(response.data[0], 'b64_json')
+        assert hasattr(response.data[0], "b64_json")
 
     def test_image_variation(self, image_file):
         """Test image variation"""
@@ -217,11 +203,11 @@ class TestImages:
                 image=f,
                 n=1,
                 size="256x256",
-                response_format="b64_json"
+                response_format="b64_json",
             )
 
         assert len(response.data) == 1
-        assert hasattr(response.data[0], 'b64_json')
+        assert hasattr(response.data[0], "b64_json")
 
     @pytest.fixture(autouse=True)
     def cleanup_image(self, image_file):
@@ -241,12 +227,11 @@ class TestAsyncSupport:
 
         async_client = AsyncOpenAI(
             base_url=os.getenv("TENSORZERO_BASE_URL", "http://localhost:3001") + "/v1",
-            api_key=os.getenv("OPENAI_API_KEY", "dummy-key")
+            api_key=os.getenv("OPENAI_API_KEY", "dummy-key"),
         )
 
         response = await async_client.chat.completions.create(
-            model="gpt-4",
-            messages=[{"role": "user", "content": "Hello"}]
+            model="gpt-4", messages=[{"role": "user", "content": "Hello"}]
         )
 
         assert response.choices[0].message.content is not None
@@ -260,12 +245,11 @@ class TestAsyncSupport:
 
         async_client = AsyncOpenAI(
             base_url=os.getenv("TENSORZERO_BASE_URL", "http://localhost:3001") + "/v1",
-            api_key=os.getenv("OPENAI_API_KEY", "dummy-key")
+            api_key=os.getenv("OPENAI_API_KEY", "dummy-key"),
         )
 
         response = await async_client.embeddings.create(
-            model="text-embedding-ada-002",
-            input="Test embedding"
+            model="text-embedding-ada-002", input="Test embedding"
         )
 
         assert len(response.data[0].embedding) == 1536
@@ -278,7 +262,7 @@ class TestAsyncSupport:
 
         async_client = AsyncOpenAI(
             base_url=os.getenv("TENSORZERO_BASE_URL", "http://localhost:3001") + "/v1",
-            api_key=os.getenv("OPENAI_API_KEY", "dummy-key")
+            api_key=os.getenv("OPENAI_API_KEY", "dummy-key"),
         )
 
         response = await async_client.images.generate(
@@ -286,10 +270,10 @@ class TestAsyncSupport:
             prompt="Async test image",
             n=1,
             size="256x256",
-            response_format="b64_json"
+            response_format="b64_json",
         )
 
         assert len(response.data) == 1
-        assert hasattr(response.data[0], 'b64_json')
+        assert hasattr(response.data[0], "b64_json")
 
         await async_client.close()

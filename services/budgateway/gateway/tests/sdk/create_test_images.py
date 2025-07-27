@@ -4,13 +4,13 @@ Create test images for image endpoint testing.
 This script generates simple test images in various formats and sizes.
 """
 
-import os
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
-import io
 
 
-def create_test_image(size=(512, 512), format="PNG", text="Test Image", color=(100, 150, 200)):
+def create_test_image(
+    size=(512, 512), format="PNG", text="Test Image", color=(100, 150, 200)
+):
     """Create a simple test image with text."""
     # Create a new image
     image = Image.new("RGB", size, color=color)
@@ -37,8 +37,11 @@ def create_test_image(size=(512, 512), format="PNG", text="Test Image", color=(1
 
     # Add some geometric shapes for visual interest
     draw.rectangle([50, 50, 150, 150], outline=(255, 0, 0), width=3)
-    draw.ellipse([size[0]-150, size[1]-150, size[0]-50, size[1]-50],
-                  outline=(0, 255, 0), width=3)
+    draw.ellipse(
+        [size[0] - 150, size[1] - 150, size[0] - 50, size[1] - 50],
+        outline=(0, 255, 0),
+        width=3,
+    )
 
     return image
 
@@ -52,9 +55,10 @@ def create_mask_image(size=(512, 512)):
     # Create transparent circle in center
     center_x, center_y = size[0] // 2, size[1] // 2
     radius = min(size) // 4
-    draw.ellipse([center_x - radius, center_y - radius,
-                  center_x + radius, center_y + radius],
-                 fill=(0, 0, 0, 0))  # Transparent
+    draw.ellipse(
+        [center_x - radius, center_y - radius, center_x + radius, center_y + radius],
+        fill=(0, 0, 0, 0),
+    )  # Transparent
 
     return mask
 
@@ -72,12 +76,16 @@ def main():
     print("✓ Created test_image.png")
 
     # Create smaller image for variation tests
-    small_image = create_test_image(size=(256, 256), text="Small Test", color=(200, 100, 150))
+    small_image = create_test_image(
+        size=(256, 256), text="Small Test", color=(200, 100, 150)
+    )
     small_image.save(fixtures_dir / "small_test.png")
     print("✓ Created small_test.png")
 
     # Create larger image for editing tests
-    large_image = create_test_image(size=(1024, 1024), text="Large Test", color=(150, 200, 100))
+    large_image = create_test_image(
+        size=(1024, 1024), text="Large Test", color=(150, 200, 100)
+    )
     large_image.save(fixtures_dir / "large_test.png")
     print("✓ Created large_test.png")
 
@@ -97,7 +105,7 @@ def main():
         img = create_test_image(
             size=size,
             text=f"{size[0]}x{size[1]}",
-            color=(50 + i*30, 100 + i*20, 150 + i*10)
+            color=(50 + i * 30, 100 + i * 20, 150 + i * 10),
         )
         img.save(fixtures_dir / f"test_{size[0]}x{size[1]}.png")
         print(f"✓ Created test_{size[0]}x{size[1]}.png")
@@ -111,7 +119,9 @@ def main():
 
     print(f"\nAll test images created in: {fixtures_dir}")
     print("Images created:")
-    for img_file in sorted(fixtures_dir.glob("*.png")) + sorted(fixtures_dir.glob("*.jpg")):
+    for img_file in sorted(fixtures_dir.glob("*.png")) + sorted(
+        fixtures_dir.glob("*.jpg")
+    ):
         size = Image.open(img_file).size
         print(f"  - {img_file.name}: {size[0]}x{size[1]}")
 

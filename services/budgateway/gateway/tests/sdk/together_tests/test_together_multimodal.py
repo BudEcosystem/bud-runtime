@@ -6,7 +6,6 @@ capabilities using the OpenAI SDK universal compatibility layer.
 """
 
 import os
-import json
 import base64
 import pytest
 from openai import OpenAI
@@ -19,10 +18,7 @@ TENSORZERO_BASE_URL = os.getenv("TENSORZERO_BASE_URL", "http://localhost:3001")
 TENSORZERO_API_KEY = os.getenv("TENSORZERO_API_KEY", "test-api-key")
 
 # Universal OpenAI client for Together AI
-client = OpenAI(
-    base_url=f"{TENSORZERO_BASE_URL}/v1",
-    api_key=TENSORZERO_API_KEY
-)
+client = OpenAI(base_url=f"{TENSORZERO_BASE_URL}/v1", api_key=TENSORZERO_API_KEY)
 
 
 class TestTogetherEmbeddings:
@@ -32,13 +28,12 @@ class TestTogetherEmbeddings:
         """Test single text embedding with Together models."""
         embedding_models = [
             "together-bge-base",  # BAAI/bge-base-en-v1.5
-            "together-m2-bert",   # togethercomputer/m2-bert-80M-8k-retrieval
+            "together-m2-bert",  # togethercomputer/m2-bert-80M-8k-retrieval
         ]
 
         for model in embedding_models:
             response = client.embeddings.create(
-                model=model,
-                input="Test embedding for Together AI models"
+                model=model, input="Test embedding for Together AI models"
             )
 
             assert response.model == model
@@ -54,13 +49,10 @@ class TestTogetherEmbeddings:
             "First document about machine learning",
             "Second document about natural language processing",
             "Third document about computer vision",
-            "Fourth document about reinforcement learning"
+            "Fourth document about reinforcement learning",
         ]
 
-        response = client.embeddings.create(
-            model="together-bge-base",
-            input=texts
-        )
+        response = client.embeddings.create(model="together-bge-base", input=texts)
 
         assert len(response.data) == len(texts)
         for i, embedding_data in enumerate(response.data):
@@ -75,16 +67,14 @@ class TestTogetherEmbeddings:
         """Test embedding dimensions for different Together models."""
         # BGE base typically has 768 dimensions
         response_bge = client.embeddings.create(
-            model="together-bge-base",
-            input="Test dimensions"
+            model="together-bge-base", input="Test dimensions"
         )
         bge_dims = len(response_bge.data[0].embedding)
         assert bge_dims > 0  # Should be 768 for BGE base
 
         # M2 BERT may have different dimensions
         response_m2 = client.embeddings.create(
-            model="together-m2-bert",
-            input="Test dimensions"
+            model="together-m2-bert", input="Test dimensions"
         )
         m2_dims = len(response_m2.data[0].embedding)
         assert m2_dims > 0
@@ -95,12 +85,11 @@ class TestTogetherEmbeddings:
             "Test with émojis 🚀🤖🌟",
             "Unicode: 你好世界",
             "Special chars: <>&\"'\\n\\t",
-            "Math symbols: ∑∏∫√∞"
+            "Math symbols: ∑∏∫√∞",
         ]
 
         response = client.embeddings.create(
-            model="together-bge-base",
-            input=special_texts
+            model="together-bge-base", input=special_texts
         )
 
         assert len(response.data) == len(special_texts)
@@ -110,10 +99,7 @@ class TestTogetherEmbeddings:
     def test_together_embeddings_empty_input(self):
         """Test error handling for empty input."""
         with pytest.raises(Exception) as exc_info:
-            client.embeddings.create(
-                model="together-bge-base",
-                input=[]
-            )
+            client.embeddings.create(model="together-bge-base", input=[])
 
         # Should raise an error for empty batch
         assert exc_info.value is not None
@@ -125,20 +111,22 @@ class TestTogetherEmbeddings:
 
         # Together embedding
         together_response = client.embeddings.create(
-            model="together-bge-base",
-            input=test_text
+            model="together-bge-base", input=test_text
         )
 
         # OpenAI embedding
         openai_response = client.embeddings.create(
-            model="text-embedding-3-small",
-            input=test_text
+            model="text-embedding-3-small", input=test_text
         )
 
         # Both should have same response structure
         assert together_response.object == openai_response.object == "list"
         assert len(together_response.data) == len(openai_response.data) == 1
-        assert together_response.data[0].object == openai_response.data[0].object == "embedding"
+        assert (
+            together_response.data[0].object
+            == openai_response.data[0].object
+            == "embedding"
+        )
 
 
 class TestTogetherImageGeneration:
@@ -149,20 +137,19 @@ class TestTogetherImageGeneration:
         prompts = [
             "A serene mountain landscape at sunset",
             "Abstract geometric patterns in vibrant colors",
-            "Futuristic city with flying cars and neon lights"
+            "Futuristic city with flying cars and neon lights",
         ]
 
         for prompt in prompts:
             response = client.images.generate(
-                model="flux-schnell",
-                prompt=prompt,
-                n=1,
-                size="1024x1024"
+                model="flux-schnell", prompt=prompt, n=1, size="1024x1024"
             )
 
             assert len(response.data) == 1
             # Should have either URL or base64 data
-            assert hasattr(response.data[0], 'url') or hasattr(response.data[0], 'b64_json')
+            assert hasattr(response.data[0], "url") or hasattr(
+                response.data[0], "b64_json"
+            )
 
     def test_together_image_multiple_generations(self):
         """Test generating multiple images with Together."""
@@ -170,12 +157,12 @@ class TestTogetherImageGeneration:
             model="flux-schnell",
             prompt="Beautiful landscape in different styles",
             n=3,  # Generate 3 images
-            size="512x512"
+            size="512x512",
         )
 
         assert len(response.data) == 3
         for i, image_data in enumerate(response.data):
-            assert hasattr(image_data, 'url') or hasattr(image_data, 'b64_json')
+            assert hasattr(image_data, "url") or hasattr(image_data, "b64_json")
 
     def test_together_image_base64_format(self):
         """Test base64 response format for images."""
@@ -184,11 +171,11 @@ class TestTogetherImageGeneration:
             prompt="A simple geometric shape",
             n=1,
             size="512x512",
-            response_format="b64_json"
+            response_format="b64_json",
         )
 
         assert len(response.data) == 1
-        assert hasattr(response.data[0], 'b64_json')
+        assert hasattr(response.data[0], "b64_json")
 
         # Verify it's valid base64
         if response.data[0].b64_json:
@@ -203,10 +190,7 @@ class TestTogetherImageGeneration:
 
         for size in sizes:
             response = client.images.generate(
-                model="flux-schnell",
-                prompt=f"Test image at {size}",
-                n=1,
-                size=size
+                model="flux-schnell", prompt=f"Test image at {size}", n=1, size=size
             )
 
             assert len(response.data) == 1
@@ -224,10 +208,7 @@ class TestTogetherImageGeneration:
         """
 
         response = client.images.generate(
-            model="flux-schnell",
-            prompt=detailed_prompt,
-            n=1,
-            size="1024x1024"
+            model="flux-schnell", prompt=detailed_prompt, n=1, size="1024x1024"
         )
 
         assert len(response.data) == 1
@@ -241,7 +222,7 @@ class TestTogetherTextToSpeech:
         response = client.audio.speech.create(
             model="together-tts",
             voice="alloy",
-            input="Hello from Together AI text to speech."
+            input="Hello from Together AI text to speech.",
         )
 
         # Response should be audio bytes
@@ -255,9 +236,7 @@ class TestTogetherTextToSpeech:
 
         for voice in standard_voices:
             response = client.audio.speech.create(
-                model="together-tts",
-                voice=voice,
-                input=f"Testing voice: {voice}"
+                model="together-tts", voice=voice, input=f"Testing voice: {voice}"
             )
 
             assert response.content is not None
@@ -276,14 +255,14 @@ class TestTogetherTextToSpeech:
             "german conversational woman",
             "customer support lady",
             "storyteller lady",
-            "calm lady"
+            "calm lady",
         ]
 
         for voice in together_voices[:3]:  # Test a few
             response = client.audio.speech.create(
                 model="together-tts",
                 voice=voice,
-                input=f"Testing Together voice: {voice}"
+                input=f"Testing Together voice: {voice}",
             )
 
             assert response.content is not None
@@ -299,7 +278,7 @@ class TestTogetherTextToSpeech:
                     model="together-tts",
                     voice="alloy",
                     input="Testing audio format",
-                    response_format=format
+                    response_format=format,
                 )
 
                 assert response.content is not None
@@ -318,9 +297,7 @@ class TestTogetherTextToSpeech:
         """
 
         response = client.audio.speech.create(
-            model="together-tts",
-            voice="nova",
-            input=long_text
+            model="together-tts", voice="nova", input=long_text
         )
 
         assert response.content is not None
@@ -338,9 +315,7 @@ class TestTogetherTextToSpeech:
         for text, voice in multilingual_texts:
             try:
                 response = client.audio.speech.create(
-                    model="together-tts",
-                    voice=voice,
-                    input=text
+                    model="together-tts", voice=voice, input=text
                 )
 
                 assert response.content is not None
@@ -358,7 +333,7 @@ class TestTogetherTextToSpeech:
                     model="together-tts",
                     voice="alloy",
                     input="Testing speech speed",
-                    speed=speed
+                    speed=speed,
                 )
 
                 assert response.content is not None
@@ -377,20 +352,18 @@ class TestTogetherMultimodalIntegration:
             "Machine learning is a subset of artificial intelligence.",
             "Natural language processing helps computers understand human language.",
             "Computer vision enables machines to interpret visual information.",
-            "Deep learning uses neural networks with multiple layers."
+            "Deep learning uses neural networks with multiple layers.",
         ]
 
         # Get embeddings for documents
         doc_response = client.embeddings.create(
-            model="together-bge-base",
-            input=documents
+            model="together-bge-base", input=documents
         )
 
         # Get embedding for query
         query = "How do computers understand text?"
         query_response = client.embeddings.create(
-            model="together-bge-base",
-            input=query
+            model="together-bge-base", input=query
         )
 
         assert len(doc_response.data) == len(documents)
@@ -404,11 +377,13 @@ class TestTogetherMultimodalIntegration:
         # 1. Generate text description
         chat_response = client.chat.completions.create(
             model="meta-llama/Llama-3.1-8B-Instruct-Turbo",
-            messages=[{
-                "role": "user",
-                "content": "Describe a futuristic city in one sentence."
-            }],
-            max_tokens=100
+            messages=[
+                {
+                    "role": "user",
+                    "content": "Describe a futuristic city in one sentence.",
+                }
+            ],
+            max_tokens=100,
         )
 
         description = chat_response.choices[0].message.content
@@ -417,10 +392,7 @@ class TestTogetherMultimodalIntegration:
         # 2. Generate image from description
         try:
             image_response = client.images.generate(
-                model="flux-schnell",
-                prompt=description,
-                n=1,
-                size="512x512"
+                model="flux-schnell", prompt=description, n=1, size="512x512"
             )
             assert len(image_response.data) == 1
         except Exception as e:
@@ -429,9 +401,7 @@ class TestTogetherMultimodalIntegration:
         # 3. Convert description to speech
         try:
             tts_response = client.audio.speech.create(
-                model="together-tts",
-                voice="nova",
-                input=description
+                model="together-tts", voice="nova", input=description
             )
             assert tts_response.content is not None
         except Exception as e:
@@ -444,20 +414,18 @@ class TestTogetherMultimodalIntegration:
             "Together AI provides fast inference for open-source models.",
             "FLUX is a powerful image generation model available on Together.",
             "Together supports embeddings, chat, and multimodal capabilities.",
-            "The platform offers competitive pricing for AI inference."
+            "The platform offers competitive pricing for AI inference.",
         ]
 
         # Create embeddings for knowledge base
         kb_embeddings = client.embeddings.create(
-            model="together-bge-base",
-            input=knowledge
+            model="together-bge-base", input=knowledge
         )
 
         # User query
         query = "What image models does Together support?"
         query_embedding = client.embeddings.create(
-            model="together-bge-base",
-            input=query
+            model="together-bge-base", input=query
         )
 
         # In practice, you'd find most similar documents here
@@ -471,14 +439,11 @@ class TestTogetherMultimodalIntegration:
             messages=[
                 {
                     "role": "system",
-                    "content": f"Answer based on this context: {knowledge[1]}"
+                    "content": f"Answer based on this context: {knowledge[1]}",
                 },
-                {
-                    "role": "user",
-                    "content": query
-                }
+                {"role": "user", "content": query},
             ],
-            max_tokens=100
+            max_tokens=100,
         )
 
         assert response.choices[0].message.content is not None

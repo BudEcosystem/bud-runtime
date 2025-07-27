@@ -10,7 +10,7 @@ from openai import OpenAI
 # Universal OpenAI client - same pattern as existing tests
 client = OpenAI(
     base_url=os.getenv("TENSORZERO_BASE_URL", "http://localhost:3001") + "/v1",
-    api_key=os.getenv("TENSORZERO_API_KEY", "test-api-key")
+    api_key=os.getenv("TENSORZERO_API_KEY", "test-api-key"),
 )
 
 
@@ -22,7 +22,7 @@ class TestUniversalSDKBasic:
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": "Hello OpenAI"}],
-            max_tokens=20
+            max_tokens=20,
         )
 
         assert response.choices[0].message.content is not None
@@ -34,7 +34,7 @@ class TestUniversalSDKBasic:
         response = client.chat.completions.create(
             model="claude-3-haiku-20240307",
             messages=[{"role": "user", "content": "Hello Anthropic via OpenAI SDK"}],
-            max_tokens=20
+            max_tokens=20,
         )
 
         assert response.choices[0].message.content is not None
@@ -46,7 +46,7 @@ class TestUniversalSDKBasic:
         response = client.chat.completions.create(
             model="meta-llama/Llama-3.2-3B-Instruct-Turbo",
             messages=[{"role": "user", "content": "Hello Together via OpenAI SDK"}],
-            max_tokens=20
+            max_tokens=20,
         )
 
         assert response.choices[0].message.content is not None
@@ -60,7 +60,7 @@ class TestUniversalSDKBasic:
         models = [
             "gpt-3.5-turbo",
             "claude-3-haiku-20240307",
-            "meta-llama/Llama-3.1-8B-Instruct-Turbo"
+            "meta-llama/Llama-3.1-8B-Instruct-Turbo",
         ]
 
         for model in models:
@@ -68,7 +68,7 @@ class TestUniversalSDKBasic:
                 model=model,
                 messages=[{"role": "user", "content": "Count to 3"}],
                 max_tokens=30,
-                stream=True
+                stream=True,
             )
 
             chunks = []
@@ -85,7 +85,7 @@ class TestUniversalSDKBasic:
         models = [
             "gpt-3.5-turbo",
             "claude-3-haiku-20240307",
-            "Qwen/Qwen2.5-72B-Instruct-Turbo"
+            "Qwen/Qwen2.5-72B-Instruct-Turbo",
         ]
 
         for model in models:
@@ -94,7 +94,7 @@ class TestUniversalSDKBasic:
                 model=model,
                 messages=[{"role": "user", "content": "Test"}],
                 max_tokens=10,
-                temperature=0.1
+                temperature=0.1,
             )
             assert response.choices[0].message.content is not None
 
@@ -103,9 +103,9 @@ class TestUniversalSDKBasic:
                 model=model,
                 messages=[
                     {"role": "system", "content": "Be helpful."},
-                    {"role": "user", "content": "Hello!"}
+                    {"role": "user", "content": "Hello!"},
                 ],
-                max_tokens=20
+                max_tokens=20,
             )
             assert response.choices[0].message.content is not None
 

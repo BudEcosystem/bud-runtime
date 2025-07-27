@@ -17,10 +17,7 @@ TENSORZERO_BASE_URL = os.getenv("TENSORZERO_BASE_URL", "http://localhost:3001")
 TENSORZERO_API_KEY = os.getenv("TENSORZERO_API_KEY", "test-api-key")
 
 # Universal OpenAI client that works with all providers
-client = OpenAI(
-    base_url=f"{TENSORZERO_BASE_URL}/v1",
-    api_key=TENSORZERO_API_KEY
-)
+client = OpenAI(base_url=f"{TENSORZERO_BASE_URL}/v1", api_key=TENSORZERO_API_KEY)
 
 
 class TestOpenAISDKUniversalCompatibility:
@@ -31,7 +28,7 @@ class TestOpenAISDKUniversalCompatibility:
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": "Hello from OpenAI model"}],
-            max_tokens=50
+            max_tokens=50,
         )
 
         assert response.choices[0].message.content is not None
@@ -42,8 +39,10 @@ class TestOpenAISDKUniversalCompatibility:
         """Test OpenAI SDK with Anthropic models through /v1/chat/completions."""
         response = client.chat.completions.create(
             model="claude-3-haiku-20240307",
-            messages=[{"role": "user", "content": "Hello from Anthropic model via OpenAI SDK"}],
-            max_tokens=50
+            messages=[
+                {"role": "user", "content": "Hello from Anthropic model via OpenAI SDK"}
+            ],
+            max_tokens=50,
         )
 
         assert response.choices[0].message.content is not None
@@ -55,7 +54,7 @@ class TestOpenAISDKUniversalCompatibility:
         response = client.chat.completions.create(
             model="claude-3-5-sonnet-20241022",
             messages=[{"role": "user", "content": "Hello from Claude 3.5 Sonnet"}],
-            max_tokens=50
+            max_tokens=50,
         )
 
         assert response.choices[0].message.content is not None
@@ -67,7 +66,7 @@ class TestOpenAISDKUniversalCompatibility:
         response = client.chat.completions.create(
             model="claude-3-opus-20240229",
             messages=[{"role": "user", "content": "Hello from Claude Opus"}],
-            max_tokens=50
+            max_tokens=50,
         )
 
         assert response.choices[0].message.content is not None
@@ -81,7 +80,7 @@ class TestOpenAISDKUniversalCompatibility:
             model="gpt-4",
             messages=[{"role": "user", "content": "Count to 3"}],
             max_tokens=30,
-            stream=True
+            stream=True,
         )
 
         chunks = []
@@ -96,7 +95,7 @@ class TestOpenAISDKUniversalCompatibility:
             model="claude-3-haiku-20240307",
             messages=[{"role": "user", "content": "Count to 3"}],
             max_tokens=30,
-            stream=True
+            stream=True,
         )
 
         chunks = []
@@ -108,16 +107,18 @@ class TestOpenAISDKUniversalCompatibility:
 
     def test_system_prompts_cross_provider(self):
         """Test system prompts work across different providers."""
-        system_prompt = "You are a helpful assistant. Always start responses with 'Assistant:'"
+        system_prompt = (
+            "You are a helpful assistant. Always start responses with 'Assistant:'"
+        )
 
         # Test with OpenAI
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": "Hello"}
+                {"role": "user", "content": "Hello"},
             ],
-            max_tokens=50
+            max_tokens=50,
         )
 
         assert response.choices[0].message.content is not None
@@ -127,9 +128,9 @@ class TestOpenAISDKUniversalCompatibility:
             model="claude-3-haiku-20240307",
             messages=[
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": "Hello"}
+                {"role": "user", "content": "Hello"},
             ],
-            max_tokens=50
+            max_tokens=50,
         )
 
         assert response.choices[0].message.content is not None
@@ -142,7 +143,7 @@ class TestOpenAISDKUniversalCompatibility:
                 model=model,
                 messages=[{"role": "user", "content": "What is 2+2?"}],
                 max_tokens=20,
-                temperature=0.0
+                temperature=0.0,
             )
 
             # High temperature
@@ -150,7 +151,7 @@ class TestOpenAISDKUniversalCompatibility:
                 model=model,
                 messages=[{"role": "user", "content": "What is 2+2?"}],
                 max_tokens=20,
-                temperature=1.0
+                temperature=1.0,
             )
 
             assert response1.choices[0].message.content is not None
@@ -164,9 +165,9 @@ class TestOpenAISDKUniversalCompatibility:
                 messages=[
                     {"role": "user", "content": "My name is Alice"},
                     {"role": "assistant", "content": "Hello Alice! Nice to meet you."},
-                    {"role": "user", "content": "What's my name?"}
+                    {"role": "user", "content": "What's my name?"},
                 ],
-                max_tokens=50
+                max_tokens=50,
             )
 
             assert response.choices[0].message.content is not None
@@ -192,14 +193,14 @@ class TestOpenAISDKEndpointCoverage:
             "meta-llama/Llama-3.3-70B-Instruct-Turbo",
             "meta-llama/Llama-3.2-3B-Instruct-Turbo",
             "Qwen/Qwen2.5-72B-Instruct-Turbo",
-            "mistralai/Mixtral-8x7B-Instruct-v0.1"
+            "mistralai/Mixtral-8x7B-Instruct-v0.1",
         ]
 
         for model in chat_models:
             response = client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": f"Testing {model}"}],
-                max_tokens=20
+                max_tokens=20,
             )
 
             assert response.choices[0].message.content is not None
@@ -210,13 +211,12 @@ class TestOpenAISDKEndpointCoverage:
         embedding_models = [
             "text-embedding-ada-002",
             "text-embedding-3-small",
-            "text-embedding-3-large"
+            "text-embedding-3-large",
         ]
 
         for model in embedding_models:
             response = client.embeddings.create(
-                model=model,
-                input="Test embedding text"
+                model=model, input="Test embedding text"
             )
 
             assert len(response.data) > 0
@@ -225,28 +225,22 @@ class TestOpenAISDKEndpointCoverage:
 
     def test_moderation_openai_models(self):
         """Moderation should work with OpenAI moderation models."""
-        moderation_models = [
-            "text-moderation-latest",
-            "omni-moderation-latest"
-        ]
+        moderation_models = ["text-moderation-latest", "omni-moderation-latest"]
 
         for model in moderation_models:
             response = client.moderations.create(
-                model=model,
-                input="This is a test message"
+                model=model, input="This is a test message"
             )
 
             assert len(response.results) > 0
-            assert hasattr(response.results[0], 'flagged')
+            assert hasattr(response.results[0], "flagged")
             assert response.model == model
 
     def test_audio_openai_models(self):
         """Audio endpoints should work with OpenAI audio models."""
         # Text-to-speech
         response = client.audio.speech.create(
-            model="tts-1",
-            voice="alloy",
-            input="Hello world"
+            model="tts-1", voice="alloy", input="Hello world"
         )
 
         assert response.content is not None
@@ -258,14 +252,14 @@ class TestOpenAISDKEndpointCoverage:
 
         for model in image_models:
             response = client.images.generate(
-                model=model,
-                prompt="A simple test image",
-                n=1,
-                size="256x256"
+                model=model, prompt="A simple test image", n=1, size="256x256"
             )
 
             assert len(response.data) > 0
-            assert response.data[0].url is not None or response.data[0].b64_json is not None
+            assert (
+                response.data[0].url is not None
+                or response.data[0].b64_json is not None
+            )
 
 
 class TestOpenAISDKVsNativeSDK:
@@ -277,7 +271,7 @@ class TestOpenAISDKVsNativeSDK:
         openai_sdk_response = client.chat.completions.create(
             model="claude-3-haiku-20240307",
             messages=[{"role": "user", "content": "Hello from OpenAI SDK"}],
-            max_tokens=50
+            max_tokens=50,
         )
 
         # Verify the response
@@ -292,7 +286,7 @@ class TestOpenAISDKVsNativeSDK:
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": "Hello from native OpenAI usage"}],
-            max_tokens=50
+            max_tokens=50,
         )
 
         assert response.choices[0].message.content is not None

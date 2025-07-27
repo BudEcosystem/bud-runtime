@@ -8,7 +8,6 @@ and other advanced capabilities.
 import os
 import json
 import pytest
-from typing import List, Dict, Any
 from openai import OpenAI
 from dotenv import load_dotenv
 
@@ -19,10 +18,7 @@ TENSORZERO_BASE_URL = os.getenv("TENSORZERO_BASE_URL", "http://localhost:3001")
 TENSORZERO_API_KEY = os.getenv("TENSORZERO_API_KEY", "test-api-key")
 
 # Universal OpenAI client
-client = OpenAI(
-    base_url=f"{TENSORZERO_BASE_URL}/v1",
-    api_key=TENSORZERO_API_KEY
-)
+client = OpenAI(base_url=f"{TENSORZERO_BASE_URL}/v1", api_key=TENSORZERO_API_KEY)
 
 
 class TestTogetherJSONMode:
@@ -35,15 +31,15 @@ class TestTogetherJSONMode:
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a helpful assistant that always responds in valid JSON."
+                    "content": "You are a helpful assistant that always responds in valid JSON.",
                 },
                 {
                     "role": "user",
-                    "content": "List 3 programming languages with their year of creation"
-                }
+                    "content": "List 3 programming languages with their year of creation",
+                },
             ],
             response_format={"type": "json_object"},
-            max_tokens=200
+            max_tokens=200,
         )
 
         content = response.choices[0].message.content
@@ -70,11 +66,11 @@ class TestTogetherJSONMode:
                         "age": number,
                         "skills": ["string"],
                         "active": boolean
-                    }"""
+                    }""",
                 }
             ],
             response_format={"type": "json_object"},
-            max_tokens=150
+            max_tokens=150,
         )
 
         assert response.choices[0].message.content is not None
@@ -91,11 +87,9 @@ class TestTogetherJSONMode:
 
         response = client.chat.completions.create(
             model="mistralai/Mixtral-8x7B-Instruct-v0.1",
-            messages=[
-                {"role": "user", "content": schema_request}
-            ],
+            messages=[{"role": "user", "content": schema_request}],
             response_format={"type": "json_object"},
-            max_tokens=300
+            max_tokens=300,
         )
 
         assert response.choices[0].message.content is not None
@@ -117,27 +111,25 @@ class TestTogetherToolCalling:
                         "properties": {
                             "location": {
                                 "type": "string",
-                                "description": "The city and state, e.g. San Francisco, CA"
+                                "description": "The city and state, e.g. San Francisco, CA",
                             },
                             "unit": {
                                 "type": "string",
-                                "enum": ["celsius", "fahrenheit"]
-                            }
+                                "enum": ["celsius", "fahrenheit"],
+                            },
                         },
-                        "required": ["location"]
-                    }
-                }
+                        "required": ["location"],
+                    },
+                },
             }
         ]
 
         response = client.chat.completions.create(
             model="meta-llama/Llama-3.3-70B-Instruct-Turbo",
-            messages=[
-                {"role": "user", "content": "What's the weather in New York?"}
-            ],
+            messages=[{"role": "user", "content": "What's the weather in New York?"}],
             tools=tools,
             tool_choice="auto",
-            max_tokens=150
+            max_tokens=150,
         )
 
         assert response.choices[0].message is not None
@@ -153,12 +145,10 @@ class TestTogetherToolCalling:
                     "description": "Search the web for information",
                     "parameters": {
                         "type": "object",
-                        "properties": {
-                            "query": {"type": "string"}
-                        },
-                        "required": ["query"]
-                    }
-                }
+                        "properties": {"query": {"type": "string"}},
+                        "required": ["query"],
+                    },
+                },
             },
             {
                 "type": "function",
@@ -167,12 +157,10 @@ class TestTogetherToolCalling:
                     "description": "Perform mathematical calculations",
                     "parameters": {
                         "type": "object",
-                        "properties": {
-                            "expression": {"type": "string"}
-                        },
-                        "required": ["expression"]
-                    }
-                }
+                        "properties": {"expression": {"type": "string"}},
+                        "required": ["expression"],
+                    },
+                },
             },
             {
                 "type": "function",
@@ -181,23 +169,19 @@ class TestTogetherToolCalling:
                     "description": "Get current time in a timezone",
                     "parameters": {
                         "type": "object",
-                        "properties": {
-                            "timezone": {"type": "string"}
-                        },
-                        "required": ["timezone"]
-                    }
-                }
-            }
+                        "properties": {"timezone": {"type": "string"}},
+                        "required": ["timezone"],
+                    },
+                },
+            },
         ]
 
         response = client.chat.completions.create(
             model="meta-llama/Llama-3.1-405B-Instruct-Turbo",
-            messages=[
-                {"role": "user", "content": "What's 25 * 4?"}
-            ],
+            messages=[{"role": "user", "content": "What's 25 * 4?"}],
             tools=tools,
             tool_choice="auto",
-            max_tokens=150
+            max_tokens=150,
         )
 
         assert response.choices[0].message is not None
@@ -214,25 +198,20 @@ class TestTogetherToolCalling:
                         "type": "object",
                         "properties": {
                             "text": {"type": "string"},
-                            "target_language": {"type": "string"}
+                            "target_language": {"type": "string"},
                         },
-                        "required": ["text", "target_language"]
-                    }
-                }
+                        "required": ["text", "target_language"],
+                    },
+                },
             }
         ]
 
         response = client.chat.completions.create(
             model="deepseek-ai/deepseek-v2.5",
-            messages=[
-                {"role": "user", "content": "Hello world"}
-            ],
+            messages=[{"role": "user", "content": "Hello world"}],
             tools=tools,
-            tool_choice={
-                "type": "function",
-                "function": {"name": "translate"}
-            },
-            max_tokens=150
+            tool_choice={"type": "function", "function": {"name": "translate"}},
+            max_tokens=150,
         )
 
         assert response.choices[0].message is not None
@@ -247,23 +226,24 @@ class TestTogetherToolCalling:
                     "description": "Get current stock price",
                     "parameters": {
                         "type": "object",
-                        "properties": {
-                            "symbol": {"type": "string"}
-                        },
-                        "required": ["symbol"]
-                    }
-                }
+                        "properties": {"symbol": {"type": "string"}},
+                        "required": ["symbol"],
+                    },
+                },
             }
         ]
 
         response = client.chat.completions.create(
             model="meta-llama/Llama-3.3-70B-Instruct-Turbo",
             messages=[
-                {"role": "user", "content": "What are the current prices of AAPL, GOOGL, and MSFT?"}
+                {
+                    "role": "user",
+                    "content": "What are the current prices of AAPL, GOOGL, and MSFT?",
+                }
             ],
             tools=tools,
             tool_choice="auto",
-            max_tokens=200
+            max_tokens=200,
         )
 
         assert response.choices[0].message is not None
@@ -282,10 +262,10 @@ class TestTogetherReasoningModels:
                     "role": "user",
                     "content": """Solve this step by step:
                     If a train travels 120 miles in 2 hours, and then 180 miles in 3 hours,
-                    what is its average speed for the entire journey?"""
+                    what is its average speed for the entire journey?""",
                 }
             ],
-            max_tokens=300
+            max_tokens=300,
         )
 
         content = response.choices[0].message.content
@@ -303,22 +283,22 @@ class TestTogetherReasoningModels:
                     The total number of heads is 35.
                     The total number of legs is 94.
                     How many chickens and how many rabbits does the farmer have?
-                    Show your reasoning step by step."""
+                    Show your reasoning step by step.""",
                 }
             ],
-            max_tokens=400
+            max_tokens=400,
         )
 
         assert response.choices[0].message.content is not None
 
     def test_code_reasoning(self):
         """Test reasoning about code."""
-        code_snippet = '''
+        code_snippet = """
         def mystery(n):
             if n <= 1:
                 return n
             return mystery(n-1) + mystery(n-2)
-        '''
+        """
 
         response = client.chat.completions.create(
             model="Qwen/Qwen2.5-72B-Instruct-Turbo",
@@ -330,10 +310,10 @@ class TestTogetherReasoningModels:
                     {code_snippet}
                     ```
                     What does this function do? What is mystery(5)?
-                    Explain your reasoning."""
+                    Explain your reasoning.""",
                 }
             ],
-            max_tokens=300
+            max_tokens=300,
         )
 
         assert response.choices[0].message.content is not None
@@ -353,7 +333,7 @@ class TestTogetherAdvancedParameters:
                     {"role": "user", "content": "Write a creative story opening"}
                 ],
                 temperature=temp,
-                max_tokens=50
+                max_tokens=50,
             )
 
             assert response.choices[0].message.content is not None
@@ -365,11 +345,9 @@ class TestTogetherAdvancedParameters:
         for top_p in top_p_values:
             response = client.chat.completions.create(
                 model="mistralai/Mixtral-8x7B-Instruct-v0.1",
-                messages=[
-                    {"role": "user", "content": "Generate a random sentence"}
-                ],
+                messages=[{"role": "user", "content": "Generate a random sentence"}],
                 top_p=top_p,
-                max_tokens=30
+                max_tokens=30,
             )
 
             assert response.choices[0].message.content is not None
@@ -379,10 +357,13 @@ class TestTogetherAdvancedParameters:
         response = client.chat.completions.create(
             model="meta-llama/Llama-3.1-8B-Instruct-Turbo",
             messages=[
-                {"role": "user", "content": "Write about a topic without repeating words"}
+                {
+                    "role": "user",
+                    "content": "Write about a topic without repeating words",
+                }
             ],
             frequency_penalty=2.0,
-            max_tokens=100
+            max_tokens=100,
         )
 
         assert response.choices[0].message.content is not None
@@ -391,11 +372,9 @@ class TestTogetherAdvancedParameters:
         """Test presence penalty parameter."""
         response = client.chat.completions.create(
             model="deepseek-ai/deepseek-v2.5",
-            messages=[
-                {"role": "user", "content": "Write about diverse topics"}
-            ],
+            messages=[{"role": "user", "content": "Write about diverse topics"}],
             presence_penalty=2.0,
-            max_tokens=100
+            max_tokens=100,
         )
 
         assert response.choices[0].message.content is not None
@@ -411,7 +390,7 @@ class TestTogetherAdvancedParameters:
             messages=[{"role": "user", "content": prompt}],
             seed=seed,
             temperature=0,
-            max_tokens=10
+            max_tokens=10,
         )
 
         # Second generation with same seed
@@ -420,7 +399,7 @@ class TestTogetherAdvancedParameters:
             messages=[{"role": "user", "content": prompt}],
             seed=seed,
             temperature=0,
-            max_tokens=10
+            max_tokens=10,
         )
 
         # With temperature=0 and same seed, outputs might be similar
@@ -441,23 +420,19 @@ class TestTogetherStreamingAdvanced:
                     "description": "Get information about a topic",
                     "parameters": {
                         "type": "object",
-                        "properties": {
-                            "topic": {"type": "string"}
-                        },
-                        "required": ["topic"]
-                    }
-                }
+                        "properties": {"topic": {"type": "string"}},
+                        "required": ["topic"],
+                    },
+                },
             }
         ]
 
         stream = client.chat.completions.create(
             model="meta-llama/Llama-3.3-70B-Instruct-Turbo",
-            messages=[
-                {"role": "user", "content": "Tell me about Python"}
-            ],
+            messages=[{"role": "user", "content": "Tell me about Python"}],
             tools=tools,
             stream=True,
-            max_tokens=100
+            max_tokens=100,
         )
 
         chunks_received = 0
@@ -473,12 +448,10 @@ class TestTogetherStreamingAdvanced:
         """Test streaming with stop sequences."""
         stream = client.chat.completions.create(
             model="Qwen/Qwen2.5-72B-Instruct-Turbo",
-            messages=[
-                {"role": "user", "content": "Count from 1 to 10"}
-            ],
+            messages=[{"role": "user", "content": "Count from 1 to 10"}],
             stop=["5", "five"],
             stream=True,
-            max_tokens=100
+            max_tokens=100,
         )
 
         full_response = ""
@@ -492,12 +465,10 @@ class TestTogetherStreamingAdvanced:
         """Test streaming with usage statistics."""
         stream = client.chat.completions.create(
             model="meta-llama/Llama-3.1-8B-Instruct-Turbo",
-            messages=[
-                {"role": "user", "content": "Hello"}
-            ],
+            messages=[{"role": "user", "content": "Hello"}],
             stream=True,
             stream_options={"include_usage": True},
-            max_tokens=50
+            max_tokens=50,
         )
 
         last_chunk = None
@@ -505,7 +476,7 @@ class TestTogetherStreamingAdvanced:
             last_chunk = chunk
 
         # Usage stats might be in the last chunk
-        if hasattr(last_chunk, 'usage'):
+        if hasattr(last_chunk, "usage"):
             assert last_chunk.usage is not None
 
 
@@ -518,7 +489,7 @@ class TestTogetherErrorScenarios:
             client.chat.completions.create(
                 model="together/invalid-model-name",
                 messages=[{"role": "user", "content": "Test"}],
-                max_tokens=10
+                max_tokens=10,
             )
 
         assert exc_info.value is not None
@@ -532,7 +503,7 @@ class TestTogetherErrorScenarios:
             response = client.chat.completions.create(
                 model="meta-llama/Llama-3.2-3B-Instruct-Turbo",
                 messages=[{"role": "user", "content": long_message}],
-                max_tokens=10
+                max_tokens=10,
             )
             # If it succeeds, verify response
             assert response.choices[0].message.content is not None
@@ -548,7 +519,7 @@ class TestTogetherErrorScenarios:
                 model="meta-llama/Llama-3.1-8B-Instruct-Turbo",
                 messages=[{"role": "user", "content": "Test"}],
                 temperature=-1.0,  # Invalid
-                max_tokens=10
+                max_tokens=10,
             )
 
         # Test with invalid max_tokens
@@ -556,7 +527,7 @@ class TestTogetherErrorScenarios:
             client.chat.completions.create(
                 model="meta-llama/Llama-3.1-8B-Instruct-Turbo",
                 messages=[{"role": "user", "content": "Test"}],
-                max_tokens=-10  # Invalid
+                max_tokens=-10,  # Invalid
             )
 
 

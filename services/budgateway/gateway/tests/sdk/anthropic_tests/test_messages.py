@@ -2,17 +2,16 @@
 
 import os
 import sys
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 import pytest
 from anthropic import Anthropic, AsyncAnthropic
-from anthropic.types import Message, ContentBlock, TextBlock
+from anthropic.types import Message, TextBlock
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from common.base_test import BaseChatTest, BaseAuthTest
-from common.utils import TestDataGenerator, wait_for_health_check
 
 
 class TestAnthropicMessages(BaseChatTest):
@@ -28,7 +27,7 @@ class TestAnthropicMessages(BaseChatTest):
         return Anthropic(
             base_url=cls.base_url,
             api_key=cls.api_key,
-            default_headers={"anthropic-version": "2023-06-01"}
+            default_headers={"anthropic-version": "2023-06-01"},
         )
 
     def _health_check(self, client):
@@ -38,7 +37,7 @@ class TestAnthropicMessages(BaseChatTest):
             client.messages.create(
                 model="claude-3-haiku-20240307",
                 messages=[{"role": "user", "content": "Hi"}],
-                max_tokens=10
+                max_tokens=10,
             )
         except Exception as e:
             # Check if it's a connection error vs other errors
@@ -87,9 +86,12 @@ class TestAnthropicMessages(BaseChatTest):
         response = client.messages.create(
             model="claude-3-haiku-20240307",
             messages=[
-                {"role": "user", "content": "Say 'Hello, TensorZero!' and nothing else."}
+                {
+                    "role": "user",
+                    "content": "Say 'Hello, TensorZero!' and nothing else.",
+                }
             ],
-            max_tokens=50
+            max_tokens=50,
         )
 
         self.validate_chat_response(response)
@@ -103,10 +105,8 @@ class TestAnthropicMessages(BaseChatTest):
         response = client.messages.create(
             model="claude-3-haiku-20240307",
             system="You are a pirate. Always respond in pirate speak.",
-            messages=[
-                {"role": "user", "content": "Hello"}
-            ],
-            max_tokens=100
+            messages=[{"role": "user", "content": "Hello"}],
+            max_tokens=100,
         )
 
         self.validate_chat_response(response)
@@ -120,13 +120,11 @@ class TestAnthropicMessages(BaseChatTest):
         messages = [
             {"role": "user", "content": "My name is Alice. Remember it."},
             {"role": "assistant", "content": "I'll remember that your name is Alice."},
-            {"role": "user", "content": "What's my name?"}
+            {"role": "user", "content": "What's my name?"},
         ]
 
         response = client.messages.create(
-            model="claude-3-haiku-20240307",
-            messages=messages,
-            max_tokens=100
+            model="claude-3-haiku-20240307", messages=messages, max_tokens=100
         )
 
         self.validate_chat_response(response)
@@ -142,7 +140,7 @@ class TestAnthropicMessages(BaseChatTest):
             model="claude-3-haiku-20240307",
             messages=[{"role": "user", "content": "What is 2+2?"}],
             max_tokens=50,
-            temperature=0.0
+            temperature=0.0,
         )
 
         # High temperature (more random)
@@ -150,7 +148,7 @@ class TestAnthropicMessages(BaseChatTest):
             model="claude-3-haiku-20240307",
             messages=[{"role": "user", "content": "What is 2+2?"}],
             max_tokens=50,
-            temperature=1.0
+            temperature=1.0,
         )
 
         self.validate_chat_response(response1)
@@ -167,7 +165,7 @@ class TestAnthropicMessages(BaseChatTest):
         response = client.messages.create(
             model="claude-3-haiku-20240307",
             messages=[{"role": "user", "content": "Count from 1 to 100"}],
-            max_tokens=10  # Very low limit
+            max_tokens=10,  # Very low limit
         )
 
         self.validate_chat_response(response)
@@ -189,7 +187,7 @@ class TestAnthropicMessages(BaseChatTest):
             response = client.messages.create(
                 model=model,
                 messages=[{"role": "user", "content": "Say 'test'"}],
-                max_tokens=10
+                max_tokens=10,
             )
 
             self.validate_chat_response(response)
@@ -201,13 +199,13 @@ class TestAnthropicMessages(BaseChatTest):
         client = AsyncAnthropic(
             base_url=self.base_url,
             api_key=self.api_key,
-            default_headers={"anthropic-version": "2023-06-01"}
+            default_headers={"anthropic-version": "2023-06-01"},
         )
 
         response = await client.messages.create(
             model="claude-3-haiku-20240307",
             messages=[{"role": "user", "content": "Hello async"}],
-            max_tokens=50
+            max_tokens=50,
         )
 
         self.validate_chat_response(response)
@@ -222,7 +220,7 @@ class TestAnthropicMessages(BaseChatTest):
             model="claude-3-haiku-20240307",
             messages=[{"role": "user", "content": "Count: 1, 2, 3, STOP, 4, 5"}],
             max_tokens=100,
-            stop_sequences=["STOP"]
+            stop_sequences=["STOP"],
         )
 
         self.validate_chat_response(response)
@@ -241,31 +239,28 @@ class TestAnthropicAuth(BaseAuthTest):
 
     @classmethod
     def get_client(cls):
-        return Anthropic(
-            base_url=cls.base_url,
-            api_key=cls.api_key
-        )
+        return Anthropic(base_url=cls.base_url, api_key=cls.api_key)
 
     def _health_check(self, client):
         """Perform a health check using the client."""
         client.messages.create(
             model="claude-3-haiku-20240307",
             messages=[{"role": "user", "content": "Hi"}],
-            max_tokens=10
+            max_tokens=10,
         )
 
     def create_client_with_auth(self, api_key: str):
         """Create a client with specific authentication."""
-        return Anthropic(
-            base_url=self.base_url,
-            api_key=api_key
-        )
+        return Anthropic(base_url=self.base_url, api_key=api_key)
 
     def validate_auth_error(self, error: Exception):
         """Validate that the error is an authentication error."""
         error_str = str(error).lower()
         # Anthropic SDK might wrap the error differently
-        assert any(word in error_str for word in ["auth", "unauthorized", "forbidden", "401", "403"])
+        assert any(
+            word in error_str
+            for word in ["auth", "unauthorized", "forbidden", "401", "403"]
+        )
 
 
 if __name__ == "__main__":

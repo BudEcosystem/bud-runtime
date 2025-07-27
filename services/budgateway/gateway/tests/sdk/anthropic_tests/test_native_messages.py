@@ -27,7 +27,7 @@ class TestNativeAnthropicMessages(BaseChatTest):
         return Anthropic(
             base_url=cls.base_url,
             api_key=cls.api_key,
-            default_headers={"anthropic-version": "2023-06-01"}
+            default_headers={"anthropic-version": "2023-06-01"},
         )
 
     def _health_check(self, client):
@@ -36,7 +36,7 @@ class TestNativeAnthropicMessages(BaseChatTest):
             client.messages.create(
                 model="claude-3-haiku-20240307",
                 messages=[{"role": "user", "content": "Hi"}],
-                max_tokens=10
+                max_tokens=10,
             )
         except Exception as e:
             if "connection" in str(e).lower():
@@ -83,10 +83,8 @@ class TestNativeAnthropicMessages(BaseChatTest):
 
         response = client.messages.create(
             model="claude-3-haiku-20240307",
-            messages=[
-                {"role": "user", "content": "Hello from native Anthropic SDK!"}
-            ],
-            max_tokens=50
+            messages=[{"role": "user", "content": "Hello from native Anthropic SDK!"}],
+            max_tokens=50,
         )
 
         self.validate_chat_response(response)
@@ -101,10 +99,8 @@ class TestNativeAnthropicMessages(BaseChatTest):
         response = client.messages.create(
             model="claude-3-haiku-20240307",
             system="You are a helpful assistant.",
-            messages=[
-                {"role": "user", "content": "Test system prompt"}
-            ],
-            max_tokens=100
+            messages=[{"role": "user", "content": "Test system prompt"}],
+            max_tokens=100,
         )
 
         self.validate_chat_response(response)
@@ -117,13 +113,11 @@ class TestNativeAnthropicMessages(BaseChatTest):
         messages = [
             {"role": "user", "content": "My name is Bob."},
             {"role": "assistant", "content": "Hello Bob! Nice to meet you."},
-            {"role": "user", "content": "What did I tell you?"}
+            {"role": "user", "content": "What did I tell you?"},
         ]
 
         response = client.messages.create(
-            model="claude-3-haiku-20240307",
-            messages=messages,
-            max_tokens=100
+            model="claude-3-haiku-20240307", messages=messages, max_tokens=100
         )
 
         self.validate_chat_response(response)
@@ -139,7 +133,7 @@ class TestNativeAnthropicMessages(BaseChatTest):
                 model="claude-3-haiku-20240307",
                 messages=[{"role": "user", "content": "Hello"}],
                 max_tokens=50,
-                temperature=temp
+                temperature=temp,
             )
 
             self.validate_chat_response(response)
@@ -152,7 +146,7 @@ class TestNativeAnthropicMessages(BaseChatTest):
         response = client.messages.create(
             model="claude-3-haiku-20240307",
             messages=[{"role": "user", "content": "Tell me about the weather"}],
-            max_tokens=20  # Very low limit
+            max_tokens=20,  # Very low limit
         )
 
         self.validate_chat_response(response)
@@ -173,7 +167,7 @@ class TestNativeAnthropicMessages(BaseChatTest):
             response = client.messages.create(
                 model=model,
                 messages=[{"role": "user", "content": "Hello"}],
-                max_tokens=20
+                max_tokens=20,
             )
 
             self.validate_chat_response(response)
@@ -188,7 +182,7 @@ class TestNativeAnthropicMessages(BaseChatTest):
             model="claude-3-haiku-20240307",
             messages=[{"role": "user", "content": "Count: 1, 2, 3, STOP, 4, 5"}],
             max_tokens=100,
-            stop_sequences=["STOP"]
+            stop_sequences=["STOP"],
         )
 
         self.validate_chat_response(response)
@@ -200,13 +194,13 @@ class TestNativeAnthropicMessages(BaseChatTest):
         client = AsyncAnthropic(
             base_url=self.base_url,
             api_key=self.api_key,
-            default_headers={"anthropic-version": "2023-06-01"}
+            default_headers={"anthropic-version": "2023-06-01"},
         )
 
         response = await client.messages.create(
             model="claude-3-haiku-20240307",
             messages=[{"role": "user", "content": "Hello async"}],
-            max_tokens=50
+            max_tokens=50,
         )
 
         self.validate_chat_response(response)
@@ -223,7 +217,7 @@ class TestNativeAnthropicMessages(BaseChatTest):
         response = client.messages.create(
             model="claude-3-haiku-20240307",
             messages=[{"role": "user", "content": "Testing endpoint path"}],
-            max_tokens=30
+            max_tokens=30,
         )
 
         self.validate_chat_response(response)

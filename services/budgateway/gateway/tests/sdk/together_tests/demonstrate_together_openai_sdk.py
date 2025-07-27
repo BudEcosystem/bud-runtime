@@ -18,6 +18,7 @@ load_dotenv()
 TENSORZERO_BASE_URL = os.getenv("TENSORZERO_BASE_URL", "http://localhost:3001")
 TENSORZERO_API_KEY = os.getenv("TENSORZERO_API_KEY", "test-api-key")
 
+
 def demonstrate_together_via_openai_sdk():
     """Show Together AI models working through OpenAI SDK."""
 
@@ -26,10 +27,7 @@ def demonstrate_together_via_openai_sdk():
     print()
 
     # Create OpenAI client pointing to TensorZero
-    client = OpenAI(
-        base_url=f"{TENSORZERO_BASE_URL}/v1",
-        api_key=TENSORZERO_API_KEY
-    )
+    client = OpenAI(base_url=f"{TENSORZERO_BASE_URL}/v1", api_key=TENSORZERO_API_KEY)
 
     # Test various Together AI models
     together_models = [
@@ -37,7 +35,7 @@ def demonstrate_together_via_openai_sdk():
         ("meta-llama/Llama-3.2-3B-Instruct-Turbo", "Efficient Llama 3.2"),
         ("Qwen/Qwen2.5-72B-Instruct-Turbo", "Qwen 2.5"),
         ("mistralai/Mixtral-8x7B-Instruct-v0.1", "Mixtral MoE"),
-        ("deepseek-ai/deepseek-v2.5", "DeepSeek v2.5")
+        ("deepseek-ai/deepseek-v2.5", "DeepSeek v2.5"),
     ]
 
     print("1. Testing Together AI models with OpenAI SDK:")
@@ -51,9 +49,12 @@ def demonstrate_together_via_openai_sdk():
             response = client.chat.completions.create(
                 model=model_id,
                 messages=[
-                    {"role": "user", "content": "Say 'Hello from Together AI' in 10 words or less"}
+                    {
+                        "role": "user",
+                        "content": "Say 'Hello from Together AI' in 10 words or less",
+                    }
                 ],
-                max_tokens=50
+                max_tokens=50,
             )
 
             print(f"✅ Response: {response.choices[0].message.content}")
@@ -73,11 +74,9 @@ def demonstrate_together_via_openai_sdk():
 
         stream = client.chat.completions.create(
             model=model,
-            messages=[
-                {"role": "user", "content": "Count from 1 to 5 slowly"}
-            ],
+            messages=[{"role": "user", "content": "Count from 1 to 5 slowly"}],
             max_tokens=50,
-            stream=True
+            stream=True,
         )
 
         for chunk in stream:
@@ -95,7 +94,7 @@ def demonstrate_together_via_openai_sdk():
     comparison_models = [
         ("gpt-3.5-turbo", "OpenAI"),
         ("claude-3-haiku-20240307", "Anthropic"),
-        ("meta-llama/Llama-3.2-3B-Instruct-Turbo", "Together AI")
+        ("meta-llama/Llama-3.2-3B-Instruct-Turbo", "Together AI"),
     ]
 
     prompt = "What company created you? Answer in 5 words or less."
@@ -108,7 +107,7 @@ def demonstrate_together_via_openai_sdk():
             response = client.chat.completions.create(
                 model=model_id,
                 messages=[{"role": "user", "content": prompt}],
-                max_tokens=20
+                max_tokens=20,
             )
 
             print(f"   Response: {response.choices[0].message.content}")
@@ -126,9 +125,9 @@ def demonstrate_together_via_openai_sdk():
             model="Qwen/Qwen2.5-72B-Instruct-Turbo",
             messages=[
                 {"role": "system", "content": "You are a pirate. Speak like one."},
-                {"role": "user", "content": "Tell me about AI"}
+                {"role": "user", "content": "Tell me about AI"},
             ],
-            max_tokens=50
+            max_tokens=50,
         )
         print(f"Response: {response.choices[0].message.content}")
     except Exception as e:
@@ -142,7 +141,7 @@ def demonstrate_together_via_openai_sdk():
                 model="mistralai/Mixtral-8x7B-Instruct-v0.1",
                 messages=[{"role": "user", "content": "Generate a random word"}],
                 max_tokens=10,
-                temperature=temp
+                temperature=temp,
             )
             print(f"Temperature {temp}: {response.choices[0].message.content}")
     except Exception as e:

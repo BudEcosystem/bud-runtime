@@ -16,8 +16,7 @@ TENSORZERO_API_KEY = os.getenv("TENSORZERO_API_KEY", "test-api-key")
 
 # Client configured for dummy provider testing
 tensorzero_client = OpenAI(
-    base_url=f"{TENSORZERO_BASE_URL}/v1",
-    api_key=TENSORZERO_API_KEY
+    base_url=f"{TENSORZERO_BASE_URL}/v1", api_key=TENSORZERO_API_KEY
 )
 
 
@@ -28,12 +27,11 @@ class TestChatCompletionsCI:
         """Test basic chat completion"""
         messages = [
             {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": "Hello, how are you?"}
+            {"role": "user", "content": "Hello, how are you?"},
         ]
 
         response = tensorzero_client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=messages
+            model="gpt-3.5-turbo", messages=messages
         )
 
         # Check response structure
@@ -59,12 +57,11 @@ class TestChatCompletionsCI:
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": "What's 2+2?"},
             {"role": "assistant", "content": "2+2 equals 4."},
-            {"role": "user", "content": "What's 3+3?"}
+            {"role": "user", "content": "What's 3+3?"},
         ]
 
         response = tensorzero_client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=messages
+            model="gpt-3.5-turbo", messages=messages
         )
 
         assert response.choices[0].message.content
@@ -75,9 +72,7 @@ class TestChatCompletionsCI:
         messages = [{"role": "user", "content": "Count to three"}]
 
         stream = tensorzero_client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=messages,
-            stream=True
+            model="gpt-3.5-turbo", messages=messages, stream=True
         )
 
         chunks = list(stream)
@@ -87,10 +82,7 @@ class TestChatCompletionsCI:
         assert chunks[0].choices[0].delta.role == "assistant"
 
         # Collect all content
-        content = "".join(
-            chunk.choices[0].delta.content or ""
-            for chunk in chunks
-        )
+        content = "".join(chunk.choices[0].delta.content or "" for chunk in chunks)
         assert content
 
     def test_completion_parameters(self):
@@ -105,7 +97,7 @@ class TestChatCompletionsCI:
             max_tokens=50,
             top_p=0.9,
             frequency_penalty=0.5,
-            presence_penalty=0.5
+            presence_penalty=0.5,
             # Note: n > 1 is not supported by TensorZero's OpenAI-compatible endpoint
         )
 
@@ -118,8 +110,7 @@ class TestChatCompletionsCI:
 
         # Test gpt-4 (configured with model_name="test")
         response = tensorzero_client.chat.completions.create(
-            model="gpt-4",
-            messages=messages
+            model="gpt-4", messages=messages
         )
 
         assert response.model == "gpt-4"
@@ -132,15 +123,13 @@ class TestChatCompletionsCI:
         from openai import AsyncOpenAI
 
         async_client = AsyncOpenAI(
-            base_url=f"{TENSORZERO_BASE_URL}/v1",
-            api_key=TENSORZERO_API_KEY
+            base_url=f"{TENSORZERO_BASE_URL}/v1", api_key=TENSORZERO_API_KEY
         )
 
         messages = [{"role": "user", "content": "Test async"}]
 
         response = await async_client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=messages
+            model="gpt-3.5-turbo", messages=messages
         )
 
         assert response.choices[0].message.content
@@ -150,8 +139,7 @@ class TestChatCompletionsCI:
         """Test that empty messages are handled by dummy provider"""
         # Dummy provider doesn't validate, so this should work
         response = tensorzero_client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[]
+            model="gpt-3.5-turbo", messages=[]
         )
 
         # Should still get a response
@@ -161,8 +149,7 @@ class TestChatCompletionsCI:
         """Test that invalid models are rejected"""
         with pytest.raises(Exception):
             tensorzero_client.chat.completions.create(
-                model="invalid-model",
-                messages=[{"role": "user", "content": "test"}]
+                model="invalid-model", messages=[{"role": "user", "content": "test"}]
             )
 
 

@@ -9,7 +9,6 @@ import json
 import os
 import sys
 from openai import OpenAI, AsyncOpenAI
-from typing import Dict, Any, Optional
 
 # Check for API key
 FIREWORKS_API_KEY = os.getenv("FIREWORKS_API_KEY")
@@ -58,11 +57,11 @@ def test_fireworks_with_sampling_params():
             "top_k": 40,
             "min_p": 0.05,
             "repetition_penalty": 1.1,
-        }
+        },
     )
 
     assert response.choices[0].message.content is not None
-    print(f"✓ Sampling params: Generated text with custom sampling")
+    print("✓ Sampling params: Generated text with custom sampling")
 
 
 def test_fireworks_context_handling():
@@ -84,7 +83,7 @@ def test_fireworks_context_handling():
         extra_body={
             "prompt_truncate_len": 500,  # Truncate to 500 tokens
             "context_length_exceeded_behavior": "truncate",
-        }
+        },
     )
 
     assert response.choices[0].message.content is not None
@@ -109,7 +108,7 @@ def test_fireworks_reasoning_model():
             temperature=0.1,
             extra_body={
                 "reasoning_effort": "low",  # Low effort for simple question
-            }
+            },
         )
 
         assert response.choices[0].message.content is not None
@@ -136,7 +135,7 @@ def test_fireworks_streaming():
         extra_body={
             "top_k": 10,  # Very restrictive for deterministic output
             "repetition_penalty": 1.0,
-        }
+        },
     )
 
     full_response = ""
@@ -161,14 +160,17 @@ def test_fireworks_json_mode():
     response = client.chat.completions.create(
         model="llama-v3p1-70b-instruct",
         messages=[
-            {"role": "user", "content": "Return a JSON object with name='Fireworks' and type='AI'"}
+            {
+                "role": "user",
+                "content": "Return a JSON object with name='Fireworks' and type='AI'",
+            }
         ],
         response_format={"type": "json_object"},
         temperature=0.1,
         max_tokens=50,
         extra_body={
             "top_k": 5,  # Very restrictive for JSON generation
-        }
+        },
     )
 
     content = response.choices[0].message.content
@@ -178,7 +180,7 @@ def test_fireworks_json_mode():
     try:
         parsed = json.loads(content)
         assert "name" in parsed or "type" in parsed
-        print(f"✓ JSON mode: Generated valid JSON")
+        print("✓ JSON mode: Generated valid JSON")
     except json.JSONDecodeError:
         print(f"⚠️  JSON mode: Response was not valid JSON: {content}")
 
@@ -213,15 +215,21 @@ def test_fireworks_multiple_messages():
         messages=[
             {"role": "system", "content": "You are a helpful assistant. Be concise."},
             {"role": "user", "content": "What is Fireworks AI?"},
-            {"role": "assistant", "content": "Fireworks AI is a platform for fast LLM inference."},
-            {"role": "user", "content": "What makes it fast? Answer in 5 words or less."},
+            {
+                "role": "assistant",
+                "content": "Fireworks AI is a platform for fast LLM inference.",
+            },
+            {
+                "role": "user",
+                "content": "What makes it fast? Answer in 5 words or less.",
+            },
         ],
         temperature=0.3,
         max_tokens=20,
         extra_body={
             "top_k": 20,
             "repetition_penalty": 1.05,
-        }
+        },
     )
 
     assert response.choices[0].message.content is not None
@@ -238,14 +246,12 @@ async def test_async_fireworks():
 
     response = await client.chat.completions.create(
         model="llama-v3p1-8b-instruct",
-        messages=[
-            {"role": "user", "content": "Say 'Async works' in exactly 2 words"}
-        ],
+        messages=[{"role": "user", "content": "Say 'Async works' in exactly 2 words"}],
         temperature=0.1,
         max_tokens=10,
         extra_body={
             "top_k": 5,
-        }
+        },
     )
 
     assert response.choices[0].message.content is not None
@@ -270,7 +276,7 @@ async def test_async_streaming():
         extra_body={
             "repetition_penalty": 1.0,
             "top_k": 10,
-        }
+        },
     )
 
     chunks = []
@@ -310,7 +316,7 @@ async def run_async_tests():
 
 def main():
     """Main test runner."""
-    print(f"\n🔥 Testing with Fireworks API\n")
+    print("\n🔥 Testing with Fireworks API\n")
 
     try:
         # Run sync tests
@@ -340,6 +346,7 @@ def main():
     except Exception as e:
         print(f"\n❌ Test failed: {e}")
         import traceback
+
         traceback.print_exc()
         return 1
 

@@ -11,13 +11,29 @@ The key principle: One OpenAI client works with ALL providers through /v1/chat/c
 """
 
 import os
+import sys
+
 import pytest
 from openai import OpenAI
+
+# Add parent directory to path for imports
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
+
+from common.test_suites import (  # noqa: E402
+    UniversalChatTestSuite,
+    UniversalStreamingTestSuite,
+    UniversalErrorTestSuite,
+    UniversalEmbeddingTestSuite,
+)
+from common.utils import UniversalTestData  # noqa: E402
 
 # Universal OpenAI client that works with ALL providers
 client = OpenAI(
     base_url=os.getenv("TENSORZERO_BASE_URL", "http://localhost:3001") + "/v1",
-    api_key=os.getenv("TENSORZERO_API_KEY", "test-api-key")
+    api_key=os.getenv("TENSORZERO_API_KEY", "test-api-key"),
 )
 
 
@@ -37,7 +53,7 @@ class TestOpenAISDKUniversalCompatibility:
             response = client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": f"Hello from {model}"}],
-                max_tokens=50
+                max_tokens=50,
             )
 
             # Basic validation
@@ -50,7 +66,7 @@ class TestOpenAISDKUniversalCompatibility:
         models_to_test = [
             "gpt-3.5-turbo",  # OpenAI
             "claude-3-haiku-20240307",  # Anthropic
-            "meta-llama/Llama-3.2-3B-Instruct-Turbo"  # Together
+            "meta-llama/Llama-3.2-3B-Instruct-Turbo",  # Together
         ]
 
         for model in models_to_test:
@@ -60,7 +76,7 @@ class TestOpenAISDKUniversalCompatibility:
                 model=model,
                 messages=[{"role": "user", "content": "Count to 3"}],
                 max_tokens=30,
-                stream=True
+                stream=True,
             )
 
             chunks = []
@@ -78,7 +94,7 @@ class TestOpenAISDKUniversalCompatibility:
         test_cases = [
             ("gpt-3.5-turbo", "OpenAI"),
             ("claude-3-haiku-20240307", "Anthropic"),
-            ("Qwen/Qwen2.5-72B-Instruct-Turbo", "Together")
+            ("Qwen/Qwen2.5-72B-Instruct-Turbo", "Together"),
         ]
 
         for model, provider in test_cases:
@@ -89,7 +105,7 @@ class TestOpenAISDKUniversalCompatibility:
                 model=model,
                 messages=[{"role": "user", "content": "What is 2+2?"}],
                 max_tokens=20,
-                temperature=0.1
+                temperature=0.1,
             )
             assert response.choices[0].message.content is not None
 
@@ -98,9 +114,9 @@ class TestOpenAISDKUniversalCompatibility:
                 model=model,
                 messages=[
                     {"role": "system", "content": "You are helpful."},
-                    {"role": "user", "content": "Hello!"}
+                    {"role": "user", "content": "Hello!"},
                 ],
-                max_tokens=30
+                max_tokens=30,
             )
             assert response.choices[0].message.content is not None
             print(f"✅ {provider}: Parameters work correctly")
@@ -110,36 +126,36 @@ class TestOpenAISDKUniversalCompatibility:
         models = [
             "gpt-4",  # OpenAI
             "claude-3-haiku-20240307",  # Anthropic
-            "meta-llama/Llama-3.1-8B-Instruct-Turbo"  # Together
+            "meta-llama/Llama-3.1-8B-Instruct-Turbo",  # Together
         ]
 
         for model in models:
             response = client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": "Test response format"}],
-                max_tokens=20
+                max_tokens=20,
             )
 
             # All should have consistent OpenAI response structure
-            assert hasattr(response, 'id')
-            assert hasattr(response, 'object')
+            assert hasattr(response, "id")
+            assert hasattr(response, "object")
             assert response.object == "chat.completion"
-            assert hasattr(response, 'created')
-            assert hasattr(response, 'model')
-            assert hasattr(response, 'choices')
-            assert hasattr(response, 'usage')
+            assert hasattr(response, "created")
+            assert hasattr(response, "model")
+            assert hasattr(response, "choices")
+            assert hasattr(response, "usage")
 
             # Check choice structure
             choice = response.choices[0]
-            assert hasattr(choice, 'index')
-            assert hasattr(choice, 'message')
-            assert hasattr(choice, 'finish_reason')
+            assert hasattr(choice, "index")
+            assert hasattr(choice, "message")
+            assert hasattr(choice, "finish_reason")
 
             # Check message structure
             message = choice.message
-            assert hasattr(message, 'role')
+            assert hasattr(message, "role")
             assert message.role == "assistant"
-            assert hasattr(message, 'content')
+            assert hasattr(message, "content")
 
             print(f"✅ {model}: Consistent OpenAI format")
 
@@ -155,7 +171,7 @@ class TestProviderSpecificFeatures:
         response = client.chat.completions.create(
             model="claude-3-haiku-20240307",
             messages=[{"role": "user", "content": long_message}],
-            max_tokens=100
+            max_tokens=100,
         )
 
         assert response.choices[0].message.content is not None
@@ -166,14 +182,16 @@ class TestProviderSpecificFeatures:
         together_models = [
             "meta-llama/Llama-3.3-70B-Instruct-Turbo",
             "mistralai/Mixtral-8x7B-Instruct-v0.1",
-            "deepseek-ai/deepseek-v2.5"
+            "deepseek-ai/deepseek-v2.5",
         ]
 
         for model in together_models:
             response = client.chat.completions.create(
                 model=model,
-                messages=[{"role": "user", "content": f"Hello from {model.split('/')[-1]}"}],
-                max_tokens=50
+                messages=[
+                    {"role": "user", "content": f"Hello from {model.split('/')[-1]}"}
+                ],
+                max_tokens=50,
             )
 
             assert response.choices[0].message.content is not None
@@ -189,7 +207,7 @@ class TestProviderSpecificFeatures:
             response = client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": "Hello from OpenAI"}],
-                max_tokens=50
+                max_tokens=50,
             )
 
             assert response.choices[0].message.content is not None
@@ -235,7 +253,7 @@ class TestUniversalTestSuites:
         models = [
             "gpt-3.5-turbo",
             "claude-3-haiku-20240307",
-            "meta-llama/Llama-3.1-8B-Instruct-Turbo"
+            "meta-llama/Llama-3.1-8B-Instruct-Turbo",
         ]
 
         for model in models:
