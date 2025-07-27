@@ -27,27 +27,27 @@ client = OpenAI(
 
 class TestTogetherEmbeddings:
     """Test Together AI embedding models through OpenAI SDK."""
-    
+
     def test_together_embeddings_single(self):
         """Test single text embedding with Together models."""
         embedding_models = [
             "together-bge-base",  # BAAI/bge-base-en-v1.5
             "together-m2-bert",   # togethercomputer/m2-bert-80M-8k-retrieval
         ]
-        
+
         for model in embedding_models:
             response = client.embeddings.create(
                 model=model,
                 input="Test embedding for Together AI models"
             )
-            
+
             assert response.model == model
             assert len(response.data) == 1
             assert response.data[0].index == 0
             assert len(response.data[0].embedding) > 0
             assert all(isinstance(x, float) for x in response.data[0].embedding)
             assert response.usage.total_tokens > 0
-    
+
     def test_together_embeddings_batch(self):
         """Test batch embeddings with Together models."""
         texts = [
@@ -56,21 +56,21 @@ class TestTogetherEmbeddings:
             "Third document about computer vision",
             "Fourth document about reinforcement learning"
         ]
-        
+
         response = client.embeddings.create(
             model="together-bge-base",
             input=texts
         )
-        
+
         assert len(response.data) == len(texts)
         for i, embedding_data in enumerate(response.data):
             assert embedding_data.index == i
             assert len(embedding_data.embedding) > 0
             assert all(isinstance(x, float) for x in embedding_data.embedding)
-        
+
         assert response.usage.total_tokens > 0
         assert response.usage.prompt_tokens == response.usage.total_tokens
-    
+
     def test_together_embeddings_dimensions(self):
         """Test embedding dimensions for different Together models."""
         # BGE base typically has 768 dimensions
@@ -80,7 +80,7 @@ class TestTogetherEmbeddings:
         )
         bge_dims = len(response_bge.data[0].embedding)
         assert bge_dims > 0  # Should be 768 for BGE base
-        
+
         # M2 BERT may have different dimensions
         response_m2 = client.embeddings.create(
             model="together-m2-bert",
@@ -88,7 +88,7 @@ class TestTogetherEmbeddings:
         )
         m2_dims = len(response_m2.data[0].embedding)
         assert m2_dims > 0
-    
+
     def test_together_embeddings_special_characters(self):
         """Test embeddings with special characters and unicode."""
         special_texts = [
@@ -97,16 +97,16 @@ class TestTogetherEmbeddings:
             "Special chars: <>&\"'\\n\\t",
             "Math symbols: ∑∏∫√∞"
         ]
-        
+
         response = client.embeddings.create(
             model="together-bge-base",
             input=special_texts
         )
-        
+
         assert len(response.data) == len(special_texts)
         for embedding_data in response.data:
             assert len(embedding_data.embedding) > 0
-    
+
     def test_together_embeddings_empty_input(self):
         """Test error handling for empty input."""
         with pytest.raises(Exception) as exc_info:
@@ -114,27 +114,27 @@ class TestTogetherEmbeddings:
                 model="together-bge-base",
                 input=[]
             )
-        
+
         # Should raise an error for empty batch
         assert exc_info.value is not None
-    
+
     def test_together_embeddings_vs_openai(self):
         """Compare Together embeddings format with OpenAI format."""
         # Test same text with both providers
         test_text = "Universal embedding test"
-        
+
         # Together embedding
         together_response = client.embeddings.create(
             model="together-bge-base",
             input=test_text
         )
-        
+
         # OpenAI embedding
         openai_response = client.embeddings.create(
             model="text-embedding-3-small",
             input=test_text
         )
-        
+
         # Both should have same response structure
         assert together_response.object == openai_response.object == "list"
         assert len(together_response.data) == len(openai_response.data) == 1
@@ -143,7 +143,7 @@ class TestTogetherEmbeddings:
 
 class TestTogetherImageGeneration:
     """Test Together AI image generation through OpenAI SDK."""
-    
+
     def test_together_flux_image_generation(self):
         """Test FLUX image generation with Together."""
         prompts = [
@@ -151,7 +151,7 @@ class TestTogetherImageGeneration:
             "Abstract geometric patterns in vibrant colors",
             "Futuristic city with flying cars and neon lights"
         ]
-        
+
         for prompt in prompts:
             response = client.images.generate(
                 model="flux-schnell",
@@ -159,11 +159,11 @@ class TestTogetherImageGeneration:
                 n=1,
                 size="1024x1024"
             )
-            
+
             assert len(response.data) == 1
             # Should have either URL or base64 data
             assert hasattr(response.data[0], 'url') or hasattr(response.data[0], 'b64_json')
-    
+
     def test_together_image_multiple_generations(self):
         """Test generating multiple images with Together."""
         response = client.images.generate(
@@ -172,11 +172,11 @@ class TestTogetherImageGeneration:
             n=3,  # Generate 3 images
             size="512x512"
         )
-        
+
         assert len(response.data) == 3
         for i, image_data in enumerate(response.data):
             assert hasattr(image_data, 'url') or hasattr(image_data, 'b64_json')
-    
+
     def test_together_image_base64_format(self):
         """Test base64 response format for images."""
         response = client.images.generate(
@@ -186,21 +186,21 @@ class TestTogetherImageGeneration:
             size="512x512",
             response_format="b64_json"
         )
-        
+
         assert len(response.data) == 1
         assert hasattr(response.data[0], 'b64_json')
-        
+
         # Verify it's valid base64
         if response.data[0].b64_json:
             try:
                 base64.b64decode(response.data[0].b64_json)
             except Exception:
                 pytest.fail("Invalid base64 data")
-    
+
     def test_together_image_different_sizes(self):
         """Test different image sizes with Together."""
         sizes = ["256x256", "512x512", "1024x1024", "1024x768"]
-        
+
         for size in sizes:
             response = client.images.generate(
                 model="flux-schnell",
@@ -208,9 +208,9 @@ class TestTogetherImageGeneration:
                 n=1,
                 size=size
             )
-            
+
             assert len(response.data) == 1
-    
+
     def test_together_image_detailed_prompts(self):
         """Test image generation with detailed prompts."""
         detailed_prompt = """
@@ -222,20 +222,20 @@ class TestTogetherImageGeneration:
         - Atmospheric fog and dramatic lighting
         Style: Blade Runner meets Studio Ghibli
         """
-        
+
         response = client.images.generate(
             model="flux-schnell",
             prompt=detailed_prompt,
             n=1,
             size="1024x1024"
         )
-        
+
         assert len(response.data) == 1
 
 
 class TestTogetherTextToSpeech:
     """Test Together AI text-to-speech through OpenAI SDK."""
-    
+
     def test_together_tts_basic(self):
         """Test basic TTS with Together."""
         response = client.audio.speech.create(
@@ -243,26 +243,26 @@ class TestTogetherTextToSpeech:
             voice="alloy",
             input="Hello from Together AI text to speech."
         )
-        
+
         # Response should be audio bytes
         assert response.content is not None
         assert len(response.content) > 0
-    
+
     def test_together_tts_voices(self):
         """Test different voice options with Together TTS."""
         # Standard OpenAI-compatible voices
         standard_voices = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"]
-        
+
         for voice in standard_voices:
             response = client.audio.speech.create(
                 model="together-tts",
                 voice=voice,
                 input=f"Testing voice: {voice}"
             )
-            
+
             assert response.content is not None
             assert len(response.content) > 0
-    
+
     def test_together_tts_native_voices(self):
         """Test Together's native voice names."""
         # Together-specific voice names
@@ -278,21 +278,21 @@ class TestTogetherTextToSpeech:
             "storyteller lady",
             "calm lady"
         ]
-        
+
         for voice in together_voices[:3]:  # Test a few
             response = client.audio.speech.create(
                 model="together-tts",
                 voice=voice,
                 input=f"Testing Together voice: {voice}"
             )
-            
+
             assert response.content is not None
             assert len(response.content) > 0
-    
+
     def test_together_tts_formats(self):
         """Test different audio output formats."""
         formats = ["mp3", "opus", "aac", "flac", "wav", "pcm"]
-        
+
         for format in formats:
             try:
                 response = client.audio.speech.create(
@@ -301,13 +301,13 @@ class TestTogetherTextToSpeech:
                     input="Testing audio format",
                     response_format=format
                 )
-                
+
                 assert response.content is not None
                 assert len(response.content) > 0
             except Exception as e:
                 # Some formats might not be supported
                 print(f"Format {format} not supported: {e}")
-    
+
     def test_together_tts_long_text(self):
         """Test TTS with longer text."""
         long_text = """
@@ -316,16 +316,16 @@ class TestTogetherTextToSpeech:
         The system should handle this gracefully and produce natural-sounding speech.
         Let's also include some numbers like 123 and special terms like AI and TTS.
         """
-        
+
         response = client.audio.speech.create(
             model="together-tts",
             voice="nova",
             input=long_text
         )
-        
+
         assert response.content is not None
         assert len(response.content) > 0
-    
+
     def test_together_tts_multilingual(self):
         """Test TTS with different languages."""
         multilingual_texts = [
@@ -334,7 +334,7 @@ class TestTogetherTextToSpeech:
             ("Guten Tag, wie geht es Ihnen?", "german conversational woman"),
             ("Hola, ¿cómo estás?", "spanish narrator man"),
         ]
-        
+
         for text, voice in multilingual_texts:
             try:
                 response = client.audio.speech.create(
@@ -342,16 +342,16 @@ class TestTogetherTextToSpeech:
                     voice=voice,
                     input=text
                 )
-                
+
                 assert response.content is not None
                 assert len(response.content) > 0
             except Exception as e:
                 print(f"Language test failed for '{text}': {e}")
-    
+
     def test_together_tts_speed_variations(self):
         """Test TTS with speed variations if supported."""
         speeds = [0.5, 1.0, 1.5, 2.0]
-        
+
         for speed in speeds:
             try:
                 response = client.audio.speech.create(
@@ -360,7 +360,7 @@ class TestTogetherTextToSpeech:
                     input="Testing speech speed",
                     speed=speed
                 )
-                
+
                 assert response.content is not None
                 assert len(response.content) > 0
             except Exception as e:
@@ -369,7 +369,7 @@ class TestTogetherTextToSpeech:
 
 class TestTogetherMultimodalIntegration:
     """Test integration scenarios across Together's multimodal capabilities."""
-    
+
     def test_embedding_search_pipeline(self):
         """Test a document search pipeline using embeddings."""
         # Sample documents
@@ -379,26 +379,26 @@ class TestTogetherMultimodalIntegration:
             "Computer vision enables machines to interpret visual information.",
             "Deep learning uses neural networks with multiple layers."
         ]
-        
+
         # Get embeddings for documents
         doc_response = client.embeddings.create(
             model="together-bge-base",
             input=documents
         )
-        
+
         # Get embedding for query
         query = "How do computers understand text?"
         query_response = client.embeddings.create(
             model="together-bge-base",
             input=query
         )
-        
+
         assert len(doc_response.data) == len(documents)
         assert len(query_response.data) == 1
-        
+
         # In a real scenario, you'd calculate cosine similarity here
         # to find the most relevant document
-    
+
     def test_multimodal_content_generation(self):
         """Test generating content across multiple modalities."""
         # 1. Generate text description
@@ -410,10 +410,10 @@ class TestTogetherMultimodalIntegration:
             }],
             max_tokens=100
         )
-        
+
         description = chat_response.choices[0].message.content
         assert description is not None
-        
+
         # 2. Generate image from description
         try:
             image_response = client.images.generate(
@@ -425,7 +425,7 @@ class TestTogetherMultimodalIntegration:
             assert len(image_response.data) == 1
         except Exception as e:
             print(f"Image generation skipped: {e}")
-        
+
         # 3. Convert description to speech
         try:
             tts_response = client.audio.speech.create(
@@ -436,7 +436,7 @@ class TestTogetherMultimodalIntegration:
             assert tts_response.content is not None
         except Exception as e:
             print(f"TTS skipped: {e}")
-    
+
     def test_rag_pipeline_with_embeddings(self):
         """Test a simple RAG pipeline using Together embeddings."""
         # Knowledge base
@@ -446,25 +446,25 @@ class TestTogetherMultimodalIntegration:
             "Together supports embeddings, chat, and multimodal capabilities.",
             "The platform offers competitive pricing for AI inference."
         ]
-        
+
         # Create embeddings for knowledge base
         kb_embeddings = client.embeddings.create(
             model="together-bge-base",
             input=knowledge
         )
-        
+
         # User query
         query = "What image models does Together support?"
         query_embedding = client.embeddings.create(
             model="together-bge-base",
             input=query
         )
-        
+
         # In practice, you'd find most similar documents here
         # For testing, just verify we got embeddings
         assert len(kb_embeddings.data) == len(knowledge)
         assert len(query_embedding.data) == 1
-        
+
         # Generate response using chat model
         response = client.chat.completions.create(
             model="meta-llama/Llama-3.1-8B-Instruct-Turbo",
@@ -480,7 +480,7 @@ class TestTogetherMultimodalIntegration:
             ],
             max_tokens=100
         )
-        
+
         assert response.choices[0].message.content is not None
 
 

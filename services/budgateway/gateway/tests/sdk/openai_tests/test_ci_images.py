@@ -53,15 +53,15 @@ class TestImageGenerationCI:
             n=1,
             size="256x256"
         )
-        
+
         # Dummy provider returns URL by default
         assert hasattr(response, 'data')
         assert len(response.data) == 1
-        
+
         # Should have either URL or b64_json (dummy provider returns URL by default)
         image_data = response.data[0]
         assert hasattr(image_data, 'url') or hasattr(image_data, 'b64_json')
-        
+
         if hasattr(image_data, 'url') and image_data.url:
             assert image_data.url.startswith('https://example.com/dummy-image-')
         elif hasattr(image_data, 'b64_json') and image_data.b64_json:
@@ -79,7 +79,7 @@ class TestImageGenerationCI:
             n=3,
             size="256x256"
         )
-        
+
         assert len(response.data) == 3
         for image_data in response.data:
             assert hasattr(image_data, 'url') or hasattr(image_data, 'b64_json')
@@ -94,7 +94,7 @@ class TestImageGenerationCI:
             n=1,
             size="1024x1024"
         )
-        
+
         assert len(response.data) == 1
         image_data = response.data[0]
         assert hasattr(image_data, 'url') or hasattr(image_data, 'b64_json')
@@ -109,7 +109,7 @@ class TestImageGenerationCI:
             n=1,
             size="1024x1024"
         )
-        
+
         assert len(response.data) == 1
         image_data = response.data[0]
         assert hasattr(image_data, 'url') or hasattr(image_data, 'b64_json')
@@ -123,10 +123,10 @@ class TestImageEditCI:
     def test_basic_image_edit(self):
         """Test basic image editing (dummy provider)"""
         setup_module()
-        
+
         if not TEST_IMAGE_PATH.exists():
             pytest.skip("Test image file not found")
-        
+
         with open(TEST_IMAGE_PATH, "rb") as image_file:
             response = tensorzero_client.images.edit(
                 model="dall-e-2",
@@ -136,7 +136,7 @@ class TestImageEditCI:
                 size="512x512",
                 response_format="b64_json"
             )
-        
+
         assert len(response.data) == 1
         image_data = response.data[0]
         # We requested b64_json format, so should get base64 data
@@ -146,10 +146,10 @@ class TestImageEditCI:
     def test_image_edit_gpt_image_1(self):
         """Test image editing with GPT-Image-1 (dummy provider)"""
         setup_module()
-        
+
         if not TEST_IMAGE_PATH.exists():
             pytest.skip("Test image file not found")
-        
+
         with open(TEST_IMAGE_PATH, "rb") as image_file:
             response = tensorzero_client.images.edit(
                 model="gpt-image-1",
@@ -158,7 +158,7 @@ class TestImageEditCI:
                 n=1,
                 size="1024x1024"
             )
-        
+
         assert len(response.data) == 1
         image_data = response.data[0]
         assert hasattr(image_data, 'url') or hasattr(image_data, 'b64_json')
@@ -172,10 +172,10 @@ class TestImageVariationCI:
     def test_basic_image_variation(self):
         """Test basic image variation (dummy provider)"""
         setup_module()
-        
+
         if not TEST_IMAGE_PATH.exists():
             pytest.skip("Test image file not found")
-        
+
         with open(TEST_IMAGE_PATH, "rb") as image_file:
             response = tensorzero_client.images.create_variation(
                 model="dall-e-2",
@@ -183,7 +183,7 @@ class TestImageVariationCI:
                 n=1,
                 size="512x512"
             )
-        
+
         assert len(response.data) == 1
         image_data = response.data[0]
         assert hasattr(image_data, 'url') or hasattr(image_data, 'b64_json')
@@ -193,10 +193,10 @@ class TestImageVariationCI:
     def test_multiple_variations(self):
         """Test generating multiple variations (dummy provider)"""
         setup_module()
-        
+
         if not TEST_IMAGE_PATH.exists():
             pytest.skip("Test image file not found")
-        
+
         with open(TEST_IMAGE_PATH, "rb") as image_file:
             response = tensorzero_client.images.create_variation(
                 model="dall-e-2",
@@ -204,7 +204,7 @@ class TestImageVariationCI:
                 n=4,
                 size="512x512"
             )
-        
+
         assert len(response.data) == 4
         for image_data in response.data:
             assert hasattr(image_data, 'url') or hasattr(image_data, 'b64_json')
@@ -223,12 +223,12 @@ class TestImageAPIStructure:
             n=1,
             size="256x256"
         )
-        
+
         # Check top-level structure
         assert hasattr(response, 'data')
         assert isinstance(response.data, list)
         assert len(response.data) == 1
-        
+
         # Check individual image data structure
         image_data = response.data[0]
         # Should have either url or b64_json (dummy provider returns b64_json)

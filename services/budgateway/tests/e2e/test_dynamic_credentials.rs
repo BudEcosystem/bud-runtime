@@ -11,7 +11,7 @@ async fn test_dynamic_model_credentials() {
     // Create a temporary directory for config
     let temp_dir = TempDir::new().unwrap();
     let config_path = temp_dir.path().join("tensorzero.toml");
-    
+
     // Write a minimal config
     let config_content = r#"
 [gateway]
@@ -26,9 +26,9 @@ endpoints = ["chat", "embedding"]
 type = "dummy"
 model_name = "test"
 "#;
-    
+
     fs::write(&config_path, config_content).unwrap();
-    
+
     // Start the gateway
     let gateway = Gateway::builder()
         .config_path(config_path.to_str().unwrap())
@@ -36,18 +36,18 @@ model_name = "test"
         .build()
         .await
         .unwrap();
-    
+
     let port = gateway.port();
     let url = format!("http://127.0.0.1:{}", port);
-    
+
     // Start gateway in background
     tokio::spawn(async move {
         gateway.start().await.unwrap();
     });
-    
+
     // Wait for gateway to start
     sleep(Duration::from_millis(500)).await;
-    
+
     // Test 1: Chat completions endpoint
     let response = reqwest::Client::new()
         .post(&format!("{}/v1/chat/completions", url))
@@ -59,12 +59,12 @@ model_name = "test"
         .send()
         .await
         .unwrap();
-    
+
     assert_eq!(response.status(), 200);
     let body: serde_json::Value = response.json().await.unwrap();
     assert!(body.get("choices").is_some());
-    
-    // Test 2: Embeddings endpoint  
+
+    // Test 2: Embeddings endpoint
     let response = reqwest::Client::new()
         .post(&format!("{}/v1/embeddings", url))
         .json(&json!({
@@ -74,7 +74,7 @@ model_name = "test"
         .send()
         .await
         .unwrap();
-    
+
     assert_eq!(response.status(), 200);
     let body: serde_json::Value = response.json().await.unwrap();
     assert!(body.get("data").is_some());
@@ -87,22 +87,22 @@ async fn test_credential_merging() {
     use tensorzero_internal::inference::{InferenceCredentials, InferenceParams};
     use secrecy::SecretString;
     use std::sync::Arc;
-    
+
     // Create AppStateData with credential store
     let config = Arc::new(Config::default());
     let app_state = AppStateData::new(config).await.unwrap();
-    
+
     // Add a credential to the store
     {
         let mut store = app_state.model_credential_store.write().unwrap();
         store.insert("store_test".to_string(), SecretString::from("stored-key"));
     }
-    
+
     // Create params with user-provided credentials
     let mut params = InferenceParams::default();
     params.credentials.insert("user_key".to_string(), SecretString::from("user-value"));
     params.credentials.insert("store_test".to_string(), SecretString::from("user-override"));
-    
+
     // Merge credentials (simulating what happens in endpoints)
     let mut merged_credentials = params.credentials.clone();
     {
@@ -113,12 +113,12 @@ async fn test_credential_merging() {
             }
         }
     }
-    
+
     // Verify merging worked correctly
     assert_eq!(merged_credentials.len(), 2);
     assert!(merged_credentials.contains_key("user_key"));
     assert!(merged_credentials.contains_key("store_test"));
-    
+
     // User-provided value should take precedence
     use secrecy::ExposeSecret;
     assert_eq!(merged_credentials.get("store_test").unwrap().expose_secret(), "user-override");

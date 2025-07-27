@@ -22,30 +22,30 @@ TENSORZERO_API_KEY = os.getenv("TENSORZERO_API_KEY", "test-api-key")
 
 def demonstrate_universal_sdk():
     """Demonstrate universal SDK compatibility."""
-    
+
     print("\n" + "="*70)
     print("🏗️  TENSORZERO SDK ARCHITECTURE DEMONSTRATION")
     print("="*70)
     print("User's Request: 'OpenAI SDK should work with all providers'")
     print("Native SDKs work only with their specific endpoints")
     print("="*70)
-    
+
     # Universal OpenAI client
     openai_client = OpenAI(
         base_url=f"{TENSORZERO_BASE_URL}/v1",
         api_key=TENSORZERO_API_KEY
     )
-    
-    # Native Anthropic client  
+
+    # Native Anthropic client
     anthropic_client = Anthropic(
         base_url=TENSORZERO_BASE_URL,
         api_key=TENSORZERO_API_KEY,
         default_headers={"anthropic-version": "2023-06-01"}
     )
-    
+
     print("\n🔧 Testing Universal OpenAI SDK Compatibility...")
     print("-" * 50)
-    
+
     # Test OpenAI SDK with Anthropic models
     try:
         response = openai_client.chat.completions.create(
@@ -57,10 +57,10 @@ def demonstrate_universal_sdk():
         print(f"   Response: {response.choices[0].message.content[:50]}...")
     except Exception as e:
         print(f"❌ OpenAI SDK + Anthropic Model: Failed - {e}")
-    
+
     try:
         response = openai_client.chat.completions.create(
-            model="claude-3-5-sonnet-20241022", 
+            model="claude-3-5-sonnet-20241022",
             messages=[{"role": "user", "content": "Hello from OpenAI SDK"}],
             max_tokens=20
         )
@@ -68,10 +68,10 @@ def demonstrate_universal_sdk():
         print(f"   Response: {response.choices[0].message.content[:50]}...")
     except Exception as e:
         print(f"❌ OpenAI SDK + Claude 3.5 Sonnet: Failed - {e}")
-    
+
     print("\n🔧 Testing Native Anthropic SDK...")
     print("-" * 50)
-    
+
     # Test Native Anthropic SDK
     try:
         response = anthropic_client.messages.create(
@@ -83,7 +83,7 @@ def demonstrate_universal_sdk():
         print(f"   Response: {response.content[0].text[:50]}...")
     except Exception as e:
         print(f"❌ Native Anthropic SDK: Failed - {e}")
-    
+
     print("\n" + "="*70)
     print("🎯 ARCHITECTURE SUMMARY")
     print("="*70)

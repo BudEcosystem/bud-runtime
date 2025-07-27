@@ -51,7 +51,7 @@ Generate images from a text prompt.
 - **n** (integer, optional): The number of images to generate. Must be between 1 and 10. Defaults to 1
 - **size** (string, optional): The size of the generated images. Must be one of:
   - `256x256`
-  - `512x512` 
+  - `512x512`
   - `1024x1024` (default)
   - `1024x1792` (dall-e-3 only)
   - `1792x1024` (dall-e-3 only)

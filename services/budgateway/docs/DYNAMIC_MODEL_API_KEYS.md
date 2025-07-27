@@ -109,7 +109,7 @@ If you encounter "PKCS#5 encryption failed" or similar errors:
 ```bash
 # First line should be one of:
 # -----BEGIN RSA PRIVATE KEY-----  (PKCS#1)
-# -----BEGIN PRIVATE KEY-----      (PKCS#8 unencrypted)  
+# -----BEGIN PRIVATE KEY-----      (PKCS#8 unencrypted)
 # -----BEGIN ENCRYPTED PRIVATE KEY----- (PKCS#8 encrypted)
 head -1 /path/to/your/key.pem
 ```

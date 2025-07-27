@@ -27,7 +27,7 @@ client = OpenAI(
 
 class TestTogetherJSONMode:
     """Test JSON mode with Together AI models."""
-    
+
     def test_json_mode_basic(self):
         """Test basic JSON mode output."""
         response = client.chat.completions.create(
@@ -45,10 +45,10 @@ class TestTogetherJSONMode:
             response_format={"type": "json_object"},
             max_tokens=200
         )
-        
+
         content = response.choices[0].message.content
         assert content is not None
-        
+
         # Try to parse as JSON
         try:
             parsed = json.loads(content)
@@ -56,7 +56,7 @@ class TestTogetherJSONMode:
         except json.JSONDecodeError:
             # For dummy provider, might not return actual JSON
             pass
-    
+
     def test_json_mode_structured_output(self):
         """Test JSON mode with structured output request."""
         response = client.chat.completions.create(
@@ -76,9 +76,9 @@ class TestTogetherJSONMode:
             response_format={"type": "json_object"},
             max_tokens=150
         )
-        
+
         assert response.choices[0].message.content is not None
-    
+
     def test_json_mode_complex_schema(self):
         """Test JSON mode with complex nested schema."""
         schema_request = """
@@ -88,7 +88,7 @@ class TestTogetherJSONMode:
         - employees (array of objects with name and role)
         - locations (object with headquarters and branches)
         """
-        
+
         response = client.chat.completions.create(
             model="mistralai/Mixtral-8x7B-Instruct-v0.1",
             messages=[
@@ -97,13 +97,13 @@ class TestTogetherJSONMode:
             response_format={"type": "json_object"},
             max_tokens=300
         )
-        
+
         assert response.choices[0].message.content is not None
 
 
 class TestTogetherToolCalling:
     """Test tool calling capabilities with Together AI models."""
-    
+
     def test_single_tool_call(self):
         """Test calling a single tool."""
         tools = [
@@ -129,7 +129,7 @@ class TestTogetherToolCalling:
                 }
             }
         ]
-        
+
         response = client.chat.completions.create(
             model="meta-llama/Llama-3.3-70B-Instruct-Turbo",
             messages=[
@@ -139,10 +139,10 @@ class TestTogetherToolCalling:
             tool_choice="auto",
             max_tokens=150
         )
-        
+
         assert response.choices[0].message is not None
         # Model may or may not call the tool depending on implementation
-    
+
     def test_multiple_tools(self):
         """Test with multiple available tools."""
         tools = [
@@ -189,7 +189,7 @@ class TestTogetherToolCalling:
                 }
             }
         ]
-        
+
         response = client.chat.completions.create(
             model="meta-llama/Llama-3.1-405B-Instruct-Turbo",
             messages=[
@@ -199,9 +199,9 @@ class TestTogetherToolCalling:
             tool_choice="auto",
             max_tokens=150
         )
-        
+
         assert response.choices[0].message is not None
-    
+
     def test_forced_tool_use(self):
         """Test forcing the model to use a specific tool."""
         tools = [
@@ -221,7 +221,7 @@ class TestTogetherToolCalling:
                 }
             }
         ]
-        
+
         response = client.chat.completions.create(
             model="deepseek-ai/deepseek-v2.5",
             messages=[
@@ -234,9 +234,9 @@ class TestTogetherToolCalling:
             },
             max_tokens=150
         )
-        
+
         assert response.choices[0].message is not None
-    
+
     def test_parallel_tool_calls(self):
         """Test parallel tool calling capabilities."""
         tools = [
@@ -255,7 +255,7 @@ class TestTogetherToolCalling:
                 }
             }
         ]
-        
+
         response = client.chat.completions.create(
             model="meta-llama/Llama-3.3-70B-Instruct-Turbo",
             messages=[
@@ -265,14 +265,14 @@ class TestTogetherToolCalling:
             tool_choice="auto",
             max_tokens=200
         )
-        
+
         assert response.choices[0].message is not None
         # Advanced models might make multiple tool calls
 
 
 class TestTogetherReasoningModels:
     """Test Together's reasoning-capable models."""
-    
+
     def test_reasoning_with_deepseek(self):
         """Test reasoning capabilities with DeepSeek models."""
         response = client.chat.completions.create(
@@ -287,11 +287,11 @@ class TestTogetherReasoningModels:
             ],
             max_tokens=300
         )
-        
+
         content = response.choices[0].message.content
         assert content is not None
         assert len(content) > 0
-    
+
     def test_complex_reasoning_task(self):
         """Test complex multi-step reasoning."""
         response = client.chat.completions.create(
@@ -299,7 +299,7 @@ class TestTogetherReasoningModels:
             messages=[
                 {
                     "role": "user",
-                    "content": """A farmer has chickens and rabbits. 
+                    "content": """A farmer has chickens and rabbits.
                     The total number of heads is 35.
                     The total number of legs is 94.
                     How many chickens and how many rabbits does the farmer have?
@@ -308,9 +308,9 @@ class TestTogetherReasoningModels:
             ],
             max_tokens=400
         )
-        
+
         assert response.choices[0].message.content is not None
-    
+
     def test_code_reasoning(self):
         """Test reasoning about code."""
         code_snippet = '''
@@ -319,7 +319,7 @@ class TestTogetherReasoningModels:
                 return n
             return mystery(n-1) + mystery(n-2)
         '''
-        
+
         response = client.chat.completions.create(
             model="Qwen/Qwen2.5-72B-Instruct-Turbo",
             messages=[
@@ -335,17 +335,17 @@ class TestTogetherReasoningModels:
             ],
             max_tokens=300
         )
-        
+
         assert response.choices[0].message.content is not None
 
 
 class TestTogetherAdvancedParameters:
     """Test advanced parameters and configurations."""
-    
+
     def test_temperature_variations(self):
         """Test different temperature settings."""
         temperatures = [0.0, 0.5, 1.0, 1.5]
-        
+
         for temp in temperatures:
             response = client.chat.completions.create(
                 model="meta-llama/Llama-3.2-3B-Instruct-Turbo",
@@ -355,13 +355,13 @@ class TestTogetherAdvancedParameters:
                 temperature=temp,
                 max_tokens=50
             )
-            
+
             assert response.choices[0].message.content is not None
-    
+
     def test_top_p_sampling(self):
         """Test top-p (nucleus) sampling."""
         top_p_values = [0.1, 0.5, 0.9, 1.0]
-        
+
         for top_p in top_p_values:
             response = client.chat.completions.create(
                 model="mistralai/Mixtral-8x7B-Instruct-v0.1",
@@ -371,9 +371,9 @@ class TestTogetherAdvancedParameters:
                 top_p=top_p,
                 max_tokens=30
             )
-            
+
             assert response.choices[0].message.content is not None
-    
+
     def test_frequency_penalty(self):
         """Test frequency penalty parameter."""
         response = client.chat.completions.create(
@@ -384,9 +384,9 @@ class TestTogetherAdvancedParameters:
             frequency_penalty=2.0,
             max_tokens=100
         )
-        
+
         assert response.choices[0].message.content is not None
-    
+
     def test_presence_penalty(self):
         """Test presence penalty parameter."""
         response = client.chat.completions.create(
@@ -397,14 +397,14 @@ class TestTogetherAdvancedParameters:
             presence_penalty=2.0,
             max_tokens=100
         )
-        
+
         assert response.choices[0].message.content is not None
-    
+
     def test_seed_reproducibility(self):
         """Test seed parameter for reproducibility."""
         seed = 42
         prompt = "Generate a random number between 1 and 10"
-        
+
         # First generation
         response1 = client.chat.completions.create(
             model="meta-llama/Llama-3.2-3B-Instruct-Turbo",
@@ -413,7 +413,7 @@ class TestTogetherAdvancedParameters:
             temperature=0,
             max_tokens=10
         )
-        
+
         # Second generation with same seed
         response2 = client.chat.completions.create(
             model="meta-llama/Llama-3.2-3B-Instruct-Turbo",
@@ -422,7 +422,7 @@ class TestTogetherAdvancedParameters:
             temperature=0,
             max_tokens=10
         )
-        
+
         # With temperature=0 and same seed, outputs might be similar
         assert response1.choices[0].message.content is not None
         assert response2.choices[0].message.content is not None
@@ -430,7 +430,7 @@ class TestTogetherAdvancedParameters:
 
 class TestTogetherStreamingAdvanced:
     """Test advanced streaming scenarios."""
-    
+
     def test_streaming_with_tool_calls(self):
         """Test streaming with tool calling."""
         tools = [
@@ -449,7 +449,7 @@ class TestTogetherStreamingAdvanced:
                 }
             }
         ]
-        
+
         stream = client.chat.completions.create(
             model="meta-llama/Llama-3.3-70B-Instruct-Turbo",
             messages=[
@@ -459,16 +459,16 @@ class TestTogetherStreamingAdvanced:
             stream=True,
             max_tokens=100
         )
-        
+
         chunks_received = 0
         for chunk in stream:
             chunks_received += 1
             if chunk.choices[0].delta.tool_calls:
                 # Tool call in stream
                 assert chunk.choices[0].delta.tool_calls is not None
-        
+
         assert chunks_received > 0
-    
+
     def test_streaming_with_stop_sequences(self):
         """Test streaming with stop sequences."""
         stream = client.chat.completions.create(
@@ -480,14 +480,14 @@ class TestTogetherStreamingAdvanced:
             stream=True,
             max_tokens=100
         )
-        
+
         full_response = ""
         for chunk in stream:
             if chunk.choices[0].delta.content:
                 full_response += chunk.choices[0].delta.content
-        
+
         assert len(full_response) > 0
-    
+
     def test_streaming_usage_stats(self):
         """Test streaming with usage statistics."""
         stream = client.chat.completions.create(
@@ -499,11 +499,11 @@ class TestTogetherStreamingAdvanced:
             stream_options={"include_usage": True},
             max_tokens=50
         )
-        
+
         last_chunk = None
         for chunk in stream:
             last_chunk = chunk
-        
+
         # Usage stats might be in the last chunk
         if hasattr(last_chunk, 'usage'):
             assert last_chunk.usage is not None
@@ -511,7 +511,7 @@ class TestTogetherStreamingAdvanced:
 
 class TestTogetherErrorScenarios:
     """Test error handling with Together models."""
-    
+
     def test_invalid_model_name(self):
         """Test with invalid model name."""
         with pytest.raises(Exception) as exc_info:
@@ -520,14 +520,14 @@ class TestTogetherErrorScenarios:
                 messages=[{"role": "user", "content": "Test"}],
                 max_tokens=10
             )
-        
+
         assert exc_info.value is not None
-    
+
     def test_context_length_handling(self):
         """Test handling of context length limits."""
         # Create a very long message
         long_message = "Test " * 10000  # Very long input
-        
+
         try:
             response = client.chat.completions.create(
                 model="meta-llama/Llama-3.2-3B-Instruct-Turbo",
@@ -539,7 +539,7 @@ class TestTogetherErrorScenarios:
         except Exception as e:
             # Expected to fail with context length error
             assert "context" in str(e).lower() or "token" in str(e).lower()
-    
+
     def test_invalid_parameters(self):
         """Test with invalid parameter combinations."""
         # Test with invalid temperature
@@ -550,7 +550,7 @@ class TestTogetherErrorScenarios:
                 temperature=-1.0,  # Invalid
                 max_tokens=10
             )
-        
+
         # Test with invalid max_tokens
         with pytest.raises(Exception):
             client.chat.completions.create(

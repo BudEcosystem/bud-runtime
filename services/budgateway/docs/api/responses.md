@@ -396,15 +396,15 @@ const decoder = new TextDecoder();
 while (true) {
   const {done, value} = await reader.read();
   if (done) break;
-  
+
   const chunk = decoder.decode(value);
   const lines = chunk.split('\\n');
-  
+
   for (const line of lines) {
     if (line.startsWith('data: ')) {
       const data = line.slice(6);
       if (data === '[DONE]') break;
-      
+
       const event = JSON.parse(data);
       if (event.event_type === 'response.output.delta') {
         const output = event.response.output[0];

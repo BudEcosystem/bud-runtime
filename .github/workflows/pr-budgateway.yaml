@@ -6,7 +6,7 @@ on:
     paths:
       - 'services/budgateway/**'
       - '.github/workflows/pr-budgateway.yaml'
-    branches: 
+    branches:
       - main
       - master
       - develop
@@ -32,11 +32,11 @@ jobs:
 
       - name: Print Rust version
         run: rustc --version
-        
+
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: ${{ env.WORKING_DIR }} -> target
-        
+
       - name: Cache cargo bin directory
         uses: actions/cache@v4
         with:
@@ -47,12 +47,12 @@ jobs:
           key: cargo-tools-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             cargo-tools-${{ runner.os }}-
-            
+
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libsasl2-dev
-          
+
       - name: Install cargo-nextest, cargo-deny, and cargo-hack
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
@@ -123,12 +123,12 @@ jobs:
             cargo-tools-${{ runner.os }}-
 
       - run: df -h
-      
+
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libsasl2-dev
-          
+
       - name: Install cargo-nextest
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
@@ -191,14 +191,14 @@ jobs:
     defaults:
       run:
         working-directory: ${{ env.WORKING_DIR }}
-    
+
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: ${{ env.WORKING_DIR }} -> target
-          
+
       - name: Cache cargo bin directory
         uses: actions/cache@v4
         with:
@@ -209,33 +209,33 @@ jobs:
           key: cargo-tools-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             cargo-tools-${{ runner.os }}-
-            
+
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libsasl2-dev
-          
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
           cache: 'pip'
-          
+
       - name: Create .env file for SDK tests
         run: |
           cd gateway/tests/sdk
           echo "TENSORZERO_BASE_URL=http://localhost:3001" > .env
           echo "OPENAI_API_KEY=dummy-key-for-testing" >> .env
-          
+
       - name: Build the gateway for SDK tests
         run: cargo build --release --bin gateway --features e2e_tests
-        
+
       - name: Launch the gateway for SDK tests
         run: |
           cargo run --release --bin gateway --features e2e_tests -- --config-file gateway/tests/sdk/test_config_unified_ci.toml > sdk_gateway_logs.txt 2>&1 &
           GATEWAY_PID=$!
           echo "GATEWAY_PID=$GATEWAY_PID" >> $GITHUB_ENV
-          
+
           # Wait for gateway to be healthy
           count=0
           max_attempts=30
@@ -250,23 +250,23 @@ jobs:
             fi
           done
           echo "Gateway is healthy and ready for SDK tests"
-          
+
       - name: Run SDK integration tests
         run: |
           cd gateway/tests/sdk
           # Run all CI tests including universal SDK tests
           ./run_tests.sh --mode ci
-          
+
       - name: Run Universal SDK compatibility tests
         run: |
           cd gateway/tests/sdk
           # Run universal SDK tests specifically
           ./run_tests.sh --provider universal
-          
+
       - name: Print gateway logs
         if: always()
         run: cat sdk_gateway_logs.txt
-        
+
       - name: Cleanup gateway process
         if: always()
         run: |
@@ -280,7 +280,7 @@ jobs:
     defaults:
       run:
         working-directory: ${{ env.WORKING_DIR }}
-    
+
     services:
       redis:
         image: redis:7-alpine
@@ -291,45 +291,45 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-    
+
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
-        
+
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: ${{ env.WORKING_DIR }} -> target
-          
+
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libsasl2-dev jq netcat-openbsd
-          
+
       - name: Install vegeta
         run: |
           wget https://github.com/tsenart/vegeta/releases/download/v12.11.1/vegeta_12.11.1_linux_amd64.tar.gz
           tar xzf vegeta_12.11.1_linux_amd64.tar.gz
           sudo mv vegeta /usr/local/bin/
           vegeta -version
-          
+
       - name: Build for performance test
         run: cargo build --release --bin gateway --bin mock-inference-provider
-        
+
       - name: Run performance test
         run: |
           export TENSORZERO_REDIS_URL="redis://localhost:6379"
           ./ci/performance/run-performance-test-ci.sh
-          
+
       - name: Check P99 latency threshold
         run: |
           P99=$(jq -r '.latencies."99th"' performance-results.json | awk '{print $1/1000000}')
           echo "P99 latency with rate limiting: ${P99}ms"
-          
+
           # Ensure rate limiting doesn't exceed threshold
           if [ $(awk -v p99="$P99" 'BEGIN { print (p99 > 1) }') -eq 1 ]; then
               echo "❌ Error: P99 latency with rate limiting exceeds 1ms threshold"
@@ -337,14 +337,14 @@ jobs:
           else
               echo "✅ P99 latency with rate limiting is within acceptable limits"
           fi
-          
+
       - name: Upload performance results
         uses: actions/upload-artifact@v4
         with:
           name: performance-results-${{ github.sha }}
           path: ${{ env.WORKING_DIR }}/performance-results.json
           retention-days: 30
-          
+
       - name: Download baseline performance results
         id: baseline
         continue-on-error: true
@@ -374,7 +374,7 @@ jobs:
           done
         env:
           GH_TOKEN: ${{ github.token }}
-          
+
       - name: Compare performance results
         if: steps.baseline.outputs.baseline_found == 'true'
         id: compare
@@ -382,40 +382,40 @@ jobs:
         run: |
           python ci/performance/compare-performance.py baseline-performance.json performance-results.json > performance-report.md
           COMPARISON_EXIT_CODE=$?
-          
+
           # Save the report
           cat performance-report.md
-          
+
           # Set output for PR comment
           {
             echo 'report<<EOF'
             cat performance-report.md
             echo 'EOF'
           } >> $GITHUB_OUTPUT
-          
+
           exit $COMPARISON_EXIT_CODE
-          
+
       - name: Comment PR with performance results
         if: github.event_name == 'pull_request' && steps.baseline.outputs.baseline_found == 'true'
         uses: actions/github-script@v7
         with:
           script: |
             const report = `${{ steps.compare.outputs.report }}`;
-            
+
             // Find existing comment
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
             });
-            
-            const botComment = comments.find(comment => 
-              comment.user.type === 'Bot' && 
+
+            const botComment = comments.find(comment =>
+              comment.user.type === 'Bot' &&
               comment.body.includes('## 📊 Performance Test Results')
             );
-            
+
             const commentBody = report || '## 📊 Performance Test Results\n\n⚠️ Performance comparison failed. Check the workflow logs for details.';
-            
+
             if (botComment) {
               // Update existing comment
               await github.rest.issues.updateComment({

@@ -66,7 +66,7 @@ class TestImageGeneration:
             n=1,
             size="256x256"
         )
-        
+
         assert hasattr(response, 'data')
         assert len(response.data) == 1
         assert hasattr(response.data[0], 'url') or hasattr(response.data[0], 'b64_json')
@@ -79,7 +79,7 @@ class TestImageGeneration:
             n=1,
             size="1024x1024"
         )
-        
+
         assert hasattr(response, 'data')
         assert len(response.data) == 1
         assert hasattr(response.data[0], 'url') or hasattr(response.data[0], 'b64_json')
@@ -95,7 +95,7 @@ class TestImageGeneration:
             n=3,
             size="256x256"
         )
-        
+
         assert hasattr(response, 'data')
         assert len(response.data) == 3
         for image_data in response.data:
@@ -104,7 +104,7 @@ class TestImageGeneration:
     def test_image_generation_different_sizes_dall_e_2(self):
         """Test different image sizes with DALL-E 2"""
         sizes = ["256x256", "512x512", "1024x1024"]
-        
+
         for size in sizes:
             response = tensorzero_client.images.generate(
                 model="dall-e-2",
@@ -112,13 +112,13 @@ class TestImageGeneration:
                 n=1,
                 size=size
             )
-            
+
             assert len(response.data) == 1
 
     def test_image_generation_different_sizes_dall_e_3(self):
         """Test different image sizes with DALL-E 3"""
         sizes = ["1024x1024", "1024x1792", "1792x1024"]
-        
+
         for size in sizes:
             response = tensorzero_client.images.generate(
                 model="dall-e-3",
@@ -126,13 +126,13 @@ class TestImageGeneration:
                 n=1,
                 size=size
             )
-            
+
             assert len(response.data) == 1
 
     def test_image_generation_quality_dall_e_3(self):
         """Test quality parameter with DALL-E 3"""
         qualities = ["standard", "hd"]
-        
+
         for quality in qualities:
             response = tensorzero_client.images.generate(
                 model="dall-e-3",
@@ -141,13 +141,13 @@ class TestImageGeneration:
                 size="1024x1024",
                 quality=quality
             )
-            
+
             assert len(response.data) == 1
 
     def test_image_generation_style_dall_e_3(self):
         """Test style parameter with DALL-E 3"""
         styles = ["vivid", "natural"]
-        
+
         for style in styles:
             response = tensorzero_client.images.generate(
                 model="dall-e-3",
@@ -156,7 +156,7 @@ class TestImageGeneration:
                 size="1024x1024",
                 style=style
             )
-            
+
             assert len(response.data) == 1
 
     def test_image_generation_response_format_url(self):
@@ -168,7 +168,7 @@ class TestImageGeneration:
             size="256x256",
             response_format="url"
         )
-        
+
         assert len(response.data) == 1
         assert hasattr(response.data[0], 'url')
         assert response.data[0].url.startswith('http')
@@ -182,14 +182,14 @@ class TestImageGeneration:
             size="256x256",
             response_format="b64_json"
         )
-        
+
         assert len(response.data) == 1
         assert hasattr(response.data[0], 'b64_json')
-        
+
         # Verify it's valid base64
         b64_data = response.data[0].b64_json
         image_data = base64.b64decode(b64_data)
-        
+
         # Verify it's a valid image
         with io.BytesIO(image_data) as image_buffer:
             img = Image.open(image_buffer)
@@ -203,7 +203,7 @@ class TestImageGeneration:
             n=1,
             size="1024x1024"
         )
-        
+
         assert len(response.data) == 1
 
     def test_image_generation_gpt_image_1_with_params(self):
@@ -218,7 +218,7 @@ class TestImageGeneration:
             # moderation="auto",
             # output_format="png"
         )
-        
+
         assert len(response.data) == 1
 
     def test_image_generation_error_handling(self):
@@ -230,7 +230,7 @@ class TestImageGeneration:
                 prompt="Test",
                 n=1
             )
-        
+
         # Test invalid size for DALL-E 3
         with pytest.raises(Exception):
             tensorzero_client.images.generate(
@@ -239,7 +239,7 @@ class TestImageGeneration:
                 n=1,
                 size="256x256"  # Not supported by DALL-E 3
             )
-        
+
         # Test too many images for DALL-E 3
         with pytest.raises(Exception):
             tensorzero_client.images.generate(
@@ -252,19 +252,19 @@ class TestImageGeneration:
     async def test_async_image_generation(self):
         """Test async image generation"""
         from openai import AsyncOpenAI
-        
+
         async_client = AsyncOpenAI(
             base_url=f"{TENSORZERO_BASE_URL}/v1",
             api_key=TENSORZERO_API_KEY
         )
-        
+
         response = await async_client.images.generate(
             model="dall-e-2",
             prompt="A red bicycle",
             n=1,
             size="256x256"
         )
-        
+
         assert len(response.data) == 1
 
 
@@ -274,10 +274,10 @@ class TestImageEdit:
     def test_basic_image_edit_dall_e_2(self):
         """Test basic image editing with DALL-E 2"""
         setup_module()  # Ensure test images exist
-        
+
         if not TEST_IMAGE_PATH.exists():
             pytest.skip("Test image file not found")
-        
+
         with open(TEST_IMAGE_PATH, "rb") as image_file:
             response = tensorzero_client.images.edit(
                 model="dall-e-2",
@@ -286,17 +286,17 @@ class TestImageEdit:
                 n=1,
                 size="512x512"
             )
-        
+
         assert len(response.data) == 1
         assert hasattr(response.data[0], 'url') or hasattr(response.data[0], 'b64_json')
 
     def test_image_edit_with_mask_dall_e_2(self):
         """Test image editing with mask"""
         setup_module()
-        
+
         if not TEST_IMAGE_PATH.exists() or not MASK_IMAGE_PATH.exists():
             pytest.skip("Test image or mask file not found")
-        
+
         with open(TEST_IMAGE_PATH, "rb") as image_file, \
              open(MASK_IMAGE_PATH, "rb") as mask_file:
             response = tensorzero_client.images.edit(
@@ -307,16 +307,16 @@ class TestImageEdit:
                 n=1,
                 size="512x512"
             )
-        
+
         assert len(response.data) == 1
 
     def test_image_edit_multiple_variations_dall_e_2(self):
         """Test generating multiple edited variations"""
         setup_module()
-        
+
         if not TEST_IMAGE_PATH.exists():
             pytest.skip("Test image file not found")
-        
+
         with open(TEST_IMAGE_PATH, "rb") as image_file:
             response = tensorzero_client.images.edit(
                 model="dall-e-2",
@@ -325,18 +325,18 @@ class TestImageEdit:
                 n=3,
                 size="512x512"
             )
-        
+
         assert len(response.data) == 3
 
     def test_image_edit_different_sizes_dall_e_2(self):
         """Test editing with different output sizes"""
         setup_module()
-        
+
         if not TEST_IMAGE_PATH.exists():
             pytest.skip("Test image file not found")
-        
+
         sizes = ["256x256", "512x512", "1024x1024"]
-        
+
         for size in sizes:
             with open(TEST_IMAGE_PATH, "rb") as image_file:
                 response = tensorzero_client.images.edit(
@@ -346,16 +346,16 @@ class TestImageEdit:
                     n=1,
                     size=size
                 )
-            
+
             assert len(response.data) == 1
 
     def test_image_edit_gpt_image_1(self):
         """Test image editing with GPT-Image-1"""
         setup_module()
-        
+
         if not TEST_IMAGE_PATH.exists():
             pytest.skip("Test image file not found")
-        
+
         with open(TEST_IMAGE_PATH, "rb") as image_file:
             response = tensorzero_client.images.edit(
                 model="gpt-image-1",
@@ -364,18 +364,18 @@ class TestImageEdit:
                 n=1,
                 size="1024x1024"
             )
-        
+
         assert len(response.data) == 1
 
     def test_image_edit_response_formats(self):
         """Test different response formats for editing"""
         setup_module()
-        
+
         if not TEST_IMAGE_PATH.exists():
             pytest.skip("Test image file not found")
-        
+
         formats = ["url", "b64_json"]
-        
+
         for response_format in formats:
             with open(TEST_IMAGE_PATH, "rb") as image_file:
                 response = tensorzero_client.images.edit(
@@ -386,7 +386,7 @@ class TestImageEdit:
                     size="512x512",
                     response_format=response_format
                 )
-            
+
             assert len(response.data) == 1
             if response_format == "url":
                 assert hasattr(response.data[0], 'url')
@@ -396,10 +396,10 @@ class TestImageEdit:
     def test_image_edit_error_handling(self):
         """Test error handling for image editing"""
         setup_module()
-        
+
         if not TEST_IMAGE_PATH.exists():
             pytest.skip("Test image file not found")
-        
+
         # Test with invalid model for editing
         with pytest.raises(Exception):
             with open(TEST_IMAGE_PATH, "rb") as image_file:
@@ -413,17 +413,17 @@ class TestImageEdit:
     async def test_async_image_edit(self):
         """Test async image editing"""
         setup_module()
-        
+
         if not TEST_IMAGE_PATH.exists():
             pytest.skip("Test image file not found")
-        
+
         from openai import AsyncOpenAI
-        
+
         async_client = AsyncOpenAI(
             base_url=f"{TENSORZERO_BASE_URL}/v1",
             api_key=TENSORZERO_API_KEY
         )
-        
+
         with open(TEST_IMAGE_PATH, "rb") as image_file:
             response = await async_client.images.edit(
                 model="dall-e-2",
@@ -432,7 +432,7 @@ class TestImageEdit:
                 n=1,
                 size="512x512"
             )
-        
+
         assert len(response.data) == 1
 
 
@@ -442,10 +442,10 @@ class TestImageVariation:
     def test_basic_image_variation_dall_e_2(self):
         """Test basic image variation with DALL-E 2"""
         setup_module()
-        
+
         if not SIMPLE_SHAPE_PATH.exists():
             pytest.skip("Test image file not found")
-        
+
         with open(SIMPLE_SHAPE_PATH, "rb") as image_file:
             response = tensorzero_client.images.create_variation(
                 model="dall-e-2",
@@ -453,17 +453,17 @@ class TestImageVariation:
                 n=1,
                 size="512x512"
             )
-        
+
         assert len(response.data) == 1
         assert hasattr(response.data[0], 'url') or hasattr(response.data[0], 'b64_json')
 
     def test_image_variation_multiple_dall_e_2(self):
         """Test generating multiple variations"""
         setup_module()
-        
+
         if not SIMPLE_SHAPE_PATH.exists():
             pytest.skip("Test image file not found")
-        
+
         with open(SIMPLE_SHAPE_PATH, "rb") as image_file:
             response = tensorzero_client.images.create_variation(
                 model="dall-e-2",
@@ -471,18 +471,18 @@ class TestImageVariation:
                 n=4,
                 size="512x512"
             )
-        
+
         assert len(response.data) == 4
 
     def test_image_variation_different_sizes_dall_e_2(self):
         """Test variations with different sizes"""
         setup_module()
-        
+
         if not SIMPLE_SHAPE_PATH.exists():
             pytest.skip("Test image file not found")
-        
+
         sizes = ["256x256", "512x512", "1024x1024"]
-        
+
         for size in sizes:
             with open(SIMPLE_SHAPE_PATH, "rb") as image_file:
                 response = tensorzero_client.images.create_variation(
@@ -491,18 +491,18 @@ class TestImageVariation:
                     n=1,
                     size=size
                 )
-            
+
             assert len(response.data) == 1
 
     def test_image_variation_response_formats(self):
         """Test different response formats for variations"""
         setup_module()
-        
+
         if not SIMPLE_SHAPE_PATH.exists():
             pytest.skip("Test image file not found")
-        
+
         formats = ["url", "b64_json"]
-        
+
         for response_format in formats:
             with open(SIMPLE_SHAPE_PATH, "rb") as image_file:
                 response = tensorzero_client.images.create_variation(
@@ -512,7 +512,7 @@ class TestImageVariation:
                     size="512x512",
                     response_format=response_format
                 )
-            
+
             assert len(response.data) == 1
             if response_format == "url":
                 assert hasattr(response.data[0], 'url')
@@ -522,17 +522,17 @@ class TestImageVariation:
     def test_image_variation_with_different_source_images(self):
         """Test variations with different source images"""
         setup_module()
-        
+
         test_images = [
             SIMPLE_SHAPE_PATH,
             SMALL_IMAGE_PATH,
             TEST_IMAGE_PATH
         ]
-        
+
         for image_path in test_images:
             if not image_path.exists():
                 continue
-                
+
             with open(image_path, "rb") as image_file:
                 response = tensorzero_client.images.create_variation(
                     model="dall-e-2",
@@ -540,16 +540,16 @@ class TestImageVariation:
                     n=1,
                     size="512x512"
                 )
-            
+
             assert len(response.data) == 1
 
     def test_image_variation_error_handling(self):
         """Test error handling for image variations"""
         setup_module()
-        
+
         if not SIMPLE_SHAPE_PATH.exists():
             pytest.skip("Test image file not found")
-        
+
         # Test with invalid model for variations
         with pytest.raises(Exception):
             with open(SIMPLE_SHAPE_PATH, "rb") as image_file:
@@ -563,17 +563,17 @@ class TestImageVariation:
     async def test_async_image_variation(self):
         """Test async image variation"""
         setup_module()
-        
+
         if not SIMPLE_SHAPE_PATH.exists():
             pytest.skip("Test image file not found")
-        
+
         from openai import AsyncOpenAI
-        
+
         async_client = AsyncOpenAI(
             base_url=f"{TENSORZERO_BASE_URL}/v1",
             api_key=TENSORZERO_API_KEY
         )
-        
+
         with open(SIMPLE_SHAPE_PATH, "rb") as image_file:
             response = await async_client.images.create_variation(
                 model="dall-e-2",
@@ -581,7 +581,7 @@ class TestImageVariation:
                 n=1,
                 size="512x512"
             )
-        
+
         assert len(response.data) == 1
 
 
@@ -591,7 +591,7 @@ class TestImageEndpointIntegration:
     def test_image_file_format_compatibility(self):
         """Test different image file formats"""
         setup_module()
-        
+
         # Test with PNG
         if TEST_IMAGE_PATH.exists():
             with open(TEST_IMAGE_PATH, "rb") as image_file:
@@ -602,7 +602,7 @@ class TestImageEndpointIntegration:
                     size="256x256"
                 )
             assert len(response.data) == 1
-        
+
         # Test with JPEG if available
         jpeg_path = FIXTURES_DIR / "test_image.jpg"
         if jpeg_path.exists():
@@ -618,10 +618,10 @@ class TestImageEndpointIntegration:
     def test_image_size_validation(self):
         """Test image size validation"""
         setup_module()
-        
+
         if not TEST_IMAGE_PATH.exists():
             pytest.skip("Test image file not found")
-        
+
         # Test with extremely large image request (should fail gracefully)
         with pytest.raises(Exception):
             with open(TEST_IMAGE_PATH, "rb") as image_file:
@@ -636,7 +636,7 @@ class TestImageEndpointIntegration:
         """Test prompt length limits"""
         # Test with very long prompt
         long_prompt = "A beautiful landscape " * 100  # Very long prompt
-        
+
         with pytest.raises(Exception):
             tensorzero_client.images.generate(
                 model="dall-e-2",
@@ -649,7 +649,7 @@ class TestImageEndpointIntegration:
         """Test handling multiple concurrent image requests"""
         import concurrent.futures
         import threading
-        
+
         def generate_image(prompt_suffix):
             return tensorzero_client.images.generate(
                 model="dall-e-2",
@@ -657,16 +657,16 @@ class TestImageEndpointIntegration:
                 n=1,
                 size="256x256"
             )
-        
+
         # Run multiple requests concurrently
         with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
             futures = [
                 executor.submit(generate_image, f"test {i}")
                 for i in range(3)
             ]
-            
+
             results = [future.result() for future in futures]
-            
+
         # Verify all requests succeeded
         assert len(results) == 3
         for result in results:
@@ -681,7 +681,7 @@ class TestImageEndpointIntegration:
                 image=open(TEST_IMAGE_PATH, "rb") if TEST_IMAGE_PATH.exists() else None,
                 prompt="Test edit"
             )
-        
+
         with pytest.raises(Exception):
             tensorzero_client.images.create_variation(
                 model="dall-e-3",
@@ -697,7 +697,7 @@ class TestImagePerformance:
     def test_image_generation_timing(self):
         """Test image generation response times"""
         import time
-        
+
         start_time = time.time()
         response = tensorzero_client.images.generate(
             model="dall-e-2",
@@ -706,13 +706,13 @@ class TestImagePerformance:
             size="256x256"
         )
         end_time = time.time()
-        
+
         assert len(response.data) == 1
         # Image generation should complete within reasonable time
         # (This will vary greatly depending on the backend)
         assert end_time - start_time < 120  # 2 minutes max
 
-    @pytest.mark.slow  
+    @pytest.mark.slow
     def test_batch_image_generation(self):
         """Test generating multiple images in a single request"""
         response = tensorzero_client.images.generate(
@@ -721,7 +721,7 @@ class TestImagePerformance:
             n=5,
             size="256x256"
         )
-        
+
         assert len(response.data) == 5
         # Verify each image is valid
         for image_data in response.data:

@@ -241,13 +241,13 @@ impl DistributedRateLimiter {
             local limit = tonumber(ARGV[1])
             local window = tonumber(ARGV[2])
             local now = tonumber(ARGV[3])
-            
+
             -- Clean old entries for sliding window
             redis.call('ZREMRANGEBYSCORE', key, 0, now - window)
-            
+
             -- Count current entries
             local current = redis.call('ZCARD', key)
-            
+
             if current < limit then
                 -- Add new entry
                 redis.call('ZADD', key, now, now .. ':' .. redis.call('INCR', key .. ':counter'))

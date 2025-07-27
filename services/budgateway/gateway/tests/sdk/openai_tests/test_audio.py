@@ -34,7 +34,7 @@ class TestAudioTranscription:
         """Test basic audio transcription"""
         if not AUDIO_SAMPLE_PATH.exists():
             pytest.skip("Audio sample file not found")
-        
+
         with open(AUDIO_SAMPLE_PATH, "rb") as audio_file:
             # TensorZero request
             tz_response = tensorzero_client.audio.transcriptions.create(
@@ -42,7 +42,7 @@ class TestAudioTranscription:
                 file=audio_file,
                 response_format="json"
             )
-        
+
         # Verify response structure
         assert isinstance(tz_response.text, str)
         assert len(tz_response.text) > 0
@@ -51,7 +51,7 @@ class TestAudioTranscription:
         """Test transcription with various parameters"""
         if not AUDIO_SAMPLE_PATH.exists():
             pytest.skip("Audio sample file not found")
-        
+
         with open(AUDIO_SAMPLE_PATH, "rb") as audio_file:
             response = tensorzero_client.audio.transcriptions.create(
                 model="whisper-1",
@@ -61,16 +61,16 @@ class TestAudioTranscription:
                 prompt="This is a music file",
                 temperature=0.2
             )
-        
+
         assert isinstance(response.text, str)
 
     def test_transcription_response_formats(self):
         """Test different response formats"""
         if not AUDIO_SAMPLE_PATH.exists():
             pytest.skip("Audio sample file not found")
-        
+
         formats = ["json", "text", "verbose_json"]
-        
+
         for format_type in formats:
             with open(AUDIO_SAMPLE_PATH, "rb") as audio_file:
                 if format_type == "text":
@@ -88,7 +88,7 @@ class TestAudioTranscription:
                         response_format=format_type
                     )
                     assert hasattr(response, 'text')
-                    
+
                     if format_type == "verbose_json":
                         # Verbose format includes additional fields
                         assert hasattr(response, 'duration')
@@ -98,7 +98,7 @@ class TestAudioTranscription:
         """Test transcription with timestamp granularities"""
         if not AUDIO_SAMPLE_PATH.exists():
             pytest.skip("Audio sample file not found")
-        
+
         with open(AUDIO_SAMPLE_PATH, "rb") as audio_file:
             response = tensorzero_client.audio.transcriptions.create(
                 model="whisper-1",
@@ -106,7 +106,7 @@ class TestAudioTranscription:
                 response_format="verbose_json",
                 timestamp_granularities=["word", "segment"]
             )
-        
+
         assert hasattr(response, 'text')
         if hasattr(response, 'words'):
             assert isinstance(response.words, list)
@@ -118,20 +118,20 @@ class TestAudioTranscription:
         """Test async audio transcription"""
         if not AUDIO_SAMPLE_PATH.exists():
             pytest.skip("Audio sample file not found")
-        
+
         from openai import AsyncOpenAI
-        
+
         async_client = AsyncOpenAI(
             base_url=f"{TENSORZERO_BASE_URL}/v1",
             api_key=TENSORZERO_API_KEY
         )
-        
+
         with open(AUDIO_SAMPLE_PATH, "rb") as audio_file:
             response = await async_client.audio.transcriptions.create(
                 model="whisper-1",
                 file=audio_file
             )
-        
+
         assert isinstance(response.text, str)
 
 
@@ -142,7 +142,7 @@ class TestAudioTranslation:
         """Test basic audio translation to English"""
         if not AUDIO_SAMPLE_PATH.exists():
             pytest.skip("Audio sample file not found")
-        
+
         with open(AUDIO_SAMPLE_PATH, "rb") as audio_file:
             # TensorZero request
             tz_response = tensorzero_client.audio.translations.create(
@@ -150,7 +150,7 @@ class TestAudioTranslation:
                 file=audio_file,
                 response_format="json"
             )
-        
+
         # Verify response structure
         assert isinstance(tz_response.text, str)
         assert len(tz_response.text) > 0
@@ -159,7 +159,7 @@ class TestAudioTranslation:
         """Test translation with various parameters"""
         if not AUDIO_SAMPLE_PATH.exists():
             pytest.skip("Audio sample file not found")
-        
+
         with open(AUDIO_SAMPLE_PATH, "rb") as audio_file:
             response = tensorzero_client.audio.translations.create(
                 model="whisper-1",
@@ -168,16 +168,16 @@ class TestAudioTranslation:
                 prompt="Translate this audio to English",
                 temperature=0.2
             )
-        
+
         assert isinstance(response.text, str)
 
     def test_translation_response_formats(self):
         """Test different response formats for translation"""
         if not AUDIO_SAMPLE_PATH.exists():
             pytest.skip("Audio sample file not found")
-        
+
         formats = ["json", "text", "verbose_json"]
-        
+
         for format_type in formats:
             with open(AUDIO_SAMPLE_PATH, "rb") as audio_file:
                 if format_type == "text":
@@ -202,28 +202,28 @@ class TestTextToSpeech:
     def test_basic_tts(self):
         """Test basic text-to-speech generation"""
         text = "Hello, this is a test of text to speech."
-        
+
         # TensorZero request
         response = tensorzero_client.audio.speech.create(
             model="tts-1",
             voice="alloy",
             input=text
         )
-        
+
         # Response should be audio bytes
         audio_data = response.read()
         assert isinstance(audio_data, bytes)
         assert len(audio_data) > 0
-        
+
         # Optionally save to file
         with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
             f.write(audio_data)
             temp_path = f.name
-        
+
         # Verify file was created
         assert os.path.exists(temp_path)
         assert os.path.getsize(temp_path) > 0
-        
+
         # Cleanup
         os.unlink(temp_path)
 
@@ -231,14 +231,14 @@ class TestTextToSpeech:
         """Test TTS with different voice options"""
         text = "Testing different voices"
         voices = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"]
-        
+
         for voice in voices:
             response = tensorzero_client.audio.speech.create(
                 model="tts-1",
                 voice=voice,
                 input=text
             )
-            
+
             audio_data = response.read()
             assert len(audio_data) > 0
 
@@ -246,7 +246,7 @@ class TestTextToSpeech:
         """Test TTS with different output formats"""
         text = "Testing different audio formats"
         formats = ["mp3", "opus", "aac", "flac"]
-        
+
         for audio_format in formats:
             response = tensorzero_client.audio.speech.create(
                 model="tts-1",
@@ -254,7 +254,7 @@ class TestTextToSpeech:
                 input=text,
                 response_format=audio_format
             )
-            
+
             audio_data = response.read()
             assert len(audio_data) > 0
 
@@ -262,7 +262,7 @@ class TestTextToSpeech:
         """Test TTS with different speed settings"""
         text = "Testing speech at different speeds"
         speeds = [0.25, 1.0, 2.0, 4.0]
-        
+
         for speed in speeds:
             response = tensorzero_client.audio.speech.create(
                 model="tts-1",
@@ -270,33 +270,33 @@ class TestTextToSpeech:
                 input=text,
                 speed=speed
             )
-            
+
             audio_data = response.read()
             assert len(audio_data) > 0
 
     def test_tts_hd_model(self):
         """Test TTS with HD model"""
         text = "Testing high definition text to speech"
-        
+
         response = tensorzero_client.audio.speech.create(
             model="tts-1-hd",
             voice="alloy",
             input=text
         )
-        
+
         audio_data = response.read()
         assert len(audio_data) > 0
 
     def test_tts_long_text(self):
         """Test TTS with longer text"""
         long_text = " ".join(["This is a longer text for testing."] * 20)
-        
+
         response = tensorzero_client.audio.speech.create(
             model="tts-1",
             voice="alloy",
             input=long_text
         )
-        
+
         audio_data = response.read()
         assert len(audio_data) > 0
 
@@ -308,14 +308,14 @@ class TestTextToSpeech:
             "Testing with emojis 🎉 (should be handled gracefully)",
             "Testing with accents: café, naïve, résumé"
         ]
-        
+
         for text in texts:
             response = tensorzero_client.audio.speech.create(
                 model="tts-1",
                 voice="alloy",
                 input=text
             )
-            
+
             audio_data = response.read()
             assert len(audio_data) > 0
 
@@ -323,20 +323,20 @@ class TestTextToSpeech:
     async def test_async_tts(self):
         """Test async text-to-speech"""
         from openai import AsyncOpenAI
-        
+
         async_client = AsyncOpenAI(
             base_url=f"{TENSORZERO_BASE_URL}/v1",
             api_key=TENSORZERO_API_KEY
         )
-        
+
         text = "Async TTS test"
-        
+
         response = await async_client.audio.speech.create(
             model="tts-1",
             voice="alloy",
             input=text
         )
-        
+
         audio_data = await response.aread()
         assert isinstance(audio_data, bytes)
         assert len(audio_data) > 0
@@ -350,7 +350,7 @@ class TestTextToSpeech:
                 voice="alloy",
                 input=""
             )
-        
+
         # Invalid voice
         with pytest.raises(Exception):
             tensorzero_client.audio.speech.create(
@@ -358,7 +358,7 @@ class TestTextToSpeech:
                 voice="invalid-voice",
                 input="Test"
             )
-        
+
         # Invalid speed
         with pytest.raises(Exception):
             tensorzero_client.audio.speech.create(

@@ -25,7 +25,7 @@ client = OpenAI(
 
 class TestTogetherModelsInUnifiedCI:
     """Test Together AI models as part of unified CI suite."""
-    
+
     def test_together_models_via_openai_sdk(self):
         """Test that Together AI models work through OpenAI SDK."""
         together_models = [
@@ -33,18 +33,18 @@ class TestTogetherModelsInUnifiedCI:
             "meta-llama/Llama-3.2-3B-Instruct-Turbo",
             "Qwen/Qwen2.5-72B-Instruct-Turbo",
         ]
-        
+
         for model in together_models:
             response = client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": "Hello"}],
                 max_tokens=10
             )
-            
+
             assert response.model == model
             assert response.choices[0].message.content is not None
             assert response.object == "chat.completion"
-    
+
     def test_together_streaming(self):
         """Test streaming works with Together AI models."""
         stream = client.chat.completions.create(
@@ -53,16 +53,16 @@ class TestTogetherModelsInUnifiedCI:
             max_tokens=20,
             stream=True
         )
-        
+
         chunks = 0
         for chunk in stream:
             chunks += 1
             assert chunk.model == "mistralai/Mixtral-8x7B-Instruct-v0.1"
             if chunk.choices[0].delta.content:
                 assert isinstance(chunk.choices[0].delta.content, str)
-        
+
         assert chunks > 0
-    
+
     def test_provider_agnostic_code(self):
         """Demonstrate same code works for OpenAI, Anthropic, and Together."""
         test_models = [
@@ -70,7 +70,7 @@ class TestTogetherModelsInUnifiedCI:
             ("claude-3-haiku-20240307", "Anthropic"),
             ("meta-llama/Llama-3.1-8B-Instruct-Turbo", "Together AI")
         ]
-        
+
         for model, provider in test_models:
             # Exact same code for all providers
             response = client.chat.completions.create(
@@ -78,7 +78,7 @@ class TestTogetherModelsInUnifiedCI:
                 messages=[{"role": "user", "content": "Say hello"}],
                 max_tokens=20
             )
-            
+
             assert response.model == model
             assert response.choices[0].message.content is not None
             print(f"✓ {provider} model '{model}' works with OpenAI SDK")

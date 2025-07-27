@@ -18,25 +18,25 @@ from openai import OpenAI
 def create_universal_client(provider_hint: Optional[str] = None) -> OpenAI:
     """
     Create OpenAI client that works with all providers through universal SDK architecture.
-    
+
     Args:
         provider_hint: Optional hint about which provider will be used (for logging/debugging)
-    
+
     Returns:
         OpenAI client configured for TensorZero gateway
     """
     base_url = os.getenv("TENSORZERO_BASE_URL", "http://localhost:3001")
     api_key = os.getenv("TENSORZERO_API_KEY", "test-api-key")
-    
+
     client = OpenAI(
         base_url=f"{base_url}/v1",
         api_key=api_key
     )
-    
+
     # Add provider hint as metadata for debugging
     if provider_hint:
         client._provider_hint = provider_hint
-    
+
     return client
 
 
@@ -51,7 +51,7 @@ def get_test_config_path(provider: str, ci_mode: bool = False) -> str:
 def wait_for_health_check(base_url: str, max_retries: int = 30, delay: float = 1.0) -> bool:
     """Wait for the gateway health check to pass."""
     health_url = f"{base_url}/health"
-    
+
     for i in range(max_retries):
         try:
             response = requests.get(health_url, timeout=5)
@@ -59,10 +59,10 @@ def wait_for_health_check(base_url: str, max_retries: int = 30, delay: float = 1
                 return True
         except requests.exceptions.RequestException:
             pass
-        
+
         if i < max_retries - 1:
             time.sleep(delay)
-    
+
     return False
 
 
@@ -70,55 +70,55 @@ def start_gateway(config_path: str, port: int = 3000) -> subprocess.Popen:
     """Start the TensorZero gateway with the given configuration."""
     env = os.environ.copy()
     env["RUST_LOG"] = "info"
-    
+
     gateway_binary = Path(__file__).parent.parent.parent.parent / "target" / "debug" / "gateway"
     if not gateway_binary.exists():
         # Try release build
         gateway_binary = gateway_binary.parent.parent / "release" / "gateway"
-    
+
     if not gateway_binary.exists():
         raise RuntimeError("Gateway binary not found. Please build the project first.")
-    
+
     cmd = [
         str(gateway_binary),
         "--config-file", config_path,
         "--port", str(port)
     ]
-    
+
     process = subprocess.Popen(
         cmd,
         env=env,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE
     )
-    
+
     # Give it a moment to start
     time.sleep(2)
-    
+
     # Check if process is still running
     if process.poll() is not None:
         stdout, stderr = process.communicate()
         raise RuntimeError(f"Gateway failed to start:\nSTDOUT: {stdout.decode()}\nSTDERR: {stderr.decode()}")
-    
+
     return process
 
 
-def compare_responses(response1: Dict[str, Any], response2: Dict[str, Any], 
+def compare_responses(response1: Dict[str, Any], response2: Dict[str, Any],
                      ignore_fields: List[str] = None) -> bool:
     """Compare two responses, ignoring specified fields."""
     if ignore_fields is None:
         ignore_fields = ["id", "created", "system_fingerprint"]
-    
+
     def remove_fields(obj: Any, fields: List[str]) -> Any:
         if isinstance(obj, dict):
             return {k: remove_fields(v, fields) for k, v in obj.items() if k not in fields}
         elif isinstance(obj, list):
             return [remove_fields(item, fields) for item in obj]
         return obj
-    
+
     cleaned1 = remove_fields(response1, ignore_fields)
     cleaned2 = remove_fields(response2, ignore_fields)
-    
+
     return cleaned1 == cleaned2
 
 
@@ -131,18 +131,18 @@ def validate_chat_response(response: Any, provider_type: Optional[str] = None):
     assert response.model is not None, "Response missing 'model' field"
     assert response.created is not None, "Response missing 'created' field"
     assert len(response.choices) > 0, "Response has no choices"
-    
+
     choice = response.choices[0]
     assert choice.index is not None, "Choice missing 'index' field"
     assert choice.message is not None, "Choice missing 'message' field"
     assert choice.message.role == "assistant", f"Expected role='assistant', got '{choice.message.role}'"
     assert choice.message.content is not None, "Message content is None"
     assert len(choice.message.content) > 0, "Message content is empty"
-    
+
     # Check usage if present
     if hasattr(response, 'usage') and response.usage:
         assert response.usage.prompt_tokens is not None, "Usage missing prompt_tokens"
-        assert response.usage.completion_tokens is not None, "Usage missing completion_tokens" 
+        assert response.usage.completion_tokens is not None, "Usage missing completion_tokens"
         assert response.usage.total_tokens is not None, "Usage missing total_tokens"
         assert response.usage.total_tokens >= response.usage.prompt_tokens + response.usage.completion_tokens
 
@@ -151,13 +151,13 @@ def validate_embedding_response(response: Any, expected_count: int = 1):
     """Universal embedding response validation."""
     assert response.object == "list", f"Expected object='list', got '{response.object}'"
     assert len(response.data) == expected_count, f"Expected {expected_count} embeddings, got {len(response.data)}"
-    
+
     for i, embedding_data in enumerate(response.data):
         assert embedding_data.object == "embedding", f"Expected object='embedding', got '{embedding_data.object}'"
         assert embedding_data.index == i, f"Expected index={i}, got {embedding_data.index}"
         assert len(embedding_data.embedding) > 0, f"Embedding {i} is empty"
         assert all(isinstance(x, float) for x in embedding_data.embedding), f"Embedding {i} contains non-float values"
-    
+
     # Check usage
     assert response.usage is not None, "Response missing usage"
     assert response.usage.total_tokens > 0, "Usage total_tokens should be > 0"
@@ -169,7 +169,7 @@ def validate_streaming_chunk(chunk: Any):
     assert chunk.object == "chat.completion.chunk", f"Expected object='chat.completion.chunk', got '{chunk.object}'"
     assert chunk.model is not None, "Chunk missing 'model' field"
     assert len(chunk.choices) > 0, "Chunk has no choices"
-    
+
     choice = chunk.choices[0]
     assert choice.index is not None, "Choice missing 'index' field"
     assert choice.delta is not None, "Choice missing 'delta' field"
@@ -188,7 +188,7 @@ def validate_response_format(response: Any, required_fields: List[str]):
     else:
         # Try to convert to dict
         response_dict = dict(response)
-    
+
     missing_fields = [field for field in required_fields if field not in response_dict]
     if missing_fields:
         raise AssertionError(f"Response missing required fields: {missing_fields}")
@@ -204,7 +204,7 @@ def generate_test_messages(count: int = 1) -> List[Dict[str, str]]:
         })
         if i < count - 1:
             messages.append({
-                "role": "assistant", 
+                "role": "assistant",
                 "content": f"Test response {i + 1}"
             })
     return messages
@@ -215,7 +215,7 @@ def create_temp_audio_file(duration_seconds: float = 1.0) -> str:
     # Create a simple WAV file header for silence
     sample_rate = 16000
     num_samples = int(sample_rate * duration_seconds)
-    
+
     # WAV header for 16-bit mono audio
     header = bytearray()
     header.extend(b'RIFF')
@@ -231,10 +231,10 @@ def create_temp_audio_file(duration_seconds: float = 1.0) -> str:
     header.extend((16).to_bytes(2, 'little'))  # Bits per sample
     header.extend(b'data')
     header.extend((num_samples * 2).to_bytes(4, 'little'))
-    
+
     # Create silence (zeros)
     data = bytes(num_samples * 2)
-    
+
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
         f.write(header + data)
         return f.name
@@ -264,7 +264,7 @@ def create_temp_image_file(width: int = 256, height: int = 256) -> str:
         0x49, 0x45, 0x4E, 0x44,  # IEND
         0xAE, 0x42, 0x60, 0x82   # CRC
     ])
-    
+
     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
         f.write(bytes(png_data))
         return f.name
@@ -274,14 +274,14 @@ def create_temp_image_file(width: int = 256, height: int = 256) -> str:
 
 class UniversalTestData:
     """Generate test data compatible with all providers."""
-    
+
     @staticmethod
     def get_basic_chat_messages() -> List[Dict[str, str]]:
         """Get basic chat messages for universal testing."""
         return [
             {"role": "user", "content": "Hello, world!"}
         ]
-    
+
     @staticmethod
     def get_multi_turn_messages() -> List[Dict[str, str]]:
         """Get multi-turn conversation for testing."""
@@ -290,7 +290,7 @@ class UniversalTestData:
             {"role": "assistant", "content": "Hello Alice! Nice to meet you."},
             {"role": "user", "content": "What's my name?"}
         ]
-    
+
     @staticmethod
     def get_system_prompt_messages() -> List[Dict[str, str]]:
         """Get messages with system prompt."""
@@ -298,7 +298,7 @@ class UniversalTestData:
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": "Hello!"}
         ]
-    
+
     @staticmethod
     def get_provider_models() -> Dict[str, List[str]]:
         """Get model lists for each provider."""
@@ -317,7 +317,7 @@ class UniversalTestData:
                 "Qwen/Qwen2.5-72B-Instruct-Turbo"
             ]
         }
-    
+
     @staticmethod
     def get_embedding_models() -> Dict[str, List[str]]:
         """Get embedding model lists for each provider."""
@@ -331,7 +331,7 @@ class UniversalTestData:
                 "together-m2-bert"
             ]
         }
-    
+
     @staticmethod
     def get_test_prompts() -> List[str]:
         """Get a list of test prompts."""
@@ -342,7 +342,7 @@ class UniversalTestData:
             "Explain quantum computing in one sentence.",
             "What's the weather like?",
         ]
-    
+
     @staticmethod
     def get_embedding_texts() -> List[str]:
         """Get texts for embedding tests."""
@@ -357,12 +357,12 @@ class UniversalTestData:
 
 class TestDataGenerator:
     """Legacy class - use UniversalTestData instead."""
-    
+
     @staticmethod
     def get_test_prompts() -> List[str]:
         """Get a list of test prompts."""
         return UniversalTestData.get_test_prompts()
-    
+
     @staticmethod
     def get_test_system_prompts() -> List[str]:
         """Get a list of test system prompts."""
@@ -372,7 +372,7 @@ class TestDataGenerator:
             "You are a technical expert. Be concise and precise.",
             "You are a teacher. Explain things clearly.",
         ]
-    
+
     @staticmethod
     def get_embedding_texts() -> List[str]:
         """Get texts for embedding tests."""

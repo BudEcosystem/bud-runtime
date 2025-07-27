@@ -30,12 +30,12 @@ class TestChatCompletionsCI:
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": "Hello, how are you?"}
         ]
-        
+
         response = tensorzero_client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=messages
         )
-        
+
         # Check response structure
         assert response.id
         assert response.object == "chat.completion"
@@ -44,7 +44,7 @@ class TestChatCompletionsCI:
         assert len(response.choices) == 1
         assert response.choices[0].index == 0
         assert response.choices[0].finish_reason == "stop"
-        
+
         # Dummy provider with json model returns {"answer":"Hello"}
         content = response.choices[0].message.content
         assert content
@@ -61,31 +61,31 @@ class TestChatCompletionsCI:
             {"role": "assistant", "content": "2+2 equals 4."},
             {"role": "user", "content": "What's 3+3?"}
         ]
-        
+
         response = tensorzero_client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=messages
         )
-        
+
         assert response.choices[0].message.content
         assert response.choices[0].message.role == "assistant"
 
     def test_streaming_chat_completion(self):
         """Test streaming chat completion"""
         messages = [{"role": "user", "content": "Count to three"}]
-        
+
         stream = tensorzero_client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=messages,
             stream=True
         )
-        
+
         chunks = list(stream)
         assert len(chunks) > 0
-        
+
         # First chunk should have role
         assert chunks[0].choices[0].delta.role == "assistant"
-        
+
         # Collect all content
         content = "".join(
             chunk.choices[0].delta.content or ""
@@ -96,7 +96,7 @@ class TestChatCompletionsCI:
     def test_completion_parameters(self):
         """Test various completion parameters"""
         messages = [{"role": "user", "content": "Test"}]
-        
+
         # These parameters are accepted but may not affect dummy provider
         response = tensorzero_client.chat.completions.create(
             model="gpt-3.5-turbo",
@@ -108,41 +108,41 @@ class TestChatCompletionsCI:
             presence_penalty=0.5
             # Note: n > 1 is not supported by TensorZero's OpenAI-compatible endpoint
         )
-        
+
         assert response.choices
         assert len(response.choices) == 1
-        
+
     def test_different_models(self):
         """Test different model configurations"""
         messages = [{"role": "user", "content": "Hello"}]
-        
+
         # Test gpt-4 (configured with model_name="test")
         response = tensorzero_client.chat.completions.create(
             model="gpt-4",
             messages=messages
         )
-        
+
         assert response.model == "gpt-4"
         assert response.choices[0].message.content
         # The "test" model returns different content than "json" model
-        
+
     @pytest.mark.asyncio
     async def test_async_chat_completion(self):
         """Test async chat completion"""
         from openai import AsyncOpenAI
-        
+
         async_client = AsyncOpenAI(
             base_url=f"{TENSORZERO_BASE_URL}/v1",
             api_key=TENSORZERO_API_KEY
         )
-        
+
         messages = [{"role": "user", "content": "Test async"}]
-        
+
         response = await async_client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=messages
         )
-        
+
         assert response.choices[0].message.content
         # Just verify we got a response, don't check specific content
 
@@ -153,7 +153,7 @@ class TestChatCompletionsCI:
             model="gpt-3.5-turbo",
             messages=[]
         )
-        
+
         # Should still get a response
         assert response.choices[0].message.content
 

@@ -207,11 +207,11 @@ Note: Since Mistral uses chat models for moderation, the response simulates Open
 
 3. **Error Handling**: If the primary provider fails, requests automatically fall back to the next provider in the routing list.
 
-4. **Performance**: 
+4. **Performance**:
    - Embedding requests are processed efficiently with Mistral's dedicated embedding model
    - Moderation requests may have higher latency due to using chat models
 
-5. **Cost Considerations**: 
+5. **Cost Considerations**:
    - Mistral's embedding model is cost-effective for large-scale embedding generation
    - Using chat models for moderation may be more expensive than dedicated moderation APIs
 

@@ -20,15 +20,15 @@ check_api_key() {
 run_gateway() {
     local config_file=$1
     echo "Starting gateway with config: $config_file"
-    
+
     # Kill any existing gateway process
     pkill -f "gateway.*--config-file" || true
     sleep 1
-    
+
     # Start the gateway
     TENSORZERO_CONFIG_FILE="$config_file" cargo run --bin gateway -- --config-file "$config_file" > gateway.log 2>&1 &
     GATEWAY_PID=$!
-    
+
     # Wait for gateway to be ready
     echo "Waiting for gateway to start..."
     for i in {1..30}; do

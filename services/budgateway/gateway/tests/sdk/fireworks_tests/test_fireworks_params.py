@@ -24,7 +24,7 @@ def test_basic_fireworks_chat():
         base_url="http://localhost:3000/v1",
         api_key="test-key",  # TensorZero uses its own auth
     )
-    
+
     response = client.chat.completions.create(
         model="llama-v3p2-3b-instruct",
         messages=[
@@ -33,7 +33,7 @@ def test_basic_fireworks_chat():
         temperature=0.1,
         max_tokens=20,
     )
-    
+
     assert response.choices[0].message.content is not None
     assert len(response.choices[0].message.content) > 0
     print(f"✓ Basic chat: {response.choices[0].message.content}")
@@ -45,7 +45,7 @@ def test_fireworks_with_sampling_params():
         base_url="http://localhost:3000/v1",
         api_key="test-key",
     )
-    
+
     # Test with various sampling parameters
     response = client.chat.completions.create(
         model="llama-v3p1-8b-instruct",
@@ -60,7 +60,7 @@ def test_fireworks_with_sampling_params():
             "repetition_penalty": 1.1,
         }
     )
-    
+
     assert response.choices[0].message.content is not None
     print(f"✓ Sampling params: Generated text with custom sampling")
 
@@ -71,10 +71,10 @@ def test_fireworks_context_handling():
         base_url="http://localhost:3000/v1",
         api_key="test-key",
     )
-    
+
     # Create a long prompt
     long_context = "This is a test. " * 100
-    
+
     response = client.chat.completions.create(
         model="llama-v3p2-3b-instruct",
         messages=[
@@ -86,7 +86,7 @@ def test_fireworks_context_handling():
             "context_length_exceeded_behavior": "truncate",
         }
     )
-    
+
     assert response.choices[0].message.content is not None
     print("✓ Context handling: Truncation parameters work")
 
@@ -97,7 +97,7 @@ def test_fireworks_reasoning_model():
         base_url="http://localhost:3000/v1",
         api_key="test-key",
     )
-    
+
     # Skip if deepseek-r1 is not available
     try:
         response = client.chat.completions.create(
@@ -111,7 +111,7 @@ def test_fireworks_reasoning_model():
                 "reasoning_effort": "low",  # Low effort for simple question
             }
         )
-        
+
         assert response.choices[0].message.content is not None
         print(f"✓ Reasoning model: {response.choices[0].message.content.strip()}")
     except Exception as e:
@@ -124,7 +124,7 @@ def test_fireworks_streaming():
         base_url="http://localhost:3000/v1",
         api_key="test-key",
     )
-    
+
     stream = client.chat.completions.create(
         model="llama-v3p1-8b-instruct",
         messages=[
@@ -138,14 +138,14 @@ def test_fireworks_streaming():
             "repetition_penalty": 1.0,
         }
     )
-    
+
     full_response = ""
     chunk_count = 0
     for chunk in stream:
         if chunk.choices[0].delta.content:
             full_response += chunk.choices[0].delta.content
             chunk_count += 1
-    
+
     assert len(full_response) > 0
     assert chunk_count > 0
     print(f"✓ Streaming: Received {chunk_count} chunks")
@@ -157,7 +157,7 @@ def test_fireworks_json_mode():
         base_url="http://localhost:3000/v1",
         api_key="test-key",
     )
-    
+
     response = client.chat.completions.create(
         model="llama-v3p1-70b-instruct",
         messages=[
@@ -170,10 +170,10 @@ def test_fireworks_json_mode():
             "top_k": 5,  # Very restrictive for JSON generation
         }
     )
-    
+
     content = response.choices[0].message.content
     assert content is not None
-    
+
     # Verify it's valid JSON
     try:
         parsed = json.loads(content)
@@ -189,12 +189,12 @@ def test_fireworks_embedding():
         base_url="http://localhost:3000/v1",
         api_key="test-key",
     )
-    
+
     response = client.embeddings.create(
         model="nomic-embed-text-v1_5",
         input="Fireworks AI provides fast inference",
     )
-    
+
     assert len(response.data) > 0
     assert len(response.data[0].embedding) > 0
     embedding_dim = len(response.data[0].embedding)
@@ -207,7 +207,7 @@ def test_fireworks_multiple_messages():
         base_url="http://localhost:3000/v1",
         api_key="test-key",
     )
-    
+
     response = client.chat.completions.create(
         model="llama-v3p2-3b-instruct",
         messages=[
@@ -223,7 +223,7 @@ def test_fireworks_multiple_messages():
             "repetition_penalty": 1.05,
         }
     )
-    
+
     assert response.choices[0].message.content is not None
     print(f"✓ Multi-message: {response.choices[0].message.content}")
 
@@ -235,7 +235,7 @@ async def test_async_fireworks():
         base_url="http://localhost:3000/v1",
         api_key="test-key",
     )
-    
+
     response = await client.chat.completions.create(
         model="llama-v3p1-8b-instruct",
         messages=[
@@ -247,7 +247,7 @@ async def test_async_fireworks():
             "top_k": 5,
         }
     )
-    
+
     assert response.choices[0].message.content is not None
     print(f"✓ Async: {response.choices[0].message.content}")
 
@@ -258,7 +258,7 @@ async def test_async_streaming():
         base_url="http://localhost:3000/v1",
         api_key="test-key",
     )
-    
+
     stream = await client.chat.completions.create(
         model="llama-v3p2-3b-instruct",
         messages=[
@@ -272,12 +272,12 @@ async def test_async_streaming():
             "top_k": 10,
         }
     )
-    
+
     chunks = []
     async for chunk in stream:
         if chunk.choices[0].delta.content:
             chunks.append(chunk.choices[0].delta.content)
-    
+
     assert len(chunks) > 0
     print(f"✓ Async streaming: Received {len(chunks)} chunks")
 
@@ -285,7 +285,7 @@ async def test_async_streaming():
 def run_sync_tests():
     """Run all synchronous tests."""
     print("\n=== Running Fireworks Full Integration Tests (Sync) ===\n")
-    
+
     test_basic_fireworks_chat()
     test_fireworks_with_sampling_params()
     test_fireworks_context_handling()
@@ -294,33 +294,33 @@ def run_sync_tests():
     test_fireworks_json_mode()
     test_fireworks_embedding()
     test_fireworks_multiple_messages()
-    
+
     print("\n✅ All synchronous tests completed!")
 
 
 async def run_async_tests():
     """Run all asynchronous tests."""
     print("\n=== Running Fireworks Full Integration Tests (Async) ===\n")
-    
+
     await test_async_fireworks()
     await test_async_streaming()
-    
+
     print("\n✅ All asynchronous tests completed!")
 
 
 def main():
     """Main test runner."""
     print(f"\n🔥 Testing with Fireworks API\n")
-    
+
     try:
         # Run sync tests
         run_sync_tests()
-        
+
         # Run async tests
         asyncio.run(run_async_tests())
-        
+
         print("\n🎉 All Fireworks integration tests passed!\n")
-        
+
         # Print parameter documentation
         print("📖 Fireworks Parameters Reference:")
         print("  - top_k: Limit token choices (default: 50)")
@@ -334,9 +334,9 @@ def main():
         print("  - prompt_truncate_len: Max prompt length")
         print("  - context_length_exceeded_behavior: 'truncate' or 'error'")
         print("\nUse these via extra_body in OpenAI SDK calls.\n")
-        
+
         return 0
-        
+
     except Exception as e:
         print(f"\n❌ Test failed: {e}")
         import traceback

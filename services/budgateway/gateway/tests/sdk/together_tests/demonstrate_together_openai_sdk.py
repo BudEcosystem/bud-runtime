@@ -20,17 +20,17 @@ TENSORZERO_API_KEY = os.getenv("TENSORZERO_API_KEY", "test-api-key")
 
 def demonstrate_together_via_openai_sdk():
     """Show Together AI models working through OpenAI SDK."""
-    
+
     print("=== Together AI + OpenAI SDK Demonstration ===")
     print(f"Connecting to TensorZero at: {TENSORZERO_BASE_URL}")
     print()
-    
+
     # Create OpenAI client pointing to TensorZero
     client = OpenAI(
         base_url=f"{TENSORZERO_BASE_URL}/v1",
         api_key=TENSORZERO_API_KEY
     )
-    
+
     # Test various Together AI models
     together_models = [
         ("meta-llama/Llama-3.3-70B-Instruct-Turbo", "Latest Llama 3.3"),
@@ -39,14 +39,14 @@ def demonstrate_together_via_openai_sdk():
         ("mistralai/Mixtral-8x7B-Instruct-v0.1", "Mixtral MoE"),
         ("deepseek-ai/deepseek-v2.5", "DeepSeek v2.5")
     ]
-    
+
     print("1. Testing Together AI models with OpenAI SDK:")
     print("-" * 50)
-    
+
     for model_id, model_name in together_models[:3]:  # Test first 3 models
         try:
             print(f"\n📦 Model: {model_name} ({model_id})")
-            
+
             # Simple chat completion
             response = client.chat.completions.create(
                 model=model_id,
@@ -55,22 +55,22 @@ def demonstrate_together_via_openai_sdk():
                 ],
                 max_tokens=50
             )
-            
+
             print(f"✅ Response: {response.choices[0].message.content}")
             print(f"   Model: {response.model}")
             print(f"   Tokens: {response.usage.total_tokens}")
-            
+
         except Exception as e:
             print(f"❌ Error: {e}")
-    
+
     print("\n\n2. Demonstrating streaming with Together AI:")
     print("-" * 50)
-    
+
     try:
         model = "meta-llama/Llama-3.1-8B-Instruct-Turbo"
         print(f"\n📦 Streaming with {model}")
         print("Response: ", end="", flush=True)
-        
+
         stream = client.chat.completions.create(
             model=model,
             messages=[
@@ -79,46 +79,46 @@ def demonstrate_together_via_openai_sdk():
             max_tokens=50,
             stream=True
         )
-        
+
         for chunk in stream:
             if chunk.choices[0].delta.content:
                 print(chunk.choices[0].delta.content, end="", flush=True)
-        
+
         print("\n✅ Streaming completed!")
-        
+
     except Exception as e:
         print(f"\n❌ Streaming error: {e}")
-    
+
     print("\n\n3. Comparing providers with same OpenAI SDK:")
     print("-" * 50)
-    
+
     comparison_models = [
         ("gpt-3.5-turbo", "OpenAI"),
         ("claude-3-haiku-20240307", "Anthropic"),
         ("meta-llama/Llama-3.2-3B-Instruct-Turbo", "Together AI")
     ]
-    
+
     prompt = "What company created you? Answer in 5 words or less."
-    
+
     for model_id, provider in comparison_models:
         try:
             print(f"\n🏢 Provider: {provider}")
             print(f"   Model: {model_id}")
-            
+
             response = client.chat.completions.create(
                 model=model_id,
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=20
             )
-            
+
             print(f"   Response: {response.choices[0].message.content}")
-            
+
         except Exception as e:
             print(f"   Error: {e}")
-    
+
     print("\n\n4. Advanced features with Together AI:")
     print("-" * 50)
-    
+
     # System prompts
     try:
         print("\n📝 Testing system prompts:")
@@ -133,7 +133,7 @@ def demonstrate_together_via_openai_sdk():
         print(f"Response: {response.choices[0].message.content}")
     except Exception as e:
         print(f"Error: {e}")
-    
+
     # Temperature control
     try:
         print("\n🌡️ Testing temperature control:")
@@ -147,7 +147,7 @@ def demonstrate_together_via_openai_sdk():
             print(f"Temperature {temp}: {response.choices[0].message.content}")
     except Exception as e:
         print(f"Error: {e}")
-    
+
     print("\n\n=== Summary ===")
     print("✅ Together AI models work seamlessly with OpenAI SDK")
     print("✅ Same code works across OpenAI, Anthropic, and Together AI")
