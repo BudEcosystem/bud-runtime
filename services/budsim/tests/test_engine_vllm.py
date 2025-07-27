@@ -18,4 +18,4 @@ def test_model_compatibility(model_name: str, expected_compatibility: bool) -> N
 # ])
 # def test_engine_args_compatibility(engine_args: Dict[str, Any], expected_compatibility: bool) -> None:
 #     engine_compatibility = EngineCompatibility()
-#     assert engine_compatibility.check_args_compatibility(engine_args) == expected_compatibility    
+#     assert engine_compatibility.check_args_compatibility(engine_args) == expected_compatibility

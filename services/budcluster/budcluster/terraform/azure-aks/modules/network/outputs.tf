@@ -26,4 +26,4 @@ output "nsg_id" {
 output "route_table_id" {
   description = "ID of the AKS route table"
   value       = azurerm_route_table.aks.id
-} 
+}

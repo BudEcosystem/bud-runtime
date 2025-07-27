@@ -66,15 +66,15 @@ function UserMessage(props: MessageProps & { onEdit: (message: string) => void }
       {/* #0d0d0d */}
       <span className="message-text user-message relative  p-[.8rem] py-[1rem] rounded-[0.5rem] border-[#1F1F1F4D] border-[1px] text-[#EEEEEE] font-[400] text-[.85rem] text-right Open-Sans z-[2]">
         <div className="absolute z-[1] w-[100%] h-[100%] top-0 left-0 right-0 bottom-0 !bg-[#1C1C1C] rounded-[0.5rem] border-[1px] border-[#1F1F1F]" />
-        
+
         <div className="relative z-[2]">{props.content}</div>
       </span>
       </div>}
       {isEditing && <div className="relative w-[100%] bg-[#101010] rounded-[0.5rem] border-[1px] border-[#1F1F1F] hover:border-[#333333] p-[1rem]">
-        <textarea 
+        <textarea
         defaultValue={props.content}
-        value={value} 
-        onChange={(e) => setValue(e.target.value)} 
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
         // size="large"
         className="w-[100%] h-[100%] bg-transparent text-[#EEEEEE] border-none focus:border-none outline-none"
         />
@@ -107,7 +107,7 @@ function AIMessage(props: MessageProps & { reload: () => void }) {
   const [metrics, setMetrics] = useState<Metrics | undefined>(undefined);
 
   const feedback = getFeedback(props.chatId, props.data.id);
-  
+
   useEffect(() => {
     if(!props.data?.annotations  ){
       return;

@@ -3047,11 +3047,11 @@ thinking = { type = "enabled", budget_tokens = 1024 }
         [models.my-model.providers.openai]
         type = "openai"
         model_name = "gpt-4o-mini-2024-07-18"
-        
+
         [models.text-embedding-model]
         routing = ["openai"]
         endpoints = ["embedding"]
-        
+
         [models.text-embedding-model.providers.openai]
         type = "openai"
         model_name = "text-embedding-3-small"

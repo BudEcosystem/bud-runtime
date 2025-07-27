@@ -44,7 +44,7 @@ export default function RunModelSuccess() {
                 Model Successfully Added To Repository
               </Text_24_600_EEEEEE>
               <Text_12_400_B3B3B3 className="text-center leading-[1.125rem] max-w-[85%]">
-              Your model Evaluation are still running, we will send you a notification when it’s done and you can see the results later. 
+              Your model Evaluation are still running, we will send you a notification when it’s done and you can see the results later.
               </Text_12_400_B3B3B3>
             </div>
           </div>

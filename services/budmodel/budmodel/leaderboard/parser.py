@@ -17,8 +17,8 @@
 """The parser for leaderboard module."""
 
 import re
-from urllib.parse import urlparse
 from typing import Any, Dict, List, Optional, Tuple, Union
+from urllib.parse import urlparse
 
 from budmicroframe.commons import logging
 
@@ -27,12 +27,13 @@ from ..commons.constants import ModelExtractionStatus, SourceType
 from ..commons.exceptions import SourceParserException
 from ..model_info.exceptions import RepoAccessException
 from ..model_info.huggingface import HuggingFaceModelInfo, HuggingfaceUtils
-from ..model_info.schemas import ModelInfoBase, ModelArchitecture, LLMConfig
+from ..model_info.schemas import LLMConfig, ModelArchitecture, ModelInfoBase
 from .base import BaseSourceParser
-from .schemas import LeaderboardBase
 from .helper import (
     upsert_license_details,
 )
+from .schemas import LeaderboardBase
+
 
 logger = logging.get_logger(__name__)
 
@@ -103,7 +104,7 @@ class ChatbotArenaSourceParser(BaseSourceMixin):
             provider_url=provider_url,
             website_url=website_url,
             author=entry.get("organization"),
-            license=license_details
+            license=license_details,
         )
         leaderboard = LeaderboardBase(**entry)
 
@@ -127,7 +128,6 @@ class BerkeleySourceParser(BaseSourceMixin):
         Returns:
             Dict[str, Any]: The parsed entry.
         """
-        
         # Convert overall_accuracy to float
         entry["bcfl"] = float(entry["overall_accuracy"])
 
@@ -153,18 +153,14 @@ class BerkeleySourceParser(BaseSourceMixin):
                     input_license = entry.get("multi_miss_func")
                 else:
                     input_license = entry.get("multi_miss_param")
-                
+
                 license_details = upsert_license_details(input_license)
-            
+
         except Exception as general_error:
             logger.exception(f"Unexpected error while parsing entry: {general_error}")
 
-
         model_info = ModelInfoBase(
-            uri=uri,
-            provider_url=provider_url,
-            website_url=website_url,
-            license = license_details
+            uri=uri, provider_url=provider_url, website_url=website_url, license=license_details
         )
         leaderboard = LeaderboardBase(**entry)
 
@@ -325,14 +321,14 @@ class VLLMSourceParser(BaseSourceMixin):
             "leaderboard": leaderboard,
             "provider_type": provider_type,
         }
+
+
 class AlpacaSourceParser(BaseSourceMixin):
     """The Alpaca source parser."""
 
     @staticmethod
     async def parse_entry(entry: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Implementation of required abstract method.
-        """
+        """Implement required abstract method."""
         return entry
 
     @staticmethod
@@ -384,11 +380,13 @@ class AlpacaSourceParser(BaseSourceMixin):
                     )
                     leaderboard = LeaderboardBase(**data_item)
 
-                    parsed_extracted_data.append({
-                        "model_info": model_info,
-                        "leaderboard": leaderboard,
-                        "provider_type": provider_type,
-                    })
+                    parsed_extracted_data.append(
+                        {
+                            "model_info": model_info,
+                            "leaderboard": leaderboard,
+                            "provider_type": provider_type,
+                        }
+                    )
 
                 result.extend(parsed_extracted_data)
             except Exception as e:
@@ -399,36 +397,38 @@ class AlpacaSourceParser(BaseSourceMixin):
 
     @staticmethod
     def parse_alpacasource_csv(csv_url):
-        """Extracts the alpaca source data from CSV URL."""
-        import pandas as pd
+        """Extract the alpaca source data from CSV URL."""
         import numpy as np
+        import pandas as pd
 
-        df = pd.read_csv(csv_url, converters={
-            'length_controlled_winrate': lambda x: float(x.strip()) if x.strip() else np.nan,
-            'win_rate': lambda x: float(x.strip()) if x.strip() else np.nan,
-        })
+        df = pd.read_csv(
+            csv_url,
+            converters={
+                "length_controlled_winrate": lambda x: float(x.strip()) if x.strip() else np.nan,
+                "win_rate": lambda x: float(x.strip()) if x.strip() else np.nan,
+            },
+        )
 
         extracted_data = (
-            df[df['filter'].isin(['verified', 'minimal'])]
+            df[df["filter"].isin(["verified", "minimal"])]
             .assign(
-                lc_win_rate=lambda x: x['length_controlled_winrate'].round(2).astype(str),
-                win_rate=lambda x: x['win_rate'].round(2).astype(str),
-                rank=lambda x: x['win_rate'].rank(ascending=False, method='first').astype('Int64')
-            )
-            [['name', 'lc_win_rate', 'win_rate', 'link', 'avg_length', 'samples', 'rank']]
-            .sort_values('rank')
-            .to_dict(orient='records')
+                lc_win_rate=lambda x: x["length_controlled_winrate"].round(2).astype(str),
+                win_rate=lambda x: x["win_rate"].round(2).astype(str),
+                rank=lambda x: x["win_rate"].rank(ascending=False, method="first").astype("Int64"),
+            )[["name", "lc_win_rate", "win_rate", "link", "avg_length", "samples", "rank"]]
+            .sort_values("rank")
+            .to_dict(orient="records")
         )
 
         return extracted_data
+
 
 class UGISourceParser(BaseSourceMixin):
     """The UGI source parser."""
 
     @staticmethod
-    async def parse_entry(entry:Dict[str,Any]) -> Dict[str,Any]:
-        """Parses an entry from the UGI source."""
-
+    async def parse_entry(entry: Dict[str, Any]) -> Dict[str, Any]:
+        """Parse an entry from the UGI source."""
         provider_url = None
         website_url = None
 
@@ -460,37 +460,47 @@ class UGISourceParser(BaseSourceMixin):
             "provider_type": provider_type,
         }
 
+
 class LLMStatsSourceParser(BaseSourceMixin):
     """The LLM Stats source parser."""
 
     @staticmethod
-    async def parse_entry(entry:Dict[str,Any]) -> Dict[str,Any]:
-        """Parses an entry from the UGI source."""
-
+    async def parse_entry(entry: Dict[str, Any]) -> Dict[str, Any]:
+        """Parse an entry from the UGI source."""
         provider_url = None
         license_details = None
         website_url = None
         architecture = None
         papers = None
-        entry["gpqa"] = float(entry["gpqa"].strip('%')) / 100 if entry["gpqa"]!= '-' else None
-        entry["mmlu"] = float(entry["mmlu"].strip('%')) / 100 if entry["mmlu"]!= '-' else None
-        entry["mmlu_pro"] = float(entry["mmlu_pro"].strip('%')) / 100 if entry["mmlu_pro"]!= '-' else None
-        entry["drop"] = float(entry["drop"].strip('%')) / 100 if entry["drop"]!= '-' else None
-        entry["humaneval"] = float(entry["humaneval"].strip('%')) / 100 if entry["humaneval"]!= '-' else None
-        entry["num_params"] = int(entry["num_params"]) if entry["num_params"] and str(entry["num_params"]).lower() not in ['-', 'null', 'none', ''] else None
-        entry["max_input_tokens"] = int(entry["max_input_tokens"]) if entry["max_input_tokens"] and str(entry["max_input_tokens"]).lower() not in ['-', 'null', 'none', ''] else None
+        entry["gpqa"] = float(entry["gpqa"].strip("%")) / 100 if entry["gpqa"] != "-" else None
+        entry["mmlu"] = float(entry["mmlu"].strip("%")) / 100 if entry["mmlu"] != "-" else None
+        entry["mmlu_pro"] = float(entry["mmlu_pro"].strip("%")) / 100 if entry["mmlu_pro"] != "-" else None
+        entry["drop"] = float(entry["drop"].strip("%")) / 100 if entry["drop"] != "-" else None
+        entry["humaneval"] = float(entry["humaneval"].strip("%")) / 100 if entry["humaneval"] != "-" else None
+        entry["num_params"] = (
+            int(entry["num_params"])
+            if entry["num_params"] and str(entry["num_params"]).lower() not in ["-", "null", "none", ""]
+            else None
+        )
+        entry["max_input_tokens"] = (
+            int(entry["max_input_tokens"])
+            if entry["max_input_tokens"] and str(entry["max_input_tokens"]).lower() not in ["-", "null", "none", ""]
+            else None
+        )
 
+        if entry["weights_link"].startswith("https://huggingface.co/") or entry["repo_link"].startswith(
+            "https://huggingface.co/"
+        ):
+            model_link = (
+                entry["weights_link"]
+                if entry["weights_link"].startswith("https://huggingface.co/")
+                else entry["repo_link"]
+            )
+            model_norm = re.sub(r"[^a-z0-9]", "", entry["model"].lower()) if entry.get("model") else ""
+            uri_path = urlparse(model_link).path.lstrip("/")
+            uri_norm = re.sub(r"[^a-z0-9]", "", uri_path.lower())
 
-        if entry["weights_link"].startswith("https://huggingface.co/") or entry["repo_link"].startswith("https://huggingface.co/"):
-            model_link= entry["weights_link"] if entry["weights_link"].startswith("https://huggingface.co/") else entry["repo_link"]
-            model_norm = re.sub(r'[^a-z0-9]', '', entry["model"].lower()) if entry.get("model") else ""
-            uri_path = urlparse(model_link).path.lstrip('/')
-            uri_norm = re.sub(r'[^a-z0-9]', '', uri_path.lower())
-
-            if model_norm and model_norm in uri_norm:
-                uri = uri_path
-            else:
-                uri = entry["model"]
+            uri = uri_path if model_norm and model_norm in uri_norm else entry["model"]
 
             provider_type = "hugging_face"
             provider_url = model_link
@@ -501,20 +511,14 @@ class LLMStatsSourceParser(BaseSourceMixin):
             if entry["num_params"] or entry.get("max_input_tokens"):
                 architecture = ModelArchitecture(
                     num_params=entry.get("num_params"),
-                    text_config = LLMConfig(
-                        context_length = entry.get("max_input_tokens")
-                    )
+                    text_config=LLMConfig(context_length=entry.get("max_input_tokens")),
                 )
-        if entry["license"] != "Proprietary":
-            input_license = entry.get("license")
-        else:
-            input_license = entry.get("organization")
+        input_license = entry.get("license") if entry["license"] != "Proprietary" else entry.get("organization")
 
         license_details = upsert_license_details(input_license)
 
         if entry.get("paper_link"):
             papers = HuggingFaceModelInfo.get_publication_info(entry["paper_link"])
-
 
         model_info = ModelInfoBase(
             author=entry["organization"],
@@ -533,6 +537,7 @@ class LLMStatsSourceParser(BaseSourceMixin):
             "provider_type": provider_type,
         }
 
+
 class SourceParserFactory:
     """Factory class to create different types of leaderboard parsers."""
 
@@ -542,9 +547,9 @@ class SourceParserFactory:
         SourceType.LIVE_CODEBENCH: LiveCodeBenchSourceParser,
         SourceType.METB: MtebSourceParser,
         SourceType.VLLM: VLLMSourceParser,
-        SourceType.ALPACA:AlpacaSourceParser,
-        SourceType.UGI:UGISourceParser,
-        SourceType.LLM_STATS:LLMStatsSourceParser,
+        SourceType.ALPACA: AlpacaSourceParser,
+        SourceType.UGI: UGISourceParser,
+        SourceType.LLM_STATS: LLMStatsSourceParser,
     }
 
     @classmethod
@@ -646,7 +651,8 @@ class ModelInfoEnricher:
                 # Fill missing fields in extracted_model_info with available values from model_info.
                 extracted_model_info = extracted_model_info.model_copy(
                     update={
-                        k: v for k, v in model_info.model_dump(exclude_unset=False).items()
+                        k: v
+                        for k, v in model_info.model_dump(exclude_unset=False).items()
                         if not getattr(extracted_model_info, k, None) and v is not None
                     }
                 )
@@ -658,7 +664,6 @@ class ModelInfoEnricher:
                 # )
                 ModelExtractionService.validate_model_extraction(extracted_model_info, model_evals, True)
 
-                                   
             except Exception:
                 logger.exception("Error extracting model info from Hugging Face for uri %s", model_info.uri)
                 model_info.extraction_status = ModelExtractionStatus.PARTIAL

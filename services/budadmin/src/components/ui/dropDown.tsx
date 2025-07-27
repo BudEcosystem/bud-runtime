@@ -100,7 +100,7 @@ interface BudDropdownMenuProps {
 export const BudDropdownMenu = (props: BudDropdownMenuProps) => {
 
   const { values, form } = useContext(BudFormContext);
-  
+
   // Component that receives value and onChange from Form.Item
   const FormItemSelect = ({ value, onChange, ...restProps }: any) => {
     return (
@@ -142,7 +142,7 @@ export const BudDropdownMenu = (props: BudDropdownMenuProps) => {
       </div>
     );
   };
-  
+
   return (
     <Form.Item name={props.name} rules={props.rules}  hasFeedback className={`${props.formItemClassnames}`}>
       <FormItemSelect />

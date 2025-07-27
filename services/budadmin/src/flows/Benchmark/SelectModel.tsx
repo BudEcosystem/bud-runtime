@@ -57,7 +57,7 @@ export default function SelectModel() {
                 openDrawerWithStep("model_benchmark-credential-select");
               } else {
                 openDrawerWithStep("Benchmark-Configuration");
-              }              
+              }
             }
           })
         // openDrawerWithStep("Select-Nodes");
@@ -82,7 +82,7 @@ export default function SelectModel() {
             <ModelFilter
               search={search}
               setSearch={setSearch}
-              
+
             />
           </DeployModelSelect>
         </BudDrawerLayout>

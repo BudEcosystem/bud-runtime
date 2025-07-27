@@ -18,7 +18,7 @@ use tracing::{debug, warn};
 /// - Prioritizes resolved endpoint ID from authentication for accurate rate limiting
 /// - Checks pre-extracted model from early extraction layer
 /// - Falls back to X-Model-Name header
-/// - Falls back to URL path extraction  
+/// - Falls back to URL path extraction
 /// - Falls back to body parsing only when necessary
 pub async fn rate_limit_middleware(
     State(limiter): State<Arc<DistributedRateLimiter>>,

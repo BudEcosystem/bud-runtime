@@ -11,7 +11,7 @@ Section 1: Definitions
 
 “Licensee” or “you” means you, or your employer or any other person or entity (if you are entering into this Agreement on such person or entity’s behalf), of the age required under applicable laws, rules or regulations to provide legal consent and that has legal authority to bind your employer or such other person or entity if you are entering in this Agreement on their behalf.
 
-“DBRX Derivatives” means all (i) modifications to DBRX, (ii) works based on DBRX and (iii) any other derivative works thereof. Outputs are not deemed DBRX Derivatives. 
+“DBRX Derivatives” means all (i) modifications to DBRX, (ii) works based on DBRX and (iii) any other derivative works thereof. Outputs are not deemed DBRX Derivatives.
 
 “DBRX” means the foundational large language models and software and algorithms, including machine-learning model code, trained model weights, inference-enabling code, training-enabling code, fine-tuning enabling code, documentation and other elements of the foregoing identified by Databricks at https://github.com/databricks/dbrx, regardless of the source that you obtained it from.
 
@@ -19,7 +19,7 @@ Section 1: Definitions
 
 As used in this Agreement, “including” means “including without limitation.”
 
-Section 2: License Rights and Conditions on Use and Distribution 
+Section 2: License Rights and Conditions on Use and Distribution
 2.1 Grant of Rights
 You are granted a non-exclusive, worldwide, non-transferable and royalty-free limited license under Databricks’ intellectual property or other rights owned by Databricks embodied in DBRX to use, reproduce, distribute, copy, modify, and create derivative works of DBRX in accordance with the terms of this Agreement.
 

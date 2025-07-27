@@ -44,7 +44,7 @@ This directory contains integration tests that validate TensorZero's compatibili
    ```bash
    # For CI tests (dummy provider)
    cargo run --bin gateway -- --config-file gateway/tests/sdk/test_config_[provider]_ci.toml
-   
+
    # For full tests (real provider)
    cargo run --bin gateway -- --config-file gateway/tests/sdk/test_config_[provider].toml
    ```
@@ -53,7 +53,7 @@ This directory contains integration tests that validate TensorZero's compatibili
 
 🎉 **Major SDK Test Suite Cleanup Completed!**
 
-- ✅ **Removed redundant scripts** - Eliminated duplicate test runners  
+- ✅ **Removed redundant scripts** - Eliminated duplicate test runners
 - ✅ **Enhanced common infrastructure** - Added universal client factory and shared validation
 - ✅ **Created universal test suites** - Reusable test classes that work across all providers
 - ✅ **Consolidated duplicate tests** - Unified cross-provider testing in `universal_tests/`
@@ -66,11 +66,11 @@ The test suite now follows a **Universal SDK Architecture** with shared infrastr
 ```
 common/
 ├── utils.py           # Universal client factory, validation, test data
-├── test_suites.py     # Reusable test suites for all providers  
+├── test_suites.py     # Reusable test suites for all providers
 └── base_test.py       # Abstract base classes
 
 universal_tests/       # NEW! Consolidated cross-provider tests
-├── test_openai_sdk_all_providers.py    # Universal SDK compatibility  
+├── test_openai_sdk_all_providers.py    # Universal SDK compatibility
 ├── test_cross_provider_comparison.py   # Side-by-side provider comparison
 └── conftest.py        # Shared fixtures
 ```
@@ -168,7 +168,7 @@ chat_suite.test_basic_chat()
 
 Access standardized test data:
 
-```python  
+```python
 from common.utils import UniversalTestData
 
 models = UniversalTestData.get_provider_models()["together"]
@@ -350,7 +350,7 @@ Quick overview:
 # Test all providers
 - name: Start TensorZero (OpenAI CI)
   run: cargo run --bin gateway -- --config-file gateway/tests/sdk/test_config_openai_ci.toml &
-  
+
 - name: Run OpenAI CI Tests
   run: cd gateway/tests/sdk && ./run_tests.sh --provider openai --mode ci
 
@@ -358,8 +358,8 @@ Quick overview:
   run: |
     pkill -f "cargo run --bin gateway" || true
     cargo run --bin gateway -- --config-file gateway/tests/sdk/test_config_anthropic_ci.toml &
-    
-- name: Run Anthropic CI Tests  
+
+- name: Run Anthropic CI Tests
   run: cd gateway/tests/sdk && ./run_tests.sh --provider anthropic --mode ci
 ```
 
@@ -368,7 +368,7 @@ Quick overview:
 ```yaml
 - name: Start TensorZero
   run: cargo run --bin gateway -- --config-file gateway/tests/sdk/test_config_${{ matrix.provider }}.toml &
-  
+
 - name: Run Full Integration Tests
   run: cd gateway/tests/sdk && ./run_tests.sh --provider ${{ matrix.provider }} --mode full
   env:

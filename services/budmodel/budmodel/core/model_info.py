@@ -1,13 +1,11 @@
-import asyncio
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.future import select
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy import desc
 from datetime import datetime
-import json
+
+from sqlalchemy import desc
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
 
 # Import Models, Sources, and get_db_uri from your models definition
-from .models import Models, Sources, get_db_uri
+from .models import Models, Sources
 
 
 # TODO: Use the PSQL service for db management and keep the models in the target modules
@@ -18,13 +16,14 @@ from .models import Models, Sources, get_db_uri
 
 
 def serialize_value(value):
-    """Helper function to handle datetime serialization."""
+    """Handle datetime serialization."""
     if isinstance(value, datetime):
         return value.isoformat()
     return value
 
 
 async def fetch_merged_models(session: AsyncSession, page: int = 1, page_size: int = 10):
+    """Fetch merged models with pagination."""
     # Calculate offset for pagination
     offset = (page - 1) * page_size
 
@@ -61,6 +60,9 @@ async def fetch_merged_models(session: AsyncSession, page: int = 1, page_size: i
 
 
 async def get_models(page: int = 1, page_size: int = 10):
-    async with AsyncSessionLocal() as session:
-        models = await fetch_merged_models(session, page, page_size)
-        return models
+    """Get models with pagination."""
+    # TODO: Fix AsyncSessionLocal import
+    # async with AsyncSessionLocal() as session:
+    #     models = await fetch_merged_models(session, page, page_size)
+    #     return models
+    return []

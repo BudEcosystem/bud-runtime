@@ -55,15 +55,15 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
   const [averageRequestData, setAverageRequestData] = useState<any>();
   const [averageChartData, setAverageChartData] = useState<any>(null);
 
-  
+
   const [ttftInterval, setTtftInterval] = useState<any>("daily");
   const [ttftRequestData, setTtftRequestData] = useState<any>();
   const [ttftChartData, setTtftChartData] = useState<any>(null);
-  
+
   const [latencyInterval, setLatencyInterval] = useState<any>("daily");
   const [latencyRequestData, setLatencyRequestData] = useState<any>();
   const [latencyChartData, setLatencyChartData] = useState<any>(null);
-  
+
   const [throughputInterval, setThroughputInterval] = useState<any>("daily");
   const [throughputRequestData, setThroughputRequestData] = useState<any>();
   const [throughputChartData, setThroughputChartData] = useState<any>(null);
@@ -97,7 +97,7 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
     }
   });
   const segmentOptions = ["LAST 24 HRS", "LAST 7 DAYS", "LAST 30 DAYS"];
-  
+
   // Reset all chart data when project changes
   useEffect(() => {
     setModleChartData(null);
@@ -190,9 +190,9 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
 
   const createModelChartData = (data) => {
     console.log("Model usage data received:", data);
-    
+
     let chartData = null;
-    
+
     // Check if we have converted format
     if (data?.overall_metrics?.summary_metrics?.items?.length) {
       const items = data.overall_metrics.summary_metrics.items;
@@ -213,34 +213,34 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
     // Handle raw observability format
     else if (data?.items?.length) {
       console.log("Using raw observability format for model usage");
-      
+
       const endpointMap = {};
-      
+
       // Aggregate request counts across all time periods
       data.items.forEach((timePeriod) => {
         timePeriod.items.forEach((item) => {
           const name = item.endpoint_name || item.model_name || 'Unknown';
           const requestCount = item.data?.request_count?.count || 0;
-          
+
           if (!endpointMap[name]) {
             endpointMap[name] = 0;
           }
-          
+
           endpointMap[name] += requestCount;
         });
       });
-      
+
       const endpoints = Object.keys(endpointMap);
       const counts = endpoints.map(name => endpointMap[name]);
-      
+
       // Calculate total requests
       const totalRequests = counts.reduce((sum, count) => sum + count, 0);
-      
+
       chartData = {
         categories: endpoints,
         data: counts,
       };
-      
+
       setExtraChartDetails((prev) => ({
         ...prev,
         modelUsage: {
@@ -249,7 +249,7 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
         },
       }));
     }
-    
+
     if (chartData && chartData.categories.length > 0) {
       setModleChartData({
         ...chartData,
@@ -266,7 +266,7 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
           avg: "0",
         },
       }));
-      
+
       setModleChartData({
         categories: [],
         data: [],
@@ -356,7 +356,7 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
           output_avg: "0"
         }
       }));
-      
+
       setAverageChartData({
         dimensions: ["endpoint", "Input Tokens", "Output Tokens"],
         source: [],
@@ -373,7 +373,7 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
     setAverageInterval(handleChartFilter(data));
   };
   // token metrics code block ----------------------------------
-  
+
 
   // TTFT code block ----------------------------------
   const getTtftData = async () => {
@@ -400,14 +400,14 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
 
   const createTtftChartData = (data) => {
     console.log("TTFT data received:", data);
-    
+
     // Handle both converted format and raw observability format
     let chartData = null;
-    
+
     // Check if we have converted format
     if (data?.ttft_metrics?.items?.length) {
       console.log("Using converted TTFT format");
-      
+
       // Use summary items if available
       if (data.ttft_metrics.summary_metrics?.items?.length) {
         const items = data.ttft_metrics.summary_metrics.items;
@@ -419,33 +419,33 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
         // Aggregate from time series data
         const endpointTotals = {};
         const endpointCounts = {};
-        
+
         data.ttft_metrics.items.forEach((timePeriod) => {
           timePeriod.items.forEach((item) => {
             const name = item.name;
             const value = item.avg_ttft_ms || item.total_value || 0;
-            
+
             if (!endpointTotals[name]) {
               endpointTotals[name] = 0;
               endpointCounts[name] = 0;
             }
-            
+
             endpointTotals[name] += value;
             endpointCounts[name] += 1;
           });
         });
-        
+
         const endpoints = Object.keys(endpointTotals);
-        const averages = endpoints.map(name => 
+        const averages = endpoints.map(name =>
           endpointCounts[name] > 0 ? endpointTotals[name] / endpointCounts[name] : 0
         );
-        
+
         chartData = {
           categories: endpoints,
           data: averages,
         };
       }
-      
+
       setExtraChartDetails((prev) => ({
         ...prev,
         ttft: {
@@ -453,43 +453,43 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
           avg: data.ttft_metrics.summary_metrics?.delta_percentage || "0",
         },
       }));
-    } 
+    }
     // Handle raw observability format
     else if (data?.items?.length) {
       console.log("Using raw observability format for TTFT");
-      
+
       const endpointMap = {};
-      
+
       // Aggregate data across all time periods
       data.items.forEach((timePeriod) => {
         timePeriod.items.forEach((item) => {
           const name = item.endpoint_name || item.model_name || 'Unknown';
           const ttftData = item.data?.ttft;
           const value = ttftData?.avg || 0;
-          
+
           if (!endpointMap[name]) {
             endpointMap[name] = { total: 0, count: 0 };
           }
-          
+
           endpointMap[name].total += value;
           endpointMap[name].count += 1;
         });
       });
-      
+
       const endpoints = Object.keys(endpointMap);
-      const values = endpoints.map(name => 
+      const values = endpoints.map(name =>
         endpointMap[name].count > 0 ? endpointMap[name].total / endpointMap[name].count : 0
       );
-      
+
       // Calculate overall average
       const overallTotal = values.reduce((sum, val) => sum + val, 0);
       const overallAvg = values.length > 0 ? overallTotal / values.length : 0;
-      
+
       chartData = {
         categories: endpoints,
         data: values,
       };
-      
+
       setExtraChartDetails((prev) => ({
         ...prev,
         ttft: {
@@ -498,7 +498,7 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
         },
       }));
     }
-    
+
     if (chartData && chartData.categories.length > 0) {
       console.log("TTFT chart data:", chartData);
       setTtftChartData({
@@ -516,7 +516,7 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
           avg: "0",
         },
       }));
-      
+
       setTtftChartData({
         categories: [],
         data: [],
@@ -589,7 +589,7 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
           avg: "0",
         },
       }));
-      
+
       setLatencyChartData({
         categories: [],
         data: [],
@@ -662,7 +662,7 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
           avg: "0",
         },
       }));
-      
+
       setThroughputChartData({
         categories: [],
         data: [],
@@ -785,7 +785,7 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
           </div>
           {averageChartData?.source?.length ? (
             <>
-              
+
               <div className="h-[232px]">
                 <TokenMetricsChart
                   key={averageChartData?.source?.length}
@@ -801,7 +801,7 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
             ></NoChartData>
           )}
         </div>
-        
+
         {/* TTFT Chart */}
         <div className="cardBG w-[49.1%] cardSetTwo  py-[1.9rem] px-[1.65rem] border border-[#1F1F1F] rounded-md">
           <div className="flex justify-between align-center">

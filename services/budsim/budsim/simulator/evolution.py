@@ -337,8 +337,10 @@ class Evolution:
         # print(f"Data: {data}")
         return data
 
-    def apply_quantization_performance(self, ttft: float, throughput_per_user: float, e2e_latency: float) -> Tuple[float, float, float]:
-        
+    def apply_quantization_performance(
+        self, ttft: float, throughput_per_user: float, e2e_latency: float
+    ) -> Tuple[float, float, float]:
+        """Apply quantization performance scaling to metrics."""
         scale = 1.0
         if self.dtype == "bf16":
             scale = 1.0
@@ -347,7 +349,7 @@ class Evolution:
         elif self.dtype == "INT4":
             scale = 1.5
 
-        return ttft/scale, throughput_per_user * scale, e2e_latency / scale
+        return ttft / scale, throughput_per_user * scale, e2e_latency / scale
 
     def _evaluate_func(self, population: List[Any]) -> List[Any]:
         # Evaluate the individuals with an invalid fitness
@@ -373,7 +375,9 @@ class Evolution:
 
             data = self.prepare_predictor_data(ind_config)
             ttft, throughput_per_user, e2e_latency = self.benchmark_predictor(data)
-            ttft, throughput_per_user, e2e_latency = self.apply_quantization_performance(ttft, throughput_per_user, e2e_latency)
+            ttft, throughput_per_user, e2e_latency = self.apply_quantization_performance(
+                ttft, throughput_per_user, e2e_latency
+            )
             cost_per_million_tokens = self.cost_calculator.get_cost_per_million_tokens(
                 throughput_per_user, ind_config["concurrency"], self.device_config, ind_config["tensor_parallel_size"]
             )

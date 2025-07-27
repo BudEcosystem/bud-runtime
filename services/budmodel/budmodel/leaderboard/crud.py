@@ -17,19 +17,19 @@
 """The leaderboard CRUD operations."""
 
 import uuid
-from typing import List, Optional, Tuple, Dict
-
+from typing import Dict, List, Optional, Tuple
 
 from budmicroframe.shared.psql_service import CRUDMixin
-from sqlalchemy import Float, case, func, desc, and_
+from sqlalchemy import case, desc, func
 from sqlalchemy.orm import Session
 from sqlalchemy.types import BigInteger
 
+from ..commons.constants import LeaderboardDataOrigin
 from ..model_info.models import Leaderboard as LeaderboardModel
 from ..model_info.models import ModelInfoSchema
 from ..model_info.models import Source as SourceModel
 from .schemas import LeaderboardCreate
-from ..commons.constants import LeaderboardDataOrigin
+
 
 class SourceCRUD(CRUDMixin[SourceModel, None, None]):
     """Source table CRUD operations."""
@@ -128,15 +128,17 @@ class LeaderboardCRUD(CRUDMixin[LeaderboardModel, None, None]):
     #     )
     #     return query.all()
 
-    
     def get_all_eval_names(self, session: Optional[Session] = None) -> List[str]:
         """Fetch all unique eval names in the LeaderboardModel table."""
         session: Session = session or self.get_session()
         query = session.query(LeaderboardModel.eval_name.distinct())
         return [row[0] for row in query.all()]
-    
+
     # Helper to fetch full leaderboard (eval_name -> score) for model
-    def get_leaderboard_by_model_info_id(self, model_info_id: uuid.UUID, session: Optional[Session] = None) -> Dict[str, float]:
+    def get_leaderboard_by_model_info_id(
+        self, model_info_id: uuid.UUID, session: Optional[Session] = None
+    ) -> Dict[str, float]:
+        """Get leaderboard data by model info ID."""
         session: Session = session or self.get_session()
         rows = (
             session.query(LeaderboardModel.eval_name, LeaderboardModel.eval_score)
@@ -169,7 +171,7 @@ class LeaderboardCRUD(CRUDMixin[LeaderboardModel, None, None]):
             for row in session.query(LeaderboardModel.normalised_eval_name)
             .filter(
                 LeaderboardModel.model_info_id == current_model_info_id,
-                LeaderboardModel.eval_score != None,
+                LeaderboardModel.eval_score is not None,
             )
             .distinct()
             .all()
@@ -190,7 +192,7 @@ class LeaderboardCRUD(CRUDMixin[LeaderboardModel, None, None]):
             .filter(
                 ModelInfoSchema.architecture["num_params"].astext.cast(BigInteger).between(min_params, max_params),
                 LeaderboardModel.model_info_id != current_model_info_id,
-                LeaderboardModel.eval_score != None,
+                LeaderboardModel.eval_score is not None,
                 LeaderboardModel.normalised_eval_name.in_(current_eval_names),
             )
             .group_by(LeaderboardModel.model_info_id)
@@ -233,7 +235,7 @@ class LeaderboardCRUD(CRUDMixin[LeaderboardModel, None, None]):
             .join(ModelInfoSchema, LeaderboardModel.model_info_id == ModelInfoSchema.id)
             .filter(
                 LeaderboardModel.model_info_id == current_model_info_id,
-                LeaderboardModel.eval_score != None,
+                LeaderboardModel.eval_score is not None,
                 LeaderboardModel.normalised_eval_name.in_(current_eval_names),
             )
             .group_by(
@@ -258,7 +260,7 @@ class LeaderboardCRUD(CRUDMixin[LeaderboardModel, None, None]):
             )
             .filter(
                 LeaderboardModel.model_info_id.in_(all_model_ids),
-                LeaderboardModel.eval_score != None,
+                LeaderboardModel.eval_score is not None,
                 LeaderboardModel.normalised_eval_name.in_(current_eval_names),
             )
             .all()
@@ -273,13 +275,12 @@ class LeaderboardCRUD(CRUDMixin[LeaderboardModel, None, None]):
         limit: int = 10,
         session: Optional[Session] = None,
     ) -> List[dict]:
+        """Get leaderboards by model URIs."""
         session: Session = session or self.get_session()
 
         # Step 1: Fetch unique eval_names only once if fields not given
         if not fields:
-            fields = [
-            row[0] for row in session.query(LeaderboardModel.normalised_eval_name.distinct()).all()
-        ]
+            fields = [row[0] for row in session.query(LeaderboardModel.normalised_eval_name.distinct()).all()]
 
         if not fields:
             return []
@@ -287,38 +288,27 @@ class LeaderboardCRUD(CRUDMixin[LeaderboardModel, None, None]):
         # Step 2a: Build per-field max(score) expressions
         field_exprs = [
             func.max(
-                case(
-                    (LeaderboardModel.normalised_eval_name == field, LeaderboardModel.eval_score),
-                    else_=None
-                )
+                case((LeaderboardModel.normalised_eval_name == field, LeaderboardModel.eval_score), else_=None)
             ).label(field)
             for field in fields
         ]
         # Step 2b: Build corresponding eval_name expressions
         eval_label_exprs = [
             func.max(
-                case(
-                    (LeaderboardModel.normalised_eval_name == field, LeaderboardModel.eval_name),
-                    else_=None
-                )
+                case((LeaderboardModel.normalised_eval_name == field, LeaderboardModel.eval_name), else_=None)
             ).label(f"{field}_eval_label")
             for field in fields
         ]
 
         # Step 3: Compute average for sorting (not returned)
         avg_score = (
-            sum(func.coalesce(column, 0.0) for column in field_exprs) /
-            func.nullif(sum(case((column != None, 1), else_=0) for column in field_exprs), 0)
+            sum(func.coalesce(column, 0.0) for column in field_exprs)
+            / func.nullif(sum(case((column is not None, 1), else_=0) for column in field_exprs), 0)
         ).label("avg_score")
 
         # Step 4: Final query
         query = (
-            session.query(
-                ModelInfoSchema.uri.label("uri"),
-                *field_exprs,
-                *eval_label_exprs,
-                avg_score
-            )
+            session.query(ModelInfoSchema.uri.label("uri"), *field_exprs, *eval_label_exprs, avg_score)
             .join(ModelInfoSchema, ModelInfoSchema.id == LeaderboardModel.model_info_id)
             .filter(ModelInfoSchema.uri.in_(model_uris))
             .having(avg_score.isnot(None))
@@ -332,7 +322,7 @@ class LeaderboardCRUD(CRUDMixin[LeaderboardModel, None, None]):
         for row in query.all():
             row_dict = dict(row._mapping)
             parsed = {"uri": row_dict["uri"]}
-            benchmarks=[]
+            benchmarks = []
             for field in fields:
                 score = row_dict.get(field)
                 eval_label = row_dict.get(f"{field}_eval_label")
@@ -341,19 +331,24 @@ class LeaderboardCRUD(CRUDMixin[LeaderboardModel, None, None]):
             if benchmarks:
                 parsed["benchmarks"] = benchmarks
                 results.append(parsed)
-            
-        return results
 
+        return results
 
     def get_model_evals_by_uris(
         self,
         model_uris: List[str],
         session: Optional[Session] = None,
     ):
+        """Get model evaluations by URIs."""
         session: Session = session or self.get_session()
         # Fetch all models with given URIs
         results = (
-            session.query(ModelInfoSchema.uri, LeaderboardModel.eval_name, LeaderboardModel.normalised_eval_name, LeaderboardModel.eval_score)
+            session.query(
+                ModelInfoSchema.uri,
+                LeaderboardModel.eval_name,
+                LeaderboardModel.normalised_eval_name,
+                LeaderboardModel.eval_score,
+            )
             .join(LeaderboardModel, ModelInfoSchema.id == LeaderboardModel.model_info_id)
             .filter(ModelInfoSchema.uri.in_(model_uris))
             .all()
@@ -361,22 +356,23 @@ class LeaderboardCRUD(CRUDMixin[LeaderboardModel, None, None]):
 
         return results
 
-
     def update_or_insert_leaderboards(
-        self,
-        model_info_id: uuid.UUID,
-        entries: List[LeaderboardCreate],
-        session: Optional[Session] = None
+        self, model_info_id: uuid.UUID, entries: List[LeaderboardCreate], session: Optional[Session] = None
     ) -> None:
+        """Update or insert leaderboard entries."""
         session: Session = session or self.get_session()
 
         # Fetch existing records with primary key (id) included
-        existing = session.query(
-            LeaderboardModel.id,
-            LeaderboardModel.normalised_eval_name,
-            LeaderboardModel.eval_score,
-            LeaderboardModel.data_origin
-        ).filter(LeaderboardModel.model_info_id == model_info_id).all()
+        existing = (
+            session.query(
+                LeaderboardModel.id,
+                LeaderboardModel.normalised_eval_name,
+                LeaderboardModel.eval_score,
+                LeaderboardModel.data_origin,
+            )
+            .filter(LeaderboardModel.model_info_id == model_info_id)
+            .all()
+        )
 
         existing_map = {row.normalised_eval_name: row for row in existing}
 
@@ -386,38 +382,50 @@ class LeaderboardCRUD(CRUDMixin[LeaderboardModel, None, None]):
         for entry in entries:
             existing_entry = existing_map.get(entry.normalised_eval_name)
 
-            if existing_entry: 
+            if existing_entry:
                 if entry.data_origin == LeaderboardDataOrigin.SCRAPED:
-                    if existing_entry.data_origin == LeaderboardDataOrigin.SCRAPED and entry.eval_score != existing_entry.eval_score:
-                        updates.append({
-                            'id': existing_entry.id,
-                            'eval_score': entry.eval_score,
-                        })
+                    if (
+                        existing_entry.data_origin == LeaderboardDataOrigin.SCRAPED
+                        and entry.eval_score != existing_entry.eval_score
+                    ):
+                        updates.append(
+                            {
+                                "id": existing_entry.id,
+                                "eval_score": entry.eval_score,
+                            }
+                        )
                     elif existing_entry.data_origin == LeaderboardDataOrigin.README_LLM:
-                        updates.append({
-                            'id': existing_entry.id,
-                            'eval_score': entry.eval_score,
-                            'data_origin': entry.data_origin,
-                            'source_id': entry.source_id
-                        })
-                elif entry.data_origin == LeaderboardDataOrigin.README_LLM:
-                    if existing_entry.data_origin == LeaderboardDataOrigin.README_LLM and entry.eval_score != existing_entry.eval_score:
-                        updates.append({
-                            'id': existing_entry.id,
-                            'eval_score': entry.eval_score,
-                        })
-
+                        updates.append(
+                            {
+                                "id": existing_entry.id,
+                                "eval_score": entry.eval_score,
+                                "data_origin": entry.data_origin,
+                                "source_id": entry.source_id,
+                            }
+                        )
+                elif entry.data_origin == LeaderboardDataOrigin.README_LLM and (
+                    existing_entry.data_origin == LeaderboardDataOrigin.README_LLM
+                    and entry.eval_score != existing_entry.eval_score
+                ):
+                    updates.append(
+                        {
+                            "id": existing_entry.id,
+                            "eval_score": entry.eval_score,
+                        }
+                    )
 
             else:
                 # Insert new row
-                inserts.append(LeaderboardModel(
-                    model_info_id=model_info_id,
-                    eval_name=entry.eval_name,
-                    normalised_eval_name=entry.normalised_eval_name,
-                    eval_score=entry.eval_score,
-                    data_origin=entry.data_origin,
-                    source_id=entry.source_id,
-                ))
+                inserts.append(
+                    LeaderboardModel(
+                        model_info_id=model_info_id,
+                        eval_name=entry.eval_name,
+                        normalised_eval_name=entry.normalised_eval_name,
+                        eval_score=entry.eval_score,
+                        data_origin=entry.data_origin,
+                        source_id=entry.source_id,
+                    )
+                )
 
         # Bulk update and insert
         if updates:

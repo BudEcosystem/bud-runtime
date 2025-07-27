@@ -16,7 +16,7 @@
 
 """Common schemas for the Bud Metrics service."""
 
-from typing import Any, Dict, Set, Union, Optional
+from typing import Any, Dict, Optional, Set, Union
 from uuid import UUID
 
 from budmicroframe.commons.schemas import ResponseBase

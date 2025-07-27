@@ -85,7 +85,7 @@ const PromptScoreDetail = () => {
 
   const getPromptUsageData = useCallback(async () => {
     if (!endpointId || !scoreType) return;
-    
+
     try {
       const response: any = await AppRequest.Get(`/endpoints/${endpointId}/interactions?scoring_result=${scoringType[scoreType]}`);
       if (response.data.results) {

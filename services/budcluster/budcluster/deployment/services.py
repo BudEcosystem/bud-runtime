@@ -203,9 +203,11 @@ class DeploymentService(SessionMixin):
         # Determine deployment type based on provider and credential_id
         is_cloud_deployment = self._is_cloud_deployment(deployment)
 
-        logger.info(f"Deployment type detection - Provider: {deployment.provider}, "
-                   f"Credential ID: {deployment.credential_id}, "
-                   f"Cloud deployment: {is_cloud_deployment}")
+        logger.info(
+            f"Deployment type detection - Provider: {deployment.provider}, "
+            f"Credential ID: {deployment.credential_id}, "
+            f"Cloud deployment: {is_cloud_deployment}"
+        )
 
         if is_cloud_deployment:
             logger.info("Routing to cloud deployment workflow")

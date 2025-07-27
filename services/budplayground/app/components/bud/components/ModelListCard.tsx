@@ -37,8 +37,8 @@ export function ModelListCard({
   const { name, model } = data;
 
   const imageUrl =
-    assetBaseUrl + (typeof data.model === 'object' && data.model ? 
-      (data.model.icon || (data.model.provider && data.model.provider.icon)) : 
+    assetBaseUrl + (typeof data.model === 'object' && data.model ?
+      (data.model.icon || (data.model.provider && data.model.provider.icon)) :
       '/icons/modelRepoWhite.png');
   const fallbackImageUrl = "/icons/modelRepoWhite.png";
 
@@ -52,10 +52,10 @@ export function ModelListCard({
         handleClick?.();
       }}
       onMouseLeave={() => setHover(false)}
-      className={`pt-[1.05rem] pb-[.8rem] cursor-pointer 
-        hover:shadow-lg pl-[1.5rem] border-y-[0.5px] border-y-[#1F1F1F] 
-        hover:border-[#757575] h-[80px] flex-row flex border-box 
-        hover:bg-[#FFFFFF08] 
+      className={`pt-[1.05rem] pb-[.8rem] cursor-pointer
+        hover:shadow-lg pl-[1.5rem] border-y-[0.5px] border-y-[#1F1F1F]
+        hover:border-[#757575] h-[80px] flex-row flex border-box
+        hover:bg-[#FFFFFF08]
           items-center justify-center ${
             selectable ? (selected ? "bg-[#FFFFFF08]" : "bg-[#1F1F1F]") : ""
           }`}

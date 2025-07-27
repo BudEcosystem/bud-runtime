@@ -221,7 +221,7 @@ with open("original.png", "rb") as img_file:
             "prompt": "Replace the sky with aurora borealis",
             "model": "dall-e-2"
         }
-        
+
         edit_response = requests.post(
             "http://localhost:3000/v1/images/edits",
             headers={"Authorization": "Bearer YOUR_API_KEY"},

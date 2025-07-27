@@ -86,7 +86,7 @@ setup(
     ),
     package_data={"askbud": ["py.typed"]},
     include_package_data=True,
-    python_requires=">=3.8.0",
+    python_requires=">=3.10.0",
     install_requires=get_requirements(),
     extras_require={},
     classifiers=[
@@ -98,7 +98,8 @@ setup(
         "License :: OSI Approved :: Apache Software License",
         "Operating System :: OS Independent",
         "Environment :: Console",
-        "Framework :: Pytest" "Programming Language :: Python :: 3",
+        "Framework :: Pytest",
+        "Programming Language :: Python :: 3",
     ]
     + [f"Programming Language :: Python :: 3.{i}" for i in range(8, version_range_max)],
 )

@@ -5,9 +5,10 @@ from .routes import observability_router
 from .schemas import ObservabilityMetricsRequest, ObservabilityMetricsResponse
 from .services import ObservabilityMetricsService
 
+
 __all__ = [
     "ClickHouseClient",
-    "ClickHouseConfig", 
+    "ClickHouseConfig",
     "QueryBuilder",
     "ObservabilityMetricsRequest",
     "ObservabilityMetricsResponse",

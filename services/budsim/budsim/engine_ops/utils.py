@@ -1,12 +1,14 @@
-import requests
 from typing import List, Optional, Union
 
-from transformers import AutoConfig
+import requests
 from budmicroframe.commons import logging
+from transformers import AutoConfig
+
 from ..commons.config import app_settings
 
 
 logger = logging.get_logger(__name__)
+
 
 def get_hf_config_sliding_window(model: str) -> Union[Optional[int], List[Optional[int]]]:
     """Get the sliding window size, or None if disabled."""
@@ -18,7 +20,10 @@ def get_hf_config_sliding_window(model: str) -> Union[Optional[int], List[Option
         return None
     return getattr(config, "sliding_window", None)
 
-def fetch_compatible_engines(model_architecture: str,) -> Optional[str]:
+
+def fetch_compatible_engines(
+    model_architecture: str,
+) -> Optional[str]:
     """Retrieve a list of compatible engines for a given model using the BudConnect API.
 
     This function makes an API call to the BudConnect service to get a list of compatible
@@ -30,18 +35,23 @@ def fetch_compatible_engines(model_architecture: str,) -> Optional[str]:
     Returns:
         Optional[str]: A string containing the compatible engines information, or None if the API call fails.
     """
-    
     try:
         response = requests.get(
             f"{app_settings.bud_connect_url}/engine/get-compatible-engines",
             params={"model_architecture": model_architecture},
-            timeout=30
+            timeout=30,
         )
         response.raise_for_status()
         response_json = response.json()
         compatible_engines = []
         for engine in response_json["compatible_engines"]:
-            compatible_engines.append({"engine_name": engine["engine"], "device": engine["device_architecture"], "image": engine["container_image"]})
+            compatible_engines.append(
+                {
+                    "engine_name": engine["engine"],
+                    "device": engine["device_architecture"],
+                    "image": engine["container_image"],
+                }
+            )
         if compatible_engines:
             return compatible_engines
         else:

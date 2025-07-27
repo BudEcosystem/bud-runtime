@@ -10,7 +10,7 @@ function HistoryListItem({ data, chatId }: { data: Session, chatId: string }) {
         onClick={() => {
             disableChat(chatId);
             enableChat(data.id);
-          
+
         }}
         className={`flex flex-row items-center gap-[1rem] p-[.45rem] px-[.65rem] justify-between border-[1px] border-[#1F1F1F00] hover:border-[#1F1F1F] rounded-[8px] backdrop-blur-[10px] hover:bg-[#FFFFFF08] cursor-pointer ${chatId === data.id ? 'bg-[#FFFFFF08] border-[#1F1F1F]' : ''}`}
       >
@@ -26,7 +26,7 @@ function HistoryListItem({ data, chatId }: { data: Session, chatId: string }) {
             {data.name}
           </span>
         </div>
-  
+
         <span className="Open-Sans text-[#757575] text-[.625rem] font-[400] pr-[.15rem]">
           {data.total_tokens} tokens
         </span>

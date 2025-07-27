@@ -41,4 +41,4 @@
     - name: Wait for a moment to ensure SCC is applied
       pause:
         seconds: 5
-      when: scc_result is changed 
+      when: scc_result is changed

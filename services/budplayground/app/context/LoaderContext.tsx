@@ -21,10 +21,10 @@ export const LoaderProvider: React.FC<{ children: React.ReactNode }> = ({
     children,
   }) => {
     const [isLoading, setIsLoading] = useState(true);
-  
+
     const showLoader = useCallback(() => setIsLoading(true), []);
     const hideLoader = useCallback(() => setIsLoading(false), []);
-  
+
     return (
       <LoaderContext.Provider value={{ isLoading, showLoader, hideLoader }}>
         {children}
@@ -43,7 +43,7 @@ export const LoaderProvider: React.FC<{ children: React.ReactNode }> = ({
 
   export const LoaderWrapper = () => {
     const { isLoading } = useLoader();
-  
+
     return isLoading ? (
       <div className="z-[1000] fixed top-0 left-0 w-screen h-screen flex justify-center items-center	backdrop-blur-[2px]">
         {/* <Spinner size="3" className="z-[1000] relative w-[20px] h-[20px] block" /> */}

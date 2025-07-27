@@ -1,7 +1,7 @@
 # BudMetrics Service
 
 [![License](https://img.shields.io/badge/License-AGPL%203.0-blue.svg)](https://opensource.org/licenses/AGPL-3.0)
-[![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.10+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green.svg)](https://fastapi.tiangolo.com/)
 [![ClickHouse](https://img.shields.io/badge/ClickHouse-22.6+-yellow.svg)](https://clickhouse.com/)
 [![Dapr](https://img.shields.io/badge/Dapr-1.10+-blue.svg)](https://dapr.io/)
@@ -366,7 +366,7 @@ POST /observability/add
 
 With 1 billion+ rows in ClickHouse:
 - Query execution: ~750ms
-- Result processing: ~1.1s  
+- Result processing: ~1.1s
 - End-to-end latency: ~3.95s (with compression + orjson)
 - Payload size: 143KB compressed (from 15.59MB raw)
 - Throughput: 10,000+ queries per minute
@@ -513,10 +513,10 @@ telnet localhost 8123
 # Error: Queries taking too long
 # Solution: Optimize queries and increase resources
 # Check ClickHouse query log:
-SELECT query, query_duration_ms, memory_usage 
-FROM system.query_log 
-WHERE type = 'QueryFinish' 
-ORDER BY query_duration_ms DESC 
+SELECT query, query_duration_ms, memory_usage
+FROM system.query_log
+WHERE type = 'QueryFinish'
+ORDER BY query_duration_ms DESC
 LIMIT 10;
 
 # Optimize table:
@@ -537,16 +537,16 @@ OPTIMIZE TABLE observability_metrics FINAL;
 # Error: Disk space running low
 # Solution: Implement data retention policies
 # Clean old data:
-ALTER TABLE observability_metrics 
+ALTER TABLE observability_metrics
 DELETE WHERE timestamp < now() - INTERVAL 90 DAY;
 
 # Check table sizes:
-SELECT 
+SELECT
     table,
     formatReadableSize(sum(bytes)) as size
-FROM system.parts 
-WHERE active 
-GROUP BY table 
+FROM system.parts
+WHERE active
+GROUP BY table
 ORDER BY sum(bytes) DESC;
 ```
 

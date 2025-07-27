@@ -34,7 +34,6 @@ from budmicroframe.shared.dapr_service import DaprService
 
 from ..commons.config import app_settings
 from ..commons.constants import ModelDownloadStatus
-from ..commons.directory_utils import DirectoryOperations
 from ..commons.exceptions import (
     Aria2Exception,
     CompressionException,
@@ -197,8 +196,6 @@ class LocalModelDownloadService:
         source_path = os.path.join(app_settings.add_model_dir, uri)
         destination = os.path.join(app_settings.model_download_dir, directory_name)
 
-        directory_operations = DirectoryOperations()
-
         # Calculate free space
         free_space_gb = DownloadHistory.get_available_space()
         model_size_bytes = get_size_in_bytes(source_path)
@@ -351,7 +348,7 @@ class LocalModelDownloadService:
                         logger.debug(
                             f"[{i}/{total_files}] {progress:.1f}% | "
                             f"Extracted: {filename} "
-                            f"({file_size / (1024*1024):.2f} MB)"
+                            f"({file_size / (1024 * 1024):.2f} MB)"
                         )
 
                     except Exception as e:
@@ -583,7 +580,7 @@ class LocalModelDownloadService:
                     progress = (transferred_size / total_size) * 100
 
                     logger.debug(
-                        "Progress: [%d/%d] %.1f%% | " "Transferred: %.2f MB",
+                        "Progress: [%d/%d] %.1f%% | Transferred: %.2f MB",
                         file_count,
                         total_files,
                         progress,

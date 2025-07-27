@@ -39,15 +39,15 @@ cleanup() {
     local exit_code=$?
     echo ""
     echo "🧹 Cleaning up..."
-    
+
     if [ -n "${GATEWAY_PID:-}" ] && check_process "$GATEWAY_PID"; then
         kill "$GATEWAY_PID" 2>/dev/null || true
     fi
-    
+
     if [ -n "${MOCK_PID:-}" ] && check_process "$MOCK_PID"; then
         kill "$MOCK_PID" 2>/dev/null || true
     fi
-    
+
     # Show logs on failure
     if [ $exit_code -ne 0 ]; then
         echo ""
@@ -165,7 +165,7 @@ if command -v jq >/dev/null 2>&1; then
     LATENCY_P99=$(jq -r '.latencies."99th"' "$OUTPUT_FILE" | awk '{print $1/1000000}')
     SUCCESS_RATE=$(jq -r '.success' "$OUTPUT_FILE" | awk '{print $1*100}')
     THROUGHPUT=$(jq -r '.throughput' "$OUTPUT_FILE")
-    
+
     printf "Latency:\n"
     printf "  P50:  %7.2f ms\n" "$LATENCY_P50"
     printf "  P95:  %7.2f ms\n" "$LATENCY_P95"
@@ -174,14 +174,14 @@ if command -v jq >/dev/null 2>&1; then
     printf "\n"
     printf "Success Rate: %.2f%%\n" "$SUCCESS_RATE"
     printf "Throughput:   %.2f req/s\n" "$THROUGHPUT"
-    
+
     # Strict threshold check - P99 must be under 1.5ms
     echo ""
     if [ $(awk -v p99="$LATENCY_P99" 'BEGIN { print (p99 > 1.5) }') -eq 1 ]; then
         echo -e "${RED}❌ Error: P99 latency (${LATENCY_P99}ms) exceeds threshold (1.5ms)${NC}"
         exit 1
     fi
-    
+
     if [ $(awk -v sr="$SUCCESS_RATE" 'BEGIN { print (sr < 99.9) }') -eq 1 ]; then
         echo -e "${RED}❌ Error: Success rate (${SUCCESS_RATE}%) below threshold (99.9%)${NC}"
         exit 1

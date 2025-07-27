@@ -23,6 +23,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from typing_extensions import Annotated, List, Optional
 
+from budapp.auth.services import AuthService
 from budapp.commons import logging
 from budapp.commons.constants import PermissionEnum
 from budapp.commons.dependencies import (
@@ -48,7 +49,6 @@ from budapp.user_ops.schemas import (
     UserUpdate,
 )
 from budapp.user_ops.services import UserService
-from budapp.auth.services import AuthService
 
 from ..permissions.schemas import CheckUserResourceScope
 from ..permissions.service import PermissionService
@@ -374,16 +374,13 @@ async def get_all_users(
 async def create_user(
     user: UserCreate,
     current_user: Annotated[User, Depends(get_current_active_user)],
-    session: Annotated[Session, Depends(get_session)]
+    session: Annotated[Session, Depends(get_session)],
 ) -> Union[UserResponse, ErrorResponse]:
     """Create a new user with email and password."""
     try:
         db_user = await AuthService(session).register_user(user)
         return UserResponse(
-            object="user.create",
-            code=status.HTTP_200_OK,
-            message="User created successfully",
-            user=db_user
+            object="user.create", code=status.HTTP_200_OK, message="User created successfully", user=db_user
         ).to_http_response()
     except ClientException as e:
         logger.error(f"ClientException: {e}")

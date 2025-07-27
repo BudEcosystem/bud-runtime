@@ -49,7 +49,7 @@ export const colourOptions = [
   { value: COLOR_19, label: "White" },
   { value: "#3EC564", label:"Available" },
   { value: COLOR_20, label:"Gray40" },
-  
+
 ];
 
 export const colourStyles = (overrides: any = {}): StylesConfig<ColourOption, true> => {

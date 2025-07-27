@@ -5,10 +5,10 @@ import { Image } from "antd";
 interface ComingSoonProps {
   textMessage?: any;
   classNames?: string;
-  shrink?: boolean; 
-  scaleValue?: number; 
-  comingYpos?: any; 
-  comingXpos?: any; 
+  shrink?: boolean;
+  scaleValue?: number;
+  comingYpos?: any;
+  comingXpos?: any;
   comingOverlay?: string;
 }
 

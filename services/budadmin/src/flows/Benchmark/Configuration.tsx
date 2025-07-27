@@ -34,7 +34,7 @@ export default function Configuration() {
   useEffect(() => {
     fetchList("");
   }, []);
-  
+
   return (
     <BudForm
       data={{

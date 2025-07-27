@@ -35,17 +35,17 @@ echo "Creating/updating ConfigMap..."
     --token=$KUBE_TOKEN --certificate-authority=$KUBE_CA_CERT apply -f -
 
 while true; do
-  
+
   echo "ConfigMap creation/update attempted. Sleeping for 300 seconds..."
   sleep 300
-  
+
   TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-  
+
   echo "Fetching node status..."
   NODE_STATUS=$(kubectl --server=https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_SERVICE_PORT \
     --token=$KUBE_TOKEN --certificate-authority=$KUBE_CA_CERT \
     get node $NODE_NAME -o=jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
-  
+
   echo "Creating/updating ConfigMap..."
   kubectl --server=https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_SERVICE_PORT \
     --token=$KUBE_TOKEN --certificate-authority=$KUBE_CA_CERT \
@@ -57,5 +57,5 @@ while true; do
     --from-literal=devices="${HARDWARE_INFO}" \
     -o yaml --dry-run=client | kubectl --server=https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_SERVICE_PORT \
     --token=$KUBE_TOKEN --certificate-authority=$KUBE_CA_CERT apply -f -
-  
+
 done

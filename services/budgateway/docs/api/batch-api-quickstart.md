@@ -144,16 +144,16 @@ while True:
         f"{BASE_URL}/batches/{batch_id}",
         headers={"Authorization": f"Bearer {API_KEY}"}
     ).json()
-    
+
     print(f"Status: {batch['status']}")
-    
+
     if batch["status"] == "completed":
         output_file_id = batch["output_file_id"]
         break
     elif batch["status"] == "failed":
         print("Batch failed!")
         exit(1)
-    
+
     time.sleep(30)  # Wait 30 seconds
 
 # 4. Download and process results

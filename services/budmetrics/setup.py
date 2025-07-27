@@ -85,7 +85,7 @@ setup(
     ),
     package_data={"budmetrics": ["py.typed"]},
     include_package_data=True,
-    python_requires=">=3.8.0",
+    python_requires=">=3.10.0",
     install_requires=get_requirements(),
     extras_require={},
     classifiers=[

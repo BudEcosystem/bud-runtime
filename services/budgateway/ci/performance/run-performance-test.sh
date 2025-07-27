@@ -48,7 +48,7 @@ cleanup() {
     local exit_code=$?
     echo ""
     echo "🧹 Cleaning up..."
-    
+
     # If we're exiting with an error, show logs
     if [ $exit_code -ne 0 ]; then
         echo ""
@@ -64,19 +64,19 @@ cleanup() {
             tail -50 mock-provider.log
         fi
     fi
-    
+
     if [ -n "${GATEWAY_PID:-}" ] && check_process "$GATEWAY_PID"; then
         echo "  Stopping gateway (PID: $GATEWAY_PID)"
         kill "$GATEWAY_PID" 2>/dev/null || true
         wait "$GATEWAY_PID" 2>/dev/null || true
     fi
-    
+
     if [ -n "${MOCK_PID:-}" ] && check_process "$MOCK_PID"; then
         echo "  Stopping mock provider (PID: $MOCK_PID)"
         kill "$MOCK_PID" 2>/dev/null || true
         wait "$MOCK_PID" 2>/dev/null || true
     fi
-    
+
     # Clean up any processes on our ports
     lsof -i :3000 | grep -v COMMAND | awk '{print $2}' | xargs -r kill -9 2>/dev/null || true
     lsof -i :3030 | grep -v COMMAND | awk '{print $2}' | xargs -r kill -9 2>/dev/null || true
@@ -215,7 +215,7 @@ if command -v jq >/dev/null 2>&1; then
     LATENCY_MAX=$(jq -r '.latencies.max' "$OUTPUT_FILE" | awk '{print $1/1000000}')
     SUCCESS_RATE=$(jq -r '.success' "$OUTPUT_FILE" | awk '{print $1*100}')
     THROUGHPUT=$(jq -r '.throughput' "$OUTPUT_FILE")
-    
+
     printf "Latency (ms):\n"
     printf "  Mean:   %8.2f ms\n" "$LATENCY_MEAN"
     printf "  P50:    %8.2f ms\n" "$LATENCY_P50"
@@ -225,18 +225,18 @@ if command -v jq >/dev/null 2>&1; then
     printf "\n"
     printf "Success Rate: %.2f%%\n" "$SUCCESS_RATE"
     printf "Throughput:   %.2f req/s\n" "$THROUGHPUT"
-    
+
     # Check for performance thresholds
     echo ""
     echo "🎯 Performance Checks"
     echo "━━━━━━━━━━━━━━━━━━━━"
-    
+
     # Define strict thresholds - P99 must be under 1.5ms
     P99_THRESHOLD=1.5  # 1.5ms max for P99 latency
     SUCCESS_THRESHOLD=99.9  # 99.9% minimum success rate
-    
+
     CHECKS_PASSED=true
-    
+
     # Check P99 latency
     if (( $(echo "$LATENCY_P99 > $P99_THRESHOLD" | bc -l) )); then
         echo -e "${RED}❌ P99 latency (${LATENCY_P99}ms) exceeds threshold (${P99_THRESHOLD}ms)${NC}"
@@ -244,7 +244,7 @@ if command -v jq >/dev/null 2>&1; then
     else
         echo -e "${GREEN}✓ P99 latency (${LATENCY_P99}ms) within threshold (${P99_THRESHOLD}ms)${NC}"
     fi
-    
+
     # Check success rate
     if (( $(echo "$SUCCESS_RATE < $SUCCESS_THRESHOLD" | bc -l) )); then
         echo -e "${RED}❌ Success rate (${SUCCESS_RATE}%) below threshold (${SUCCESS_THRESHOLD}%)${NC}"
@@ -252,7 +252,7 @@ if command -v jq >/dev/null 2>&1; then
     else
         echo -e "${GREEN}✓ Success rate (${SUCCESS_RATE}%) meets threshold (${SUCCESS_THRESHOLD}%)${NC}"
     fi
-    
+
     if [ "$CHECKS_PASSED" = false ]; then
         echo ""
         echo -e "${RED}⚠️  Performance checks failed!${NC}"

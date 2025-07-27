@@ -58,9 +58,9 @@ const RoutesComponent: React.FC<RoutesProps> = ({ data }) => {
       const { hasProjectPermission, hasPermission } = useUser();
       const { setSelectedProjectId } = useRoutes();
       useLoaderOnLoding(loading);
-  
+
       const { contextHolder, openConfirm } = useConfirmAction()
-  
+
       const page = 1;
       const limit = 1000;
       const getData = async () => {
@@ -76,22 +76,22 @@ const RoutesComponent: React.FC<RoutesProps> = ({ data }) => {
       const setEndpointDetails = (id) => {
           getEndpointClusterDetails(id, projectId as string);
       }
-  
+
       useHandleRouteChange(() => {
           notification.destroy();
       });
-  
+
       useEffect(() => {
           if (projectId) {
               getData();
               setSelectedProjectId(projectId as string)
           }
       }, [projectId])
-  
+
       useEffect(() => {
           // debounce
           if (!projectId) return;
-  
+
           const timer = setTimeout(() => {
               getEndPoints({
                   id: projectId,
@@ -103,7 +103,7 @@ const RoutesComponent: React.FC<RoutesProps> = ({ data }) => {
           }, 500);
           return () => clearTimeout(timer);
       }, [searchValue, order, orderBy]);
-  
+
       const confirmDelete = (record) => {
           if (record?.status === 'deleting' || record?.status === 'deleted') {
               errorToast('Deployment is in deleting state, please wait for it to complete');
@@ -140,11 +140,11 @@ const RoutesComponent: React.FC<RoutesProps> = ({ data }) => {
               type: 'warining'
           });
       }
-  
+
       return (
           <div className='pb-[60px] pt-[.4rem]'>
               {contextHolder}
-  
+
               <Table<DataType>
                   columns={[
                       {
@@ -269,7 +269,7 @@ const RoutesComponent: React.FC<RoutesProps> = ({ data }) => {
                       setOrderBy(sorter.field)
                   }}
                   showSorterTooltip={true}
-  
+
                   title={() => (
                       <div className='flex justify-between items-center px-[0.75rem] py-[1rem]'>
                           <Text_16_600_FFFFFF className='text-[#EEEEEE]'  >
@@ -312,5 +312,3 @@ const RoutesComponent: React.FC<RoutesProps> = ({ data }) => {
 };
 
 export default RoutesComponent;
-
-

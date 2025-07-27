@@ -38,32 +38,32 @@ const formatDateByScale = (dateStr: string, scale: string): string => {
   // Check if it has a timezone indicator at the end (Z, +XX:XX, -XX:XX)
   const hasTimezone = /[Z]$|[+-]\d{2}:\d{2}$/.test(dateStr);
   const utcDateStr = hasTimezone ? dateStr : dateStr + 'Z';
-  
+
   const date = new Date(utcDateStr);
-  
+
   if (scale === "hourly") {
     // For hourly data (24hrs view), show only time without date
-    return date.toLocaleTimeString('en-US', { 
+    return date.toLocaleTimeString('en-US', {
       hour: '2-digit',
       minute: '2-digit',
       hour12: true
     });
   } else if (scale === "daily") {
     // For daily data, show date
-    return date.toLocaleDateString('en-US', { 
-      month: 'short', 
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
       day: 'numeric'
     });
   } else if (scale === "weekly") {
     // For weekly data, show week range
     const weekStart = new Date(date);
     weekStart.setDate(date.getDate() - date.getDay());
-    return weekStart.toLocaleDateString('en-US', { 
-      month: 'short', 
+    return weekStart.toLocaleDateString('en-US', {
+      month: 'short',
       day: 'numeric'
     });
   }
-  
+
   return formatDate(dateStr);
 };
 import ComingSoon from "@/components/ui/comingSoon";
@@ -419,7 +419,7 @@ function APICallsTimeSeriesChart({
 }) {
   useEffect(() => {
     if (!data || !data.categories || !data.data) return;
-    
+
     const chartRef = document.getElementById("api-calls-time-series-chart");
     const myChart = echarts.init(chartRef, null, {
       renderer: "canvas",
@@ -709,7 +709,7 @@ function TokenUsageCard(deployment) {
             name: "Task 1",
             data: data?.concurrency_metrics?.items
               .map((period) =>
-                period.items && period.items.length > 0 ? 
+                period.items && period.items.length > 0 ?
                   period.items[0].total_value || 0 : 0
               )
               .reverse(),
@@ -742,20 +742,20 @@ function TokenUsageCard(deployment) {
         metrics: "concurrency",
         to_date: to_date,
       };
-      
+
       // Convert to new format
       const observabilityRequest = convertToObservabilityRequest(params);
-      
+
       const url = `${tempApiBaseUrl}/metrics/analytics`;
       const response: any = await AppRequest.Post(url, observabilityRequest);
-      
+
       // Convert response back to old format
       const convertedData = convertObservabilityResponse(
         response.data,
         params.metrics,
         params.filter_by
       );
-      
+
       setTokenUsageRequestData(convertedData);
     } catch (error) {
       console.error("Error fetching concurrent requests:", error);
@@ -892,7 +892,7 @@ function APICallsCard(endpoint) {
   const load = async () => {
     try {
       const to_date = new Date().toISOString();
-      
+
       // Map interval to appropriate frequency
       let frequency = apiRequestInterval;
       if (apiRequestInterval === "daily") {
@@ -902,7 +902,7 @@ function APICallsCard(endpoint) {
       } else if (apiRequestInterval === "monthly") {
         frequency = "weekly"; // Last 30 days -> weekly data
       }
-      
+
       const params = {
         frequency: frequency,
         filter_by: "endpoint",
@@ -912,20 +912,20 @@ function APICallsCard(endpoint) {
         metrics: "overall",
         to_date: to_date,
       };
-      
+
       // Convert to new format
       const observabilityRequest = convertToObservabilityRequest(params);
-      
+
       const url = `${tempApiBaseUrl}/metrics/analytics`;
       const response: any = await AppRequest.Post(url, observabilityRequest);
-      
+
       // Convert response back to old format
       const convertedData = convertObservabilityResponse(
         response.data,
         params.metrics,
         params.filter_by
       );
-      
+
       setRequestCounts(convertedData);
     } catch (error) {
       console.error("Error fetching request counts:", error);
@@ -937,13 +937,13 @@ function APICallsCard(endpoint) {
   }, [requestCounts, apiRequestInterval]);
 
   const createApiChartData = (data) => {
-    
+
     if (data?.overall_metrics?.items?.length) {
       // Create time series data
       const categories = [];
       const counts = [];
       let totalCount = 0;
-      
+
       // Determine the scale based on the interval
       let scale = "daily";
       if (apiRequestInterval === "daily") {
@@ -953,13 +953,13 @@ function APICallsCard(endpoint) {
       } else if (apiRequestInterval === "monthly") {
         scale = "weekly";
       }
-      
+
       // Process each time period
       data.overall_metrics.items.forEach((timePeriod) => {
         // Format the date based on scale
         const dateLabel = formatDateByScale(timePeriod.time_period, scale);
         categories.push(dateLabel);
-        
+
         // Sum all requests for this time period
         let periodTotal = 0;
         timePeriod.items.forEach((item) => {
@@ -967,12 +967,12 @@ function APICallsCard(endpoint) {
           const count = item.total_requests || item.total_value || item.request_count || item.count || 0;
           periodTotal += count;
         });
-        
+
         counts.push(periodTotal);
         totalCount += periodTotal;
       });
-      
-      
+
+
       setExtraChartDetails((prev) => ({
         ...prev,
         apiCalls: {
@@ -980,7 +980,7 @@ function APICallsCard(endpoint) {
           avg: data?.overall_metrics?.summary_metrics?.delta_percentage || 0,
         },
       }));
-      
+
       // Reverse arrays to show oldest to newest
       setApiChartData({
         categories: categories.reverse(),
@@ -998,7 +998,7 @@ function APICallsCard(endpoint) {
           avg: "0",
         },
       }));
-      
+
       setApiChartData(null);
     }
   };
@@ -1121,7 +1121,7 @@ function TTFTCard(endpoint) {
   const load = async () => {
     try {
       const to_date = new Date().toISOString();
-      
+
       // Map interval to appropriate frequency
       let frequency = ttftInterval;
       if (ttftInterval === "daily") {
@@ -1131,7 +1131,7 @@ function TTFTCard(endpoint) {
       } else if (ttftInterval === "monthly") {
         frequency = "weekly"; // Last 30 days -> weekly data
       }
-      
+
       const params = {
         frequency: frequency,
         filter_by: "endpoint",
@@ -1140,20 +1140,20 @@ function TTFTCard(endpoint) {
         metrics: "ttft",
         to_date: to_date,
       };
-      
+
       // Convert to new format
       const observabilityRequest = convertToObservabilityRequest(params);
-      
+
       const url = `${tempApiBaseUrl}/metrics/analytics`;
       const response: any = await AppRequest.Post(url, observabilityRequest);
-      
+
       // Convert response back to old format
       const convertedData = convertObservabilityResponse(
         response.data,
         params.metrics,
         params.filter_by
       );
-      
+
       setRequestData(convertedData);
     } catch (error) {
       console.error("Error fetching TTFT data:", error);
@@ -1166,14 +1166,14 @@ function TTFTCard(endpoint) {
 
   const createTtftChartData = (data) => {
     console.log("TTFT Chart Data received:", data);
-    
+
     if (data?.ttft_metrics?.items?.length) {
       // Create time series data
       const categories = [];
       const values = [];
       let totalValue = 0;
       let count = 0;
-      
+
       // Determine the scale based on the interval
       let scale = "daily";
       if (ttftInterval === "daily") {
@@ -1183,13 +1183,13 @@ function TTFTCard(endpoint) {
       } else if (ttftInterval === "monthly") {
         scale = "weekly";
       }
-      
+
       // Process each time period
       data.ttft_metrics.items.forEach((timePeriod) => {
         // Format the date based on scale
         const dateLabel = formatDateByScale(timePeriod.time_period, scale);
         categories.push(dateLabel);
-        
+
         // Get average TTFT for this time period
         let periodSum = 0;
         let periodCount = 0;
@@ -1200,15 +1200,15 @@ function TTFTCard(endpoint) {
             periodCount++;
           });
         }
-        
+
         const periodValue = periodCount > 0 ? periodSum / periodCount : 0;
         values.push(periodValue);
         totalValue += periodValue;
         count++;
       });
-      
+
       const overallAvg = count > 0 ? totalValue / count : 0;
-      
+
       setExtraChartDetails((prev) => ({
         ...prev,
         ttft: {
@@ -1216,7 +1216,7 @@ function TTFTCard(endpoint) {
           avg: data?.ttft_metrics?.summary_metrics?.delta_percentage || 0,
         },
       }));
-      
+
       // Reverse arrays to show oldest to newest
       setTtftData({
         categories: categories.reverse(),
@@ -1231,7 +1231,7 @@ function TTFTCard(endpoint) {
           avg: "0",
         },
       }));
-      
+
       setTtftData(null);
     }
   };
@@ -1314,8 +1314,8 @@ function TTFTCard(endpoint) {
               </div>
             </div>
             <div className="w-full relative h-[180px] 1680px:h-[210px] 1920px:h-[230px] relative">
-              <MetricTimeSeriesChart 
-                data={ttftData} 
+              <MetricTimeSeriesChart
+                data={ttftData}
                 color="#32D583"
                 unit="ms"
                 metricName="TTFT"
@@ -1348,7 +1348,7 @@ function LatencyCard(endpoint) {
   const load = async () => {
     try {
       const to_date = new Date().toISOString();
-      
+
       // Map interval to appropriate frequency
       let frequency = latencyInterval;
       if (latencyInterval === "daily") {
@@ -1358,7 +1358,7 @@ function LatencyCard(endpoint) {
       } else if (latencyInterval === "monthly") {
         frequency = "weekly";
       }
-      
+
       const params = {
         frequency: frequency,
         filter_by: "endpoint",
@@ -1367,17 +1367,17 @@ function LatencyCard(endpoint) {
         metrics: "latency",
         to_date: to_date,
       };
-      
+
       const observabilityRequest = convertToObservabilityRequest(params);
       const url = `${tempApiBaseUrl}/metrics/analytics`;
       const response: any = await AppRequest.Post(url, observabilityRequest);
-      
+
       const convertedData = convertObservabilityResponse(
         response.data,
         params.metrics,
         params.filter_by
       );
-      
+
       setRequestData(convertedData);
     } catch (error) {
       console.error("Error fetching latency data:", error);
@@ -1394,7 +1394,7 @@ function LatencyCard(endpoint) {
       const values = [];
       let totalValue = 0;
       let count = 0;
-      
+
       let scale = "daily";
       if (latencyInterval === "daily") {
         scale = "hourly";
@@ -1403,11 +1403,11 @@ function LatencyCard(endpoint) {
       } else if (latencyInterval === "monthly") {
         scale = "weekly";
       }
-      
+
       data.latency_metrics.items.forEach((timePeriod) => {
         const dateLabel = formatDateByScale(timePeriod.time_period, scale);
         categories.push(dateLabel);
-        
+
         // If there are multiple items (endpoints), we take the first one or sum them
         // For now, we'll take the average of all endpoints for that time period
         let periodSum = 0;
@@ -1419,15 +1419,15 @@ function LatencyCard(endpoint) {
             periodCount++;
           });
         }
-        
+
         const periodValue = periodCount > 0 ? periodSum / periodCount : 0;
         values.push(periodValue);
         totalValue += periodValue;
         count++;
       });
-      
+
       const overallAvg = count > 0 ? totalValue / count : 0;
-      
+
       setExtraChartDetails((prev) => ({
         ...prev,
         latency: {
@@ -1435,7 +1435,7 @@ function LatencyCard(endpoint) {
           avg: data?.latency_metrics?.summary_metrics?.delta_percentage || 0,
         },
       }));
-      
+
       setLatencyData({
         categories: categories.reverse(),
         data: values.reverse(),
@@ -1448,7 +1448,7 @@ function LatencyCard(endpoint) {
           avg: "0",
         },
       }));
-      
+
       setLatencyData(null);
     }
   };
@@ -1531,8 +1531,8 @@ function LatencyCard(endpoint) {
               </div>
             </div>
             <div className="w-full relative h-[180px] 1680px:h-[210px] 1920px:h-[230px] relative">
-              <MetricTimeSeriesChart 
-                data={latencyData} 
+              <MetricTimeSeriesChart
+                data={latencyData}
                 color="#4A90E2"
                 unit="ms"
                 metricName="Latency"
@@ -1565,7 +1565,7 @@ function ThroughputCard(endpoint) {
   const load = async () => {
     try {
       const to_date = new Date().toISOString();
-      
+
       let frequency = throughputInterval;
       if (throughputInterval === "daily") {
         frequency = "hourly";
@@ -1574,7 +1574,7 @@ function ThroughputCard(endpoint) {
       } else if (throughputInterval === "monthly") {
         frequency = "weekly";
       }
-      
+
       const params = {
         frequency: frequency,
         filter_by: "endpoint",
@@ -1583,17 +1583,17 @@ function ThroughputCard(endpoint) {
         metrics: "throughput",
         to_date: to_date,
       };
-      
+
       const observabilityRequest = convertToObservabilityRequest(params);
       const url = `${tempApiBaseUrl}/metrics/analytics`;
       const response: any = await AppRequest.Post(url, observabilityRequest);
-      
+
       const convertedData = convertObservabilityResponse(
         response.data,
         params.metrics,
         params.filter_by
       );
-      
+
       setRequestData(convertedData);
     } catch (error) {
       console.error("Error fetching throughput data:", error);
@@ -1610,7 +1610,7 @@ function ThroughputCard(endpoint) {
       const values = [];
       let totalValue = 0;
       let count = 0;
-      
+
       let scale = "daily";
       if (throughputInterval === "daily") {
         scale = "hourly";
@@ -1619,11 +1619,11 @@ function ThroughputCard(endpoint) {
       } else if (throughputInterval === "monthly") {
         scale = "weekly";
       }
-      
+
       data.throughput_metrics.items.forEach((timePeriod) => {
         const dateLabel = formatDateByScale(timePeriod.time_period, scale);
         categories.push(dateLabel);
-        
+
         let periodSum = 0;
         let periodCount = 0;
         if (timePeriod.items && timePeriod.items.length > 0) {
@@ -1633,16 +1633,16 @@ function ThroughputCard(endpoint) {
             periodCount++;
           });
         }
-        
+
         const periodValue = periodCount > 0 ? periodSum / periodCount : 0;
         // Round to 2 decimal places
         values.push(parseFloat(periodValue.toFixed(2)));
         totalValue += periodValue;
         count++;
       });
-      
+
       const overallAvg = count > 0 ? totalValue / count : 0;
-      
+
       setExtraChartDetails((prev) => ({
         ...prev,
         throughput: {
@@ -1650,7 +1650,7 @@ function ThroughputCard(endpoint) {
           avg: data?.throughput_metrics?.summary_metrics?.delta_percentage || 0,
         },
       }));
-      
+
       setThroughputData({
         categories: categories.reverse(),
         data: values.reverse(),
@@ -1663,7 +1663,7 @@ function ThroughputCard(endpoint) {
           avg: "0",
         },
       }));
-      
+
       setThroughputData(null);
     }
   };
@@ -1746,8 +1746,8 @@ function ThroughputCard(endpoint) {
               </div>
             </div>
             <div className="w-full relative h-[180px] 1680px:h-[210px] 1920px:h-[230px] relative">
-              <MetricTimeSeriesChart 
-                data={throughputData} 
+              <MetricTimeSeriesChart
+                data={throughputData}
                 color="#F39C12"
                 unit="tokens/s"
                 metricName="Throughput"
@@ -1782,7 +1782,7 @@ function TokenMetricsCard(endpoint) {
   const load = async () => {
     try {
       const to_date = new Date().toISOString();
-      
+
       let frequency = tokenInterval;
       if (tokenInterval === "daily") {
         frequency = "hourly";
@@ -1791,7 +1791,7 @@ function TokenMetricsCard(endpoint) {
       } else if (tokenInterval === "monthly") {
         frequency = "weekly";
       }
-      
+
       const params = {
         frequency: frequency,
         filter_by: "endpoint",
@@ -1800,17 +1800,17 @@ function TokenMetricsCard(endpoint) {
         metrics: "input_output_tokens",
         to_date: to_date,
       };
-      
+
       const observabilityRequest = convertToObservabilityRequest(params);
       const url = `${tempApiBaseUrl}/metrics/analytics`;
       const response: any = await AppRequest.Post(url, observabilityRequest);
-      
+
       const convertedData = convertObservabilityResponse(
         response.data,
         params.metrics,
         params.filter_by
       );
-      
+
       setRequestData(convertedData);
     } catch (error) {
       console.error("Error fetching token data:", error);
@@ -1829,7 +1829,7 @@ function TokenMetricsCard(endpoint) {
       let totalInput = 0;
       let totalOutput = 0;
       let count = 0;
-      
+
       let scale = "daily";
       if (tokenInterval === "daily") {
         scale = "hourly";
@@ -1838,11 +1838,11 @@ function TokenMetricsCard(endpoint) {
       } else if (tokenInterval === "monthly") {
         scale = "weekly";
       }
-      
+
       data.input_output_tokens_metrics.items.forEach((timePeriod) => {
         const dateLabel = formatDateByScale(timePeriod.time_period, scale);
         categories.push(dateLabel);
-        
+
         let periodInput = 0;
         let periodOutput = 0;
         if (timePeriod.items && timePeriod.items.length > 0) {
@@ -1851,17 +1851,17 @@ function TokenMetricsCard(endpoint) {
             periodOutput += item.output_tokens || 0;
           });
         }
-        
+
         inputValues.push(periodInput);
         outputValues.push(periodOutput);
         totalInput += periodInput;
         totalOutput += periodOutput;
         count++;
       });
-      
+
       const avgInput = count > 0 ? totalInput / count : 0;
       const avgOutput = count > 0 ? totalOutput / count : 0;
-      
+
       setExtraChartDetails((prev) => ({
         ...prev,
         tokens: {
@@ -1871,7 +1871,7 @@ function TokenMetricsCard(endpoint) {
           output_avg: data?.input_output_tokens_metrics?.summary_metrics?.output_tokens_delta_percentage || 0,
         },
       }));
-      
+
       setTokenData({
         categories: categories.reverse(),
         inputData: inputValues.reverse(),
@@ -1887,7 +1887,7 @@ function TokenMetricsCard(endpoint) {
           output_avg: "0",
         },
       }));
-      
+
       setTokenData(null);
     }
   };
@@ -1958,7 +1958,7 @@ function TokenMetricsCard(endpoint) {
               </div>
             </div>
             <div className="w-full relative h-[180px] 1680px:h-[210px] 1920px:h-[230px] relative">
-              <TokenTimeSeriesChart 
+              <TokenTimeSeriesChart
                 data={tokenData}
               />
             </div>
@@ -1990,7 +1990,7 @@ function MetricTimeSeriesChart({
 }) {
   useEffect(() => {
     if (!data || !data.categories || !data.data) return;
-    
+
     const chartRef = document.getElementById(`${metricName}-time-series-chart`);
     const myChart = echarts.init(chartRef, null, {
       renderer: "canvas",
@@ -2134,7 +2134,7 @@ function TokenTimeSeriesChart({
 }) {
   useEffect(() => {
     if (!data || !data.categories) return;
-    
+
     const chartRef = document.getElementById("token-time-series-chart");
     const myChart = echarts.init(chartRef, null, {
       renderer: "canvas",

@@ -357,7 +357,7 @@ const PerfomanceBenchmarks = () => {
                                       border: "0.5px solid #757575",
                                       width: "100%",
                                     }}
-                                    value={tempFilter.status || undefined} 
+                                    value={tempFilter.status || undefined}
                                     size="large"
                                     className="drawerInp !bg-[transparent] text-[#EEEEEE] py-[.6rem] font-[300]  text-[.75rem] shadow-none w-full indent-[.4rem] border-0 outline-0 hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] h-[2.5rem] outline-none"
                                     options={[

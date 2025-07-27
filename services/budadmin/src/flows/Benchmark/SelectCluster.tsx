@@ -93,7 +93,7 @@ const SelectCluster: React.FC = (props: {
     "workflow_id": "4e8e755e-395c-4d9e-b453-714bb7927526"
   }
   const { currentWorkflow, currentWorkflowId, stepThree, setSelectedCluster, selectedCluster, evalWith } = usePerfomanceBenchmark();
-  
+
   const { openDrawerWithStep, openDrawer, setPreviousStep, currentFlow, step } = useDrawer();
   const [search, setSearch] = useState<string>("");
   const { clusters, getClusters } = useCluster();
@@ -105,7 +105,7 @@ const SelectCluster: React.FC = (props: {
   useEffect(() => {
     getClusters({ page: 1, limit: 1000 });
   }, []);
-  
+
   useEffect(() => {
     console.log('selectedCluster', selectedCluster)
   }, [selectedCluster]);

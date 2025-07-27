@@ -47,9 +47,7 @@ class CloudModelExtractionService:
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.get(
-                    url,
-                    headers={"accept": "application/json"},
-                    timeout=app_settings.budconnect_timeout
+                    url, headers={"accept": "application/json"}, timeout=app_settings.budconnect_timeout
                 )
                 response.raise_for_status()
                 return response.json()
@@ -90,11 +88,13 @@ class CloudModelExtractionService:
             if cloud_data.get("papers"):
                 papers = []
                 for paper in cloud_data["papers"]:
-                    papers.append({
-                        "title": paper.get("title", ""),
-                        "authors": paper.get("authors", []),
-                        "url": paper.get("url", "")
-                    })
+                    papers.append(
+                        {
+                            "title": paper.get("title", ""),
+                            "authors": paper.get("authors", []),
+                            "url": paper.get("url", ""),
+                        }
+                    )
                 model_info_data["papers"] = papers
 
             # Map architecture information if available
@@ -107,7 +107,7 @@ class CloudModelExtractionService:
                     "model_weights_size": arch.get("model_weights_size"),
                     "text_config": arch.get("text_config"),
                     "vision_config": arch.get("vision_config"),
-                    "embedding_config": arch.get("embedding_config")
+                    "embedding_config": arch.get("embedding_config"),
                 }
 
             # Map model tree/derivatives if available
@@ -118,7 +118,7 @@ class CloudModelExtractionService:
                     "is_finetune": tree.get("is_finetune"),
                     "is_adapter": tree.get("is_adapter"),
                     "is_quantization": tree.get("is_quantization"),
-                    "is_merge": tree.get("is_merge")
+                    "is_merge": tree.get("is_merge"),
                 }
 
             return ModelInfo.model_validate(model_info_data)
@@ -134,11 +134,13 @@ class CloudModelExtractionService:
         formatted_evals = []
 
         for eval_item in evaluations:
-            formatted_evals.append({
-                "name": eval_item.get("name", ""),  # Changed from benchmark_name to name
-                "score": eval_item.get("score", 0),
-                "metric_type": "accuracy",  # Default metric type
-            })
+            formatted_evals.append(
+                {
+                    "name": eval_item.get("name", ""),  # Changed from benchmark_name to name
+                    "score": eval_item.get("score", 0),
+                    "metric_type": "accuracy",  # Default metric type
+                }
+            )
 
         return formatted_evals
 
@@ -177,9 +179,7 @@ class CloudModelExtractionService:
                 from ..leaderboard.crud import LeaderboardCRUD
                 from ..leaderboard.services import LeaderboardService
 
-                leaderboard_data = LeaderboardService().format_llm_leaderboard_data(
-                    model_evals, db_model_info.id
-                )
+                leaderboard_data = LeaderboardService().format_llm_leaderboard_data(model_evals, db_model_info.id)
                 with LeaderboardCRUD() as crud:
                     crud.update_or_insert_leaderboards(db_model_info.id, leaderboard_data)
                     logger.debug("Leaderboard data inserted for cloud model %s", model_info.uri)
@@ -190,4 +190,3 @@ class CloudModelExtractionService:
         except Exception as e:
             logger.exception("Error in cloud model extraction: %s", str(e))
             raise e
-

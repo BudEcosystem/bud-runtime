@@ -10,17 +10,14 @@ from ..model_info.schemas import LicenseInfo
 logger = logging.get_logger(__name__)
 
 
-
-def upsert_license_details(model_license:str) -> LicenseInfo:
-
-    """ Insert or update the license details of a model """
-
+def upsert_license_details(model_license: str) -> LicenseInfo:
+    """Insert or update the license details of a model."""
     licenses = mapped_licenses()
 
     if model_license:
-        license_id, license_name, license_url = get_license_details(model_license, licenses)
+        license_id, _license_name, license_url = get_license_details(model_license, licenses)
     else:
-        license_id = license_name = license_url = None
+        license_id = license_url = None
 
     license_details = None
 

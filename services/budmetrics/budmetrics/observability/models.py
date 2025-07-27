@@ -1,29 +1,30 @@
 import asyncio
 import hashlib
-import logging
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-UTC = timezone.utc
 from enum import Enum
-
-class StrEnum(str, Enum):
-    pass
 from typing import Any, Literal, Optional, Union
 from uuid import UUID
 
 import asynch
 import orjson
-
 from budmicroframe.commons import logging
 
 from budmetrics.commons.config import app_settings, secrets_settings
 from budmetrics.commons.profiling_utils import (
     PerformanceMetrics,
+    performance_logger,
     profile_async,
     profile_sync,
-    performance_logger,
 )
+
+
+UTC = timezone.utc
+
+
+class StrEnum(str, Enum):
+    pass
 
 
 logging.skip_module_warnings_and_logs(["asynch"])
@@ -72,33 +73,37 @@ class FrequencyUnit(StrEnum):
 
 @dataclass
 class Frequency:
-    value: Optional[
-        int
-    ]  # None means use standard functions, numeric means align to from_date
+    value: Optional[int]  # None means use standard functions, numeric means align to from_date
     unit: FrequencyUnit
 
     @classmethod
     def hourly(cls) -> "Frequency":
+        """Create an hourly frequency."""
         return cls(None, FrequencyUnit.HOUR)
 
     @classmethod
     def daily(cls) -> "Frequency":
+        """Create a daily frequency."""
         return cls(None, FrequencyUnit.DAY)
 
     @classmethod
     def weekly(cls) -> "Frequency":
+        """Create a weekly frequency."""
         return cls(None, FrequencyUnit.WEEK)
 
     @classmethod
     def monthly(cls) -> "Frequency":
+        """Create a monthly frequency."""
         return cls(None, FrequencyUnit.MONTH)
 
     @classmethod
     def quarterly(cls) -> "Frequency":
+        """Create a quarterly frequency."""
         return cls(None, FrequencyUnit.QUARTER)
 
     @classmethod
     def yearly(cls) -> "Frequency":
+        """Create a yearly frequency."""
         return cls(None, FrequencyUnit.YEAR)
 
     @classmethod
@@ -112,11 +117,7 @@ class Frequency:
     def name(self) -> str:
         """Get human-readable name for the frequency."""
         if self.value is None or self.value == 1:
-            return (
-                self.unit.value + "ly"
-                if isinstance(self.unit, FrequencyUnit)
-                else f"every_{self.unit.value}"
-            )
+            return self.unit.value + "ly" if isinstance(self.unit, FrequencyUnit) else f"every_{self.unit.value}"
         else:
             return f"every_{self.value}_{self.unit.value}s"
 
@@ -135,27 +136,28 @@ class Frequency:
         return f"INTERVAL {value if order == 'asc' else -value} {unit_map[self.unit]}"
 
     def __str__(self) -> str:
+        """Return string representation of frequency."""
         return self.name
 
 
 class TimeSeriesHelper:
     """Helper class for time series operations in ClickHouse queries.
-    
+
     This class provides utilities for:
     - Converting frequency specifications to ClickHouse time functions
     - Generating time bucket expressions for grouping
     - Handling both standard intervals (daily, weekly) and custom aligned intervals
     """
-    
+
     @staticmethod
     def get_time_format(frequency: Frequency) -> str:
         """Get ClickHouse date truncation function for different frequencies.
 
         For custom intervals, we'll use a different approach in the query.
-        
+
         Args:
             frequency: Frequency object specifying the interval
-            
+
         Returns:
             ClickHouse function string or None for custom intervals
         """
@@ -175,9 +177,7 @@ class TimeSeriesHelper:
             return None  # Signal that we need custom handling
 
     @staticmethod
-    def get_time_bucket_expression(
-        frequency: Frequency, time_field: str, from_date: Optional[datetime] = None
-    ) -> str:
+    def get_time_bucket_expression(frequency: Frequency, time_field: str, from_date: Optional[datetime] = None) -> str:
         """Generate ClickHouse expression for time buckets.
 
         - If frequency.value is None: Use standard ClickHouse functions (toStartOfWeek, etc.)
@@ -192,9 +192,7 @@ class TimeSeriesHelper:
         if from_date and frequency.value is not None:
             # Calculate buckets aligned to from_date
             interval_seconds = TimeSeriesHelper._get_interval_seconds(frequency)
-            from_timestamp = (
-                f"toUnixTimestamp('{from_date.strftime('%Y-%m-%d %H:%M:%S')}')"
-            )
+            from_timestamp = f"toUnixTimestamp('{from_date.strftime('%Y-%m-%d %H:%M:%S')}')"
 
             # Formula: from_date + floor((timestamp - from_date) / interval) * interval
             return (
@@ -205,9 +203,7 @@ class TimeSeriesHelper:
             )
         else:
             # Fallback to toStartOfInterval
-            return (
-                f"toStartOfInterval({time_field}, {frequency.to_clickhouse_interval()})"
-            )
+            return f"toStartOfInterval({time_field}, {frequency.to_clickhouse_interval()})"
 
     @staticmethod
     def _get_interval_seconds(frequency: Frequency) -> int:
@@ -225,7 +221,7 @@ class TimeSeriesHelper:
 
 @dataclass
 class CTEDefinition:
-    """Definition for a Common Table Expression"""
+    """Definition for a Common Table Expression."""
 
     name: str
     query: str  # Can contain placeholders like {from_date}, {to_date}, {filters}, {group_columns}
@@ -248,23 +244,23 @@ class MetricDefinition:
 
 class QueryBuilder:
     """Core query builder for ClickHouse analytics queries.
-    
+
     This class is responsible for:
     - Constructing complex SQL queries based on metric requirements
     - Managing table joins and CTEs (Common Table Expressions)
     - Handling time series bucketing and aggregations
     - Supporting filtering, grouping, and TopK operations
-    
+
     The builder uses a composable pattern where each metric type has its own
     definition method that returns MetricDefinition objects. These are then
     combined to build the final query.
-    
+
     Attributes:
         _MAPPING_COLUMNS: Maps API field names to database columns
         _MAPPING_TABLE_ALIAS: Maps table names to their query aliases
         metric_type: Registry of available metric types and their builders
     """
-    
+
     _MAPPING_COLUMNS = {
         "model": "mid.model_id",
         "project": "mid.project_id",
@@ -276,6 +272,7 @@ class QueryBuilder:
     }
 
     def __init__(self, performance_metrics: Optional[PerformanceMetrics] = None):
+        """Initialize TimeSeriesHelper with optional performance metrics."""
         self.time_helper = TimeSeriesHelper()
         self.performance_metrics = performance_metrics
 
@@ -302,9 +299,7 @@ class QueryBuilder:
         group_by_fields: Optional[list[str]] = None,
     ):
         model_inference_alias = self._MAPPING_TABLE_ALIAS["ModelInference"]
-        model_inference_details_alias = self._MAPPING_TABLE_ALIAS[
-            "ModelInferenceDetails"
-        ]
+        model_inference_details_alias = self._MAPPING_TABLE_ALIAS["ModelInferenceDetails"]
 
         # Initialize CTE registry if not provided
         cte_registry = cte_registry or {}
@@ -330,22 +325,16 @@ class QueryBuilder:
                 f"ModelInference {model_inference_alias} INNER JOIN ModelInferenceDetails {model_inference_details_alias} ON {model_inference_alias}.inference_id = {model_inference_details_alias}.inference_id"
             )
         elif "ModelInference" in base_tables:
-            from_parts.append(
-                f"ModelInference {self._MAPPING_TABLE_ALIAS['ModelInference']}"
-            )
+            from_parts.append(f"ModelInference {self._MAPPING_TABLE_ALIAS['ModelInference']}")
         elif "ModelInferenceDetails" in base_tables:
-            from_parts.append(
-                f"ModelInferenceDetails {self._MAPPING_TABLE_ALIAS['ModelInferenceDetails']}"
-            )
+            from_parts.append(f"ModelInferenceDetails {self._MAPPING_TABLE_ALIAS['ModelInferenceDetails']}")
 
         # Add CTEs as joins
         for cte_name in cte_tables:
             if from_parts and "ModelInferenceDetails" in base_tables:
                 # If we have base tables, join the CTE
                 # For concurrent_counts CTE, we use LEFT JOIN to handle cases with no concurrency
-                join_conditions = [
-                    f"cc.request_arrival_time = {model_inference_details_alias}.request_arrival_time"
-                ]
+                join_conditions = [f"cc.request_arrival_time = {model_inference_details_alias}.request_arrival_time"]
 
                 # Add group by fields to join conditions
                 if group_by_fields:
@@ -354,12 +343,8 @@ class QueryBuilder:
                         join_conditions.append(f"cc.{col_name} = {field}")
 
                 # Use LEFT JOIN for concurrent_counts to handle cases with no concurrency
-                join_type = (
-                    "LEFT JOIN" if cte_name == "concurrent_counts" else "INNER JOIN"
-                )
-                from_parts.append(
-                    f"{join_type} {cte_name} cc ON {' AND '.join(join_conditions)}"
-                )
+                join_type = "LEFT JOIN" if cte_name == "concurrent_counts" else "INNER JOIN"
+                from_parts.append(f"{join_type} {cte_name} cc ON {' AND '.join(join_conditions)}")
             else:
                 # If no base tables, CTE is the main table
                 from_parts.append(f"{cte_name} cc")
@@ -394,22 +379,14 @@ class QueryBuilder:
         conditions = []
 
         if include_date_filters:
-            time_field = (
-                "mid.request_arrival_time"
-                if "ModelInferenceDetails" in required_tables
-                else "mi.timestamp"
-            )
+            time_field = "mid.request_arrival_time" if "ModelInferenceDetails" in required_tables else "mi.timestamp"
 
             # Remove prefix if not needed (for CTEs)
             if not include_table_prefix:
                 time_field = time_field.split(".")[-1]
 
-            conditions.append(
-                f"{time_field} >= '{from_date.strftime(self.datetime_fmt)}'"
-            )
-            conditions.append(
-                f"{time_field} <= '{to_date.strftime(self.datetime_fmt)}'"
-            )
+            conditions.append(f"{time_field} >= '{from_date.strftime(self.datetime_fmt)}'")
+            conditions.append(f"{time_field} <= '{to_date.strftime(self.datetime_fmt)}'")
 
         if filters is not None:
             for key, value in filters.items():
@@ -420,18 +397,10 @@ class QueryBuilder:
                         )
 
                     # Use mapped column or remove prefix based on flag
-                    col_name = (
-                        col_mapping
-                        if include_table_prefix
-                        else col_mapping.split(".")[-1]
-                    )
+                    col_name = col_mapping if include_table_prefix else col_mapping.split(".")[-1]
 
                     if isinstance(value, list) and len(value):
-                        conditions.append(
-                            f"{col_name} IN ("
-                            + ",".join([f"'{str(val)}'" for val in value])
-                            + ")"
-                        )
+                        conditions.append(f"{col_name} IN (" + ",".join([f"'{str(val)}'" for val in value]) + ")")
                     else:
                         conditions.append(f"{col_name}='{str(value)}'")
                 else:
@@ -474,9 +443,7 @@ class QueryBuilder:
         )
         metric_delta = []
         if incl_delta:
-            metric_delta = self._get_metrics_trend_definitions(
-                req_count_alias, time_period_bin_alias, group_by_fields
-            )
+            metric_delta = self._get_metrics_trend_definitions(req_count_alias, time_period_bin_alias, group_by_fields)
 
         return [metric, *metric_delta]
 
@@ -643,14 +610,14 @@ class QueryBuilder:
 
         # Create CTE template for concurrent requests calculation
         cte_template = f"""
-            SELECT 
-                {', '.join(select_columns)},
+            SELECT
+                {", ".join(select_columns)},
                 COUNT(*) as concurrent_count
             FROM ModelInferenceDetails
-            WHERE request_arrival_time >= '{{from_date}}' 
+            WHERE request_arrival_time >= '{{from_date}}'
               AND request_arrival_time <= '{{to_date}}'
               {{filters}}
-            GROUP BY {', '.join(group_by_columns)}
+            GROUP BY {", ".join(group_by_columns)}
             HAVING COUNT(*) > 1
             """
 
@@ -665,14 +632,14 @@ class QueryBuilder:
         topk_cte_query = f"""(
             SELECT {{group_columns}}, MAX(concurrent_count) as rank_value
             FROM (
-                SELECT 
-                    {', '.join(select_columns)},
+                SELECT
+                    {", ".join(select_columns)},
                     COUNT(*) as concurrent_count
                 FROM ModelInferenceDetails
-                WHERE request_arrival_time >= '{{from_date}}' 
+                WHERE request_arrival_time >= '{{from_date}}'
                   AND request_arrival_time <= '{{to_date}}'
                   {{filters}}
-                GROUP BY {', '.join(group_by_columns)}
+                GROUP BY {", ".join(group_by_columns)}
                 HAVING COUNT(*) > 1
             ) AS inner_query
             GROUP BY {{group_columns}}
@@ -729,9 +696,7 @@ class QueryBuilder:
         ]
         metric_delta = []
         if incl_delta:
-            metric_delta = self._get_metrics_trend_definitions(
-                ttft_alias, time_period_bin_alias, group_by_fields
-            )
+            metric_delta = self._get_metrics_trend_definitions(ttft_alias, time_period_bin_alias, group_by_fields)
 
         return [*metrics, *metric_delta]
 
@@ -768,9 +733,7 @@ class QueryBuilder:
         ]
         metric_delta = []
         if incl_delta:
-            metric_delta = self._get_metrics_trend_definitions(
-                latency_alias, time_period_bin_alias, group_by_fields
-            )
+            metric_delta = self._get_metrics_trend_definitions(latency_alias, time_period_bin_alias, group_by_fields)
 
         return [*metrics, *metric_delta]
 
@@ -874,9 +837,7 @@ class QueryBuilder:
             ),
         ]
 
-    def _build_filter_clause(
-        self, filters: Optional[dict[str, Union[list[UUID], UUID]]]
-    ) -> str:
+    def _build_filter_clause(self, filters: Optional[dict[str, Union[list[UUID], UUID]]]) -> str:
         """Build a filter clause string for template substitution.
 
         Reuses _get_filter_conditions with appropriate flags for CTE usage.
@@ -886,9 +847,7 @@ class QueryBuilder:
 
         # Get filter conditions without table prefixes and without date filters
         filter_conditions = self._get_filter_conditions(
-            required_tables=[
-                "ModelInferenceDetails"
-            ],  # Dummy, just to satisfy the function
+            required_tables=["ModelInferenceDetails"],  # Dummy, just to satisfy the function
             from_date=datetime.now(),  # Dummy dates
             to_date=datetime.now(),
             filters=filters,
@@ -944,9 +903,7 @@ class QueryBuilder:
 
         # Build column lists
         topk_group_cols_with_alias = group_fields or []
-        topk_group_cols_without_alias = [
-            col.split(".")[-1] for col in topk_group_cols_with_alias
-        ]
+        topk_group_cols_without_alias = [col.split(".")[-1] for col in topk_group_cols_with_alias]
 
         from_date = from_date.strftime(self.datetime_fmt)
         to_date = to_date.strftime(self.datetime_fmt)
@@ -967,9 +924,7 @@ class QueryBuilder:
 
             # Get required tables for the metric
             required_tables = [
-                t
-                for t in metric_def.required_tables
-                if t in ["ModelInference", "ModelInferenceDetails"]
+                t for t in metric_def.required_tables if t in ["ModelInference", "ModelInferenceDetails"]
             ]
 
             # Ensure ModelInferenceDetails is included for grouping
@@ -984,7 +939,7 @@ class QueryBuilder:
             ranking_query = f"""(
                 SELECT {", ".join(topk_group_cols_without_alias)}, {ranking_metric} as rank_value
                 {from_clause}
-                WHERE mid.request_arrival_time >= '{from_date}' 
+                WHERE mid.request_arrival_time >= '{from_date}'
                   AND mid.request_arrival_time <= '{(to_date)}'
                   {filters_clause}
                 GROUP BY {", ".join(topk_group_cols_without_alias)}
@@ -995,18 +950,14 @@ class QueryBuilder:
             ranking_query = f"""(
                 SELECT {", ".join(topk_group_cols_without_alias)}, COUNT(*) as rank_value
                 FROM ModelInferenceDetails mid
-                WHERE mid.request_arrival_time >= '{from_date}' 
+                WHERE mid.request_arrival_time >= '{from_date}'
                   AND mid.request_arrival_time <= '{(to_date)}'
                   {filters_clause}
                 GROUP BY {", ".join(topk_group_cols_without_alias)}
             )"""
 
         # Determine sort order
-        ranking_order = (
-            metric_def.topk_sort_order
-            if (metric_def and metric_def.topk_sort_order)
-            else "DESC"
-        )
+        ranking_order = metric_def.topk_sort_order if (metric_def and metric_def.topk_sort_order) else "DESC"
 
         # Build the complete topk CTE
         topk_cte = f"""topk_entities AS (
@@ -1040,23 +991,21 @@ class QueryBuilder:
         to_date: Optional[datetime] = None,
         frequency_unit: Union[FrequencyUnit, str] = FrequencyUnit.DAY,
         frequency_interval: Optional[int] = None,
-        filters: Optional[
-            dict[Literal["model", "project", "endpoint"], Union[list[UUID], UUID]]
-        ] = None,
+        filters: Optional[dict[Literal["model", "project", "endpoint"], Union[list[UUID], UUID]]] = None,
         group_by: Optional[list[Literal["model", "project", "endpoint"]]] = None,
         return_delta: bool = False,
         fill_time_gaps: bool = True,
         topk: Optional[int] = None,
     ):
         """Build a complete ClickHouse analytics query.
-        
+
         This method orchestrates the entire query building process:
         1. Validates and processes input parameters
         2. Determines required metric definitions
         3. Builds CTEs if needed
         4. Constructs the main SELECT query
         5. Adds filtering, grouping, and ordering
-        
+
         Args:
             metrics: List of metrics to include in the query
             from_date: Start date for the query range
@@ -1068,10 +1017,10 @@ class QueryBuilder:
             return_delta: Whether to include period-over-period changes
             fill_time_gaps: Whether to fill missing time periods with NULL
             topk: Limit results to top K entities by primary metric
-            
+
         Returns:
             Tuple of (query_string, field_order_list)
-            
+
         Raises:
             ValueError: If invalid metric or filter is specified
         """
@@ -1103,15 +1052,11 @@ class QueryBuilder:
         select_field_order = []
         required_tables = []
         cte_registry: dict[str, CTEDefinition] = {}  # Local CTE registry for this query
-        metric_definitions: dict[str, MetricDefinition] = (
-            {}
-        )  # Store metric definitions for reuse
+        metric_definitions: dict[str, MetricDefinition] = {}  # Store metric definitions for reuse
 
         for metric in metrics:
             if metric not in self.metric_type:
-                raise ValueError(
-                    f"{metric} is not a support metrics. Choose from ({', '.join(self.metric_type)})"
-                )
+                raise ValueError(f"{metric} is not a support metrics. Choose from ({', '.join(self.metric_type)})")
 
             for item in self.metric_type[metric](
                 time_bucket_alias,
@@ -1143,14 +1088,10 @@ class QueryBuilder:
             if "ModelInferenceDetails" in required_tables
             else "ModelInference"
         )
-        time_bucket_expr = self.time_helper.get_time_bucket_expression(
-            frequency, time_column, from_date
-        )
+        time_bucket_expr = self.time_helper.get_time_bucket_expression(frequency, time_column, from_date)
         time_bucket_expr += f" AS {time_bucket_alias}"
 
-        conditions = self._get_filter_conditions(
-            list(required_tables), from_date, to_date, filters
-        )
+        conditions = self._get_filter_conditions(list(required_tables), from_date, to_date, filters)
 
         group_by_parts = [time_bucket_alias, *group_fields]
         select_parts = [time_bucket_expr, *group_fields, *select_parts]
@@ -1183,9 +1124,7 @@ class QueryBuilder:
                     col = self._MAPPING_COLUMNS[group_field]
                     # Extract just the column name without alias for the subquery
                     col_name = col.split(".")[-1]
-                    topk_conditions.append(
-                        f"{col} IN (SELECT {col_name} FROM topk_entities)"
-                    )
+                    topk_conditions.append(f"{col} IN (SELECT {col_name} FROM topk_entities)")
                 conditions.append(f"({' AND '.join(topk_conditions)})")
 
         if cte_registry:
@@ -1196,11 +1135,7 @@ class QueryBuilder:
                     from_date,
                     to_date,
                     filters,
-                    (
-                        [col.split(".")[-1] for col in group_fields]
-                        if group_fields
-                        else None
-                    ),
+                    ([col.split(".")[-1] for col in group_fields] if group_fields else None),
                 )
                 cte_clauses.append(f"{cte_name} AS ({cte_query})")
 
@@ -1224,6 +1159,7 @@ class QueryCache:
     """Simple LRU cache for query results with TTL support."""
 
     def __init__(self, max_size: int = 1000, ttl: int = 300):
+        """Initialize LRU cache with max size and TTL."""
         self.max_size = max_size
         self.ttl = ttl
         self.cache: dict[str, tuple[Any, float]] = {}
@@ -1236,9 +1172,7 @@ class QueryCache:
         key_str = orjson.dumps(dict(sorted(key_data.items(), key=lambda x: x[0])))
         return hashlib.md5(key_str).hexdigest()
 
-    async def get(
-        self, query: str, params: Optional[dict[str, Any]] = None
-    ) -> Optional[Any]:
+    async def get(self, query: str, params: Optional[dict[str, Any]] = None) -> Optional[Any]:
         """Get cached result if available and not expired."""
         async with self._lock:
             key = self._make_key(query, params)
@@ -1255,9 +1189,7 @@ class QueryCache:
                     self.access_order.remove(key)
             return None
 
-    async def set(
-        self, query: str, result: Any, params: Optional[dict[str, Any]] = None
-    ):
+    async def set(self, query: str, result: Any, params: Optional[dict[str, Any]] = None):
         """Cache query result."""
         async with self._lock:
             key = self._make_key(query, params)
@@ -1265,7 +1197,7 @@ class QueryCache:
             # If key already exists, remove it from access_order
             if key in self.cache:
                 self.access_order.remove(key)
-            
+
             # Remove oldest entries if cache is full
             while len(self.cache) >= self.max_size:
                 oldest_key = self.access_order.pop(0)
@@ -1283,6 +1215,7 @@ class QueryCache:
 
 class ClickHouseClient:
     def __init__(self, config: Optional[ClickHouseConfig] = None):
+        """Initialize ClickHouse client with optional config."""
         self.config = config
         self._pool: Optional[asynch.Pool] = None
         self._semaphore: Optional[asyncio.Semaphore] = None
@@ -1292,6 +1225,7 @@ class ClickHouseClient:
         self.performance_metrics = performance_logger.get_metrics()
 
     async def initialize(self):
+        """Initialize the ClickHouse connection pool."""
         if self._initialized:
             return
 
@@ -1317,9 +1251,7 @@ class ClickHouseClient:
             await self._warmup_connections()
 
         self._initialized = True
-        logger.info(
-            f"ClickHouse connection pool initialized: min={config.pool_min_size}, max={config.pool_max_size}"
-        )
+        logger.info(f"ClickHouse connection pool initialized: min={config.pool_min_size}, max={config.pool_max_size}")
 
         if self.config is None:
             self.config = config
@@ -1347,6 +1279,7 @@ class ClickHouseClient:
             await cursor.fetchall()
 
     async def close(self):
+        """Close the ClickHouse connection pool."""
         if self._pool:
             await self._pool.shutdown()
             self._initialized = False
@@ -1360,6 +1293,7 @@ class ClickHouseClient:
         with_column_types: bool = False,
         use_cache: bool = True,
     ) -> Union[list[tuple], tuple[list[tuple], Any]]:
+        """Execute a query against ClickHouse."""
         if not self._initialized:
             await self.initialize()
 
@@ -1414,24 +1348,19 @@ class ClickHouseClient:
         tasks = [self.execute_query(query) for query in queries]
         return await asyncio.gather(*tasks)
 
-    async def insert_data(
-        self, table: str, data: list[tuple], columns: Optional[list[str]] = None
-    ):
+    async def insert_data(self, table: str, data: list[tuple], columns: Optional[list[str]] = None):
         """Insert data into a table."""
         if not self._initialized:
             await self.initialize()
 
         async with self._semaphore, self._pool.connection() as conn, conn.cursor() as cursor:
-            query = (
-                f"INSERT INTO {table} ({','.join(columns)}) VALUES"
-                if columns
-                else f"INSERT INTO {table} VALUES"
-            )
+            query = f"INSERT INTO {table} ({','.join(columns)}) VALUES" if columns else f"INSERT INTO {table} VALUES"
 
             # Execute the insert with data
             await cursor.execute(query, data)
 
     async def get_pool_stats(self) -> dict[str, Any]:
+        """Get connection pool statistics."""
         if not self._pool:
             return {"status": "not_initialized"}
 

@@ -38,19 +38,19 @@ def get_valid_config() -> Crawl4aiConfig:
                     'svelte-virtual-table-viewport table',
                     '.svelte-1oa6fve'
                 ];
-            
+
                 let tableBody;
                 for (const tableClass of potentialTableClasses) {
                     tableBody = document.querySelector(tableClass);
                     if (tableBody) break;
                 }
-            
+
                 console.log("Checking for table body...", tableBody);
-            
+
                 if (tableBody) {
                     console.log("tableBody found", tableBody);
                     const collectedData = [];
-            
+
                     // Create or select the results container
                     let resultsContainer = document.querySelector('.results-container');
                     if (!resultsContainer) {
@@ -58,13 +58,13 @@ def get_valid_config() -> Crawl4aiConfig:
                         resultsContainer.classList.add('results-container');
                         document.body.appendChild(resultsContainer);
                     }
-            
+
                     function extractData() {
                         const rows = tableBody.querySelectorAll('tr[slot="tbody"]');
                         rows.forEach(row => {
                             const cells = row.querySelectorAll('td');
                             const modelName = cells[2]?.querySelector('a')?.innerText.trim() || '';
-            
+
                             if (!collectedData.some(data => data.model_name === modelName)) {
                                 const rowData = {
                                     rank_ub: cells[0]?.innerText.trim() || '',
@@ -82,16 +82,16 @@ def get_valid_config() -> Crawl4aiConfig:
                             }
                         });
                     }
-            
+
                     let scrollAttempts = 0;
-            
+
                     function scrollTableBody() {
                         const viewport = tableBody;
                         tableBody.scrollTop += 300;
-            
+
                         setTimeout(() => {
                             const newScrollHeight = viewport.scrollHeight;
-            
+
                             if (viewport.scrollTop + viewport.clientHeight >= newScrollHeight || scrollAttempts > 1000) {
                                 console.log("Reached the end or max attempts, stopping scroll.");
                                 extractData();
@@ -104,7 +104,7 @@ def get_valid_config() -> Crawl4aiConfig:
                             }
                         }, 500);
                     }
-            
+
                     function updateResultsContainer() {
                         resultsContainer.innerHTML = '';
                         console.log("Total records:", collectedData.length);
@@ -126,10 +126,10 @@ def get_valid_config() -> Crawl4aiConfig:
                         });
                         console.log("Data appended to results container.");
                     }
-            
+
                     extractData();
                     scrollTableBody();
-            
+
                 } else {
                     console.log("Table body not found, retrying in 500 ms...");
                     setTimeout(checkTableBody, 500);
@@ -143,6 +143,7 @@ def get_valid_config() -> Crawl4aiConfig:
 
 @common_profiler
 async def profile_crawler(url: str, config: Crawl4aiConfig) -> List[Dict[str, Any]]:
+    """Profile the crawler performance for a given URL and configuration."""
     crawler = Crawl4aiCrawler(url)
     return await crawler.extract_data(config)
 

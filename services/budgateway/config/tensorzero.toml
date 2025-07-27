@@ -15,7 +15,7 @@ batch_size = 1000
 linger_ms = 10
 # # Use SASL_PLAINTEXT as the broker seems to require it
 security_protocol = "SASL_PLAINTEXT"
-# 
+#
 # # Try with PLAIN mechanism
 [gateway.observability.kafka.sasl]
 mechanism = "PLAIN"
@@ -52,7 +52,3 @@ enabled = true
 endpoint_id = "gpt"
 model_id = "019787c1-3de1-7b50-969b-e0a58514b6a2"
 project_id = "019787c1-3de1-7b50-969b-e0a58514b6a1"
-
-
-
-

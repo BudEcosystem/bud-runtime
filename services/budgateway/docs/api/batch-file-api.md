@@ -405,12 +405,12 @@ while True:
         f"https://api.tensorzero.com/v1/batches/{batch_id}",
         headers={"Authorization": "Bearer YOUR_API_KEY"}
     ).json()
-    
+
     if batch["status"] == "completed":
         break
     elif batch["status"] == "failed":
         raise Exception("Batch processing failed")
-    
+
     time.sleep(60)  # Wait 1 minute before polling again
 
 # 6. Download results

@@ -24,4 +24,4 @@ subjects:
   - kind: ServiceAccount
     name: {{ include "node-device-labeler.serviceAccountName" . }}
     namespace: {{ .Release.Namespace }}
-{{- end }} 
+{{- end }}

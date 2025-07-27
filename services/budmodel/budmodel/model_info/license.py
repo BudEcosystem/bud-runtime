@@ -565,7 +565,7 @@ class LocalModelLicenseExtractor(LicenseExtractor):
             logger.error(f"Error generating license details: {e}")
             license_details = {}
 
-        license_name = license_details.get("name", None)
+        license_name = license_details.get("name")
         if license_name:
             # NOTE: Commented Out: Reason - For local models no need to reuse foreign id of common licenses, since model license relation is one to one if model is onboarded from disk, url
             # # Check if license_name is in existing_licenses_mapper

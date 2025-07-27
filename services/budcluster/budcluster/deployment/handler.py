@@ -72,7 +72,7 @@ class DeploymentHandler:
             )
 
         for numa in available_numa[:tp_size]:
-            cpu_affinity.append(f"{numa*14}-{(numa+1)*14-2}")
+            cpu_affinity.append(f"{numa * 14}-{(numa + 1) * 14 - 2}")
         thread_bind = "|".join(cpu_affinity)
         return thread_bind, tp_size * 26
 

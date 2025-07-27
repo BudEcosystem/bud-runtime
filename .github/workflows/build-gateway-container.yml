@@ -12,13 +12,13 @@ jobs:
     defaults:
       run:
         working-directory: ${{ env.WORKING_DIR }}
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-        
+
       - name: Build gateway container
         uses: docker/build-push-action@v5
         with:
@@ -29,7 +29,7 @@ jobs:
           tags: budgateway:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          
+
       - name: Test gateway container starts
         run: |
           docker run -d --name test-gateway -p 3000:3000 budgateway:${{ github.sha }} --default-config

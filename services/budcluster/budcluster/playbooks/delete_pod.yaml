@@ -82,5 +82,3 @@
     #       - new_deployment_info.resources[0].spec.replicas == (running_pods | length)
     #     fail_msg: "The deployment {{ deployment_name }} in namespace {{ namespace }} is not scaled down."
     #     success_msg: "The deployment {{ deployment_name }} in namespace {{ namespace }} is successfully scaled down."
-
-

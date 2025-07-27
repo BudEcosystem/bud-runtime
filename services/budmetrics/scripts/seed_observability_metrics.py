@@ -1,22 +1,24 @@
 #!/usr/bin/env python3
-"""
-Seeder script for observability metrics using the /add endpoint.
+"""Seeder script for observability metrics using the /add endpoint.
+
 This script generates and posts test data to the observability/add endpoint.
 Optionally, it can also seed the ModelInference table directly.
 """
 
-import asyncio
-import random
-import time
-import json
-from datetime import datetime, timedelta, timezone, UTC
-from typing import List, Dict, Any, Tuple
-from uuid import UUID, uuid4
-import aiohttp
 import argparse
-from pathlib import Path
-import sys
+import asyncio
+import json
 import os
+import random
+import sys
+import time
+from datetime import UTC, datetime, timedelta, timezone
+from pathlib import Path
+from typing import Any, Dict, List, Tuple
+from uuid import UUID, uuid4
+
+import aiohttp
+
 
 # Add parent directory to path to import modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -25,7 +27,9 @@ os.environ["DEBUG"] = "False"
 os.environ["LOG_LEVEL"] = "INFO"
 
 from budmicroframe.commons import logging
+
 from budmetrics.observability.models import ClickHouseClient, ClickHouseConfig
+
 
 logger = logging.get_logger(__name__)
 
@@ -39,6 +43,13 @@ class ObservabilityMetricsSeeder:
         seed_model_inference: bool = False,
         direct_db: bool = False,
     ):
+        """Initialize the observability metrics seeder.
+
+        Args:
+            base_url: Base URL of the API
+            seed_model_inference: Whether to seed ModelInference table
+            direct_db: Whether to use direct DB for ModelInferenceDetails
+        """
         self.base_url = base_url
         self.endpoint_url = f"{base_url}/observability/add"
         self.seed_model_inference = seed_model_inference
@@ -102,9 +113,7 @@ class ObservabilityMetricsSeeder:
 
     def generate_reference_data(self, num_projects: int = 10, num_models: int = 20):
         """Generate reference data maintaining proper relationships."""
-        logger.info(
-            f"Generating reference data: {num_projects} projects, {num_models} models..."
-        )
+        logger.info(f"Generating reference data: {num_projects} projects, {num_models} models...")
 
         # Generate projects
         self.projects = [uuid4() for _ in range(num_projects)]
@@ -157,17 +166,11 @@ class ObservabilityMetricsSeeder:
             self.project_to_endpoints[project_id].append(endpoint)
 
         logger.info(f"Generated {len(self.endpoints)} endpoints")
-        logger.info(
-            "Relationship check: Each endpoint has 1 model, projects have multiple endpoints"
-        )
+        logger.info("Relationship check: Each endpoint has 1 model, projects have multiple endpoints")
 
         # Verify relationships
-        model_endpoint_counts = [
-            len(endpoints) for endpoints in self.model_to_endpoints.values()
-        ]
-        project_endpoint_counts = [
-            len(endpoints) for endpoints in self.project_to_endpoints.values()
-        ]
+        model_endpoint_counts = [len(endpoints) for endpoints in self.model_to_endpoints.values()]
+        project_endpoint_counts = [len(endpoints) for endpoints in self.project_to_endpoints.values()]
         logger.info(f"  Models have 1-{max(model_endpoint_counts)} endpoints each")
         logger.info(f"  Projects have 1-{max(project_endpoint_counts)} endpoints each")
 
@@ -180,25 +183,10 @@ class ObservabilityMetricsSeeder:
         random_hex = format(random.getrandbits(74), "019x")
 
         # Construct UUID
-        uuid_hex = (
-            timestamp_hex
-            + random_hex[:3]
-            + "7"
-            + random_hex[3:7]
-            + "8"
-            + random_hex[7:]
-        )
+        uuid_hex = timestamp_hex + random_hex[:3] + "7" + random_hex[3:7] + "8" + random_hex[7:]
 
         return UUID(
-            uuid_hex[:8]
-            + "-"
-            + uuid_hex[8:12]
-            + "-"
-            + uuid_hex[12:16]
-            + "-"
-            + uuid_hex[16:20]
-            + "-"
-            + uuid_hex[20:32]
+            uuid_hex[:8] + "-" + uuid_hex[8:12] + "-" + uuid_hex[12:16] + "-" + uuid_hex[16:20] + "-" + uuid_hex[20:32]
         )
 
     def generate_model_inference_batch(
@@ -221,9 +209,7 @@ class ObservabilityMetricsSeeder:
             response_time = random.randint(100, 5000) if random.random() > 0.1 else None
             ttft = random.randint(50, response_time) if response_time else None
             cached = random.choice([True, False])
-            finish_reason = (
-                random.choice(self.finish_reasons) if random.random() > 0.1 else None
-            )
+            finish_reason = random.choice(self.finish_reasons) if random.random() > 0.1 else None
 
             record = (
                 str(id_val),
@@ -275,40 +261,40 @@ class ObservabilityMetricsSeeder:
             values.append(row)
 
         query = f"""
-        INSERT INTO ModelInference 
+        INSERT INTO ModelInference
         (id, inference_id, raw_request, raw_response, model_name, model_provider_name,
          input_tokens, output_tokens, response_time_ms, ttft_ms, system, input_messages,
          output, cached, finish_reason)
         VALUES {",".join(values)}
         """
         await self.clickhouse_client.execute_query(query)
-    
+
     async def _insert_model_inference_details_batch(self, batch_data: List[Dict[str, Any]]):
         """Insert ModelInferenceDetails records directly to DB."""
         if not batch_data:
             return {"inserted": 0, "duplicates": 0, "failures": 0}
-        
+
         # Extract all inference_ids to check for existing records
         inference_ids = [record["inference_id"] for record in batch_data]
-        
+
         # Check for existing inference_ids
         existing_check_query = f"""
-        SELECT inference_id 
-        FROM ModelInferenceDetails 
-        WHERE inference_id IN ({','.join([f"'{id}'" for id in inference_ids])})
+        SELECT inference_id
+        FROM ModelInferenceDetails
+        WHERE inference_id IN ({",".join([f"'{id}'" for id in inference_ids])})
         """
-        
+
         existing_records = await self.clickhouse_client.execute_query(existing_check_query)
         existing_ids = {str(row[0]) for row in existing_records} if existing_records else set()
-        
+
         # Filter out records with existing inference_ids
         new_records = [record for record in batch_data if record["inference_id"] not in existing_ids]
         duplicate_count = len(batch_data) - len(new_records)
-        
+
         if not new_records:
             logger.debug(f"All {len(batch_data)} records already exist, skipping insert")
             return {"inserted": 0, "duplicates": duplicate_count, "failures": 0}
-        
+
         # Build VALUES clause
         values = []
         for record in new_records:
@@ -325,7 +311,7 @@ class ObservabilityMetricsSeeder:
                 f"'{record['request_forward_time']}')"
             )
             values.append(row)
-        
+
         # Build and execute the INSERT query
         query = f"""
         INSERT INTO ModelInferenceDetails
@@ -333,7 +319,7 @@ class ObservabilityMetricsSeeder:
          cost, response_analysis, is_success, request_arrival_time, request_forward_time)
         VALUES {",".join(values)}
         """
-        
+
         try:
             await self.clickhouse_client.execute_query(query)
             return {"inserted": len(new_records), "duplicates": duplicate_count, "failures": 0}
@@ -341,14 +327,12 @@ class ObservabilityMetricsSeeder:
             logger.error(f"Error inserting ModelInferenceDetails batch: {e}")
             return {"inserted": 0, "duplicates": duplicate_count, "failures": len(new_records)}
 
-    def generate_batch_data(
-        self, batch_size: int, base_time: datetime
-    ) -> Tuple[List[Dict[str, Any]], List[UUID]]:
+    def generate_batch_data(self, batch_size: int, base_time: datetime) -> Tuple[List[Dict[str, Any]], List[UUID]]:
         """Generate a batch of InferenceDetailsMetrics data."""
         batch_data = []
         inference_ids = []
 
-        for i in range(batch_size):
+        for _ in range(batch_size):
             # Generate inference_id that will be shared between both tables
             inference_id = uuid4()
             inference_ids.append(inference_id)
@@ -370,23 +354,17 @@ class ObservabilityMetricsSeeder:
             # IP address (optional)
             request_ip = None
             if random.random() > 0.3:  # 70% have IP
-                request_ip = (
-                    f"192.168.{random.randint(1, 255)}.{random.randint(1, 255)}"
-                )
+                request_ip = f"192.168.{random.randint(1, 255)}.{random.randint(1, 255)}"
 
             # Response analysis (optional)
             response_analysis = None
-            if (
-                is_success and random.random() > 0.5
-            ):  # 50% of successful requests have analysis
+            if is_success and random.random() > 0.5:  # 50% of successful requests have analysis
                 response_analysis = {
                     "sentiment": random.choice(["positive", "negative", "neutral"]),
                     "confidence": round(random.random(), 2),
                     "topics": [f"topic_{j}" for j in range(random.randint(1, 3))],
                     "language": random.choice(["en", "es", "fr", "de"]),
-                    "model_name": endpoint[
-                        "model_name"
-                    ],  # Include model info in analysis
+                    "model_name": endpoint["model_name"],  # Include model info in analysis
                 }
 
             # Create the metric data following InferenceDetailsMetrics schema
@@ -454,9 +432,7 @@ class ObservabilityMetricsSeeder:
             "type": "add_request_metrics",
         }
 
-    async def send_batch(
-        self, session: aiohttp.ClientSession, batch_data: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+    async def send_batch(self, session: aiohttp.ClientSession, batch_data: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Send a batch of metrics to the /add endpoint."""
         bulk_request = self.create_bulk_request(batch_data)
 
@@ -515,7 +491,7 @@ class ObservabilityMetricsSeeder:
         total_batches = (total_records + batch_size - 1) // batch_size
         time_range = (end_date - start_date).total_seconds()
 
-        logger.info(f"\nStarting data seeding:")
+        logger.info("\nStarting data seeding:")
         if self.direct_db:
             logger.info(
                 f"  ModelInferenceDetails via direct DB: {self.clickhouse_config.host}:{self.clickhouse_config.port}"
@@ -523,9 +499,7 @@ class ObservabilityMetricsSeeder:
         else:
             logger.info(f"  ModelInferenceDetails via API: {self.endpoint_url}")
         if self.seed_model_inference:
-            logger.info(
-                f"  ModelInference via direct DB: {self.clickhouse_config.host}:{self.clickhouse_config.port}"
-            )
+            logger.info(f"  ModelInference via direct DB: {self.clickhouse_config.host}:{self.clickhouse_config.port}")
         logger.info(f"  Total records: {total_records:,}")
         logger.info(f"  Batch size: {batch_size:,}")
         logger.info(f"  Total batches: {total_batches:,}")
@@ -536,19 +510,13 @@ class ObservabilityMetricsSeeder:
         async with aiohttp.ClientSession() as session:
             for batch_num in range(total_batches):
                 # Calculate time for this batch
-                batch_time = start_date + timedelta(
-                    seconds=(batch_num / total_batches) * time_range
-                )
+                batch_time = start_date + timedelta(seconds=(batch_num / total_batches) * time_range)
 
                 # Calculate actual batch size for last batch
-                current_batch_size = min(
-                    batch_size, total_records - (batch_num * batch_size)
-                )
+                current_batch_size = min(batch_size, total_records - (batch_num * batch_size))
 
                 # Generate batch data with shared inference_ids
-                batch_data, inference_ids = self.generate_batch_data(
-                    current_batch_size, batch_time
-                )
+                batch_data, inference_ids = self.generate_batch_data(current_batch_size, batch_time)
 
                 # If seeding ModelInference, insert that data first
                 if self.seed_model_inference:
@@ -558,9 +526,7 @@ class ObservabilityMetricsSeeder:
                         )
                         await self._insert_model_inference_batch(inference_records)
                     except Exception as e:
-                        logger.error(
-                            f"Error inserting ModelInference batch {batch_num + 1}: {e}"
-                        )
+                        logger.error(f"Error inserting ModelInference batch {batch_num + 1}: {e}")
 
                 # Send ModelInferenceDetails either via API or direct DB
                 if self.direct_db:
@@ -573,7 +539,7 @@ class ObservabilityMetricsSeeder:
                 else:
                     # API insertion
                     result = await self.send_batch(session, batch_data)
-                    
+
                     # Update statistics
                     self.total_sent += current_batch_size
                     if result.get("success"):
@@ -606,7 +572,7 @@ class ObservabilityMetricsSeeder:
 
         # Final summary
         elapsed = time.time() - start_time
-        logger.info(f"\nSeeding completed:")
+        logger.info("\nSeeding completed:")
         logger.info(f"  Total time: {elapsed:.1f} seconds")
         logger.info(f"  Records sent: {self.total_sent:,}")
         logger.info(f"  Successfully inserted: {self.total_inserted:,}")
@@ -630,39 +596,33 @@ class ObservabilityMetricsSeeder:
         }
 
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
+            async with (
+                aiohttp.ClientSession() as session,
+                session.post(
                     analytics_url,
                     json=analytics_request,
                     headers={"Content-Type": "application/json"},
-                ) as response:
-                    if response.status == 200:
-                        result = await response.json()
+                ) as response,
+            ):
+                if response.status == 200:
+                    result = await response.json()
 
-                        # Count total requests from all time periods
-                        total_requests = 0
-                        for period in result.get("items", []):
-                            for item in period.get("items", []):
-                                request_count = (
-                                    item.get("data", {})
-                                    .get("request_count", {})
-                                    .get("count", 0)
-                                )
-                                total_requests += request_count
+                    # Count total requests from all time periods
+                    total_requests = 0
+                    for period in result.get("items", []):
+                        for item in period.get("items", []):
+                            request_count = item.get("data", {}).get("request_count", {}).get("count", 0)
+                            total_requests += request_count
 
-                        logger.info(
-                            f"  Total records in ModelInferenceDetails: {total_requests:,}"
-                        )
-                        logger.info(
-                            f"  Expected records (inserted): {self.total_inserted:,}"
-                        )
+                    logger.info(f"  Total records in ModelInferenceDetails: {total_requests:,}")
+                    logger.info(f"  Expected records (inserted): {self.total_inserted:,}")
 
-                        if total_requests >= self.total_inserted:
-                            logger.info("  ✓ Verification successful!")
-                        else:
-                            logger.warning(f"  ⚠ Found fewer records than expected")
+                    if total_requests >= self.total_inserted:
+                        logger.info("  ✓ Verification successful!")
                     else:
-                        logger.error(f"  Failed to verify: HTTP {response.status}")
+                        logger.warning("  ⚠ Found fewer records than expected")
+                else:
+                    logger.error(f"  Failed to verify: HTTP {response.status}")
 
         except Exception as e:
             logger.error(f"  Verification error: {e}")
@@ -682,13 +642,9 @@ class ObservabilityMetricsSeeder:
                 """
                 )
                 if result:
-                    logger.warning(
-                        f"  WARNING: Found {len(result)} endpoints with multiple models!"
-                    )
+                    logger.warning(f"  WARNING: Found {len(result)} endpoints with multiple models!")
                 else:
-                    logger.info(
-                        f"  ✓ All endpoints have exactly one model (correct 1:1 relationship)"
-                    )
+                    logger.info("  ✓ All endpoints have exactly one model (correct 1:1 relationship)")
 
                 # Check project-endpoint relationship (should be 1:many)
                 result = await self.clickhouse_client.execute_query(
@@ -701,20 +657,16 @@ class ObservabilityMetricsSeeder:
                 """
                 )
                 if result:
-                    logger.info(f"  Top 5 projects by endpoint count:")
+                    logger.info("  Top 5 projects by endpoint count:")
                     for project_id, endpoint_count in result:
-                        logger.info(
-                            f"    Project {str(project_id)[:8]}...: {endpoint_count} endpoints"
-                        )
+                        logger.info(f"    Project {str(project_id)[:8]}...: {endpoint_count} endpoints")
             except Exception as e:
                 logger.error(f"  Relationship verification error: {e}")
 
 
 async def main():
-    """Main function to run the seeder."""
-    parser = argparse.ArgumentParser(
-        description="Seed observability metrics via the /add API endpoint"
-    )
+    """Run the seeder."""
+    parser = argparse.ArgumentParser(description="Seed observability metrics via the /add API endpoint")
     parser.add_argument(
         "--url",
         default="http://localhost:8000",
@@ -754,16 +706,12 @@ async def main():
         action="store_true",
         help="Use direct DB insertion for ModelInferenceDetails instead of API",
     )
-    parser.add_argument(
-        "--verify", action="store_true", help="Verify the data after seeding"
-    )
+    parser.add_argument("--verify", action="store_true", help="Verify the data after seeding")
 
     args = parser.parse_args()
 
     seeder = ObservabilityMetricsSeeder(
-        base_url=args.url, 
-        seed_model_inference=args.seed_model_inference,
-        direct_db=args.direct_db
+        base_url=args.url, seed_model_inference=args.seed_model_inference, direct_db=args.direct_db
     )
 
     try:

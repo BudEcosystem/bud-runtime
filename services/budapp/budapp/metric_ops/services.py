@@ -58,10 +58,13 @@ class BudMetricService(SessionMixin):
         logger.debug(f"Proxying analytics request to bud_metrics: {request_body}")
 
         try:
-            async with aiohttp.ClientSession() as session, session.post(
-                analytics_endpoint,
-                json=request_body,
-            ) as response:
+            async with (
+                aiohttp.ClientSession() as session,
+                session.post(
+                    analytics_endpoint,
+                    json=request_body,
+                ) as response,
+            ):
                 response_data = await response.json()
 
                 # Return the response as-is, including the status code

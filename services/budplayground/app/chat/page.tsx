@@ -28,16 +28,16 @@ export default function ChatPage() {
       setHasHydrated(hydrated);
     }
   }, []);
-  
+
 
   useEffect(() => {
     if (!hasHydrated) return;
-    
+
     hideLoader();
     if (activeChatList.length === 0) {
       createNewChat();
     }
-  }, [hasHydrated]);
+  }, [hasHydrated, activeChatList.length, createNewChat, hideLoader]);
 
   useEffect(() => {
 
@@ -58,7 +58,7 @@ export default function ChatPage() {
       setSelectedModel(model);
     }
 
-  }, []);
+  }, [checkAccessKey, hideLoader]);
 
   const checkAccessKey = async (accessKey: string) => {
     const isLoginSuccessful = await login("", accessKey);

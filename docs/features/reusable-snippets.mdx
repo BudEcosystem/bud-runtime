@@ -18,7 +18,7 @@ class BudRuntimeClient:
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
         }
-    
+
     def generate_text(self, prompt, model="llama2-7b"):
         response = requests.post(
             f"{self.base_url}/v1/completions",
@@ -30,7 +30,7 @@ class BudRuntimeClient:
             }
         )
         return response.json()
-    
+
     def generate_image(self, prompt, size="1024x1024"):
         response = requests.post(
             f"{self.base_url}/v1/images/generations",
@@ -194,12 +194,12 @@ avg(gpu_utilization{namespace="bud-system"}) by (pod)
 rate(http_requests_total{namespace="bud-system"}[5m])
 
 # Model Inference Latency
-histogram_quantile(0.95, 
+histogram_quantile(0.95,
   rate(model_inference_duration_seconds_bucket{namespace="bud-system"}[5m])
 )
 
 # Memory Usage
-container_memory_usage_bytes{namespace="bud-system"} / 
+container_memory_usage_bytes{namespace="bud-system"} /
 container_spec_memory_limit_bytes{namespace="bud-system"}
 ```
 
@@ -280,9 +280,9 @@ def check_health(base_url):
         "/v1/models",
         "/metrics"
     ]
-    
+
     all_healthy = True
-    
+
     for endpoint in endpoints:
         try:
             response = requests.get(f"{base_url}{endpoint}", timeout=5)
@@ -294,7 +294,7 @@ def check_health(base_url):
         except Exception as e:
             print(f"✗ {endpoint} - Error: {str(e)}")
             all_healthy = False
-    
+
     return all_healthy
 
 if __name__ == "__main__":

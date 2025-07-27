@@ -10,7 +10,7 @@ const ThemeContextProvider = ({ children }) => {
   const currentTheme = typeof window !== 'undefined' ? localStorage.getItem('theme') : '';
   const [theme, setTheme] = useState("light");
 
-  useEffect(() => {    
+  useEffect(() => {
     if(theme == 'dark') {
       root.className = 'dark';
     } else if (theme == 'light') {

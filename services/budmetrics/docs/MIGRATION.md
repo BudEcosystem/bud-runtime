@@ -47,7 +47,7 @@ If you need to run the migration manually:
 
 1. Ensure environment variables are set:
    - `PSQL_HOST`: ClickHouse host
-   - `PSQL_PORT`: ClickHouse port  
+   - `PSQL_PORT`: ClickHouse port
    - `PSQL_DBNAME`: Database name
    - `PSQL_USER`: Username
    - `PSQL_PASSWORD`: Password

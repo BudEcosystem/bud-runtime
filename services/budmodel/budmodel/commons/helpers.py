@@ -212,7 +212,7 @@ def get_remote_file_size(url):
 
 
 def get_size_in_bytes(path_or_string) -> int:
-    """Get size in bytes for a file or directory
+    """Get size in bytes for a file or directory.
 
     Args:
         path_or_string: String path or Path object
@@ -239,7 +239,7 @@ def get_size_in_bytes(path_or_string) -> int:
         # If it's a directory, calculate total size
         if path.is_dir():
             total_size = 0
-            for dirpath, dirnames, filenames in os.walk(path):
+            for dirpath, _, filenames in os.walk(path):
                 # Add size of all files in current directory
                 for filename in filenames:
                     file_path = Path(dirpath) / filename
@@ -333,8 +333,9 @@ def list_directory_files(directory: str) -> Tuple[List[Dict], int]:
 
 
 def extract_json_from_string(text):
-    """Extract text between <json> and </json> tags from a string,
-    excluding the tags themselves.
+    """Extract text between <json> and </json> tags from a string.
+
+    Excluding the tags themselves.
 
     Args:
         text (str): The input string to search in

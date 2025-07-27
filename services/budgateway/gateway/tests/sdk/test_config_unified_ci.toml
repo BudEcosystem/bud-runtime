@@ -128,7 +128,7 @@ endpoints = ["image_generation", "image_edit"]
 type = "dummy"
 model_name = "test"
 
-# === Anthropic Models - Universal OpenAI SDK Compatibility ===  
+# === Anthropic Models - Universal OpenAI SDK Compatibility ===
 # These Anthropic models work perfectly with OpenAI SDK through /v1/chat/completions
 # This demonstrates universal compatibility: one SDK, all providers!
 

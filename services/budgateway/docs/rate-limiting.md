@@ -74,7 +74,7 @@ requests_per_hour = 5000    # 5000 requests per hour (83 per minute average)
   - Lower values: More accurate distributed limiting
   - Higher values: Better performance, less Redis load
 
-#### Redis Configuration  
+#### Redis Configuration
 - **`redis_timeout_ms`** (default: `1`): Timeout for Redis operations
   - Lower values: Faster fallback to local-only limiting
   - Higher values: More tolerance for Redis latency
@@ -107,7 +107,7 @@ When rate limits are exceeded on OpenAI-compatible endpoints, TensorZero returns
 {
   "error": {
     "message": "Rate limit exceeded",
-    "type": "rate_limit_error", 
+    "type": "rate_limit_error",
     "code": "rate_limit_exceeded"
   }
 }
@@ -250,7 +250,7 @@ requests_per_minute = 20
 burst_size = 5
 enabled = true
 
-# Premium tier  
+# Premium tier
 [models.gpt-4.rate_limits]
 requests_per_minute = 100
 burst_size = 20
@@ -286,7 +286,7 @@ enabled = true
    - Reduces latency by 3-5ms for large request bodies
    - Example: `X-Model-Name: gpt-3.5-turbo`
 
-2. **Cache TTL**: 
+2. **Cache TTL**:
    - Start with 200ms default
    - Increase to 500-1000ms for better performance
    - Decrease to 50-100ms for stricter enforcement
@@ -313,7 +313,7 @@ requests_per_minute = 600   # 10/s average
 requests_per_hour = 36000   # 10/s average
 
 # Bad: Conflicting rates
-[models.example.rate_limits] 
+[models.example.rate_limits]
 requests_per_second = 100   # 100/s
 requests_per_minute = 60    # 1/s average - this will be the effective limit!
 ```

@@ -596,7 +596,7 @@ xAI supports a subset of OpenAI's image generation parameters:
 
 Unlike OpenAI's DALL-E models, xAI currently doesn't support:
 - `quality`: Not supported by xAI API
-- `size`: Not supported by xAI API  
+- `size`: Not supported by xAI API
 - `style`: Not supported by xAI API
 
 These parameters are ignored gracefully if provided.

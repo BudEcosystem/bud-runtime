@@ -33,7 +33,7 @@ function PerfomanceTable() {
   const [pageSize, setPageSize] = useState(10);
 
   const { getBenchmarkResultRequestMetrics, benchmarkRequestMetrics, benchmarkRequestMetricsTotalCount} = useBenchmarks();
-  
+
   useLoaderOnLoding(loading);
 
   useHandleRouteChange(() => {
@@ -189,5 +189,3 @@ function PerfomanceTable() {
 };
 
 export default PerfomanceTable;
-
-

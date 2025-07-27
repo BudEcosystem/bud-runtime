@@ -19,7 +19,7 @@ export default function AddWorkerDeployStatus() {
   const { getWorkers } = useWorkers();
   const router = useRouter();
   const projectId = router.query.projectId as string
-  
+
   if (!currentWorkflow?.workflow_id) {
     return null;
   }

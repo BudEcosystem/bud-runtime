@@ -385,13 +385,13 @@ batch_id = response.json()["id"]
 while True:
     response = requests.get(f"{BASE_URL}/v1/batches/{batch_id}", headers=headers)
     batch = response.json()
-    
+
     print(f"Status: {batch['status']}")
     print(f"Progress: {batch['request_counts']['completed']}/{batch['request_counts']['total']}")
-    
+
     if batch["status"] in ["completed", "failed", "expired", "cancelled"]:
         break
-    
+
     time.sleep(30)  # Poll every 30 seconds
 
 # 6. Download results
@@ -401,7 +401,7 @@ if batch["status"] == "completed":
         f"{BASE_URL}/v1/files/{output_file_id}/content",
         headers=headers
     )
-    
+
     # Process results
     for line in response.text.strip().split("\n"):
         result = json.loads(line)
@@ -482,11 +482,11 @@ async function processBatch() {
   let batch;
   do {
     await new Promise(resolve => setTimeout(resolve, 30000)); // Wait 30 seconds
-    
+
     const statusResponse = await fetch(`${BASE_URL}/v1/batches/${batchId}`, {
       headers: { 'Authorization': `Bearer ${API_KEY}` }
     });
-    
+
     batch = await statusResponse.json();
     console.log(`Status: ${batch.status}, Progress: ${batch.request_counts.completed}/${batch.request_counts.total}`);
   } while (!['completed', 'failed', 'expired', 'cancelled'].includes(batch.status));
@@ -500,7 +500,7 @@ async function processBatch() {
 
     const results = await resultsResponse.text();
     const lines = results.trim().split('\n');
-    
+
     for (const line of lines) {
       const result = JSON.parse(line);
       console.log(`${result.custom_id}: ${result.response ? 'Success' : 'Failed'}`);

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""
-ClickHouse migration script for bud-serve-metrics.
+"""ClickHouse migration script for bud-serve-metrics.
+
 Run this script to create required tables in ClickHouse.
 """
 
@@ -11,11 +11,14 @@ import sys
 import time
 from pathlib import Path
 
+
 # Add parent directory to path to import modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from budmetrics.observability.models import ClickHouseClient, ClickHouseConfig
 from budmicroframe.commons import logging
+
+from budmetrics.observability.models import ClickHouseClient, ClickHouseConfig
+
 
 logger = logging.get_logger(__name__)
 
@@ -33,9 +36,7 @@ def get_clickhouse_config() -> ClickHouseConfig:
     missing_vars = [var for var in required_vars if not os.getenv(var)]
 
     if missing_vars:
-        raise ValueError(
-            f"Missing required environment variables: {', '.join(missing_vars)}"
-        )
+        raise ValueError(f"Missing required environment variables: {', '.join(missing_vars)}")
 
     # Log connection info (without password)
     logger.info(
@@ -54,6 +55,13 @@ def get_clickhouse_config() -> ClickHouseConfig:
 
 class ClickHouseMigration:
     def __init__(self, include_model_inference: bool = False, max_retries: int = 30, retry_delay: int = 2):
+        """Initialize the ClickHouse migration.
+
+        Args:
+            include_model_inference: Whether to include ModelInference table creation
+            max_retries: Maximum number of connection retries
+            retry_delay: Delay between retries in seconds
+        """
         self.include_model_inference = include_model_inference
         self.max_retries = max_retries
         self.retry_delay = retry_delay
@@ -63,26 +71,24 @@ class ClickHouseMigration:
     async def wait_for_clickhouse(self):
         """Wait for ClickHouse to be ready with retry mechanism."""
         logger.info("Waiting for ClickHouse to be ready...")
-        
+
         for attempt in range(self.max_retries):
             try:
                 # Try to initialize the client
                 await self.client.initialize()
-                
+
                 # Test connection by running a simple query
                 result = await self.client.execute_query("SELECT 1")
                 if result and result[0][0] == 1:
                     logger.info("ClickHouse is ready!")
                     return True
-                    
+
             except Exception as e:
                 if attempt < self.max_retries - 1:
-                    logger.warning(
-                        f"ClickHouse not ready yet (attempt {attempt + 1}/{self.max_retries}): {e}"
-                    )
+                    logger.warning(f"ClickHouse not ready yet (attempt {attempt + 1}/{self.max_retries}): {e}")
                     logger.info(f"Retrying in {self.retry_delay} seconds...")
                     time.sleep(self.retry_delay)
-                    
+
                     # Close the client to reset connection
                     try:
                         await self.client.close()
@@ -90,8 +96,8 @@ class ClickHouseMigration:
                         logger.warning(f"Failed to close ClickHouse client during retry: {close_exc}")
                 else:
                     logger.error(f"ClickHouse failed to become ready after {self.max_retries} attempts")
-                    raise Exception(f"ClickHouse connection failed: {e}")
-        
+                    raise Exception(f"ClickHouse connection failed: {e}") from e
+
         return False
 
     async def initialize(self):
@@ -103,9 +109,7 @@ class ClickHouseMigration:
     async def create_database(self):
         """Create database if it doesn't exist."""
         try:
-            await self.client.execute_query(
-                f"CREATE DATABASE IF NOT EXISTS {self.config.database}"
-            )
+            await self.client.execute_query(f"CREATE DATABASE IF NOT EXISTS {self.config.database}")
             logger.info(f"Database '{self.config.database}' created or already exists")
         except Exception as e:
             logger.error(f"Error creating database: {e}")
@@ -114,9 +118,7 @@ class ClickHouseMigration:
     async def create_model_inference_table(self):
         """Create ModelInference table (optional)."""
         if not self.include_model_inference:
-            logger.info(
-                "Skipping ModelInference table creation (use --include-model-inference to create)"
-            )
+            logger.info("Skipping ModelInference table creation (use --include-model-inference to create)")
             return
 
         query = """
@@ -227,9 +229,7 @@ class ClickHouseMigration:
                     logger.info(f"✓ Table {table} exists")
 
                     # Get row count
-                    count_result = await self.client.execute_query(
-                        f"SELECT COUNT(*) FROM {table}"
-                    )
+                    count_result = await self.client.execute_query(f"SELECT COUNT(*) FROM {table}")
                     count = count_result[0][0] if count_result else 0
                     logger.info(f"  - Row count: {count:,}")
                 else:
@@ -256,9 +256,8 @@ class ClickHouseMigration:
 
 
 async def main():
-    parser = argparse.ArgumentParser(
-        description="ClickHouse migration script for bud-serve-metrics"
-    )
+    """Run the ClickHouse migration script."""
+    parser = argparse.ArgumentParser(description="ClickHouse migration script for bud-serve-metrics")
     parser.add_argument(
         "--include-model-inference",
         action="store_true",
@@ -287,7 +286,7 @@ async def main():
     migration = ClickHouseMigration(
         include_model_inference=args.include_model_inference,
         max_retries=args.max_retries,
-        retry_delay=args.retry_delay
+        retry_delay=args.retry_delay,
     )
 
     try:

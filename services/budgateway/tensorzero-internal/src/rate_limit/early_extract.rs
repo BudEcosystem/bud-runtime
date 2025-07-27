@@ -55,7 +55,7 @@ pub async fn early_model_extraction(mut request: Request, next: Next) -> Respons
                     let total_time = extract_start.elapsed();
                     let body_time = body_read_start.elapsed();
                     tracing::debug!(
-                        "Early extraction SUCCESS: found model '{}' in JSON. Total: {:?}, Body read: {:?}", 
+                        "Early extraction SUCCESS: found model '{}' in JSON. Total: {:?}, Body read: {:?}",
                         model, total_time, body_time
                     );
                 } else {

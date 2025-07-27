@@ -24,7 +24,7 @@ export default function QuantizationSpecificationCard() {
             clusterId: currentWorkflow.workflow_steps.quantization_config.cluster_id,
         })
     }, [currentWorkflow])
-    
+
     const addSpecification = (name: string, value: string, icon: string, full: boolean = false) => {
         specifications.push({
             name: name,

@@ -71,9 +71,7 @@ auth_router = APIRouter(prefix="/auth", tags=["auth"])
 )
 @rate_limit(max_requests=3, window_seconds=3600)  # 3 requests per hour
 async def register_user(
-    request: Request,
-    user: UserCreate, 
-    session: Annotated[Session, Depends(get_session)]
+    request: Request, user: UserCreate, session: Annotated[Session, Depends(get_session)]
 ) -> Union[UserRegisterResponse, ErrorResponse]:
     """Register a user with email and password."""
     try:
@@ -118,9 +116,7 @@ async def register_user(
 )
 @rate_limit(max_requests=10, window_seconds=60)  # 10 requests per minute
 async def login_user(
-    request: Request,
-    user: UserLogin, 
-    session: Annotated[Session, Depends(get_session)]
+    request: Request, user: UserLogin, session: Annotated[Session, Depends(get_session)]
 ) -> Union[UserLoginResponse, ErrorResponse]:
     """Login a user with email and password."""
     try:
@@ -199,9 +195,7 @@ async def logout_user(
 )
 @rate_limit(max_requests=20, window_seconds=60, use_user_id=True)  # 20 requests per minute per user
 async def refresh_token(
-    request: Request,
-    token: RefreshTokenRequest, 
-    session: Annotated[Session, Depends(get_session)]
+    request: Request, token: RefreshTokenRequest, session: Annotated[Session, Depends(get_session)]
 ) -> Union[RefreshTokenResponse, ErrorResponse]:
     """Refresh a user's access token using their refresh token."""
     try:

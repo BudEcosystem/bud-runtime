@@ -12,7 +12,7 @@ const GameOfLifeBackground = () => {
     const GENERATION_INTERVAL = 1000; // 2 seconds between generations
     const FRAME_RATE = 75; // 50ms between frames for smooth animation
     const MAX_OPACITY = 0.2;
-    
+
     // Use innerWidth/innerHeight for viewport dimensions
     const CELL_SIZE = Math.min(window.innerWidth, window.innerHeight) / DESIRED_CELL_COUNT;
     const GRID_WIDTH = Math.ceil(window.innerWidth / CELL_SIZE);
@@ -40,7 +40,7 @@ const GameOfLifeBackground = () => {
     const draw = () => {
       const grid = gridRef.current;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
+
       // Draw cells
       for (let y = 0; y < GRID_HEIGHT; y++) {
         for (let x = 0; x < GRID_WIDTH; x++) {
@@ -70,11 +70,11 @@ const GameOfLifeBackground = () => {
           }
         }
       }
-      
+
       // Draw grid lines
       ctx.strokeStyle = '#333333';
       ctx.lineWidth = 1;
-      
+
       // Vertical lines
       for (let x = 0; x <= GRID_WIDTH; x++) {
         ctx.beginPath();
@@ -82,7 +82,7 @@ const GameOfLifeBackground = () => {
         ctx.lineTo(x * CELL_SIZE, CANVAS_HEIGHT);
         ctx.stroke();
       }
-      
+
       // Horizontal lines
       for (let y = 0; y <= GRID_HEIGHT; y++) {
         ctx.beginPath();
@@ -123,14 +123,14 @@ const GameOfLifeBackground = () => {
 
     const animate = () => {
       draw();
-      
+
       // Check if it's time for next generation
       const currentTime = Date.now();
       if (currentTime - lastGenerationTime >= GENERATION_INTERVAL) {
         nextGeneration();
         lastGenerationTime = currentTime;
       }
-      
+
       setTimeout(() => requestAnimationFrame(animate), FRAME_RATE);
     };
 
