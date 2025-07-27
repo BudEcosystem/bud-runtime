@@ -1,8 +1,8 @@
 """Add company, purpose, and user_type fields to User model
 
-Revision ID: 033bac35a684
-Revises: c301ac188f1b
-Create Date: 2025-07-18 17:09:05.622824
+Revision ID: 5f8cf497ed7b
+Revises: 34c89ff1662c
+Create Date: 2025-07-27 14:36:35.498911
 
 """
 
@@ -14,8 +14,8 @@ from sqlalchemy.dialects import postgresql
 
 
 # revision identifiers, used by Alembic.
-revision: str = "033bac35a684"
-down_revision: Union[str, None] = "c301ac188f1b"
+revision: str = "5f8cf497ed7b"
+down_revision: Union[str, None] = "34c89ff1662c"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
