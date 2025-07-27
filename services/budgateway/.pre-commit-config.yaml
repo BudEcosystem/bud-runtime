@@ -86,18 +86,6 @@ repos:
         exclude: '.*\.ipynb$'
         pass_filenames: false
 
-      - id: "prettier: openai-node"
-        name: "prettier: openai-node"
-        entry: bash -c 'cd clients/openai-node && pnpm run format'
-        language: node
-        types_or:
-          [css, html, javascript, json, jsx, markdown, scss, ts, tsx, yaml]
-        additional_dependencies:
-          - prettier
-          - prettier-plugin-tailwindcss
-          - "@prettier/plugin-xml"
-        exclude: '.*\.ipynb$'
-        pass_filenames: false
 
       - id: "eslint: ui"
         name: "eslint: ui"
@@ -110,16 +98,6 @@ repos:
           - "@typescript-eslint/eslint-plugin"
         pass_filenames: false
 
-      - id: "eslint: openai-node"
-        name: "eslint: openai-node"
-        entry: bash -c 'cd clients/openai-node && pnpm run lint'
-        language: node
-        types_or: [javascript, jsx, ts, tsx]
-        additional_dependencies:
-          - eslint
-          - "@typescript-eslint/parser"
-          - "@typescript-eslint/eslint-plugin"
-        pass_filenames: false
 
       - id: "tsc: ui"
         name: "tsc: ui"
@@ -130,14 +108,6 @@ repos:
           - typescript
         pass_filenames: false
 
-      - id: "tsc: openai-node"
-        name: "tsc: openai-node"
-        entry: bash -c 'cd clients/openai-node && pnpm run typecheck'
-        language: node
-        types_or: [ts, tsx]
-        additional_dependencies:
-          - typescript
-        pass_filenames: false
 
       - id: compile-check-notebooks
         name: compile-check-notebooks
@@ -164,13 +134,6 @@ repos:
   - repo: https://github.com/RobertCraigie/pyright-python
     rev: v1.1.391
     hooks:
-      - id: pyright
-        name: "pyright: clients/openai-python"
-        files: ^clients/openai-python/
-        args: ["--project", "clients/openai-python/pyrightconfig.json"]
-        additional_dependencies:
-          - openai
-
       - id: pyright
         name: "pyright: recipes"
         files: ^recipes/

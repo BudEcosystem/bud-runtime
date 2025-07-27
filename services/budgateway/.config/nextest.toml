@@ -76,3 +76,8 @@ slow-timeout = { period = "500s", terminate-after = 1 }
 filter = 'not binary(e2e)'
 retries = 0
 slow-timeout = { period = "10s", terminate-after = 1 }
+
+[[profile.default.overrides]]
+# Settings for RSA key generation test which needs more time
+filter = 'test(test_parse_model_with_encrypted_api_key)'
+slow-timeout = { period = "30s", terminate-after = 1 }

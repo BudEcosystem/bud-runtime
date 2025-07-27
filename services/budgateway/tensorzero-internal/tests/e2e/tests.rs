@@ -3,6 +3,7 @@ mod batch;
 mod best_of_n;
 mod cache;
 mod clickhouse;
+mod client_stubs;
 mod common;
 mod datasets;
 mod dicl;
