@@ -60,10 +60,10 @@ spec:
                 fi
                 return 1
               }
-              
+
               # Remove existing device type labels first
               kubectl label node ${NODE_NAME} device.kubernetes.io/type- --overwrite 2>/dev/null || true
-              
+
               DEVICE_FOUND=false
 
               # Check for GPU
@@ -74,7 +74,7 @@ spec:
                 DEVICE_FOUND=true
               fi
               {{- end }}
-              
+
               # Check for HPU
               {{- if .Values.deviceChecks.hpu.enabled }}
               if ! $DEVICE_FOUND && check_hpu; then
@@ -92,7 +92,7 @@ spec:
                 DEVICE_FOUND=true
               fi
               {{- end }}
-              
+
               # Default to CPU if no other devices found
               {{- if .Values.deviceChecks.cpu.enabled }}
               if ! $DEVICE_FOUND; then
@@ -105,7 +105,7 @@ spec:
               while true; do
                 sleep 3600
               done
-              
+
           securityContext:
             privileged: true
           volumeMounts:

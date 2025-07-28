@@ -40,7 +40,7 @@ export default function NavBar({chatId, onToggleLeftSidebar, onToggleRightSideba
         active: true,
       };
       createChat(newChatPayload);
-  
+
     }
 
     const handleCloseChat = (action: string) => {
@@ -169,7 +169,7 @@ export default function NavBar({chatId, onToggleLeftSidebar, onToggleRightSideba
                   >
                     Close
                   </DropdownMenuItem>
-                
+
                 <DropdownMenuItem
                   onClick={async () => {
                     handleCloseChat("delete");

@@ -48,7 +48,7 @@ services:
       - "4317:4317"
       - "4318:4318"
       - "5778:5778"
-  
+
   kafka:
     image: apache/kafka:3.7.0
     ports:

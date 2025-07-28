@@ -10,7 +10,6 @@ from sqlalchemy import (
     Enum,
     Float,
     ForeignKey,
-    Integer,
     PrimaryKeyConstraint,
     String,
     Text,
@@ -20,7 +19,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Session, relationship
 from sqlalchemy.sql import func
 
-from ..commons.constants import ModelDownloadStatus, ModelExtractionStatus, LeaderboardDataOrigin
+from ..commons.constants import LeaderboardDataOrigin, ModelDownloadStatus, ModelExtractionStatus
 
 
 logger = logging.get_logger(__name__)
@@ -77,6 +76,7 @@ class Leaderboard(PSQLBase):
     source = relationship("Source", back_populates="leaderboards")
 
     def __repr__(self):
+        """Return string representation of Leaderboard."""
         return f"<Leaderboard(model_info_id={self.model_info_id}, benchmark_name={self.benchmark_name}, value={self.benchmark_value})>"
 
 
@@ -98,6 +98,7 @@ class LicenseInfoSchema(PSQLBase):
     model_info = relationship("ModelInfoSchema", back_populates="license")
 
     def __repr__(self):
+        """Return string representation of LicenseInfo."""
         return f"<LicenseInfo(id={self.id}, license_id={self.license_id}, name={self.name}, url={self.url})>"
 
 
@@ -136,6 +137,7 @@ class ModelInfoSchema(PSQLBase):
     )
 
     def __repr__(self):
+        """Return string representation of ModelInfo."""
         return f"<ModelInfo(uri={self.uri}, modality={self.modality}, tasks={self.tasks})>"
 
 
@@ -150,6 +152,7 @@ class ModelDownloadHistory(PSQLBase):
     modified_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     def __repr__(self):
+        """Return string representation of ModelDownloadHistory."""
         return (
             f"<ModelDownloadHistory(id={self.id}, status={self.status}, size={self.size}, "
             f"path={self.path}, created_at={self.created_at})>"
@@ -160,6 +163,7 @@ class LicenseInfoCRUD(CRUDMixin[LicenseInfoSchema, None, None]):
     __model__ = LicenseInfoSchema
 
     def __init__(self):
+        """Initialize LicenseInfoCRUD."""
         super().__init__(model=self.__model__)
 
 
@@ -167,9 +171,11 @@ class ModelInfoCRUD(CRUDMixin[ModelInfoSchema, None, None]):
     __model__ = ModelInfoSchema
 
     def __init__(self):
+        """Initialize ModelInfoCRUD."""
         super().__init__(model=self.__model__)
 
     def check_existing_model(self, model_uri: str, extraction_status: ModelExtractionStatus) -> dict | None:
+        """Check if model exists with given URI and extraction status."""
         session: Session = self.get_session()
         query = (
             session.query(ModelInfoSchema, LicenseInfoSchema)
@@ -219,4 +225,5 @@ class ModelDownloadHistoryCRUD(CRUDMixin[ModelDownloadHistory, None, None]):
     __model__ = ModelDownloadHistory
 
     def __init__(self):
+        """Initialize ModelDownloadHistoryCRUD."""
         super().__init__(model=self.__model__)

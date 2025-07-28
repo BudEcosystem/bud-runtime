@@ -17,7 +17,7 @@ export default function ModelInfo({deployment}: any){
         } else {
             setImageUrl(assetBaseUrl + "/icons/providers/openai.png");
         }
-    }, [])
+    }, [deployment])
 
 
     return(

@@ -1,7 +1,7 @@
 # Ask Bud Service
 
 [![License](https://img.shields.io/badge/License-AGPL%203.0-blue.svg)](https://opensource.org/licenses/AGPL-3.0)
-[![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.10+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green.svg)](https://fastapi.tiangolo.com/)
 [![Dapr](https://img.shields.io/badge/Dapr-1.10+-blue.svg)](https://dapr.io/)
 
@@ -106,7 +106,7 @@ ask-bud/
 
 ### Required
 
-- **Python** 3.8+
+- **Python 3.10+
 - **Docker** and Docker Compose
 - **Git**
 

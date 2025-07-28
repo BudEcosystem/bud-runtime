@@ -34,7 +34,7 @@ export default function LoadModel(props: LoadModelProps) {
         document.documentElement.scrollLeft = document.documentElement.clientWidth;
 
         getEndPoints({ page: 1, limit: 25, apiKey: "" });
-    }, []);
+    }, [getEndPoints]);
 
     useEffect(() => {
 
@@ -167,8 +167,8 @@ export default function LoadModel(props: LoadModelProps) {
                     onClick={() => props.setOpen(!props.open)}
                 >
                     <Image
-                        src={typeof chat.selectedDeployment.model === 'string' 
-                            ? "/icons/modelRepoWhite.png" 
+                        src={typeof chat.selectedDeployment.model === 'string'
+                            ? "/icons/modelRepoWhite.png"
                             : `${assetBaseUrl}${chat.selectedDeployment.model?.icon || chat.selectedDeployment.model?.provider?.icon}`}
                         fallback={"/icons/modelRepoWhite.png"}
                         preview={false}

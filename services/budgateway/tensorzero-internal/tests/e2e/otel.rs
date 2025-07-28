@@ -10,8 +10,9 @@ use opentelemetry_sdk::{
 };
 use tensorzero::{
     ClientInferenceParams, ClientInput, ClientInputMessage, ClientInputMessageContent,
-    InferenceOutput, Role,
+    InferenceOutput,
 };
+use tensorzero_internal::inference::types::Role;
 use tensorzero_internal::inference::types::TextKind;
 use tensorzero_internal::observability::build_opentelemetry_layer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};

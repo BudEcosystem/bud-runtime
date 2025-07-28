@@ -10,14 +10,14 @@ RUN apt-get install -y clamav clamav-daemon
 
 RUN DEBIAN_FRONTEND=noninteractive apt-get install -y firejail
 # Update ClamAV virus database
-RUN freshclam        
-    
+RUN freshclam
+
 RUN mkdir -p /var/run/clamav && \
-    chown clamav:clamav /var/run/clamav && \ 
+    chown clamav:clamav /var/run/clamav && \
     chmod 750 /var/run/clamav
-    
+
 COPY clamd.conf.example /etc/clamav/clamd.conf
- 
+
 WORKDIR /app
 COPY . .
 

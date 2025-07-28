@@ -12,7 +12,7 @@ This document describes the changes implemented to add embedding model support t
 
 Added `identify_supported_endpoints` method that checks which API endpoints a deployed model supports:
 - Tests `/v1/embeddings` endpoint with a minimal POST request
-- Tests `/v1/chat/completions` endpoint 
+- Tests `/v1/chat/completions` endpoint
 - Returns a dictionary of endpoint availability
 
 **File**: `budcluster/cluster_ops/__init__.py`

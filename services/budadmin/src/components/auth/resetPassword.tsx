@@ -44,10 +44,10 @@ const ResetPasswordPage = ({ onSubmit }: ResetPasswordProps) => {
   useEffect(() => {
     setMounted(true);
   }, []);
-  
+
   useEffect(() => {
     getUser()
-  }, []);
+  }, [getUser]);
 
   const passwordRegex =
     /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{8,}$/;

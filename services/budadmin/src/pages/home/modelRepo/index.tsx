@@ -115,7 +115,7 @@ function ModelCard(item: Model, index) {
                   {item?.model_cluster_recommended?.cluster?.availability_percentage}% Available
                 </div>
               </Tag>
-              {item?.model_cluster_recommended?.hardware_type?.map((resource, index) => (  
+              {item?.model_cluster_recommended?.hardware_type?.map((resource, index) => (
                 <Tag
                   key={index}
                   className={`text-[#B3B3B3] border-[0] rounded-[6px] cursor-pointer hover:text-[#EEEEEE] flex justify-center items-center py-[.3rem] px-[.4rem]`}
@@ -357,7 +357,7 @@ export default function ModelRepo() {
     }
     setFilterReset(true);
   };
-  
+
   useEffect(() => {
     if (filterReset) {
       applyFilter();

@@ -120,7 +120,7 @@ export default function SelectModelEvaluations() {
                 <Text_14_400_EEEEEE className="">
                   InternLM 2.5
                 </Text_14_400_EEEEEE>
-                <div className="w-[.75rem] h-[.75rem] cursor-pointer" 
+                <div className="w-[.75rem] h-[.75rem] cursor-pointer"
                  onClick={async () => {
                   // await getModel(currentWorkflow?.workflow_steps?.model?.id);
                   // openDrawer("edit-model");

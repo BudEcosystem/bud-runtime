@@ -34,7 +34,7 @@ password = "your-password"
 When enabled, TensorZero writes to the following Kafka topics (prefixed with your configured `topic_prefix`):
 
 - `{topic_prefix}_model_inference` - Raw model provider responses
-- `{topic_prefix}_chat_inference` - Chat completion inference results  
+- `{topic_prefix}_chat_inference` - Chat completion inference results
 - `{topic_prefix}_json_inference` - JSON mode inference results
 
 ## Message Format

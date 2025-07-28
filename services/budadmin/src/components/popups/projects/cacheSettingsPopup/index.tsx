@@ -39,7 +39,7 @@ const CacheSettingsPopup: React.FC<CacheSettingsPopupProps> = ({
   onSubmit,
   // saveForm
 }) => {
-  const [formData, setFormData] = useState<any>({...initialValues?.cachedValues, 
+  const [formData, setFormData] = useState<any>({...initialValues?.cachedValues,
     maxCache: initialValues.cachedValues.maxCache || 1000,
   });
   const [errors, setErrors] = useState<Partial<FormData>>({});
@@ -108,7 +108,7 @@ const CacheSettingsPopup: React.FC<CacheSettingsPopupProps> = ({
     (obj) => obj.model.name === 'sentence-transformers/all-mpnet-base-v2'
   );
   const [embeddingModel, setEmbeddingModel] = useState<any>(defaultEmbeddingModle);
-  const [evictionPolicy, setEvictionPolicy] = useState<any>(initialValues.cachedValues.evictionPolicy ? 
+  const [evictionPolicy, setEvictionPolicy] = useState<any>(initialValues.cachedValues.evictionPolicy ?
     evictionList?.filter((el: any)=> el.name === initialValues.cachedValues.evictionPolicy)[0] : defaultEvictionPolicy);
   const [isTtl, setIsTtl] = useState<any>(evictionList?.filter((el: any)=> el.name === initialValues?.cachedValues?.evictionPolicy)[0]?.code === 'TTL');
 
@@ -158,7 +158,7 @@ const CacheSettingsPopup: React.FC<CacheSettingsPopupProps> = ({
       const prevVal = {
         embeddingModel : initialValues.cachedValues.embeddingModel,
         evictionPolicy : initialValues.cachedValues.evictionPolicy
-      }      
+      }
       setFormData({...formData, ...initialValues.cachedValues})
     }
   }, [initialValues.cachedValues])

@@ -32,7 +32,7 @@ bind_address = "0.0.0.0:3000"
 enabled = false
 
 # When authentication is disabled:
-# - OpenAI-compatible endpoints (/v1/chat/completions, /v1/embeddings) 
+# - OpenAI-compatible endpoints (/v1/chat/completions, /v1/embeddings)
 #   will be accessible without API keys
 # - Other endpoints remain unaffected
 # - Redis-based dynamic API key updates are disabled

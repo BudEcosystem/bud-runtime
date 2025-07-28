@@ -606,9 +606,10 @@ class QuantizationService(SessionMixin):
             f"Performing cancel model quantization request to budcluster {cancel_model_quantization_endpoint}"
         )
         try:
-            async with aiohttp.ClientSession() as session, session.post(
-                cancel_model_quantization_endpoint
-            ) as response:
+            async with (
+                aiohttp.ClientSession() as session,
+                session.post(cancel_model_quantization_endpoint) as response,
+            ):
                 response_data = await response.json()
                 if response.status != 200 or response_data.get("object") == "error":
                     logger.error(f"Failed to cancel model quantization: {response.status} {response_data}")

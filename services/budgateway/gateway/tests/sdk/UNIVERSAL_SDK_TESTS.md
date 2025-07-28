@@ -87,7 +87,7 @@ When running `./run_tests.sh --provider universal`, you should see:
 
 ```
 ✅ OpenAI SDK + Anthropic models: PASSED
-✅ OpenAI SDK + OpenAI models: PASSED  
+✅ OpenAI SDK + OpenAI models: PASSED
 ✅ Native Anthropic SDK + /v1/messages: PASSED
 ```
 

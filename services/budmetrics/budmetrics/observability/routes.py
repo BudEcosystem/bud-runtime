@@ -51,9 +51,7 @@ async def add_metrics(request: BulkCloudEventBase) -> Response:
                 # Serialize response_analysis JSON to string for ClickHouse
                 response_analysis_str = None
                 if inference_metric.response_analysis is not None:
-                    response_analysis_str = orjson.dumps(
-                        inference_metric.response_analysis
-                    ).decode("utf-8")
+                    response_analysis_str = orjson.dumps(inference_metric.response_analysis).decode("utf-8")
 
                 inference_data = (
                     inference_metric.inference_id,  # inference_id
@@ -106,24 +104,16 @@ async def add_metrics(request: BulkCloudEventBase) -> Response:
         message_parts = []
 
         if insertion_results["inserted"] > 0:
-            message_parts.append(
-                f"Successfully inserted {insertion_results['inserted']} new records"
-            )
+            message_parts.append(f"Successfully inserted {insertion_results['inserted']} new records")
 
         if insertion_results["duplicates"] > 0:
-            message_parts.append(
-                f"Skipped {insertion_results['duplicates']} duplicate records"
-            )
+            message_parts.append(f"Skipped {insertion_results['duplicates']} duplicate records")
 
         if validation_errors:
             message_parts.append(f"Failed to validate {len(validation_errors)} entries")
 
         # Determine overall status
-        if (
-            insertion_results["inserted"] == 0
-            and insertion_results["duplicates"] == 0
-            and not validation_errors
-        ):
+        if insertion_results["inserted"] == 0 and insertion_results["duplicates"] == 0 and not validation_errors:
             message = "No records to process"
         else:
             message = ". ".join(message_parts)
@@ -148,16 +138,16 @@ async def add_metrics(request: BulkCloudEventBase) -> Response:
                 shown_duplicates = insertion_results["duplicate_ids"][:10]
                 response_data["details"]["duplicate_inference_ids"] = shown_duplicates
                 if len(insertion_results["duplicate_ids"]) > 10:
-                    response_data["details"][
-                        "note"
-                    ] = f"Showing first 10 of {len(insertion_results['duplicate_ids'])} duplicate IDs"
+                    response_data["details"]["note"] = (
+                        f"Showing first 10 of {len(insertion_results['duplicate_ids'])} duplicate IDs"
+                    )
 
             if validation_errors:
                 response_data["details"]["validation_errors"] = validation_errors[:10]
                 if len(validation_errors) > 10:
-                    response_data["details"][
-                        "validation_note"
-                    ] = f"Showing first 10 of {len(validation_errors)} validation errors"
+                    response_data["details"]["validation_note"] = (
+                        f"Showing first 10 of {len(validation_errors)} validation errors"
+                    )
 
         response = SuccessResponse(
             message=response_data["message"],

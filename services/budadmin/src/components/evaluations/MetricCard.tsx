@@ -1,8 +1,8 @@
 import React from "react";
-import { 
-  Text_16_600_FFFFFF, 
-  Text_12_400_B3B3B3, 
-  Text_24_600_FFFFFF, 
+import {
+  Text_16_600_FFFFFF,
+  Text_12_400_B3B3B3,
+  Text_24_600_FFFFFF,
   Text_32_600_FFFFFF,
   Text_18_400_EEEEEE,
   Text_10_400_B3B3B3

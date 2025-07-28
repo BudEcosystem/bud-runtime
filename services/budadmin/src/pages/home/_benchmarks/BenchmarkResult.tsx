@@ -154,7 +154,7 @@ const BenchmarkResult = () => {
 
     getInputDistribution,
     inputDistribution,
-    
+
     getOutputDistribution,
     outputDistribution,
 

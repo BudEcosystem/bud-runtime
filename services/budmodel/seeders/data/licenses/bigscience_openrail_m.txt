@@ -180,4 +180,4 @@ groups based on legally protected characteristics or categories;
 justice, law enforcement, immigration or asylum processes, such as predicting an
 individual will commit fraud/crime commitment (e.g. by text profiling, drawing causal
 relationships between assertions made in documents, indiscriminate and
-arbitrarily-targeted use).
+arbitrarily-targeted use).

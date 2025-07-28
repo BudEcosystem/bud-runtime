@@ -338,7 +338,7 @@ endpoints = ["chat"]
 type = "openai"
 model_name = "gpt-4"
 
-# Anthropic Chat  
+# Anthropic Chat
 [models.claude-3]
 routing = ["anthropic"]
 endpoints = ["chat"]

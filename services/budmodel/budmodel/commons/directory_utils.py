@@ -100,7 +100,7 @@ class DirectoryOperations:
                     "Not enough disk space. Need %s bytes, but only %s bytes available", source_size, free_space
                 )
                 raise DirectoryOperationException(
-                    f"Not enough disk space. Need {source_size} bytes, " f"but only {free_space} bytes available"
+                    f"Not enough disk space. Need {source_size} bytes, but only {free_space} bytes available"
                 )
         except Exception as e:
             logger.error(f"Disk space check failed: {str(e)}")

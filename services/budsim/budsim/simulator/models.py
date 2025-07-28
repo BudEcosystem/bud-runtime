@@ -50,6 +50,7 @@ class SimulationResultsSchema(PSQLBase):
     modified_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     def __repr__(self):
+        """Return a string representation of the SimulationResultsSchema."""
         return f"<SimulationSchema(id={self.id}, model_name={self.model_name}, workflow_id={self.workflow_id})>"
 
 
@@ -57,6 +58,7 @@ class SimulationResultsCRUD(CRUDMixin[SimulationResultsSchema, None, None]):
     __model__ = SimulationResultsSchema
 
     def __init__(self):
+        """Initialize the simulation results CRUD handler."""
         super().__init__(model=self.__model__)
 
     def fetch_topk_configs_by_cluster(
@@ -68,6 +70,7 @@ class SimulationResultsCRUD(CRUDMixin[SimulationResultsSchema, None, None]):
         skip: int = 0,
         session: Optional[Session] = None,
     ):
+        """Fetch top-k configurations by cluster."""
         _session = session or self.get_session()
         try:
             min_cost_subquery = _session.query(
@@ -146,6 +149,7 @@ class SimulationResultsCRUD(CRUDMixin[SimulationResultsSchema, None, None]):
             self.cleanup_session(_session if session is None else None)
 
     def update_feedback(self, feedback: List[Feedback], session: Optional[Session] = None):
+        """Update feedback for simulation results."""
         _session = session or self.get_session()
 
         failed_nodes = [int(f.config_id) for f in feedback if f.failed]

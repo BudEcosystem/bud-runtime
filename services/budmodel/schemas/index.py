@@ -276,11 +276,11 @@ sources = {
             (function checkTableBody() {
                 const tableBody = document.querySelector('svelte-virtual-table-viewport table');
                 console.log("Checking for table body...", tableBody);
-    
+
                 if (tableBody) {
                     console.log("tableBody found", tableBody);
                     const collectedData = [];
-    
+
                     // Create or select the results container
                     let resultsContainer = document.querySelector('.results-container');
                     if (!resultsContainer) {
@@ -288,13 +288,13 @@ sources = {
                         resultsContainer.classList.add('results-container');
                         document.body.appendChild(resultsContainer);
                     }
-    
+
                     function extractData() {
                         const rows = tableBody.querySelectorAll('tr[slot="tbody"]');
                         rows.forEach(row => {
                             const cells = row.querySelectorAll('td');
                             const modelName = cells[1]?.innerText.trim() || '';
-    
+
                             if (!collectedData.some(data => data.model_name === modelName)) {
                                 const rowData = {
                                     rank: cells[0]?.innerText.trim() || '',
@@ -317,15 +317,15 @@ sources = {
                             }
                         });
                     }
-    
+
                     let scrollAttempts = 0;
-    
+
                     function scrollTableBody() {
                         tableBody.scrollTop += 300;
-    
+
                         setTimeout(() => {
                             const newScrollHeight = tableBody.scrollHeight;
-    
+
                             if (tableBody.scrollTop + tableBody.clientHeight >= newScrollHeight || scrollAttempts > 1000) {
                                 console.log("Reached the end or max attempts, stopping scroll.");
                                 extractData(); // Final extraction in case of remaining items
@@ -338,10 +338,10 @@ sources = {
                             }
                         }, 500);
                     }
-    
+
                     function updateResultsContainer() {
                         resultsContainer.innerHTML = ''; // Clear existing content
-    
+
                         collectedData.forEach(rowData => {
                             const row = document.createElement('div');
                             row.classList.add('model-row');
@@ -365,10 +365,10 @@ sources = {
                         });
                         console.log("Data appended to results container.");
                     }
-    
+
                     extractData();
                     scrollTableBody();
-    
+
                 } else {
                     console.log("Table body not found, retrying in 500 ms...");
                     setTimeout(checkTableBody, 500); // Retry after 500 ms if tableBody is not found
@@ -415,11 +415,11 @@ sources = {
             (function checkTableBody() {
                 const tableBody = document.querySelector('svelte-virtual-table-viewport table');
                 console.log("Checking for table body...", tableBody);
-    
+
                 if (tableBody) {
                     console.log("tableBody found", tableBody);
                     const collectedData = [];
-    
+
                     // Create or select the results container
                     let resultsContainer = document.querySelector('.results-container');
                     if (!resultsContainer) {
@@ -427,13 +427,13 @@ sources = {
                         resultsContainer.classList.add('results-container');
                         document.body.appendChild(resultsContainer);
                     }
-    
+
                     function extractData() {
                         const rows = tableBody.querySelectorAll('tr[slot="tbody"]');
                         rows.forEach(row => {
                             const cells = row.querySelectorAll('td');
                             const modelName = cells[1]?.querySelector('a')?.innerText.trim() || '';
-    
+
                             if (!collectedData.some(data => data.model_name === modelName)) {
                                 const rowData = {
                                     rank: cells[0]?.innerText.trim() || '',
@@ -452,16 +452,16 @@ sources = {
                             }
                         });
                     }
-    
+
                     let scrollAttempts = 0;
-    
+
                     function scrollTableBody() {
                         const viewport = tableBody
                         tableBody.scrollTop += 300;
-    
+
                         setTimeout(() => {
                             const newScrollHeight = viewport.scrollHeight;
-    
+
                             if (viewport.scrollTop + viewport.clientHeight >= newScrollHeight || scrollAttempts > 1000) {
                                 console.log("Reached the end or max attempts, stopping scroll.");
                                 extractData(); // Final extraction in case of remaining items
@@ -474,7 +474,7 @@ sources = {
                             }
                         }, 500);
                     }
-    
+
                     function updateResultsContainer() {
                         resultsContainer.innerHTML = ''; // Clear existing content
                         console.log("total doc", collectedData.length)
@@ -497,10 +497,10 @@ sources = {
                         });
                         console.log("Data appended to results container.");
                     }
-    
+
                     extractData();
                     scrollTableBody();
-    
+
                 } else {
                     console.log("Table body not found, retrying in 500 ms...");
                     setTimeout(checkTableBody, 500); // Retry after 500 ms if tableBody is not found
@@ -552,11 +552,11 @@ sources = {
             (function checkTableBody() {
                 const tableBody = document.querySelector('svelte-virtual-table-viewport table');
                 console.log("Checking for table body...", tableBody);
-    
+
                 if (tableBody) {
                     console.log("tableBody found", tableBody);
                     const collectedData = [];
-    
+
                     // Create or select the results container
                     let resultsContainer = document.querySelector('.results-container');
                     if (!resultsContainer) {
@@ -564,13 +564,13 @@ sources = {
                         resultsContainer.classList.add('results-container');
                         document.body.appendChild(resultsContainer);
                     }
-    
+
                     function extractData() {
                         const rows = tableBody.querySelectorAll('tr[slot="tbody"]');
                         rows.forEach(row => {
                             const cells = row.querySelectorAll('td');
                             const modelName = cells[1]?.querySelector('a')?.innerText.trim() || '';
-    
+
                             if (!collectedData.some(data => data.model_name === modelName)) {
                                 const rowData = {
                                     rank: cells[0]?.innerText.trim() || '',
@@ -594,16 +594,16 @@ sources = {
                             }
                         });
                     }
-    
+
                     let scrollAttempts = 0;
-    
+
                     function scrollTableBody() {
                         const viewport = tableBody;
                         tableBody.scrollTop += 300;
-    
+
                         setTimeout(() => {
                             const newScrollHeight = viewport.scrollHeight;
-    
+
                             if (viewport.scrollTop + viewport.clientHeight >= newScrollHeight || scrollAttempts > 1000) {
                                 console.log("Reached the end or max attempts, stopping scroll.");
                                 extractData(); // Final extraction in case of remaining items
@@ -616,7 +616,7 @@ sources = {
                             }
                         }, 500);
                     }
-    
+
                     function updateResultsContainer() {
                         resultsContainer.innerHTML = ''; // Clear existing content
                         console.log("Total records:", collectedData.length);
@@ -644,10 +644,10 @@ sources = {
                         });
                         console.log("Data appended to results container.");
                     }
-    
+
                     extractData();
                     scrollTableBody();
-    
+
                 } else {
                     console.log("Table body not found, retrying in 500 ms...");
                     setTimeout(checkTableBody, 500); // Retry after 500 ms if tableBody is not found
@@ -697,19 +697,19 @@ sources = {
             'svelte-virtual-table-viewport table',
             '.svelte-1oa6fve'
         ];
-    
+
         let tableBody;
         for (const tableClass of potentialTableClasses) {
             tableBody = document.querySelector(tableClass);
             if (tableBody) break;
         }
-    
+
         console.log("Checking for table body...", tableBody);
-    
+
         if (tableBody) {
             console.log("tableBody found", tableBody);
             const collectedData = [];
-    
+
             // Create or select the results container
             let resultsContainer = document.querySelector('.results-container');
             if (!resultsContainer) {
@@ -717,13 +717,13 @@ sources = {
                 resultsContainer.classList.add('results-container');
                 document.body.appendChild(resultsContainer);
             }
-    
+
             function extractData() {
                 const rows = tableBody.querySelectorAll('tr[slot="tbody"]');
                 rows.forEach(row => {
                     const cells = row.querySelectorAll('td');
                     const modelName = cells[2]?.querySelector('a')?.innerText.trim() || '';
-    
+
                     if (!collectedData.some(data => data.model_name === modelName)) {
                         const rowData = {
                             rank_ub: cells[0]?.innerText.trim() || '',
@@ -741,16 +741,16 @@ sources = {
                     }
                 });
             }
-    
+
             let scrollAttempts = 0;
-    
+
             function scrollTableBody() {
                 const viewport = tableBody;
                 tableBody.scrollTop += 300;
-    
+
                 setTimeout(() => {
                     const newScrollHeight = viewport.scrollHeight;
-    
+
                     if (viewport.scrollTop + viewport.clientHeight >= newScrollHeight || scrollAttempts > 1000) {
                         console.log("Reached the end or max attempts, stopping scroll.");
                         extractData();
@@ -763,7 +763,7 @@ sources = {
                     }
                 }, 500);
             }
-    
+
             function updateResultsContainer() {
                 resultsContainer.innerHTML = '';
                 console.log("Total records:", collectedData.length);
@@ -785,16 +785,16 @@ sources = {
                 });
                 console.log("Data appended to results container.");
             }
-    
+
             extractData();
             scrollTableBody();
-    
+
         } else {
             console.log("Table body not found, retrying in 500 ms...");
             setTimeout(checkTableBody, 500);
         }
     })();
-    
+
             """
         ],
         "url": "https://lmarena-ai-chatbot-arena-leaderboard.hf.space/",

@@ -1286,7 +1286,6 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
- "tensorzero",
  "tensorzero-internal",
  "tokio",
  "tracing",
@@ -1562,6 +1561,7 @@ dependencies = [
  "clap",
  "futures",
  "indicatif",
+ "reqwest",
  "serde",
  "serde_json",
  "tensorzero",
@@ -4709,6 +4709,7 @@ dependencies = [
 name = "tensorzero-internal"
 version = "2025.5.9"
 dependencies = [
+ "anyhow",
  "arc-swap",
  "async-stream",
  "async-trait",

@@ -36,8 +36,8 @@
         kubeconfig: "{{ kubeconfig_path }}"
         validate_certs: "{{ validate_certs }}"
       register: ns_status
-      until: ns_status.resources is defined and 
-             ns_status.resources | length > 0 and 
+      until: ns_status.resources is defined and
+             ns_status.resources | length > 0 and
              ns_status.resources[0].status.phase == "Active"
       retries: 10
       delay: 5
@@ -87,11 +87,11 @@
         kubeconfig: "{{ kubeconfig_path }}"
         validate_certs: "{{ validate_certs }}"
       register: pod_info
-      until: pod_info.resources is defined and 
+      until: pod_info.resources is defined and
              ((pod_info.resources | type_debug == "list" and
               pod_info.resources | length > 0 and
               pod_info.resources[0].status is defined and
-              (pod_info.resources[0].status.phase == "Running" or 
+              (pod_info.resources[0].status.phase == "Running" or
                pod_info.resources[0].status.phase == "Succeeded")) or
               (pod_info.resources | type_debug == "dict" and
               pod_info.resources.status is defined and
@@ -104,7 +104,7 @@
       set_fact:
         pod_name: "model-transfer-pod"
       when: all_pods.resources | length > 0
-    
+
     # - name: Delete the model transfer pod
     #   kubernetes.core.k8s:
     #     state: absent

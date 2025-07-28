@@ -6,7 +6,7 @@ TensorZero implements a unique SDK architecture that provides **universal compat
 
 ## Key Architectural Principle
 
-> **OpenAI SDK works universally with ALL providers through `/v1/chat/completions`**  
+> **OpenAI SDK works universally with ALL providers through `/v1/chat/completions`**
 > **Native SDKs work only with their specific endpoints for provider-specific features**
 
 ## Universal OpenAI SDK Compatibility
@@ -32,7 +32,7 @@ response = client.chat.completions.create(
 
 # Works with Anthropic models too!
 response = client.chat.completions.create(
-    model="claude-3-haiku-20240307", 
+    model="claude-3-haiku-20240307",
     messages=[{"role": "user", "content": "Hello"}]
 )
 
@@ -107,7 +107,7 @@ Our test suite demonstrates both approaches:
 # Universal OpenAI SDK tests (work with all providers)
 gateway/tests/sdk/openai_tests/test_all_providers.py
 
-# Native provider SDK tests  
+# Native provider SDK tests
 gateway/tests/sdk/anthropic_tests/test_native_messages.py
 
 # Architecture demonstration
@@ -133,7 +133,7 @@ api_key_location = { env = "OPENAI_API_KEY" }
 
 # Anthropic model - works with both OpenAI SDK and native Anthropic SDK
 [models."claude-3-haiku-20240307"]
-routing = ["anthropic"] 
+routing = ["anthropic"]
 endpoints = ["chat"]
 
 [models."claude-3-haiku-20240307".providers.anthropic]
@@ -159,7 +159,7 @@ python demonstrate_universal_sdk.py
 
 ```
 ✅ OpenAI SDK + OpenAI models: WORKS
-✅ OpenAI SDK + Anthropic models: WORKS  
+✅ OpenAI SDK + Anthropic models: WORKS
 ✅ OpenAI SDK + Any provider models: WORKS
 ✅ Native Anthropic SDK + /v1/messages: WORKS
 ```
@@ -196,7 +196,7 @@ response = universal_client.chat.completions.create(
 ### Planned Universal Endpoints
 
 - [ ] `/v1/assistants` - Universal assistants API
-- [ ] `/v1/threads` - Universal conversation threads  
+- [ ] `/v1/threads` - Universal conversation threads
 - [ ] `/v1/files` - Universal file management
 - [ ] `/v1/batch` - Universal batch processing
 

@@ -27,7 +27,7 @@ const DeleteDialog: React.FC<DeleteDialogProps> = ({ isOpen, onClose, onDelete, 
           </Dialog.Close>
         </Flex>
         <Dialog.Description className="text-xs text-[#787B83] pt-2 font-normal" mb="4">
-        You’re about to delete a the {itemName} key. the deployed projects may incur some issues.  
+        You’re about to delete a the {itemName} key. the deployed projects may incur some issues.
         </Dialog.Description>
         <Flex gap="3" mt="4" justify="center">
           <Button size="1" className="h-[1.75rem] w-full text-xs font-normal" onClick={onDelete}>Delete</Button>

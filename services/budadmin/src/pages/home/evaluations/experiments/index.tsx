@@ -97,11 +97,11 @@ const ExperimentsTable = () => {
   ];
 
   // Use Zustand store
-  const { 
-    experimentsList, 
-    experimentsListTotal, 
-    loading, 
-    getExperiments 
+  const {
+    experimentsList,
+    experimentsListTotal,
+    loading,
+    getExperiments
   } = useEvaluations();
 
   // Fetch experiments data from API
@@ -116,7 +116,7 @@ const ExperimentsTable = () => {
         order: order || undefined,
         orderBy: orderBy || undefined,
       };
-      
+
       await getExperiments(payload);
     } catch (error) {
       console.error("Failed to fetch experiments:", error);

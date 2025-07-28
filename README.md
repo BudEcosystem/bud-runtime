@@ -1,11 +1,11 @@
 # Bud Stack
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Next.js](https://img.shields.io/badge/Next.js-14+-black.svg)](https://nextjs.org/)
 [![Kubernetes](https://img.shields.io/badge/kubernetes-1.25+-blue.svg)](https://kubernetes.io/)
 
-A comprehensive multi-service platform for AI/ML model deployment, optimization, and cluster management. Bud Stack provides intelligent infrastructure automation, performance optimization, and seamless model deployment across multi-cloud environments.
+A comprehensive inference stack for GenAI deployment, optimization and scaling.  Bud Stack provides intelligent infrastructure automation, performance optimization, and seamless model deployment across multi-cloud/multi-hardware environments.
 
 ## 🚀 Features
 
@@ -56,7 +56,7 @@ Bud Stack follows a microservices architecture built on Kubernetes with Dapr for
 
 ### Core Technologies
 
-- **Backend**: Python 3.8+ with FastAPI and budmicroframe
+- **Backend**: Python 3.10+ with FastAPI and budmicroframe
 - **Frontend**: Next.js 14 with TypeScript and Zustand state management
 - **Service Mesh**: Dapr for communication, workflows, and state management
 - **Databases**: PostgreSQL, ClickHouse, Redis/Valkey
@@ -92,7 +92,7 @@ Bud Stack follows a microservices architecture built on Kubernetes with Dapr for
 - **Docker & Docker Compose** (v20.10+)
 - **Git** (v2.25+)
 - **Node.js** (v20.16+) - for frontend development
-- **Python** (v3.8+) - for backend development
+- **Python 3.10+) - for backend development
 
 ### Optional (Recommended)
 
@@ -233,7 +233,7 @@ tofu apply
 ### Production Considerations
 
 - Configure persistent volumes for databases
-- Setup TLS certificates for secure communication  
+- Setup TLS certificates for secure communication
 - Configure backup strategies for PostgreSQL and ClickHouse
 - Setup monitoring and alerting with the LGTM stack
 - Configure multi-tenant Keycloak realms

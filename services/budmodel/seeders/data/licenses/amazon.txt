@@ -5,7 +5,7 @@ The Service Terms below govern your use of the Services. Capitalized terms used 
 
 1.1. You may not transfer outside the Services any software (including related documentation) you obtain from us or third party licensors in connection with the Services without specific authorization to do so.
 
-1.2. You must comply with current technical documentation applicable to the Services (including applicable user, admin, and developer guides) posted on the AWS Site at https://docs.aws.amazon.com/index.html (and any successor or related locations designated by us). 
+1.2. You must comply with current technical documentation applicable to the Services (including applicable user, admin, and developer guides) posted on the AWS Site at https://docs.aws.amazon.com/index.html (and any successor or related locations designated by us).
 
 1.3. You will provide information or other materials related to Your Content (including copies of any client-side applications) as reasonably requested by us to verify your compliance with the Agreement. You will reasonably cooperate with us to identify the source of any problem with the Services that we reasonably believe may be attributable to Your Content or any end user materials that you control.
 
@@ -33,7 +33,7 @@ If, as of the time of a change of the AWS Contracting Party responsible for your
 
 1.14. Data Protection.
 
-1.14.1 These Service Terms incorporate the AWS Data Processing Addendum (“DPA”), when you use AWS Services to process Customer Data (as defined in the DPA). 
+1.14.1 These Service Terms incorporate the AWS Data Processing Addendum (“DPA”), when you use AWS Services to process Customer Data (as defined in the DPA).
 
 1.14.2 These Service Terms incorporate the AWS Supplementary Addendum to the DPA, when you use AWS Services to process Customer Data (as defined in the DPA).
 
@@ -67,13 +67,13 @@ If, as of the time of a change of the AWS Contracting Party responsible for your
 
 1.21. Information included in resource identifiers, metadata tags, access controls, rules, usage policies, permissions, and similar items related to the management of AWS resources does not constitute Your Content. AWS recommends that you do not include personally identifying, confidential, or sensitive information in these items.
 
-1.22. Tax Exempt Status 
+1.22. Tax Exempt Status
 
 1.22.1 To request tax exempt status for your AWS account, you must provide us with a valid tax exemption certificate or other equivalent documentation for the relevant jurisdiction.  You are responsible for updating such documentation so it is accurate at all times.
 
-1.22.2 In certain jurisdictions (as noted in the AWS Tax Help pages), you may only use your tax-exempt account to purchase services that are eligible for tax exemption. If you do not use services for the purpose for which your tax exemption applies, you are responsible for reporting and paying sales and use taxes for that usage directly to the relevant tax authorities to the extent required by law. 
+1.22.2 In certain jurisdictions (as noted in the AWS Tax Help pages), you may only use your tax-exempt account to purchase services that are eligible for tax exemption. If you do not use services for the purpose for which your tax exemption applies, you are responsible for reporting and paying sales and use taxes for that usage directly to the relevant tax authorities to the extent required by law.
 
-1.22.3 If you are required by law to pay us using your organization’s funds to qualify for your tax exemption, you warrant that purchases on your account will be made with the tax-exempt organization’s funds. 
+1.22.3 If you are required by law to pay us using your organization’s funds to qualify for your tax exemption, you warrant that purchases on your account will be made with the tax-exempt organization’s funds.
 
 1.22.4 We may, in our sole discretion, reject your request for tax exempt status or revoke the tax exempt status of your account at any time.
 
@@ -81,7 +81,7 @@ If, as of the time of a change of the AWS Contracting Party responsible for your
 
 1.23. If you use any artificial intelligence and machine learning Services, features, and functionality (including third-party models) that we provide, it’s your responsibility to ensure that your use complies with all applicable laws, rules, and regulations, and the AWS Responsible AI Policy.
 
-1.24. Certain Services may incorporate generative AI features, powered by Amazon Bedrock, that enable you to use prompts to generate output, including: Amazon CloudWatch, Amazon CodeCatalyst, Amazon Connect Contact Lens, AWS Database Migration Service, Amazon DataZone, Amazon Lex, Amazon Personalize, Amazon Q, AWS AppFabric, AWS HealthScribe, and AWS App Studio. 
+1.24. Certain Services may incorporate generative AI features, powered by Amazon Bedrock, that enable you to use prompts to generate output, including: Amazon CloudWatch, Amazon CodeCatalyst, Amazon Connect Contact Lens, AWS Database Migration Service, Amazon DataZone, Amazon Lex, Amazon Personalize, Amazon Q, AWS AppFabric, AWS HealthScribe, and AWS App Studio.
 
 1.24.1. The Amazon Bedrock automated abuse detection mechanisms may apply to such services. See here for more details.
 
@@ -116,7 +116,7 @@ You must own or have all necessary rights to use any domain name or SSL certific
 
 4.3. Facility Assessment. You will ensure that, at all times, the facility at which the Outposts Equipment is located (the “Designated Facility”) meets the minimum requirements necessary to support the installation, maintenance, use, and removal of the Outposts Equipment as described here and otherwise as described in the Outposts technical documentation or indicated to you during the ordering and installation process.
 
-4.4. Delivery and Use. You will ensure that you have all necessary rights, certifications, and licenses for the delivery, installation, maintenance, use, and removal of the Outposts Equipment at the Designated Facility. You are responsible for any damage to the Outposts Equipment while it is at the Designated Facility, unless caused by AWS. AWS may terminate your use of AWS Outposts and remove the Outposts Equipment if you breach these terms or materially breach the terms of the Agreement with respect to AWS Outposts. In the event that we terminate your use of AWS Outposts and remove the Outposts Equipment in accordance with this Section 4.4, we will provide you with prior notice where practicable under the circumstances.  
+4.4. Delivery and Use. You will ensure that you have all necessary rights, certifications, and licenses for the delivery, installation, maintenance, use, and removal of the Outposts Equipment at the Designated Facility. You are responsible for any damage to the Outposts Equipment while it is at the Designated Facility, unless caused by AWS. AWS may terminate your use of AWS Outposts and remove the Outposts Equipment if you breach these terms or materially breach the terms of the Agreement with respect to AWS Outposts. In the event that we terminate your use of AWS Outposts and remove the Outposts Equipment in accordance with this Section 4.4, we will provide you with prior notice where practicable under the circumstances.
 
 4.5. Access to Outposts Equipment. You will give personnel designated by AWS prompt and reasonable access to the Designated Facility as necessary to deliver, install, inspect, maintain, and remove the Outposts Equipment. You will not require AWS personnel to sign, accept, or otherwise agree to any documentation as a condition of accessing the Designated Facility, and you agree that the terms of any such documentation are void even if signed by AWS personnel. You will ensure that no one accesses, moves, or repairs the Outposts Equipment other than (i) personnel designated by AWS, (ii) as permitted in writing by AWS in connection with the maintenance of Outposts Equipment, or (iii) as necessary due to a situation involving imminent injury, damage to property, or an active fire alarm system. You will ensure that no one modifies, alters, reverse engineers, or tampers with the Outposts Equipment. You acknowledge that the Outposts Equipment may be equipped with tamper monitoring.
 
@@ -163,7 +163,7 @@ Your use of Qualcomm Technologies Inc.’s software is subject to the terms and 
 
 5.4.1. We may change Savings Plans, EC2 Reserved Instance and EC2 Dedicated Host Reservation pricing at any time, but price changes will not apply to previously designated Savings Plans, EC2 Reserved Instances or EC2 Dedicated Host Reservations, except as described in this Section 5.4. If Microsoft increases the license fees it charges for Windows, or if Red Hat increases the license fees it charges for Red Hat Enterprise Linux (“RHEL”), we may make a corresponding increase to the per-hour usage rate (or institute a corresponding per-hour usage rate) for Savings Plans for, or EC2 Reserved Instances with, Windows or RHEL. Any increase in (or institution of) the per-hour usage rate for Savings Plans for, or EC2 Reserved Instances with, Windows will be made between December 1 and January 31, and we will provide 30 days’ notice. For any increase in (or institution of) the per-hour usage rate for Savings Plans for, or EC2 Reserved Instances with, RHEL, we will provide 30 days’ advance notice. If this happens, you may: (a) continue to use your EC2 Reserved Instances with Windows or RHEL with the new per-hour usage price; (b) convert your EC2 Reserved Instances with Windows or RHEL to comparable EC2 Reserved Instances with Linux; or (c) terminate your EC2 Reserved Instances with Windows or RHEL and receive a pro rata refund of the up-front fee you paid for the terminated EC2 Reserved Instances with Windows or RHEL.
 
-5.4.2. We may terminate the Savings Plans, EC2 Reserved Instance or EC2 Dedicated Host Reservation pricing programs at any time. Savings Plans and EC2 Dedicated Hosts are nontransferable, and EC2 Reserved Instances are only transferrable in accordance with the requirements of the RI Marketplace provided on the AWS Site. Scheduled Instances and Convertible Reserved Instances are not eligible for the RI Marketplace. Savings Plans, EC2 Reserved Instances and EC2 Dedicated Host Reservations are noncancellable, and EC2 Dedicated Hosts associated with an active EC2 Dedicated Host Reservation cannot be removed from your account, so you will be charged for the duration of the term you selected, even if you terminate the Agreement. All amounts paid in connection with Savings Plans, EC2 Reserved Instances and EC2 Dedicated Host Reservations are nonrefundable, except that if we terminate the Agreement other than for cause, terminate an individual EC2 Reserved Instance or EC2 Dedicated Host Reservation type, or terminate the Savings Plans, EC2 Reserved Instance or EC2 Dedicated Host pricing program(s), we will refund you a pro rata portion of any up-front fee paid in connection with any previously designated Savings Plans, EC2 Reserved Instances or EC2 Dedicated Hosts. You may not purchase EC2 Reserved Instances for the purpose of reselling them in the RI Marketplace, and we reserve the right to refuse or cancel your purchase if we suspect you are doing so. Upon expiration or termination of the term of Savings Plans, EC2 Reserved Instances or EC2 Dedicated Host Reservations, the reserved pricing will expire and standard on-demand usage prices will apply. You are responsible for determining if you are subject to any limitations arising from the purchase of Savings Plans, EC2 Reserved Instances or EC2 Dedicated Host Reservations. For example, you are responsible for complying with any applicable laws, policies, terms or conditions governing your payment of up-front fees or the expiration of reserved resources, including any fiscal or appropriation laws, or other policies or restrictions governing up-front payments for goods or services. 
+5.4.2. We may terminate the Savings Plans, EC2 Reserved Instance or EC2 Dedicated Host Reservation pricing programs at any time. Savings Plans and EC2 Dedicated Hosts are nontransferable, and EC2 Reserved Instances are only transferrable in accordance with the requirements of the RI Marketplace provided on the AWS Site. Scheduled Instances and Convertible Reserved Instances are not eligible for the RI Marketplace. Savings Plans, EC2 Reserved Instances and EC2 Dedicated Host Reservations are noncancellable, and EC2 Dedicated Hosts associated with an active EC2 Dedicated Host Reservation cannot be removed from your account, so you will be charged for the duration of the term you selected, even if you terminate the Agreement. All amounts paid in connection with Savings Plans, EC2 Reserved Instances and EC2 Dedicated Host Reservations are nonrefundable, except that if we terminate the Agreement other than for cause, terminate an individual EC2 Reserved Instance or EC2 Dedicated Host Reservation type, or terminate the Savings Plans, EC2 Reserved Instance or EC2 Dedicated Host pricing program(s), we will refund you a pro rata portion of any up-front fee paid in connection with any previously designated Savings Plans, EC2 Reserved Instances or EC2 Dedicated Hosts. You may not purchase EC2 Reserved Instances for the purpose of reselling them in the RI Marketplace, and we reserve the right to refuse or cancel your purchase if we suspect you are doing so. Upon expiration or termination of the term of Savings Plans, EC2 Reserved Instances or EC2 Dedicated Host Reservations, the reserved pricing will expire and standard on-demand usage prices will apply. You are responsible for determining if you are subject to any limitations arising from the purchase of Savings Plans, EC2 Reserved Instances or EC2 Dedicated Host Reservations. For example, you are responsible for complying with any applicable laws, policies, terms or conditions governing your payment of up-front fees or the expiration of reserved resources, including any fiscal or appropriation laws, or other policies or restrictions governing up-front payments for goods or services.
 
 5.5. EC2 Capacity Blocks for ML. AWS Capacity Blocks cannot be canceled nor can they be modified, and the full price of a Capacity Block is nonrefundable. You are responsible for determining if you are subject to any limitations arising from the purchase of Capacity Blocks. For example, you are responsible for complying with any applicable laws, policies, terms or conditions governing your payment of up-front fees or the expiration of reserved resources, including any fiscal or appropriation laws, or other policies or restrictions governing up-front payments for goods or services. During the final 30 minutes of a Capacity Block, we may terminate your instances without notice and prevent new instance launches into your reservation. Capacity Blocks are nontransferable. Capacity Blocks that you purchase cannot be resold to another party, and we reserve the right to refuse or cancel your purchase if we suspect you are doing so. You may not cooperate with any third party in an attempt to influence or manipulate the price for Capacity Blocks. You may not submit requests for Capacity Blocks through any third party (e.g., “proxy purchasing”).
 
@@ -199,12 +199,12 @@ If during the previous 6 months you have incurred no fees for Amazon SimpleDB an
 8.1. Amazon CloudWatch collects and stores certain information for the Services you are monitoring, including CPU utilization, data transfer, and disk usage and activity (collectively, “CloudWatch Metric Data”). CloudWatch Metric Data may be used by AWS to develop and improve the Services.
 
 8.2. You agree and instruct that when using any Amazon CloudWatch ML Functionality, (a) we may use and store your Amazon CloudWatch ML Content to develop and improve that functionality and its underlying technologies and (b) solely in connection with the development and improvement described in clause (a), we may use your Amazon CloudWatch ML Content in an AWS region outside of the AWS region where you are using Amazon CloudWatch. You may instruct AWS not to use and store your Amazon CloudWatch ML Content as described in the prior sentence by configuring an AI services opt-out policy using AWS Organizations. “Amazon CloudWatch ML Functionality” means any Amazon CloudWatch functionalities identified to you as powered by artificial intelligence or machine learning. “Amazon CloudWatch ML Content” means Your Content that is processed by an Amazon CloudWatch ML Functionality. In addition, the Amazon CloudWatch ML Functionality entitled “query builder” may be used solely for purposes of building a query for your metrics or logs.
- 
+
 8.3. Amazon CloudWatch Network Monitoring
- 
+
 8.3.1. “Amazon CloudWatch Network Monitoring” includes Internet Monitor, Network Flow Monitor, and Network Synthetic Monitor.
- 
-8.3.2. This Section applies to data provided by monitors in your AWS account and in third party AWS accounts. You may not, and may not allow any third party to, use Amazon CloudWatch Network Monitoring, or any data or information made available through Amazon CloudWatch Network Monitoring, to, directly or indirectly, develop, improve, or offer a similar or competing product or service. You may not resell or redistribute Amazon CloudWatch Network Monitoring or any metrics provided by Amazon CloudWatch Network Monitoring unless you have been authorized as an AWS reseller, you add material value as part of the resale or redistribution, you restrict recipients from further reselling or redistributing to any additional entities, and for each monitor, you do not resell or redistribute metrics provided by the monitor to more than one entity. You may distribute metrics provided by your monitor(s) to third party network observability services solely for your personal use. 
+
+8.3.2. This Section applies to data provided by monitors in your AWS account and in third party AWS accounts. You may not, and may not allow any third party to, use Amazon CloudWatch Network Monitoring, or any data or information made available through Amazon CloudWatch Network Monitoring, to, directly or indirectly, develop, improve, or offer a similar or competing product or service. You may not resell or redistribute Amazon CloudWatch Network Monitoring or any metrics provided by Amazon CloudWatch Network Monitoring unless you have been authorized as an AWS reseller, you add material value as part of the resale or redistribution, you restrict recipients from further reselling or redistributing to any additional entities, and for each monitor, you do not resell or redistribute metrics provided by the monitor to more than one entity. You may distribute metrics provided by your monitor(s) to third party network observability services solely for your personal use.
 9. AWS Snowball and AWS Snowcone
 9.1. “AWS Snow Family” includes: AWS Snowball and AWS Snowcone.
 
@@ -367,7 +367,7 @@ The Amazon DynamoDB Reserved Capacity program allows you to purchase reserved th
 
 20.1.3. To the extent authorized by the respective third party provider on AWS Marketplace, AWS may disable access to or remove any Third Party Content you purchased or subscribed to on AWS Marketplace in the event of overdue and uncollected payments, upon AWS providing you with at least 30 days’ advance written notice.
 
-20.1.4. Professional services offered on AWS Marketplace by third parties are subject to separate terms and conditions specified by the respective third party. AWS has no control over and makes no guarantees about such services. 
+20.1.4. Professional services offered on AWS Marketplace by third parties are subject to separate terms and conditions specified by the respective third party. AWS has no control over and makes no guarantees about such services.
 
 20.1.5. If you are a buyer on AWS Marketplace, you are responsible for collecting tax documentation, withholding as required, and filing all tax forms with your applicable tax authorities for your AWS Marketplace transactions. If you are a buyer making a payment of U.S. source services or royalty income to a non-U.S. third party provider, all such collection, withholding, and filing obligations are yours as we do not act as a Withholding Agent as defined by U.S. Treas. Reg. 1.1441-7(a). In certain countries, AWS will collect fees and taxes on behalf of the seller and remit the taxes and subscription payment to the seller.
 
@@ -407,7 +407,7 @@ South Korea
 
 Amazon Web Services Korea LLC
 
-N/A	
+N/A
 L12, East tower, 231, Teheran-ro, Gangnam-gu, Seoul, 06142, Republic of Korea
 
 The countries within Europe, the Middle East, and Africa (except South Africa and Turkey) listed at1: https://aws.amazon.com/legal/aws-emea-countries/
@@ -434,9 +434,9 @@ U.S.A.
 
 20.1.7. The contract term of your purchase or subscription commences on the date specified in the end user license agreement, order form, or other contract between you and the applicable third party provider. If no contract term is specified, then the contract term commences on the date specified in your AWS Marketplace invoice.
 
-20.1.8. If you are an AWS customer located in India, parties agree that this Section 20.1.8 will be applicable: 
+20.1.8. If you are an AWS customer located in India, parties agree that this Section 20.1.8 will be applicable:
 
-20.1.8.1. If you have provided your Goods and Services Tax (GST) registration number to us so that it can be applied to your purchases, then the information you provide with your registration (including your GST registration number and the name and address associated with your GST registration) will be shared with third parties from whom you have purchased software on the AWS Marketplace to the extent necessary for those third parties to comply with GST invoicing regulations and requirements. 
+20.1.8.1. If you have provided your Goods and Services Tax (GST) registration number to us so that it can be applied to your purchases, then the information you provide with your registration (including your GST registration number and the name and address associated with your GST registration) will be shared with third parties from whom you have purchased software on the AWS Marketplace to the extent necessary for those third parties to comply with GST invoicing regulations and requirements.
 
 20.1.8.2. The purchase fees and charges payable by you will be exclusive of all applicable Taxes, and will be made free and clear of any deduction or withholding, as may be required by law. For clarity, if any such deduction or withholding (including but not limited to cross-border withholding taxes) is required on any payment, you will pay such additional amount, as necessary, to ensure that the net amount received by AWS or its affiliates is equal to the amount then due and payable by you for your purchases on the AWS Marketplace. AWS or its affiliates will provide you with such tax forms, as are reasonably requested, in order to reduce or eliminate the amount of any withholding or deduction for taxes, in respect of the payments made by you for purchases on the AWS Marketplace. AWS or its affiliates may charge, and you will pay, all applicable Taxes that it or we are legally obligated or authorized to collect from you. AWS or its affiliates will not collect, and you will not pay, any Taxes for which you furnish us a properly completed exemption certificate, or a direct payment permit certificate, for which AWS or its affiliates may claim an available exemption from such Taxes.
 
@@ -444,36 +444,36 @@ U.S.A.
 
 21. AWS Ground Station
 21.1. Any guidance provided through Licensing Accelerator or by AWS Ground Station is provided for your convenience, does not constitute legal or compliance advice, and is not subject to any legal professional privilege. You are responsible for making your own assessment of whether your use of AWS Ground Station meets applicable legal and regulatory requirements, including by engaging with a legal professional if necessary.
- 
+
 21.2. You will not, and will not allow any third-party or End User to, use Licensing Accelerator or AWS Ground Station to, directly or indirectly, develop or improve a similar or competing product or service.
- 
+
 21.3. You are solely responsible for applying appropriate security measures to your space assets and the data transmitted to and from your space assets, including using encryption, firewalls, and other network security tools as appropriate, and not allowing unauthorized access to your data.
- 
+
 21.4. You represent and warrant that you own all right, title, and interest in, or have all necessary authority to permit use of, the Ephemeris API and any space assets associated with your AWS account, and you agree to provide to AWS, upon request, documentation demonstrating such ownership or authority.
- 
+
 21.5. We reserve the right to refuse or cancel your contacts to comply with applicable laws or regulatory requirements.
- 
+
 21.6. AWS is not a party to any agreement you have or may enter into with any other individual or entity accessing or using the Services, any of your Content, or any space assets associated with your account. You are solely responsible for your separate relationship with any such individual or entity, including without limitation screening such individual or entity and complying with all applicable data protection, import, re-import, export, and re-export control laws and country-specific sanctions programs.
- 
+
 21.7. If your AWS Contracting Party is AWS Serviços Brasil Ltda., AWS Ground Station continues to be sold and provided to you by Amazon Web Services, Inc. (or other entity identified as applicable); but AWS Serviços Brasil Ltda. remains your AWS Contracting Party under the Agreement.
- 
+
 21.8. If you are part of the AWS Ground Station Software Partner Program Pathway, you own the AWS account and will not allow any third-party, including the End User, to have access to your AWS account or AWS management console. You represent and warrant that you have obtained a Foundational Technical Review (FTR) for your Ground Station Offering. You are solely responsible for ensuring that End Users are appropriately licensed to use AWS Ground Station by providing the End Users’ licensing and any other technical information reasonably necessary to AWS to enable its use of AWS Ground Station. You will facilitate communications between AWS and your customers as requested by AWS in order to address any licensing considerations.
- 
+
 21.9. If you are part of the Amazon Dedicated Antenna Program, AWS may make equipment available to you to support your use of AWS Ground Station (the “Ground Station Equipment”). AWS or its affiliates maintain all rights in and control of the Ground Station Equipment and is not selling, renting, leasing, or transferring any ownership, control, intellectual or other rights in the Ground Station Equipment to you. You will not, and will not purport to, assign, grant, or transfer the Ground Station Equipment or any interest in the Ground Station Equipment to any individual or entity, and any such purported assignment, grant or transfer is void.
 22. Amazon Elastic Transcoder
 The distribution of files created by Amazon Elastic Transcoder may require that you obtain license rights from third parties, including owners or licensors of certain third party audio and video formats. You are solely responsible for obtaining these licenses and paying any necessary royalties or fees.
 23. AWS OpsWorks
 23.1. Your use of the AWS OpsWorks agent is governed by the AWS OpsWorks Client License Agreement. Your use of AWS OpsWorks for Chef Automate is subject to Chef Software Inc.’s end user license agreement. Your use of AWS OpsWorks for Puppet Enterprise is subject to Puppet, Inc.’s  Puppet Enterprise License Agreement.
- 
+
 23.2. Your use of AWS OpsWorks for Chef Automate and AWS-ApplyChefRecipes, which leverage the Chef Infra Client software, are subject to Progress Software Corporation’s Online Master License and Services Agreement for Chef (the “Progress EULA”) except that sections 1.9.2. (Product Compliance with Documentation) and 1.10.1. (Our Indemnification Obligation) of the Progress EULA do not apply and the Product, Documentation, and Technology (all as defined in the Progress EULA) are provided “as is,” with all faults, and Progress Software Corporation disclaims all warranties, express or implied, including, but not limited to, warranties of merchantability, fitness for a particular purpose, title, noninfringement, availability, error-free or uninterrupted operation, and any warranties arising from course of dealing, course of performance, or usage of trade. To the extent that Progress Software Corporation may not as a matter of applicable law disclaim any implied warranty, the scope and duration of such warranty will be the minimum permitted under applicable law.
 24. AWS Supply Chain
 24.1. You agree and instruct that we may use Your Content that is processed by AWS Supply Chain to generate forecasts, insights, or recommendations to you.
 
 24.2. You and your End Users are responsible for all decisions made, advice given, actions taken, and failures to take action based on your use of AWS Supply Chain. AWS Supply Chain uses machine learning models that generate predictions based on patterns in data. Output generated by a machine learning model is probabilistic and should be evaluated for accuracy as appropriate for your use case, including by employing human review of such output.
 
-24.3. You agree and instruct that for AWS Supply Chain: (a) we may use and store Your Content that is processed by the AWS Supply Chain service to develop and improve the service and its underlying technologies; (b) we may use and store Your Content that is not personal data to develop and improve AWS and affiliate machine-learning and artificial-intelligence technologies; and (c) solely in connection with the development and improvement described in clauses (a) and (b), we may store Your Content in an AWS region outside of the AWS region where you are using AWS Supply Chain. You may instruct AWS not to use and store Your Content processed by AWS Supply Chain to develop and improve the AWS Supply Chain service or technologies of AWS or its affiliates by following the instructions set forth in the “Opt-out policy” section of AWS Supply Chain administrative guide.  
+24.3. You agree and instruct that for AWS Supply Chain: (a) we may use and store Your Content that is processed by the AWS Supply Chain service to develop and improve the service and its underlying technologies; (b) we may use and store Your Content that is not personal data to develop and improve AWS and affiliate machine-learning and artificial-intelligence technologies; and (c) solely in connection with the development and improvement described in clauses (a) and (b), we may store Your Content in an AWS region outside of the AWS region where you are using AWS Supply Chain. You may instruct AWS not to use and store Your Content processed by AWS Supply Chain to develop and improve the AWS Supply Chain service or technologies of AWS or its affiliates by following the instructions set forth in the “Opt-out policy” section of AWS Supply Chain administrative guide.
 
-24.4. You are responsible for providing legally adequate privacy notices to End Users of AWS Supply Chain and obtaining any necessary consent from such End Users for the processing of Content and the storage, use, and transfer of Content as described under this Section 24. 
+24.4. You are responsible for providing legally adequate privacy notices to End Users of AWS Supply Chain and obtaining any necessary consent from such End Users for the processing of Content and the storage, use, and transfer of Content as described under this Section 24.
 
 24.5. If you have been onboarded to the AWS Supply Chain N-Tier Visibility Service by your customer (Your Customer), the following applies to Your Content that is within the N-Tier Visibility Service:
 
@@ -528,7 +528,7 @@ The distribution of files created by Amazon Elastic Transcoder may require that 
 28.8. AWS is the registrant of, and controls the DNS records for, all [name].workdocs.aws domain names (“Domain Names”). Customer does not acquire any rights in any such domain. Termination or suspension of Customer’s AWS account may result in the termination or suspension of Customer’s ability to use its previously assigned Domain Names. In order to use a Domain Name, Customer must comply with all guidelines included in the Amazon WorkDocs Site Naming Policy.
 
 29. Amazon Pinpoint and AWS End User Messaging (formerly, the SMS, MMS, voice message, and push notification features of Amazon Pinpoint)
-29.1. Portions of Amazon Pinpoint and AWS End User Messaging in Japan are sold and provided by AMCS LLC (“AMCS”), an affiliate of AWS, and not AWS, but are otherwise subject to the terms of the Agreement. 
+29.1. Portions of Amazon Pinpoint and AWS End User Messaging in Japan are sold and provided by AMCS LLC (“AMCS”), an affiliate of AWS, and not AWS, but are otherwise subject to the terms of the Agreement.
 
 29.2. Portions of Amazon Pinpoint and AWS End User Messaging in Singapore are sold and provided by AMCS SG PRIVATE LIMITED (“AMCS SG”), an affiliate of AWS, and not AWS, but are otherwise subject to the terms of the Agreement.
 
@@ -565,7 +565,7 @@ sweepstakes or contests; or
 advertisements or promotions for commercial products, goods, or services.
 29.11. To enable WhatsApp messaging integration with AWS End User Messaging, you must create a WhatsApp Business Account (“WABA”) and are responsible for reviewing and accepting any applicable Meta and WhatsApp terms related to the WhatsApp Business Solution. You understand that any content, information, and data you upload to, and any messages you send or receive using, the WhatsApp Business Solution are processed by Meta in order to provide the Service. You agree that you are solely responsible for your or your End User’s use of the WhatsApp Business Solution, the content you or your End Users send through the WhatsApp Business Solution, and compliance with applicable Meta or WhatsApp terms.
 
-29.12. Your use of the AWS End User Messaging Service in certain countries is subject to additional Country Specific Communications Service Terms. 
+29.12. Your use of the AWS End User Messaging Service in certain countries is subject to additional Country Specific Communications Service Terms.
 
 29.13. AWS End User Messaging's SMS Protect feature uses statistical models that generate SMS Artificially Inflated Traffic (AIT) risk predictions based on patterns in data. SMS Protect does not guarantee the accuracy of such predictions or complete protection from AIT.
 
@@ -648,7 +648,7 @@ You must have all necessary rights to use any domain name that you use in conjun
 
 39.6. The AWS IoT FleetWise Edge Agent Reference Implementation is intended to help you develop your Edge Agent for AWS IoT FleetWise and includes sample code that you may reference or modify so your Edge Agent meets your requirements. You are solely responsible for your Edge Agent, including ensuring that your Edge Agent and any updates and modifications thereto are deployed and maintained safely and securely in any vehicles.
 
-39.7. AWS IoT ExpressLink is AWS cloud connectivity software and specifications that select AWS Partner Network (APN) Partners may incorporate into hardware modules they develop, manufacture, and offer to AWS customers. If you purchase a hardware module (including any evaluation kit) from an APN Partner that includes AWS IoT ExpressLink, you agree that AWS is not a party to any agreement between you and the APN Partner governing your purchase and use of the module, AWS is not responsible or liable to you for the module, and AWS does not make any representations or warranties with respect to the module. 
+39.7. AWS IoT ExpressLink is AWS cloud connectivity software and specifications that select AWS Partner Network (APN) Partners may incorporate into hardware modules they develop, manufacture, and offer to AWS customers. If you purchase a hardware module (including any evaluation kit) from an APN Partner that includes AWS IoT ExpressLink, you agree that AWS is not a party to any agreement between you and the APN Partner governing your purchase and use of the module, AWS is not responsible or liable to you for the module, and AWS does not make any representations or warranties with respect to the module.
 
 39.8. The FreeRTOS Extended Maintenance Plan (“FreeRTOS EMP”) provides subscribing customers with security patches and critical bug fixes on a chosen FreeRTOS Long Term Support (LTS) version beyond the expiry of that version’s initial LTS period. FreeRTOS EMP is a “Service” for purposes of the Agreement. Any code, fixes or patches (collectively, “EMP Patches”) that you receive, obtain or access in connection with FreeRTOS EMP that have not been incorporated into the publicly available FreeRTOS libraries are AWS Content provided to you under the Intellectual Property License, except that AWS also grants you a limited, non-exclusive, non-sublicensable, non-transferrable, perpetual license to (a) modify and create derivative works of the EMP Patches and (b) to distribute the EMP Patches in object code form only.
 
@@ -662,12 +662,12 @@ If you use this feature, you authorize AWS to transmit to the LoRaWAN Network Pr
 
 39.11.1. “AWS IoT Core for Amazon Sidewalk” is a feature of AWS IoT Core that enables customers to build applications and devices that connect to a shared network of bridge devices (“Gateways”) that contribute low-bandwidth connection to Amazon Sidewalk-enabled devices to help extend their working ranges and stay connected to the internet (“Amazon Sidewalk”). Amazon Sidewalk is provided by Ring LLC, however usage of and connectivity to Amazon Sidewalk from AWS is included as a part of AWS IoT Core for Amazon Sidewalk. You agree to, and must comply with, the following (which can be found in the Amazon Sidewalk User Guide): (i) the Amazon Sidewalk Program Requirements; (ii) the Works with Amazon Sidewalk Qualification Guidelines; and (iii) the Amazon Sidewalk Program Security Requirements. We may suspend or terminate Amazon Sidewalk and/or your access to it at any time without prior notice.
 
-39.11.2. You may not sell, distribute, or otherwise make available any device, component, or other product that connects to, enables connectivity to, or interacts with Amazon Sidewalk (an “AS Device”) unless that AS Device has been and remains qualified at all times through the Works with Amazon Sidewalk (“WWAS”) qualification program.  
+39.11.2. You may not sell, distribute, or otherwise make available any device, component, or other product that connects to, enables connectivity to, or interacts with Amazon Sidewalk (an “AS Device”) unless that AS Device has been and remains qualified at all times through the Works with Amazon Sidewalk (“WWAS”) qualification program.
 
 39.11.3. We may collect and use certain information related to your AS Devices, including transmission and authentication identifiers. We use this data for purposes of maintaining and providing AWS IoT Core for Amazon Sidewalk. You provide specific authorization for AWS to use Ring LLC as a sub-processor in accordance with the DPA to process Customer Data in the US in order to make Amazon Sidewalk available for this feature.
 
 39.11.4. Gateways are owned by customers who are contributing bandwidth from their Gateway’s existing internet service to Amazon Sidewalk, and are separate from and located outside of AWS data center facilities, servers, networking equipment, storage media, and host software systems. Consequently, (i) you are responsible for ensuring the security of your products and services in connection with their usage of or connectivity to Amazon Sidewalk, (ii) any commitments made in the Agreement related to security do not apply to Amazon Sidewalk, and (iii) Amazon Sidewalk coverage, density, bandwidth, up-time, and availability is not guaranteed and may change without notice.
- 
+
 39.11.5. Subject to your compliance at all times with the Agreement and the Works with Amazon Sidewalk Badge Guidelines, we hereby grant you a non-exclusive, royalty-free, and revocable license to use AWS Marks provided to you in connection with the WWAS qualification program (collectively, the “WWAS Marks”), to identify your WWAS-qualified AS Devices as using or being compatible with Amazon Sidewalk. Your use of WWAS Marks is also subject to Sections 4-7, 9, 11, and 14-18, of the AWS Trademark Guidelines. You must include the following statement in any materials that display the WWAS Marks: “Amazon, Amazon Sidewalk, and all related marks are trademarks of Amazon.com, Inc. or its affiliates.” We may include information about you and your AS Devices in our marketing materials to identify you as a participant in the WWAS program, including your name, logo, images, and videos of your AS Devices.
 
 39.12. Managed integrations (Preview). Managed integrations is a feature of AWS IoT Device Management that allows you to create or access cloud-to-cloud connectors which link your AWS resources with one or more of your devices (“C2C Connectors”). Any C2C Connector you create is Your Content, and any C2C Connector created by another customer that you access is Third-Party Content. AWS does not create or manage any C2C Connectors.
@@ -679,15 +679,15 @@ If AWS makes available to you any contact information of any provider of a C2C C
 40. Amazon QuickSight
 40.1. You may enable End Users to use Amazon QuickSight under your account. If you choose to enable End Users under your account, it is your responsibility to inform each End User that our termination of your use of Amazon QuickSight will also terminate their use of Amazon QuickSight. It is also your responsibility to inform them that you are acting as an “Amazon QuickSight Administrator” and can perform the following actions: (a) activate and deactivate End Users’ Amazon QuickSight accounts; (b) control End User access to data sets and certain functionality of Amazon QuickSight; and (c) access information about End Users’ use of Amazon QuickSight.
 
- 
+
 
 40.2. Amazon QuickSight may use Your Content that you select as a data source for Amazon QuickSight to make personalized recommendations to you, such as suggested visualizations based on your query history and suggested insights.
 
- 
 
-40.3. Amazon QuickSight Machine Learning Services. Section 50 below applies to Amazon Q in QuickSight (formerly known as Amazon QuickSight Q). 
 
- 
+40.3. Amazon QuickSight Machine Learning Services. Section 50 below applies to Amazon Q in QuickSight (formerly known as Amazon QuickSight Q).
+
+
 
 40.4. QuickSight Readers. Readers (as defined in the QuickSight documentation) that are used for automatically or programmatically refreshing dashboards for near real-time use cases must choose capacity pricing. For readers under user pricing, each reader is limited to manual use by one individual only.
 
@@ -764,7 +764,7 @@ AWS licenses any Software to you under the Apache License, Version 2.0.
 
 45.9. If there is a conflict between this Section 45 and any AWS Implementation Services Addendum between you and AWS, the terms of the AWS Implementation Services Addendum will control, and references to “Implementation Services” in that addendum include AWS Professional Services.
 
-45.10. AWS and its affiliates will handle any personal data relating to your personnel (“Personnel”) that is provided to AWS or its affiliates in connection with a SOW in accordance with the handling practices described in the AWS Privacy Notice (available at https://aws.amazon.com/privacy/). You will make the AWS Privacy Notice available to any Personnel whose personal data you provide to AWS or its affiliates. 
+45.10. AWS and its affiliates will handle any personal data relating to your personnel (“Personnel”) that is provided to AWS or its affiliates in connection with a SOW in accordance with the handling practices described in the AWS Privacy Notice (available at https://aws.amazon.com/privacy/). You will make the AWS Privacy Notice available to any Personnel whose personal data you provide to AWS or its affiliates.
 
 46. Amazon Redshift
 The Reserved Node program allows you to designate Amazon Redshift nodes as subject to the reserved pricing and payment terms set forth on the Amazon Redshift pricing page on the AWS Site (each designated node, a “Reserved Node”). We may terminate the Reserved Node program at any time. We may change pricing for the Reserved Node Program at any time, but price changes will not apply to previously designated Reserved Nodes. Reserved Nodes are noncancellable, and you will owe the amount charged for the Reserved Node for the duration of the term you selected, even if the Agreement is terminated. Reserved Nodes are nontransferable, and all amounts paid in connection with Reserved Nodes are nonrefundable, except that if we terminate the Agreement other than for cause, terminate an individual Reserved Node type, or terminate the Reserved Node program, we will refund you a pro rata portion of any up-front fee paid in connection with any previously designated Reserved Node. Upon expiration or termination of the term of a Reserved Node, the Reserved Node pricing will expire and standard on-demand usage prices will apply to the Amazon Redshift node.
@@ -833,7 +833,7 @@ Notwithstanding any other provision of the Agreement, you may incorporate into y
 
 50.12.1. Third-party models are made available to you either by AWS or by third party providers as “Third-Party Content” and may be subject to additional third-party license terms specified in Amazon Bedrock, these Service Terms, and related documentation. We may share information, that does not include Your Content, about your use of a third-party model on Amazon Bedrock with the provider of that third-party model. Your access to and use of third-party models on Amazon Bedrock may require your use of AWS Marketplace, and in those cases Section 20 (AWS Marketplace) of the Service Terms apply. Notwithstanding anything to the contrary in the Agreement or Service Terms, for purposes of facilitating your purchases of models sold by third parties, Amazon Web Services, Inc. will be the AWS Contracting Party.
 
-50.12.2. As part of providing the Service, Amazon Bedrock may use automated abuse detection mechanisms designed to detect harmful content, including related to potential violations of our or third-party model providers’ terms of service or acceptable use policies. If these mechanisms detect apparent child sexual abuse material, you agree and instruct that we may report the incident to the National Center for Missing and Exploited Children or other authority. See here for more details about abuse detection on Bedrock and related information sharing with third parties. 
+50.12.2. As part of providing the Service, Amazon Bedrock may use automated abuse detection mechanisms designed to detect harmful content, including related to potential violations of our or third-party model providers’ terms of service or acceptable use policies. If these mechanisms detect apparent child sexual abuse material, you agree and instruct that we may report the incident to the National Center for Missing and Exploited Children or other authority. See here for more details about abuse detection on Bedrock and related information sharing with third parties.
 
 50.12.3. Provisioned throughput commitments for Bedrock. We may change provisioned throughput commitment pricing or stop offering commitments for provisioned throughput at any time. Any price changes will not apply to existing commitments. Provisioned throughput commitments are nontransferable and noncancellable, so you will be charged for the duration of the term you selected, even if you terminate the Agreement.
 
@@ -852,7 +852,7 @@ You will defend, indemnify, and hold harmless Mistral, its affiliates, and its l
 
 50.12.7. DeepSeek-R1 on Bedrock. DeepSeek-R1 is trained and developed by Hangzhou DeepSeek Artificial Intelligence Co., Ltd. and its affiliates, and is Third-Party Content. If you use DeepSeek-R1 on Bedrock (excluding Amazon Bedrock Marketplace) then the following additional terms apply: https://huggingface.co/deepseek-ai/DeepSeek-R1/blob/main/LICENSE.
 
-50.12.8. Output generated by models accessed through Amazon Bedrock may include information such as metadata, digital signatures, or watermarks to identify it is generated using a generative artificial intelligence model ("Provenance Data"), as indicated in applicable documentation (for example, see here for Amazon Titan Image Generator). Neither you nor any End User may modify, tamper with, remove, obscure, or otherwise alter such Provenance Data. 
+50.12.8. Output generated by models accessed through Amazon Bedrock may include information such as metadata, digital signatures, or watermarks to identify it is generated using a generative artificial intelligence model ("Provenance Data"), as indicated in applicable documentation (for example, see here for Amazon Titan Image Generator). Neither you nor any End User may modify, tamper with, remove, obscure, or otherwise alter such Provenance Data.
 
 50.13. Amazon Q. To help Amazon Q provide the most relevant information, we may use AI Content processed by Amazon Q, such as prompts and responses (“Amazon Q Content”), for service improvement as described below. Currently, this Section 50.13 applies only to Amazon Q Developer Free Tier and Amazon Q Developer operational investigations (Preview), and we may add Amazon Q features or services from time to time as they launch. This Section 50.13 does not apply to any Amazon Q feature or service that is not listed in the prior sentence.
 
@@ -901,13 +901,13 @@ You will defend, indemnify, and hold harmless Mistral, its affiliates, and its l
 
 53.6. Unless stated otherwise, your or your End Users’ subscription to any of Amazon Chime’s free features does not require the payment of a subscription fee. Amazon Chime’s free features are not guaranteed for any period of time, and AWS may restrict, change, limit, or terminate the use of "free" or "basic" features of Amazon Chime by any individual, entity, or group of entities. If you or your End Users sign up for and use paid features of Amazon Chime and then for any reason, including non-payment or breach, your or your End Users’ access to the paid services is terminated, you and your End Users may be reverted to the free features of Amazon Chime and may no longer have access to data and other material that you or your End Users may have stored in connection with Amazon Chime, and that data and material may be deleted by AWS.
 
-53.7. Emergency calling. 
+53.7. Emergency calling.
 
 53.7.1. The Chime PSTN Service, including Voice Connector features and Business Calling features, is not a traditional telephone service or a replacement for traditional telephone service. Amazon Chime does not provide emergency calling to any emergency services personnel or public safety answering points ("Emergency Services") outside the United States. End Users should not make an Emergency Services call from a location outside the United States because the call will not to be routed to the call answering service for that location.
 
-53.7.2. Within the United States, Voice Connector and Business Calling features support 911 calls to Emergency Services differently than through traditional telephone services. Amazon Chime may not know the physical location of End Users and depends on End Users having access to power and the internet. As calls to Emergency Services in the United States made using Voice Connector or Business Calling features will not automatically provide an End User’s location information, the End User must provide their emergency address information to the operator that answers the call. You and your End Users are responsible for ensuring that a valid call-back number is provided with any 911 call placed using Voice Connector or Business Calling.  You are solely responsible for any arrangements with third parties to provide your End Users with access to Emergency Services, and AWS makes no representations or warranties regarding the use of any such arrangements with Amazon Chime. You agree to inform your End Users that (a) the Chime PSTN Service cannot be used to make calls if the End User experiences a power outage, cannot access the Internet, or their device has no power, (b) Emergency Services calls in the United States using the Chime PSTN Service may not be routed appropriately because Amazon Chime may not know the End User’s location, and (c) End Users may access Emergency Services via other means that may be available to them, including any alternative arrangements that you make available. 
+53.7.2. Within the United States, Voice Connector and Business Calling features support 911 calls to Emergency Services differently than through traditional telephone services. Amazon Chime may not know the physical location of End Users and depends on End Users having access to power and the internet. As calls to Emergency Services in the United States made using Voice Connector or Business Calling features will not automatically provide an End User’s location information, the End User must provide their emergency address information to the operator that answers the call. You and your End Users are responsible for ensuring that a valid call-back number is provided with any 911 call placed using Voice Connector or Business Calling.  You are solely responsible for any arrangements with third parties to provide your End Users with access to Emergency Services, and AWS makes no representations or warranties regarding the use of any such arrangements with Amazon Chime. You agree to inform your End Users that (a) the Chime PSTN Service cannot be used to make calls if the End User experiences a power outage, cannot access the Internet, or their device has no power, (b) Emergency Services calls in the United States using the Chime PSTN Service may not be routed appropriately because Amazon Chime may not know the End User’s location, and (c) End Users may access Emergency Services via other means that may be available to them, including any alternative arrangements that you make available.
 
-53.7.3. The Amazon Chime SDK features do not support calls to Emergency Services. If you permit End Users to place outbound calls or send outbound SMS from a dialpad enabled by Amazon Chime SDK, you must provide prominent notice to your End Users that access to the Emergency Services is not supported. 
+53.7.3. The Amazon Chime SDK features do not support calls to Emergency Services. If you permit End Users to place outbound calls or send outbound SMS from a dialpad enabled by Amazon Chime SDK, you must provide prominent notice to your End Users that access to the Emergency Services is not supported.
 
 53.7.4. Neither AWS nor its affiliates are liable for any damages resulting from any Emergency Services call or any inability to place or complete an Emergency Services call using Amazon Chime. AWS disclaims all responsibility for the conduct of local emergency response centers, third parties engaged by you to facilitate emergency response location or other address updates, and all other third parties involved in the provision of Emergency Services. As permitted by applicable law, you agree to release, indemnify, and hold harmless AWS and its affiliates from and against any liability relating to: (a) any acts or omissions of such third parties or other third parties involved in the handling of or response to any emergency call, (b) your inability to use the Chime PSTN Service to contact Emergency Services due to lack of power or internet access; (c) any failure by you or your End Users to provide accurate caller location information or call back information; or (d) your failure to make additional arrangements to access Emergency Services.
 
@@ -950,11 +950,11 @@ You will defend, indemnify, and hold harmless Mistral, its affiliates, and its l
 
 54.1.7. Calling to premium rate numbers is supported subject to certain limits. Additional charges may apply to calls to premium rate number above those limits. For more information, please contact Amazon Connect support.
 
-54.2. Emergency calling 
+54.2. Emergency calling
 
 54.2.1. The Connect PSTN Service is not a replacement for traditional telephone services. Amazon Connect does not support or carry emergency calling to any emergency services personnel or public safety answering points (“Emergency Services”) outside the United States. Your call agents and other End Users that may use Amazon Connect should not make an Emergency Services call from a location outside the United States because the call will not to be routed to the call answering service for that location.
 
-54.2.2. Within the United States, the Connect PSTN Service supports 911 calls to Emergency Services differently than through traditional telephone services. Amazon Connect may not know the physical location of End Users and depends on End Users having access to power and the internet. You and your End Users are responsible for ensuring that  current location information and a valid callback number for the End User is available to Amazon Connect for any 911 call placed using the Connect PSTN Service. You agree to inform all call agents and other End Users that may use Amazon Connect that: a) the Connect PSTN Service cannot be used to make calls if the call agent or other End User experiences a power outage, cannot access the Internet, or their device has no power, (b) Emergency Services calls in the United States using the Connect PSTN Service may not be routed appropriately because Amazon Connect may not know the call agent’s or other End User’s location, and (c)  they may access Emergency Services via other means that may be available to them, including any alternative arrangements that you have made available. 
+54.2.2. Within the United States, the Connect PSTN Service supports 911 calls to Emergency Services differently than through traditional telephone services. Amazon Connect may not know the physical location of End Users and depends on End Users having access to power and the internet. You and your End Users are responsible for ensuring that  current location information and a valid callback number for the End User is available to Amazon Connect for any 911 call placed using the Connect PSTN Service. You agree to inform all call agents and other End Users that may use Amazon Connect that: a) the Connect PSTN Service cannot be used to make calls if the call agent or other End User experiences a power outage, cannot access the Internet, or their device has no power, (b) Emergency Services calls in the United States using the Connect PSTN Service may not be routed appropriately because Amazon Connect may not know the call agent’s or other End User’s location, and (c)  they may access Emergency Services via other means that may be available to them, including any alternative arrangements that you have made available.
 
 54.2.3. Neither AWS nor its affiliates will be liable for any damages resulting from any Emergency Services call or any inability to place an Emergency Services call using Amazon Connect.  AWS disclaims all responsibility for the conduct of local emergency response centers, third parties engaged by you to facilitate emergency response location or other address updates, and all other third parties involved in the provision of Emergency Services. As permitted by applicable law, you agree to release, indemnify, and hold harmless AWS and its affiliates from and against any liability relating to: (a) any acts or omissions of such third parties or other third parties involved in the handling of or response to any emergency call, (b) your inability to use the Connect PSTN Service to contact Emergency Services due to lack of power or internet access; (c) any failure by you, your call agents or your other End Users that may use Amazon Connect to provide accurate caller location information or call back information; or (d) your failure to make additional arrangements to access Emergency Services.
 
@@ -977,15 +977,15 @@ You will defend, indemnify, and hold harmless Mistral, its affiliates, and its l
 (d) Amazon Connect ML Services are not intended for use in, or in association with, the operation of any hazardous environments or critical systems that may lead to serious bodily injury or death or cause environmental or property damage. Amazon Connect ML Services may be used in connection with supporting healthcare services but are not medical devices and are not intended to be used by themselves for any clinical decision-making or other clinical use.
 
 54.8. Amazon Connect Voice ID
- 
-54.8.1. Your use of Amazon Connect Voice ID is subject to additional  Biometric Notice and Consent Service Terms.  
- 
+
+54.8.1. Your use of Amazon Connect Voice ID is subject to additional  Biometric Notice and Consent Service Terms.
+
 54.8.2. You will not, and will not allow any third-party to, use Amazon Connect Voice ID to, directly or indirectly, develop or improve a similar or competing product or service.
- 
+
 54.8.3. Amazon Connect Voice ID uses machine learning models that generate predictions based on patterns in data. Output generated by Amazon Connect Voice ID is probabilistic and should be evaluated for accuracy as appropriate for your use case, including by employing human review of the output or combining it with other verification factors. You and your End Users are responsible for all decisions made, advice given, actions taken, and failures to take action based on your use of Amazon Connect Voice ID.
- 
+
 54.9. Amazon Connect outbound campaigns. You are responsible for complying with legal requirements related to unsolicited or unwanted communications or telemarketing, including without limitation, the Telephone Consumer Protection Act (TCPA), the FTC’s Telemarketing Sales Rule, the EU e-Privacy Directive, UK Privacy and Electronic Communications Regulations, Ofcom’s policies regarding nuisance calls and texts, or any similar federal, state, or local laws and regulations. We reserve the right to suspend your use of Amazon Connect outbound campaigns if the percentage of answered calls falls below 20% of calls made in any 7 day period or such other level as we may establish in our documentation or policies for outbound campaigns.
- 
+
 54.10. You may only use Amazon Connect Chat for its intended purpose as set forth in the technical documentation. Other uses, including without limitation creating chats for the primary purpose of sending non-chat-based communications, such as email, are not permitted and may result in additional fees being charged to your account or in any increased service limits being reverted to default capacity.
 55. AWS Greengrass
 Your use of the AWS Greengrass Core is governed by the AWS Greengrass Core Software License.
@@ -1005,7 +1005,7 @@ If your messages sent through Amazon MQ are blocked, delayed, or prevented from 
 
 58.3.1. In order to provide MEM, we may request that you implement specific AWS Elemental Software updates and/or provide us with prompt and reasonable access to your AWS Elemental Products. MEM Services do not include installation, configuration, administration, performance, operation, error, fault or defect resolution or other support and maintenance of any AWS Elemental Products, AWS Services or any third-party products (or any combination of any of the foregoing).
 
-58.3.2. AWS does not provide security, risk, governance, legal or compliance advice. You are responsible for making your own assessment of whether your use of the MEM Services meets applicable legal and regulatory requirements. You are also solely responsible for carrying out any advice or recommendations we provide.  
+58.3.2. AWS does not provide security, risk, governance, legal or compliance advice. You are responsible for making your own assessment of whether your use of the MEM Services meets applicable legal and regulatory requirements. You are also solely responsible for carrying out any advice or recommendations we provide.
 
 58.3.3. Payments for MEM Services are not refundable, and your sole remedy is for AWS to re-perform the relevant MEM Services, provided that you must notify us of any failure within 10 business days of the original date of performance. We will invoice you in the manner set forth on your engagement summary.
 
@@ -1018,7 +1018,7 @@ If your messages sent through Amazon MQ are blocked, delayed, or prevented from 
 
 59.3. You are responsible for providing legally adequate privacy notices to End Users of your products or services and obtaining any necessary consent from such End Users for the processing of AWS Entity Resolution Content and the storage, use, and transfer of AWS Entity Resolution Content as described under this Section 59. You represent to us that you have provided all necessary privacy notices and obtained all necessary consents. You are responsible for notifying us in the event that any AWS Entity Resolution Content stored by AWS Entity Resolution must be deleted under applicable law.
 
-59.4. You will not, and will not allow any third-party to, use AWS Entity Resolution, directly or indirectly, to develop or improve a similar or competing product or service. 
+59.4. You will not, and will not allow any third-party to, use AWS Entity Resolution, directly or indirectly, to develop or improve a similar or competing product or service.
 
 60. Amazon SageMaker AI
 60.1. You are responsible for providing legally adequate privacy notices to End Users of your products or services that use Amazon SageMaker AI (including End Users in your private workforce when using Amazon SageMaker Ground Truth) and obtaining all necessary consents from such End Users.
@@ -1082,18 +1082,18 @@ AWS Support. You will remain enrolled in Business Support or better during the e
 
 65.5. Other than Third Party Content, Content that SAS provides as part of the AWS Security Assurance Services is AWS Content. You are solely responsible for testing, deploying, maintaining and supporting Content provided or recommended by SAS.
 
-65.6. SAS may develop Content consisting of either (a) documents and diagrams (“Documents”) or (b) software (in source or object code form), sample code, or scripts (“Software”) for you as part of the AWS Security Assurance Services (such Documents and Software, “Developed Content”). Subject to any non- disclosure agreement in effect between you and SAS, SAS is not precluded from developing, using, or selling products or services that are similar to or related to the Developed Content. Any Developed Content provided to you by SAS as part of the AWS Security Assurance Services under a SOW is licensed under the following terms: 
+65.6. SAS may develop Content consisting of either (a) documents and diagrams (“Documents”) or (b) software (in source or object code form), sample code, or scripts (“Software”) for you as part of the AWS Security Assurance Services (such Documents and Software, “Developed Content”). Subject to any non- disclosure agreement in effect between you and SAS, SAS is not precluded from developing, using, or selling products or services that are similar to or related to the Developed Content. Any Developed Content provided to you by SAS as part of the AWS Security Assurance Services under a SOW is licensed under the following terms:
 
 SAS licenses any Documents to you under the Creative Commons Attribution 4.0 International License (CC-BY 4.0); and
 
-SAS licenses any Software to you under the Apache License, Version 2.0. 
+SAS licenses any Software to you under the Apache License, Version 2.0.
 
 65.7. Some Developed Content may include AWS Content or Third Party Content provided under a separate license. In the event of a conflict between Section 65.6 above and any separate license, the separate license will control with respect to such AWS Content or Third Party Content.
 
 65.8. Any materials or information that you own or license from a third party and provide to SAS for the purposes of the AWS Security Assurance Services are Your Content.
 
 66. AWS Data Transfer Terminal
-66.1. To use AWS Data Transfer Terminal, You connect Your storage device(s) to fiber connections that allow You to send data to Your AWS storage resources. These fiber connections are located in facilities with existing AWS-owned routers that are networked to AWS’s global network. These facilities, and the fiber between the AWS Data Transfer Terminal connection points and the AWS network router, may be owned and/or managed by our colocation providers. You and/or your designees may be asked to sign, accept, or otherwise agree to those colocation providers' terms, policies, and/or procedures as a condition of accessing an AWS Data Transfer Terminal facility, and you agree to comply with any such terms, policies, and/or procedures.  
+66.1. To use AWS Data Transfer Terminal, You connect Your storage device(s) to fiber connections that allow You to send data to Your AWS storage resources. These fiber connections are located in facilities with existing AWS-owned routers that are networked to AWS’s global network. These facilities, and the fiber between the AWS Data Transfer Terminal connection points and the AWS network router, may be owned and/or managed by our colocation providers. You and/or your designees may be asked to sign, accept, or otherwise agree to those colocation providers' terms, policies, and/or procedures as a condition of accessing an AWS Data Transfer Terminal facility, and you agree to comply with any such terms, policies, and/or procedures.
 
 66.2. You are solely responsible for applying appropriate security measures to Your data prior to and during Your use of the AWS Data Transfer Terminal Service, including but not limited to encrypting Your data in transit and not allowing unauthorized access to Your devices or an AWS Data Transfer Terminal facility.
 
@@ -1105,38 +1105,38 @@ SAS licenses any Software to you under the Apache License, Version 2.0.
 
 67. AWS Training
 67.1. “AWS Training” equips individual learners and enterprises with the skills to use, build, and innovate using the cloud, and includes instructor-led training, self-paced digital training, hands-on labs, enterprise training deployment, and other learning content and sessions provided by AWS. Specific categories of AWS Training such as instructor-led classes (“Classroom Training”), self-paced digital training (“Digital Training”), and training deployment support (“Enterprise Skills Transformation” or “EST”), are detailed in sections below. References to “AWS” in any order for AWS Training (an “Order”) mean: (a) the applicable AWS Contracting Party as defined in the Agreement, or (b) for Classroom Training provided in certain jurisdictions, the local AWS Contracting Party listed in the Special Provisions for Certain Jurisdictions.
- 
+
 67.2. Payment
- 
+
 67.2.1 Prepayment. Prepayment for enterprise AWS Training is available in those countries listed on the AWS Site. Digital Training Team Subscriptions and EST are not eligible for prepayment. If you opt to prepay, you agree to pay the amount listed in your Order and applicable taxes (“Prepaid Funds”) within 30 days of (a) the effective date of your Order, or (b) receipt of the prepayment invoice, whichever is later. If you do not prepay within 30-days, you will pay as described in the Agreement. Prepaid Funds are non-refundable and expire at the end of the term in the applicable Order.
- 
+
 67.2.2. Fees. AWS will charge you a fee equal to the value of any funding, discounts, or credits you receive for enterprise AWS Training if you do not consume AWS Training equal to the total amount listed in your Order, within the term specified in your Order.
- 
+
 67.3. Classroom Training
- 
+
 67.3.1. Individual Classroom Training. To access Classroom Training as an individual, you must create an AWS Training account as directed on the AWS Site, and register for a public class. Once you have registered, AWS will provide you with instructions on how to access the class, the course materials, and any lab environment. You may withdraw from a class by visiting your AWS Training account and withdrawing from the class in your transcript. If a refund is available, you will be informed at the time of withdrawal.
- 
+
 67.3.2. Enterprise Classroom Training. Either you or AWS may request to reschedule or cancel an enterprise Classroom Training class at least 14 days before the class start date. If you request to reschedule or cancel a class less than 14 days before the class start date, AWS may bill you the fee listed in your Order for the canceled class excluding discounts, credits or other funding, incurred travel expenses listed in your Order, and applicable taxes. If you make a timely rescheduling request but AWS is unable to reschedule, you may keep the original class start date, or AWS will cancel the class at no charge. If AWS makes a timely rescheduling request but you are unable to reschedule, AWS will cancel the class at no charge. The maximum number of individuals you may enroll in an enterprise Classroom Training class is 25.
- 
+
 67.3.2.1. Vouchers. Vouchers for Classroom Training are non-refundable, non-transferable, and may not be resold, licensed, rented, or redeemed for cash. Vouchers must be used before the expiration date listed in your Order, and AWS will bill you for unused vouchers after the vouchers expire. AWS reserves the right to invalidate or reject any voucher without issuing any refund if AWS suspects that it was obtained, used, or applied fraudulently, unlawfully, or otherwise in violation of this Section. As of the date the vouchers are emailed to the contact address listed in the Order, you are solely responsible for any voucher that is lost, stolen, or used without your permission. You may distribute vouchers only to learners who are your employees, affiliates' employees, or contractors who are aware of, and comply with, the restrictions described in this Section.
- 
+
 67.4. Digital Training
- 
+
 67.4.1. Access and Fees. Subscribers to Digital Training on the AWS Site may access and participate in self-paced trainings on the AWS Site an unlimited number of times during their subscription. From time to time, we may add or remove Digital Trainings from the AWS Site and we make no guarantee as to the availability of specific Digital Trainings or the minimum number of Digital Trainings available. If your subscription ends, you will no longer have access to the Digital Trainings you selected from the AWS Site. The service fees for Digital Training subscriptions are stated on the AWS Site. From time to time, we may offer different subscription lengths, and the subscription service fees may vary. Subscription service fees may be subject to tax and are non-refundable except as expressly set forth in this section.
- 
+
 67.4.2. Individual Subscription. You may cancel your individual subscription by visiting your account and adjusting your subscription settings. If you cancel your individual subscription, you will not receive a refund of any subscription fees already paid and the subscription will remain active until the end of the current pay period. You may not transfer or assign your subscription or any Digital Training benefits.
- 
+
 67.4.3. Team Subscription. For an Order of 5 or more subscriptions (“Seats”) to Digital Training on the AWS Site (a “Team Subscription”), you must provide AWS all reasonably necessary setup information within 5 business days of your Order’s effective date, or as otherwise specified in your Order. The Team Subscription provides you access to your Seats on the date AWS gives your learning administrator(s) access for the period listed in your Order. If you inform your AWS training representative in writing within 2 business days of the start date that you do not have access to your Seats, your Team Subscription will not start until AWS confirms you have access. Seats may only be used by a single person for the entire term of the Team Subscription, except that you may reassign up to twenty percent of Seats within your organization during the term of the Team Subscription.
- 
+
 67.4.3.1. Additional Seats. You may purchase additional Seats under your existing Team Subscription by contacting your AWS Training representative as described on the AWS Training detail page on the AWS Site. Your start date for additional Seats begins when AWS gives your learning administrator(s) access, and any additional Seats purchased will expire at the end of your existing Team Subscription. Fees for additional Seats are calculated pro-rata based on the time remaining in your existing Team Subscription.
- 
+
 67.4.4. Auto-Renewal. Unless you notify us before a charge that you want to cancel or do not want to auto renew, your Digital Training subscription will automatically continue and you authorize us (without notice to you, unless required by applicable law) to collect the then-applicable subscription service fees and any taxes, using any payment method we have on record for you. We may change the Digital Training subscription service fee from time to time by notifying you of the change and effective date before it takes effect. You may reject the change by cancelling your subscription at no additional cost at any time before a subscription service fee change takes effect. From time to time we may also offer non-recurring subscriptions. The provisions in this section regarding automatic renewal are not applicable to those subscriptions.
 If all payment methods we have on file for you are declined for payment of your subscription service fees, your subscription will be cancelled unless you provide us with a new payment method. If you provide us with a new payment method that is successfully charged before your subscription is cancelled, your new subscription period will be based on the original renewal date and not the date of the successful charge.
- 
+
 67.5. Enterprise Skills Transformation
- 
+
 67.5.1. Access. To enable EST support and guidance, AWS may require access to your internal communication systems including but not limited to email, instant messaging, and other systems related to such access as identified by you (“Customer Systems”). When accessing Customer Systems, AWS agrees to comply with your reasonable policies and procedures, to the extent such policies and procedures are (i) applicable to such access and use, and (ii) do not conflict with the Agreement. Subject to your prior approval, you will arrange for AWS to have reasonable access to your Customer Systems to the extent required to enable EST, and at no additional cost to AWS. You may revoke your access approval at any time. AWS is not responsible for any failure to perform caused by your revocation of AWS’ access to your Customer Systems.
- 
+
 67.5.2. Cancellation. Either you or AWS may cancel your EST engagement with 15 days written notice, which may be via email. AWS will charge you for the full month during which the cancellation takes effect.
 68. AWS Certification
 “AWS Certification Program” means the program through which AWS makes available professional certifications and other credentials in connection with the Services. The AWS Certification Program is a “Service” for purposes of the Agreement. To participate in the AWS Certification Program, you must agree to the Certification Program Agreement (“CPA”). To the extent there is a conflict between the Agreement and the CPA, the CPA controls.
@@ -1146,10 +1146,10 @@ Migration Evaluator collects performance and usage metrics and data about your v
 
 70. AWS IQ
 70.1. AWS IQ Experts (“Providers”) offer their services (“Provider Services”) as independent contractors, and are not employees of you or us. AWS is not a party to the agreement between you and any Providers for their Provider Services, is not responsible or liable for Provider Services, and does not guarantee the quality or accuracy of Provider Services. For avoidance of doubt, any certification that a Provider obtains from us only certifies that the Provider has passed a test intended to evaluate the Provider’s proficiency and understanding of a particular AWS Service or area of knowledge to which that certification relates, and is not a guarantee that the Provider Services will be performed at any particular level of quality, speed, or to your specific requirements.
- 
+
 70.2. AWS charges service fees for transactions between you and Providers on the AWS IQ marketplace. AWS only collects these service fees if you and a Provider pay and receive payment through the AWS IQ marketplace. Therefore, for 24 months from the time you identify a Provider through AWS IQ, you agree to use AWS IQ as your exclusive method to pay for Provider Services. For avoidance of doubt, if you did not identify a Provider through use of AWS IQ, such as if you worked with a Provider prior to connecting with that Provider on AWS IQ, then this section does not apply.
- 
-70.3. You acknowledge and agree that we may use information from AWS IQ listings, proposals, chat communications, and additional terms proposed or agreed to between you and Providers on AWS IQ to develop and improve the quality and feature set of AWS IQ. 
+
+70.3. You acknowledge and agree that we may use information from AWS IQ listings, proposals, chat communications, and additional terms proposed or agreed to between you and Providers on AWS IQ to develop and improve the quality and feature set of AWS IQ.
 70.4. If you choose to grant Providers access to your AWS account, you are solely responsible and liable for (a) any actions taken by the Provider in your account; (b) the Provider’s use of Your Content or use of the Services or AWS Content; (c) ensuring the Provider complies with your obligations under the Agreement, the Acceptable Use Policy, any other Policies, the Intellectual Property License and applicable laws; (d) ensuring the Provider does not use the Services or AWS Content in any manner or for any purpose other than as expressly permitted by the Agreement and the Intellectual Property License; and (e) ensuring Provider does not attempt to (i) modify, distribute, alter, tamper with, repair, or otherwise create derivative works of any AWS Content or other Content included in the Services (except to the extent Content included in the Services is provided to you under a separate license that expressly permits the creation of derivative works), (ii) reverse engineer, disassemble, or decompile the Services or AWS Content or apply any other process or procedure to derive the source code of any software included in the Services or AWS Content (except to the extent applicable law doesn’t allow this restriction), (iii) access or use the Services in a way intended to avoid incurring fees or exceeding usage limits or quotas, or (iv) resell or sublicense the Services or AWS Content. You will immediately revoke Provider’s access to your AWS account if you become aware of any violation of your obligations under the Agreement or the Intellectual Property License caused by a Provider with access to your AWS account. If you use AWS IQ’s feature that allows you to grant a Provider access to your account, AWS may, but is not obligated to, review activities in your account for security purposes, and may revoke the Provider’s access at any time.
 
 70.5. You release us (and our agents and employees) from claims, demands, and damages (actual or consequential) of any and every kind and nature, known or unknown, suspected or unsuspected, disclosed and undisclosed, arising out of or in any way connected with your use of the AWS IQ marketplace.
@@ -1168,9 +1168,9 @@ AWS CodeStar Notifications utilizes one or more of the following: Amazon Simple 
 
 73.2. You may not use any Content obtained through AWS Data Exchange that was anonymized, de-identified, or otherwise disassociated from an identifiable person in any manner that would attempt to re-identify, de-anonymize, or otherwise associate such Content with an identifiable person.
 
-73.3. If we remove your Data Offering (as defined in the Service Terms for AWS Marketplace Sellers), then we may also cancel any current associated subscriptions if we determine, in our sole discretion, that your Data Offering: (a) poses a security risk to us or a Subscriber (as defined in the Service Terms for AWS Marketplace Sellers); (b) could subject us, our affiliates, or any third party to liability; (c) could be fraudulent; or (d) violates the AWS Marketplace Service Terms.  
+73.3. If we remove your Data Offering (as defined in the Service Terms for AWS Marketplace Sellers), then we may also cancel any current associated subscriptions if we determine, in our sole discretion, that your Data Offering: (a) poses a security risk to us or a Subscriber (as defined in the Service Terms for AWS Marketplace Sellers); (b) could subject us, our affiliates, or any third party to liability; (c) could be fraudulent; or (d) violates the AWS Marketplace Service Terms.
 
-73.4. Except as agreed to in writing between you and the respective Subscriber, otherwise permitted by law, in addition to any other restrictions on your use of Subscriber Information (as defined in the Service Terms for AWS Marketplace Sellers) in the Service Terms for AWS Marketplace Sellers, you may only use Subscriber Information for compliance verification in connection with Subscribers acquiring rights to the underlying content of your Data Offerings. 
+73.4. Except as agreed to in writing between you and the respective Subscriber, otherwise permitted by law, in addition to any other restrictions on your use of Subscriber Information (as defined in the Service Terms for AWS Marketplace Sellers) in the Service Terms for AWS Marketplace Sellers, you may only use Subscriber Information for compliance verification in connection with Subscribers acquiring rights to the underlying content of your Data Offerings.
 
 73.5. You represent and warrant to us that to the extent your Data Offerings contains any data that (i) identifies or can be used by a Subscriber or other third party to identify a natural person; or (ii) otherwise may be deemed to be personal data or personal information under applicable laws or regulations with respect to the Subscriber, then such data (a) has already lawfully been made available to the general public, such as via governmental records, widely distributed media, or legally required public disclosures; and (b) does not include sensitive data or sensitive information about an individual or shall not otherwise be deemed to be sensitive data or sensitive information under applicable laws and regulations, including without limitation, information relating to biometric or genetic data, health, racial or ethnic origin, political opinions, religious or philosophical beliefs, sex or sexual orientation, trade union membership, or personal payment or sensitive personal data.
 
@@ -1215,7 +1215,7 @@ For the Service Level Agreements applicable to any Services or Service workloads
 
 80.2. By uploading Content to Amazon ECR Public, you hereby grant AWS and its Affiliates a worldwide, non-exclusive, fully paid-up, royalty-free license to store, parse, copy, reproduce (including by making mechanical reproductions), reformat, transmit, display, and perform the Content in connection with providing Amazon ECR Public, and, with respect to any Third-Party Content you upload that is subject to an open source or Third-Party Content license, you represent and warrant that the terms for such Third-Party Content permit AWS and its Affiliates to store, parse, copy, reproduce (including by making mechanical reproductions), reformat, transmit, display, and perform the Content in connection with providing Amazon ECR Public.
 
-80.3. You may specify the terms under which you license Your Content to Registry Users. If you do not specify such terms when you upload Your Content, you hereby grant to any other Registry User a non-exclusive license to access, download, use, modify or otherwise exploit Your Content for any personal or business purposes. If you upload and share any Third-Party Content to Amazon ECR Public, you are responsible for ensuring that you have the rights and licenses necessary to do so. 
+80.3. You may specify the terms under which you license Your Content to Registry Users. If you do not specify such terms when you upload Your Content, you hereby grant to any other Registry User a non-exclusive license to access, download, use, modify or otherwise exploit Your Content for any personal or business purposes. If you upload and share any Third-Party Content to Amazon ECR Public, you are responsible for ensuring that you have the rights and licenses necessary to do so.
 
 81. Industrial AI Services
 81.1. “Industrial AI Services” means, collectively, Amazon Lookout for Vision, Amazon Lookout for Equipment, Amazon Monitron, and AWS Panorama. “Industrial AI Content” means Your Content that is processed by an Industrial AI Service.
@@ -1256,7 +1256,7 @@ c. Incorporate Amazon Location Service, including any Location Data, into any in
 d. Use, incorporate, modify, distribute, provide access to, or combine any Location Data in a manner that would subject the Location Data to open-source or open-database license terms that require any part of the Location Data to be disclosed to third parties, licensed to third parties for the purpose of making derivative works, or redistributed to third parties at no charge.
 
 e. Use Location Data to develop paper maps or an atlas (digital or otherwise) for purposes of sale or distribution to others.
- 
+
 f. Place your company name or marks, or any third-party advertisements, on or in the Location Data (e.g., on a map display).
 82.5. In addition to the restrictions in Section 82.4, if you use HERE as your Geolocation Provider, you may not:
 
@@ -1275,11 +1275,11 @@ b. Layer routes from HERE on top of a map from another third-party provider, or 
 82.10. Attribution for Location Data can be found here. You must pass through attribution for Location Data that you make available to others via your application or its product documentation. If any Location Data has attribution details attached or incorporated, you may not remove, modify, or obscure (or permit any End Users to remove, modify, or obscure) any copyright, trademark notice, restrictive legend, or other proprietary right notices supplied to you.
 
 83. AWS Managed Services
-83.1. If you request that AWS Managed Services be provided for any software or service that is not expressly identified as supported in the AWS Managed Services user guides posted on the AWS Site (“Customer-Requested Configuration”), any AWS Managed Services provided for such Customer-Requested Configuration will be treated as a “Beta Service” under these Service Terms. 
+83.1. If you request that AWS Managed Services be provided for any software or service that is not expressly identified as supported in the AWS Managed Services user guides posted on the AWS Site (“Customer-Requested Configuration”), any AWS Managed Services provided for such Customer-Requested Configuration will be treated as a “Beta Service” under these Service Terms.
 
-83.2. You represent and warrant to AWS that the person requesting any of your AWS accounts to be an AWS Managed Services Account (as defined in the AWS Managed Services user guides posted on the AWS Site) is authorized to make such requests and procure AWS Managed Services on your behalf and with respect to such AWS accounts. 
+83.2. You represent and warrant to AWS that the person requesting any of your AWS accounts to be an AWS Managed Services Account (as defined in the AWS Managed Services user guides posted on the AWS Site) is authorized to make such requests and procure AWS Managed Services on your behalf and with respect to such AWS accounts.
 
-83.3. AWS and its affiliates will not be liable to you for any damages arising from (a) AWS’s actions taken pursuant to any instructions or requests that you provide or approve, (b) you not following an instruction or recommendation from AWS, (c) your delay or withholding of approval for AWS to take a requested action, or (d) any change by you to your Managed Environment (as defined in the AWS Managed Services user guides posted on the AWS Site). 
+83.3. AWS and its affiliates will not be liable to you for any damages arising from (a) AWS’s actions taken pursuant to any instructions or requests that you provide or approve, (b) you not following an instruction or recommendation from AWS, (c) your delay or withholding of approval for AWS to take a requested action, or (d) any change by you to your Managed Environment (as defined in the AWS Managed Services user guides posted on the AWS Site).
 
 84. Amazon FinSpace
 Amazon FinSpace is a tool to help you analyze data for investment and business decisions. It is not a substitute for the judgment and experience of the user when making investment and business decisions. Amazon FinSpace does not provide investment advice, make investment recommendations or evaluate the suitability of any investment or investment strategy.
@@ -1305,7 +1305,7 @@ Amazon FinSpace is a tool to help you analyze data for investment and business d
 86.6. You must be a student in high school or a higher education institution, and at least 16 years old, to use AWS DeepRacer Student. If you are under 18 years of age, or the age of majority in your location, you may use AWS DeepRacer Student only with involvement of a parent or guardian who agrees to be bound by these Service Terms.
 
 87. Amazon GuardDuty
-87.1. “Malware Content” is Your Content that the Amazon GuardDuty Malware Protection feature processes and identifies as being malicious or harmful. 
+87.1. “Malware Content” is Your Content that the Amazon GuardDuty Malware Protection feature processes and identifies as being malicious or harmful.
 
 87.2. You agree and instruct that: (a) we may use and store Malware Content to develop and improve Amazon GuardDuty and its underlying technologies; (b) we may use and store Malware Content that is not personal data to develop and improve other AWS security services; and (c) solely in connection with the development and improvement described in clauses (a) and (b), we may store such Malware Content in an AWS region outside the AWS region where you are using the Amazon GuardDuty Malware Protection feature. You may instruct AWS not to use and store Malware Content to develop and improve Amazon GuardDuty or other AWS security services by configuring an AI services opt-out policy using AWS Organizations.
 
@@ -1315,31 +1315,31 @@ Amazon FinSpace is a tool to help you analyze data for investment and business d
 
 88. AWS Wickr
 88.1. End Users.
- 
+
 88.1.1. You may enable End Users to use AWS Wickr under your account. Termination of your account’s use of AWS Wickr may also suspend or terminate such End Users’ features or access associated with your account or organization.
- 
+
 88.1.2. AWS Wickr End Users can be managed by End Users with administrative privileges (“AWS Wickr Administrators”). AWS Wickr Administrators can (a) upgrade or downgrade End Users’ AWS Wickr feature set; (b) suspend End User’s access to AWS Wickr; and (c) access information about their End Users’ use of AWS Wickr.
 89. AWS Private 5G
 89.1. AWS Private 5G Equipment. AWS will make equipment available to you to support your use of the AWS Private 5G Service (the “Private 5G Equipment”). AWS, or its affiliates, maintain all rights in the Private 5G Equipment and is not selling, renting, leasing, or transferring any ownership, intellectual or other rights in the Private 5G Equipment to you. You will not, and will not purport to, assign, grant, or transfer the Private 5G Equipment or any interest in the Private 5G Equipment to any individual or entity, and any such purported assignment, grant or transfer is void.
- 
-89.2. Facility Assessment. You will ensure that, at all times, the facility at which the Private 5G Equipment is located (the “Designated Facility”) meets the minimum requirements necessary to support the installation, maintenance, use, and removal of the Private 5G Equipment as described here and otherwise as described in the AWS Private 5G technical documentation or provided to you during the ordering process. When moving the Private 5G Equipment from the Designated Facility to a new Designated Facility, you must notify AWS of the new Designated Facility’s Address. 
- 
-89.3. Delivery. You will ensure that you have all necessary rights, certifications, and licenses for the delivery, installation, maintenance, use, and removal of the Private 5G Equipment at the Designated Facility. 
- 
+
+89.2. Facility Assessment. You will ensure that, at all times, the facility at which the Private 5G Equipment is located (the “Designated Facility”) meets the minimum requirements necessary to support the installation, maintenance, use, and removal of the Private 5G Equipment as described here and otherwise as described in the AWS Private 5G technical documentation or provided to you during the ordering process. When moving the Private 5G Equipment from the Designated Facility to a new Designated Facility, you must notify AWS of the new Designated Facility’s Address.
+
+89.3. Delivery. You will ensure that you have all necessary rights, certifications, and licenses for the delivery, installation, maintenance, use, and removal of the Private 5G Equipment at the Designated Facility.
+
 89.4. Use. You are responsible for the installation, use, and removal of the AWS Private 5G Equipment at the Designated Facility and returning the Private 5G Equipment to AWS as described in the AWS Private 5G technical documentation or provided to you during the ordering process. Except as provided for in the technical documentation, you will ensure that no one accesses or repairs the Private 5G Equipment. In addition to other rights and remedies AWS may have under the Agreement, AWS may charge a lost device fee if the Private 5G Equipment is lost or damaged between when it is first in your possession and when the carrier accepts the Private 5G Equipment for delivery back to AWS. AWS may terminate your use of AWS Private 5G and remove the Private 5G Equipment if you breach these terms or materially breach the terms of the Agreement with respect to AWS Private 5G. In the event that we terminate your use of AWS Private 5G and remove the Private 5G Equipment in accordance with this Section 89.4, we will provide you with prior notice where practicable under the circumstances.
- 
+
 89.5. Business Support. You will remain enrolled in AWS Support at the Business level during the entire period of your use of AWS Private 5G.
- 
-89.6. Security. As the Private 5G Equipment is physically located at the Designated Facility, you are responsible for physical security and access controls, as well as all power, networking, and environmental conditions at your Designated Facility. Consequently, any AWS commitments in the Agreement that depend on AWS’s operation of such physical security and access controls, or power, networking, and environmental conditions, do not apply to AWS Private 5G. 
+
+89.6. Security. As the Private 5G Equipment is physically located at the Designated Facility, you are responsible for physical security and access controls, as well as all power, networking, and environmental conditions at your Designated Facility. Consequently, any AWS commitments in the Agreement that depend on AWS’s operation of such physical security and access controls, or power, networking, and environmental conditions, do not apply to AWS Private 5G.
 90. AWS SimSpace
 90.1. We may change, discontinue, or deprecate support for any third-party integrations or samples at any time. We will provide you with prior notice of any deprecation or discontinuation of support for a third-party integration or sample where practicable under the circumstances.
- 
+
 90.2. AWS SimSpace Weaver is designed to help customers build simulations. This may include simulation of real-world locations, scenarios, and assets, based on the simulation code and data you provide. Data generated by AWS SimSpace Weaver should be evaluated for accuracy as appropriate for your use case. You and your End Users are solely responsible for all decisions made, advice given, actions taken, and failures to act based on your use of AWS SimSpace Weaver.
 91. AWS Builder ID
 91.1. If during the previous 12 months you have registered no usage of your AWS Builder ID, we may delete your AWS Builder ID upon 30 days’ prior notice.
- 
+
 91.2. Upon deletion of your AWS Builder ID, you will no longer have access to Your Content through your AWS Builder ID, and such content will be deleted.
- 
+
 91.3. For purposes of your use of AWS Builder ID, Amazon Web Services, Inc. is the AWS Contracting Party under the Agreement.
 92. AWS Clean Rooms
 92.1. You may not use AWS Clean Rooms or any information obtained from your use of AWS Clean Rooms to identify a person or associate such information with an identifiable person, unless otherwise permitted by the applicable third-party contributor of the data.
@@ -1370,7 +1370,7 @@ Amazon FinSpace is a tool to help you analyze data for investment and business d
 94. Integrated Private Wireless on AWS
 94.1. AWS may stop providing the Integrated Private Wireless on AWS portal (or remove any offerings on the Integrated Private Wireless on AWS site (or any successor site)) at any time. We will provide you with prior notice where practicable under the circumstances.
 
-94.2. The offerings on the Integrated Private Wireless on AWS site (or any successor site) are offered by third parties and subject to separate terms and conditions specified by the respective third party. AWS has no control and makes no guarantees about such offerings. 
+94.2. The offerings on the Integrated Private Wireless on AWS site (or any successor site) are offered by third parties and subject to separate terms and conditions specified by the respective third party. AWS has no control and makes no guarantees about such offerings.
 
 95. AWS Diode
 95.1. AWS Diode allows You to map Your account to another Diode account (“Mapped Account”), enabling Your Content to be moved and stored by the Mapped Account to an AWS region of a different classification level.  You acknowledge and agree that using the Service may result in Your Content being moved and stored in AWS regions other than the AWS regions where You initially stored Your Content.
@@ -1381,7 +1381,7 @@ Amazon FinSpace is a tool to help you analyze data for investment and business d
 AWS personnel do not have access to Your Content on AWS Nitro System EC2 instances. There are no technical means or APIs available to AWS personnel to read, copy, extract, modify, or otherwise access Your Content on an AWS Nitro System EC2 instance or encrypted-EBS volume attached to an AWS Nitro System EC2 instance. Access to AWS Nitro System EC2 instance APIs – which enable AWS personnel to operate the system without access to Your Content - is always logged, and always requires authentication and authorization.
 
 97. Amazon Security Lake
-97.1. "Security Lake Content" is Your Content that (a) Amazon Security Lake processes or (b) is stored in Amazon Security Lake.  
+97.1. "Security Lake Content" is Your Content that (a) Amazon Security Lake processes or (b) is stored in Amazon Security Lake.
 
 97.2. You agree and instruct that: (a) we may use and store your Security Lake Content to develop and improve Amazon Security Lake and its underlying technologies; and (b) we may use and store Security Lake Content that is not personal data to develop and improve other AWS security services. You may instruct AWS not to use and store Security Lake Content to develop and improve Amazon Security Lake or other AWS security services by configuring an AI services opt-out policy using AWS Organizations.
 
@@ -1435,7 +1435,7 @@ d. Your use of Autodesk’s Arnold for Maya is subject to the terms and conditio
 
 e. Your use of Blender Foundation's Software is subject to the terms and conditions of the GNU General Public License.
 
-f. Your use of Luxion’s Keyshot is subject to the terms and conditions of the Terms and Conditions. 
+f. Your use of Luxion’s Keyshot is subject to the terms and conditions of the Terms and Conditions.
 
 g. Your use of Maxon’s Software is subject to the terms and conditions of the End User License Agreement.
 
@@ -1452,4 +1452,4 @@ h. Your use of Adobe After Effects is subject to the terms and conditions of the
 
 104.2. AWS and its affiliates will not be liable to you for any damages arising from (a) AWS’s actions taken pursuant to any instructions, requests, or pre-authorizations that you provide or approve, (b) you not following an instruction or recommendation from AWS, (c) your delay or withholding of approval for AWS to take a requested action, or (d) any change by you to your AWS Security Incident Response Membership Account (as defined in the AWS Security Incident Response user guides posted on the AWS Site).
 
-104.3. By enabling alert triaging you agree to grant AWS Security Incident Response permissions to access Amazon GuardDuty and AWS Security Hub to ingest alerts and create suppression rules on your behalf. 
+104.3. By enabling alert triaging you agree to grant AWS Security Incident Response permissions to access Amazon GuardDuty and AWS Security Hub to ingest alerts and create suppression rules on your behalf.

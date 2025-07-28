@@ -357,10 +357,10 @@ async function createSession() {
     modalities: ['text', 'audio'],
     instructions: 'You are a helpful assistant.'
   });
-  
+
   console.log('Session ID:', session.id);
   console.log('Client Secret:', session.client_secret.value);
-  
+
   return session;
 }
 ```

@@ -61,8 +61,8 @@ const BenchmarkChart: React.FC<BenchmarkChartProps> = ({ data }) => {
           bottom: '9.5%',
         },
         tooltip: {
-          trigger: 'axis', 
-          backgroundColor: 'rgba(44, 44, 44, .6)', 
+          trigger: 'axis',
+          backgroundColor: 'rgba(44, 44, 44, .6)',
           borderWidth: 0,
           textStyle: {
             color: '#ffffff',
@@ -97,7 +97,7 @@ const BenchmarkChart: React.FC<BenchmarkChartProps> = ({ data }) => {
         },
         xAxis: {
           type: 'category',
-          
+
           axisLine: {
             lineStyle: {
               color: '#2d2d2d',

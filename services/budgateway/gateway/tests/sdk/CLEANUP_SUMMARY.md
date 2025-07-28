@@ -7,7 +7,7 @@ Major cleanup and improvement of the TensorZero SDK test suite to eliminate dupl
 ## ✅ Completed Improvements
 
 ### 1. **Removed Redundant Test Runner Scripts**
-- **Deleted**: `run_tests_ci.sh`, `run_tests_full.sh`  
+- **Deleted**: `run_tests_ci.sh`, `run_tests_full.sh`
 - **Reason**: These were simple redirects to the main `run_tests.sh` script
 - **Impact**: Simplified maintenance, reduced confusion
 - **Migration**: Use `./run_tests.sh --provider openai --mode ci|full` instead
@@ -43,7 +43,7 @@ messages = UniversalTestData.get_basic_chat_messages()
 
 #### Reusable Test Classes
 - `UniversalChatTestSuite` - Chat completion tests that work with any provider
-- `UniversalStreamingTestSuite` - Streaming tests for all providers  
+- `UniversalStreamingTestSuite` - Streaming tests for all providers
 - `UniversalEmbeddingTestSuite` - Embedding tests for all providers
 - `UniversalErrorTestSuite` - Error handling tests for all providers
 
@@ -56,7 +56,7 @@ messages = UniversalTestData.get_basic_chat_messages()
 
 #### New Consolidated Test Files
 - `test_openai_sdk_all_providers.py` - Comprehensive universal SDK compatibility tests
-- `test_cross_provider_comparison.py` - Side-by-side provider comparisons  
+- `test_cross_provider_comparison.py` - Side-by-side provider comparisons
 - `conftest.py` - Shared fixtures for universal tests
 
 #### Replaces and Consolidates
@@ -86,7 +86,7 @@ messages = UniversalTestData.get_basic_chat_messages()
 
 ### Code Reduction
 - **Eliminated**: ~200 lines of duplicate client initialization code
-- **Eliminated**: ~150 lines of duplicate validation logic  
+- **Eliminated**: ~150 lines of duplicate validation logic
 - **Eliminated**: ~100 lines of duplicate test data definitions
 - **Net Result**: Significantly more maintainable codebase with better consistency
 
@@ -165,7 +165,7 @@ The cleanup reinforces the key architectural principle: **OpenAI SDK works with 
 - `together_tests/test_*_improved.py` - Improved Together tests
 - `CLEANUP_SUMMARY.md` - This summary
 
-### Enhanced  
+### Enhanced
 - `common/utils.py` - Added client factory, validation, test data
 - `README.md` - Updated with new architecture and examples
 

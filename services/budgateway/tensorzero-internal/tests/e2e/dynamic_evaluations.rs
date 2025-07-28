@@ -8,8 +8,9 @@ use crate::providers::common::{make_embedded_gateway, make_http_gateway};
 use serde_json::json;
 use tensorzero::{
     ClientInferenceParams, ClientInput, ClientInputMessage, ClientInputMessageContent,
-    DynamicEvaluationRunParams, FeedbackParams, InferenceOutput, Role,
+    DynamicEvaluationRunParams, FeedbackParams, InferenceOutput,
 };
+use tensorzero_internal::inference::types::Role;
 use tensorzero_internal::{
     clickhouse::test_helpers::{
         get_clickhouse, select_chat_inference_clickhouse, select_dynamic_evaluation_run_clickhouse,

@@ -126,7 +126,6 @@ dashmap = "6.1.0"
 [dev-dependencies]
 tempfile = "3.20.0"
 tracing-test = { workspace = true }
-tensorzero = { path = "../clients/rust" }
 paste = "1.0.15"
 aws-sdk-s3 = { version = "1.87.0", default-features = false, features = [
     "behavior-version-latest",
@@ -137,6 +136,8 @@ aws-sdk-s3 = { version = "1.87.0", default-features = false, features = [
 aws-credential-types = { version = "1.2.2", features = [
     "hardcoded-credentials",
 ] }
+tensorzero = { path = "../clients/rust" }
+anyhow = { workspace = true }
 
 [build-dependencies]
 built = { version = "0.8.0", features = ["git2"] }

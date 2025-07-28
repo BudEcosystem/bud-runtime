@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # /// script
 # dependencies = [
 #   "requests",
@@ -101,7 +102,7 @@ def download_file(filename, remote_etag):
 
 def main():
     print("Starting fixture download process...")
-    
+
     # Create s3-fixtures directory if it doesn't exist
     S3_FIXTURES_DIR.mkdir(exist_ok=True)
 
@@ -135,10 +136,10 @@ def main():
     print(f"Processing {len(FIXTURES)} fixture files...")
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
         results = list(executor.map(process_fixture, FIXTURES))
-    
+
     success_count = sum(results)
     print(f"\nCompleted: {success_count}/{len(FIXTURES)} files processed successfully")
-    
+
     if success_count < len(FIXTURES):
         print("Some fixtures failed to download!")
         exit(1)

@@ -20,7 +20,7 @@ model_name = "o4-mini"
 
 
 # Usage examples:
-# 
+#
 # 1. Direct model access (no authentication required with this config):
 #    curl -X POST http://localhost:3000/v1/chat/completions \
 #      -H "Content-Type: application/json" \

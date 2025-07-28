@@ -3533,9 +3533,10 @@ class ModelService(SessionMixin):
 
         # Perform recommended cluster simulation
         try:
-            async with aiohttp.ClientSession() as session, session.post(
-                recommended_cluster_endpoint, json=recommended_cluster_request.model_dump()
-            ) as response:
+            async with (
+                aiohttp.ClientSession() as session,
+                session.post(recommended_cluster_endpoint, json=recommended_cluster_request.model_dump()) as response,
+            ):
                 response_data = await response.json()
                 if response.status >= 400:
                     raise ClientException("Unable to perform recommended cluster simulation")

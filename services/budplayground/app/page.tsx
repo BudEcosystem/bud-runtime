@@ -8,12 +8,12 @@ import { useLoader } from "./context/LoaderContext";
 
 
 export default function Home() {
-    
+
     const { apiKey, isLoading } = useAuth();
     const { showLoader, hideLoader } = useLoader();
     const router = useRouter();
 
-    
+
 
     useEffect(() => {
         if (!apiKey && !isLoading) {
@@ -24,7 +24,7 @@ export default function Home() {
         if(!isLoading){
             hideLoader();
         }
-    }, [apiKey, isLoading]);
+    }, [apiKey, isLoading, hideLoader, router]);
 
     return <div>
         Welcome to the chat

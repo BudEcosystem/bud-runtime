@@ -57,7 +57,7 @@ export default function SelectEndpointsForRoutes() {
   useEffect(() => {
     setStepTwoData();
   }, [multiSelectedEndpoints])
-  
+
   useEffect(() => {
     if (projectId) {
       getData();

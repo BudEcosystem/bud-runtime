@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Box, Button, Flex } from "@radix-ui/themes";
 import {
   Text_12_300_EEEEEE,
@@ -34,9 +34,9 @@ const LoginPage = ({ onSubmit }: LoginPageModalProps) => {
     if (isSubmitted) {
       validateForm();
     }
-  }, [formData, isSubmitted]);
+  }, [formData, isSubmitted, validateForm]);
 
-  const validateForm = () => {
+  const validateForm = useCallback(() => {
     const passwordValid = formData["password"]?.length >= 8;
     const emailValid = emailRegex.test(formData["email"] || "");
 
@@ -46,7 +46,7 @@ const LoginPage = ({ onSubmit }: LoginPageModalProps) => {
         : ""
     );
     setIsEmailValid(!formData["email"] || emailValid);
-  };
+  }, [formData, emailRegex]);
 
   const handleLogin = (e: { preventDefault: () => void }) => {
     e.preventDefault();

@@ -6,6 +6,7 @@ from git import Repo
 
 
 def clone_and_check_repo(repo_url, repo_dir):
+    """Clone and check a repository."""
     # Delete the folder if it exists to clone afresh
     if os.path.exists(repo_dir):
         print(f"Removing existing repository folder: {repo_dir}")

@@ -20,11 +20,11 @@ const ScatterChart: React.FC<ScatterChartProps> = ({ data }) => {
   useEffect(() => {
     if (data) { setBarChartData(data); }
   }, [data]);
-  
+
   useEffect(() => {
     console.log('chartData', chartData);
   }, [chartData]);
-  
+
   const chartRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (chartRef.current) {
@@ -50,7 +50,7 @@ const ScatterChart: React.FC<ScatterChartProps> = ({ data }) => {
         },
         xAxis: {
           scale: true,
-          min: 0, 
+          min: 0,
           type: '',
           axisTick: {
             show: false, // Remove the tick marks from the x-axis
@@ -147,5 +147,3 @@ const ScatterChart: React.FC<ScatterChartProps> = ({ data }) => {
 };
 
 export default ScatterChart;
-
-

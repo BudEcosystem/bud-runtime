@@ -277,7 +277,7 @@ async function getBatchEmbeddings() {
   });
 
   const result = await response.json();
-  
+
   result.data.forEach(item => {
     console.log(`Index ${item.index}: ${item.embedding.length} dimensions`);
   });

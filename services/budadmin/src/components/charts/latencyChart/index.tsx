@@ -36,9 +36,9 @@ const LatencyChart: React.FC<LatencyChartProps> = ({ data, Legend }) => {
 
       const option = {
         backgroundColor: 'transparent',
-        
+
         legend: {
-          show: Legend, 
+          show: Legend,
           orient: 'horizontal', // Arrange legend items vertically
           left: '0%', // Position the legend on the right side
           top: 'top', // Vertically center the legend

@@ -90,7 +90,7 @@ const config = {
         bounceIn: 'bounceIn 0.4s ease-out',
       },
       backgroundColor: {
-        'custom-bg': '#000000', 
+        'custom-bg': '#000000',
       },
       backdropBlur: {
         'custom': '10px',

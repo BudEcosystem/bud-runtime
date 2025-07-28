@@ -327,7 +327,7 @@ def license_QA(license_source: str) -> List[Dict[str, Any]]:
             logger.error(f"Error generating prompts: {str(e)}")
             return []
 
-        question_to_prompt = dict(zip(Questions, prompts))
+        question_to_prompt = dict(zip(Questions, prompts, strict=True))
 
         responses = {}
         with concurrent.futures.ThreadPoolExecutor() as executor:

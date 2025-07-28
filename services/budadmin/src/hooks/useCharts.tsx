@@ -59,14 +59,14 @@ export const useCharts = create<
       // Convert old params to new observability format
       const observabilityRequest = convertToObservabilityRequest({ ...params, to_date });
       const response: any = await AppRequest.Post(url, observabilityRequest);
-      
+
       // Convert response to old format for backward compatibility
       const convertedData = convertObservabilityResponse(
         response.data as ObservabilityMetricsResponse,
         params.metrics,
         params.filter_by
       );
-      
+
       set(params.filter_by === 'project' ? { requestCounts: convertedData } : params.metrics == 'input_output_tokens' ? {tokenMetrics : convertedData}: { modelCounts: convertedData });
       successToast(response.message);
     } catch (error) {
@@ -83,14 +83,14 @@ export const useCharts = create<
       // Convert old params to new observability format
       const observabilityRequest = convertToObservabilityRequest({ ...params, to_date });
       const response: any = await AppRequest.Post(url, observabilityRequest);
-      
+
       // Convert response to old format for backward compatibility
       const convertedData = convertObservabilityResponse(
         response.data as ObservabilityMetricsResponse,
         params.metrics,
         params.filter_by
       );
-      
+
       set(params.metrics === 'throughput' ? { throughputCount: convertedData } : { latencyCount: convertedData });
       successToast(response.message);
     } catch (error) {
@@ -121,14 +121,14 @@ export const useCharts = create<
       // Convert old params to new observability format
       const observabilityRequest = convertToObservabilityRequest({ ...params, to_date });
       const response: any = await AppRequest.Post(url, observabilityRequest);
-      
+
       // Convert response to old format for backward compatibility
       const convertedData = convertObservabilityResponse(
         response.data as ObservabilityMetricsResponse,
         params.metrics,
         params.filter_by
       );
-      
+
       set({ totalRequests: convertedData });
       successToast(response.message);
     } catch (error) {

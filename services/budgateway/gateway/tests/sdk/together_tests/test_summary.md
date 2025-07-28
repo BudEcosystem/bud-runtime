@@ -221,7 +221,7 @@ In `tensorzero-internal/tests/e2e/openai_compatible.rs`:
 
 ### Endpoints Tested:
 - ✅ `/v1/chat/completions` - Full coverage
-- ✅ `/v1/embeddings` - Full coverage  
+- ✅ `/v1/embeddings` - Full coverage
 - ✅ `/v1/images/generations` - Full coverage
 - ✅ `/v1/audio/speech` - Full coverage
 - ❌ `/v1/audio/transcriptions` - Not supported by Together

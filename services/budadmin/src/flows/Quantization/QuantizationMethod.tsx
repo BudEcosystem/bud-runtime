@@ -16,7 +16,7 @@ import QuantizationSpecificationCard from "./QuantizationSpecificationCard";
 
 
 export default function QuantizationMethod() {
-    
+
     const { openDrawerWithStep } = useDrawer();
     const { updateQuantizationMethod, setQuantizationWorkflow, quantizationWorkflow, getQuantizationMethods, quantizationMethods, updateQuantizationAdvanced } = useDeployModel();
     const { values, form } = useContext(BudFormContext);
@@ -37,9 +37,9 @@ export default function QuantizationMethod() {
         setQuantizationWorkflow({ ...quantizationWorkflow, "method": value.name });
     }
 
-    const filteredMethods = quantizationMethods?.filter((method) => 
-        method.name.toLowerCase().includes(search.toLowerCase()) && 
-        method.hardware_support.includes(quantizationWorkflow?.hardware?.toUpperCase()) && 
+    const filteredMethods = quantizationMethods?.filter((method) =>
+        method.name.toLowerCase().includes(search.toLowerCase()) &&
+        method.hardware_support.includes(quantizationWorkflow?.hardware?.toUpperCase()) &&
         method.method_type.includes(quantizationWorkflow?.type?.toUpperCase())
     );
 
@@ -51,7 +51,7 @@ export default function QuantizationMethod() {
 
 
     const handleNext = async () => {
-        
+
         const result = await updateQuantizationMethod(quantizationWorkflow.method);
         if (!result) {
             return;
@@ -99,7 +99,7 @@ export default function QuantizationMethod() {
                         expanded
                         // expanded searchValue={""} setSearchValue={function (value: string): void {
                         //     throw new Error("Function not implemented.");
-                        // } }                    
+                        // } }
                         />
                 </div>
                 <div className="pt-[.4rem]">

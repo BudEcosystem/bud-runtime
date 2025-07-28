@@ -8,7 +8,7 @@
 - name: Store kubeconfig path as a fact
   ansible.builtin.set_fact:
     kubeconfig_path: "{{ temp_kubeconfig.path }}"
-    cacheable: no 
+    cacheable: no
 
 - name: Create a temporary kubeconfig file
   ansible.builtin.copy:

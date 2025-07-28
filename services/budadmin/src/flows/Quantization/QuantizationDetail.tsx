@@ -30,7 +30,7 @@ export default function QuantizationDetail() {
         { label: "CPU", value: "CPU" },
         { label: "GPU", value: "CUDA" },
         ];
-    
+
     const handleNext = async () => {
         form.submit();
 

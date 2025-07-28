@@ -1,9 +1,15 @@
 import asyncio
-from pyppeteer import launch
 import json
+
+from pyppeteer import launch
 
 
 async def get_vlm_leaderboard():
+    """Fetch leaderboard data from VLM.
+
+    Returns:
+        Extracted leaderboard data from VLM website.
+    """
     browser = await launch(headless=True, args=["--no-sandbox"])
     page = await browser.newPage()
     await page.goto(

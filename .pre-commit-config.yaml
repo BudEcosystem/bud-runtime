@@ -1,0 +1,155 @@
+repos:
+  # General file checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: check-added-large-files
+        args: ["--maxkb=1024"]
+      - id: check-case-conflict
+      - id: check-executables-have-shebangs
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-symlinks
+      - id: check-toml
+      - id: check-vcs-permalinks
+        exclude: |
+          (?x)^(
+              services/budadmin/public/login_files/.*|
+              node_modules/.*
+          )$
+      - id: check-xml
+      - id: check-yaml
+        exclude: |
+          (?x)^(
+              infra/helm/.*\.yaml|
+              services/.*/charts/.*/templates/.*\.yaml|
+              services/.*/examples/.*/templates/.*\.yaml|
+              .*\.minijinja$
+          )$
+      - id: detect-private-key
+        exclude: |
+          (?x)^(
+              services/budcluster/crypto-keys/.*\.pem|
+              services/budgateway/docs/.*\.md|
+              services/budgateway/CLAUDE\.md|
+              services/budgateway/ci/dummy-gcp-credentials\.json|
+              services/budgateway/tensorzero-internal/src/inference/providers/gcp_vertex_gemini\.rs|
+              \.env\.sample
+          )$
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+
+  # Python linting and formatting (for all Python services)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    # Ruff version.
+    rev: v0.12.2
+    hooks:
+      # Run the linter.
+      - id: ruff
+        types_or: [python, pyi, jupyter]
+        args: [--fix]
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    # Ruff version.
+    rev: v0.12.2
+    hooks:
+      # Run the formatter.
+      - id: ruff-format
+        types_or: [python, pyi, jupyter]
+
+  # Python type checking (MyPy)
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.11.0
+    hooks:
+      - id: mypy
+        types_or: [python, pyi]
+        files: ^services/(budapp|budcluster|budsim|budmodel|budmetrics|budnotify|ask-bud)/
+        exclude: ^services/.*/(setup\.py|tests/conftest\.py)$
+        additional_dependencies:
+          - "pydantic>=1.10.4"
+          - ujson
+          - types-ujson
+          - fastapi
+          - sqlalchemy
+        args: [--ignore-missing-imports]
+
+  # Rust formatting and linting (for budgateway)
+  - repo: local
+    hooks:
+      - id: cargo-fmt
+        name: cargo fmt
+        entry: bash -c 'cd services/budgateway && cargo +nightly fmt -- --check || cargo fmt -- --check'
+        language: system
+        types: [rust]
+        files: ^services/budgateway/
+        pass_filenames: false
+
+      - id: cargo-clippy
+        name: cargo clippy
+        entry: bash -c 'cd services/budgateway && cargo +nightly clippy --all-targets --all-features -- -D warnings || cargo clippy --all-targets --all-features -- -D warnings'
+        language: system
+        types: [rust]
+        files: ^services/budgateway/
+        pass_filenames: false
+
+      - id: cargo-deny
+        name: cargo deny
+        entry: bash -c 'cd services/budgateway && cargo +nightly deny check || cargo deny check'
+        language: system
+        types: [rust]
+        files: ^services/budgateway/
+        pass_filenames: false
+
+  # TypeScript/JavaScript linting and formatting (for budadmin and budplayground)
+  - repo: local
+    hooks:
+      - id: budadmin-lint
+        name: budadmin lint
+        entry: bash -c 'cd services/budadmin && npm run lint'
+        language: system
+        types_or: [javascript, jsx, ts, tsx]
+        files: ^services/budadmin/(src|pages)/
+        pass_filenames: false
+
+      - id: budplayground-lint
+        name: budplayground lint
+        entry: bash -c 'cd services/budplayground && npm run lint'
+        language: system
+        types_or: [javascript, jsx, ts, tsx]
+        files: ^services/budplayground/(app|components|lib)/
+        pass_filenames: false
+
+      - id: budadmin-typecheck
+        name: budadmin typecheck
+        entry: bash -c 'cd services/budadmin && npx tsc --noEmit'
+        language: system
+        types_or: [ts, tsx]
+        files: ^services/budadmin/(src|pages)/
+        pass_filenames: false
+
+      - id: budplayground-typecheck
+        name: budplayground typecheck
+        entry: bash -c 'cd services/budplayground && npx tsc --noEmit'
+        language: system
+        types_or: [ts, tsx]
+        files: ^services/budplayground/(app|components|lib)/
+        pass_filenames: false
+
+  # Commit message linting
+  - repo: https://github.com/alessandrojcm/commitlint-pre-commit-hook
+    rev: v9.16.0
+    hooks:
+      - id: commitlint
+        stages: [commit-msg]
+        additional_dependencies: ['@commitlint/config-conventional']
+        args: ['--config', '.commitlintrc.js']
+
+  # Python security scanning
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.10
+    hooks:
+      - id: bandit
+        args: [-r, -ll]
+        files: ^services/(budapp|budcluster|budsim|budmodel|budmetrics|budnotify|ask-bud)/.*\.py$
+
+
+default_stages: [pre-commit]

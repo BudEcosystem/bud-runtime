@@ -23,7 +23,6 @@ from budmicroframe.commons.schemas import ErrorResponse
 from fastapi import APIRouter, Query, Response, status
 from fastapi.exceptions import HTTPException
 
-from ..commons.constants import LEADERBOARD_FIELDS
 from .schemas import LeaderboardListResponse, LeaderboardModelCompareResponse, LeaderboardModelUrisListResponse
 from .services import LeaderboardService
 from .workflows import LeaderboardCronWorkflows  # noqa: F401
@@ -117,7 +116,7 @@ async def get_leaderboard_by_models(
 async def get_leaderboard_by_model_uris(
     model_uris: Annotated[
         List[str] | None, Query(..., description="List of model URIs to filter by", default_factory=list)
-    ] = None
+    ] = None,
 ) -> Response:
     """Get the leaderboards for the given model URIs.
 

@@ -172,5 +172,3 @@ const EvalBarChart: React.FC<BarChartProps> = ({ data }) => {
 };
 
 export default EvalBarChart;
-
-

@@ -1,11 +1,14 @@
-API_KEY = "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"
+import os
 
 import requests
-import json
+
+
+API_KEY = os.getenv("PERPLEXITY_API_KEY")
 
 
 # Function to call Perplexity's chat completion API to extract leaderboard data
 def fetch_data_from_perplexity(api_key, website_url):
+    """Fetch data from Perplexity API."""
     api_endpoint = "https://api.perplexity.ai/v1/chat/completions"
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
 
@@ -38,6 +41,7 @@ def fetch_data_from_perplexity(api_key, website_url):
 
 # Main function to get leaderboard data from multiple URLs
 def get_leaderboard_data(api_key):
+    """Get leaderboard data from multiple URLs."""
     websites = [
         "https://huggingface.co/spaces/mteb/leaderboard",
         # "https://huggingface.co/spaces/lmsys/chatbot-arena-leaderboard",

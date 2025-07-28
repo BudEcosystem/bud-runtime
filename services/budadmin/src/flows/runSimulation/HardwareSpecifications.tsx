@@ -106,7 +106,7 @@ export default function HardwareSpecifications() {
               formItemClassnames="mb-[1.25rem]"
               infoText={'Enter Memory Bandwidth'}
             />
-            
+
             <TextInput
               name="ICNBandwidth"
               label={'ICN Bandwidth'}

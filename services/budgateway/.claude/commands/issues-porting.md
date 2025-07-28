@@ -7,7 +7,7 @@
 - New issues automatically get the `needs-triage` label
 - Community members should use GitHub Discussions for:
   - **Feature requests**: https://github.com/tensorzero/tensorzero/discussions/new?category=feature-requests
-  - **Bug reports**: https://github.com/tensorzero/tensorzero/discussions/new?category=bug-reports  
+  - **Bug reports**: https://github.com/tensorzero/tensorzero/discussions/new?category=bug-reports
   - **Help/Questions**: https://github.com/tensorzero/tensorzero/discussions/new?category=help
 
 ### Code Contributions

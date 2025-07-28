@@ -16,11 +16,11 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "preserve",
-    "baseUrl": ".", // This tells TypeScript to use this directory as the base for non-relative module names
+    "baseUrl": ".",
     "paths": {
       "@/lib/*": [
         "src/lib/*"
-      ], // Maps `@/lib/*` imports to `src/lib/*`
+      ],
       "@/components/*": [
         "src/components/*"
       ],

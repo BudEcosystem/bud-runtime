@@ -6,7 +6,7 @@
 
   vars_files:
     - vars/common.yaml
-    
+
   roles:
     - create_kubeconfig
 
@@ -24,7 +24,7 @@
       fail:
         msg: "Namespace '{{ namespace }}' does not exist"
       when: namespace_info.resources | length == 0
-    
+
     - name: Get Job status from Kubernetes
       kubernetes.core.k8s_info:
         api_version: batch/v1
@@ -39,7 +39,7 @@
     - name: Extract Job status
       set_fact:
         job_data: "{{ job_status.resources[0].status }}"
-      
+
     - name: Get quantization status from ConfigMap
       kubernetes.core.k8s_info:
         api_version: v1
@@ -54,5 +54,3 @@
     - name: Extract quantization data
       set_fact:
         quantization_data: "{{ quantization_status_configmap.resources[0].data }}"
-
-    

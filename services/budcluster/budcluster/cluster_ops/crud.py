@@ -93,6 +93,18 @@ class ClusterDataManager(BaseDataManager):
         if db_cluster:
             await self.delete_one(db_cluster)
 
+    async def get_all_clusters_by_status(self, statuses: List) -> List[ClusterModel]:
+        """Get all clusters by status list.
+
+        Args:
+            statuses: List of cluster statuses to filter by
+
+        Returns:
+            List of clusters matching the given statuses
+        """
+        stmt = select(ClusterModel).filter(ClusterModel.status.in_(statuses))
+        return await self.get_all(stmt)
+
 
 class ClusterNodeInfoDataManager(BaseDataManager):
     """Cluster node info data manager class responsible for operations over database."""

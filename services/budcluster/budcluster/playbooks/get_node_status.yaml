@@ -6,7 +6,7 @@
 
   vars_files:
     - vars/common.yaml
-    
+
   roles:
     - create_kubeconfig
 
@@ -25,11 +25,11 @@
       set_fact:
         node_status: >-
           {{
-            (node_info.resources[0].status.conditions | 
-            selectattr('type', 'equalto', 'Ready') | 
+            (node_info.resources[0].status.conditions |
+            selectattr('type', 'equalto', 'Ready') |
             map(attribute='status') | first == 'True')
-            | ternary('Ready', 
-              (node_info.resources[0].spec.unschedulable | default(false)) | 
+            | ternary('Ready',
+              (node_info.resources[0].spec.unschedulable | default(false)) |
               ternary('SchedulingDisabled', 'NotReady')
             )
           }}

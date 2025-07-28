@@ -58,7 +58,7 @@ The Azure provider in TensorZero supports all endpoint types:
 
 ### ✅ Audio Processing
 - **Transcription**: Convert audio to text
-- **Translation**: Convert non-English audio to English text  
+- **Translation**: Convert non-English audio to English text
 - **Text-to-Speech**: Generate audio from text
 - Multiple voices and response formats
 - Language specification and temperature control
@@ -87,7 +87,7 @@ api_key_location = { env = "AZURE_OPENAI_API_KEY" }
 
 # Azure embedding model
 [models."text-embedding-ada-002-azure"]
-routing = ["azure"]  
+routing = ["azure"]
 endpoints = ["embedding"]
 
 [models."text-embedding-ada-002-azure".providers.azure]

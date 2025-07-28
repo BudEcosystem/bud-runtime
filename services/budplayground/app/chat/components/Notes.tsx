@@ -85,13 +85,13 @@ export default function Notes({chatId}: {chatId: string}) {
     return (
         <div onScroll={handleScroll} className="px-[.5rem]">
           {notes?.map((note: any) => (
-            <NoteItem note={note} />
+            <NoteItem key={note.id || `note-${notes.indexOf(note)}`} note={note} />
           ))}
           <Button
             onClick={() => {
               createNote();
             }}
-            icon={<Image src="icons/plus.svg" preview={false} />}
+            icon={<Image src="icons/plus.svg" alt="Add note" preview={false} />}
             className="flex items-center justify-center w-full h-[2rem] bg-[#D1B854] text-[#101010] text-[.75rem] font-[400] rounded-[6px]"
             type="primary"
           >

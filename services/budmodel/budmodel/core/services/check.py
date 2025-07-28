@@ -1,13 +1,12 @@
 import asyncio
-import re
-from bs4 import BeautifulSoup
+
 from crawl4ai import AsyncWebCrawler
+from crawl4ai.async_crawler_strategy import AsyncPlaywrightCrawlerStrategy
 from crawl4ai.extraction_strategy import LLMExtractionStrategy
 from pydantic import BaseModel, Field
-from crawl4ai.chunking_strategy import RegexChunking
-from crawl4ai.async_crawler_strategy import AsyncPlaywrightCrawlerStrategy
 
 from budmodel.commons.config import get_secrets_config
+
 
 # Get API key from configuration
 secrets = get_secrets_config()
@@ -97,16 +96,8 @@ class OpenAIModelFee(BaseModel):
 
 
 async def crawl_huggingface_leaderboard():
+    """Crawl the Hugging Face leaderboard for model data."""
     print("here_______")
-    # JavaScript to click a "Load More" button if present
-    js_code = """
-    const loadMoreButton = Array.from(document.querySelectorAll('button')).find(button => button.textContent.includes('Load More'));
-    if (loadMoreButton) {
-        loadMoreButton.click();
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds for content to load
-    }
-    """
-
     # Wait function to ensure necessary content is loaded on the page
     wait_for = """
     () => {
