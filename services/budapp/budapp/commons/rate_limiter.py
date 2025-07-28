@@ -19,6 +19,7 @@
 from functools import wraps
 from typing import Callable, Optional
 
+import redis.asyncio as aioredis
 from fastapi import HTTPException, Request, status
 
 from ..shared.redis_service import RedisService
