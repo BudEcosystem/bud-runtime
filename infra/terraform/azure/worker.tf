@@ -101,9 +101,9 @@ resource "azurerm_linux_virtual_machine" "worker" {
   }
 
   source_image_reference {
-    publisher = "Microsoft-DSVM"
-    offer     = "Ubuntu-HPC"
-    sku       = "2204-rocm"
+    publisher = "Canonical"
+    offer     = "ubuntu-24_04-lts"
+    sku       = "server"
     version   = "latest"
   }
 }
