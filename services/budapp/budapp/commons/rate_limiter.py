@@ -108,9 +108,11 @@ class RateLimiter:
         
         except HTTPException:
             raise
+        except aioredis.RedisError as e:
+            logger.error(f"Rate limiting Redis error for key {key}: {e}")
         except Exception as e:
             # Log error but don't block request if Redis fails
-            logger.error(f"Rate limiting error: {e}")
+            logger.error(f"Unexpected rate limiting error for key {key}: {e}")
 
 
 def rate_limit(max_requests: int, window_seconds: int, use_user_id: bool = False):
@@ -154,8 +156,12 @@ def rate_limit(max_requests: int, window_seconds: int, use_user_id: bool = False
             
             if not request:
                 # If no request object found, skip rate limiting
-                logger.warning(f"No request object found for rate limiting in {func.__name__}")
-                return await func(*args, **kwargs)
+                logger.error(f"No request object found for rate limiting in {func.__name__}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Request object missing for rate limiting.",
+                )
+                #return await func(*args, **kwargs)
             
             logger.debug(f"Request found, proceeding with rate limiting")
             
