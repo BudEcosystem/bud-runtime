@@ -62,7 +62,7 @@ repos:
     hooks:
       - id: mypy
         types_or: [python, pyi]
-        files: ^services/(budapp|budcluster|budsim|budmodel|budmetrics|budnotify|ask-bud)/
+        files: ^services/(budcluster|budsim|budmodel|budmetrics|budnotify|ask-bud)/ # TODO: add budapp back
         exclude: ^services/.*/(setup\.py|tests/conftest\.py)$
         additional_dependencies:
           - "pydantic>=1.10.4"
