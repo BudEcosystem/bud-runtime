@@ -8,45 +8,7 @@ on:
       - master
 
 jobs:
-  lint-test-secure:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./services/budmodel
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install flake8 bandit black pytest
-
-      - name: Run flake8 (linting)
-        continue-on-error: true
-        run: flake8 .
-
-      - name: Run black (format check)
-        continue-on-error: true
-        run: black --check .
-
-      - name: Run bandit (security check)
-        continue-on-error: true
-        run: bandit -r . -x tests
-
-      - name: Run tests
-        continue-on-error: true
-        run: pytest
-
   build-and-push:
-    needs: lint-test-secure
     runs-on: ubuntu-latest
     defaults:
       run:

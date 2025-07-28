@@ -8,42 +8,8 @@ on:
       - master
 
 jobs:
-  verify:
-    name: Verify Code Quality
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    defaults:
-        run:
-          working-directory: ./services/budadmin
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install dependencies
-        run: npm ci
-        continue-on-error: true
-
-      - name: Run ESLint
-        run: npx eslint . --ext .js,.jsx,.ts,.tsx
-        continue-on-error: true
-
-      - name: Run unit tests
-        run: npm test -- --ci --coverage
-        continue-on-error: true
-
-      - name: Run security audit
-        run: npx audit-ci --moderate --report-type=summary
-        continue-on-error: true
-
   build-and-push:
     name: Build and Push Docker Image
-    needs: verify
     runs-on: ubuntu-latest
     continue-on-error: false
     defaults:

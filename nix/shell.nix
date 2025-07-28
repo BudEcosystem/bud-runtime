@@ -10,15 +10,19 @@
   kubectl,
   kubernetes-helm,
   helm-ls,
-  yaml-language-server,
   openssl,
+
+  yaml-language-server,
+  nodejs,
 
   terraform-ls,
   opentofu,
   azure-cli,
+  jq, # nixos-anywhere terraform module
+
   shfmt,
   bash-language-server,
-  jq, # nixos-anywhere terraform module
+  pre-commit,
 }:
 
 mkShell {
@@ -38,6 +42,8 @@ mkShell {
     shfmt
     bash-language-server
     jq
+    pre-commit
+    nodejs
   ];
 
   shellHook = ''

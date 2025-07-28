@@ -204,6 +204,9 @@ jobs:
   pr-status:
     name: PR Review Status
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./services/budapp
     needs: [security, test, dependency-check]
     if: always()
 
