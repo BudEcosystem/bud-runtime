@@ -1,12 +1,19 @@
-name: Build and Push Docker Image on Release
+name: "BudSim: Build and Push Nightly Docker Image"
 
 on:
-  release:
-    types: [created]
+  push:
+    paths:
+      - 'services/budsim/**'
+    branches:
+      - master
 
 jobs:
   lint-test-secure:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./services/budsim
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -41,9 +48,12 @@ jobs:
   build-and-push:
     needs: lint-test-secure
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./services/budsim
 
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
@@ -55,17 +65,10 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Extract tag name
-        id: extract_tag
-        run: |
-          RAW_TAG=${GITHUB_REF#refs/tags/}
-          CLEAN_TAG=${RAW_TAG#v}
-          echo "RELEASE_TAG=$CLEAN_TAG" >> $GITHUB_ENV
-
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
           file: ./deploy/Dockerfile
-          tags: budstudio/budmetrics:${{ env.RELEASE_TAG }}
+          tags: budstudio/budsim:nightly

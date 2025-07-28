@@ -1,12 +1,17 @@
-name: Build and Push Nightly Docker Image
+name: "BudCluster: Build and Push Nightly Docker Image"
 
 on:
   push:
+    paths:
+      - 'services/budcluster/**'
     branches:
-      - main
+      - master
 
 jobs:
   lint-test-secure:
+    defaults:
+      run:
+        working-directory: ./services/budcluster
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -42,6 +47,9 @@ jobs:
   build-and-push:
     needs: lint-test-secure
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./services/budcluster
 
     steps:
       - name: Checkout code
@@ -62,4 +70,4 @@ jobs:
           context: .
           push: true
           file: ./deploy/Dockerfile
-          tags: budstudio/budsim:nightly
+          tags: budstudio/budcluster:nightly

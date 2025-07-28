@@ -1,4 +1,4 @@
-name: Build and Push Docker Image on Release
+name: "BudCluster: Build and Push Docker Image on Release"
 
 on:
   release:
@@ -7,6 +7,9 @@ on:
 jobs:
   lint-test-secure:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./services/budcluster
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -41,6 +44,9 @@ jobs:
   build-and-push:
     needs: lint-test-secure
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./services/budcluster
 
     steps:
       - name: Checkout repository

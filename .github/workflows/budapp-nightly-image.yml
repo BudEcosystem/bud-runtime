@@ -11,8 +11,8 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     defaults:
-          run:
-            working-directory: ./services/budapp
+      run:
+        working-directory: ./services/budapp
 
     steps:
       - name: Checkout code
@@ -42,5 +42,5 @@ jobs:
         with:
           context: .
           push: true
-          file: ./services/budapp/deploy/Dockerfile
+          file: ./deploy/Dockerfile
           tags: budstudio/budapp:nightly

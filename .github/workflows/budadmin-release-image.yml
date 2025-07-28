@@ -10,8 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     defaults:
-          run:
-            working-directory: ./services/budadmin
+      run:
+        working-directory: ./services/budadmin
 
     steps:
       - name: Checkout code
@@ -40,6 +40,9 @@ jobs:
   build-and-push:
     needs: lint-test-secure
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./services/budadmin
 
     steps:
       - name: Checkout repository
@@ -66,5 +69,5 @@ jobs:
         with:
           context: .
           push: true
-          file: ./services/budadmin/Dockerfile
+          file: ./Dockerfile
           tags: budstudio/bud-dashboard:${{ env.RELEASE_TAG }}
