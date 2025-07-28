@@ -566,15 +566,16 @@ class PublicationHistoryDataManager(DataManagerUtils):
         count = self.execute_scalar(count_stmt)
 
         # Main query with user details
+        # Main query with user details
         stmt = (
             select(PublicationHistoryModel)
+            .options(joinedload(PublicationHistoryModel.performed_by_user))
             .filter(PublicationHistoryModel.deployment_id == deployment_id)
             .order_by(desc(PublicationHistoryModel.performed_at))
             .limit(limit)
             .offset(offset)
         )
         result = self.scalars_all(stmt)
-
         return result, count
 
 
