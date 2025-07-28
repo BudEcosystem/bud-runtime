@@ -1,15 +1,15 @@
 # 🥷 BudPrompt
 
 
-BudPrompt is a cloud service designed to complement and manage Bud inference runtimes deployed on customer infrastructure. It provides a central hub for compatibility validation of models and engine versions, acting as a registry and sync point for validated updates.
+A full-featured platform for designing, testing, comparing, and deploying LLM prompts — including support for tools (MCPs), structured output, prompt versioning, analytics, and scaling.
 
 
 ### Steps to Setup Development environment
 
 1.Clone the Repository:
 ```bash
-git clone https://github.com/BudEcosystem/bud-serve-budsim
-cd bud-serve-budsim
+git clone https://github.com/BudEcosystem/bud-serve-prompt
+cd bud-serve-prompt
 ```
 2.Set environment variables:
 ```bash
@@ -19,7 +19,7 @@ cp .env.sample .env
 
 Use the following command to bring up all the services, including Dapr:
 ```bash
-cd bud-serve-budsim
+cd bud-serve-prompt
 
 ./deploy/start_dev.sh
 ```
@@ -29,12 +29,12 @@ cd bud-serve-budsim
 
 1.Clone the Repository:
 ```bash
-git clone https://github.com/BudEcosystem/bud-serve-budsim
-cd bud-serve-budsim
+git clone https://github.com/BudEcosystem/bud-serve-prompt
+cd bud-serve-prompt
 ```
 2.Run Helm chart
 ```bash
-helm install bud-serve-budsim ./deploy/helm -n bud-serve-budsim --create-namespace
+helm install bud-serve-prompt ./deploy/helm -n bud-serve-prompt --create-namespace
 ```
 
 ### Steps to run migrations

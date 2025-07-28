@@ -4,10 +4,10 @@ metadata:
   name: pubsub-subscription
   namespace: development
 spec:
-  topic: budSimMessages
+  topic: budPromptMessages
   routes:
     default: /notifications
   pubsubname: pubsub-redis
   deadLetterTopic: poisonMessages
 scopes:
-  - budsim
+  - budprompt
