@@ -16,7 +16,7 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, List, Optional, Union
+from typing import Any, List, Literal, Optional, Union
 from uuid import UUID
 
 from pydantic import UUID4, BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -57,6 +57,7 @@ class EndpointFilter(BaseModel):
 
     name: str | None = None
     status: EndpointStatusEnum | None = None
+    is_published: Optional[bool] = None
 
 
 class EndpointResponse(BaseModel):
@@ -86,6 +87,10 @@ class EndpointListResponse(BaseModel):
     modified_at: datetime
     is_deprecated: bool
     supported_endpoints: list[ModelEndpointEnum]
+    # Publication fields
+    is_published: bool
+    published_date: Optional[datetime] = None
+    published_by: Optional[UUID4] = None
 
 
 class EndpointPaginatedResponse(PaginatedSuccessResponse):
@@ -543,3 +548,51 @@ class UpdateDeploymentSettingsRequest(BaseModel):
     rate_limits: Optional[RateLimitConfig] = None
     retry_config: Optional[RetryConfig] = None
     fallback_config: Optional[FallbackConfig] = None
+
+
+# Publication schemas
+
+
+class UpdatePublicationStatusRequest(BaseModel):
+    """Request schema for updating publication status (publish/unpublish)."""
+
+    action: Literal["publish", "unpublish"]
+    metadata: Optional[dict] = None
+
+
+class PublicationHistoryEntry(BaseModel):
+    """Schema for a single publication history entry."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID4
+    deployment_id: UUID4
+    action: str
+    performed_by: UUID4
+    performed_at: datetime
+    metadata: Optional[dict] = None
+    previous_state: Optional[dict] = None
+    new_state: Optional[dict] = None
+    created_at: datetime
+    modified_at: datetime
+    # Include user details
+    performed_by_user: Optional[dict] = None
+
+
+class PublicationHistoryResponse(PaginatedSuccessResponse):
+    """Response schema for publication history endpoint."""
+
+    history: list[PublicationHistoryEntry] = []
+    object: str = "endpoint.publication_history"
+
+
+class PublishEndpointResponse(SuccessResponse):
+    """Response schema for publish endpoint operations."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    endpoint_id: UUID4
+    is_published: bool
+    published_date: Optional[datetime] = None
+    published_by: Optional[UUID4] = None
+    object: str = "endpoint.publish"

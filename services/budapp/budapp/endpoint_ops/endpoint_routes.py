@@ -47,7 +47,10 @@ from .schemas import (
     EndpointFilter,
     EndpointPaginatedResponse,
     ModelClusterDetailResponse,
+    PublicationHistoryResponse,
+    PublishEndpointResponse,
     UpdateDeploymentSettingsRequest,
+    UpdatePublicationStatusRequest,
     WorkerDetailResponse,
     WorkerInfoFilter,
     WorkerInfoResponse,
@@ -78,7 +81,7 @@ endpoint_router = APIRouter(prefix="/endpoints", tags=["endpoint"])
             "description": "Successfully list all endpoints",
         },
     },
-    description="List all endpoints. \n\n order_by fields are: name, status, created_at, modified_at, cluster_name, model_name, modality",
+    description="List all endpoints. \n\n order_by fields are: name, status, created_at, modified_at, cluster_name, model_name, modality, is_published, published_date",
 )
 @require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
 async def list_all_endpoints(
@@ -634,6 +637,108 @@ async def delete_adapter_from_endpoint(
         logger.exception(f"Failed to delete adapter from endpoint: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to delete adapter from endpoint"
+        ).to_http_response()
+
+
+@endpoint_router.put(
+    "/{endpoint_id}/publish",
+    responses={
+        status.HTTP_200_OK: {
+            "model": PublishEndpointResponse,
+            "description": "Successfully updated publication status",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Invalid request or action",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Endpoint not found",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Failed to update publication status",
+        },
+    },
+    description="Update publication status of an endpoint (publish/unpublish)",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
+async def update_publication_status(
+    endpoint_id: UUID,
+    request: UpdatePublicationStatusRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    x_resource_type: Annotated[Optional[str], Header()] = None,
+    x_entity_id: Annotated[Optional[str], Header()] = None,
+) -> Union[PublishEndpointResponse, ErrorResponse]:
+    """Update publication status of an endpoint (publish/unpublish)."""
+    try:
+        endpoint = await EndpointService(session).update_publication_status(
+            endpoint_id=endpoint_id,
+            action=request.action,
+            current_user_id=current_user.id,
+            metadata=request.metadata,
+        )
+        return PublishEndpointResponse(
+            endpoint_id=endpoint.id,
+            is_published=endpoint.is_published,
+            published_date=endpoint.published_date,
+            published_by=endpoint.published_by,
+            message=f"Endpoint {request.action}ed successfully",
+        ).to_http_response()
+    except ClientException as e:
+        logger.exception(f"Failed to update publication status: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to update publication status: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to update publication status"
+        ).to_http_response()
+
+
+@endpoint_router.get(
+    "/{endpoint_id}/publication-history",
+    responses={
+        status.HTTP_200_OK: {
+            "model": PublicationHistoryResponse,
+            "description": "Successfully retrieved publication history",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Endpoint not found",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Failed to get publication history",
+        },
+    },
+    description="Get publication history for an endpoint",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
+async def get_publication_history(
+    endpoint_id: UUID,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    x_resource_type: Annotated[Optional[str], Header()] = None,
+    x_entity_id: Annotated[Optional[str], Header()] = None,
+) -> Union[PublicationHistoryResponse, ErrorResponse]:
+    """Get publication history for an endpoint."""
+    try:
+        result = await EndpointService(session).get_publication_history(
+            endpoint_id=endpoint_id,
+            page=page,
+            limit=limit,
+        )
+        return PublicationHistoryResponse(**result).to_http_response()
+    except ClientException as e:
+        logger.exception(f"Failed to get publication history: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to get publication history: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get publication history"
         ).to_http_response()
 
 

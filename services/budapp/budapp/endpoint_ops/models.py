@@ -17,7 +17,7 @@
 """The endpoint ops package, containing essential business logic, services, and routing configurations for the endpoint ops."""
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 from uuid import UUID, uuid4
 
@@ -79,6 +79,10 @@ class Endpoint(Base, TimestampMixin):
         ),
         nullable=False,
     )
+    # Publication fields
+    is_published: Mapped[bool] = mapped_column(Boolean, default=False)
+    published_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    published_by: Mapped[Optional[UUID]] = mapped_column(ForeignKey("user.id"), nullable=True)
 
     model: Mapped[Model] = relationship("Model", back_populates="endpoints", foreign_keys=[model_id])
     # worker: Mapped[Worker] = relationship(
@@ -98,6 +102,13 @@ class Endpoint(Base, TimestampMixin):
     routers: Mapped[list["RouterEndpoint"]] = relationship(
         "RouterEndpoint",
         back_populates="endpoint",
+    )
+    # Publication relationships
+    published_user: Mapped[Optional["User"]] = relationship(
+        "User", back_populates="published_endpoints", foreign_keys=[published_by]
+    )
+    publication_history: Mapped[list["PublicationHistory"]] = relationship(
+        "PublicationHistory", back_populates="endpoint", cascade="all, delete-orphan"
     )
 
     @hybrid_property
@@ -199,3 +210,44 @@ class Adapter(Base, TimestampMixin):
             created_at=datetime.fromisoformat(data.get("created_at")),
             modified_at=datetime.fromisoformat(data.get("modified_at")),
         )
+
+
+class PublicationHistory(Base, TimestampMixin):
+    """Publication history model for tracking publish/unpublish actions on endpoints."""
+
+    __tablename__ = "publication_history"
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    deployment_id: Mapped[UUID] = mapped_column(ForeignKey("endpoint.id", ondelete="CASCADE"), nullable=False)
+    action: Mapped[str] = mapped_column(String(20), nullable=False)  # "publish" or "unpublish"
+    performed_by: Mapped[UUID] = mapped_column(ForeignKey("user.id"), nullable=False)
+    performed_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=lambda: datetime.now(timezone.utc)
+    )
+    metadata: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    previous_state: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    new_state: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+
+    # Relationships
+    endpoint: Mapped[Endpoint] = relationship(
+        "Endpoint", back_populates="publication_history", foreign_keys=[deployment_id]
+    )
+    performed_by_user: Mapped["User"] = relationship("User", foreign_keys=[performed_by])
+
+    def to_dict(self):
+        """Convert the PublicationHistory instance to a dictionary.
+
+        Returns:
+            dict: A dictionary representation of the PublicationHistory instance.
+        """
+        return {
+            "id": str(self.id),
+            "deployment_id": str(self.deployment_id),
+            "action": self.action,
+            "performed_by": str(self.performed_by),
+            "performed_at": self.performed_at.isoformat(),
+            "metadata": self.metadata,
+            "previous_state": self.previous_state,
+            "new_state": self.new_state,
+            "created_at": self.created_at.isoformat(),
+            "modified_at": self.modified_at.isoformat(),
+        }
