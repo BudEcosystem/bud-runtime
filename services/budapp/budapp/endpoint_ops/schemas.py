@@ -553,6 +553,14 @@ class UpdateDeploymentSettingsRequest(BaseModel):
 # Publication schemas
 
 
+class UserSummary(BaseModel):
+    """Summary schema for user details in publication history."""
+
+    id: UUID4
+    email: str
+    name: str
+
+
 class UpdatePublicationStatusRequest(BaseModel):
     """Request schema for updating publication status (publish/unpublish)."""
 
@@ -576,7 +584,7 @@ class PublicationHistoryEntry(BaseModel):
     created_at: datetime
     modified_at: datetime
     # Include user details
-    performed_by_user: Optional[dict] = None
+    performed_by_user: Optional[UserSummary] = None
 
 
 class PublicationHistoryResponse(PaginatedSuccessResponse):

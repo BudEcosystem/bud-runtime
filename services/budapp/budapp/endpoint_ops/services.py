@@ -62,7 +62,6 @@ from ..model_ops.models import Provider as ProviderModel
 from ..model_ops.services import ModelServiceUtil
 from ..shared.notification_service import BudNotifyService, NotificationBuilder
 from ..shared.redis_service import RedisService
-from ..user_ops.crud import UserDataManager
 from ..user_ops.models import User as UserModel
 from ..workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
 from ..workflow_ops.models import Workflow as WorkflowModel
@@ -2737,17 +2736,7 @@ class EndpointService(SessionMixin):
             limit=limit,
         )
 
-        # Add user details to each entry
-        for entry in history_entries:
-            user = await UserDataManager(self.session).retrieve_by_fields(
-                UserModel, {"id": entry.performed_by}, missing_ok=True
-            )
-            if user:
-                entry.performed_by_user = {
-                    "id": str(user.id),
-                    "email": user.email,
-                    "name": user.name,
-                }
+        # User details are already loaded via eager loading (joinedload)
 
         return {
             "history": history_entries,
