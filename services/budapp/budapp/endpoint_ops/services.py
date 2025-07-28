@@ -2654,10 +2654,10 @@ class EndpointService(SessionMixin):
             return endpoint
 
         # For publish action, check if endpoint is in valid state
-        if action == "publish" and endpoint.status not in [EndpointStatusEnum.RUNNING, EndpointStatusEnum.UNHEALTHY]:
+        if action == "publish" and endpoint.status != EndpointStatusEnum.RUNNING:
             raise ClientException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                message=f"Cannot publish endpoint in {endpoint.status} state. Endpoint must be running or unhealthy.",
+                message=f"Cannot publish endpoint in {endpoint.status} state. Endpoint must be in RUNNING state to be published.",
             )
 
         # Capture previous state for history

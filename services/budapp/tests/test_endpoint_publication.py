@@ -456,3 +456,269 @@ class TestEndpointPublicationSchemas:
         assert entry.action == "publish"
         assert entry.metadata["reason"] == "Test"
         assert entry.performed_by_user["email"] == "test@example.com"
+
+    @pytest.mark.asyncio
+    async def test_publish_already_published_endpoint(self, mock_session, mock_user):
+        """Test publishing an already published endpoint (idempotent operation)."""
+        # Arrange
+        service = EndpointService(mock_session)
+        endpoint_id = uuid4()
+
+        # Create already published endpoint
+        published_endpoint = Mock(spec=EndpointModel)
+        published_endpoint.id = endpoint_id
+        published_endpoint.name = "Already Published Endpoint"
+        published_endpoint.status = EndpointStatusEnum.RUNNING
+        published_endpoint.is_published = True
+        published_endpoint.published_date = datetime.now(timezone.utc)
+        published_endpoint.published_by = uuid4()
+
+        with patch.object(EndpointDataManager, 'retrieve_by_fields', new_callable=AsyncMock) as mock_retrieve:
+            mock_retrieve.return_value = published_endpoint
+
+            # Act
+            result = await service.update_publication_status(
+                endpoint_id=endpoint_id,
+                action="publish",
+                current_user_id=mock_user.id,
+                metadata={"reason": "Attempting to republish"}
+            )
+
+            # Assert - should return without error (idempotent)
+            assert result.is_published is True
+            assert result == published_endpoint
+
+    @pytest.mark.asyncio
+    async def test_unpublish_already_unpublished_endpoint(self, mock_session, mock_user):
+        """Test unpublishing an already unpublished endpoint (idempotent operation)."""
+        # Arrange
+        service = EndpointService(mock_session)
+        endpoint_id = uuid4()
+
+        # Create unpublished endpoint
+        unpublished_endpoint = Mock(spec=EndpointModel)
+        unpublished_endpoint.id = endpoint_id
+        unpublished_endpoint.name = "Unpublished Endpoint"
+        unpublished_endpoint.status = EndpointStatusEnum.RUNNING
+        unpublished_endpoint.is_published = False
+        unpublished_endpoint.published_date = None
+        unpublished_endpoint.published_by = None
+
+        with patch.object(EndpointDataManager, 'retrieve_by_fields', new_callable=AsyncMock) as mock_retrieve:
+            mock_retrieve.return_value = unpublished_endpoint
+
+            # Act
+            result = await service.update_publication_status(
+                endpoint_id=endpoint_id,
+                action="unpublish",
+                current_user_id=mock_user.id,
+                metadata={"reason": "Attempting to unpublish again"}
+            )
+
+            # Assert - should return without error (idempotent)
+            assert result.is_published is False
+            assert result == unpublished_endpoint
+
+    @pytest.mark.asyncio
+    async def test_publish_endpoint_invalid_state_pending(self, mock_session, mock_user):
+        """Test publishing an endpoint in PENDING state should fail."""
+        # Arrange
+        service = EndpointService(mock_session)
+        endpoint_id = uuid4()
+
+        # Create endpoint in PENDING state
+        pending_endpoint = Mock(spec=EndpointModel)
+        pending_endpoint.id = endpoint_id
+        pending_endpoint.name = "Pending Endpoint"
+        pending_endpoint.status = EndpointStatusEnum.PENDING
+        pending_endpoint.is_published = False
+        pending_endpoint.published_date = None
+        pending_endpoint.published_by = None
+
+        with patch.object(EndpointDataManager, 'retrieve_by_fields', new_callable=AsyncMock) as mock_retrieve:
+            mock_retrieve.return_value = pending_endpoint
+
+            # Act & Assert
+            with pytest.raises(ClientException) as exc_info:
+                await service.update_publication_status(
+                    endpoint_id=endpoint_id,
+                    action="publish",
+                    current_user_id=mock_user.id,
+                    metadata={"reason": "Trying to publish pending endpoint"}
+                )
+
+            assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
+            assert "Cannot publish endpoint in PENDING state" in exc_info.value.message
+            assert "must be in RUNNING state" in exc_info.value.message
+
+    @pytest.mark.asyncio
+    async def test_publish_endpoint_invalid_state_failed(self, mock_session, mock_user):
+        """Test publishing an endpoint in FAILED state should fail."""
+        # Arrange
+        service = EndpointService(mock_session)
+        endpoint_id = uuid4()
+
+        # Create endpoint in FAILED state
+        failed_endpoint = Mock(spec=EndpointModel)
+        failed_endpoint.id = endpoint_id
+        failed_endpoint.name = "Failed Endpoint"
+        failed_endpoint.status = EndpointStatusEnum.FAILED
+        failed_endpoint.is_published = False
+        failed_endpoint.published_date = None
+        failed_endpoint.published_by = None
+
+        with patch.object(EndpointDataManager, 'retrieve_by_fields', new_callable=AsyncMock) as mock_retrieve:
+            mock_retrieve.return_value = failed_endpoint
+
+            # Act & Assert
+            with pytest.raises(ClientException) as exc_info:
+                await service.update_publication_status(
+                    endpoint_id=endpoint_id,
+                    action="publish",
+                    current_user_id=mock_user.id,
+                    metadata={"reason": "Trying to publish failed endpoint"}
+                )
+
+            assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
+            assert "Cannot publish endpoint in FAILED state" in exc_info.value.message
+            assert "must be in RUNNING state" in exc_info.value.message
+
+    @pytest.mark.asyncio
+    async def test_publish_endpoint_invalid_state_unhealthy(self, mock_session, mock_user):
+        """Test publishing an endpoint in UNHEALTHY state should fail."""
+        # Arrange
+        service = EndpointService(mock_session)
+        endpoint_id = uuid4()
+
+        # Create endpoint in UNHEALTHY state
+        unhealthy_endpoint = Mock(spec=EndpointModel)
+        unhealthy_endpoint.id = endpoint_id
+        unhealthy_endpoint.name = "Unhealthy Endpoint"
+        unhealthy_endpoint.status = EndpointStatusEnum.UNHEALTHY
+        unhealthy_endpoint.is_published = False
+        unhealthy_endpoint.published_date = None
+        unhealthy_endpoint.published_by = None
+
+        with patch.object(EndpointDataManager, 'retrieve_by_fields', new_callable=AsyncMock) as mock_retrieve:
+            mock_retrieve.return_value = unhealthy_endpoint
+
+            # Act & Assert
+            with pytest.raises(ClientException) as exc_info:
+                await service.update_publication_status(
+                    endpoint_id=endpoint_id,
+                    action="publish",
+                    current_user_id=mock_user.id,
+                    metadata={"reason": "Trying to publish unhealthy endpoint"}
+                )
+
+            assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
+            assert "Cannot publish endpoint in UNHEALTHY state" in exc_info.value.message
+            assert "must be in RUNNING state" in exc_info.value.message
+
+    @pytest.mark.asyncio
+    async def test_unpublish_endpoint_any_state(self, mock_session, mock_user):
+        """Test unpublishing an endpoint in any state should succeed."""
+        # Test various states for unpublish operation
+        states_to_test = [
+            EndpointStatusEnum.RUNNING,
+            EndpointStatusEnum.PENDING,
+            EndpointStatusEnum.FAILED,
+            EndpointStatusEnum.UNHEALTHY,
+            EndpointStatusEnum.DELETING
+        ]
+
+        for state in states_to_test:
+            # Arrange
+            service = EndpointService(mock_session)
+            endpoint_id = uuid4()
+
+            # Create published endpoint in various states
+            endpoint = Mock(spec=EndpointModel)
+            endpoint.id = endpoint_id
+            endpoint.name = f"Endpoint in {state} state"
+            endpoint.status = state
+            endpoint.is_published = True
+            endpoint.published_date = datetime.now(timezone.utc)
+            endpoint.published_by = uuid4()
+
+            with patch.object(EndpointDataManager, 'retrieve_by_fields', new_callable=AsyncMock) as mock_retrieve:
+                with patch.object(EndpointDataManager, 'update_publication_status', new_callable=AsyncMock) as mock_update:
+                    with patch.object(PublicationHistoryDataManager, 'create_publication_history', new_callable=AsyncMock):
+                        mock_retrieve.return_value = endpoint
+
+                        # Configure the updated endpoint
+                        updated_endpoint = Mock(spec=EndpointModel)
+                        updated_endpoint.id = endpoint_id
+                        updated_endpoint.is_published = False
+                        updated_endpoint.published_date = None
+                        updated_endpoint.published_by = None
+                        updated_endpoint.status = state
+                        mock_update.return_value = updated_endpoint
+
+                        # Act - should succeed regardless of state
+                        result = await service.update_publication_status(
+                            endpoint_id=endpoint_id,
+                            action="unpublish",
+                            current_user_id=mock_user.id,
+                            metadata={"reason": f"Unpublishing {state} endpoint"}
+                        )
+
+                        # Assert
+                        assert result.is_published is False
+                        assert result.published_date is None
+
+    @pytest.mark.asyncio
+    async def test_publish_endpoint_state_transition(self, mock_session, mock_user):
+        """Test publishing an endpoint tracks proper state transitions in history."""
+        # Arrange
+        service = EndpointService(mock_session)
+        endpoint_id = uuid4()
+
+        # Create endpoint ready to be published
+        endpoint = Mock(spec=EndpointModel)
+        endpoint.id = endpoint_id
+        endpoint.name = "Test Endpoint"
+        endpoint.status = EndpointStatusEnum.RUNNING
+        endpoint.is_published = False
+        endpoint.published_date = None
+        endpoint.published_by = None
+
+        with patch.object(EndpointDataManager, 'retrieve_by_fields', new_callable=AsyncMock) as mock_retrieve:
+            with patch.object(EndpointDataManager, 'update_publication_status', new_callable=AsyncMock) as mock_update:
+                with patch.object(PublicationHistoryDataManager, 'create_publication_history', new_callable=AsyncMock) as mock_history:
+                    mock_retrieve.return_value = endpoint
+
+                    # Configure the updated endpoint
+                    action_time = datetime.now(timezone.utc)
+                    updated_endpoint = Mock(spec=EndpointModel)
+                    updated_endpoint.id = endpoint_id
+                    updated_endpoint.is_published = True
+                    updated_endpoint.published_date = action_time
+                    updated_endpoint.published_by = mock_user.id
+                    mock_update.return_value = updated_endpoint
+
+                    # Act
+                    result = await service.update_publication_status(
+                        endpoint_id=endpoint_id,
+                        action="publish",
+                        current_user_id=mock_user.id,
+                        metadata={"reason": "Testing state transition", "version": "1.0"}
+                    )
+
+                    # Assert - verify state transition tracking
+                    mock_history.assert_called_once()
+                    call_args = mock_history.call_args[1]
+
+                    assert call_args['deployment_id'] == endpoint_id
+                    assert call_args['action'] == "publish"
+                    assert call_args['performed_by'] == mock_user.id
+                    assert call_args['metadata'] == {"reason": "Testing state transition", "version": "1.0"}
+
+                    # Verify state transition
+                    assert call_args['previous_state']['is_published'] is False
+                    assert call_args['previous_state']['published_date'] is None
+                    assert call_args['previous_state']['published_by'] is None
+
+                    assert call_args['new_state']['is_published'] is True
+                    assert call_args['new_state']['published_date'] is not None
+                    assert call_args['new_state']['published_by'] == str(mock_user.id)

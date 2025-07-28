@@ -328,3 +328,111 @@ class TestPublicationAPIEndpoints:
 
                 # Assert - should get permission denied
                 assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    @pytest.mark.asyncio
+    async def test_publish_already_published_endpoint_integration(self, client, mock_current_user, auth_headers):
+        """Integration test for publishing an already published endpoint."""
+        endpoint_id = uuid4()
+
+        # Create already published endpoint
+        published_endpoint = Mock(spec=EndpointModel)
+        published_endpoint.id = endpoint_id
+        published_endpoint.name = "Already Published Endpoint"
+        published_endpoint.status = EndpointStatusEnum.RUNNING
+        published_endpoint.is_published = True
+        published_endpoint.published_date = datetime.now(timezone.utc)
+        published_endpoint.published_by = uuid4()
+
+        with patch('budapp.commons.dependencies.get_current_active_user', return_value=mock_current_user):
+            with patch('budapp.commons.permission_handler.require_permissions', return_value=lambda x: x):
+                with patch('budapp.endpoint_ops.services.EndpointService.update_publication_status', new_callable=AsyncMock) as mock_update:
+                    mock_update.return_value = published_endpoint
+
+                    # Make request
+                    response = client.put(
+                        f"/endpoints/{endpoint_id}/publish",
+                        json={"action": "publish", "metadata": {"reason": "Re-publishing"}},
+                        headers=auth_headers
+                    )
+
+                    # Assert - should succeed (idempotent)
+                    assert response.status_code == status.HTTP_200_OK
+                    data = response.json()
+                    assert data["data"]["is_published"] is True
+                    assert data["message"] == "Endpoint published successfully"
+
+    @pytest.mark.asyncio
+    async def test_publish_endpoint_invalid_state_integration(self, client, mock_current_user, auth_headers):
+        """Integration test for publishing an endpoint in invalid state."""
+        endpoint_id = uuid4()
+
+        with patch('budapp.commons.dependencies.get_current_active_user', return_value=mock_current_user):
+            with patch('budapp.commons.permission_handler.require_permissions', return_value=lambda x: x):
+                with patch('budapp.endpoint_ops.services.EndpointService.update_publication_status', new_callable=AsyncMock) as mock_update:
+                    # Mock service to raise exception for invalid state
+                    mock_update.side_effect = ClientException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        message="Cannot publish endpoint in PENDING state. Endpoint must be in RUNNING state to be published."
+                    )
+
+                    # Make request
+                    response = client.put(
+                        f"/endpoints/{endpoint_id}/publish",
+                        json={"action": "publish", "metadata": {"reason": "Testing"}},
+                        headers=auth_headers
+                    )
+
+                    # Assert
+                    assert response.status_code == status.HTTP_400_BAD_REQUEST
+                    data = response.json()
+                    assert "Cannot publish endpoint in PENDING state" in data["message"]
+                    assert "must be in RUNNING state" in data["message"]
+
+    @pytest.mark.asyncio
+    async def test_unpublish_already_unpublished_endpoint_integration(self, client, mock_current_user, auth_headers):
+        """Integration test for unpublishing an already unpublished endpoint."""
+        endpoint_id = uuid4()
+
+        # Create unpublished endpoint
+        unpublished_endpoint = Mock(spec=EndpointModel)
+        unpublished_endpoint.id = endpoint_id
+        unpublished_endpoint.name = "Unpublished Endpoint"
+        unpublished_endpoint.status = EndpointStatusEnum.RUNNING
+        unpublished_endpoint.is_published = False
+        unpublished_endpoint.published_date = None
+        unpublished_endpoint.published_by = None
+
+        with patch('budapp.commons.dependencies.get_current_active_user', return_value=mock_current_user):
+            with patch('budapp.commons.permission_handler.require_permissions', return_value=lambda x: x):
+                with patch('budapp.endpoint_ops.services.EndpointService.update_publication_status', new_callable=AsyncMock) as mock_update:
+                    mock_update.return_value = unpublished_endpoint
+
+                    # Make request
+                    response = client.put(
+                        f"/endpoints/{endpoint_id}/publish",
+                        json={"action": "unpublish", "metadata": {"reason": "Re-unpublishing"}},
+                        headers=auth_headers
+                    )
+
+                    # Assert - should succeed (idempotent)
+                    assert response.status_code == status.HTTP_200_OK
+                    data = response.json()
+                    assert data["data"]["is_published"] is False
+                    assert data["message"] == "Endpoint unpublished successfully"
+
+    @pytest.mark.asyncio
+    async def test_invalid_publication_action_integration(self, client, mock_current_user, auth_headers):
+        """Integration test for invalid publication action."""
+        endpoint_id = uuid4()
+
+        with patch('budapp.commons.dependencies.get_current_active_user', return_value=mock_current_user):
+            with patch('budapp.commons.permission_handler.require_permissions', return_value=lambda x: x):
+                # Make request with invalid action
+                response = client.put(
+                    f"/endpoints/{endpoint_id}/publish",
+                    json={"action": "invalid_action"},
+                    headers=auth_headers
+                )
+
+                # Assert - should fail validation
+                assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
