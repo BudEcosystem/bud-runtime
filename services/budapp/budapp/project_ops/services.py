@@ -757,6 +757,7 @@ class ProjectService(SessionMixin):
                     color=user.color,
                     role=user.role,
                     status=user.status,
+                    user_type=user.user_type,
                     permissions=permissions,
                     project_role=project_role,
                 )
@@ -803,6 +804,7 @@ class ProjectService(SessionMixin):
                     color=result[0].color,
                     role=result[0].role,
                     status=result[0].status,
+                    user_type=result[0].user_type,
                     permissions=permissions,
                     project_role=result[1],
                 )
