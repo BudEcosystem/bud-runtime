@@ -1,7 +1,7 @@
 {
   disko.devices = {
     disk = {
-      disk1 = {
+      main = {
         device = "/dev/nvme0n1";
         type = "disk";
 
@@ -9,8 +9,8 @@
           type = "gpt";
           partitions = {
             ESP = {
-              type = "EF00";
               size = "1G";
+              type = "EF00";
               content = {
                 type = "filesystem";
                 format = "vfat";

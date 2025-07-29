@@ -7,6 +7,5 @@ in
     ./modules/users.nix
   ];
 
-  networking.useDHCP = lib.mkForce true;
   sops.defaultSopsFile = lib.mkForce ../${host}/secrets.yaml;
 }

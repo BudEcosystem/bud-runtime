@@ -88,6 +88,10 @@ resource "azurerm_linux_virtual_machine" "worker" {
   disable_password_authentication = true
   admin_username                  = var.admin_user
 
+  boot_diagnostics {
+    storage_account_uri = null
+  }
+
   admin_ssh_key {
     username   = var.admin_user
     public_key = var.ssh_pub_key

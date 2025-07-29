@@ -2,11 +2,12 @@
 
 {
   imports = [
-    ./hardware-configuration.nix
     ../common/configuration.nix
+    ./hardware-configuration.nix
     ./modules/k3s.nix
+    ./disko.nix
   ];
 
-  system.stateVersion = lib.mkForce "25.11";
   boot.loader.systemd-boot.enable = true;
+  system.stateVersion = lib.mkForce "25.11";
 }

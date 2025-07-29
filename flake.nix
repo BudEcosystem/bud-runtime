@@ -1,6 +1,7 @@
 {
   inputs = {
     nixpkgs.url = "github:NixOs/nixpkgs/nixos-unstable";
+    nixos-facter-modules.url = "github:nix-community/nixos-facter-modules";
 
     sinan = {
       url = "github:sinanmohd/nixos/master";
@@ -19,6 +20,7 @@
       nixpkgs,
       sinan,
       disko,
+      nixos-facter-modules,
     }:
     let
       lib = nixpkgs.lib;
@@ -44,6 +46,7 @@
 
             disko.nixosModules.disko
             sinan.nixosModules.server
+            nixos-facter-modules.nixosModules.facter
 
             ./nix/nixos/${host}/configuration.nix
           ];
