@@ -25,6 +25,7 @@ from fastapi import HTTPException, Request, status
 from ..shared.redis_service import RedisService
 from . import logging
 
+
 logger = logging.get_logger(__name__)
 
 
@@ -32,8 +33,7 @@ class RateLimiter:
     """Rate limiter using Redis for tracking requests."""
 
     def __init__(self, max_requests: int, window_seconds: int, key_prefix: str = "rate_limit"):
-        """
-        Initialize rate limiter.
+        """Initialize rate limiter.
 
         Args:
             max_requests: Maximum number of requests allowed in the window
@@ -46,8 +46,7 @@ class RateLimiter:
         self.redis_service = RedisService()
 
     def _get_identifier(self, request: Request, user_id: Optional[str] = None) -> str:
-        """
-        Get identifier for rate limiting (IP address or user ID).
+        """Get identifier for rate limiting (IP address or user ID).
 
         Args:
             request: FastAPI request object
@@ -58,7 +57,7 @@ class RateLimiter:
         """
         if user_id:
             return user_id
-        
+
         # Get client IP address
         # Check for forwarded IP first (for proxy/load balancer scenarios)
         forwarded_for = request.headers.get("X-Forwarded-For")
@@ -67,12 +66,11 @@ class RateLimiter:
             client_ip = forwarded_for.split(",")[0].strip()
         else:
             client_ip = request.client.host if request.client else "unknown"
-        
+
         return client_ip
 
     async def check_rate_limit(self, request: Request, user_id: Optional[str] = None) -> None:
-        """
-        Check if request exceeds rate limit.
+        """Check if request exceeds rate limit.
 
         Args:
             request: FastAPI request object
@@ -87,11 +85,11 @@ class RateLimiter:
         try:
             # Increment counter
             current_count = await self.redis_service.incr(key)
-            
+
             # Set expiry on first request
             if current_count == 1:
                 await self.redis_service.set(key, current_count, ex=self.window_seconds)
-            
+
             # Check if limit exceeded
             if current_count > self.max_requests:
                 # Get TTL to inform user when to retry
@@ -100,13 +98,13 @@ class RateLimiter:
                     f"Rate limit exceeded for {identifier} on {request.url.path}. "
                     f"Count: {current_count}, Limit: {self.max_requests}"
                 )
-                
+
                 raise HTTPException(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                     detail=f"Rate limit exceeded. Please try again in {ttl} seconds.",
-                    headers={"Retry-After": str(ttl)}
+                    headers={"Retry-After": str(ttl)},
                 )
-        
+
         except HTTPException:
             raise
         except aioredis.RedisError as e:
@@ -117,8 +115,7 @@ class RateLimiter:
 
 
 def rate_limit(max_requests: int, window_seconds: int, use_user_id: bool = False):
-    """
-    Decorator for rate limiting FastAPI endpoints.
+    """Decorator for rate limiting FastAPI endpoints.
 
     Args:
         max_requests: Maximum number of requests allowed in the window
@@ -139,22 +136,24 @@ def rate_limit(max_requests: int, window_seconds: int, use_user_id: bool = False
             # Check positional args
             for i, arg in enumerate(args):
                 # Skip self argument if present
-                if i == 0 and hasattr(arg, '__self__'):
+                if i == 0 and hasattr(arg, "__self__"):
                     continue
                 # Use duck typing to detect Request-like objects
-                if hasattr(arg, 'url') and hasattr(arg, 'client') and hasattr(arg, 'headers'):
+                if hasattr(arg, "url") and hasattr(arg, "client") and hasattr(arg, "headers"):
                     request = arg
                     break
-            
+
             # Check kwargs if not found in args
             if not request:
                 request = kwargs.get("request")
                 # Verify it's Request-like
-                if request and (hasattr(request, 'url') and hasattr(request, 'client') and hasattr(request, 'headers')):
+                if request and (
+                    hasattr(request, "url") and hasattr(request, "client") and hasattr(request, "headers")
+                ):
                     pass  # Valid request
                 else:
                     request = None
-            
+
             if not request:
                 # If no request object found, skip rate limiting
                 logger.error(f"No request object found for rate limiting in {func.__name__}")
@@ -162,10 +161,10 @@ def rate_limit(max_requests: int, window_seconds: int, use_user_id: bool = False
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail="Request object missing for rate limiting.",
                 )
-                #return await func(*args, **kwargs)
-            
-            logger.debug(f"Request found, proceeding with rate limiting")
-            
+                # return await func(*args, **kwargs)
+
+            logger.debug("Request found, proceeding with rate limiting")
+
             # Get user_id if needed
             user_id = None
             if use_user_id:
@@ -173,16 +172,16 @@ def rate_limit(max_requests: int, window_seconds: int, use_user_id: bool = False
                 current_user = kwargs.get("current_user")
                 if current_user and hasattr(current_user, "id"):
                     user_id = str(current_user.id)
-            
+
             # Create limiter instance lazily to allow for mocking
             limiter = RateLimiter(max_requests, window_seconds)
-            
+
             # Check rate limit
             await limiter.check_rate_limit(request, user_id)
-            
+
             # Call the original function
             return await func(*args, **kwargs)
-        
+
         return wrapper
-    
+
     return decorator

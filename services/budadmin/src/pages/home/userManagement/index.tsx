@@ -72,7 +72,7 @@ export default function UserManagement() {
   const [activeTab, setActiveTab] = useState<'client' | 'admin'>('client');
   const [adminCurrentPage, setAdminCurrentPage] = useState(1);
   const [clientCurrentPage, setClientCurrentPage] = useState(1);
-  
+
   const { users, totalUsers, getUsers, getUsersDetails, userDetails, getUsersPermissions, userPermissions } = useUsers();
   const [tempFilter, setTempFilter] = useState<any>({});
   const [filter, setFilter] = useState<
@@ -433,14 +433,14 @@ export default function UserManagement() {
                 Admin Users
               </button>
             </div>
-            
+
             {/* User Count Display */}
             <div className="mb-4 px-4">
               <Text_12_400_757575>
                 Showing {totalUsers} {activeTab === 'admin' ? 'Admin' : 'Client'} Users
               </Text_12_400_757575>
             </div>
-            
+
             {/* Users Table */}
             <div className="tablePadding userTable relative CommonCustomPagination">
               <Table<User>
