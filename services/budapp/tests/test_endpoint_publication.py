@@ -249,7 +249,7 @@ class TestEndpointPublicationService:
 
         with patch.object(EndpointDataManager, 'retrieve_by_fields', new_callable=AsyncMock) as mock_retrieve:
             with patch.object(PublicationHistoryDataManager, 'get_publication_history', new_callable=AsyncMock) as mock_get_history:
-                with patch.object(EndpointService, '_get_user_details', new_callable=AsyncMock) as mock_get_user:
+                with patch('budapp.user_ops.crud.UserDataManager.retrieve_by_fields', new_callable=AsyncMock) as mock_get_user:
                     mock_retrieve.return_value = mock_endpoint
                     mock_get_history.return_value = (history_entries, 3)
                     mock_get_user.return_value = mock_user
