@@ -30,12 +30,6 @@ const LoginPage = ({ onSubmit }: LoginPageModalProps) => {
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-  useEffect(() => {
-    if (isSubmitted) {
-      validateForm();
-    }
-  }, [formData, isSubmitted, validateForm]);
-
   const validateForm = useCallback(() => {
     const passwordValid = formData["password"]?.length >= 8;
     const emailValid = emailRegex.test(formData["email"] || "");
@@ -47,6 +41,12 @@ const LoginPage = ({ onSubmit }: LoginPageModalProps) => {
     );
     setIsEmailValid(!formData["email"] || emailValid);
   }, [formData, emailRegex]);
+
+  useEffect(() => {
+    if (isSubmitted) {
+      validateForm();
+    }
+  }, [formData, isSubmitted, validateForm]);
 
   const handleLogin = (e: { preventDefault: () => void }) => {
     e.preventDefault();
