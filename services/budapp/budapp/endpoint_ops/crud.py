@@ -21,8 +21,8 @@ from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
 from sqlalchemy import and_, asc, case, cast, desc, distinct, func, literal, or_, select, update
-from sqlalchemy.orm import joinedload
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import joinedload
 
 from budapp.cluster_ops.models import Cluster as ClusterModel
 from budapp.commons import logging

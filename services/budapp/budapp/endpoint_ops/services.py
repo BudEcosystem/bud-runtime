@@ -2751,7 +2751,7 @@ class EndpointService(SessionMixin):
                 "created_at": entry.created_at,
                 "modified_at": entry.modified_at,
             }
-            
+
             # Add user summary if user details are loaded
             if entry.performed_by_user:
                 entry_dict["performed_by_user"] = {
@@ -2761,7 +2761,7 @@ class EndpointService(SessionMixin):
                 }
             else:
                 entry_dict["performed_by_user"] = None
-                
+
             transformed_entries.append(entry_dict)
 
         return {

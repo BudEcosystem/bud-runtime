@@ -86,8 +86,12 @@ class User(Base, TimestampMixin):
     project_permissions: Mapped[list[ProjectPermission]] = relationship(back_populates="user")
     created_projects: Mapped[list[Project]] = relationship(back_populates="created_user")
     created_clusters: Mapped[list[Cluster]] = relationship(back_populates="created_user")
-    created_endpoints: Mapped[list[Endpoint]] = relationship(back_populates="created_user", foreign_keys="[Endpoint.created_by]")
-    published_endpoints: Mapped[list[Endpoint]] = relationship(back_populates="published_user", foreign_keys="[Endpoint.published_by]")
+    created_endpoints: Mapped[list[Endpoint]] = relationship(
+        back_populates="created_user", foreign_keys="[Endpoint.created_by]"
+    )
+    published_endpoints: Mapped[list[Endpoint]] = relationship(
+        back_populates="published_user", foreign_keys="[Endpoint.published_by]"
+    )
 
 
 class Tenant(Base, TimestampMixin):

@@ -104,7 +104,9 @@ class Endpoint(Base, TimestampMixin):
         back_populates="endpoint",
     )
     # Publication relationships
-    published_user: Mapped[Optional["User"]] = relationship("User", foreign_keys=[published_by], back_populates="published_endpoints")
+    published_user: Mapped[Optional["User"]] = relationship(
+        "User", foreign_keys=[published_by], back_populates="published_endpoints"
+    )
     publication_history: Mapped[list["PublicationHistory"]] = relationship(
         "PublicationHistory", back_populates="endpoint", cascade="all, delete-orphan"
     )
