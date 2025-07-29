@@ -1,6 +1,6 @@
 import ipaddress
 from datetime import datetime
-from typing import Any, Dict, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 from uuid import UUID
 
 from budmicroframe.commons.schemas import CloudEventBase, ResponseBase
@@ -215,3 +215,155 @@ class InferenceDetailsMetrics(CloudEventBase):
         if self.request_forward_time < self.request_arrival_time:
             raise ValueError("request_forward_time cannot be before request_arrival_time")
         return self
+
+
+class InferenceListRequest(BaseModel):
+    """Request schema for listing inference requests."""
+
+    # Pagination
+    offset: int = 0
+    limit: int = 50
+
+    # Filters
+    project_id: Optional[UUID] = None
+    endpoint_id: Optional[UUID] = None
+    model_id: Optional[UUID] = None
+    from_date: datetime
+    to_date: Optional[datetime] = None
+    is_success: Optional[bool] = None
+    min_tokens: Optional[int] = None
+    max_tokens: Optional[int] = None
+    max_latency_ms: Optional[int] = None
+
+    # Sorting
+    sort_by: Literal["timestamp", "tokens", "latency", "cost"] = "timestamp"
+    sort_order: Literal["asc", "desc"] = "desc"
+
+    @field_validator("limit")
+    @classmethod
+    def validate_limit(cls, v: int) -> int:
+        """Validate that limit is between 1 and 1000."""
+        if v < 1:
+            raise ValueError("limit must be at least 1")
+        if v > 1000:
+            raise ValueError("limit must not exceed 1000")
+        return v
+
+    @field_validator("offset")
+    @classmethod
+    def validate_offset(cls, v: int) -> int:
+        """Validate that offset is not negative."""
+        if v < 0:
+            raise ValueError("offset must not be negative")
+        return v
+
+    @field_validator("to_date")
+    @classmethod
+    def validate_to_date(cls, v: Optional[datetime], info) -> Optional[datetime]:
+        """Validate that to_date is after from_date."""
+        if v is None:
+            return v
+        from_date = info.data.get("from_date")
+        if from_date and v < from_date:
+            raise ValueError("to_date must be after from_date")
+        return v
+
+
+class InferenceListItem(BaseModel):
+    """Schema for inference items in list response."""
+
+    inference_id: UUID
+    timestamp: datetime
+    model_name: str
+    prompt_preview: str  # First 100 chars
+    response_preview: str  # First 100 chars
+    input_tokens: int
+    output_tokens: int
+    total_tokens: int
+    response_time_ms: int
+    cost: Optional[float] = None
+    is_success: bool
+    cached: bool
+
+
+class InferenceListResponse(ResponseBase):
+    """Response schema for listing inference requests."""
+
+    object: str = "inference_list"
+    items: List[InferenceListItem]
+    total_count: int
+    offset: int
+    limit: int
+    has_more: bool
+
+
+class InferenceDetailResponse(ResponseBase):
+    """Response schema for detailed inference information."""
+
+    object: str = "inference_detail"
+
+    # Core info
+    inference_id: UUID
+    timestamp: datetime
+
+    # Model info
+    model_name: str
+    model_provider: str
+    model_id: UUID
+
+    # Content
+    system_prompt: Optional[str] = None
+    messages: List[Dict[str, Any]]  # Full chat messages
+    output: str
+
+    # Metadata
+    function_name: Optional[str] = None
+    variant_name: Optional[str] = None
+    episode_id: Optional[UUID] = None
+
+    # Performance
+    input_tokens: int
+    output_tokens: int
+    response_time_ms: int
+    ttft_ms: Optional[int] = None
+    processing_time_ms: Optional[int] = None
+
+    # Request details
+    request_ip: Optional[str] = None
+    request_arrival_time: datetime
+    request_forward_time: datetime
+    project_id: UUID
+    endpoint_id: UUID
+
+    # Status
+    is_success: bool
+    cached: bool
+    finish_reason: Optional[str] = None
+    cost: Optional[float] = None
+
+    # Raw data (optional)
+    raw_request: Optional[str] = None
+    raw_response: Optional[str] = None
+
+    # Feedback summary
+    feedback_count: int
+    average_rating: Optional[float] = None
+
+
+class FeedbackItem(BaseModel):
+    """Schema for individual feedback item."""
+
+    feedback_id: UUID
+    feedback_type: Literal["boolean", "float", "comment", "demonstration"]
+    metric_name: Optional[str] = None
+    value: Optional[Union[bool, float, str]] = None
+    created_at: datetime
+
+
+class InferenceFeedbackResponse(ResponseBase):
+    """Response schema for inference feedback."""
+
+    object: str = "inference_feedback"
+    inference_id: UUID
+    feedback_items: List[FeedbackItem]
+    total_count: int

@@ -16,6 +16,12 @@ from budmetrics.observability.models import (
 from budmetrics.observability.schemas import (
     CacheMetric,
     CountMetric,
+    FeedbackItem,
+    InferenceDetailResponse,
+    InferenceFeedbackResponse,
+    InferenceListItem,
+    InferenceListRequest,
+    InferenceListResponse,
     MetricsData,
     ObservabilityMetricsRequest,
     ObservabilityMetricsResponse,
@@ -574,3 +580,365 @@ class ObservabilityMetricsService:
             "duplicates": len(duplicate_ids),
             "duplicate_ids": duplicate_ids,
         }
+
+    async def list_inferences(self, request: InferenceListRequest) -> InferenceListResponse:
+        """List inference requests with pagination and filtering.
+
+        Args:
+            request: InferenceListRequest with query parameters
+
+        Returns:
+            InferenceListResponse with paginated inference data
+        """
+        await self.initialize()
+
+        # Build WHERE clause for filters
+        where_conditions = []
+        params = {}
+
+        # Always filter by date range
+        where_conditions.append("mi.timestamp >= %(from_date)s")
+        params["from_date"] = request.from_date
+
+        if request.to_date:
+            where_conditions.append("mi.timestamp <= %(to_date)s")
+            params["to_date"] = request.to_date
+
+        if request.project_id:
+            where_conditions.append("mid.project_id = %(project_id)s")
+            params["project_id"] = str(request.project_id)
+
+        if request.endpoint_id:
+            where_conditions.append("mid.endpoint_id = %(endpoint_id)s")
+            params["endpoint_id"] = str(request.endpoint_id)
+
+        if request.model_id:
+            where_conditions.append("mid.model_id = %(model_id)s")
+            params["model_id"] = str(request.model_id)
+
+        if request.is_success is not None:
+            where_conditions.append("mid.is_success = %(is_success)s")
+            params["is_success"] = 1 if request.is_success else 0
+
+        if request.min_tokens is not None:
+            where_conditions.append("(mi.input_tokens + mi.output_tokens) >= %(min_tokens)s")
+            params["min_tokens"] = request.min_tokens
+
+        if request.max_tokens is not None:
+            where_conditions.append("(mi.input_tokens + mi.output_tokens) <= %(max_tokens)s")
+            params["max_tokens"] = request.max_tokens
+
+        if request.max_latency_ms is not None:
+            where_conditions.append("mi.response_time_ms <= %(max_latency_ms)s")
+            params["max_latency_ms"] = request.max_latency_ms
+
+        where_clause = " AND ".join(where_conditions)
+
+        # Build ORDER BY clause
+        sort_column_map = {
+            "timestamp": "mi.timestamp",
+            "tokens": "(mi.input_tokens + mi.output_tokens)",
+            "latency": "mi.response_time_ms",
+            "cost": "mid.cost",
+        }
+        order_by = f"{sort_column_map[request.sort_by]} {request.sort_order.upper()}"
+
+        # Count total records
+        count_query = f"""
+        SELECT COUNT(*) as total_count
+        FROM ModelInference mi
+        INNER JOIN ModelInferenceDetails mid ON mi.inference_id = mid.inference_id
+        LEFT JOIN ChatInference ci ON mi.inference_id = ci.id
+        WHERE {where_clause}
+        """
+
+        # Replace parameters in count query
+        formatted_count_query = count_query
+        for param, value in params.items():
+            formatted_count_query = formatted_count_query.replace(f"%({param})s", f"'{value}'")
+
+        count_result = await self.clickhouse_client.execute_query(formatted_count_query)
+        total_count = count_result[0][0] if count_result else 0
+
+        # Get paginated data
+        list_query = f"""
+        SELECT
+            mi.inference_id,
+            mi.timestamp,
+            mi.model_name,
+            substring(coalesce(ci.input, mi.input_messages), 1, 100) as prompt_preview,
+            substring(coalesce(ci.output, mi.output), 1, 100) as response_preview,
+            mi.input_tokens,
+            mi.output_tokens,
+            mi.input_tokens + mi.output_tokens as total_tokens,
+            mi.response_time_ms,
+            mid.cost,
+            mid.is_success,
+            mi.cached
+        FROM ModelInference mi
+        INNER JOIN ModelInferenceDetails mid ON mi.inference_id = mid.inference_id
+        LEFT JOIN ChatInference ci ON mi.inference_id = ci.id
+        WHERE {where_clause}
+        ORDER BY {order_by}
+        LIMIT %(limit)s OFFSET %(offset)s
+        """
+
+        params["limit"] = request.limit
+        params["offset"] = request.offset
+
+        # Replace parameters in list query
+        formatted_list_query = list_query
+        for param, value in params.items():
+            formatted_list_query = formatted_list_query.replace(f"%({param})s", f"'{value}'")
+
+        results = await self.clickhouse_client.execute_query(formatted_list_query)
+
+        # Convert results to InferenceListItem objects
+        items = []
+        for row in results:
+            items.append(
+                InferenceListItem(
+                    inference_id=row[0],
+                    timestamp=row[1],
+                    model_name=row[2],
+                    prompt_preview=row[3] or "",
+                    response_preview=row[4] or "",
+                    input_tokens=row[5] or 0,
+                    output_tokens=row[6] or 0,
+                    total_tokens=row[7] or 0,
+                    response_time_ms=row[8] or 0,
+                    cost=row[9],
+                    is_success=bool(row[10]),
+                    cached=bool(row[11]),
+                )
+            )
+
+        has_more = (request.offset + request.limit) < total_count
+
+        return InferenceListResponse(
+            object="inference_list",
+            items=items,
+            total_count=total_count,
+            offset=request.offset,
+            limit=request.limit,
+            has_more=has_more,
+        )
+
+    async def get_inference_details(self, inference_id: str) -> InferenceDetailResponse:
+        """Get complete details for a single inference.
+
+        Args:
+            inference_id: UUID of the inference
+
+        Returns:
+            InferenceDetailResponse with full inference details
+        """
+        await self.initialize()
+
+        query = """
+        SELECT
+            mi.inference_id,
+            mi.timestamp,
+            mi.model_name,
+            mi.model_provider_name,
+            mid.model_id,
+            mi.system,
+            mi.input_messages,
+            mi.output,
+            ci.function_name,
+            ci.variant_name,
+            ci.episode_id,
+            mi.input_tokens,
+            mi.output_tokens,
+            mi.response_time_ms,
+            mi.ttft_ms,
+            ci.processing_time_ms,
+            mid.request_ip,
+            mid.request_arrival_time,
+            mid.request_forward_time,
+            mid.project_id,
+            mid.endpoint_id,
+            mid.is_success,
+            mi.cached,
+            mi.finish_reason,
+            mid.cost,
+            mi.raw_request,
+            mi.raw_response
+        FROM ModelInference mi
+        INNER JOIN ModelInferenceDetails mid ON mi.inference_id = mid.inference_id
+        LEFT JOIN ChatInference ci ON mi.inference_id = ci.id
+        WHERE mi.inference_id = %(inference_id)s
+        """
+
+        formatted_query = query.replace("%(inference_id)s", f"'{inference_id}'")
+        results = await self.clickhouse_client.execute_query(formatted_query)
+
+        if not results:
+            raise ValueError(f"Inference with ID {inference_id} not found")
+
+        row = results[0]
+
+        # Parse messages from JSON string
+        import json
+
+        try:
+            messages = json.loads(row[6]) if row[6] else []
+        except json.JSONDecodeError:
+            messages = []
+
+        # Get feedback count
+        feedback_count_query = f"""
+        SELECT COUNT(*) FROM (
+            SELECT target_id FROM BooleanMetricFeedback WHERE target_id = '{inference_id}'
+            UNION ALL
+            SELECT target_id FROM FloatMetricFeedback WHERE target_id = '{inference_id}'
+            UNION ALL
+            SELECT target_id FROM CommentFeedback WHERE target_id = '{inference_id}'
+            UNION ALL
+            SELECT target_id FROM DemonstrationFeedback WHERE target_id = '{inference_id}'
+        )
+        """
+        feedback_result = await self.clickhouse_client.execute_query(feedback_count_query)
+        feedback_count = feedback_result[0][0] if feedback_result else 0
+
+        # Get average rating from float metrics
+        avg_rating_query = f"""
+        SELECT AVG(value) 
+        FROM FloatMetricFeedback 
+        WHERE target_id = '{inference_id}' 
+            AND metric_name IN ('rating', 'score', 'quality')
+        """
+        rating_result = await self.clickhouse_client.execute_query(avg_rating_query)
+        average_rating = rating_result[0][0] if rating_result and rating_result[0][0] else None
+
+        return InferenceDetailResponse(
+            object="inference_detail",
+            inference_id=row[0],
+            timestamp=row[1],
+            model_name=row[2],
+            model_provider=row[3] or "unknown",
+            model_id=row[4],
+            system_prompt=row[5],
+            messages=messages,
+            output=row[7] or "",
+            function_name=row[8],
+            variant_name=row[9],
+            episode_id=row[10],
+            input_tokens=row[11] or 0,
+            output_tokens=row[12] or 0,
+            response_time_ms=row[13] or 0,
+            ttft_ms=row[14],
+            processing_time_ms=row[15],
+            request_ip=row[16],
+            request_arrival_time=row[17],
+            request_forward_time=row[18],
+            project_id=row[19],
+            endpoint_id=row[20],
+            is_success=bool(row[21]),
+            cached=bool(row[22]),
+            finish_reason=row[23],
+            cost=row[24],
+            raw_request=row[25],
+            raw_response=row[26],
+            feedback_count=feedback_count,
+            average_rating=average_rating,
+        )
+
+    async def get_inference_feedback(self, inference_id: str) -> InferenceFeedbackResponse:
+        """Get all feedback associated with an inference.
+
+        Args:
+            inference_id: UUID of the inference
+
+        Returns:
+            InferenceFeedbackResponse with aggregated feedback
+        """
+        await self.initialize()
+
+        feedback_items = []
+
+        # Get boolean feedback
+        boolean_query = f"""
+        SELECT id, metric_name, value, created_at
+        FROM BooleanMetricFeedback
+        WHERE target_id = '{inference_id}'
+        ORDER BY created_at DESC
+        """
+        boolean_results = await self.clickhouse_client.execute_query(boolean_query)
+        for row in boolean_results:
+            feedback_items.append(
+                FeedbackItem(
+                    feedback_id=row[0],
+                    feedback_type="boolean",
+                    metric_name=row[1],
+                    value=bool(row[2]),
+                    created_at=row[3],
+                )
+            )
+
+        # Get float feedback
+        float_query = f"""
+        SELECT id, metric_name, value, created_at
+        FROM FloatMetricFeedback
+        WHERE target_id = '{inference_id}'
+        ORDER BY created_at DESC
+        """
+        float_results = await self.clickhouse_client.execute_query(float_query)
+        for row in float_results:
+            feedback_items.append(
+                FeedbackItem(
+                    feedback_id=row[0],
+                    feedback_type="float",
+                    metric_name=row[1],
+                    value=float(row[2]),
+                    created_at=row[3],
+                )
+            )
+
+        # Get comment feedback
+        comment_query = f"""
+        SELECT id, comment, created_at
+        FROM CommentFeedback
+        WHERE target_id = '{inference_id}'
+        ORDER BY created_at DESC
+        """
+        comment_results = await self.clickhouse_client.execute_query(comment_query)
+        for row in comment_results:
+            feedback_items.append(
+                FeedbackItem(
+                    feedback_id=row[0],
+                    feedback_type="comment",
+                    metric_name=None,
+                    value=row[1],
+                    created_at=row[2],
+                )
+            )
+
+        # Get demonstration feedback
+        demo_query = f"""
+        SELECT id, demonstration, created_at
+        FROM DemonstrationFeedback
+        WHERE target_id = '{inference_id}'
+        ORDER BY created_at DESC
+        """
+        demo_results = await self.clickhouse_client.execute_query(demo_query)
+        for row in demo_results:
+            feedback_items.append(
+                FeedbackItem(
+                    feedback_id=row[0],
+                    feedback_type="demonstration",
+                    metric_name=None,
+                    value=row[1],
+                    created_at=row[2],
+                )
+            )
+
+        # Sort all feedback by created_at
+        feedback_items.sort(key=lambda x: x.created_at, reverse=True)
+
+        return InferenceFeedbackResponse(
+            object="inference_feedback",
+            inference_id=UUID(inference_id),
+            feedback_items=feedback_items,
+            total_count=len(feedback_items),
+        )
