@@ -348,7 +348,7 @@ class TestEndpointPublicationCRUD:
         action_time = datetime.now(timezone.utc)
 
         # Act
-        result = await crud.create_publication_history(
+        await crud.create_publication_history(
             deployment_id=deployment_id,
             action="publish",
             performed_by=user_id,
@@ -397,7 +397,7 @@ class TestEndpointPublicationSchemas:
             "name": "Test Endpoint",
             "status": EndpointStatusEnum.RUNNING,
             "model": {
-                "id": uuid4(), 
+                "id": uuid4(),
                 "name": "Test Model",
                 "author": "Test Author",
                 "modality": ["text_input", "text_output"],
@@ -710,7 +710,7 @@ class TestEndpointPublicationSchemas:
                     mock_update.return_value = updated_endpoint
 
                     # Act
-                    result = await service.update_publication_status(
+                    await service.update_publication_status(
                         endpoint_id=endpoint_id,
                         action="publish",
                         current_user_id=mock_user.id,
