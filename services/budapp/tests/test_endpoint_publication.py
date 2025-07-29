@@ -38,7 +38,7 @@ def mock_session():
 @pytest.fixture
 def mock_endpoint():
     """Create a mock endpoint."""
-    endpoint = Mock(spec=EndpointModel)
+    endpoint = Mock()
     endpoint.id = uuid4()
     endpoint.name = "Test Endpoint"
     endpoint.status = EndpointStatusEnum.RUNNING
@@ -47,6 +47,7 @@ def mock_endpoint():
     endpoint.published_by = None
     endpoint.project_id = uuid4()
     endpoint.model_id = uuid4()
+    endpoint.cache_config = "{}"  # Add default cache_config
     return endpoint
 
 
@@ -77,7 +78,7 @@ class TestEndpointPublicationService:
                     mock_retrieve.return_value = mock_endpoint
 
                     # Configure the updated endpoint
-                    updated_endpoint = Mock(spec=EndpointModel)
+                    updated_endpoint = Mock()
                     updated_endpoint.id = endpoint_id
                     updated_endpoint.is_published = True
                     updated_endpoint.published_date = datetime.now(timezone.utc)
@@ -120,7 +121,7 @@ class TestEndpointPublicationService:
                     mock_retrieve.return_value = mock_endpoint
 
                     # Configure the updated endpoint
-                    updated_endpoint = Mock(spec=EndpointModel)
+                    updated_endpoint = Mock()
                     updated_endpoint.id = endpoint_id
                     updated_endpoint.is_published = False
                     updated_endpoint.published_date = None
@@ -238,7 +239,7 @@ class TestEndpointPublicationService:
         # Create mock history entries
         history_entries = []
         for i in range(3):
-            entry = Mock(spec=PublicationHistoryModel)
+            entry = Mock()
             entry.id = uuid4()
             entry.deployment_id = endpoint_id
             entry.action = "publish" if i % 2 == 0 else "unpublish"
@@ -395,7 +396,18 @@ class TestEndpointPublicationSchemas:
             "id": uuid4(),
             "name": "Test Endpoint",
             "status": EndpointStatusEnum.RUNNING,
-            "model": {"id": uuid4(), "name": "Test Model"},
+            "model": {
+                "id": uuid4(), 
+                "name": "Test Model",
+                "author": "Test Author",
+                "modality": ["text_input", "text_output"],
+                "source": "test_source",
+                "uri": "test://model/uri",
+                "provider_type": "cloud_model",
+                "created_at": datetime.now(timezone.utc),
+                "modified_at": datetime.now(timezone.utc),
+                "supported_endpoints": []
+            },
             "created_at": datetime.now(timezone.utc),
             "modified_at": datetime.now(timezone.utc),
             "is_deprecated": False,
@@ -418,7 +430,7 @@ class TestEndpointPublicationSchemas:
             action_metadata={"reason": "Ready for production"}
         )
         assert request.action == "publish"
-        assert request.metadata["reason"] == "Ready for production"
+        assert request.action_metadata["reason"] == "Ready for production"
 
         # Valid unpublish action
         request = UpdatePublicationStatusRequest(
@@ -446,7 +458,7 @@ class TestEndpointPublicationSchemas:
             "created_at": datetime.now(timezone.utc),
             "modified_at": datetime.now(timezone.utc),
             "performed_by_user": {
-                "id": str(uuid4()),
+                "id": uuid4(),
                 "email": "test@example.com",
                 "name": "Test User"
             }
@@ -454,8 +466,8 @@ class TestEndpointPublicationSchemas:
 
         entry = PublicationHistoryEntry(**entry_data)
         assert entry.action == "publish"
-        assert entry.action_metadata["reason"] == "Test"}
-        assert entry.performed_by_user["email"] == "test@example.com"
+        assert entry.action_metadata["reason"] == "Test"
+        assert entry.performed_by_user.email == "test@example.com"
 
     @pytest.mark.asyncio
     async def test_publish_already_published_endpoint(self, mock_session, mock_user):
@@ -465,7 +477,7 @@ class TestEndpointPublicationSchemas:
         endpoint_id = uuid4()
 
         # Create already published endpoint
-        published_endpoint = Mock(spec=EndpointModel)
+        published_endpoint = Mock()
         published_endpoint.id = endpoint_id
         published_endpoint.name = "Already Published Endpoint"
         published_endpoint.status = EndpointStatusEnum.RUNNING
@@ -496,7 +508,7 @@ class TestEndpointPublicationSchemas:
         endpoint_id = uuid4()
 
         # Create unpublished endpoint
-        unpublished_endpoint = Mock(spec=EndpointModel)
+        unpublished_endpoint = Mock()
         unpublished_endpoint.id = endpoint_id
         unpublished_endpoint.name = "Unpublished Endpoint"
         unpublished_endpoint.status = EndpointStatusEnum.RUNNING
@@ -527,7 +539,7 @@ class TestEndpointPublicationSchemas:
         endpoint_id = uuid4()
 
         # Create endpoint in PENDING state
-        pending_endpoint = Mock(spec=EndpointModel)
+        pending_endpoint = Mock()
         pending_endpoint.id = endpoint_id
         pending_endpoint.name = "Pending Endpoint"
         pending_endpoint.status = EndpointStatusEnum.PENDING
@@ -548,7 +560,7 @@ class TestEndpointPublicationSchemas:
                 )
 
             assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
-            assert "Cannot publish endpoint in PENDING state" in exc_info.value.message
+            assert "Cannot publish endpoint in pending state" in exc_info.value.message
             assert "must be in RUNNING state" in exc_info.value.message
 
     @pytest.mark.asyncio
@@ -559,10 +571,10 @@ class TestEndpointPublicationSchemas:
         endpoint_id = uuid4()
 
         # Create endpoint in FAILED state
-        failed_endpoint = Mock(spec=EndpointModel)
+        failed_endpoint = Mock()
         failed_endpoint.id = endpoint_id
         failed_endpoint.name = "Failed Endpoint"
-        failed_endpoint.status = EndpointStatusEnum.FAILED
+        failed_endpoint.status = EndpointStatusEnum.FAILURE
         failed_endpoint.is_published = False
         failed_endpoint.published_date = None
         failed_endpoint.published_by = None
@@ -580,7 +592,7 @@ class TestEndpointPublicationSchemas:
                 )
 
             assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
-            assert "Cannot publish endpoint in FAILED state" in exc_info.value.message
+            assert "Cannot publish endpoint in failure state" in exc_info.value.message
             assert "must be in RUNNING state" in exc_info.value.message
 
     @pytest.mark.asyncio
@@ -591,7 +603,7 @@ class TestEndpointPublicationSchemas:
         endpoint_id = uuid4()
 
         # Create endpoint in UNHEALTHY state
-        unhealthy_endpoint = Mock(spec=EndpointModel)
+        unhealthy_endpoint = Mock()
         unhealthy_endpoint.id = endpoint_id
         unhealthy_endpoint.name = "Unhealthy Endpoint"
         unhealthy_endpoint.status = EndpointStatusEnum.UNHEALTHY
@@ -612,7 +624,7 @@ class TestEndpointPublicationSchemas:
                 )
 
             assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
-            assert "Cannot publish endpoint in UNHEALTHY state" in exc_info.value.message
+            assert "Cannot publish endpoint in unhealthy state" in exc_info.value.message
             assert "must be in RUNNING state" in exc_info.value.message
 
     @pytest.mark.asyncio
@@ -622,7 +634,7 @@ class TestEndpointPublicationSchemas:
         states_to_test = [
             EndpointStatusEnum.RUNNING,
             EndpointStatusEnum.PENDING,
-            EndpointStatusEnum.FAILED,
+            EndpointStatusEnum.FAILURE,
             EndpointStatusEnum.UNHEALTHY,
             EndpointStatusEnum.DELETING
         ]
@@ -633,7 +645,7 @@ class TestEndpointPublicationSchemas:
             endpoint_id = uuid4()
 
             # Create published endpoint in various states
-            endpoint = Mock(spec=EndpointModel)
+            endpoint = Mock()
             endpoint.id = endpoint_id
             endpoint.name = f"Endpoint in {state} state"
             endpoint.status = state
@@ -647,7 +659,7 @@ class TestEndpointPublicationSchemas:
                         mock_retrieve.return_value = endpoint
 
                         # Configure the updated endpoint
-                        updated_endpoint = Mock(spec=EndpointModel)
+                        updated_endpoint = Mock()
                         updated_endpoint.id = endpoint_id
                         updated_endpoint.is_published = False
                         updated_endpoint.published_date = None
@@ -675,7 +687,7 @@ class TestEndpointPublicationSchemas:
         endpoint_id = uuid4()
 
         # Create endpoint ready to be published
-        endpoint = Mock(spec=EndpointModel)
+        endpoint = Mock()
         endpoint.id = endpoint_id
         endpoint.name = "Test Endpoint"
         endpoint.status = EndpointStatusEnum.RUNNING
@@ -690,7 +702,7 @@ class TestEndpointPublicationSchemas:
 
                     # Configure the updated endpoint
                     action_time = datetime.now(timezone.utc)
-                    updated_endpoint = Mock(spec=EndpointModel)
+                    updated_endpoint = Mock()
                     updated_endpoint.id = endpoint_id
                     updated_endpoint.is_published = True
                     updated_endpoint.published_date = action_time
