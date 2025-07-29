@@ -17,7 +17,7 @@ variable "master" {
   default = {
     hostname = "master"
     disksize = 128
-    sku      = "Standard_DS1_v2"
+    sku      = "Standard_D32als_v6"
   }
 }
 

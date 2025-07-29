@@ -61,6 +61,13 @@
         }
       );
 
+      packages = forAllSystems (
+        { system, pkgs }:
+        {
+          workflows = pkgs.callPackage ./nix/workflows { inherit self; };
+        }
+      );
+
       nixosConfigurations = lib.genAttrs [
         "common"
         "devbox"
