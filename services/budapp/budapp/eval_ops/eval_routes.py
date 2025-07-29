@@ -109,11 +109,7 @@ def list_experiments(
     try:
         offset = (page - 1) * limit
         experiments, total_count = ExperimentService(session).list_experiments(
-            user_id=current_user.id,
-            project_id=project_id,
-            experiment_id=id,
-            offset=offset,
-            limit=limit
+            user_id=current_user.id, project_id=project_id, experiment_id=id, offset=offset, limit=limit
         )
     except Exception as e:
         logger.debug(f"Failed to list experiments: {e}", exc_info=True)

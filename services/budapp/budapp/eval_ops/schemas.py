@@ -5,7 +5,7 @@ from typing import List, Optional
 
 from pydantic import UUID4, BaseModel, Field
 
-from budapp.commons.schemas import SuccessResponse, PaginatedSuccessResponse
+from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse
 from budapp.eval_ops.models import RunStatusEnum
 
 
