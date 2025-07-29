@@ -104,7 +104,7 @@ class Endpoint(Base, TimestampMixin):
         back_populates="endpoint",
     )
     # Publication relationships
-    published_user: Mapped[Optional["User"]] = relationship("User", foreign_keys=[published_by])
+    published_user: Mapped[Optional["User"]] = relationship("User", foreign_keys=[published_by], back_populates="published_endpoints")
     publication_history: Mapped[list["PublicationHistory"]] = relationship(
         "PublicationHistory", back_populates="endpoint", cascade="all, delete-orphan"
     )
@@ -221,7 +221,7 @@ class PublicationHistory(Base, TimestampMixin):
     performed_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=lambda: datetime.now(timezone.utc)
     )
-    metadata: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    action_metadata: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     previous_state: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     new_state: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
 
@@ -243,7 +243,7 @@ class PublicationHistory(Base, TimestampMixin):
             "action": self.action,
             "performed_by": str(self.performed_by),
             "performed_at": self.performed_at.isoformat(),
-            "metadata": self.metadata,
+            "action_metadata": self.action_metadata,
             "previous_state": self.previous_state,
             "new_state": self.new_state,
             "created_at": self.created_at.isoformat(),

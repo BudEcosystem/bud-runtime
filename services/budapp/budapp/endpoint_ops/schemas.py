@@ -565,7 +565,7 @@ class UpdatePublicationStatusRequest(BaseModel):
     """Request schema for updating publication status (publish/unpublish)."""
 
     action: Literal["publish", "unpublish"]
-    metadata: Optional[dict] = None
+    action_metadata: Optional[dict] = None
 
 
 class PublicationHistoryEntry(BaseModel):
@@ -578,7 +578,7 @@ class PublicationHistoryEntry(BaseModel):
     action: str
     performed_by: UUID4
     performed_at: datetime
-    metadata: Optional[dict] = None
+    action_metadata: Optional[dict] = None
     previous_state: Optional[dict] = None
     new_state: Optional[dict] = None
     created_at: datetime

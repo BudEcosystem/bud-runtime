@@ -89,7 +89,7 @@ class TestEndpointPublicationService:
                         endpoint_id=endpoint_id,
                         action="publish",
                         current_user_id=mock_user.id,
-                        metadata={"reason": "Ready for production"}
+                        action_metadata={"reason": "Ready for production"}
                     )
 
                     # Assert
@@ -102,7 +102,7 @@ class TestEndpointPublicationService:
                     history_call_args = mock_history.call_args[1]
                     assert history_call_args['action'] == 'publish'
                     assert history_call_args['performed_by'] == mock_user.id
-                    assert history_call_args['metadata'] == {"reason": "Ready for production"}
+                    assert history_call_args['action_metadata'] == {"reason": "Ready for production"}
 
     @pytest.mark.asyncio
     async def test_update_publication_status_unpublish_success(self, mock_session, mock_endpoint, mock_user):
@@ -132,7 +132,7 @@ class TestEndpointPublicationService:
                         endpoint_id=endpoint_id,
                         action="unpublish",
                         current_user_id=mock_user.id,
-                        metadata={"reason": "Security issue found"}
+                        action_metadata={"reason": "Security issue found"}
                     )
 
                     # Assert
@@ -143,7 +143,7 @@ class TestEndpointPublicationService:
                     mock_history.assert_called_once()
                     history_call_args = mock_history.call_args[1]
                     assert history_call_args['action'] == 'unpublish'
-                    assert history_call_args['metadata'] == {"reason": "Security issue found"}
+                    assert history_call_args['action_metadata'] == {"reason": "Security issue found"}
 
     @pytest.mark.asyncio
     async def test_update_publication_status_endpoint_not_found(self, mock_session, mock_user):
@@ -244,7 +244,7 @@ class TestEndpointPublicationService:
             entry.action = "publish" if i % 2 == 0 else "unpublish"
             entry.performed_by = mock_user.id
             entry.performed_at = datetime.now(timezone.utc)
-            entry.metadata = {"iteration": i}
+            entry.action_metadata = {"iteration": i}
             history_entries.append(entry)
 
         with patch.object(EndpointDataManager, 'retrieve_by_fields', new_callable=AsyncMock) as mock_retrieve:
@@ -352,7 +352,7 @@ class TestEndpointPublicationCRUD:
             action="publish",
             performed_by=user_id,
             performed_at=action_time,
-            metadata={"reason": "Initial publication"},
+            action_metadata={"reason": "Initial publication"},
             previous_state={"is_published": False},
             new_state={"is_published": True}
         )
@@ -366,7 +366,7 @@ class TestEndpointPublicationCRUD:
         assert created_obj.deployment_id == deployment_id
         assert created_obj.action == "publish"
         assert created_obj.performed_by == user_id
-        assert created_obj.metadata == {"reason": "Initial publication"}
+        assert created_obj.action_metadata == {"reason": "Initial publication"}
 
 
 class TestEndpointPublicationSchemas:
@@ -415,7 +415,7 @@ class TestEndpointPublicationSchemas:
         # Valid publish action
         request = UpdatePublicationStatusRequest(
             action="publish",
-            metadata={"reason": "Ready for production"}
+            action_metadata={"reason": "Ready for production"}
         )
         assert request.action == "publish"
         assert request.metadata["reason"] == "Ready for production"
@@ -423,10 +423,10 @@ class TestEndpointPublicationSchemas:
         # Valid unpublish action
         request = UpdatePublicationStatusRequest(
             action="unpublish",
-            metadata=None
+            action_metadata=None
         )
         assert request.action == "unpublish"
-        assert request.metadata is None
+        assert request.action_metadata is None
 
         # Invalid action should raise validation error
         with pytest.raises(ValueError):
@@ -440,7 +440,7 @@ class TestEndpointPublicationSchemas:
             "action": "publish",
             "performed_by": uuid4(),
             "performed_at": datetime.now(timezone.utc),
-            "metadata": {"reason": "Test"},
+            "action_metadata": {"reason": "Test"},
             "previous_state": {"is_published": False},
             "new_state": {"is_published": True},
             "created_at": datetime.now(timezone.utc),
@@ -454,7 +454,7 @@ class TestEndpointPublicationSchemas:
 
         entry = PublicationHistoryEntry(**entry_data)
         assert entry.action == "publish"
-        assert entry.metadata["reason"] == "Test"
+        assert entry.action_metadata["reason"] == "Test"}
         assert entry.performed_by_user["email"] == "test@example.com"
 
     @pytest.mark.asyncio
@@ -481,7 +481,7 @@ class TestEndpointPublicationSchemas:
                 endpoint_id=endpoint_id,
                 action="publish",
                 current_user_id=mock_user.id,
-                metadata={"reason": "Attempting to republish"}
+                action_metadata={"reason": "Attempting to republish"}
             )
 
             # Assert - should return without error (idempotent)
@@ -512,7 +512,7 @@ class TestEndpointPublicationSchemas:
                 endpoint_id=endpoint_id,
                 action="unpublish",
                 current_user_id=mock_user.id,
-                metadata={"reason": "Attempting to unpublish again"}
+                action_metadata={"reason": "Attempting to unpublish again"}
             )
 
             # Assert - should return without error (idempotent)
@@ -544,7 +544,7 @@ class TestEndpointPublicationSchemas:
                     endpoint_id=endpoint_id,
                     action="publish",
                     current_user_id=mock_user.id,
-                    metadata={"reason": "Trying to publish pending endpoint"}
+                    action_metadata={"reason": "Trying to publish pending endpoint"}
                 )
 
             assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
@@ -576,7 +576,7 @@ class TestEndpointPublicationSchemas:
                     endpoint_id=endpoint_id,
                     action="publish",
                     current_user_id=mock_user.id,
-                    metadata={"reason": "Trying to publish failed endpoint"}
+                    action_metadata={"reason": "Trying to publish failed endpoint"}
                 )
 
             assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
@@ -608,7 +608,7 @@ class TestEndpointPublicationSchemas:
                     endpoint_id=endpoint_id,
                     action="publish",
                     current_user_id=mock_user.id,
-                    metadata={"reason": "Trying to publish unhealthy endpoint"}
+                    action_metadata={"reason": "Trying to publish unhealthy endpoint"}
                 )
 
             assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
@@ -660,7 +660,7 @@ class TestEndpointPublicationSchemas:
                             endpoint_id=endpoint_id,
                             action="unpublish",
                             current_user_id=mock_user.id,
-                            metadata={"reason": f"Unpublishing {state} endpoint"}
+                            action_metadata={"reason": f"Unpublishing {state} endpoint"}
                         )
 
                         # Assert
@@ -702,7 +702,7 @@ class TestEndpointPublicationSchemas:
                         endpoint_id=endpoint_id,
                         action="publish",
                         current_user_id=mock_user.id,
-                        metadata={"reason": "Testing state transition", "version": "1.0"}
+                        action_metadata={"reason": "Testing state transition", "version": "1.0"}
                     )
 
                     # Assert - verify state transition tracking
@@ -712,7 +712,7 @@ class TestEndpointPublicationSchemas:
                     assert call_args['deployment_id'] == endpoint_id
                     assert call_args['action'] == "publish"
                     assert call_args['performed_by'] == mock_user.id
-                    assert call_args['metadata'] == {"reason": "Testing state transition", "version": "1.0"}
+                    assert call_args['action_metadata'] == {"reason": "Testing state transition", "version": "1.0"}
 
                     # Verify state transition
                     assert call_args['previous_state']['is_published'] is False

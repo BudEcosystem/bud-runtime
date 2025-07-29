@@ -37,7 +37,7 @@ def upgrade() -> None:
         sa.Column("action", sa.String(length=20), nullable=False),
         sa.Column("performed_by", sa.UUID(), nullable=False),
         sa.Column("performed_at", sa.DateTime(), nullable=False),
-        sa.Column("metadata", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column("action_metadata", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column("previous_state", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column("new_state", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column("created_at", sa.DateTime(), nullable=False),

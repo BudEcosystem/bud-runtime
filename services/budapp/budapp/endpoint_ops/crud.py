@@ -21,6 +21,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
 from sqlalchemy import and_, asc, case, cast, desc, distinct, func, literal, or_, select, update
+from sqlalchemy.orm import joinedload
 from sqlalchemy.dialects.postgresql import JSONB
 
 from budapp.cluster_ops.models import Cluster as ClusterModel
@@ -510,7 +511,7 @@ class PublicationHistoryDataManager(DataManagerUtils):
         action: str,
         performed_by: UUID,
         performed_at: datetime,
-        metadata: Optional[dict] = None,
+        action_metadata: Optional[dict] = None,
         previous_state: Optional[dict] = None,
         new_state: Optional[dict] = None,
     ) -> PublicationHistoryModel:
@@ -521,7 +522,7 @@ class PublicationHistoryDataManager(DataManagerUtils):
             action (str): The action performed ("publish" or "unpublish").
             performed_by (UUID): The ID of the user who performed the action.
             performed_at (datetime): When the action was performed.
-            metadata (Optional[dict]): Additional metadata about the action.
+            action_metadata (Optional[dict]): Additional metadata about the action.
             previous_state (Optional[dict]): The state before the action.
             new_state (Optional[dict]): The state after the action.
 
@@ -533,7 +534,7 @@ class PublicationHistoryDataManager(DataManagerUtils):
             action=action,
             performed_by=performed_by,
             performed_at=performed_at,
-            metadata=metadata,
+            action_metadata=action_metadata,
             previous_state=previous_state,
             new_state=new_state,
         )

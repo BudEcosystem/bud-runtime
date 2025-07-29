@@ -2604,7 +2604,7 @@ class EndpointService(SessionMixin):
             # Don't raise exception - cache update failure shouldn't block settings update
 
     async def update_publication_status(
-        self, endpoint_id: UUID, action: str, current_user_id: UUID, metadata: Optional[dict] = None
+        self, endpoint_id: UUID, action: str, current_user_id: UUID, action_metadata: Optional[dict] = None
     ) -> EndpointModel:
         """Update the publication status of an endpoint (publish/unpublish).
 
@@ -2612,7 +2612,7 @@ class EndpointService(SessionMixin):
             endpoint_id (UUID): The ID of the endpoint.
             action (str): The action to perform ("publish" or "unpublish").
             current_user_id (UUID): The ID of the user performing the action.
-            metadata (Optional[dict]): Additional metadata about the action.
+            action_metadata (Optional[dict]): Additional metadata about the action.
 
         Returns:
             EndpointModel: The updated endpoint.
@@ -2691,7 +2691,7 @@ class EndpointService(SessionMixin):
             action=action,
             performed_by=current_user_id,
             performed_at=action_time,
-            metadata=metadata,
+            action_metadata=action_metadata,
             previous_state=previous_state,
             new_state=new_state,
         )
@@ -2736,10 +2736,36 @@ class EndpointService(SessionMixin):
             limit=limit,
         )
 
-        # User details are already loaded via eager loading (joinedload)
+        # Transform history entries to include user summary
+        transformed_entries = []
+        for entry in history_entries:
+            entry_dict = {
+                "id": entry.id,
+                "deployment_id": entry.deployment_id,
+                "action": entry.action,
+                "performed_by": entry.performed_by,
+                "performed_at": entry.performed_at,
+                "action_metadata": entry.action_metadata,
+                "previous_state": entry.previous_state,
+                "new_state": entry.new_state,
+                "created_at": entry.created_at,
+                "modified_at": entry.modified_at,
+            }
+            
+            # Add user summary if user details are loaded
+            if entry.performed_by_user:
+                entry_dict["performed_by_user"] = {
+                    "id": entry.performed_by_user.id,
+                    "email": entry.performed_by_user.email,
+                    "name": entry.performed_by_user.name,
+                }
+            else:
+                entry_dict["performed_by_user"] = None
+                
+            transformed_entries.append(entry_dict)
 
         return {
-            "history": history_entries,
+            "history": transformed_entries,
             "total_record": total_count,
             "page": page,
             "limit": limit,

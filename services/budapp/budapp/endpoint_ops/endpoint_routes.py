@@ -677,7 +677,7 @@ async def update_publication_status(
             endpoint_id=endpoint_id,
             action=request.action,
             current_user_id=current_user.id,
-            metadata=request.metadata,
+            action_metadata=request.action_metadata,
         )
         return PublishEndpointResponse(
             endpoint_id=endpoint.id,
