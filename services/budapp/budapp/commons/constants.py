@@ -552,7 +552,7 @@ class WorkflowTypeEnum(StrEnum):
     MODEL_BENCHMARK = auto()
     ADD_ADAPTER = auto()
     DELETE_ADAPTER = auto()
-    EXPERIMENT_CREATION = auto()
+    EVALUATION_CREATION = auto()
 
 
 class NotificationType(Enum):
