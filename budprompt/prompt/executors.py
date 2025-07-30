@@ -27,13 +27,9 @@ from pydantic_ai.providers.openai import OpenAIProvider
 
 from budprompt.commons.exceptions import InputValidationError, PromptExecutionError, SchemaConversionError
 
+from .schema_builder import PydanticModelGenerator
 from .schemas import Message, ModelSettings
-from .utils import (
-    convert_json_schema_to_pydantic,
-    load_pydantic_model_from_code,
-    validate_input_data_type,
-    validate_json_schema,
-)
+from .utils import validate_input_data_type
 
 
 logger = logging.getLogger(__name__)
@@ -55,6 +51,7 @@ class SimplePromptExecutor:
         """
         self.base_url = base_url
         self.api_key = api_key
+        self.model_generator = PydanticModelGenerator()
 
     async def execute(
         self,
@@ -146,14 +143,8 @@ class SimplePromptExecutor:
         Raises:
             SchemaConversionError: If conversion fails
         """
-        # Validate schema
-        validate_json_schema(schema)
-
-        # Convert to Pydantic code
-        generated_code = convert_json_schema_to_pydantic(schema, model_name)
-
-        # Load model from code
-        return load_pydantic_model_from_code(generated_code, model_name)
+        # Use the model generator to create Pydantic model from schema
+        return self.model_generator.from_json_schema(schema, model_name)
 
     async def _create_agent(
         self,
