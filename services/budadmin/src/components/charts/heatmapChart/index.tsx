@@ -84,9 +84,9 @@ const HeatmapChart: React.FC<HeatmapChartProps> = ({ data }) => {
             show: false,
           },
           axisLabel: {
-            color: '#B3B3B3',
-            fontSize: 11,
-            fontWeight: 400,
+            color: '#FFFFFF',
+            fontSize: 14,
+            fontWeight: 600,
             interval: 0,
             rotate: 0,
           },
@@ -107,9 +107,9 @@ const HeatmapChart: React.FC<HeatmapChartProps> = ({ data }) => {
             show: false,
           },
           axisLabel: {
-            color: '#B3B3B3',
-            fontSize: 11,
-            fontWeight: 400,
+            color: '#FFFFFF',
+            fontSize: 14,
+            fontWeight: 600,
           },
         },
         visualMap: {
