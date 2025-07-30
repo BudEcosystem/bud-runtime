@@ -560,7 +560,7 @@ class TestEndpointPublicationSchemas:
                 )
 
             assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
-            assert "Cannot publish endpoint in PENDING state" in exc_info.value.message
+            assert "Cannot publish endpoint in pending state" in exc_info.value.message
             assert "must be in RUNNING state" in exc_info.value.message
 
     @pytest.mark.asyncio
