@@ -54,6 +54,6 @@ mkShell {
     export_sops_secret_silent s3 access_key AWS_ACCESS_KEY_ID
     export_sops_secret_silent s3 secret_key AWS_SECRET_ACCESS_KEY
 
-    export PS1="\033[0;35m[bud-infra]\033[0m $PS1"
+    export PS1="\033[0;35m[bud]\033[0m $PS1"
   '';
 }
