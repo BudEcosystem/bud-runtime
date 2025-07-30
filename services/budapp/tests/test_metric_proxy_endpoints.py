@@ -22,7 +22,7 @@ from budapp.model_ops.models import Model
 @pytest.fixture
 def mock_user():
     """Mock user for testing."""
-    user = Mock(spec=User)
+    user = Mock()
     user.id = str(uuid.uuid4())
     user.username = "testuser"
     user.email = "test@example.com"
@@ -32,8 +32,9 @@ def mock_user():
 @pytest.fixture
 def mock_project():
     """Mock project for testing."""
-    project = Mock(spec=Project)
-    project.id = str(uuid.uuid4())
+    project = Mock()
+    project_id = str(uuid.uuid4())
+    project.id = project_id
     project.name = "Test Project"
     project.organization_id = str(uuid.uuid4())
     return project
@@ -42,7 +43,7 @@ def mock_project():
 @pytest.fixture
 def mock_endpoint():
     """Mock endpoint for testing."""
-    endpoint = Mock(spec=Endpoint)
+    endpoint = Mock()
     endpoint.id = str(uuid.uuid4())
     endpoint.name = "Test Endpoint"
     endpoint.project_id = str(uuid.uuid4())
@@ -52,7 +53,7 @@ def mock_endpoint():
 @pytest.fixture
 def mock_model():
     """Mock model for testing."""
-    model = Mock(spec=Model)
+    model = Mock()
     model.id = str(uuid.uuid4())
     model.name = "gpt-4"
     model.display_name = "GPT-4"
@@ -128,7 +129,8 @@ class TestMetricProxyEndpoints:
                 offset=0
             )
 
-            response = await service.list_inferences(request, mock_db_session, mock_user)
+            service.set_db_session(mock_db_session)
+            response = await service.list_inferences(request, mock_user)
 
             assert response.total_count == 1
             assert len(response.items) == 1
@@ -319,7 +321,8 @@ class TestMetricProxyEndpoints:
                 from_date=datetime.utcnow() - timedelta(days=7)
             )
 
-            response = await service.list_inferences(request, mock_db_session, mock_user)
+            service.set_db_session(mock_db_session)
+            response = await service.list_inferences(request, mock_user)
 
             # Should still return data, but without enriched names
             assert response.total_count == 1
