@@ -18,7 +18,6 @@
 
 import logging
 import time
-from typing import Any, Dict
 
 from .executors import SimplePromptExecutor
 from .schemas import PromptExecuteRequest, PromptExecuteResponse
@@ -55,13 +54,6 @@ class PromptExecutorService:
         metadata = {}
 
         try:
-            logger.info(f"Executing prompt with deployment: {request.deployment_name}")
-
-            # Log whether this is structured or unstructured
-            input_type = "structured" if request.input_schema is not None else "unstructured"
-            output_type = "structured" if request.output_schema is not None else "unstructured"
-            logger.info(f"Input type: {input_type}, Output type: {output_type}")
-
             # Execute the prompt with input_data from request
             result = await self.executor.execute(
                 deployment_name=request.deployment_name,
@@ -97,33 +89,3 @@ class PromptExecutorService:
             clean_model_cache()
 
             return PromptExecuteResponse(success=False, data=None, error=str(e), metadata=metadata)
-
-    async def validate_deployment(self, deployment_name: str) -> bool:
-        """Validate if a deployment exists and is accessible.
-
-        Args:
-            deployment_name: Name of the deployment to validate
-
-        Returns:
-            True if deployment is valid, False otherwise
-        """
-        # TODO: Implement deployment validation
-        # For now, we assume all deployments are valid
-        return True
-
-    async def get_deployment_info(self, deployment_name: str) -> Dict[str, Any]:
-        """Get information about a deployment.
-
-        Args:
-            deployment_name: Name of the deployment
-
-        Returns:
-            Deployment information dictionary
-        """
-        # TODO: Implement deployment info retrieval
-        # For now, return basic info
-        return {
-            "name": deployment_name,
-            "status": "active",
-            "base_url": self.executor.base_url,
-        }

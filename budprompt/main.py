@@ -26,7 +26,7 @@ from budmicroframe.shared.dapr_workflow import DaprWorkflow
 from fastapi import FastAPI
 
 from .commons.config import app_settings, secrets_settings
-from .prompt.routes import router as prompt_router
+from .prompt.routes import prompt_router
 
 
 logger = logging.getLogger(__name__)

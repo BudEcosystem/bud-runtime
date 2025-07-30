@@ -17,9 +17,8 @@
 """API routes for the prompt module."""
 
 import logging
-from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, HTTPException, status
 
 from .schemas import PromptExecuteRequest, PromptExecuteResponse
 from .services import PromptExecutorService
@@ -27,30 +26,16 @@ from .services import PromptExecutorService
 
 logger = logging.getLogger(__name__)
 
-# Create router
-router = APIRouter(
+# Prompt Router
+prompt_router = APIRouter(
     prefix="/prompt",
     tags=["prompt"],
-    responses={
-        404: {"description": "Not found"},
-        500: {"description": "Internal server error"},
-    },
 )
 
 
-def get_prompt_executor_service() -> PromptExecutorService:
-    """Dependency to get the PromptExecutorService instance.
-
-    Returns:
-        PromptExecutorService instance
-    """
-    return PromptExecutorService()
-
-
-@router.post(
+@prompt_router.post(
     "/execute",
     response_model=PromptExecuteResponse,
-    status_code=status.HTTP_200_OK,
     summary="Execute a prompt",
     description="Execute a prompt with structured input and output schemas",
     responses={
@@ -59,12 +44,12 @@ def get_prompt_executor_service() -> PromptExecutorService:
             "model": PromptExecuteResponse,
         },
         400: {"description": "Invalid request"},
-        500: {"description": "Execution error"},
+        422: {"description": "Unprocessable entity"},
+        500: {"description": "Internal server error"},
     },
 )
 async def execute_prompt(
     request: PromptExecuteRequest,
-    service: Annotated[PromptExecutorService, Depends(get_prompt_executor_service)],
 ) -> PromptExecuteResponse:
     """Execute a prompt with structured input and output.
 
@@ -79,10 +64,10 @@ async def execute_prompt(
         HTTPException: If the request is invalid or execution fails
     """
     try:
-        logger.info(f"Received prompt execution request for deployment: {request.deployment_name}")
+        logger.info("Received prompt execution request")
 
         # Execute the prompt
-        response = await service.execute_prompt(request)
+        response = await PromptExecutorService().execute_prompt(request)
 
         # If execution failed, return appropriate status
         if not response.success:
