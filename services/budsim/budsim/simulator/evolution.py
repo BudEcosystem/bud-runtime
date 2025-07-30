@@ -554,6 +554,7 @@ class Evolution:
         # device_config.pop("node_name", None)
         # device_config.pop("id", None)
         # device_config.pop("type", None)
+        logger.info(f"Creating ModelAnalysis with TP={ind_config['tensor_parallel_size']}, PP={ind_config.get('pipeline_parallel_size', 1)}")
         model_analysis = ModelAnalysis(
             model=self.model,
             device_config=device_config,
@@ -563,7 +564,9 @@ class Evolution:
             tp_size=ind_config["tensor_parallel_size"],
             pp_size=ind_config.get("pipeline_parallel_size", 1),  # Include PP size
         )
+        logger.info("Calling model_analysis.analyze()")
         model_data = model_analysis.analyze()
+        logger.info("ModelAnalysis complete")
 
         # Add PP-specific features to the data dictionary
         pp_size = ind_config.get("pipeline_parallel_size", 1)
@@ -670,9 +673,11 @@ class Evolution:
     def _evaluate_func(self, population: List[Any]) -> List[Any]:
         # Evaluate the individuals with an invalid fitness
         individuals = [ind for ind in population if not ind.fitness.valid]
+        logger.info(f"Evaluating {len(individuals)} individuals in population")
 
-        for ind in individuals:
+        for idx, ind in enumerate(individuals):
             ind_config = self._individual_to_config(ind)
+            logger.info(f"Evaluating individual {idx+1}/{len(individuals)}: {ind_config}")
             config_tuple = self._config_to_tuple(ind_config)
 
             try:
@@ -706,13 +711,16 @@ class Evolution:
                 self.evaluated_configs[config_tuple] = eval_result
                 continue
 
+            logger.info(f"Preparing predictor data for config: {ind_config}")
             data = self.prepare_predictor_data(ind_config)
 
             # Route to appropriate prediction method
+            logger.info(f"Using {'heuristic' if self.use_heuristic else 'ML predictor'} for performance prediction")
             if self.use_heuristic:
                 ttft, throughput_per_user, e2e_latency = self.heuristic_calculator(data)
             else:
                 ttft, throughput_per_user, e2e_latency = self.benchmark_predictor(data)
+            logger.info(f"Performance prediction complete: TTFT={ttft}, Throughput={throughput_per_user}, E2E={e2e_latency}")
 
             ttft, throughput_per_user, e2e_latency = self.apply_quantization_performance(
                 ttft, throughput_per_user, e2e_latency
