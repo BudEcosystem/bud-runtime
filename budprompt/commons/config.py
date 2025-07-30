@@ -19,7 +19,7 @@
 from pathlib import Path
 
 from budmicroframe.commons.config import BaseAppConfig, BaseSecretsConfig, register_settings
-from pydantic import DirectoryPath
+from pydantic import DirectoryPath, Field
 
 from ..__about__ import __version__
 
@@ -32,6 +32,9 @@ class AppConfig(BaseAppConfig):
 
     # Base Directory
     base_dir: DirectoryPath = Path(__file__).parent.parent.parent.resolve()
+
+    # BudServe Gateway Configuration
+    bud_gateway_base_url: str = Field(..., alias="BUD_GATEWAY_BASE_URL")
 
 
 class SecretsConfig(BaseSecretsConfig):

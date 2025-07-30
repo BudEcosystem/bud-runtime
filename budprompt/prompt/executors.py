@@ -22,10 +22,9 @@ from typing import Any, Dict, List, Optional, Type, Union
 from pydantic import BaseModel, ValidationError
 from pydantic_ai import Agent
 from pydantic_ai.models.openai import ModelSettings as OpenAIModelSettings
-from pydantic_ai.models.openai import OpenAIModel
-from pydantic_ai.providers.openai import OpenAIProvider
 
 from budprompt.commons.exceptions import InputValidationError, PromptExecutionError, SchemaConversionError
+from budprompt.shared.providers import BudServeProvider
 
 from .schema_builder import PydanticModelGenerator
 from .schemas import Message, ModelSettings
@@ -42,15 +41,9 @@ class SimplePromptExecutor:
     creates AI agents, and executes prompts with structured input/output.
     """
 
-    def __init__(self, base_url: str = "http://20.66.97.208/v1", api_key: str = "sk_"):
-        """Initialize the SimplePromptExecutor.
-
-        Args:
-            base_url: Base URL for the OpenAI-compatible API
-            api_key: API key for authentication (default: sk_ for BudInference)
-        """
-        self.base_url = base_url
-        self.api_key = api_key
+    def __init__(self):
+        """Initialize the SimplePromptExecutor."""
+        self.provider = BudServeProvider()
         self.model_generator = PydanticModelGenerator()
 
     async def execute(
@@ -164,15 +157,9 @@ class SimplePromptExecutor:
         Returns:
             Configured AI agent
         """
-        provider = OpenAIProvider(
-            base_url=self.base_url,
-            api_key=self.api_key,
-        )
-
-        # Create OpenAI model with custom endpoint
-        model = OpenAIModel(
+        # Create model using BudServeProvider
+        model = self.provider.get_model(
             model_name=deployment_name,
-            provider=provider,
             settings=OpenAIModelSettings(
                 temperature=model_settings.temperature,
                 max_tokens=model_settings.max_tokens,

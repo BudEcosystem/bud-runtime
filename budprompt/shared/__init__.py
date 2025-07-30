@@ -15,3 +15,8 @@
 #  -----------------------------------------------------------------------------
 
 """The shared package, containing shared services and components that are used across multiple microservices within the project."""
+
+from .providers import BudServeProvider
+
+
+__all__ = ["BudServeProvider"]
