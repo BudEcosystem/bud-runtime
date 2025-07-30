@@ -12,6 +12,10 @@ pydantic-settings >= 2.3.4
 structlog >= 24.4.0
 cachetools >= 5.4.0
 
+# AI & Schema Generation
+pydantic-ai == 0.4.4
+datamodel-code-generator == 0.32.0
+
 # Database
 SQLAlchemy>=2.0.36
 sqlalchemy-utils>=0.41.2

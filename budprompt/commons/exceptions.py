@@ -36,3 +36,21 @@ class BaseException(Exception):
             Formatted error message with exception class name
         """
         return f"{self.__class__.__name__}: {self.message}"
+
+
+class SchemaConversionError(BaseException):
+    """Exception raised when JSON schema to Pydantic model conversion fails."""
+
+    pass
+
+
+class PromptExecutionError(BaseException):
+    """Exception raised when prompt execution fails."""
+
+    pass
+
+
+class InputValidationError(BaseException):
+    """Exception raised when input validation fails."""
+
+    pass

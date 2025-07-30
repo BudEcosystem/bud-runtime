@@ -26,6 +26,7 @@ from budmicroframe.shared.dapr_workflow import DaprWorkflow
 from fastapi import FastAPI
 
 from .commons.config import app_settings, secrets_settings
+from .prompt.routes import router as prompt_router
 
 
 logger = logging.getLogger(__name__)
@@ -59,3 +60,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 app = configure_app(app_settings, secrets_settings, lifespan=lifespan)
+
+# Include the prompt router
+app.include_router(prompt_router)
