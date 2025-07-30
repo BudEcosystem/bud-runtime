@@ -145,3 +145,12 @@ Key environment variables (see `.env.sample`):
 - Configuration syncs periodically from Dapr configuration store
 - Pre-commit hooks enforce code quality standards
 - Ruff is configured for 119 character line length
+
+# Code Quality (*VERY IMPORTANT*)
+- Use the following design patterns on planning the code **VERY IMPORTANT**
+    - https://refactoring.guru/design-patterns/catalog
+- Do a research on the codebase before writing and planning the code
+- If you are not sure about what to do, ask me for help
+- Make sure to follow single responsibility, Solid, DRY, etc. principles.
+- When creating a new file or directory, make sure to follow the project structure and file structure from docs/microservice_guidelines.md
+- New envs should be added to the .env.sample file
