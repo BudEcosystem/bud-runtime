@@ -65,6 +65,12 @@ class EngineArgs(BaseEngineArgs):
         default=1,
     )
 
+    pipeline_parallel_size: int = Field(
+        description="The pipeline parallel size.",
+        alias="args_pipeline_parallel_size",
+        default=1,
+    )
+
     disable_custom_all_reduce: bool = Field(
         description="Whether to disable custom all reduce.",
         alias="args_disable_custom_all_reduce",
@@ -77,6 +83,27 @@ class EngineArgs(BaseEngineArgs):
         default="cuda",
         examples=["xpu", "cuda"],
     )
+
+    @staticmethod
+    def get_pipeline_parallel_size(value: Optional[int] = None) -> int:
+        """Retrieve the pipeline parallel size.
+
+        This method returns a random integer between the minimum and maximum
+        values for the pipeline parallel size, incremented by 2.
+
+        Args:
+            value (int, optional): The initial value for mutation. Defaults to None.
+
+        Returns:
+            int: A random integer between 1 and 8, incremented by powers of 2.
+        """
+        min_val = 1
+        max_val = 3
+        if value is not None:
+            mutation = random.choice([-1, 1]) * 2
+            mutated_value = min(max_val, max(min_val, value + mutation))
+            return int(2**mutated_value)
+        return int(2 ** random.randint(min_val, max_val))
 
     @staticmethod
     def get_disable_custom_all_reduce(value: Optional[bool] = None) -> bool:
@@ -124,10 +151,27 @@ class EngineCompatibility(BaseEngineCompatibility):
 
     def check_args_compatibility(self, engine_args: Dict[str, Any]) -> bool:
         """Check the compatibility of the engine args/envs combinations."""
-        if engine_args.get("tensor_parallel_size", 1) > 1:
+        tp_size = engine_args.get("tensor_parallel_size", 1)
+        pp_size = engine_args.get("pipeline_parallel_size", 1)
+
+        if tp_size > 1:
             assert engine_args.get("disable_custom_all_reduce"), (
                 "disable_custom_all_reduce must be set to True when tensor_parallel_size > 1."
             )
+
+        # Basic validation for PP and TP sizes
+        if pp_size is not None:
+            assert isinstance(pp_size, int) and pp_size >= 1, (
+                f"pipeline_parallel_size must be a positive integer, got {pp_size}"
+            )
+
+        if tp_size is not None:
+            assert isinstance(tp_size, int) and tp_size >= 1, (
+                f"tensor_parallel_size must be a positive integer, got {tp_size}"
+            )
+
+        # SGLang supports pipeline parallelism for multi-node deployments
+        # Additional SGLang-specific PP constraints can be added here as needed
 
         return True
 

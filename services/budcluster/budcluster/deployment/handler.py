@@ -177,8 +177,8 @@ class DeploymentHandler:
                     raise ValueError(f"Device configuration is missing required keys: {device}")
                 device["args"]["port"] = app_settings.engine_container_port
                 device["args"]["tensor-parallel-size"] = 1
-                device["args"]["max-loras"] = max_loras
-                device["args"]["max-lora-rank"] = 256
+                # device["args"]["max-loras"] = max_loras
+                # device["args"]["max-lora-rank"] = 256
 
                 # Remove scheduler-delay-factor and chunked-prefill-enabled from args
                 device["args"] = {
@@ -188,7 +188,7 @@ class DeploymentHandler:
                 }
                 device["args"] = self._prepare_args(device["args"])
                 device["args"].append(f"--served-model-name={namespace}")
-                device["args"].append("--enable-lora")
+                # device["args"].append("--enable-lora")
                 device["args"].append("--max-model-len=8192")
 
                 thread_bind, core_count = self._get_cpu_affinity(device["tp_size"])

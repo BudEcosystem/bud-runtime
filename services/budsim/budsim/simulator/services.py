@@ -53,6 +53,7 @@ from .schemas import (
     DeviceConfiguration,
     DeviceTypeMetrics,
     NodeConfiguration,
+    SimulationMethod,
     SimulationMetrics,
 )
 
@@ -63,6 +64,180 @@ dapr_workflow = DaprWorkflow()
 
 
 class SimulationService:
+    @staticmethod
+    def _group_devices_by_type_across_cluster(
+        cluster_info: List[Dict[str, Any]], cluster_topology: Dict[str, Any]
+    ) -> Dict[str, Dict[str, Any]]:
+        """Group devices by type across the entire cluster for PP-aware optimization.
+
+        This method creates device groups that span across nodes and clusters,
+        enabling better pipeline parallel planning by considering all available
+        devices of the same type together.
+
+        Args:
+            cluster_info: List of cluster dictionaries with node and device information
+            cluster_topology: Pre-analyzed cluster topology information
+
+        Returns:
+            Dict mapping device type to device group information including:
+                - devices: List of all devices of this type
+                - cluster_id: ID of the cluster (assumes single cluster for now)
+                - node_distribution: Count of devices per node
+                - devices_by_node: Devices organized by node for PP planning
+        """
+        device_groups = {}
+
+        for cluster in cluster_info:
+            cluster_id = cluster["id"]
+
+            for node in cluster.get("nodes", []):
+                node_id = node["id"]
+                node_name = node["name"]
+
+                for device in node.get("devices", []):
+                    device_type = device["type"]
+                    available_count = device["available_count"]
+
+                    logger.debug(
+                        f"Processing device {device.get('name', 'unknown')} in node {node_id}: "
+                        f"type={device_type}, available_count={available_count}"
+                    )
+
+                    # Skip devices with 0 available count
+                    if available_count <= 0:
+                        logger.warning(
+                            f"Skipping device {device.get('name', 'unknown')} in node {node_id}: "
+                            f"available_count = {available_count}"
+                        )
+                        continue
+
+                    # Initialize device group if not exists
+                    if device_type not in device_groups:
+                        device_groups[device_type] = {
+                            "devices": [],
+                            "cluster_id": cluster_id,
+                            "node_distribution": {},
+                            "devices_by_node": {},
+                        }
+
+                    # Add device spec to group (one record per device type per node)
+                    device_copy = deepcopy(device)
+                    device_copy["node_id"] = node_id
+                    device_copy["node_name"] = node_name
+                    device_copy["cluster_id"] = cluster_id
+                    device_groups[device_type]["devices"].append(device_copy)
+
+                    # Track node distribution (available_count represents actual physical devices)
+                    if node_id not in device_groups[device_type]["node_distribution"]:
+                        device_groups[device_type]["node_distribution"][node_id] = 0
+                        device_groups[device_type]["devices_by_node"][node_id] = []
+
+                    device_groups[device_type]["node_distribution"][node_id] += available_count
+                    device_groups[device_type]["devices_by_node"][node_id].append(device_copy)
+
+        # Add summary statistics to each device group
+        for device_type, group in device_groups.items():
+            group["total_nodes_with_device"] = len(group["node_distribution"])
+            group["max_devices_per_node"] = (
+                max(group["node_distribution"].values()) if group["node_distribution"] else 0
+            )
+            group["min_devices_per_node"] = (
+                min(group["node_distribution"].values()) if group["node_distribution"] else 0
+            )
+
+            logger.debug(
+                f"Device type {device_type}: {len(group['devices'])} devices across "
+                f"{group['total_nodes_with_device']} nodes, max_per_node={group['max_devices_per_node']}, "
+                f"node_distribution={group['node_distribution']}"
+            )
+
+        return device_groups
+
+    @staticmethod
+    def analyze_cluster_topology(cluster_info: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Analyze cluster topology for TP+PP planning.
+
+        This method analyzes the cluster structure to determine:
+        - Node capacities and device distributions
+        - Maximum TP size per node (intra-node parallelism)
+        - Maximum PP size (inter-node parallelism)
+        - Total cluster resources
+
+        Args:
+            cluster_info: List of cluster dictionaries with node and device information
+
+        Returns:
+            Dict containing cluster topology analysis for TP+PP optimization
+        """
+        node_capacities = []
+        total_nodes = 0
+        max_tp_per_node = 0
+        total_cluster_devices = 0
+
+        for cluster in cluster_info:
+            for node in cluster.get("nodes", []):
+                total_nodes += 1
+                device_types = {}
+                node_total_devices = 0
+
+                # Group devices by type within this node
+                for device in node.get("devices", []):
+                    device_type = device["type"]
+                    available_count = device["available_count"]
+
+                    if device_type not in device_types:
+                        device_types[device_type] = 0
+                    device_types[device_type] += available_count
+                    node_total_devices += available_count
+
+                node_capacities.append(
+                    {
+                        "cluster_id": cluster["id"],
+                        "node_id": node["id"],
+                        "node_name": node["name"],
+                        "device_types": device_types,
+                        "total_devices": node_total_devices,
+                        "inter_node_bandwidth": node.get("devices", [{}])[0].get(
+                            "inter_node_bandwidth_in_GB_per_sec", 200
+                        ),
+                        "intra_node_bandwidth": node.get("devices", [{}])[0].get(
+                            "intra_node_bandwidth_in_GB_per_sec", 300
+                        ),
+                    }
+                )
+
+                # Track maximums
+                max_tp_per_node = max(max_tp_per_node, node_total_devices)
+                total_cluster_devices += node_total_devices
+
+        return {
+            "total_nodes": total_nodes,
+            "node_capacities": node_capacities,
+            "max_tp_per_node": max_tp_per_node,
+            "total_cluster_devices": total_cluster_devices,
+            "max_pp_size": total_nodes,  # PP can span up to all nodes
+        }
+
+    @staticmethod
+    def get_simulation_method(request: ClusterRecommendationRequest) -> SimulationMethod:
+        """Determine which simulation method to use based on request and configuration.
+
+        Args:
+            request: The cluster recommendation request that may contain simulation_method
+
+        Returns:
+            SimulationMethod: The method to use for simulation (regressor or heuristic)
+        """
+        if request.simulation_method is not None:
+            return request.simulation_method
+
+        # Fall back to configuration default
+        default_method = app_settings.default_simulation_method.lower()
+        if default_method == "heuristic":
+            return SimulationMethod.HEURISTIC
+        else:
+            return SimulationMethod.REGRESSOR
+
     @staticmethod
     def get_eta(current_step: str, cluster_count: int, step_time: int = None):
         """Calculate the estimated time to completion for workflow steps.
@@ -112,6 +287,7 @@ class SimulationService:
         device_config: Dict[str, Any],
         quantization_type: str,
         engine_image: str,
+        simulation_method: SimulationMethod = SimulationMethod.REGRESSOR,
         **kwargs: Dict[str, Any],
     ) -> Dict[str, Any]:
         """Generate the top K deployment configurations based on the provided parameters.
@@ -146,20 +322,67 @@ class SimulationService:
                 generation=app_settings.generation_count,
                 population_size=app_settings.population_size,
                 dtype=quantization_type,
+                use_heuristic=(simulation_method == SimulationMethod.HEURISTIC),
             )
             top_k_configs = evolution.evolve()
 
-            device_config["device_id"] = device_config.pop("id", str(uuid.uuid4()))
-            device_config["device_type"] = device_config.pop("type")
-            device_config["device_name"] = device_config.pop("name", device_config["device_id"])
-            device_config = {k.lower(): v for k, v in device_config.items()}
+            # Handle both cluster-wide and legacy device configurations
+            if "node_distribution" in device_config:
+                # Cluster-wide configuration: create results for each device
+                results = []
+                devices_by_node = device_config.get("devices_by_node", {})
 
-            return {
-                "top_k_configs": top_k_configs,
-                "engine": engine_name,
-                "engine_image": engine_image,
-                "device_config": device_config,
-            }
+                for node_id, devices in devices_by_node.items():
+                    for device in devices:
+                        device_result = {
+                            "device_id": device.get("id", str(uuid.uuid4())),
+                            "device_type": device_config["device_type"],
+                            "device_name": device.get("name", device.get("id")),
+                            "node_id": node_id,
+                            "node_name": device.get("node_name", node_id),
+                            "cluster_id": device_config["cluster_id"],
+                            "available_count": device.get("available_count", 1),
+                            **{
+                                k.lower(): v
+                                for k, v in device.items()
+                                if k not in ["id", "type", "name", "node_id", "node_name", "cluster_id"]
+                            },
+                        }
+
+                        results.append(
+                            {
+                                "top_k_configs": top_k_configs,
+                                "engine": engine_name,
+                                "engine_image": engine_image,
+                                "device_config": device_result,
+                            }
+                        )
+
+                return (
+                    results
+                    if results
+                    else [
+                        {
+                            "top_k_configs": top_k_configs,
+                            "engine": engine_name,
+                            "engine_image": engine_image,
+                            "device_config": device_config,
+                        }
+                    ]
+                )
+            else:
+                # Legacy per-device configuration
+                device_config["device_id"] = device_config.pop("id", str(uuid.uuid4()))
+                device_config["device_type"] = device_config.pop("type")
+                device_config["device_name"] = device_config.pop("name", device_config["device_id"])
+                device_config = {k.lower(): v for k, v in device_config.items()}
+
+                return {
+                    "top_k_configs": top_k_configs,
+                    "engine": engine_name,
+                    "engine_image": engine_image,
+                    "device_config": device_config,
+                }
         except Exception as e:
             logger.exception(
                 "Error running simulation for %s with device type %s: %s",
@@ -177,6 +400,7 @@ class SimulationService:
         concurrency: int,
         device_config: Dict[str, Any],
         engine_image: str,
+        simulation_method: SimulationMethod = SimulationMethod.REGRESSOR,
         **kwargs: Dict[str, Any],
     ) -> Dict[str, Any]:
         """Generate the top K deployment configurations based on the provided parameters.
@@ -234,6 +458,7 @@ class SimulationService:
         quantization_method: str,
         quantization_type: str,
         engine_image: str,
+        simulation_method: SimulationMethod = SimulationMethod.REGRESSOR,
         **kwargs: Dict[str, Any],
     ) -> Dict[str, Any]:
         """Generate the top K quantization engine configurations based on the provided parameters.
@@ -583,28 +808,108 @@ class SimulationService:
         if request.is_quantization:
             method = self.get_topk_quantization_engine_configs
 
+        # Determine the simulation method to use
+        simulation_method = self.get_simulation_method(request)
+        logger.info(f"Using simulation method: {simulation_method.value}")
+
+        # Analyze cluster topology for TP+PP optimization
+        cluster_topology = self.analyze_cluster_topology(cluster_info)
+        logger.info(
+            f"Cluster topology: {cluster_topology['total_nodes']} nodes, {cluster_topology['total_cluster_devices']} total devices"
+        )
+
+        # Group devices by type across entire cluster for PP-aware optimization
+        device_groups = self._group_devices_by_type_across_cluster(cluster_info, cluster_topology)
+
+        # Filter out invalid device groups (no devices or no nodes)
+        valid_device_groups = {}
+        for device_type, group in device_groups.items():
+            if group["max_devices_per_node"] > 0 and group["total_nodes_with_device"] > 0:
+                valid_device_groups[device_type] = group
+            else:
+                logger.warning(
+                    f"Skipping device type {device_type}: "
+                    f"max_devices_per_node={group['max_devices_per_node']}, "
+                    f"total_nodes_with_device={group['total_nodes_with_device']}"
+                )
+
+        device_groups = valid_device_groups
+        logger.info(f"Found {len(device_groups)} valid device type groups for optimization")
+
+        if not device_groups:
+            logger.error("No valid device groups found for optimization")
+            raise ValueError(
+                "No devices available for simulation - all device types have 0 available count or 0 nodes"
+            )
+
         try:
             with ProcessPoolExecutor() as executor:
-                results = [
-                    executor.submit(
-                        method,
-                        device_config={
-                            **deepcopy(device),
-                            "cluster_id": cluster["id"],
-                            "node_id": node["id"],
-                            "node_name": node["name"],
-                        },
-                        **request.model_dump(),
-                        engine_name=engine_device_combo["engine_name"],
-                        engine_image=engine_device_combo["image"],
-                    )
-                    for cluster in cluster_info
-                    for node in cluster.get("nodes", [])
-                    for device in node.get("devices", [])
-                    for engine_device_combo in compatible_engines
-                    if device["type"] == engine_device_combo["device"]
-                ]
-                results = [future.result() for future in results]  # type: ignore
+                futures = []
+
+                # Run evolution once per device type with full cluster context
+                for device_type, device_group in device_groups.items():
+                    for engine_device_combo in compatible_engines:
+                        if engine_device_combo["device"] == device_type:
+                            # Calculate total available devices across all nodes
+                            total_available_count = sum(
+                                device["available_count"] for device in device_group["devices"]
+                            )
+
+                            # Create cluster-wide device configuration for this device type
+                            # Use first device as representative for specs but override counts
+                            representative_device = device_group["devices"][0].copy()
+                            representative_device["available_count"] = total_available_count
+
+                            # Create base config from representative device
+                            cluster_device_config = {
+                                **representative_device,  # Device specs first
+                                # Override with cluster-specific values (these take precedence)
+                                "device_type": device_type,
+                                "cluster_id": device_group["cluster_id"],
+                                "total_devices": total_available_count,  # Fixed: Total available devices, not device entries
+                                "node_distribution": device_group["node_distribution"],
+                                "devices_by_node": device_group["devices_by_node"],
+                                "cluster_topology": cluster_topology,
+                                "max_devices_per_node": device_group["max_devices_per_node"],
+                                "total_nodes_with_device": device_group["total_nodes_with_device"],
+                                "available_count": total_available_count,  # Ensure this is correct
+                            }
+
+                            logger.info(
+                                f"Creating cluster config for {device_type}: "
+                                f"max_devices_per_node={cluster_device_config['max_devices_per_node']}, "
+                                f"total_available_count={total_available_count}, "
+                                f"total_nodes_with_device={cluster_device_config['total_nodes_with_device']}, "
+                                f"total_devices={cluster_device_config['total_devices']}"
+                            )
+
+                            # Final safety check before creating Evolution
+                            if cluster_device_config["max_devices_per_node"] <= 0:
+                                logger.error(
+                                    f"Invalid cluster_device_config for {device_type}: "
+                                    f"max_devices_per_node = {cluster_device_config['max_devices_per_node']}"
+                                )
+                                continue  # Skip this invalid configuration
+
+                            futures.append(
+                                executor.submit(
+                                    method,
+                                    device_config=cluster_device_config,
+                                    **request.model_dump(),
+                                    engine_name=engine_device_combo["engine_name"],
+                                    engine_image=engine_device_combo["image"],
+                                    simulation_method=simulation_method,
+                                )
+                            )
+
+                # Collect results and flatten if needed
+                raw_results = [future.result() for future in futures]  # type: ignore
+                results = []
+                for result in raw_results:
+                    if isinstance(result, list):
+                        results.extend(result)
+                    elif result is not None:
+                        results.append(result)
 
             notification_req.payload.content = NotificationContent(
                 title="Generated best configurations for each cluster"

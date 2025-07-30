@@ -328,4 +328,4 @@ Note: Make sure to update CLAUDE.md if you come across anything new related to a
 ### Claude dev guidelines
 
 - Use sub agents when ever required
-- Use the stack-keeper agent to plan the development task and distribute to respective agents.
+- Use proactively stack-keeper agent to plan the development task and distribute to respective agents.

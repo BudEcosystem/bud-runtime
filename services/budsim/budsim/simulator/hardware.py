@@ -1,4 +1,8 @@
+import logging
 from typing import Any, Dict
+
+
+logger = logging.getLogger(__name__)
 
 
 class CostCalculator:
@@ -47,6 +51,11 @@ class CostCalculator:
         """
         tokens_in_million = 1e6
         tokens_generated_per_hour = throughput_per_user * concurrency * 60 * 60
+
+        # Avoid division by zero
+        if tokens_generated_per_hour <= 0:
+            logger.warning(f"Invalid tokens_generated_per_hour: {tokens_generated_per_hour}, returning high cost")
+            return 1e6  # Return very high cost for invalid configurations
 
         time_to_generate_million_tokens = tokens_in_million / tokens_generated_per_hour
 

@@ -12,6 +12,7 @@ class ModelAnalysis:
         output_tokens: int,
         concurrency: int,
         tp_size: int,
+        pp_size: int = 1,
     ):
         """Initialize ModelAnalysis.
 
@@ -22,17 +23,21 @@ class ModelAnalysis:
             output_tokens (int): Number of output tokens to generate.
             concurrency (int): Number of concurrent requests.
             tp_size (int): Tensor parallelism size.
+            pp_size (int): Pipeline parallelism size (default 1).
         """
         self.model = model
         self.device_config = device_config
         self.input_tokens = input_tokens
         self.output_tokens = output_tokens
         self.tp_size = tp_size
+        self.pp_size = pp_size
         self.concurrency = concurrency
 
         self.device_config.pop("cluster_id", None)
         self.device_config.pop("node_id", None)
         self.device_config.pop("node_name", None)
+        self.device_config.pop("node_devices", None)  # Remove new cluster context fields
+        self.device_config.pop("cluster_topology", None)
         self.device_config.pop("id", None)
         self.device_config.pop("type", None)
 
@@ -43,6 +48,7 @@ class ModelAnalysis:
             num_tokens_to_generate=self.output_tokens,
             batch_size_per_gpu=self.concurrency,
             tp_size=self.tp_size,
+            pp_size=self.pp_size,  # Add PP size support
             log_level="ERROR",
         )
 
