@@ -1,21 +1,26 @@
 # Bud Stack
 
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![License](https://img.shields.io/badge/License-AGPL%203.0-blue.svg)](https://opensource.org/licenses/AGPL-3.0)
 [![Python 3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Next.js](https://img.shields.io/badge/Next.js-14+-black.svg)](https://nextjs.org/)
+[![Rust](https://img.shields.io/badge/rust-1.70+-orange.svg)](https://www.rust-lang.org/)
 [![Kubernetes](https://img.shields.io/badge/kubernetes-1.25+-blue.svg)](https://kubernetes.io/)
 
-A comprehensive inference stack for GenAI deployment, optimization and scaling.  Bud Stack provides intelligent infrastructure automation, performance optimization, and seamless model deployment across multi-cloud/multi-hardware environments.
+A comprehensive AI/ML infrastructure platform for intelligent model deployment, optimization, and scaling. Bud Stack provides enterprise-grade automation, ML-driven performance optimization, and seamless deployment across multi-cloud and multi-hardware environments.
+
+**[Quick Start](#-quick-start)** • **[Documentation](#-documentation)** • **[Services](#-services)** • **[Contributing](#-contributing)**
 
 ## 🚀 Features
 
 - **Multi-Cloud Deployment**: Automated cluster provisioning on AWS EKS, Azure AKS, and on-premises OpenShift
 - **AI Model Management**: Complete lifecycle management for LLM and ML models with metadata and licensing
 - **Performance Optimization**: ML-based deployment optimization using genetic algorithms and XGBoost predictions
-- **Real-time Analytics**: ClickHouse-powered observability and time-series metrics
+- **Real-time Analytics**: ClickHouse-powered observability and time-series metrics with inference request tracking
+- **High-Performance Gateway**: Rust-based API gateway with sub-millisecond latency for model inference routing
 - **Intelligent Assistance**: AI-powered cluster analysis and performance recommendations
 - **Web Dashboard**: Modern Next.js frontend with real-time updates and interactive workflows
 - **Enterprise Security**: Keycloak authentication, multi-tenancy, and encrypted credential management
+- **Inference Observability**: Detailed tracking and analysis of AI model inference requests
 
 ## 📋 Table of Contents
 
@@ -35,29 +40,28 @@ Bud Stack follows a microservices architecture built on Kubernetes with Dapr for
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   budadmin      │    │     budapp      │    │   budcluster    │
-│   (Frontend)    │◄──►│  (Main API)     │◄──►│  (Clusters)     │
+│   budadmin      │    │     budapp      │    │   budgateway    │
+│   (Frontend)    │◄──►│  (Main API)     │◄──►│ (Rust Gateway)  │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
                               │                        │
         ┌─────────────────────┼────────────────────────┼─────────────────────┐
         │                     │                        │                     │
 ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│   budsim    │    │  budmodel   │    │ budmetrics  │    │  budnotify  │
-│(Simulation) │    │ (Registry)  │    │(Analytics)  │    │(Messaging)  │
+│ budcluster  │    │  budmodel   │    │ budmetrics  │    │  budnotify  │
+│ (Clusters)  │    │ (Registry)  │    │(Analytics)  │    │(Messaging)  │
 └─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
         │                     │                        │                     │
-        └─────────────────────┼────────────────────────┼─────────────────────┘
-                              │                        │
-                      ┌─────────────┐         ┌─────────────────┐
-                      │   ask-bud   │         │  Infrastructure │
-                      │ (AI Agent)  │         │ (K8s + Dapr)    │
-                      └─────────────┘         └─────────────────┘
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│   budsim    │    │   ask-bud   │    │  budeval    │    │budplayground│
+│(Simulation) │    │ (AI Agent)  │    │(Evaluation) │    │(Playground) │
+└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
 ```
 
 ### Core Technologies
 
 - **Backend**: Python 3.10+ with FastAPI and budmicroframe
 - **Frontend**: Next.js 14 with TypeScript and Zustand state management
+- **Gateway**: Rust with Tokio for high-performance async processing
 - **Service Mesh**: Dapr for communication, workflows, and state management
 - **Databases**: PostgreSQL, ClickHouse, Redis/Valkey
 - **Infrastructure**: Kubernetes, Helm, Terraform/OpenTofu, Ansible
@@ -75,9 +79,12 @@ Bud Stack follows a microservices architecture built on Kubernetes with Dapr for
 | **budcluster** | Cluster lifecycle management and infrastructure automation | FastAPI, Terraform, Ansible, PostgreSQL |
 | **budsim** | Performance simulation and ML-based deployment optimization | FastAPI, XGBoost, DEAP, PostgreSQL |
 | **budmodel** | Model registry with metadata, licensing, and leaderboard data | FastAPI, PostgreSQL, Hugging Face API |
-| **budmetrics** | Observability service with time-series analytics | FastAPI, ClickHouse, Redis |
+| **budmetrics** | Observability service with time-series analytics and inference tracking | FastAPI, ClickHouse, Redis |
 | **budnotify** | Notification and pub/sub messaging service | FastAPI, Redis, Dapr |
 | **ask-bud** | AI assistant for cluster analysis and recommendations | FastAPI, PostgreSQL, AI models |
+| **budgateway** | High-performance API gateway for model inference routing | Rust, Tokio, Redis, Multiple AI providers |
+| **budeval** | Model evaluation and benchmarking service | FastAPI, PostgreSQL |
+| **budplayground** | Interactive AI model testing interface | Next.js, React |
 
 ### Frontend Service
 
@@ -127,13 +134,20 @@ Ensure Docker, Node.js, and Python are installed on your system.
 
 #### Start Individual Services
 ```bash
-# Backend services
+# Backend services (Python/FastAPI)
 cd services/budapp && ./deploy/start_dev.sh
 cd services/budcluster && ./deploy/start_dev.sh --build
 cd services/budsim && ./deploy/start_dev.sh --build
+cd services/budmodel && ./deploy/start_dev.sh
+cd services/budmetrics && ./deploy/start_dev.sh
+cd services/budnotify && ./deploy/start_dev.sh
+cd services/ask-bud && ./deploy/start_dev.sh
+
+# Rust gateway service
+cd services/budgateway && cargo run
 
 # Frontend dashboard
-cd services/budadmin && npm run dev
+cd services/budadmin && npm install && npm run dev
 ```
 
 #### Or Start All Services
@@ -164,8 +178,7 @@ cd services/budadmin && cp .env.sample .env
 
 ### Code Quality
 
-All Python services use consistent tooling:
-
+#### Python Services (budapp, budcluster, budsim, budmodel, budmetrics, budnotify, ask-bud)
 ```bash
 # Linting and formatting
 ruff check . --fix
@@ -176,13 +189,26 @@ mypy <service_name>/
 
 # Testing
 pytest --dapr-http-port 3510 --dapr-api-token <TOKEN>
+
+# Install pre-commit hooks
+./scripts/install_hooks.sh
 ```
 
-Frontend service:
+#### Frontend Service (budadmin)
 ```bash
 cd services/budadmin
 npm run lint
 npm run build
+npm test
+```
+
+#### Rust Service (budgateway)
+```bash
+cd services/budgateway
+cargo fmt              # Format code
+cargo clippy          # Lint code
+cargo test            # Run tests
+cargo build --release # Build for production
 ```
 
 ### Database Operations
@@ -254,6 +280,29 @@ tofu apply
 - [budadmin README](./services/budadmin/readme.md) - Frontend dashboard
 - [budmodel README](./services/budmodel/README.md) - Model registry
 - [budmetrics README](./services/budmetrics/README.md) - Analytics service
+- [budgateway README](./services/budgateway/README.md) - High-performance API gateway
+- [ask-bud README](./services/ask-bud/README.md) - AI assistant service
+
+## 🎯 Recent Features
+
+### Inference Request/Prompt Listing (January 2025)
+
+A comprehensive feature for viewing and analyzing AI model inference requests has been added:
+
+#### Key Capabilities
+- **Detailed Request Tracking**: View individual AI inference requests with full prompt/response details
+- **Advanced Filtering**: Filter by date range, success status, token counts, and latency
+- **Performance Metrics**: Track response time, token usage, and costs per inference
+- **User Feedback**: Access ratings, boolean metrics, and comments for each inference
+- **Data Export**: Export inference data in CSV and JSON formats for external analysis
+- **Row-Level Security**: Ensures users can only access their project's inference data
+
+#### Implementation Across Services
+- **BudMetrics**: New endpoints for efficient ClickHouse-based inference data retrieval
+- **BudApp**: Proxy endpoints with access control and entity name enrichment
+- **BudAdmin**: Interactive UI with data tables, filtering, sorting, and detailed modal views
+
+For more details, see the [inference endpoints documentation](./services/budapp/docs/inference-endpoints.md).
 
 ## 🤝 Contributing
 
