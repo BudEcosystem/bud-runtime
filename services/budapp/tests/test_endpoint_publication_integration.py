@@ -44,7 +44,7 @@ def mock_current_user():
 @pytest.fixture
 def mock_endpoint():
     """Create a mock endpoint for testing."""
-    endpoint = Mock(spec=EndpointModel)
+    endpoint = Mock()
     endpoint.id = uuid4()
     endpoint.name = "Test Endpoint"
     endpoint.status = EndpointStatusEnum.RUNNING
@@ -266,7 +266,7 @@ class TestPublicationAPIEndpoints:
         # Create mock published endpoints
         published_endpoints = []
         for i in range(2):
-            endpoint = Mock(spec=EndpointModel)
+            endpoint = Mock()
             endpoint.id = uuid4()
             endpoint.name = f"Published Endpoint {i}"
             endpoint.status = EndpointStatusEnum.RUNNING
@@ -335,7 +335,7 @@ class TestPublicationAPIEndpoints:
         endpoint_id = uuid4()
 
         # Create already published endpoint
-        published_endpoint = Mock(spec=EndpointModel)
+        published_endpoint = Mock()
         published_endpoint.id = endpoint_id
         published_endpoint.name = "Already Published Endpoint"
         published_endpoint.status = EndpointStatusEnum.RUNNING
@@ -394,7 +394,7 @@ class TestPublicationAPIEndpoints:
         endpoint_id = uuid4()
 
         # Create unpublished endpoint
-        unpublished_endpoint = Mock(spec=EndpointModel)
+        unpublished_endpoint = Mock()
         unpublished_endpoint.id = endpoint_id
         unpublished_endpoint.name = "Unpublished Endpoint"
         unpublished_endpoint.status = EndpointStatusEnum.RUNNING
