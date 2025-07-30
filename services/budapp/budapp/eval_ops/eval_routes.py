@@ -127,6 +127,86 @@ def list_experiments(
 
 
 @router.get(
+    "/traits",
+    response_model=ListTraitsResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        status.HTTP_400_BAD_REQUEST: {"model": ErrorResponse},
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
+    },
+)
+def list_traits(
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    page: Annotated[int, Query(ge=1, description="Page number")] = 1,
+    limit: Annotated[int, Query(ge=1, description="Results per page")] = 10,
+    name: Annotated[Optional[str], Query(description="Filter by trait name")] = None,
+    unique_id: Annotated[Optional[str], Query(description="Filter by trait UUID")] = None,
+):
+    """List experiment traits with optional filtering and pagination."""
+    try:
+        offset = (page - 1) * limit
+        traits, total_count = ExperimentService(session).list_traits(
+            offset=offset, limit=limit, name=name, unique_id=unique_id
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to list traits") from e
+
+    return ListTraitsResponse(
+        code=status.HTTP_200_OK,
+        object="trait.list",
+        message="Successfully listed traits",
+        traits=traits,
+        total_record=total_count,
+        page=page,
+        limit=limit,
+    )
+
+
+@router.get(
+    "/datasets",
+    response_model=ListDatasetsResponse,
+    status_code=status.HTTP_200_OK,
+    responses={status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse}},
+)
+def list_datasets(
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    page: Annotated[int, Query(ge=1, description="Page number")] = 1,
+    limit: Annotated[int, Query(ge=1, description="Results per page")] = 10,
+    name: Annotated[Optional[str], Query(description="Filter by dataset name")] = None,
+    modalities: Annotated[Optional[str], Query(description="Filter by modalities (comma-separated)")] = None,
+    language: Annotated[Optional[str], Query(description="Filter by languages (comma-separated)")] = None,
+    domains: Annotated[Optional[str], Query(description="Filter by domains (comma-separated)")] = None,
+):
+    """List datasets with optional filtering and pagination."""
+    try:
+        offset = (page - 1) * limit
+
+        # Parse comma-separated filters
+        filters = DatasetFilter(
+            name=name,
+            modalities=modalities.split(",") if modalities else None,
+            language=language.split(",") if language else None,
+            domains=domains.split(",") if domains else None,
+        )
+
+        datasets, total_count = ExperimentService(session).list_datasets(offset=offset, limit=limit, filters=filters)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to list datasets") from e
+
+    return ListDatasetsResponse(
+        code=status.HTTP_200_OK,
+        object="dataset.list",
+        message="Successfully listed datasets",
+        datasets=datasets,
+        total_record=total_count,
+        page=page,
+        limit=limit,
+    )
+
+
+@router.get(
     "/{experiment_id}",
     response_model=GetExperimentResponse,
     status_code=status.HTTP_200_OK,
@@ -529,86 +609,6 @@ def delete_run(
         code=status.HTTP_200_OK,
         object="run.delete",
         message="Successfully deleted run",
-    )
-
-
-@router.get(
-    "/traits",
-    response_model=ListTraitsResponse,
-    status_code=status.HTTP_200_OK,
-    responses={
-        status.HTTP_400_BAD_REQUEST: {"model": ErrorResponse},
-        status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
-    },
-)
-def list_traits(
-    session: Annotated[Session, Depends(get_session)],
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    page: Annotated[int, Query(ge=1, description="Page number")] = 1,
-    limit: Annotated[int, Query(ge=1, description="Results per page")] = 10,
-    name: Annotated[Optional[str], Query(description="Filter by trait name")] = None,
-    unique_id: Annotated[Optional[str], Query(description="Filter by trait UUID")] = None,
-):
-    """List experiment traits with optional filtering and pagination."""
-    try:
-        offset = (page - 1) * limit
-        traits, total_count = ExperimentService(session).list_traits(
-            offset=offset, limit=limit, name=name, unique_id=unique_id
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Failed to list traits") from e
-
-    return ListTraitsResponse(
-        code=status.HTTP_200_OK,
-        object="trait.list",
-        message="Successfully listed traits",
-        traits=traits,
-        total_record=total_count,
-        page=page,
-        limit=limit,
-    )
-
-
-@router.get(
-    "/datasets",
-    response_model=ListDatasetsResponse,
-    status_code=status.HTTP_200_OK,
-    responses={status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse}},
-)
-def list_datasets(
-    session: Annotated[Session, Depends(get_session)],
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    page: Annotated[int, Query(ge=1, description="Page number")] = 1,
-    limit: Annotated[int, Query(ge=1, description="Results per page")] = 10,
-    name: Annotated[Optional[str], Query(description="Filter by dataset name")] = None,
-    modalities: Annotated[Optional[str], Query(description="Filter by modalities (comma-separated)")] = None,
-    language: Annotated[Optional[str], Query(description="Filter by languages (comma-separated)")] = None,
-    domains: Annotated[Optional[str], Query(description="Filter by domains (comma-separated)")] = None,
-):
-    """List datasets with optional filtering and pagination."""
-    try:
-        offset = (page - 1) * limit
-
-        # Parse comma-separated filters
-        filters = DatasetFilter(
-            name=name,
-            modalities=modalities.split(",") if modalities else None,
-            language=language.split(",") if language else None,
-            domains=domains.split(",") if domains else None,
-        )
-
-        datasets, total_count = ExperimentService(session).list_datasets(offset=offset, limit=limit, filters=filters)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Failed to list datasets") from e
-
-    return ListDatasetsResponse(
-        code=status.HTTP_200_OK,
-        object="dataset.list",
-        message="Successfully listed datasets",
-        datasets=datasets,
-        total_record=total_count,
-        page=page,
-        limit=limit,
     )
 
 
