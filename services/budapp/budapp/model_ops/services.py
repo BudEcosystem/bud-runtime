@@ -16,6 +16,8 @@
 
 """The model ops services. Contains business logic for model ops."""
 
+import hashlib
+import json
 import os
 import re
 import tempfile
@@ -31,6 +33,7 @@ from bs4 import BeautifulSoup
 from fastapi import UploadFile, status
 from pydantic import HttpUrl
 from PyPDF2 import PdfReader
+from sqlalchemy.orm import Session
 
 from budapp.commons import logging
 from budapp.commons.config import app_settings
@@ -96,6 +99,7 @@ from ..project_ops.crud import ProjectDataManager
 from ..project_ops.models import Project as ProjectModel
 from ..shared.minio_store import ModelStore
 from ..shared.notification_service import BudNotifyService, NotificationBuilder
+from ..shared.redis_service import RedisService, cache
 from ..workflow_ops.schemas import WorkflowUtilCreate
 from .crud import (
     CloudModelDataManager,
@@ -3533,22 +3537,22 @@ class ModelService(SessionMixin):
 
         # Perform recommended cluster simulation
         try:
-            async with (
-                aiohttp.ClientSession() as session,
-                session.post(recommended_cluster_endpoint, json=recommended_cluster_request.model_dump()) as response,
-            ):
-                response_data = await response.json()
-                if response.status >= 400:
-                    raise ClientException("Unable to perform recommended cluster simulation")
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    recommended_cluster_endpoint, json=recommended_cluster_request.model_dump()
+                ) as response:
+                    response_data = await response.json()
+                    if response.status >= 400:
+                        raise ClientException("Unable to perform recommended cluster simulation")
 
-                # Add payload key to steps
-                if "steps" in response_data:
-                    steps = response_data["steps"]
-                    for step in steps:
-                        step["payload"] = {}
-                    response_data["steps"] = steps
+                    # Add payload key to steps
+                    if "steps" in response_data:
+                        steps = response_data["steps"]
+                        for step in steps:
+                            step["payload"] = {}
+                        response_data["steps"] = steps
 
-                return response_data
+                    return response_data
         except ClientException as e:
             raise e
         except Exception as e:
@@ -3797,3 +3801,199 @@ class ModelServiceUtil(SessionMixin):
             return db_model.provider.icon
         else:
             return db_model.icon
+
+
+class ModelCatalogService(SessionMixin):
+    """Service for model catalog operations."""
+
+    def __init__(self, session: Session):
+        """Initialize the service."""
+        super().__init__(session)
+        self.redis_service = RedisService()
+
+    def _generate_cache_key(self, prefix: str, **kwargs) -> str:
+        """Generate a cache key from parameters."""
+        # Create a sorted dictionary to ensure consistent keys
+        sorted_params = dict(sorted(kwargs.items()))
+        # Convert to JSON string and create hash
+        params_str = json.dumps(sorted_params, sort_keys=True, default=str)
+        params_hash = hashlib.sha256(params_str.encode()).hexdigest()[:16]
+        return f"catalog:{prefix}:{params_hash}"
+
+    async def get_published_models(
+        self,
+        filters: Dict[str, Any],
+        offset: int,
+        limit: int,
+        order_by: Optional[List[Tuple[str, str]]] = None,
+        search_term: Optional[str] = None,
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        """Get published models with filtering and search.
+
+        Args:
+            filters: Filter criteria (modality, status, etc.)
+            offset: Pagination offset
+            limit: Pagination limit
+            order_by: Ordering fields
+            search_term: Optional search term
+
+        Returns:
+            Tuple of (models list, total count)
+        """
+        # Generate cache key
+        cache_key = self._generate_cache_key(
+            "models",
+            filters=filters,
+            offset=offset,
+            limit=limit,
+            order_by=order_by,
+            search_term=search_term,
+        )
+
+        # Try to get from cache
+        cached_data = await self.redis_service.get(cache_key)
+        if cached_data:
+            try:
+                data = json.loads(cached_data)
+                return data["items"], data["count"]
+            except (json.JSONDecodeError, KeyError):
+                # Invalid cache data, continue to fetch from DB
+                pass
+
+        # Get data from CRUD
+        results, total_count = await ModelDataManager(self.session).get_published_models_catalog(
+            offset=offset,
+            limit=limit,
+            filters=filters,
+            order_by=order_by or [],
+            search_term=search_term,
+        )
+
+        # Transform results to catalog items
+        catalog_items = []
+        for row in results:
+            model, endpoint, input_cost, output_cost, currency, per_tokens = row
+
+            # Build capabilities from strengths and tags
+            capabilities = []
+            if model.strengths:
+                capabilities.extend(model.strengths)
+            if model.tags:
+                # Extract tag names
+                tag_names = [tag.get("name") for tag in model.tags if isinstance(tag, dict) and "name" in tag]
+                capabilities.extend(tag_names)
+
+            # Build catalog item
+            catalog_item = {
+                "id": str(model.id),
+                "name": model.name,
+                "modality": model.modality,
+                "status": model.status,
+                "description": model.description,
+                "capabilities": list(set(capabilities)),  # Remove duplicates
+                "token_limit": model.token_limit,
+                "max_input_tokens": model.max_input_tokens,
+                "use_cases": model.use_cases,
+                "author": model.author,
+                "model_size": model.model_size,
+                "provider_type": model.provider_type,
+                "published_date": endpoint.published_date.isoformat() if endpoint.published_date else None,
+                "endpoint_id": str(endpoint.id),
+                "supported_endpoints": model.supported_endpoints,
+            }
+
+            # Add pricing if available
+            if input_cost is not None and output_cost is not None:
+                catalog_item["pricing"] = {
+                    "input_cost": float(input_cost),
+                    "output_cost": float(output_cost),
+                    "currency": currency or "USD",
+                    "per_tokens": per_tokens or 1000,
+                }
+            else:
+                catalog_item["pricing"] = None
+
+            catalog_items.append(catalog_item)
+
+        # Cache the results with 5-minute TTL
+        cache_data = {"items": catalog_items, "count": total_count}
+        await self.redis_service.set(cache_key, json.dumps(cache_data), ex=300)
+
+        return catalog_items, total_count
+
+    async def get_model_details(self, endpoint_id: UUID) -> Optional[Dict[str, Any]]:
+        """Get detailed model information by endpoint ID.
+
+        Args:
+            endpoint_id: The endpoint ID
+
+        Returns:
+            Model details or None if not found
+
+        Raises:
+            ClientException: If endpoint not found or not published
+        """
+        # Generate cache key
+        cache_key = f"catalog:model:{endpoint_id}"
+
+        # Try to get from cache
+        cached_data = await self.redis_service.get(cache_key)
+        if cached_data:
+            try:
+                return json.loads(cached_data)
+            except json.JSONDecodeError:
+                # Invalid cache data, continue to fetch from DB
+                pass
+
+        result = await ModelDataManager(self.session).get_published_model_detail(endpoint_id)
+
+        if not result:
+            raise ClientException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                message=f"Published model not found for endpoint {endpoint_id}",
+            )
+
+        model, endpoint, input_cost, output_cost, currency, per_tokens = result
+
+        # Build capabilities
+        capabilities = []
+        if model.strengths:
+            capabilities.extend(model.strengths)
+        if model.tags:
+            tag_names = [tag.get("name") for tag in model.tags if isinstance(tag, dict) and "name" in tag]
+            capabilities.extend(tag_names)
+
+        # Build catalog item
+        catalog_item = {
+            "id": str(model.id),
+            "name": model.name,
+            "modality": model.modality,
+            "status": model.status,
+            "description": model.description,
+            "capabilities": list(set(capabilities)),
+            "token_limit": model.token_limit,
+            "max_input_tokens": model.max_input_tokens,
+            "use_cases": model.use_cases,
+            "author": model.author,
+            "model_size": model.model_size,
+            "provider_type": model.provider_type,
+            "published_date": endpoint.published_date.isoformat() if endpoint.published_date else None,
+            "endpoint_id": str(endpoint.id),
+            "supported_endpoints": model.supported_endpoints,
+        }
+
+        # Add pricing if available
+        if input_cost is not None and output_cost is not None:
+            catalog_item["pricing"] = {
+                "input_cost": float(input_cost),
+                "output_cost": float(output_cost),
+                "currency": currency or "USD",
+                "per_tokens": per_tokens or 1000,
+            }
+        else:
+            catalog_item["pricing"] = None
+
+        # Cache the result with 5-minute TTL
+        await self.redis_service.set(cache_key, json.dumps(catalog_item), ex=300)
+
+        return catalog_item

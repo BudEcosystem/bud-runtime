@@ -41,6 +41,7 @@ from budapp.commons.constants import (
     ModelEndpointEnum,
     ModelProviderTypeEnum,
     ModelSecurityScanStatusEnum,
+    ModelStatusEnum,
     WorkflowStatusEnum,
 )
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Tag, Task
@@ -1229,3 +1230,70 @@ class QuantizationMethodFilter(BaseModel):
     """Quantization method filter schema."""
 
     name: str | None = None
+
+
+# Model Catalog Schemas
+class DeploymentPricingInfo(BaseModel):
+    """Simplified pricing info for catalog."""
+
+    input_cost: float
+    output_cost: float
+    currency: str = "USD"
+    per_tokens: int = 1000
+
+
+class ModelCatalogItem(BaseModel):
+    """Single model in catalog with pricing."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID4
+    name: str
+    modality: List[ModalityEnum]
+    status: ModelStatusEnum
+    description: Optional[str] = None
+    capabilities: List[str] = []  # From strengths + tags
+    token_limit: Optional[int] = None
+    max_input_tokens: Optional[int] = None
+    use_cases: Optional[List[str]] = None
+    author: Optional[str] = None
+    model_size: Optional[int] = None
+    provider_type: ModelProviderTypeEnum
+    # Pricing information
+    pricing: Optional[DeploymentPricingInfo] = None
+    # Publication metadata
+    published_date: datetime
+    endpoint_id: UUID4
+    supported_endpoints: List[ModelEndpointEnum]
+
+    @field_serializer("modality")
+    def serialized_modality(self, modalities: List[ModalityEnum], _info) -> Dict[str, Any]:
+        """Serialize the modality."""
+        return ModalityEnum.serialize_modality(modalities)
+
+    @field_serializer("supported_endpoints")
+    def serialized_endpoints(self, endpoints: List[ModelEndpointEnum], _info) -> Dict[str, Any]:
+        """Serialize the endpoints."""
+        return ModelEndpointEnum.serialize_endpoints(endpoints)
+
+
+class ModelCatalogResponse(PaginatedSuccessResponse):
+    """Paginated catalog response."""
+
+    models: List[ModelCatalogItem] = []
+    object: str = "models.catalog"
+
+
+class ModelCatalogDetailResponse(SuccessResponse):
+    """Detailed model information response."""
+
+    model: ModelCatalogItem
+    object: str = "models.catalog.detail"
+
+
+class ModelCatalogFilter(BaseModel):
+    """Filter options for model catalog."""
+
+    modality: Optional[List[ModalityEnum]] = None
+    status: Optional[ModelStatusEnum] = None
+    search: Optional[str] = None

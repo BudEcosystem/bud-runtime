@@ -15,6 +15,7 @@
 """Contains core Pydantic schemas used for data validation and serialization within the core services."""
 
 from datetime import datetime
+from decimal import Decimal
 from enum import Enum
 from typing import Any, List, Literal, Optional, Union
 from uuid import UUID
@@ -561,11 +562,28 @@ class UserSummary(BaseModel):
     name: str
 
 
+class DeploymentPricingInput(BaseModel):
+    """Input schema for deployment pricing."""
+
+    input_cost: Decimal = Field(..., decimal_places=6, ge=0, description="Cost per input tokens")
+    output_cost: Decimal = Field(..., decimal_places=6, ge=0, description="Cost per output tokens")
+    currency: str = Field(default="USD", max_length=3, description="Currency code (ISO 4217)")
+    per_tokens: int = Field(default=1000, gt=0, description="Number of tokens for the pricing unit")
+
+
 class UpdatePublicationStatusRequest(BaseModel):
     """Request schema for updating publication status (publish/unpublish)."""
 
     action: Literal["publish", "unpublish"]
+    pricing: Optional[DeploymentPricingInput] = Field(None, description="Required when action='publish'")
     action_metadata: Optional[dict] = None
+
+    @model_validator(mode="after")
+    def validate_pricing_required(self):
+        """Validate that pricing is provided when publishing."""
+        if self.action == "publish" and not self.pricing:
+            raise ValueError("Pricing information is required when publishing an endpoint")
+        return self
 
 
 class PublicationHistoryEntry(BaseModel):
@@ -594,6 +612,23 @@ class PublicationHistoryResponse(PaginatedSuccessResponse):
     object: str = "endpoint.publication_history"
 
 
+class DeploymentPricingResponse(BaseModel):
+    """Response schema for deployment pricing."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID4
+    endpoint_id: UUID4
+    input_cost: Decimal
+    output_cost: Decimal
+    currency: str
+    per_tokens: int
+    is_current: bool
+    created_by: UUID4
+    created_at: datetime
+    modified_at: datetime
+
+
 class PublishEndpointResponse(SuccessResponse):
     """Response schema for publish endpoint operations."""
 
@@ -603,4 +638,21 @@ class PublishEndpointResponse(SuccessResponse):
     is_published: bool
     published_date: Optional[datetime] = None
     published_by: Optional[UUID4] = None
+    pricing: Optional[DeploymentPricingResponse] = None
     object: str = "endpoint.publish"
+
+
+class UpdatePricingRequest(BaseModel):
+    """Request to update endpoint pricing."""
+
+    input_cost: Decimal = Field(..., decimal_places=6, ge=0, description="Cost per input tokens")
+    output_cost: Decimal = Field(..., decimal_places=6, ge=0, description="Cost per output tokens")
+    currency: str = Field(default="USD", max_length=3, description="Currency code (ISO 4217)")
+    per_tokens: int = Field(default=1000, gt=0, description="Number of tokens for the pricing unit")
+
+
+class PricingHistoryResponse(PaginatedSuccessResponse):
+    """Paginated pricing history response."""
+
+    pricing_history: List[DeploymentPricingResponse] = []
+    object: str = "endpoint.pricing_history"
