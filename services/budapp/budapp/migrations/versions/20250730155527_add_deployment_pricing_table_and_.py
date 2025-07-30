@@ -1,7 +1,7 @@
 """add deployment pricing table and catalog indexes
 
 Revision ID: 20250730155527
-Revises: ffb55b8f01fc
+Revises: e82a355aae6f
 Create Date: 2025-07-30 15:55:27.000000
 
 """
@@ -15,7 +15,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = "20250730155527"
-down_revision: Union[str, None] = "ffb55b8f01fc"
+down_revision: Union[str, None] = "e82a355aae6f"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
