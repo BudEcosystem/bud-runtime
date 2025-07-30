@@ -1506,19 +1506,17 @@ class ClusterService(SessionMixin):
             logger.debug(
                 f"Performing update cluster node status request. payload: {payload}, endpoint: {update_cluster_endpoint}"
             )
-            async with (
-                aiohttp.ClientSession() as session,
-                session.post(update_cluster_endpoint, json=payload) as response,
-            ):
-                response_data = await response.json()
-                if response.status != 200 or response_data.get("object") == "error":
-                    logger.error(f"Failed to update cluster node status: {response.status} {response_data}")
-                    raise ClientException(
-                        "Failed to update cluster node status", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
-                    )
+            async with aiohttp.ClientSession() as session:
+                async with session.post(update_cluster_endpoint, json=payload) as response:
+                    response_data = await response.json()
+                    if response.status != 200 or response_data.get("object") == "error":
+                        logger.error(f"Failed to update cluster node status: {response.status} {response_data}")
+                        raise ClientException(
+                            "Failed to update cluster node status", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+                        )
 
-                logger.debug("Successfully updated cluster node status")
-                return response_data
+                    logger.debug("Successfully updated cluster node status")
+                    return response_data
         except Exception as e:
             logger.exception(f"Failed to send update cluster node status request: {e}")
             raise ClientException(
@@ -1780,19 +1778,17 @@ class ClusterService(SessionMixin):
 
         try:
             logger.debug(f"Performing get recommended clusters request. endpoint: {get_recommended_clusters_endpoint}")
-            async with (
-                aiohttp.ClientSession() as session,
-                session.get(get_recommended_clusters_endpoint, params=query_params) as response,
-            ):
-                response_data = await response.json()
-                if response.status != 200 or response_data.get("object") == "error":
-                    logger.error(f"Failed to get recommended clusters: {response.status} {response_data}")
-                    raise ClientException(
-                        "Failed to get recommended clusters", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
-                    )
+            async with aiohttp.ClientSession() as session:
+                async with session.get(get_recommended_clusters_endpoint, params=query_params) as response:
+                    response_data = await response.json()
+                    if response.status != 200 or response_data.get("object") == "error":
+                        logger.error(f"Failed to get recommended clusters: {response.status} {response_data}")
+                        raise ClientException(
+                            "Failed to get recommended clusters", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+                        )
 
-                logger.debug("Successfully fetched recommended clusters")
-                return response_data
+                    logger.debug("Successfully fetched recommended clusters")
+                    return response_data
         except Exception as e:
             logger.exception(f"Failed to send get recommended clusters request: {e}")
             raise ClientException(
