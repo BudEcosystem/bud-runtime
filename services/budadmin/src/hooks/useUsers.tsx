@@ -12,6 +12,7 @@ export type User = {
   name: string;
   role: string;
   status: string;
+  user_type?: string;
 };
 export type UserPermission = {
   global_scopes: [];
@@ -44,6 +45,7 @@ type GetUserParams = {
   email?: string;
   role?: string;
   status?: string;
+  user_type?: string;
   search?: any
 };
 
@@ -153,7 +155,7 @@ export const useUsers = create<{
   },
 
   addUser: async (payload) => {
-    const response: any = await AppRequest.Post(`/auth/register`, payload);
+    const response: any = await AppRequest.Post(`/users`, payload);
     if (response) {
       get().getUsers({ page: 1, limit: 10, order_by: "-created_at" });
     }

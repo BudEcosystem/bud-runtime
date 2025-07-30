@@ -17,32 +17,20 @@ resource "azurerm_network_security_group" "master" {
   location            = azurerm_resource_group.common.location
   resource_group_name = azurerm_resource_group.common.name
 
+  # pass through, firewall managed by NixOS
   security_rule {
-    name                       = "${var.prefix}-master_inbound_ssh"
+    name                       = "${var.prefix}-inbound"
     priority                   = 100
-    direction                  = "Inbound"
-    access                     = "Allow"
-    protocol                   = "Tcp"
-    source_port_range          = "*"
-    destination_port_range     = "22"
-    source_address_prefix      = "*"
-    destination_address_prefix = "*"
-  }
-
-  security_rule {
-    name                       = "${var.prefix}-master_inbound_local"
-    priority                   = 200
     direction                  = "Inbound"
     access                     = "Allow"
     protocol                   = "*"
     source_port_range          = "*"
     destination_port_range     = "*"
-    source_address_prefix      = one(azurerm_virtual_network.common.address_space)
+    source_address_prefix      = "*"
     destination_address_prefix = "*"
   }
-
   security_rule {
-    name                       = "${var.prefix}-master_outbound"
+    name                       = "${var.prefix}-outbound"
     priority                   = 100
     direction                  = "Outbound"
     access                     = "Allow"
@@ -75,14 +63,19 @@ resource "azurerm_network_interface_security_group_association" "master" {
 
 resource "azurerm_linux_virtual_machine" "master" {
   name                            = "${var.prefix}-master"
+  computer_name                   = var.master.hostname
   location                        = azurerm_resource_group.common.location
   resource_group_name             = azurerm_resource_group.common.name
   network_interface_ids           = [azurerm_network_interface.master.id]
-  size                            = "Standard_DS1_v2"
+  size                            = var.master.sku
   secure_boot_enabled             = false
   vtpm_enabled                    = false
   disable_password_authentication = true
   admin_username                  = var.admin_user
+
+  boot_diagnostics {
+    storage_account_uri = null
+  }
 
   admin_ssh_key {
     username   = var.admin_user
@@ -92,14 +85,14 @@ resource "azurerm_linux_virtual_machine" "master" {
   os_disk {
     name                 = "${var.prefix}-master-root"
     caching              = "ReadWrite"
-    storage_account_type = "Standard_LRS"
-    disk_size_gb         = 2048
+    storage_account_type = "Premium_LRS"
+    disk_size_gb         = var.master.disksize
   }
 
   source_image_reference {
     publisher = "Canonical"
-    offer     = "0001-com-ubuntu-server-jammy"
-    sku       = "22_04-lts-gen2"
+    offer     = "ubuntu-24_04-lts"
+    sku       = "server"
     version   = "latest"
   }
 }

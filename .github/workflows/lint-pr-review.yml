@@ -62,10 +62,10 @@ jobs:
       - name: Install Node.js dependencies for frontend services
         run: |
           if [ -d "services/budadmin" ]; then
-            cd services/budadmin && npm ci && cd ../..
+            cd services/budadmin && npm install && cd ../..
           fi
           if [ -d "services/budplayground" ]; then
-            cd services/budplayground && npm ci && cd ../..
+            cd services/budplayground && npm install && cd ../..
           fi
 
       - name: Run pre-commit on changed files
