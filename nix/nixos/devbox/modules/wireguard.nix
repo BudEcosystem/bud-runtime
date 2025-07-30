@@ -5,11 +5,6 @@
   ...
 }:
 let
-  nameServer = [
-    "1.1.1.1"
-    "8.8.8.8"
-  ];
-
   wgInterface = "wg";
   wanInterface = "eth0";
   port = 51820;
@@ -73,15 +68,5 @@ in
     };
 
     wg-quick.interfaces.${wgInterface}.configFile = builtins.toString wgConf;
-  };
-
-  services.dnsmasq = {
-    enable = true;
-    settings = {
-      bind-interfaces = true;
-      server = nameServer;
-      interface = [ wgInterface ];
-      no-dhcp-interface = wgInterface;
-    };
   };
 }
