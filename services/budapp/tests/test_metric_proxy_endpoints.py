@@ -115,11 +115,11 @@ class TestMetricProxyEndpoints:
         ]
 
         # Mock budmetrics client
-        with patch('budapp.metric_ops.services.httpx.AsyncClient') as mock_client:
+        with patch('budapp.metric_ops.services.aiohttp.ClientSession') as mock_session:
             mock_response = Mock()
-            mock_response.status_code = 200
-            mock_response.json.return_value = sample_inference_response
-            mock_client.return_value.__aenter__.return_value.post = AsyncMock(return_value=mock_response)
+            mock_response.status = 200
+            mock_response.json = AsyncMock(return_value=sample_inference_response)
+            mock_session.return_value.__aenter__.return_value.post.return_value.__aenter__.return_value = mock_response
 
             service = BudMetricService()
             request = InferenceListRequest(
@@ -193,14 +193,15 @@ class TestMetricProxyEndpoints:
         mock_db_session.execute.return_value.scalar_one_or_none.return_value = mock_project
 
         # Mock budmetrics client
-        with patch('budapp.metric_ops.services.httpx.AsyncClient') as mock_client:
+        with patch('budapp.metric_ops.services.aiohttp.ClientSession') as mock_session:
             mock_response = Mock()
-            mock_response.status_code = 200
-            mock_response.json.return_value = sample_detail_response
-            mock_client.return_value.__aenter__.return_value.get = AsyncMock(return_value=mock_response)
+            mock_response.status = 200
+            mock_response.json = AsyncMock(return_value=sample_detail_response)
+            mock_session.return_value.__aenter__.return_value.get.return_value.__aenter__.return_value = mock_response
 
             service = BudMetricService()
-            response = await service.get_inference_details(inference_id, mock_db_session, mock_user)
+            service.set_db_session(mock_db_session)
+            response = await service.get_inference_details(inference_id, mock_user)
 
             assert response.inference_id == inference_id
             assert response.model_name == "gpt-4"
@@ -213,16 +214,17 @@ class TestMetricProxyEndpoints:
         from budapp.metric_ops.services import BudMetricService
 
         # Mock budmetrics client returning 404
-        with patch('budapp.metric_ops.services.httpx.AsyncClient') as mock_client:
+        with patch('budapp.metric_ops.services.aiohttp.ClientSession') as mock_session:
             mock_response = Mock()
             mock_response.status_code = 404
             mock_response.text = "Inference not found"
-            mock_client.return_value.__aenter__.return_value.get = AsyncMock(return_value=mock_response)
+            mock_session.return_value.__aenter__.return_value.get.return_value.__aenter__.return_value = mock_response
 
             service = BudMetricService()
 
             with pytest.raises(HTTPException) as exc_info:
-                await service.get_inference_details(str(uuid.uuid4()), mock_db_session, mock_user)
+                service.set_db_session(mock_db_session)
+                await service.get_inference_details(str(uuid.uuid4()), mock_user)
 
             assert exc_info.value.status_code == 404
 
@@ -256,14 +258,15 @@ class TestMetricProxyEndpoints:
             mock_get_details.return_value = Mock(project_id=mock_project.id)
 
             # Mock budmetrics client
-            with patch('budapp.metric_ops.services.httpx.AsyncClient') as mock_client:
+            with patch('budapp.metric_ops.services.aiohttp.ClientSession') as mock_session:
                 mock_response = Mock()
-                mock_response.status_code = 200
-                mock_response.json.return_value = sample_feedback_response
-                mock_client.return_value.__aenter__.return_value.get = AsyncMock(return_value=mock_response)
+                mock_response.status = 200
+                mock_response.json = AsyncMock(return_value=sample_feedback_response)
+                mock_session.return_value.__aenter__.return_value.get.return_value.__aenter__.return_value = mock_response
 
                 service = BudMetricService()
-                response = await service.get_inference_feedback(inference_id, mock_db_session, mock_user)
+                service.set_db_session(mock_db_session)
+                response = await service.get_inference_feedback(inference_id, mock_user)
 
                 assert len(response) == 2
                 assert response[0].feedback_type == "boolean"
@@ -309,11 +312,11 @@ class TestMetricProxyEndpoints:
         ]
 
         # Mock budmetrics client
-        with patch('budapp.metric_ops.services.httpx.AsyncClient') as mock_client:
+        with patch('budapp.metric_ops.services.aiohttp.ClientSession') as mock_session:
             mock_response = Mock()
-            mock_response.status_code = 200
-            mock_response.json.return_value = sample_response
-            mock_client.return_value.__aenter__.return_value.post = AsyncMock(return_value=mock_response)
+            mock_response.status = 200
+            mock_response.json = AsyncMock(return_value=sample_response)
+            mock_session.return_value.__aenter__.return_value.post.return_value.__aenter__.return_value = mock_response
 
             service = BudMetricService()
             request = InferenceListRequest(
