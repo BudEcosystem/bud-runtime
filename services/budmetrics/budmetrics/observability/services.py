@@ -450,7 +450,8 @@ class ObservabilityMetricsService:
         try:
             results = await self.clickhouse_client.execute_query(query)
         except Exception as e:
-            raise RuntimeError(f"Failed to execute metrics query: {str(e)}") from e
+            logger.error(f"Failed to execute metrics query: {str(e)}")
+            raise RuntimeError("Failed to execute metrics query") from e
 
         # Process results
         period_bins = self._process_query_results(results, field_order, request.metrics, request.group_by)
@@ -506,13 +507,27 @@ class ObservabilityMetricsService:
         inference_ids = [str(record[0]) for record in batch_data]
 
         # Check for existing inference_ids
-        existing_check_query = f"""
+        if not inference_ids:
+            return {
+                "total_records": 0,
+                "inserted": 0,
+                "duplicates": 0,
+                "duplicate_ids": [],
+            }
+
+        # Use parameterized query with placeholders
+        placeholders = ",".join([f"{{id_{i}:UUID}}" for i in range(len(inference_ids))])
+        # Safe: placeholders are generated programmatically, not from user input
+        existing_check_query = f"""  # nosec B608
         SELECT inference_id
         FROM ModelInferenceDetails
-        WHERE inference_id IN ({",".join([f"'{id}'" for id in inference_ids])})
+        WHERE inference_id IN ({placeholders})  # nosec
         """
 
-        existing_records = await self.clickhouse_client.execute_query(existing_check_query)
+        # Create params dict
+        params = {f"id_{i}": id for i, id in enumerate(inference_ids)}
+
+        existing_records = await self.clickhouse_client.execute_query(existing_check_query, params)
         existing_ids = {str(row[0]) for row in existing_records} if existing_records else set()
 
         # Filter out records with existing inference_ids
@@ -564,11 +579,12 @@ class ObservabilityMetricsService:
             values.append(row)
 
         # Build and execute the INSERT query
-        query = f"""
+        # Safe: values are escaped using _escape_string method
+        query = f"""  # nosec B608
         INSERT INTO ModelInferenceDetails
         (inference_id, request_ip, project_id, endpoint_id, model_id,
          cost, response_analysis, is_success, request_arrival_time, request_forward_time)
-        VALUES {",".join(values)}
+        VALUES {",".join(values)}  # nosec
         """
 
         await self.clickhouse_client.execute_query(query)
@@ -634,34 +650,41 @@ class ObservabilityMetricsService:
 
         where_clause = " AND ".join(where_conditions)
 
-        # Build ORDER BY clause
+        # Build ORDER BY clause - validate sort_by to prevent injection
         sort_column_map = {
             "timestamp": "mi.timestamp",
             "tokens": "(mi.input_tokens + mi.output_tokens)",
             "latency": "mi.response_time_ms",
             "cost": "mid.cost",
         }
+
+        # Validate sort_by is in allowed columns
+        if request.sort_by not in sort_column_map:
+            raise ValueError("Invalid sort_by parameter")
+
+        # Validate sort_order
+        if request.sort_order.upper() not in ("ASC", "DESC"):
+            raise ValueError("Invalid sort_order parameter")
+
         order_by = f"{sort_column_map[request.sort_by]} {request.sort_order.upper()}"
 
         # Count total records
-        count_query = f"""
+        # Safe: where_clause is built from validated conditions
+        count_query = f"""  # nosec B608
         SELECT COUNT(*) as total_count
         FROM ModelInference mi
         INNER JOIN ModelInferenceDetails mid ON mi.inference_id = mid.inference_id
         LEFT JOIN ChatInference ci ON mi.inference_id = ci.id
-        WHERE {where_clause}
+        WHERE {where_clause}  # nosec
         """
 
-        # Replace parameters in count query
-        formatted_count_query = count_query
-        for param, value in params.items():
-            formatted_count_query = formatted_count_query.replace(f"%({param})s", f"'{value}'")
-
-        count_result = await self.clickhouse_client.execute_query(formatted_count_query)
+        # Execute count query with parameters
+        count_result = await self.clickhouse_client.execute_query(count_query, params)
         total_count = count_result[0][0] if count_result else 0
 
         # Get paginated data
-        list_query = f"""
+        # Safe: where_clause and order_by are validated, limit/offset use parameters
+        list_query = f"""  # nosec B608
         SELECT
             mi.inference_id,
             mi.timestamp,
@@ -678,20 +701,16 @@ class ObservabilityMetricsService:
         FROM ModelInference mi
         INNER JOIN ModelInferenceDetails mid ON mi.inference_id = mid.inference_id
         LEFT JOIN ChatInference ci ON mi.inference_id = ci.id
-        WHERE {where_clause}
-        ORDER BY {order_by}
+        WHERE {where_clause}  # nosec
+        ORDER BY {order_by}  # nosec
         LIMIT %(limit)s OFFSET %(offset)s
         """
 
         params["limit"] = request.limit
         params["offset"] = request.offset
 
-        # Replace parameters in list query
-        formatted_list_query = list_query
-        for param, value in params.items():
-            formatted_list_query = formatted_list_query.replace(f"%({param})s", f"'{value}'")
-
-        results = await self.clickhouse_client.execute_query(formatted_list_query)
+        # Execute list query with parameters
+        results = await self.clickhouse_client.execute_query(list_query, params)
 
         # Convert results to InferenceListItem objects
         items = []
@@ -735,6 +754,12 @@ class ObservabilityMetricsService:
         """
         await self.initialize()
 
+        # Validate inference_id is a valid UUID
+        try:
+            UUID(inference_id)
+        except ValueError:
+            raise ValueError("Invalid inference ID format") from None
+
         query = """
         SELECT
             mi.inference_id,
@@ -770,11 +795,11 @@ class ObservabilityMetricsService:
         WHERE mi.inference_id = %(inference_id)s
         """
 
-        formatted_query = query.replace("%(inference_id)s", f"'{inference_id}'")
-        results = await self.clickhouse_client.execute_query(formatted_query)
+        params = {"inference_id": inference_id}
+        results = await self.clickhouse_client.execute_query(query, params)
 
         if not results:
-            raise ValueError(f"Inference with ID {inference_id} not found")
+            raise ValueError("Inference not found")
 
         row = results[0]
 
@@ -787,28 +812,29 @@ class ObservabilityMetricsService:
             messages = []
 
         # Get feedback count
-        feedback_count_query = f"""
+        feedback_count_query = """
         SELECT COUNT(*) FROM (
-            SELECT target_id FROM BooleanMetricFeedback WHERE target_id = '{inference_id}'
+            SELECT target_id FROM BooleanMetricFeedback WHERE target_id = %(inference_id)s
             UNION ALL
-            SELECT target_id FROM FloatMetricFeedback WHERE target_id = '{inference_id}'
+            SELECT target_id FROM FloatMetricFeedback WHERE target_id = %(inference_id)s
             UNION ALL
-            SELECT target_id FROM CommentFeedback WHERE target_id = '{inference_id}'
+            SELECT target_id FROM CommentFeedback WHERE target_id = %(inference_id)s
             UNION ALL
-            SELECT target_id FROM DemonstrationFeedback WHERE target_id = '{inference_id}'
+            SELECT target_id FROM DemonstrationFeedback WHERE target_id = %(inference_id)s
         )
         """
-        feedback_result = await self.clickhouse_client.execute_query(feedback_count_query)
+        feedback_params = {"inference_id": inference_id}
+        feedback_result = await self.clickhouse_client.execute_query(feedback_count_query, feedback_params)
         feedback_count = feedback_result[0][0] if feedback_result else 0
 
         # Get average rating from float metrics
-        avg_rating_query = f"""
-        SELECT AVG(value) 
-        FROM FloatMetricFeedback 
-        WHERE target_id = '{inference_id}' 
+        avg_rating_query = """
+        SELECT AVG(value)
+        FROM FloatMetricFeedback
+        WHERE target_id = %(inference_id)s
             AND metric_name IN ('rating', 'score', 'quality')
         """
-        rating_result = await self.clickhouse_client.execute_query(avg_rating_query)
+        rating_result = await self.clickhouse_client.execute_query(avg_rating_query, feedback_params)
         average_rating = rating_result[0][0] if rating_result and rating_result[0][0] else None
 
         return InferenceDetailResponse(
@@ -855,16 +881,23 @@ class ObservabilityMetricsService:
         """
         await self.initialize()
 
+        # Validate inference_id is a valid UUID
+        try:
+            UUID(inference_id)
+        except ValueError:
+            raise ValueError("Invalid inference ID format") from None
+
         feedback_items = []
 
         # Get boolean feedback
-        boolean_query = f"""
+        boolean_query = """
         SELECT id, metric_name, value, created_at
         FROM BooleanMetricFeedback
-        WHERE target_id = '{inference_id}'
+        WHERE target_id = %(inference_id)s
         ORDER BY created_at DESC
         """
-        boolean_results = await self.clickhouse_client.execute_query(boolean_query)
+        params = {"inference_id": inference_id}
+        boolean_results = await self.clickhouse_client.execute_query(boolean_query, params)
         for row in boolean_results:
             feedback_items.append(
                 FeedbackItem(
@@ -877,13 +910,13 @@ class ObservabilityMetricsService:
             )
 
         # Get float feedback
-        float_query = f"""
+        float_query = """
         SELECT id, metric_name, value, created_at
         FROM FloatMetricFeedback
-        WHERE target_id = '{inference_id}'
+        WHERE target_id = %(inference_id)s
         ORDER BY created_at DESC
         """
-        float_results = await self.clickhouse_client.execute_query(float_query)
+        float_results = await self.clickhouse_client.execute_query(float_query, params)
         for row in float_results:
             feedback_items.append(
                 FeedbackItem(
@@ -896,13 +929,13 @@ class ObservabilityMetricsService:
             )
 
         # Get comment feedback
-        comment_query = f"""
+        comment_query = """
         SELECT id, comment, created_at
         FROM CommentFeedback
-        WHERE target_id = '{inference_id}'
+        WHERE target_id = %(inference_id)s
         ORDER BY created_at DESC
         """
-        comment_results = await self.clickhouse_client.execute_query(comment_query)
+        comment_results = await self.clickhouse_client.execute_query(comment_query, params)
         for row in comment_results:
             feedback_items.append(
                 FeedbackItem(
@@ -915,13 +948,13 @@ class ObservabilityMetricsService:
             )
 
         # Get demonstration feedback
-        demo_query = f"""
+        demo_query = """
         SELECT id, demonstration, created_at
         FROM DemonstrationFeedback
-        WHERE target_id = '{inference_id}'
+        WHERE target_id = %(inference_id)s
         ORDER BY created_at DESC
         """
-        demo_results = await self.clickhouse_client.execute_query(demo_query)
+        demo_results = await self.clickhouse_client.execute_query(demo_query, params)
         for row in demo_results:
             feedback_items.append(
                 FeedbackItem(

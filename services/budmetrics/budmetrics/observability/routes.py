@@ -1,5 +1,4 @@
 from typing import Union
-from uuid import UUID
 
 import orjson
 from budmicroframe.commons import logging
@@ -9,8 +8,8 @@ from pydantic import ValidationError
 
 from budmetrics.commons.schemas import BulkCloudEventBase
 from budmetrics.observability.schemas import (
-    InferenceDetailsMetrics,
     InferenceDetailResponse,
+    InferenceDetailsMetrics,
     InferenceFeedbackResponse,
     InferenceListRequest,
     InferenceListResponse,
@@ -206,9 +205,7 @@ async def get_analytics(request: ObservabilityMetricsRequest) -> Response:
 
 
 @observability_router.post("/inferences/list", tags=["Observability"])
-async def list_inference_requests(
-    request: InferenceListRequest
-) -> Response:
+async def list_inference_requests(request: InferenceListRequest) -> Response:
     """List inference requests with pagination and filtering.
 
     This endpoint retrieves inference requests from ClickHouse with support for:
@@ -238,9 +235,7 @@ async def list_inference_requests(
 
 
 @observability_router.get("/inferences/{inference_id}", tags=["Observability"])
-async def get_inference_details(
-    inference_id: str
-) -> Response:
+async def get_inference_details(inference_id: str) -> Response:
     """Get complete details for a single inference.
 
     This endpoint retrieves full inference details including:
@@ -271,9 +266,7 @@ async def get_inference_details(
 
 
 @observability_router.get("/inferences/{inference_id}/feedback", tags=["Observability"])
-async def get_inference_feedback(
-    inference_id: str
-) -> Response:
+async def get_inference_feedback(inference_id: str) -> Response:
     """Get all feedback associated with an inference.
 
     This endpoint retrieves all feedback types for an inference:
