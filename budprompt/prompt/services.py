@@ -17,10 +17,10 @@
 """Services for the prompt module."""
 
 import logging
-import time
+from typing import Any, Dict, Union
 
 from .executors import SimplePromptExecutor
-from .schemas import PromptExecuteRequest, PromptExecuteResponse
+from .schemas import PromptExecuteRequest
 from .utils import clean_model_cache
 
 
@@ -38,54 +38,30 @@ class PromptExecutorService:
         """Initialize the PromptExecutorService."""
         self.executor = SimplePromptExecutor()
 
-    async def execute_prompt(self, request: PromptExecuteRequest) -> PromptExecuteResponse:
+    async def execute_prompt(self, request: PromptExecuteRequest) -> Union[Dict[str, Any], str]:
         """Execute a prompt based on the request.
 
         Args:
             request: Prompt execution request
 
         Returns:
-            Prompt execution response
+            The result of the prompt execution
 
         Raises:
             PromptExecutionError: If execution fails
         """
-        start_time = time.time()
-        metadata = {}
+        # Execute the prompt with input_data from request
+        result = await self.executor.execute(
+            deployment_name=request.deployment_name,
+            model_settings=request.model_settings,
+            input_schema=request.input_schema,
+            output_schema=request.output_schema,
+            system_prompt=request.system_prompt,
+            messages=request.messages,
+            input_data=request.input_data,
+        )
 
-        try:
-            # Execute the prompt with input_data from request
-            result = await self.executor.execute(
-                deployment_name=request.deployment_name,
-                model_settings=request.model_settings,
-                input_schema=request.input_schema,
-                output_schema=request.output_schema,
-                system_prompt=request.system_prompt,
-                messages=request.messages,
-                input_data=request.input_data,
-            )
+        # Clean up temporary modules
+        clean_model_cache()
 
-            # Calculate execution time
-            execution_time = time.time() - start_time
-            metadata["execution_time_seconds"] = round(execution_time, 3)
-            metadata["deployment_name"] = request.deployment_name
-
-            # Clean up temporary modules
-            clean_model_cache()
-
-            logger.info(f"Prompt executed successfully in {execution_time:.3f}s")
-
-            return PromptExecuteResponse(success=True, data=result, error=None, metadata=metadata)
-
-        except Exception as e:
-            # Calculate execution time even on failure
-            execution_time = time.time() - start_time
-            metadata["execution_time_seconds"] = round(execution_time, 3)
-            metadata["deployment_name"] = request.deployment_name
-
-            logger.error(f"Prompt execution failed: {str(e)}")
-
-            # Clean up temporary modules even on failure
-            clean_model_cache()
-
-            return PromptExecuteResponse(success=False, data=None, error=str(e), metadata=metadata)
+        return result

@@ -17,8 +17,11 @@
 """API routes for the prompt module."""
 
 import logging
+from typing import Union
 
-from fastapi import APIRouter, HTTPException, status
+from budmicroframe.commons.exceptions import ClientException
+from budmicroframe.commons.schemas import ErrorResponse
+from fastapi import APIRouter, status
 
 from .schemas import PromptExecuteRequest, PromptExecuteResponse
 from .services import PromptExecutorService
@@ -35,7 +38,7 @@ prompt_router = APIRouter(
 
 @prompt_router.post(
     "/execute",
-    response_model=PromptExecuteResponse,
+    response_model=Union[PromptExecuteResponse, ErrorResponse],
     summary="Execute a prompt",
     description="Execute a prompt with structured input and output schemas",
     responses={
@@ -50,7 +53,7 @@ prompt_router = APIRouter(
 )
 async def execute_prompt(
     request: PromptExecuteRequest,
-) -> PromptExecuteResponse:
+) -> Union[PromptExecuteResponse, ErrorResponse]:
     """Execute a prompt with structured input and output.
 
     Args:
@@ -67,22 +70,22 @@ async def execute_prompt(
         logger.info("Received prompt execution request")
 
         # Execute the prompt
-        response = await PromptExecutorService().execute_prompt(request)
+        result = await PromptExecutorService().execute_prompt(request)
 
-        # If execution failed, return appropriate status
-        if not response.success:
-            logger.error(f"Prompt execution failed: {response.error}")
-            # Still return 200 OK with success=false in response
-            # This allows client to handle structured error
+        return PromptExecuteResponse(
+            code=status.HTTP_200_OK,
+            message="Prompt executed successfully",
+            data=result,
+        ).to_http_response()
 
-        return response
-
-    except ValueError as e:
-        logger.error(f"Invalid request: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except ClientException as e:
+        return ErrorResponse(
+            code=e.status_code,
+            message=e.message,
+        ).to_http_response()
     except Exception as e:
         logger.error(f"Unexpected error during prompt execution: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred during prompt execution",
-        )
+        return ErrorResponse(
+            code=500,
+            message="An unexpected error occurred during prompt execution",
+        ).to_http_response()

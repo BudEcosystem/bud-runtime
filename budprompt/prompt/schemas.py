@@ -18,6 +18,7 @@
 
 from typing import Any, Dict, List, Optional, Union
 
+from budmicroframe.commons.schemas import SuccessResponse
 from pydantic import BaseModel, Field
 
 
@@ -91,7 +92,7 @@ class PromptExecuteRequest(BaseModel):
     )
 
 
-class PromptExecuteResponse(BaseModel):
+class PromptExecuteResponse(SuccessResponse):
     """Response model for prompt execution.
 
     Attributes:
@@ -101,11 +102,6 @@ class PromptExecuteResponse(BaseModel):
         metadata: Additional metadata about the execution
     """
 
-    success: bool = Field(..., description="Execution success status")
     data: Optional[Union[Dict[str, Any], str]] = Field(
         None, description="Generated output (Dict for structured, str for unstructured)"
-    )
-    error: Optional[str] = Field(None, description="Error message if failed")
-    metadata: Dict[str, Any] = Field(
-        default_factory=dict, description="Execution metadata (tokens used, timing, etc.)"
     )
