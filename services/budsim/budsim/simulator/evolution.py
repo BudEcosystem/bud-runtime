@@ -341,9 +341,23 @@ class Evolution:
 
     def _init_boundaries(self) -> None:
         # TODO: Use TP and PP based on the evolution
+        device_config = self.device_config.copy()
+        # Remove fields that GPUConfig doesn't expect
+        device_config.pop("cluster_id", None)
+        device_config.pop("node_id", None)
+        device_config.pop("node_name", None)
+        device_config.pop("id", None)
+        # Don't remove 'type' as it's used later
+        # device_config.pop("type", None)
+        device_config.pop("node_distribution", None)
+        device_config.pop("max_devices_per_node", None)
+        device_config.pop("cluster_topology", None)
+        device_config.pop("devices_by_node", None)
+        device_config.pop("total_devices", None)
+        
         model_analysis = ModelAnalysis(
             model=self.model,
-            device_config=self.device_config.copy(),
+            device_config=device_config,
             input_tokens=self.input_tokens,
             output_tokens=self.output_tokens,
             concurrency=1,
@@ -549,11 +563,18 @@ class Evolution:
             Dict[str, Any]: The data for the predictor.
         """
         device_config = self.device_config.copy()
-        # device_config.pop("cluster_id", None)
-        # device_config.pop("node_id", None)
-        # device_config.pop("node_name", None)
-        # device_config.pop("id", None)
+        # Remove fields that GPUConfig doesn't expect
+        device_config.pop("cluster_id", None)
+        device_config.pop("node_id", None)
+        device_config.pop("node_name", None)
+        device_config.pop("id", None)
+        # Don't remove 'type' as it's used later
         # device_config.pop("type", None)
+        device_config.pop("node_distribution", None)
+        device_config.pop("max_devices_per_node", None)
+        device_config.pop("cluster_topology", None)
+        device_config.pop("devices_by_node", None)
+        device_config.pop("total_devices", None)
         logger.info(f"Creating ModelAnalysis with TP={ind_config['tensor_parallel_size']}, PP={ind_config.get('pipeline_parallel_size', 1)}")
         model_analysis = ModelAnalysis(
             model=self.model,
