@@ -354,7 +354,7 @@ class Evolution:
         device_config.pop("cluster_topology", None)
         device_config.pop("devices_by_node", None)
         device_config.pop("total_devices", None)
-        
+
         model_analysis = ModelAnalysis(
             model=self.model,
             device_config=device_config,
@@ -575,7 +575,9 @@ class Evolution:
         device_config.pop("cluster_topology", None)
         device_config.pop("devices_by_node", None)
         device_config.pop("total_devices", None)
-        logger.info(f"Creating ModelAnalysis with TP={ind_config['tensor_parallel_size']}, PP={ind_config.get('pipeline_parallel_size', 1)}")
+        logger.info(
+            f"Creating ModelAnalysis with TP={ind_config['tensor_parallel_size']}, PP={ind_config.get('pipeline_parallel_size', 1)}"
+        )
         model_analysis = ModelAnalysis(
             model=self.model,
             device_config=device_config,
@@ -698,7 +700,7 @@ class Evolution:
 
         for idx, ind in enumerate(individuals):
             ind_config = self._individual_to_config(ind)
-            logger.info(f"Evaluating individual {idx+1}/{len(individuals)}: {ind_config}")
+            logger.info(f"Evaluating individual {idx + 1}/{len(individuals)}: {ind_config}")
             config_tuple = self._config_to_tuple(ind_config)
 
             try:
@@ -741,7 +743,9 @@ class Evolution:
                 ttft, throughput_per_user, e2e_latency = self.heuristic_calculator(data)
             else:
                 ttft, throughput_per_user, e2e_latency = self.benchmark_predictor(data)
-            logger.info(f"Performance prediction complete: TTFT={ttft}, Throughput={throughput_per_user}, E2E={e2e_latency}")
+            logger.info(
+                f"Performance prediction complete: TTFT={ttft}, Throughput={throughput_per_user}, E2E={e2e_latency}"
+            )
 
             ttft, throughput_per_user, e2e_latency = self.apply_quantization_performance(
                 ttft, throughput_per_user, e2e_latency
@@ -877,7 +881,8 @@ class Evolution:
         num_elite = int(self.population_size * self.elite_ratio)
 
         # Evolve the population
-        for gen in tqdm(range(self.generation), desc="Running evolution"):
+        pbar = tqdm(range(self.generation), desc="Running evolution")
+        for gen in pbar:
             # Select and preserve elite individuals
             elite = tools.selBest(population, k=num_elite)
             # Remove duplicates from elite
@@ -935,6 +940,9 @@ class Evolution:
             if len(unique_offspring) == 0:
                 logger.info(f"Early stopping at generation {gen} due to no new unique combinations.")
                 break
+
+        # Close the progress bar properly
+        pbar.close()
 
         # top_5_individuals = tools.selBest(population, k=5)
         top_5_scores = list(self.top_configs)  # Convert deque to list
