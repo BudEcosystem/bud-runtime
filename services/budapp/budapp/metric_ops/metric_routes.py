@@ -222,9 +222,7 @@ async def get_inference_details(
         InferenceDetailResponse: Complete inference details.
     """
     try:
-        return await BudMetricService(session).get_inference_details(
-            str(inference_id), current_user
-        )
+        return await BudMetricService(session).get_inference_details(str(inference_id), current_user)
     except ClientException as e:
         logger.exception(f"Failed to get inference details: {e}")
         return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
@@ -274,9 +272,7 @@ async def get_inference_feedback(
         InferenceFeedbackResponse: Aggregated feedback data.
     """
     try:
-        return await BudMetricService(session).get_inference_feedback(
-            str(inference_id), current_user
-        )
+        return await BudMetricService(session).get_inference_feedback(str(inference_id), current_user)
     except ClientException as e:
         logger.exception(f"Failed to get inference feedback: {e}")
         return ErrorResponse(code=e.status_code, message=e.message).to_http_response()

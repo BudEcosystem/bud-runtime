@@ -114,16 +114,16 @@ class TestInferenceEndpoints:
 
         from budmetrics.observability.services import ObservabilityService
         service = ObservabilityService()
-        
+
         request = InferenceListRequest(
             project_id=uuid.UUID(sample_inference_data["project_id"]),
             from_date=datetime.utcnow() - timedelta(days=7),
             limit=10,
             offset=0
         )
-        
+
         response = await service.list_inferences(request)
-        
+
         assert response.total_count == 1
         assert len(response.items) == 1
         assert response.items[0].inference_id == sample_inference_data["inference_id"]
@@ -140,7 +140,7 @@ class TestInferenceEndpoints:
 
         from budmetrics.observability.services import ObservabilityService
         service = ObservabilityService()
-        
+
         request = InferenceListRequest(
             project_id=uuid.uuid4(),
             endpoint_id=uuid.uuid4(),
@@ -154,12 +154,12 @@ class TestInferenceEndpoints:
             sort_by="latency",
             sort_order="desc"
         )
-        
+
         response = await service.list_inferences(request)
-        
+
         assert response.total_count == 0
         assert len(response.items) == 0
-        
+
         # Verify the query was built with all filters
         calls = mock_clickhouse_client.execute.call_args_list
         count_query = calls[0][0][0]
@@ -176,7 +176,7 @@ class TestInferenceEndpoints:
     ):
         """Test successful inference detail retrieval."""
         inference_id = sample_inference_data["inference_id"]
-        
+
         # Mock responses for different queries
         mock_clickhouse_client.execute.side_effect = [
             # ModelInference query
@@ -217,9 +217,9 @@ class TestInferenceEndpoints:
 
         from budmetrics.observability.services import ObservabilityService
         service = ObservabilityService()
-        
+
         response = await service.get_inference_details(inference_id)
-        
+
         assert response.inference_id == inference_id
         assert response.model_name == "gpt-4"
         assert response.is_success is True
@@ -236,7 +236,7 @@ class TestInferenceEndpoints:
 
         from budmetrics.observability.services import ObservabilityService
         service = ObservabilityService()
-        
+
         with pytest.raises(ValueError, match="Inference not found"):
             await service.get_inference_details(str(uuid.uuid4()))
 
@@ -244,7 +244,7 @@ class TestInferenceEndpoints:
     async def test_get_inference_feedback_success(self, mock_clickhouse_client, sample_feedback_data):
         """Test successful feedback retrieval."""
         inference_id = str(uuid.uuid4())
-        
+
         mock_clickhouse_client.execute.return_value = [
             (
                 fb["feedback_id"],
@@ -259,9 +259,9 @@ class TestInferenceEndpoints:
 
         from budmetrics.observability.services import ObservabilityService
         service = ObservabilityService()
-        
+
         response = await service.get_inference_feedback(inference_id)
-        
+
         assert len(response) == 2
         assert response[0].feedback_type == "boolean"
         assert response[0].metric_name == "helpful"
@@ -277,9 +277,9 @@ class TestInferenceEndpoints:
 
         from budmetrics.observability.services import ObservabilityService
         service = ObservabilityService()
-        
+
         response = await service.get_inference_feedback(str(uuid.uuid4()))
-        
+
         assert len(response) == 0
 
     def test_inference_list_request_validation(self):
@@ -292,7 +292,7 @@ class TestInferenceEndpoints:
         )
         assert request.limit == 50
         assert request.offset == 0
-        
+
         # Test with all optional parameters
         request = InferenceListRequest(
             project_id=uuid.uuid4(),
@@ -315,7 +315,7 @@ class TestInferenceEndpoints:
     def test_inference_response_serialization(self, sample_inference_data):
         """Test response serialization."""
         from budmetrics.observability.schemas import InferenceListItem
-        
+
         item = InferenceListItem(
             inference_id=sample_inference_data["inference_id"],
             timestamp=sample_inference_data["timestamp"],
@@ -333,7 +333,7 @@ class TestInferenceEndpoints:
             prompt_preview="Hello",
             response_preview="Hi there!"
         )
-        
+
         # Test JSON serialization
         json_data = item.model_dump_json()
         assert sample_inference_data["inference_id"] in json_data

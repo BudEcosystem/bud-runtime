@@ -30,25 +30,25 @@ const InferenceDetailModal: React.FC<InferenceDetailModalProps> = ({
     fetchInferenceFeedback,
     clearSelectedInference,
   } = useInferences();
-  
+
   useEffect(() => {
     if (visible && inferenceId) {
       fetchInferenceDetail(inferenceId);
       fetchInferenceFeedback(inferenceId);
     }
-    
+
     return () => {
       if (!visible) {
         clearSelectedInference();
       }
     };
   }, [visible, inferenceId]);
-  
+
   const copyToClipboard = (text: string, label: string = 'Content') => {
     navigator.clipboard.writeText(text);
     message.success(`${label} copied to clipboard`);
   };
-  
+
   const downloadAsFile = (content: string, filename: string) => {
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
@@ -60,12 +60,12 @@ const InferenceDetailModal: React.FC<InferenceDetailModalProps> = ({
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   };
-  
+
   const renderMessages = () => {
     if (!selectedInference?.messages || selectedInference.messages.length === 0) {
       return <Empty description="No messages available" />;
     }
-    
+
     return (
       <div style={{ maxHeight: '60vh', overflowY: 'auto' }}>
         {selectedInference.system_prompt && (
@@ -86,13 +86,13 @@ const InferenceDetailModal: React.FC<InferenceDetailModalProps> = ({
             </div>
           </div>
         )}
-        
+
         {selectedInference.messages.map((message, index) => (
           <div key={index} style={{ marginBottom: 16 }}>
             <Text strong>{message.role === 'user' ? 'User' : 'Assistant'}:</Text>
-            <div style={{ 
-              marginTop: 8, 
-              padding: 12, 
+            <div style={{
+              marginTop: 8,
+              padding: 12,
               backgroundColor: message.role === 'user' ? '#e6f7ff' : '#f6ffed',
               borderRadius: 8,
               border: `1px solid ${message.role === 'user' ? '#91d5ff' : '#b7eb8f'}`
@@ -114,7 +114,7 @@ const InferenceDetailModal: React.FC<InferenceDetailModalProps> = ({
             </div>
           </div>
         ))}
-        
+
         {selectedInference.output && (
           <div style={{ marginBottom: 16 }}>
             <Text strong>Final Output:</Text>
@@ -136,10 +136,10 @@ const InferenceDetailModal: React.FC<InferenceDetailModalProps> = ({
       </div>
     );
   };
-  
+
   const renderPerformanceMetrics = () => {
     if (!selectedInference) return null;
-    
+
     return (
       <div>
         <Descriptions bordered column={2}>
@@ -169,7 +169,7 @@ const InferenceDetailModal: React.FC<InferenceDetailModalProps> = ({
             {selectedInference.cost ? `$${selectedInference.cost.toFixed(6)}` : 'N/A'}
           </Descriptions.Item>
         </Descriptions>
-        
+
         {selectedInference.cached && (
           <Tag color="blue" style={{ marginTop: 16 }}>
             Response was cached
@@ -178,10 +178,10 @@ const InferenceDetailModal: React.FC<InferenceDetailModalProps> = ({
       </div>
     );
   };
-  
+
   const renderRawData = () => {
     if (!selectedInference) return null;
-    
+
     return (
       <div>
         {selectedInference.raw_request && (
@@ -219,7 +219,7 @@ const InferenceDetailModal: React.FC<InferenceDetailModalProps> = ({
             </div>
           </div>
         )}
-        
+
         {selectedInference.raw_response && (
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -258,16 +258,16 @@ const InferenceDetailModal: React.FC<InferenceDetailModalProps> = ({
       </div>
     );
   };
-  
+
   const renderFeedback = () => {
     if (isLoadingFeedback) {
       return <Spin />;
     }
-    
+
     if (!inferenceFeedback || inferenceFeedback.length === 0) {
       return <Empty description="No feedback available for this inference" />;
     }
-    
+
     const feedbackByType = inferenceFeedback.reduce((acc, item) => {
       if (!acc[item.feedback_type]) {
         acc[item.feedback_type] = [];
@@ -275,7 +275,7 @@ const InferenceDetailModal: React.FC<InferenceDetailModalProps> = ({
       acc[item.feedback_type].push(item);
       return acc;
     }, {} as Record<string, typeof inferenceFeedback>);
-    
+
     return (
       <div>
         {feedbackByType.boolean && feedbackByType.boolean.length > 0 && (
@@ -296,7 +296,7 @@ const InferenceDetailModal: React.FC<InferenceDetailModalProps> = ({
             </Space>
           </div>
         )}
-        
+
         {feedbackByType.float && feedbackByType.float.length > 0 && (
           <div style={{ marginBottom: 24 }}>
             <Title level={5}>Numeric Ratings</Title>
@@ -317,7 +317,7 @@ const InferenceDetailModal: React.FC<InferenceDetailModalProps> = ({
             </Space>
           </div>
         )}
-        
+
         {feedbackByType.comment && feedbackByType.comment.length > 0 && (
           <div style={{ marginBottom: 24 }}>
             <Title level={5}>Comments</Title>
@@ -333,7 +333,7 @@ const InferenceDetailModal: React.FC<InferenceDetailModalProps> = ({
             </Timeline>
           </div>
         )}
-        
+
         {feedbackByType.demonstration && feedbackByType.demonstration.length > 0 && (
           <div>
             <Title level={5}>Demonstrations</Title>
@@ -354,7 +354,7 @@ const InferenceDetailModal: React.FC<InferenceDetailModalProps> = ({
       </div>
     );
   };
-  
+
   return (
     <Modal
       title="Inference Details"
@@ -420,25 +420,25 @@ const InferenceDetailModal: React.FC<InferenceDetailModalProps> = ({
               </Descriptions>
             </div>
           </TabPane>
-          
+
           <TabPane tab="Messages" key="messages">
             <div style={{ padding: 24 }}>
               {renderMessages()}
             </div>
           </TabPane>
-          
+
           <TabPane tab="Performance" key="performance">
             <div style={{ padding: 24 }}>
               {renderPerformanceMetrics()}
             </div>
           </TabPane>
-          
+
           <TabPane tab="Raw Data" key="raw">
             <div style={{ padding: 24 }}>
               {renderRawData()}
             </div>
           </TabPane>
-          
+
           <TabPane tab="Feedback" key="feedback">
             <div style={{ padding: 24 }}>
               {renderFeedback()}

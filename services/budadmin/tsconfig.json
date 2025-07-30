@@ -29,6 +29,9 @@
       ],
       "@/utils/*": [
         "src/utils/*"
+      ],
+      "@/stores/*": [
+        "src/stores/*"
       ]
     }
   },

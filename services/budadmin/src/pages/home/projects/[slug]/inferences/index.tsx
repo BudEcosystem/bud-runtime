@@ -16,7 +16,7 @@ const InferenceListView: React.FC = () => {
   const { slug: projectId } = router.query;
   const [selectedInferenceId, setSelectedInferenceId] = useState<string | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
-  
+
   const {
     inferences,
     pagination,
@@ -25,26 +25,26 @@ const InferenceListView: React.FC = () => {
     setPagination,
     exportInferences,
   } = useInferences();
-  
+
   // Fetch inferences when component mounts or projectId changes
   useEffect(() => {
     if (projectId && typeof projectId === 'string') {
       fetchInferences(projectId);
     }
   }, [projectId]);
-  
+
   // Copy inference ID to clipboard
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     message.success('Copied to clipboard');
   };
-  
+
   // Format tokens display
   const formatTokens = (input: number, output: number) => {
     const total = input + output;
     return `${total.toLocaleString()} (${input.toLocaleString()} / ${output.toLocaleString()})`;
   };
-  
+
   // Table columns definition
   const columns: ColumnsType<InferenceListItem> = [
     {
@@ -183,7 +183,7 @@ const InferenceListView: React.FC = () => {
       ),
     },
   ];
-  
+
   // Handle table change (pagination, sorting)
   const handleTableChange = (newPagination: any, filters: any, sorter: any) => {
     // Update pagination
@@ -193,7 +193,7 @@ const InferenceListView: React.FC = () => {
       });
       fetchInferences(projectId as string);
     }
-    
+
     // Handle sorting
     if (sorter.order) {
       const sortMap: Record<string, string> = {
@@ -202,10 +202,10 @@ const InferenceListView: React.FC = () => {
         response_time_ms: 'latency',
         cost: 'cost',
       };
-      
+
       const sortBy = sortMap[sorter.field] || 'timestamp';
       const sortOrder = sorter.order === 'ascend' ? 'asc' : 'desc';
-      
+
       useInferences.getState().setFilters({
         sort_by: sortBy as any,
         sort_order: sortOrder as any,
@@ -213,7 +213,7 @@ const InferenceListView: React.FC = () => {
       fetchInferences(projectId as string);
     }
   };
-  
+
   // Export actions
   const exportMenu = [
     {
@@ -227,7 +227,7 @@ const InferenceListView: React.FC = () => {
       onClick: () => exportInferences('json'),
     },
   ];
-  
+
   return (
     <div style={{ padding: '24px' }}>
       <div style={{ marginBottom: 24 }}>
@@ -251,13 +251,13 @@ const InferenceListView: React.FC = () => {
             </Button.Group>
           </Space>
         </div>
-        
+
         <InferenceFilters
           projectId={projectId as string}
           onFiltersChange={() => fetchInferences(projectId as string)}
         />
       </div>
-      
+
       <Table
         columns={columns}
         dataSource={inferences}
@@ -287,7 +287,7 @@ const InferenceListView: React.FC = () => {
           ),
         }}
       />
-      
+
       {showDetailModal && selectedInferenceId && (
         <InferenceDetailModal
           inferenceId={selectedInferenceId}

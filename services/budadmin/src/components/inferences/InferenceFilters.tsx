@@ -15,9 +15,9 @@ interface InferenceFiltersProps {
 const InferenceFilters: React.FC<InferenceFiltersProps> = ({ projectId, onFiltersChange }) => {
   const [form] = Form.useForm();
   const [showAdvanced, setShowAdvanced] = useState(false);
-  
+
   const { filters, setFilters, resetFilters } = useInferences();
-  
+
   const handleFilterChange = (changedValues: any) => {
     // Handle date range
     if (changedValues.dateRange) {
@@ -27,7 +27,7 @@ const InferenceFilters: React.FC<InferenceFiltersProps> = ({ projectId, onFilter
         to_date: toDate ? toDate.toISOString() : undefined,
       });
     }
-    
+
     // Handle other filters
     const filterMap: Record<string, string> = {
       isSuccess: 'is_success',
@@ -35,23 +35,23 @@ const InferenceFilters: React.FC<InferenceFiltersProps> = ({ projectId, onFilter
       maxTokens: 'max_tokens',
       maxLatency: 'max_latency_ms',
     };
-    
+
     Object.keys(changedValues).forEach((key) => {
       if (key !== 'dateRange' && filterMap[key]) {
         setFilters({ [filterMap[key]]: changedValues[key] });
       }
     });
-    
+
     // Trigger data refresh
     onFiltersChange();
   };
-  
+
   const handleReset = () => {
     form.resetFields();
     resetFilters();
     onFiltersChange();
   };
-  
+
   const quickDateOptions = [
     { label: 'Last 1 hour', value: 1 },
     { label: 'Last 6 hours', value: 6 },
@@ -59,23 +59,23 @@ const InferenceFilters: React.FC<InferenceFiltersProps> = ({ projectId, onFilter
     { label: 'Last 7 days', value: 24 * 7 },
     { label: 'Last 30 days', value: 24 * 30 },
   ];
-  
+
   const handleQuickDate = (hours: number) => {
     const now = dayjs();
     const fromDate = now.subtract(hours, 'hour');
-    
+
     form.setFieldsValue({
       dateRange: [fromDate, now],
     });
-    
+
     setFilters({
       from_date: fromDate.toISOString(),
       to_date: now.toISOString(),
     });
-    
+
     onFiltersChange();
   };
-  
+
   return (
     <Card
       size="small"
@@ -130,7 +130,7 @@ const InferenceFilters: React.FC<InferenceFiltersProps> = ({ projectId, onFilter
               ))}
             </Space>
           </Col>
-          
+
           <Col span={12}>
             <Form.Item label="Status Filter">
               <Space>
@@ -142,7 +142,7 @@ const InferenceFilters: React.FC<InferenceFiltersProps> = ({ projectId, onFilter
             </Form.Item>
           </Col>
         </Row>
-        
+
         {showAdvanced && (
           <Row gutter={16}>
             <Col span={8}>
@@ -154,7 +154,7 @@ const InferenceFilters: React.FC<InferenceFiltersProps> = ({ projectId, onFilter
                 />
               </Form.Item>
             </Col>
-            
+
             <Col span={8}>
               <Form.Item label="Max Tokens" name="maxTokens">
                 <InputNumber
@@ -164,7 +164,7 @@ const InferenceFilters: React.FC<InferenceFiltersProps> = ({ projectId, onFilter
                 />
               </Form.Item>
             </Col>
-            
+
             <Col span={8}>
               <Form.Item label="Max Latency (ms)" name="maxLatency">
                 <InputNumber
