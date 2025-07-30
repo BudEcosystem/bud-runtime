@@ -49,6 +49,7 @@ let
 in
 {
   sops.secrets."misc/wireguard" = { };
+  services.k3s.extraFlags = [ "--tls-san 10.54.132.1" ];
 
   networking = {
     nat = {
