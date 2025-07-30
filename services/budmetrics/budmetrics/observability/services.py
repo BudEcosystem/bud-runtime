@@ -518,11 +518,11 @@ class ObservabilityMetricsService:
         # Use parameterized query with placeholders
         placeholders = ",".join([f"{{id_{i}:UUID}}" for i in range(len(inference_ids))])
         # Safe: placeholders are generated programmatically, not from user input
-        existing_check_query = f"""  # nosec B608
+        existing_check_query = f"""
         SELECT inference_id
         FROM ModelInferenceDetails
-        WHERE inference_id IN ({placeholders})  # nosec
-        """
+        WHERE inference_id IN ({placeholders})
+        """  # nosec B608
 
         # Create params dict
         params = {f"id_{i}": id for i, id in enumerate(inference_ids)}
@@ -580,12 +580,12 @@ class ObservabilityMetricsService:
 
         # Build and execute the INSERT query
         # Safe: values are escaped using _escape_string method
-        query = f"""  # nosec B608
+        query = f"""
         INSERT INTO ModelInferenceDetails
         (inference_id, request_ip, project_id, endpoint_id, model_id,
          cost, response_analysis, is_success, request_arrival_time, request_forward_time)
-        VALUES {",".join(values)}  # nosec
-        """
+        VALUES {",".join(values)}
+        """  # nosec B608
 
         await self.clickhouse_client.execute_query(query)
         logger.info(f"Successfully inserted {len(new_records)} new records")
@@ -670,13 +670,13 @@ class ObservabilityMetricsService:
 
         # Count total records
         # Safe: where_clause is built from validated conditions
-        count_query = f"""  # nosec B608
+        count_query = f"""
         SELECT COUNT(*) as total_count
         FROM ModelInference mi
         INNER JOIN ModelInferenceDetails mid ON mi.inference_id = mid.inference_id
         LEFT JOIN ChatInference ci ON mi.inference_id = ci.id
-        WHERE {where_clause}  # nosec
-        """
+        WHERE {where_clause}
+        """  # nosec B608
 
         # Execute count query with parameters
         count_result = await self.clickhouse_client.execute_query(count_query, params)
@@ -684,7 +684,7 @@ class ObservabilityMetricsService:
 
         # Get paginated data
         # Safe: where_clause and order_by are validated, limit/offset use parameters
-        list_query = f"""  # nosec B608
+        list_query = f"""
         SELECT
             mi.inference_id,
             mi.timestamp,
@@ -701,10 +701,10 @@ class ObservabilityMetricsService:
         FROM ModelInference mi
         INNER JOIN ModelInferenceDetails mid ON mi.inference_id = mid.inference_id
         LEFT JOIN ChatInference ci ON mi.inference_id = ci.id
-        WHERE {where_clause}  # nosec
-        ORDER BY {order_by}  # nosec
+        WHERE {where_clause}
+        ORDER BY {order_by}
         LIMIT %(limit)s OFFSET %(offset)s
-        """
+        """  # nosec B608
 
         params["limit"] = request.limit
         params["offset"] = request.offset
