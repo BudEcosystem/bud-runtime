@@ -38,7 +38,7 @@ def mock_session():
 @pytest.fixture
 def mock_endpoint():
     """Create a mock endpoint."""
-    endpoint = Mock(spec=EndpointModel)
+    endpoint = Mock()
     endpoint.id = uuid4()
     endpoint.name = "Test Endpoint"
     endpoint.status = EndpointStatusEnum.RUNNING
@@ -78,7 +78,7 @@ class TestEndpointPublicationService:
                     mock_retrieve.return_value = mock_endpoint
 
                     # Configure the updated endpoint
-                    updated_endpoint = Mock(spec=EndpointModel)
+                    updated_endpoint = Mock()
                     updated_endpoint.id = endpoint_id
                     updated_endpoint.is_published = True
                     updated_endpoint.published_date = datetime.now(timezone.utc)
@@ -121,7 +121,7 @@ class TestEndpointPublicationService:
                     mock_retrieve.return_value = mock_endpoint
 
                     # Configure the updated endpoint
-                    updated_endpoint = Mock(spec=EndpointModel)
+                    updated_endpoint = Mock()
                     updated_endpoint.id = endpoint_id
                     updated_endpoint.is_published = False
                     updated_endpoint.published_date = None
@@ -239,7 +239,7 @@ class TestEndpointPublicationService:
         # Create mock history entries
         history_entries = []
         for i in range(3):
-            entry = Mock(spec=PublicationHistoryModel)
+            entry = Mock()
             entry.id = uuid4()
             entry.deployment_id = endpoint_id
             entry.action = "publish" if i % 2 == 0 else "unpublish"
@@ -477,7 +477,7 @@ class TestEndpointPublicationSchemas:
         endpoint_id = uuid4()
 
         # Create already published endpoint
-        published_endpoint = Mock(spec=EndpointModel)
+        published_endpoint = Mock()
         published_endpoint.id = endpoint_id
         published_endpoint.name = "Already Published Endpoint"
         published_endpoint.status = EndpointStatusEnum.RUNNING
@@ -508,7 +508,7 @@ class TestEndpointPublicationSchemas:
         endpoint_id = uuid4()
 
         # Create unpublished endpoint
-        unpublished_endpoint = Mock(spec=EndpointModel)
+        unpublished_endpoint = Mock()
         unpublished_endpoint.id = endpoint_id
         unpublished_endpoint.name = "Unpublished Endpoint"
         unpublished_endpoint.status = EndpointStatusEnum.RUNNING
@@ -539,7 +539,7 @@ class TestEndpointPublicationSchemas:
         endpoint_id = uuid4()
 
         # Create endpoint in PENDING state
-        pending_endpoint = Mock(spec=EndpointModel)
+        pending_endpoint = Mock()
         pending_endpoint.id = endpoint_id
         pending_endpoint.name = "Pending Endpoint"
         pending_endpoint.status = EndpointStatusEnum.PENDING
@@ -571,7 +571,7 @@ class TestEndpointPublicationSchemas:
         endpoint_id = uuid4()
 
         # Create endpoint in FAILED state
-        failed_endpoint = Mock(spec=EndpointModel)
+        failed_endpoint = Mock()
         failed_endpoint.id = endpoint_id
         failed_endpoint.name = "Failed Endpoint"
         failed_endpoint.status = EndpointStatusEnum.FAILURE
@@ -603,7 +603,7 @@ class TestEndpointPublicationSchemas:
         endpoint_id = uuid4()
 
         # Create endpoint in UNHEALTHY state
-        unhealthy_endpoint = Mock(spec=EndpointModel)
+        unhealthy_endpoint = Mock()
         unhealthy_endpoint.id = endpoint_id
         unhealthy_endpoint.name = "Unhealthy Endpoint"
         unhealthy_endpoint.status = EndpointStatusEnum.UNHEALTHY
@@ -645,7 +645,7 @@ class TestEndpointPublicationSchemas:
             endpoint_id = uuid4()
 
             # Create published endpoint in various states
-            endpoint = Mock(spec=EndpointModel)
+            endpoint = Mock()
             endpoint.id = endpoint_id
             endpoint.name = f"Endpoint in {state} state"
             endpoint.status = state
@@ -659,7 +659,7 @@ class TestEndpointPublicationSchemas:
                         mock_retrieve.return_value = endpoint
 
                         # Configure the updated endpoint
-                        updated_endpoint = Mock(spec=EndpointModel)
+                        updated_endpoint = Mock()
                         updated_endpoint.id = endpoint_id
                         updated_endpoint.is_published = False
                         updated_endpoint.published_date = None
@@ -687,7 +687,7 @@ class TestEndpointPublicationSchemas:
         endpoint_id = uuid4()
 
         # Create endpoint ready to be published
-        endpoint = Mock(spec=EndpointModel)
+        endpoint = Mock()
         endpoint.id = endpoint_id
         endpoint.name = "Test Endpoint"
         endpoint.status = EndpointStatusEnum.RUNNING
@@ -702,7 +702,7 @@ class TestEndpointPublicationSchemas:
 
                     # Configure the updated endpoint
                     action_time = datetime.now(timezone.utc)
-                    updated_endpoint = Mock(spec=EndpointModel)
+                    updated_endpoint = Mock()
                     updated_endpoint.id = endpoint_id
                     updated_endpoint.is_published = True
                     updated_endpoint.published_date = action_time
