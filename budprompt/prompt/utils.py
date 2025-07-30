@@ -24,10 +24,14 @@ import uuid
 from pathlib import Path
 from typing import Any, Dict, Type
 
+from budmicroframe.commons import logging
 from datamodel_code_generator import DataModelType, InputFileType, generate
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from budprompt.commons.exceptions import InputValidationError, SchemaConversionError
+
+
+logger = logging.get_logger(__name__)
 
 
 def convert_json_schema_to_pydantic(json_schema: Dict[str, Any], model_name: str = "GeneratedModel") -> str:
@@ -48,9 +52,11 @@ def convert_json_schema_to_pydantic(json_schema: Dict[str, Any], model_name: str
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as input_file:
             json.dump(json_schema, input_file)
             input_path = Path(input_file.name)
+        logger.debug("Pydantic model json schema saved to temp file: %s", input_path)
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as output_file:
             output_path = Path(output_file.name)
+        logger.debug("Pydantic model saved to temp file: %s", output_path)
 
         # Generate Pydantic model
         generate(
@@ -71,12 +77,15 @@ def convert_json_schema_to_pydantic(json_schema: Dict[str, Any], model_name: str
         return generated_code
 
     except Exception as e:
+        logger.error("Failed to convert JSON schema to Pydantic model: %s", str(e))
         raise SchemaConversionError(f"Failed to convert JSON schema to Pydantic model: {str(e)}")
     finally:
         # Clean up temporary files
         if "input_path" in locals():
+            logger.debug("Deleting temp file: %s", input_path)
             input_path.unlink(missing_ok=True)
         if "output_path" in locals():
+            logger.debug("Deleting temp file: %s", output_path)
             output_path.unlink(missing_ok=True)
 
 
@@ -96,13 +105,16 @@ def load_pydantic_model_from_code(generated_code: str, model_name: str = None) -
     try:
         # Generate unique module name to avoid conflicts
         module_name = f"temp_models_{uuid.uuid4().hex[:8]}"
+        logger.debug("Creating module spec for: %s", module_name)
 
         # Create module spec
         spec = importlib.util.spec_from_loader(module_name, loader=None)
         if spec is None:
+            logger.error("Failed to create module spec")
             raise SchemaConversionError("Failed to create module spec")
 
         module = importlib.util.module_from_spec(spec)
+        logger.debug("Module created: %s", module)
 
         # Register in sys.modules
         sys.modules[module_name] = module
@@ -114,6 +126,7 @@ def load_pydantic_model_from_code(generated_code: str, model_name: str = None) -
             if model_name:
                 # Get specific model by name
                 if not hasattr(module, model_name):
+                    logger.error("Model '%s' not found in generated code", model_name)
                     raise SchemaConversionError(f"Model '{model_name}' not found in generated code")
                 model_class = getattr(module, model_name)
             else:
@@ -131,6 +144,7 @@ def load_pydantic_model_from_code(generated_code: str, model_name: str = None) -
                         break
 
                 if model_class is None:
+                    logger.error("No Pydantic model found in generated code")
                     raise SchemaConversionError("No Pydantic model found in generated code")
 
             return model_class
@@ -138,11 +152,13 @@ def load_pydantic_model_from_code(generated_code: str, model_name: str = None) -
         finally:
             # Clean up - remove from sys.modules
             if module_name in sys.modules:
+                logger.debug("Removing module from sys.modules: %s", module_name)
                 del sys.modules[module_name]
 
     except SchemaConversionError:
         raise
     except Exception as e:
+        logger.error("Failed to load Pydantic model from code: %s", str(e))
         raise SchemaConversionError(f"Failed to load Pydantic model from code: {str(e)}")
 
 
@@ -160,8 +176,10 @@ def validate_json_schema(schema: Dict[str, Any]) -> None:
 
     if schema_type == "object":
         if not all(field in schema for field in required_fields):
+            logger.error("Schema is invalid")
             raise SchemaConversionError(f"Object schema must contain: {required_fields}. Got: {set(schema.keys())}")
     elif schema_type not in ["string", "number", "integer", "boolean", "array", "object"]:
+        logger.error("Schema is invalid")
         raise SchemaConversionError(f"Invalid schema type: {schema_type}")
 
 
@@ -169,25 +187,8 @@ def clean_model_cache():
     """Clean up any temporary modules from sys.modules."""
     modules_to_remove = [key for key in sys.modules.keys() if key.startswith("temp_models_")]
     for module_name in modules_to_remove:
+        logger.debug("Removing module from sys.modules: %s", module_name)
         del sys.modules[module_name]
-
-
-def create_string_model(model_name: str = "StringModel") -> Type[BaseModel]:
-    """Create a simple Pydantic model for string input/output.
-
-    Args:
-        model_name: Name for the model class
-
-    Returns:
-        Pydantic model class with a single string field
-    """
-    # Dynamically create a Pydantic model with a single string field
-    model_attrs = {
-        "content": Field(..., description="String content"),
-        "__module__": f"temp_models_{uuid.uuid4().hex[:8]}",
-    }
-
-    return type(model_name, (BaseModel,), model_attrs)
 
 
 def validate_input_data_type(input_data: Any, input_schema: Dict[str, Any] = None) -> None:
