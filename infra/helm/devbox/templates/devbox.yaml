@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-devbox
+spec:
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-devbox
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-devbox
+    spec:
+      containers:
+      - name: devbox
+        image: docker.io/budstudio/devbox
+        imagePullPolicy: "Always"
+        ports:
+        - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-devbox
+spec:
+  selector:
+    app: {{ .Release.Name }}-devbox
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80

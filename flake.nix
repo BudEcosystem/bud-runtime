@@ -33,6 +33,7 @@
         };
       supportedSystems = lib.platforms.unix;
       forAllSystems = f: lib.genAttrs supportedSystems (forSystem f);
+      forLinuxSystems = f: lib.genAttrs lib.platforms.linux (forSystem f);
 
       makeNixos =
         host: system:
@@ -64,12 +65,22 @@
         }
       );
 
-      packages = forAllSystems (
-        { system, pkgs }:
-        {
-          workflows = pkgs.callPackage ./nix/workflows { inherit self; };
-        }
-      );
+      packages =
+        lib.recursiveUpdate
+          (forAllSystems (
+            { system, pkgs }:
+            {
+              workflows = pkgs.callPackage ./nix/workflows { inherit self; };
+            }
+          ))
+          (
+            forLinuxSystems (
+              { system, pkgs }:
+              {
+                images = pkgs.callPackage ./nix/images { };
+              }
+            )
+          );
 
       nixosConfigurations = lib.genAttrs [
         "common"

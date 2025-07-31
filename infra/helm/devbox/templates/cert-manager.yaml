@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Release.Name }}-cloudflare-api-token
+type: Opaque
+stringData:
+  api_token: {{ .Values.certManagerSecrets.cloudflare_api_token }}
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: {{ .Values.cert.ingressShim.defaultIssuerName }}
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: {{ .Values.certManagerSecrets.email }}
+    profile: tlsserver
+    privateKeySecretRef:
+      name: {{ .Release.Name }}-letsencrypt-acme-private-key
+    solvers:
+      - dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: {{ .Release.Name }}-cloudflare-api-token
+              key: api_token
