@@ -90,7 +90,13 @@ class TestEndpointPublicationService:
                         endpoint_id=endpoint_id,
                         action="publish",
                         current_user_id=mock_user.id,
-                        action_metadata={"reason": "Ready for production"}
+                        action_metadata={"reason": "Ready for production"},
+                        pricing={
+                            "input_cost": "0.001000",
+                            "output_cost": "0.002000",
+                            "currency": "USD",
+                            "per_tokens": 1000
+                        }
                     )
 
                     # Assert
@@ -161,7 +167,13 @@ class TestEndpointPublicationService:
                 await service.update_publication_status(
                     endpoint_id=endpoint_id,
                     action="publish",
-                    current_user_id=mock_user.id
+                    current_user_id=mock_user.id,
+                    pricing={
+                        "input_cost": "0.001000",
+                        "output_cost": "0.002000",
+                        "currency": "USD",
+                        "per_tokens": 1000
+                    }
                 )
 
             assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
@@ -202,7 +214,13 @@ class TestEndpointPublicationService:
                 await service.update_publication_status(
                     endpoint_id=mock_endpoint.id,
                     action="publish",
-                    current_user_id=mock_user.id
+                    current_user_id=mock_user.id,
+                    pricing={
+                        "input_cost": "0.001000",
+                        "output_cost": "0.002000",
+                        "currency": "USD",
+                        "per_tokens": 1000
+                    }
                 )
 
             assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
@@ -223,7 +241,13 @@ class TestEndpointPublicationService:
             result = await service.update_publication_status(
                 endpoint_id=mock_endpoint.id,
                 action="publish",
-                current_user_id=mock_user.id
+                current_user_id=mock_user.id,
+                pricing={
+                    "input_cost": "0.001000",
+                    "output_cost": "0.002000",
+                    "currency": "USD",
+                    "per_tokens": 1000
+                }
             )
 
             # Assert - should return the endpoint without error
@@ -424,21 +448,41 @@ class TestEndpointPublicationSchemas:
 
     def test_update_publication_status_request(self):
         """Test UpdatePublicationStatusRequest schema."""
-        # Valid publish action
+        # Valid publish action with required pricing
+        from decimal import Decimal
+        from budapp.endpoint_ops.schemas import DeploymentPricingInput
+        
         request = UpdatePublicationStatusRequest(
             action="publish",
-            action_metadata={"reason": "Ready for production"}
+            action_metadata={"reason": "Ready for production"},
+            pricing=DeploymentPricingInput(
+                input_cost=Decimal("0.001000"),
+                output_cost=Decimal("0.002000"),
+                currency="USD",
+                per_tokens=1000
+            )
         )
         assert request.action == "publish"
         assert request.action_metadata["reason"] == "Ready for production"
+        assert request.pricing is not None
+        assert request.pricing.input_cost == Decimal("0.001000")
 
-        # Valid unpublish action
+        # Publish without pricing should raise validation error
+        with pytest.raises(ValueError) as exc_info:
+            UpdatePublicationStatusRequest(
+                action="publish",
+                action_metadata={"reason": "Ready for production"}
+            )
+        assert "Pricing information is required when publishing an endpoint" in str(exc_info.value)
+
+        # Valid unpublish action (pricing not required)
         request = UpdatePublicationStatusRequest(
             action="unpublish",
             action_metadata=None
         )
         assert request.action == "unpublish"
         assert request.action_metadata is None
+        assert request.pricing is None
 
         # Invalid action should raise validation error
         with pytest.raises(ValueError):
@@ -493,7 +537,13 @@ class TestEndpointPublicationSchemas:
                 endpoint_id=endpoint_id,
                 action="publish",
                 current_user_id=mock_user.id,
-                action_metadata={"reason": "Attempting to republish"}
+                action_metadata={"reason": "Attempting to republish"},
+                pricing={
+                    "input_cost": "0.001000",
+                    "output_cost": "0.002000",
+                    "currency": "USD",
+                    "per_tokens": 1000
+                }
             )
 
             # Assert - should return without error (idempotent)
@@ -556,7 +606,13 @@ class TestEndpointPublicationSchemas:
                     endpoint_id=endpoint_id,
                     action="publish",
                     current_user_id=mock_user.id,
-                    action_metadata={"reason": "Trying to publish pending endpoint"}
+                    action_metadata={"reason": "Trying to publish pending endpoint"},
+                    pricing={
+                        "input_cost": "0.001000",
+                        "output_cost": "0.002000",
+                        "currency": "USD",
+                        "per_tokens": 1000
+                    }
                 )
 
             assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
@@ -588,7 +644,13 @@ class TestEndpointPublicationSchemas:
                     endpoint_id=endpoint_id,
                     action="publish",
                     current_user_id=mock_user.id,
-                    action_metadata={"reason": "Trying to publish failed endpoint"}
+                    action_metadata={"reason": "Trying to publish failed endpoint"},
+                    pricing={
+                        "input_cost": "0.001000",
+                        "output_cost": "0.002000",
+                        "currency": "USD",
+                        "per_tokens": 1000
+                    }
                 )
 
             assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
@@ -620,7 +682,13 @@ class TestEndpointPublicationSchemas:
                     endpoint_id=endpoint_id,
                     action="publish",
                     current_user_id=mock_user.id,
-                    action_metadata={"reason": "Trying to publish unhealthy endpoint"}
+                    action_metadata={"reason": "Trying to publish unhealthy endpoint"},
+                    pricing={
+                        "input_cost": "0.001000",
+                        "output_cost": "0.002000",
+                        "currency": "USD",
+                        "per_tokens": 1000
+                    }
                 )
 
             assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
@@ -714,7 +782,13 @@ class TestEndpointPublicationSchemas:
                         endpoint_id=endpoint_id,
                         action="publish",
                         current_user_id=mock_user.id,
-                        action_metadata={"reason": "Testing state transition", "version": "1.0"}
+                        action_metadata={"reason": "Testing state transition", "version": "1.0"},
+                        pricing={
+                            "input_cost": "0.001000",
+                            "output_cost": "0.002000",
+                            "currency": "USD",
+                            "per_tokens": 1000
+                        }
                     )
 
                     # Assert - verify state transition tracking
