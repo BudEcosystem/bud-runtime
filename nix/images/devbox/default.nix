@@ -16,7 +16,7 @@ dockerTools.buildLayeredImage {
       (lib.getExe caddy)
       "file-server"
       "--root"
-      ./.
+      ./web
       "--listen"
       "0.0.0.0:${toString port}"
     ];
