@@ -642,13 +642,8 @@ class PublishEndpointResponse(SuccessResponse):
     object: str = "endpoint.publish"
 
 
-class UpdatePricingRequest(BaseModel):
-    """Request to update endpoint pricing."""
-
-    input_cost: Decimal = Field(..., decimal_places=6, ge=0, description="Cost per input tokens")
-    output_cost: Decimal = Field(..., decimal_places=6, ge=0, description="Cost per output tokens")
-    currency: str = Field(default="USD", max_length=3, description="Currency code (ISO 4217)")
-    per_tokens: int = Field(default=1000, gt=0, description="Number of tokens for the pricing unit")
+# Use alias to avoid duplication and maintain DRY principle
+UpdatePricingRequest = DeploymentPricingInput
 
 
 class PricingHistoryResponse(PaginatedSuccessResponse):

@@ -8,7 +8,7 @@ from uuid import uuid4
 
 import pytest
 from fastapi import status
-from fastapi.testclient import TestClient
+# from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from budapp.commons.constants import ModalityEnum, PermissionEnum
@@ -88,7 +88,7 @@ class TestCatalogAPIEndpoints:
     """Test cases for catalog API endpoints."""
 
     @pytest.mark.asyncio
-    async def test_list_catalog_models_success(self, client: TestClient, mock_user_with_client_access, mock_catalog_items):
+    async def test_list_catalog_models_success(self, client, mock_user_with_client_access, mock_catalog_items):
         """Test successful listing of catalog models."""
         # Arrange
         with patch('budapp.commons.dependencies.get_current_active_user', return_value=mock_user_with_client_access):
@@ -111,7 +111,7 @@ class TestCatalogAPIEndpoints:
                 assert data["models"][0]["pricing"]["input_cost"] == 0.03
 
     @pytest.mark.asyncio
-    async def test_list_catalog_models_with_filters(self, client: TestClient, mock_user_with_client_access, mock_catalog_items):
+    async def test_list_catalog_models_with_filters(self, client, mock_user_with_client_access, mock_catalog_items):
         """Test listing catalog models with filters."""
         # Arrange
         filtered_items = [item for item in mock_catalog_items if item["modality"] == ["text"]]
@@ -140,7 +140,7 @@ class TestCatalogAPIEndpoints:
                 assert "modality" in call_args.kwargs["filters"]
 
     @pytest.mark.asyncio
-    async def test_get_catalog_model_details_success(self, client: TestClient, mock_user_with_client_access, mock_catalog_items):
+    async def test_get_catalog_model_details_success(self, client, mock_user_with_client_access, mock_catalog_items):
         """Test getting model details by endpoint ID."""
         # Arrange
         endpoint_id = uuid4()
@@ -162,7 +162,7 @@ class TestCatalogAPIEndpoints:
                 assert data["pricing"]["input_cost"] == 0.03
 
     @pytest.mark.asyncio
-    async def test_get_catalog_model_details_not_found(self, client: TestClient, mock_user_with_client_access):
+    async def test_get_catalog_model_details_not_found(self, client, mock_user_with_client_access):
         """Test getting model details when model not found."""
         # Arrange
         endpoint_id = uuid4()
@@ -180,7 +180,7 @@ class TestCatalogAPIEndpoints:
                 assert "Published model not found" in data["message"]
 
     @pytest.mark.asyncio
-    async def test_catalog_models_with_search(self, client: TestClient, mock_user_with_client_access, mock_catalog_items):
+    async def test_catalog_models_with_search(self, client, mock_user_with_client_access, mock_catalog_items):
         """Test searching catalog models using the search parameter."""
         # Arrange
         search_results = [item for item in mock_catalog_items if "GPT" in item["name"]]
@@ -212,7 +212,7 @@ class TestCatalogAPIEndpoints:
                 assert call_args.kwargs["search_term"] == "GPT"
 
     @pytest.mark.asyncio
-    async def test_catalog_access_denied_without_permission(self, client: TestClient):
+    async def test_catalog_access_denied_without_permission(self, client):
         """Test that catalog endpoints require CLIENT_ACCESS permission."""
         # Arrange
         user_without_permission = Mock(spec=UserModel)
@@ -227,7 +227,7 @@ class TestCatalogAPIEndpoints:
             assert response.status_code == status.HTTP_403_FORBIDDEN
 
     @pytest.mark.asyncio
-    async def test_catalog_pagination(self, client: TestClient, mock_user_with_client_access, mock_catalog_items):
+    async def test_catalog_pagination(self, client, mock_user_with_client_access, mock_catalog_items):
         """Test catalog pagination."""
         # Arrange
         page = 2
@@ -257,7 +257,7 @@ class TestCatalogAPIEndpoints:
                 assert data["total_record"] == 2
 
     @pytest.mark.asyncio
-    async def test_catalog_ordering(self, client: TestClient, mock_user_with_client_access, mock_catalog_items):
+    async def test_catalog_ordering(self, client, mock_user_with_client_access, mock_catalog_items):
         """Test catalog ordering by different fields."""
         # Arrange
         sorted_items = sorted(mock_catalog_items, key=lambda x: x["name"])
@@ -286,7 +286,7 @@ class TestCatalogAPIEndpoints:
                 assert call_args.kwargs["order_by"] is not None
 
     @pytest.mark.asyncio
-    async def test_catalog_search_minimum_length(self, client: TestClient, mock_user_with_client_access):
+    async def test_catalog_search_minimum_length(self, client, mock_user_with_client_access):
         """Test that search requires minimum query length."""
         # Arrange
         with patch('budapp.commons.dependencies.get_current_active_user', return_value=mock_user_with_client_access):
@@ -304,7 +304,7 @@ class TestCatalogAPIEndpoints:
             assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
     @pytest.mark.asyncio
-    async def test_catalog_combined_search_and_filter(self, client: TestClient, mock_user_with_client_access, mock_catalog_items):
+    async def test_catalog_combined_search_and_filter(self, client, mock_user_with_client_access, mock_catalog_items):
         """Test combining search with filters."""
         # Arrange
         filtered_search_results = [
