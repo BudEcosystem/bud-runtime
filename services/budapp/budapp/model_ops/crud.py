@@ -557,11 +557,11 @@ class ModelDataManager(DataManagerUtils):
 
         # Apply search if provided
         if search_term:
-            ts_query = func.plainto_tsquery('english', search_term)
+            ts_query = func.plainto_tsquery("english", search_term)
             search_conditions = or_(
-                func.to_tsvector('english', Model.name).op('@@')(ts_query),
-                func.to_tsvector('english', func.coalesce(Model.description, '')).op('@@')(ts_query),
-                func.array_to_string(Model.use_cases, " ").ilike(f"%{search_term}%")
+                func.to_tsvector("english", Model.name).op("@@")(ts_query),
+                func.to_tsvector("english", func.coalesce(Model.description, "")).op("@@")(ts_query),
+                func.array_to_string(Model.use_cases, " ").ilike(f"%{search_term}%"),
             )
             base_query = base_query.filter(search_conditions)
 
