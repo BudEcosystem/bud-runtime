@@ -1,0 +1,358 @@
+1. Authentication & Authorization
+Allow users to register and log in with their credentials, including additional info like company, purpose, and role. 
+🔧 Backend
+Database:
+
+
+User table: id, email, password_hash, name, company, purpose, role, created_at
+Add additional fields as custom Attributes in keycloak.
+SSO Login (Google, LinkedIn, github, Microsoft Entra)
+
+
+Endpoints:
+
+
+Add new register API
+POST /auth/register: accepts user info, validates, hashes password, stores user
+
+
+POST /auth/login: validates credentials, returns JWT token
+
+
+GET /auth/me: fetch current user info (requires token)
+Update the current JWT verification middleware to check the user’s role to prevent the client user from accessing the current application
+
+
+Security:
+
+
+Use JWT for stateless auth
+
+
+🖼️ Frontend
+Register form with fields: email, name, password, company, purpose, role
+
+
+Login form with email, password
+
+
+Handle validation, error messages, and loading states
+
+
+
+2. Model Brochure
+Provide a visually rich overview of all available models with filtering and deep dive capabilities.
+🔧 Backend
+Model metadata table/config: stored in DB or config file
+
+
+API Endpoints:
+
+
+GET /models: list all models with published deployments
+
+
+GET /models/:id: detailed view for a model
+
+
+GET /models?modality=vision: filter by modality
+
+
+Sample Model Fields:
+
+
+id, name, modality, status, description, capabilities, token_limit, use_cases[]  – reuse from Model table
+Pricing  - Add new pricing table mapped against the deployment table with fields input_cost, output_cost, created_by and created_at fields. input _cost and output_cost represents cost per million tokens. If needed we can also have a is_current key to determine the current price faster
+IsPublished, published_date, published_by – to be added to the current deployment model
+🖼️ Frontend
+Grid/list view of all models grouped by modality
+
+
+Status badges (Available, Deprecated)
+
+
+Search/filter controls
+
+
+Detail page or expandable panel per model
+
+
+“Try in Playground” CTA button (Phase II)
+
+
+
+
+2a. Model Brochure(Existing APP)
+Provide Model publishing capabilities.
+🔧 Backend
+API Endpoints:
+
+
+POST /endpoints/publish : Publish a deployment
+POST /endpoints/:id/price : Update the pricing of a deployment
+GET /endpoints/:id/price : Retrieves the price history of a deployment
+🖼️ Frontend
+Add Button to publish the deployment
+Add Page to view and add pricing information
+
+
+
+3. Logs
+Show logs of API requests and responses with metadata and filtering.
+🔧 Backend
+Log table: id, user_id, model_id, input, output, token_count, cost, latency, status, created_at
+
+
+API Endpoints:
+
+
+GET /logs: filter by model, status, user, date_range, project
+The API should retrieve the information from clickhouse
+
+
+🖼️ Frontend
+Paginated table view
+
+
+Filters and search
+
+
+Expandable rows to show full input/output JSON
+
+
+Token usage & cost column
+
+
+Date/time sorting
+
+
+
+4. Batches
+Support batch file uploads for mass inference and provide feedback on job status.
+🔧 Backend
+Batch Jobs Table: id, user_id, file_id, status, model, config, results_url
+
+
+Endpoints:
+
+
+POST /batches: accepts config + file reference
+
+
+GET /batches: list user’s batches
+
+
+GET /batches/:id: status + results
+
+
+Worker System: Celery or serverless job runner for async processing
+
+
+File Storage: Store user files using object storage (e.g., S3, local)
+
+
+🖼️ Frontend
+File upload component (only JSONL allowed)
+
+
+Form for model config (temperature, stop sequence, etc.)
+
+
+Job progress list with statuses (Queued, Running, Failed, Done)
+
+
+Download results button
+
+
+Error summary section
+
+
+
+5. API Access & Key Management
+
+Allow users to generate, manage, and monitor their API keys securely.
+🔧 Backend
+API Key Table: id, user_id, key_hash, label, last_used_at, revoked, created_at
+
+
+Endpoints:
+
+
+POST /proprietary/credentials: create a new key
+
+
+DELETE /proprietary/credentials/:id: revoke key
+
+
+GET /proprietary/credentials: list user’s keys
+
+
+Existing APIs can be reused. Add a credential type to identify client app credentials with existing credentials
+Middle ware to be updated to allow access only to the published models using the API Keys created in the client app
+
+
+🖼️ Frontend
+Create key button with optional label
+
+
+List of keys with usage stats
+
+
+Revoke key button
+
+
+Key preview modal (show once)
+
+
+
+6. Usage & Billing
+Provide real-time usage tracking and billing info to the user.
+🔧 Backend
+Usage Table: user_id, tokens_used, cost, date, endpoint
+
+
+Billing Table: user_id, plan, quota_limit, quota_used, alerts_triggered, invoice_url
+
+
+Endpoints:
+
+
+GET /usage: token/cost usage over time
+
+
+GET /billing: billing plan, quota info
+
+
+POST /billing/alert: create alert config
+
+
+GET /invoices: list/download invoices(Phase II)
+
+
+Backend:
+
+1. Admin can set input cost / 1M tokens, output cost / 1 M tokens
+2. Admin can set an hourly cost for different 
+3. Admin can see token cost automatically for different cloud model providers
+4. Admin can edit the GA cost
+
+🖼️ Frontend
+Usage charts (daily/monthly toggle)
+
+
+Breakdown by model or endpoint
+
+
+Budget alert setup UI
+
+
+Plan info display
+
+
+Invoice download section(Phase II)
+
+
+
+7. Monitoring & Audit
+Audit trail for actions like key creation, model use spikes, etc.
+🔧 Backend
+Audit Table: id, user_id, action, resource_type, resource_id, timestamp
+
+
+Endpoints:
+
+
+GET /audit: list logs with filters
+
+
+🖼️ Frontend
+Audit table grouped by date
+
+
+Filter by action type, resource, user
+
+
+Export to CSV (optional)
+
+
+
+8. Project Management
+Allow users to organize resources (logs, prompts, models) under projects.
+🔧 Backend
+Project Table: id, user_id, name, created_at
+
+
+Link API Keys, Batches, Logs, etc., to project_id
+
+
+Endpoints:
+
+
+POST /projects
+
+
+GET /projects
+
+
+DELETE /projects/:id
+Reuse existing Project implementation
+Add additional project type to understand if the project is created in the client app or the existing app.
+
+
+🖼️ Frontend
+Subtle UI dropdown for project context switch
+
+
+Create/delete project UI
+
+
+Show project context in API Keys, Batches, etc.
+
+
+
+9. Notifications
+Alert users when important system or usage events occur.
+🔧 Backend
+Notification Table: id, user_id, type, message, read, created_at
+
+
+Trigger alerts via billing usage, job failures, etc.
+
+
+Endpoints:
+
+
+GET /notifications
+
+
+POST /notifications/read
+Reuse the existing notification module
+🖼️ Frontend
+Bell icon with unread count
+
+
+Dropdown panel or sidebar for messages
+
+
+Dismiss/read tracking
+
+
+10. Playground / Chat Interface
+ Provide an interactive interface for users to experiment with and communicate with different OpenAI models using configurable parameters. Enable saving, organizing, sharing, and exporting conversations, along with token usage tracking.
+🔧 Backend
+Recheck the model listing API to list only published deployment for the external dashboard
+🖼️ Frontend
+Reuse the existing playground component
+11. User Listing/analytics(Existing App)
+🔧 Backend
+Endpoint: GET /users/external
+Functionality:
+Paginated list of external users
+
+
+Search by username, email, or name.
+🖼️ Frontend
+Data table with pagination and search box.
+
+
+Actions per user: View, Edit, Deactivate/Delete.
