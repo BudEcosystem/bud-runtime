@@ -221,19 +221,31 @@ class TestPricingIntegration:
         # Create multiple pricing records
         pricing_history = [mock_pricing, mock_pricing, mock_pricing]
 
-        with patch.object(EndpointDataManager, 'get_pricing_history', new_callable=AsyncMock) as mock_history:
-            mock_history.return_value = pricing_history
+        with patch.object(EndpointDataManager, 'retrieve_by_fields', new_callable=AsyncMock) as mock_retrieve:
+            with patch.object(EndpointDataManager, 'get_pricing_history', new_callable=AsyncMock) as mock_history:
+                mock_retrieve.return_value = mock_endpoint
+                mock_history.return_value = (pricing_history, 3)  # Return tuple with (history, total_count)
 
-            # Act
-            result = await service.get_pricing_history(
-                endpoint_id=endpoint_id,
-                offset=0,
-                limit=10
-            )
+                # Act
+                result = await service.get_pricing_history(
+                    endpoint_id=endpoint_id,
+                    page=1,
+                    limit=10
+                )
 
-            # Assert
-            assert len(result) == 3
-            mock_history.assert_called_once_with(endpoint_id, 0, 10)
+                # Assert
+                assert result['total_record'] == 3
+                assert len(result['pricing_history']) == 3
+                assert result['page'] == 1
+                assert result['limit'] == 10
+                assert result['code'] == status.HTTP_200_OK
+                
+                # Verify DataManager was called with correct parameters
+                mock_history.assert_called_once_with(
+                    endpoint_id=endpoint_id,
+                    offset=0,  # (page-1) * limit = (1-1) * 10 = 0
+                    limit=10
+                )
 
 
 class TestModelCatalog:
