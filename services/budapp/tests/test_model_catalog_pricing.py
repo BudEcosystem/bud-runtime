@@ -13,7 +13,8 @@ from sqlalchemy.orm import Session
 from budapp.commons.constants import EndpointStatusEnum
 from budapp.commons.exceptions import ClientException
 from budapp.endpoint_ops.crud import EndpointDataManager, PublicationHistoryDataManager
-from budapp.endpoint_ops.models import DeploymentPricing, Endpoint as EndpointModel
+from budapp.endpoint_ops.models import DeploymentPricing
+from budapp.endpoint_ops.models import Endpoint as EndpointModel
 from budapp.endpoint_ops.schemas import (
     DeploymentPricingInput,
     DeploymentPricingResponse,
@@ -133,7 +134,7 @@ class TestPricingIntegration:
                         with patch.object(PublicationHistoryDataManager, 'create_publication_history', new_callable=AsyncMock):
                             with patch.object(RedisService, 'invalidate_catalog_cache', new_callable=AsyncMock):
                                     mock_retrieve.return_value = mock_endpoint
-                                    
+
                                     # Configure the updated endpoint to be returned by update_publication_status
                                     updated_endpoint = Mock()
                                     updated_endpoint.id = endpoint_id
@@ -241,7 +242,7 @@ class TestPricingIntegration:
                 assert result['page'] == 1
                 assert result['limit'] == 10
                 assert result['code'] == status.HTTP_200_OK
-                
+
                 # Verify DataManager was called with correct parameters
                 mock_history.assert_called_once_with(
                     endpoint_id=endpoint_id,
@@ -352,7 +353,7 @@ class TestModelCatalog:
         )
 
         with patch.object(RedisService, 'get', new_callable=AsyncMock) as mock_get:
-            with patch.object(RedisService, 'set', new_callable=AsyncMock) as mock_set:
+            with patch.object(RedisService, 'set', new_callable=AsyncMock):
                 with patch.object(ModelDataManager, 'get_published_model_detail', new_callable=AsyncMock) as mock_detail:
                     mock_get.return_value = None  # Cache miss
                     mock_detail.return_value = db_result
@@ -452,7 +453,7 @@ class TestCacheInvalidation:
                                 mock_redis_instance = AsyncMock()
                                 mock_redis_class.return_value = mock_redis_instance
                                 mock_retrieve.return_value = mock_endpoint
-                                
+
                                 # Configure the updated endpoint
                                 updated_endpoint = Mock()
                                 updated_endpoint.id = endpoint_id
