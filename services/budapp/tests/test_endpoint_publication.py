@@ -451,7 +451,7 @@ class TestEndpointPublicationSchemas:
         # Valid publish action with required pricing
         from decimal import Decimal
         from budapp.endpoint_ops.schemas import DeploymentPricingInput
-        
+
         request = UpdatePublicationStatusRequest(
             action="publish",
             action_metadata={"reason": "Ready for production"},

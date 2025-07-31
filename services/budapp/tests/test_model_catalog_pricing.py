@@ -68,7 +68,7 @@ def mock_model():
 @pytest.fixture
 def mock_endpoint():
     """Create a mock endpoint."""
-    endpoint = Mock(spec=EndpointModel)
+    endpoint = Mock()
     endpoint.id = uuid4()
     endpoint.name = "gpt-4-endpoint"
     endpoint.status = EndpointStatusEnum.RUNNING
