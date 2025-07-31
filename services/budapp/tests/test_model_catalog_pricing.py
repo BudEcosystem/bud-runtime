@@ -447,10 +447,19 @@ class TestCacheInvalidation:
             with patch.object(EndpointDataManager, 'update_publication_status', new_callable=AsyncMock) as mock_update:
                 with patch.object(EndpointDataManager, 'update_previous_pricing', new_callable=AsyncMock):
                     with patch.object(EndpointDataManager, 'create_deployment_pricing', new_callable=AsyncMock):
-                        with patch.object(RedisService, 'invalidate_catalog_cache', new_callable=AsyncMock) as mock_invalidate:
+                        with patch.object(PublicationHistoryDataManager, 'create_publication_history', new_callable=AsyncMock):
+                            with patch('budapp.endpoint_ops.services.RedisService') as mock_redis_class:
+                                mock_redis_instance = AsyncMock()
+                                mock_redis_class.return_value = mock_redis_instance
                                 mock_retrieve.return_value = mock_endpoint
-                                mock_endpoint.is_published = True
-                                mock_update.return_value = mock_endpoint
+                                
+                                # Configure the updated endpoint
+                                updated_endpoint = Mock()
+                                updated_endpoint.id = endpoint_id
+                                updated_endpoint.is_published = True
+                                updated_endpoint.published_date = datetime.now(timezone.utc)
+                                updated_endpoint.published_by = mock_user.id
+                                mock_update.return_value = updated_endpoint
 
                                 # Act
                                 await service.update_publication_status(
@@ -461,7 +470,7 @@ class TestCacheInvalidation:
                                 )
 
                                 # Assert cache invalidation
-                                mock_invalidate.assert_called_once_with(endpoint_id=str(endpoint_id))
+                                mock_redis_instance.invalidate_catalog_cache.assert_called_once_with(endpoint_id=str(endpoint_id))
 
     @pytest.mark.asyncio
     async def test_cache_invalidation_on_pricing_update(self, mock_session, mock_endpoint, mock_user, mock_pricing):
@@ -481,7 +490,9 @@ class TestCacheInvalidation:
         with patch.object(EndpointDataManager, 'retrieve_by_fields', new_callable=AsyncMock) as mock_retrieve:
             with patch.object(EndpointDataManager, 'update_previous_pricing', new_callable=AsyncMock):
                 with patch.object(EndpointDataManager, 'create_deployment_pricing', new_callable=AsyncMock) as mock_create:
-                    with patch.object(RedisService, 'invalidate_catalog_cache', new_callable=AsyncMock) as mock_invalidate:
+                    with patch('budapp.endpoint_ops.services.RedisService') as mock_redis_class:
+                            mock_redis_instance = AsyncMock()
+                            mock_redis_class.return_value = mock_redis_instance
                             mock_retrieve.return_value = mock_endpoint
                             mock_create.return_value = mock_pricing
 
@@ -493,4 +504,4 @@ class TestCacheInvalidation:
                             )
 
                             # Assert cache invalidation
-                            mock_invalidate.assert_called_once_with(endpoint_id=str(endpoint_id))
+                            mock_redis_instance.invalidate_catalog_cache.assert_called_once_with(endpoint_id=str(endpoint_id))
