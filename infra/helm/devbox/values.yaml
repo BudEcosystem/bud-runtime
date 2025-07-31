@@ -1,11 +1,2 @@
 host:
   devbox: dev.bud.studio
-
-cert:
-  enabled: true
-  crds:
-    enabled: true
-  ingressShim:
-    defaultIssuerName: letsencrypt
-    defaultIssuerKind: ClusterIssue
-    defaultIssuerGroup: cert-manager.io

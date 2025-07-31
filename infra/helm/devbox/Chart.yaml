@@ -11,10 +11,3 @@ maintainers:
   - name: "sinanmohd"
     email: "sinan@sinanmohd.com"
     url: "https://www.sinanmohd.com"
-
-dependencies:
-  - name: cert-manager
-    alias: cert
-    version: 1.18.2
-    repository: https://charts.jetstack.io
-    condition: cert.enabled
