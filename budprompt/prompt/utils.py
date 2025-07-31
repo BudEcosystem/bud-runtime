@@ -21,7 +21,7 @@ from typing import Any, Dict
 
 from budmicroframe.commons import logging
 
-from budprompt.commons.exceptions import InputValidationError
+from budprompt.commons.exceptions import SchemaGenerationException
 
 
 logger = logging.get_logger(__name__)
@@ -43,19 +43,15 @@ def validate_input_data_type(input_data: Any, input_schema: Dict[str, Any] = Non
         input_schema: The input schema (None for unstructured)
 
     Raises:
-        InputValidationError: If input_data type doesn't match schema presence
+        SchemaGenerationException: If input_data type doesn't match schema presence
     """
     if input_schema is not None:
         # Structured input expected
         if not isinstance(input_data, dict):
-            raise InputValidationError(
-                "Structured input expected (input_schema provided) but got non-dict input_data. "
-                f"Got type: {type(input_data).__name__}"
-            )
+            logger.error(f"Expected dict for structured input, got {type(input_data).__name__}")
+            raise SchemaGenerationException("Input data must be a dictionary when input_schema is provided")
     else:
         # Unstructured input expected
         if input_data is not None and not isinstance(input_data, str):
-            raise InputValidationError(
-                "Unstructured input expected (input_schema is None) but got non-string input_data. "
-                f"Got type: {type(input_data).__name__}"
-            )
+            logger.error(f"Expected string for unstructured input, got {type(input_data).__name__}")
+            raise SchemaGenerationException("Input data must be a string when input_schema is not provided")

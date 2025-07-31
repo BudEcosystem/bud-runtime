@@ -19,6 +19,11 @@
 import logging
 from typing import Any, Dict, Union
 
+from budmicroframe.commons.exceptions import ClientException
+from pydantic import ValidationError
+
+from budprompt.commons.exceptions import PromptExecutionException, SchemaGenerationException
+
 from .executors import SimplePromptExecutor
 from .schemas import PromptExecuteRequest
 from .utils import clean_model_cache
@@ -48,20 +53,47 @@ class PromptExecutorService:
             The result of the prompt execution
 
         Raises:
-            PromptExecutionError: If execution fails
+            ClientException: If validation or execution fails
         """
-        # Execute the prompt with input_data from request
-        result = await self.executor.execute(
-            deployment_name=request.deployment_name,
-            model_settings=request.model_settings,
-            input_schema=request.input_schema,
-            output_schema=request.output_schema,
-            system_prompt=request.system_prompt,
-            messages=request.messages,
-            input_data=request.input_data,
-        )
+        try:
+            # Execute the prompt with input_data from request
+            result = await self.executor.execute(
+                deployment_name=request.deployment_name,
+                model_settings=request.model_settings,
+                input_schema=request.input_schema,
+                output_schema=request.output_schema,
+                system_prompt=request.system_prompt,
+                messages=request.messages,
+                input_data=request.input_data,
+            )
 
-        # Clean up temporary modules
-        clean_model_cache()
+            # Clean up temporary modules
+            clean_model_cache()
 
-        return result
+            return result
+
+        except ValidationError as e:
+            # Input validation errors -> 400 Bad Request
+            logger.error(f"Input validation failed: {str(e)}")
+            raise ClientException(status_code=400, message="Invalid input data")
+
+        except SchemaGenerationException as e:
+            # Schema generation errors -> 400 Bad Request
+            logger.error(f"Schema generation failed: {str(e)}")
+            raise ClientException(
+                status_code=400,
+                message=e.message,  # Use the custom exception's message
+            )
+
+        except PromptExecutionException as e:
+            # Prompt execution errors -> 500 Internal Server Error
+            logger.error(f"Prompt execution failed: {str(e)}")
+            raise ClientException(
+                status_code=500,
+                message=e.message,  # Use the custom exception's message
+            )
+
+        except Exception as e:
+            # Let unhandled exceptions bubble up
+            logger.error(f"Unexpected error: {str(e)}")
+            raise

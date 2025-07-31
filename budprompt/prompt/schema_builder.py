@@ -28,7 +28,7 @@ from budmicroframe.commons import logging
 from datamodel_code_generator import DataModelType, InputFileType, generate
 from pydantic import BaseModel
 
-from budprompt.commons.exceptions import SchemaConversionError
+from budprompt.commons.exceptions import SchemaGenerationException
 
 
 logger = logging.get_logger(__name__)
@@ -52,7 +52,7 @@ class PydanticModelGenerator:
             Pydantic model class
 
         Raises:
-            SchemaConversionError: If schema validation or conversion fails
+            SchemaGenerationException: If schema validation or conversion fails
         """
         # Validate the schema first
         self._validate_schema(schema)
@@ -70,7 +70,7 @@ class PydanticModelGenerator:
             schema: JSON schema dictionary to validate
 
         Raises:
-            SchemaConversionError: If schema is invalid
+            SchemaGenerationException: If schema is invalid
         """
         required_fields = {"type", "properties"}
         schema_type = schema.get("type")
@@ -78,12 +78,12 @@ class PydanticModelGenerator:
         if schema_type == "object":
             if not all(field in schema for field in required_fields):
                 logger.error("Schema is invalid: missing required fields")
-                raise SchemaConversionError(
+                raise SchemaGenerationException(
                     f"Object schema must contain: {required_fields}. Got: {set(schema.keys())}"
                 )
         elif schema_type not in ["string", "number", "integer", "boolean", "array", "object"]:
             logger.error("Schema is invalid: unsupported type %s", schema_type)
-            raise SchemaConversionError(f"Invalid schema type: {schema_type}")
+            raise SchemaGenerationException(f"Invalid schema type: {schema_type}")
 
     def _generate_code(self, schema: Dict[str, Any], model_name: str) -> str:
         """Generate Pydantic model code from JSON schema.
@@ -96,7 +96,7 @@ class PydanticModelGenerator:
             Generated Python code as string
 
         Raises:
-            SchemaConversionError: If code generation fails
+            SchemaGenerationException: If code generation fails
         """
         input_path = None
         output_path = None
@@ -133,7 +133,7 @@ class PydanticModelGenerator:
 
         except Exception as e:
             logger.error("Failed to generate Pydantic code: %s", str(e))
-            raise SchemaConversionError(f"Failed to convert JSON schema to Pydantic model: {str(e)}")
+            raise SchemaGenerationException("Invalid JSON schema format")
 
         finally:
             # Clean up temporary files
@@ -155,7 +155,7 @@ class PydanticModelGenerator:
             Pydantic model class
 
         Raises:
-            SchemaConversionError: If loading fails
+            SchemaGenerationException: If loading fails
         """
         # Generate unique module name to avoid conflicts
         module_name = f"temp_models_{uuid.uuid4().hex[:8]}"
@@ -166,7 +166,7 @@ class PydanticModelGenerator:
             spec = importlib.util.spec_from_loader(module_name, loader=None)
             if spec is None:
                 logger.error("Failed to create module spec")
-                raise SchemaConversionError("Failed to create module spec")
+                raise SchemaGenerationException("Failed to create module spec")
 
             module = importlib.util.module_from_spec(spec)
 
@@ -195,7 +195,7 @@ class PydanticModelGenerator:
 
                     if model_class is None:
                         logger.error("No Pydantic model found in generated code")
-                        raise SchemaConversionError("No Pydantic model found in generated code")
+                        raise SchemaGenerationException("No Pydantic model found in generated code")
                 else:
                     model_class = getattr(module, model_name)
                     logger.debug("Successfully loaded model: %s", model_name)
@@ -208,8 +208,8 @@ class PydanticModelGenerator:
                     logger.debug("Removing temporary module from sys.modules: %s", module_name)
                     del sys.modules[module_name]
 
-        except SchemaConversionError:
+        except SchemaGenerationException:
             raise
         except Exception as e:
             logger.error("Failed to load Pydantic model from code: %s", str(e))
-            raise SchemaConversionError(f"Failed to load Pydantic model from code: {str(e)}")
+            raise SchemaGenerationException("Unable to process schema")

@@ -23,7 +23,7 @@ from pydantic import BaseModel, ValidationError
 from pydantic_ai import Agent
 from pydantic_ai.models.openai import ModelSettings as OpenAIModelSettings
 
-from budprompt.commons.exceptions import InputValidationError, PromptExecutionError, SchemaConversionError
+from budprompt.commons.exceptions import PromptExecutionException, SchemaGenerationException
 from budprompt.shared.providers import BudServeProvider
 
 from .schema_builder import PydanticModelGenerator
@@ -71,9 +71,9 @@ class SimplePromptExecutor:
             Output data (Dict for structured, str for unstructured)
 
         Raises:
-            SchemaConversionError: If schema conversion fails
-            InputValidationError: If input validation fails
-            PromptExecutionError: If prompt execution fails
+            SchemaGenerationException: If schema conversion fails
+            ValidationError: If input validation fails
+            PromptExecutionException: If prompt execution fails
         """
         try:
             # Validate input data type matches schema presence
@@ -86,8 +86,9 @@ class SimplePromptExecutor:
                 input_model = await self._get_pydantic_model(input_schema, "InputModel")
                 try:
                     validated_input = input_model.model_validate(input_data)
-                except ValidationError as e:
-                    raise InputValidationError(f"Input validation failed: {str(e)}")
+                except ValidationError:
+                    # Let the ValidationError bubble up directly
+                    raise
             else:
                 # Unstructured input: use string directly
                 validated_input = input_data
@@ -117,11 +118,11 @@ class SimplePromptExecutor:
                 # Unstructured output: return as string
                 return result
 
-        except (SchemaConversionError, InputValidationError):
+        except (SchemaGenerationException, ValidationError):
             raise
         except Exception as e:
             logger.error(f"Prompt execution failed: {str(e)}")
-            raise PromptExecutionError(f"Failed to execute prompt: {str(e)}")
+            raise PromptExecutionException("Failed to execute prompt")
 
     async def _get_pydantic_model(self, schema: Dict[str, Any], model_name: str) -> Type[BaseModel]:
         """Convert JSON schema to Pydantic model.
@@ -134,7 +135,7 @@ class SimplePromptExecutor:
             Pydantic model class
 
         Raises:
-            SchemaConversionError: If conversion fails
+            SchemaGenerationException: If conversion fails
         """
         # Use the model generator to create Pydantic model from schema
         return self.model_generator.from_json_schema(schema, model_name)
@@ -216,11 +217,11 @@ class SimplePromptExecutor:
             Agent execution result
 
         Raises:
-            PromptExecutionError: If execution fails
+            PromptExecutionException: If execution fails
         """
         try:
             result = await agent.run(prompt)
             return result.output
         except Exception as e:
             logger.error(f"Agent execution failed: {str(e)}")
-            raise PromptExecutionError(f"Agent execution failed: {str(e)}")
+            raise PromptExecutionException("Agent execution failed")
