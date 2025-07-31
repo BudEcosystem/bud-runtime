@@ -17,6 +17,8 @@
 
 """Contains core Pydantic schemas used for data validation and serialization within the model ops services."""
 
+from __future__ import annotations
+
 import re
 from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional, Tuple
@@ -336,6 +338,8 @@ class ModelDetailResponse(BaseModel):
     provider: Provider | None = None
     supported_endpoints: List[ModelEndpointEnum]
     created_at: datetime
+    # Pricing information
+    pricing: Optional[DeploymentPricingInfo] = None
 
     @field_serializer("modality")
     def serialized_modality(self, modalities: List[ModalityEnum], _info) -> Dict[str, Any]:

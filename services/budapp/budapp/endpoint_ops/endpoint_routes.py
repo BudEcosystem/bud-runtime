@@ -751,7 +751,7 @@ async def update_endpoint_pricing(
             pricing_data=request.model_dump(),
             current_user_id=current_user.id,
         )
-        return DeploymentPricingResponse.model_validate(pricing).to_http_response()
+        return DeploymentPricingResponse.model_validate(pricing)
     except ClientException as e:
         logger.exception(f"Failed to update pricing: {e}")
         return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
@@ -796,7 +796,7 @@ async def get_endpoint_pricing(
                 code=status.HTTP_404_NOT_FOUND,
                 message=f"No pricing found for endpoint {endpoint_id}",
             ).to_http_response()
-        return DeploymentPricingResponse.model_validate(pricing).to_http_response()
+        return DeploymentPricingResponse.model_validate(pricing)
     except ClientException as e:
         logger.exception(f"Failed to get pricing: {e}")
         return ErrorResponse(code=e.status_code, message=e.message).to_http_response()

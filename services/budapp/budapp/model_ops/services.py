@@ -3997,3 +3997,80 @@ class ModelCatalogService(SessionMixin):
         await self.redis_service.set(cache_key, json.dumps(catalog_item), ex=300)
 
         return catalog_item
+
+    async def get_catalog_model_details(self, endpoint_id: UUID) -> "ModelDetailSuccessResponse":
+        """Get detailed model information by endpoint ID in the same format as retrieve_model.
+
+        Args:
+            endpoint_id: The endpoint ID
+
+        Returns:
+            ModelDetailSuccessResponse with model details
+
+        Raises:
+            ClientException: If endpoint not found or not published
+        """
+        from budapp.commons.constants import EndpointStatusEnum
+        from budapp.endpoint_ops.models import Endpoint
+        from budapp.model_ops.crud import ModelDataManager
+        from budapp.model_ops.schemas import DeploymentPricingInfo, ModelDetailResponse
+
+        # Get the published model details
+        result = await ModelDataManager(self.session).get_published_model_detail(endpoint_id)
+
+        if not result:
+            raise ClientException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                message=f"Published model not found for endpoint {endpoint_id}",
+            )
+
+        model, endpoint, input_cost, output_cost, currency, per_tokens = result
+
+        # Get base model relation count
+        model_tree_count = await ModelDataManager(self.session).get_model_tree_count(model.uri)
+        base_model_relation_count = {row.base_model_relation.value: row.count for row in model_tree_count}
+        from budapp.commons.constants import BaseModelRelationEnum
+        from budapp.model_ops.schemas import ModelTree
+
+        model_tree = ModelTree(
+            adapters_count=base_model_relation_count.get(BaseModelRelationEnum.ADAPTER.value, 0),
+            finetunes_count=base_model_relation_count.get(BaseModelRelationEnum.FINETUNE.value, 0),
+            merges_count=base_model_relation_count.get(BaseModelRelationEnum.MERGE.value, 0),
+            quantizations_count=base_model_relation_count.get(BaseModelRelationEnum.QUANTIZED.value, 0),
+        )
+
+        # Get endpoint count for this model
+        db_endpoint_count = await ModelDataManager(self.session).get_count_by_fields(
+            Endpoint, fields={"model_id": model.id}, exclude_fields={"status": EndpointStatusEnum.DELETED}
+        )
+
+        # Add pricing information to the model
+        if input_cost is not None and output_cost is not None:
+            # Create pricing info from the available data
+            pricing_info = DeploymentPricingInfo(
+                input_cost=float(input_cost),
+                output_cost=float(output_cost),
+                currency=currency or "USD",
+                per_tokens=per_tokens or 1000,
+            )
+        else:
+            pricing_info = None
+
+        # Convert model to dict and add pricing
+        model_dict = model.__dict__.copy()
+        model_dict["pricing"] = pricing_info
+
+        # Create ModelDetailResponse from the model dict
+        model_response = ModelDetailResponse.model_validate(model_dict)
+
+        from budapp.model_ops.schemas import ModelDetailSuccessResponse
+
+        return ModelDetailSuccessResponse(
+            model=model_response,
+            model_tree=model_tree,
+            scan_result=model.model_security_scan_result,
+            endpoints_count=db_endpoint_count,
+            message="Model retrieved successfully",
+            code=status.HTTP_200_OK,
+            object="catalog.model.get",
+        ).to_http_response()

@@ -2847,15 +2847,11 @@ class EndpointService(SessionMixin):
             limit=limit,
         )
 
-        # Calculate pagination info
-        total_pages = (total_count + limit - 1) // limit if total_count > 0 else 0
-
         return {
             "pricing_history": [DeploymentPricingResponse.model_validate(p) for p in pricing_history],
             "page": page,
             "limit": limit,
             "total_record": total_count,
-            "total_pages": total_pages,
             "code": status.HTTP_200_OK,
         }
 
