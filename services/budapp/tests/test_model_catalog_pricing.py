@@ -90,7 +90,9 @@ def mock_pricing():
     pricing.currency = "USD"
     pricing.per_tokens = 1000
     pricing.is_current = True
+    pricing.created_by = uuid4()  # Add created_by as UUID
     pricing.created_at = datetime.now(timezone.utc)
+    pricing.modified_at = datetime.now(timezone.utc)  # Add modified_at as datetime
     return pricing
 
 
