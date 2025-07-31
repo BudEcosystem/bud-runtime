@@ -1,2 +1,16 @@
 host:
   devbox: dev.bud.studio
+  argo: argo.dev.bud.studio
+
+argo:
+  enabled: true
+  global:
+    domain: argo.dev.bud.studio
+  configs:
+    params:
+      server.insecure: true
+    cm:
+      accounts.sinan: "login"
+      accounts.sinan.enabled: "true"
+      accounts.ditto: "login"
+      accounts.ditto.enabled: "true"

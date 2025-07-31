@@ -17,7 +17,20 @@ spec:
                 name: {{ .Release.Name }}-devbox
                 port:
                   number: 80
+    - host: {{ .Values.host.argo }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-argocd-server
+                port:
+                  number: 80
   tls:
     - hosts:
         - {{ .Values.host.devbox }}
       secretName: {{ .Release.Name }}-devbox-acme-cert
+    - hosts:
+        - {{ .Values.host.argo }}
+      secretName: {{ .Release.Name }}-argo-acme-cert
