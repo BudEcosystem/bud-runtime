@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from budapp.commons.constants import EndpointStatusEnum, ModelStatusEnum, ModalityEnum
 from budapp.commons.exceptions import ClientException
-from budapp.endpoint_ops.crud import EndpointDataManager
+from budapp.endpoint_ops.crud import EndpointDataManager, PublicationHistoryDataManager
 from budapp.endpoint_ops.models import DeploymentPricing, Endpoint as EndpointModel
 from budapp.endpoint_ops.schemas import (
     DeploymentPricingInput,
@@ -128,23 +128,30 @@ class TestPricingIntegration:
             with patch.object(EndpointDataManager, 'update_publication_status', new_callable=AsyncMock) as mock_update:
                 with patch.object(EndpointDataManager, 'update_previous_pricing', new_callable=AsyncMock) as mock_update_pricing:
                     with patch.object(EndpointDataManager, 'create_deployment_pricing', new_callable=AsyncMock) as mock_create_pricing:
-                        with patch.object(RedisService, 'invalidate_catalog_cache', new_callable=AsyncMock):
-                                mock_retrieve.return_value = mock_endpoint
-                                mock_endpoint.is_published = True
-                                mock_update.return_value = mock_endpoint
+                        with patch.object(PublicationHistoryDataManager, 'create_publication_history', new_callable=AsyncMock):
+                            with patch.object(RedisService, 'invalidate_catalog_cache', new_callable=AsyncMock):
+                                    mock_retrieve.return_value = mock_endpoint
+                                    
+                                    # Configure the updated endpoint to be returned by update_publication_status
+                                    updated_endpoint = Mock()
+                                    updated_endpoint.id = endpoint_id
+                                    updated_endpoint.is_published = True
+                                    updated_endpoint.published_date = datetime.now(timezone.utc)
+                                    updated_endpoint.published_by = mock_user.id
+                                    mock_update.return_value = updated_endpoint
 
-                                # Act
-                                result = await service.update_publication_status(
-                                    endpoint_id=endpoint_id,
-                                    action="publish",
-                                    current_user_id=mock_user.id,
-                                    pricing=pricing_data.model_dump()
-                                )
+                                    # Act
+                                    result = await service.update_publication_status(
+                                        endpoint_id=endpoint_id,
+                                        action="publish",
+                                        current_user_id=mock_user.id,
+                                        pricing=pricing_data.model_dump()
+                                    )
 
-                                # Assert
-                                assert result.is_published is True
-                                mock_update_pricing.assert_called_once_with(endpoint_id)
-                                mock_create_pricing.assert_called_once()
+                                    # Assert
+                                    assert result.is_published is True
+                                    mock_update_pricing.assert_called_once_with(endpoint_id)
+                                    mock_create_pricing.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_publish_endpoint_without_pricing_fails(self, mock_session, mock_endpoint, mock_user):
