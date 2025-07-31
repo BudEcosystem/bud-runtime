@@ -10,7 +10,7 @@ import pytest
 from fastapi import status
 from sqlalchemy.orm import Session
 
-from budapp.commons.constants import EndpointStatusEnum, ModelStatusEnum, ModalityEnum
+from budapp.commons.constants import EndpointStatusEnum
 from budapp.commons.exceptions import ClientException
 from budapp.endpoint_ops.crud import EndpointDataManager, PublicationHistoryDataManager
 from budapp.endpoint_ops.models import DeploymentPricing, Endpoint as EndpointModel
@@ -51,8 +51,8 @@ def mock_model():
     model.id = uuid4()
     model.name = "GPT-4"
     model.description = "Advanced language model"
-    model.modality = [ModalityEnum.TEXT_INPUT]
-    model.status = ModelStatusEnum.ACTIVE
+    model.modality = ["text_input"]  # Use string value instead of enum
+    model.status = "active"  # Use string value instead of enum
     model.author = "OpenAI"
     model.model_size = 1760
     model.provider_type = "CLOUD"
