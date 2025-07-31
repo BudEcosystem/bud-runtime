@@ -557,14 +557,13 @@ class ModelDataManager(DataManagerUtils):
 
         # Apply search if provided
         if search_term:
-            search_conditions = []
-            # Full-text search on name and description
-            search_conditions.append(Model.name.ilike(f"%{search_term}%"))
-            if Model.description is not None:
-                search_conditions.append(Model.description.ilike(f"%{search_term}%"))
-            # Search in use_cases array
-            search_conditions.append(func.array_to_string(Model.use_cases, " ").ilike(f"%{search_term}%"))
-            base_query = base_query.filter(or_(*search_conditions))
+            ts_query = func.plainto_tsquery('english', search_term)
+            search_conditions = or_(
+                func.to_tsvector('english', Model.name).op('@@')(ts_query),
+                func.to_tsvector('english', func.coalesce(Model.description, '')).op('@@')(ts_query),
+                func.array_to_string(Model.use_cases, " ").ilike(f"%{search_term}%")
+            )
+            base_query = base_query.filter(search_conditions)
 
         # Count query
         count_query = select(func.count(func.distinct(Model.id))).select_from(base_query.subquery())
