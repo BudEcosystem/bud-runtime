@@ -6,7 +6,7 @@ import sys
 from typing import Dict, List, Optional, Tuple, Union
 
 import requests
-from jose import ExpiredSignatureError, JWTError
+from jwt.exceptions import ExpiredSignatureError, PyJWTError as JWTError
 from keycloak import (
     KeycloakAdmin,
     KeycloakAuthenticationError,
