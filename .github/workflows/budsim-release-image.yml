@@ -1,21 +1,18 @@
-name: "BudApp: Build and Push Nightly Docker Image"
+name: "BudSim: Build and Push Docker Image on Release"
 
 on:
-  push:
-    paths:
-      - 'services/budapp/**'
-    branches:
-      - master
+  release:
+    types: [created]
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./services/budapp
+        working-directory: ./services/budsim
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
@@ -27,15 +24,12 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Save private key to file
+      - name: Extract tag name
+        id: extract_tag
         run: |
-          echo "${{ secrets.PRIVATE_KEY }}" > private_key.pem
-          chmod 600 private_key.pem
-
-      - name: Save public key to file
-        run: |
-          echo "${{ secrets.PUBLIC_KEY }}" > public_key.pem
-          chmod 600 public_key.pem
+          RAW_TAG=${GITHUB_REF#refs/tags/}
+          CLEAN_TAG=${RAW_TAG#v}
+          echo "RELEASE_TAG=$CLEAN_TAG" >> $GITHUB_ENV
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -43,4 +37,4 @@ jobs:
           context: .
           push: true
           file: ./deploy/Dockerfile
-          tags: budstudio/budapp:nightly
+          tags: budstudio/budsim:${{ env.RELEASE_TAG }}
