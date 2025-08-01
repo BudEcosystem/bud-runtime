@@ -432,7 +432,9 @@ class HuggingFaceLicenseExtractor(LicenseExtractor):
             if hf_token:
                 headers["Authorization"] = f"Bearer {hf_token}"
             try:
-                response = requests.get(f"https://huggingface.co/{uri}/resolve/main/{license_file}", headers=headers)
+                response = requests.get(
+                    f"https://huggingface.co/{uri}/resolve/main/{license_file}", headers=headers, timeout=30
+                )
                 license_content = response.text
             except Exception as e:
                 logger.error(f"Error fetching license content: {e}")

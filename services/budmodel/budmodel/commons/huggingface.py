@@ -7,7 +7,7 @@ def get_files_huggingface_space(space_url, pattern_start, pattern_end):
     api_url = f"{space_url.rstrip('/')}/tree/main"
 
     # Make the request to the constructed API URL
-    response = requests.get(api_url)
+    response = requests.get(api_url, timeout=30)
 
     if response.status_code == 200:
         files = response.json()

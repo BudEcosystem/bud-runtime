@@ -1,0 +1,78 @@
+// Import color variables
+$bg-main: #101010;
+$bg-card: #18191b;
+$border-color: #1F1F1F;
+$text-white: #EEEEEE;
+$text-gray: #B3B3B3;
+$text-dark-gray: #757575;
+$primary-color: #965CDE;
+
+.searchInput {
+  :global(.ant-input) {
+    background: $bg-card !important;
+    border-color: $border-color !important;
+    color: $text-white;
+
+    &::placeholder {
+      color: $text-dark-gray;
+    }
+
+    &:hover,
+    &:focus {
+      border-color: $primary-color !important;
+      box-shadow: none !important;
+    }
+  }
+
+  :global(.ant-input-prefix) {
+    margin-right: 0.75rem;
+  }
+}
+
+.modalityBtn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: $bg-card;
+  border: 1px solid $border-color;
+  border-radius: 6px;
+  color: $text-gray;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+
+  &:hover {
+    background: darken($bg-card, 2%);
+    color: $text-white;
+    border-color: lighten($border-color, 10%);
+  }
+
+  &.active {
+    background: rgba($primary-color, 0.2);
+    border-color: $primary-color;
+    color: $primary-color;
+  }
+}
+
+.modelsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 3rem;
+}
+
+.detailsBtn {
+  background: transparent !important;
+  border: 1px solid $border-color !important;
+  color: $text-gray !important;
+  height: 36px;
+  padding: 0 1rem;
+  font-size: 0.875rem;
+
+  &:hover {
+    background: darken($bg-card, 2%) !important;
+    border-color: $primary-color !important;
+    color: $text-white !important;
+  }
+}
