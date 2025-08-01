@@ -8,6 +8,7 @@
 
     ./modules/k3s.nix
     ./modules/wireguard.nix
+    ./modules/auto.nix
   ];
 
   boot.loader.systemd-boot.enable = true;

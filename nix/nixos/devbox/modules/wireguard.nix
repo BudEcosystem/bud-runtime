@@ -56,14 +56,18 @@ in
     firewall = {
       allowedUDPPorts = [ port ];
       interfaces.${wgInterface} = {
-        allowedTCPPortRanges = [{
-          from = 1;
-          to = 65535;
-        }];
-        allowedUDPPortRanges = [{
-          from = 1;
-          to = 65535;
-        }];
+        allowedTCPPortRanges = [
+          {
+            from = 1;
+            to = 65535;
+          }
+        ];
+        allowedUDPPortRanges = [
+          {
+            from = 1;
+            to = 65535;
+          }
+        ];
       };
     };
 

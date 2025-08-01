@@ -22,7 +22,7 @@ terraform {
       source = "carlpett/sops"
     }
     cloudflare = {
-      source  = "cloudflare/cloudflare"
+      source = "cloudflare/cloudflare"
     }
   }
 }

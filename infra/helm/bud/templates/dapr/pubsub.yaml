@@ -108,7 +108,7 @@ scopes:
 apiVersion: dapr.io/v2alpha1
 kind: Subscription
 metadata:
-  name: {{ .Release.Name }}-budui-pubsub-subscription
+  name: {{ .Release.Name }}-budadmin-pubsub-subscription
 spec:
   topic: notificationMessages
   routes:
@@ -116,7 +116,7 @@ spec:
   pubsubname: kafka-pubsub
   deadLetterTopic: poisonMessages
 scopes:
-  - budui
+  - budadmin
 ---
 apiVersion: dapr.io/v2alpha1
 kind: Subscription
@@ -130,29 +130,3 @@ spec:
   deadLetterTopic: poisonMessages
 scopes:
   - askbud
----
-apiVersion: dapr.io/v2alpha1
-kind: Subscription
-metadata:
-  name: {{ .Release.Name }}-budhardware-pubsub-subscription
-spec:
-  topic: budhardware
-  routes:
-    default: /notifications
-  pubsubname: kafka-pubsub
-  deadLetterTopic: poisonMessages
-scopes:
-  - budhardware
----
-apiVersion: dapr.io/v2alpha1
-kind: Subscription
-metadata:
-  name: {{ .Release.Name }}-budeval-pubsub-subscription
-spec:
-  topic: budEvalMessages
-  routes:
-    default: /notifications
-  pubsubname: kafka-pubsub
-  deadLetterTopic: poisonMessages
-scopes:
-  - budeval
