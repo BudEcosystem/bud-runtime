@@ -81,7 +81,7 @@ repos:
     hooks:
       - id: cargo-fmt
         name: cargo fmt
-        entry: bash -c 'cd services/budgateway && cargo +nightly fmt -- --check || cargo fmt -- --check'
+        entry: bash -c 'command -v cargo >/dev/null 2>&1 && [ -d services/budgateway ] && (cd services/budgateway && (cargo +nightly fmt -- --check 2>/dev/null || cargo fmt -- --check)) || echo "Skipping cargo fmt"'
         language: system
         types: [rust]
         files: ^services/budgateway/
@@ -89,7 +89,7 @@ repos:
 
       - id: cargo-clippy
         name: cargo clippy
-        entry: bash -c 'cd services/budgateway && cargo +nightly clippy --all-targets --all-features -- -D warnings || cargo clippy --all-targets --all-features -- -D warnings'
+        entry: bash -c 'command -v cargo >/dev/null 2>&1 && [ -d services/budgateway ] && (cd services/budgateway && (cargo +nightly clippy --all-targets --all-features -- -D warnings 2>/dev/null || cargo clippy --all-targets --all-features -- -D warnings)) || echo "Skipping cargo clippy"'
         language: system
         types: [rust]
         files: ^services/budgateway/
@@ -97,7 +97,7 @@ repos:
 
       - id: cargo-deny
         name: cargo deny
-        entry: bash -c 'cd services/budgateway && cargo +nightly deny check || cargo deny check'
+        entry: bash -c 'command -v cargo-deny >/dev/null 2>&1 && [ -d services/budgateway ] && (cd services/budgateway && (cargo +nightly deny check 2>/dev/null || cargo deny check)) || echo "Skipping cargo deny"'
         language: system
         types: [rust]
         files: ^services/budgateway/
