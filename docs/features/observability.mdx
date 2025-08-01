@@ -1,0 +1,766 @@
+---
+title: "Observability & Inference Analytics"
+description: "Comprehensive AI model inference monitoring, analytics, and performance optimization through detailed observability features."
+---
+
+## Overview
+
+Bud Runtime's Observability feature provides comprehensive monitoring and analytics for AI model inferences, enabling teams to understand model performance, user interactions, and system behavior in real-time. This feature transforms raw inference data into actionable insights through an intuitive interface for viewing prompts, responses, performance metrics, and user feedback.
+
+<CardGroup cols={2}>
+  <Card
+    title="Inference Analytics"
+    icon="chart-line"
+    href="#inference-listing"
+  >
+    View and analyze individual AI model inference requests with detailed breakdowns
+  </Card>
+  <Card
+    title="Performance Monitoring"
+    icon="gauge-high"
+    href="#performance-metrics"
+  >
+    Track response times, token usage, costs, and system performance
+  </Card>
+  <Card
+    title="User Feedback Analysis"
+    icon="message-dots"
+    href="#feedback-management"
+  >
+    Collect and analyze user feedback to improve model performance
+  </Card>
+  <Card
+    title="Export & Integration"
+    icon="download"
+    href="#data-export"
+  >
+    Export data for external analysis and integrate with existing workflows
+  </Card>
+</CardGroup>
+
+## Key Benefits
+
+### Comprehensive Visibility
+- **Complete Inference History**: View every AI model interaction with full context
+- **Real-time Monitoring**: Track system performance as it happens
+- **Cross-project Analytics**: Analyze performance across multiple projects and models
+
+### Performance Optimization
+- **Bottleneck Identification**: Quickly identify slow or expensive inferences
+- **Cost Management**: Track and optimize AI model usage costs
+- **Resource Planning**: Understand usage patterns for capacity planning
+
+### Quality Assurance
+- **Error Analysis**: Debug failed inferences with complete request/response data
+- **User Feedback Integration**: Collect ratings and feedback to improve model outputs
+- **A/B Testing Support**: Compare performance across different models and configurations
+
+### Data-Driven Decisions
+- **Usage Analytics**: Understand how users interact with your AI models
+- **Trend Analysis**: Identify patterns in model performance over time
+- **Export Capabilities**: Integrate with external analytics and reporting tools
+
+## Inference Listing
+
+### Accessing Inference Data
+
+Navigate to any project in the Bud Runtime dashboard and select the **"Inferences"** tab to view all model interactions for that project.
+
+<Tabs>
+  <Tab title="Project Navigation">
+    ```
+    Dashboard → Projects → [Your Project] → Inferences Tab
+    ```
+
+    The inferences view is automatically scoped to show only data from the selected project, ensuring data privacy and relevance.
+  </Tab>
+
+  <Tab title="Direct Access">
+    Use deep links to navigate directly to filtered views:
+    ```
+    /projects/[project-id]/inferences?from=2024-01-01&status=failed
+    ```
+  </Tab>
+</Tabs>
+
+### Data Table Features
+
+The inference list displays comprehensive information in an easy-to-scan table format:
+
+| Column | Description | Interactive Features |
+|--------|-------------|----------------------|
+| **Timestamp** | When the inference occurred | Sortable, timezone-aware |
+| **Model** | AI model name and provider | Click to filter by model |
+| **Prompt Preview** | First 100 characters of the user input | Click to expand full view |
+| **Response Preview** | First 100 characters of the AI response | Click to expand full view |
+| **Tokens** | Input/Output/Total token counts | Sortable, hover for breakdown |
+| **Latency** | Response time in milliseconds | Sortable, color-coded performance |
+| **Cost** | Inference cost in USD | Sortable, cumulative totals |
+| **Status** | Success/Failed indicator | Visual badges, click to filter |
+| **Actions** | View, Copy, Export options | Quick action menu |
+
+### Advanced Filtering
+
+<Accordion title="Filter Options">
+  <AccordionItem title="Date & Time">
+    - **Date Range Picker**: Select specific time periods
+    - **Quick Ranges**: Last hour, day, week, month
+    - **Timezone Support**: Automatic conversion to user timezone
+  </AccordionItem>
+
+  <AccordionItem title="Performance Filters">
+    - **Success Status**: All, Success Only, Failed Only
+    - **Token Range**: Minimum and maximum token counts
+    - **Latency Threshold**: Maximum response time in milliseconds
+    - **Cost Range**: Filter by inference cost
+  </AccordionItem>
+
+  <AccordionItem title="Model & Endpoint">
+    - **Model Selection**: Filter by specific AI models
+    - **Provider Filter**: Filter by model provider (OpenAI, Anthropic, etc.)
+    - **Endpoint Filter**: Filter by deployment endpoint
+  </AccordionItem>
+
+  <AccordionItem title="Content Filters">
+    - **Text Search**: Search within prompts and responses
+    - **Cached vs Non-cached**: Filter by cache usage
+    - **Feedback Presence**: Show only inferences with user feedback
+  </AccordionItem>
+</Accordion>
+
+### Sorting & Pagination
+
+- **Multi-column Sorting**: Click column headers to sort, shift-click for secondary sort
+- **Flexible Pagination**: Choose page sizes (25, 50, 100 items per page)
+- **Deep Linking**: URLs update to reflect current filters and sort order
+- **Performance Optimized**: Server-side pagination handles large datasets efficiently
+
+## Detailed Inference View
+
+### Overview Tab
+
+Click any inference row to open the detailed view, starting with comprehensive overview information:
+
+<CardGroup cols={3}>
+  <Card title="Request Details" icon="file-lines">
+    - Unique inference ID
+    - Timestamp with timezone
+    - Request source IP
+    - User agent information
+  </Card>
+  <Card title="Model Information" icon="robot">
+    - Model name and version
+    - Provider information
+    - Endpoint configuration
+    - Deployment details
+  </Card>
+  <Card title="Performance Summary" icon="stopwatch">
+    - Total response time
+    - Time to first token (TTFT)
+    - Processing time breakdown
+    - Success/failure status
+  </Card>
+</CardGroup>
+
+### Messages Tab
+
+View the complete conversation in an intuitive chat interface:
+
+<Tabs>
+  <Tab title="Chat View">
+    - **System Prompts**: Display system instructions and context
+    - **User Messages**: Original user inputs with metadata
+    - **Assistant Responses**: Complete AI responses with formatting
+    - **Message Timing**: Individual message timestamps and token counts
+  </Tab>
+
+  <Tab title="Raw Content">
+    - **Structured Data**: JSON representation of message arrays
+    - **Token Breakdown**: Per-message token usage analysis
+    - **Content Actions**: Copy individual messages or entire conversations
+  </Tab>
+</Tabs>
+
+### Performance Tab
+
+Comprehensive performance analytics with visual representations:
+
+#### Timing Metrics
+```
+Request Received ──→ Request Forwarded ──→ First Token ──→ Response Complete
+    (0ms)              (45ms)               (234ms)         (1,456ms)
+```
+
+<CardGroup cols={2}>
+  <Card title="Latency Breakdown" icon="clock">
+    - **Queue Time**: Time spent waiting for processing
+    - **Processing Time**: Actual model inference time
+    - **Network Time**: Request/response transfer time
+    - **Total Latency**: End-to-end response time
+  </Card>
+  <Card title="Token Analysis" icon="hashtag">
+    - **Input Tokens**: User prompt and system context
+    - **Output Tokens**: Generated response content
+    - **Token Rate**: Tokens generated per second
+    - **Efficiency Metrics**: Cost per token analysis
+  </Card>
+</CardGroup>
+
+#### Performance Benchmarking
+
+Compare current inference against:
+- **Project Average**: How this inference compares to project baseline
+- **Model Average**: Performance relative to other instances of the same model
+- **Historical Trends**: Performance over time for context
+
+### Raw Data Tab
+
+Access complete technical details for debugging and integration:
+
+<Accordion title="Request Data">
+  <AccordionItem title="Original Request">
+    ```json
+    {
+      "model": "gpt-4",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a helpful AI assistant..."
+        },
+        {
+          "role": "user",
+          "content": "What is the capital of France?"
+        }
+      ],
+      "temperature": 0.7,
+      "max_tokens": 150
+    }
+    ```
+  </AccordionItem>
+
+  <AccordionItem title="Provider Response">
+    ```json
+    {
+      "id": "chatcmpl-8ABC123",
+      "object": "chat.completion",
+      "created": 1699649152,
+      "model": "gpt-4",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "content": "The capital of France is Paris..."
+          },
+          "finish_reason": "stop"
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 45,
+        "completion_tokens": 28,
+        "total_tokens": 73
+      }
+    }
+    ```
+  </AccordionItem>
+</Accordion>
+
+### Feedback Tab
+
+Analyze user feedback and quality metrics:
+
+<CardGroup cols={2}>
+  <Card title="Feedback Summary" icon="star">
+    - **Average Rating**: Aggregate user satisfaction score
+    - **Feedback Count**: Total number of feedback entries
+    - **Response Rate**: Percentage of inferences with feedback
+    - **Trend Analysis**: Feedback trends over time
+  </Card>
+  <Card title="Feedback Types" icon="message">
+    - **Boolean Metrics**: Thumbs up/down, helpful/not helpful
+    - **Rating Scales**: 1-5 star ratings for quality
+    - **Text Comments**: Detailed user feedback
+    - **Demonstrations**: User-provided improvements
+  </Card>
+</CardGroup>
+
+#### Feedback Timeline
+
+Track how user perception evolves:
+
+```
+Initial Rating: ★★★★☆ (4/5) - "Good response"
+Follow-up: ★★★☆☆ (3/5) - "Could be more detailed"
+Final: ★★★★★ (5/5) - "Perfect after clarification"
+```
+
+## Performance Metrics
+
+### Real-time Monitoring
+
+<CardGroup cols={3}>
+  <Card title="Response Time" icon="stopwatch">
+    - **Current Average**: Real-time response time tracking
+    - **99th Percentile**: Worst-case performance monitoring
+    - **SLA Compliance**: Track against performance targets
+  </Card>
+  <Card title="Token Usage" icon="hashtag">
+    - **Tokens per Hour**: Current usage rate
+    - **Cost Tracking**: Real-time cost accumulation
+    - **Efficiency Trends**: Token utilization patterns
+  </Card>
+  <Card title="Success Rate" icon="check-circle">
+    - **Success Percentage**: Current success rate
+    - **Error Categories**: Breakdown of failure types
+    - **Recovery Metrics**: System resilience tracking
+  </Card>
+</CardGroup>
+
+### Performance Analytics
+
+#### Trend Analysis
+
+Track key metrics over time to identify patterns and issues:
+
+- **Response Time Trends**: Identify performance degradation
+- **Usage Patterns**: Understand peak usage times
+- **Cost Trends**: Monitor spending patterns
+- **Quality Metrics**: Track user satisfaction over time
+
+#### Comparative Analysis
+
+Compare performance across different dimensions:
+
+<Tabs>
+  <Tab title="Model Comparison">
+    Compare different AI models on:
+    - Average response time
+    - Token efficiency
+    - Cost per inference
+    - User satisfaction ratings
+  </Tab>
+
+  <Tab title="Time-based Analysis">
+    Analyze performance by:
+    - Hour of day patterns
+    - Day of week variations
+    - Monthly trends
+    - Seasonal patterns
+  </Tab>
+
+  <Tab title="Project Analysis">
+    Cross-project insights:
+    - Resource utilization
+    - Performance variations
+    - Cost distribution
+    - Usage patterns
+  </Tab>
+</Tabs>
+
+### Performance Optimization
+
+#### Bottleneck Identification
+
+Automatically identify performance issues:
+
+<Warning>
+**High Latency Alert**: 15% of inferences exceeded 5s response time in the last hour
+</Warning>
+
+<Info>
+**Cost Optimization**: Switch to smaller model for simple queries could reduce costs by 40%
+</Info>
+
+#### Optimization Recommendations
+
+Based on performance data, receive actionable recommendations:
+
+1. **Model Selection**: Suggest optimal models for different use cases
+2. **Parameter Tuning**: Recommend temperature, max_tokens adjustments
+3. **Caching Strategies**: Identify opportunities for response caching
+4. **Load Balancing**: Optimize request distribution across endpoints
+
+## Feedback Management
+
+### Collecting User Feedback
+
+The observability system integrates with user feedback collection:
+
+#### Feedback Types
+
+<CardGroup cols={2}>
+  <Card title="Quantitative Feedback" icon="chart-bar">
+    - **Boolean Metrics**: Yes/No, Helpful/Not Helpful
+    - **Rating Scales**: 1-5 stars, 1-10 satisfaction
+    - **Performance Ratings**: Speed, accuracy, relevance
+  </Card>
+  <Card title="Qualitative Feedback" icon="comment">
+    - **Text Comments**: Open-ended user feedback
+    - **Improvement Suggestions**: User recommendations
+    - **Use Case Context**: How the response was used
+  </Card>
+</CardGroup>
+
+#### Integration Points
+
+- **API Endpoints**: Direct feedback submission via API
+- **UI Components**: Built-in feedback widgets
+- **Webhook Integration**: Real-time feedback notifications
+- **Third-party Tools**: Integration with customer feedback platforms
+
+### Feedback Analysis
+
+#### Sentiment Analysis
+
+Automatically analyze text feedback for sentiment and themes:
+
+- **Positive Sentiment**: Identify what users appreciate most
+- **Negative Sentiment**: Understand pain points and issues
+- **Neutral Feedback**: Collect objective observations
+- **Theme Extraction**: Identify common topics in feedback
+
+#### Quality Metrics
+
+Track key quality indicators:
+
+<CardGroup cols={3}>
+  <Card title="Accuracy" icon="bullseye">
+    How often responses are factually correct and relevant
+  </Card>
+  <Card title="Helpfulness" icon="hand-helping">
+    How useful responses are for user goals
+  </Card>
+  <Card title="Clarity" icon="eye">
+    How easy responses are to understand
+  </Card>
+</CardGroup>
+
+### Feedback-Driven Improvements
+
+#### Model Fine-tuning
+
+Use feedback data to improve models:
+
+- **Training Data Generation**: Convert feedback into training examples
+- **Parameter Optimization**: Adjust model parameters based on feedback
+- **Prompt Engineering**: Improve system prompts using feedback insights
+
+#### System Optimization
+
+Optimize the entire inference pipeline:
+
+- **Response Filtering**: Remove low-quality responses before delivery
+- **Confidence Scoring**: Add confidence indicators to responses
+- **Fallback Strategies**: Implement better fallback options
+
+## Data Export
+
+### Export Formats
+
+<Tabs>
+  <Tab title="CSV Export">
+    Perfect for spreadsheet analysis and reporting:
+
+    ```csv
+    inference_id,timestamp,model_name,prompt_preview,response_preview,input_tokens,output_tokens,response_time_ms,cost,is_success
+    550e8400-e29b-41d4-a716-446655440001,2024-01-15T10:30:00Z,gpt-4,"What is the capital...","The capital of France...",45,73,1234,0.0045,true
+    ```
+
+    **Use Cases:**
+    - Excel/Google Sheets analysis
+    - Business intelligence tools
+    - Custom dashboard creation
+  </Tab>
+
+  <Tab title="JSON Export">
+    Structured data for programmatic processing:
+
+    ```json
+    {
+      "export_metadata": {
+        "timestamp": "2024-01-15T12:00:00Z",
+        "filters_applied": {...},
+        "total_records": 1523
+      },
+      "inferences": [
+        {
+          "inference_id": "550e8400-e29b-41d4-a716-446655440001",
+          "timestamp": "2024-01-15T10:30:00Z",
+          "model": {
+            "id": "model-789",
+            "name": "gpt-4",
+            "provider": "openai"
+          },
+          "performance": {
+            "input_tokens": 45,
+            "output_tokens": 73,
+            "response_time_ms": 1234,
+            "cost": 0.0045
+          },
+          "content": {
+            "messages": [...],
+            "output": "..."
+          }
+        }
+      ]
+    }
+    ```
+
+    **Use Cases:**
+    - API integration
+    - Data warehouse ingestion
+    - Machine learning pipelines
+  </Tab>
+</Tabs>
+
+### Export Options
+
+#### Filtered Exports
+
+Export respects all current filters:
+
+- **Date Range**: Export only data from selected time period
+- **Performance Filters**: Export high-latency or failed inferences
+- **Model Filters**: Export data for specific models or endpoints
+- **Content Filters**: Export inferences matching text search
+
+#### Scheduled Exports
+
+Automate data export for regular analysis:
+
+- **Daily Reports**: Automated daily performance summaries
+- **Weekly Analytics**: Comprehensive weekly analysis reports
+- **Monthly Insights**: Monthly trends and insights reports
+- **Custom Schedules**: Configure exports for specific needs
+
+### Integration Capabilities
+
+#### Analytics Platforms
+
+Integrate with popular analytics tools:
+
+<CardGroup cols={2}>
+  <Card title="Business Intelligence" icon="chart-line">
+    - Tableau integration
+    - Power BI connectors
+    - Looker dashboards
+    - Custom BI tools
+  </Card>
+  <Card title="Data Warehouses" icon="database">
+    - Snowflake integration
+    - BigQuery exports
+    - Redshift compatibility
+    - Custom database connectors
+  </Card>
+</CardGroup>
+
+#### API Integration
+
+Use the inference API for custom integrations:
+
+```python
+import requests
+
+# Fetch inference data programmatically
+response = requests.post(
+    'https://api.bud.studio/api/v1/metrics/inferences/list',
+    headers={'Authorization': 'Bearer YOUR_TOKEN'},
+    json={
+        'project_id': 'your-project-id',
+        'from_date': '2024-01-01T00:00:00Z',
+        'limit': 1000
+    }
+)
+
+inferences = response.json()['items']
+```
+
+## API Reference
+
+### Authentication
+
+All API endpoints require authentication via Bearer token:
+
+```bash
+curl -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+     https://api.bud.studio/api/v1/metrics/inferences/list
+```
+
+### List Inferences Endpoint
+
+**POST** `/api/v1/metrics/inferences/list`
+
+Retrieve paginated inference data with filtering options.
+
+<ParamField path="project_id" type="string" optional>
+  Filter inferences by project ID
+</ParamField>
+
+<ParamField path="from_date" type="string" required>
+  Start date in ISO 8601 format (e.g., "2024-01-01T00:00:00Z")
+</ParamField>
+
+<ParamField path="to_date" type="string" optional>
+  End date in ISO 8601 format
+</ParamField>
+
+<ParamField path="is_success" type="boolean" optional>
+  Filter by success status
+</ParamField>
+
+<ParamField path="min_tokens" type="number" optional>
+  Minimum total token count
+</ParamField>
+
+<ParamField path="max_tokens" type="number" optional>
+  Maximum total token count
+</ParamField>
+
+<ParamField path="max_latency_ms" type="number" optional>
+  Maximum response time in milliseconds
+</ParamField>
+
+<ParamField path="sort_by" type="string" optional>
+  Sort field: "timestamp", "tokens", "latency", or "cost"
+</ParamField>
+
+<ParamField path="sort_order" type="string" optional>
+  Sort order: "asc" or "desc"
+</ParamField>
+
+<ParamField path="offset" type="number" optional>
+  Pagination offset (default: 0)
+</ParamField>
+
+<ParamField path="limit" type="number" optional>
+  Page size, max 1000 (default: 50)
+</ParamField>
+
+### Get Inference Details Endpoint
+
+**GET** `/api/v1/metrics/inferences/{inference_id}`
+
+Retrieve complete details for a single inference.
+
+### Get Inference Feedback Endpoint
+
+**GET** `/api/v1/metrics/inferences/{inference_id}/feedback`
+
+Retrieve all feedback associated with an inference.
+
+## Security & Privacy
+
+### Data Protection
+
+<CardGroup cols={2}>
+  <Card title="Access Control" icon="shield">
+    - **Project-level Isolation**: Users see only their project data
+    - **Role-based Permissions**: Different access levels by user role
+    - **API Key Management**: Secure token-based authentication
+  </Card>
+  <Card title="Data Privacy" icon="lock">
+    - **Content Sanitization**: Sensitive data automatically masked
+    - **Audit Logging**: All data access logged for compliance
+    - **Data Retention**: Configurable retention policies
+  </Card>
+</CardGroup>
+
+### Compliance Features
+
+- **GDPR Compliance**: Right to deletion and data portability
+- **SOC 2 Type II**: Certified security controls
+- **HIPAA Ready**: Healthcare data protection capabilities
+- **Custom Compliance**: Configurable for industry-specific requirements
+
+## Troubleshooting
+
+### Common Issues
+
+<Accordion title="Data Not Loading">
+  <AccordionItem title="Symptoms">
+    - Empty inference list
+    - Loading spinner never stops
+    - Error messages in browser console
+  </AccordionItem>
+
+  <AccordionItem title="Solutions">
+    1. **Check Project Selection**: Ensure correct project is selected
+    2. **Verify Date Range**: Confirm date filters include expected time period
+    3. **Authentication**: Refresh browser or re-login if session expired
+    4. **Network Issues**: Check network connectivity and try again
+  </AccordionItem>
+</Accordion>
+
+<Accordion title="Performance Issues">
+  <AccordionItem title="Symptoms">
+    - Slow page loading
+    - Timeouts on large data requests
+    - Browser becomes unresponsive
+  </AccordionItem>
+
+  <AccordionItem title="Solutions">
+    1. **Reduce Date Range**: Query smaller time periods
+    2. **Add Filters**: Use filters to reduce dataset size
+    3. **Pagination**: Use smaller page sizes (25-50 items)
+    4. **Browser Resources**: Close other tabs, check browser memory
+  </AccordionItem>
+</Accordion>
+
+<Accordion title="Export Problems">
+  <AccordionItem title="Symptoms">
+    - Export files not downloading
+    - Incomplete export data
+    - Corrupted file formats
+  </AccordionItem>
+
+  <AccordionItem title="Solutions">
+    1. **Browser Settings**: Check popup blocker and download settings
+    2. **File Size Limits**: Reduce export size if too large
+    3. **Format Selection**: Try different export format (CSV vs JSON)
+    4. **Connection Stability**: Ensure stable internet during export
+  </AccordionItem>
+</Accordion>
+
+### Support Resources
+
+- **Documentation**: Complete API and UI documentation
+- **Support Chat**: In-app support for immediate assistance
+- **Community Forum**: Community-driven troubleshooting
+- **Enterprise Support**: Dedicated support for enterprise customers
+
+## Getting Started
+
+### Quick Start Guide
+
+1. **Navigate to Project**: Select your project from the dashboard
+2. **Open Inferences Tab**: Click the "Inferences" tab in project navigation
+3. **Explore Data**: Browse recent inferences to understand the interface
+4. **Apply Filters**: Use date range and other filters to focus on relevant data
+5. **View Details**: Click any inference to see detailed information
+6. **Export Data**: Use export features to analyze data externally
+
+### Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Monitoring Strategy" icon="binoculars">
+    - Set up regular monitoring schedules
+    - Define performance baselines and alerts
+    - Track key metrics consistently
+    - Review trends weekly
+  </Card>
+  <Card title="Performance Optimization" icon="rocket">
+    - Use filtering to identify bottlenecks
+    - Analyze high-cost inferences regularly
+    - Monitor user feedback for quality issues
+    - Export data for deeper analysis
+  </Card>
+</CardGroup>
+
+### Advanced Usage
+
+- **Custom Dashboards**: Create project-specific monitoring dashboards
+- **Automated Alerts**: Set up notifications for performance issues
+- **Integration Workflows**: Connect with existing analytics pipelines
+- **Team Collaboration**: Share filtered views and insights with team members
+
+The Observability feature in Bud Runtime provides comprehensive visibility into your AI model performance, enabling data-driven optimization and ensuring high-quality user experiences across all your AI applications.
