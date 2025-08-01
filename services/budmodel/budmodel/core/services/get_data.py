@@ -23,7 +23,7 @@ def fetch_data_from_perplexity(api_key, website_url):
     }
 
     try:
-        response = requests.post(api_endpoint, headers=headers, json=data)
+        response = requests.post(api_endpoint, headers=headers, json=data, timeout=30)
         print(response)
         response.raise_for_status()
         leaderboard_data = response.json().get("choices")[0]["message"]["content"]

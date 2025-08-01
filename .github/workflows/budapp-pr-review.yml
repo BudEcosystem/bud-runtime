@@ -1,4 +1,4 @@
-name: "PR Review - BudApp"
+name: "BudApp: PR Review"
 
 on:
   pull_request:
@@ -10,13 +10,12 @@ env:
   PYTHON_VERSION: "3.11"
 
 jobs:
-
   security:
     name: Security Scan
     runs-on: ubuntu-latest
     defaults:
-          run:
-            working-directory: ./services/budapp
+      run:
+        working-directory: ./services/budapp
 
     steps:
       - name: Checkout code
@@ -50,8 +49,8 @@ jobs:
     name: Run Tests
     runs-on: ubuntu-latest
     defaults:
-          run:
-            working-directory: ./services/budapp
+      run:
+        working-directory: ./services/budapp
 
     services:
       postgres:
@@ -179,8 +178,8 @@ jobs:
     name: Check Dependencies
     runs-on: ubuntu-latest
     defaults:
-          run:
-            working-directory: ./services/budapp
+      run:
+        working-directory: ./services/budapp
 
     steps:
       - name: Checkout code
@@ -205,6 +204,9 @@ jobs:
   pr-status:
     name: PR Review Status
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./services/budapp
     needs: [security, test, dependency-check]
     if: always()
 

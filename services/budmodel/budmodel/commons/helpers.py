@@ -152,7 +152,7 @@ def is_zip_file(path: str) -> bool:
 def estimate_download_speed(url: str, chunk_size=1024, test_duration=2) -> float:
     """Estimate download speed in bytes per second from HuggingFace."""
     try:
-        response = requests.get(url, stream=True)
+        response = requests.get(url, stream=True, timeout=30)
         response.raise_for_status()
 
         start_time = time.time()
@@ -185,7 +185,7 @@ def get_remote_file_size(url):
         int: File size in bytes, or None if size cannot be determined
     """
     try:
-        response = requests.head(url, allow_redirects=True)
+        response = requests.head(url, allow_redirects=True, timeout=30)
         response.raise_for_status()
 
         # Try to get Content-Length header
@@ -194,7 +194,7 @@ def get_remote_file_size(url):
             return int(content_length)
 
         # If no Content-Length header, try Range header
-        response = requests.get(url, stream=True, headers={"Range": "bytes=0-0"})
+        response = requests.get(url, stream=True, headers={"Range": "bytes=0-0"}, timeout=30)
         content_range = response.headers.get("content-range")
         if content_range:
             size = content_range.split("/")[-1]

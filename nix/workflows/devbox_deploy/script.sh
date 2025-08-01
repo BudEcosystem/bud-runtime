@@ -5,7 +5,7 @@ export_sops_secret_silent() {
 	k2="$2"
 	var_name="$3"
 
-	if var_value="$(sops --decrypt --extract "[\"""$k1""\"][\"""$k2""\"]" "infra/terraform/devbox/secrets.yaml" 2>/dev/null)"; then
+	if var_value="$(sops --decrypt --extract "[\"""$k1""\"][\"""$k2""\"]" "infra/terraform/devbox/secrets.yaml")"; then
 		export "$var_name"="$var_value"
 	fi
 }

@@ -433,7 +433,7 @@ class RegisterClusterWorkflow:
                     raise ValueError(f"Unsupported provider: {provider}")
 
             # Initialize Terraform
-            prefix = f"{hashlib.md5(tf_config.cluster_name.encode()).hexdigest()}"
+            prefix = f"{hashlib.md5(tf_config.cluster_name.encode(), usedforsecurity=False).hexdigest()}"
             init_result = tf_manager.init(prefix)
 
             if init_result.returncode != 0:
@@ -1444,7 +1444,9 @@ class DeleteClusterWorkflow:
                         azure_tf_manager = AzureAksManager(azure_config)
 
                         # Init
-                        prefix = f"{hashlib.md5(azure_config.cluster_name.encode()).hexdigest()}"
+                        prefix = (
+                            f"{hashlib.md5(azure_config.cluster_name.encode(), usedforsecurity=False).hexdigest()}"
+                        )
                         init_result = azure_tf_manager.init(prefix)
 
                         if init_result.returncode != 0:
@@ -1510,7 +1512,7 @@ class DeleteClusterWorkflow:
                         # Create the AWS Terraform manager instance.
                         aws_tf_manager = AWSEksManager(aws_config)
 
-                        prefix = f"{hashlib.md5(aws_config.cluster_name.encode()).hexdigest()}"
+                        prefix = f"{hashlib.md5(aws_config.cluster_name.encode(), usedforsecurity=False).hexdigest()}"
                         init_result = aws_tf_manager.init(prefix)
                         if init_result.returncode != 0:
                             logger.error(f"Terraform init failed: {init_result.stdout}")

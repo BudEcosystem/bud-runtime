@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-budsim
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-budsim
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-budsim
+      annotations:
+        dapr.io/enabled: "true"
+        dapr.io/app-id: "budsim"
+        dapr.io/app-port: "3002"
+    spec:
+      containers:
+      - name: {{ .Release.Name }}-budsim
+        image: {{ .Values.microservices.budsim.image }}
+        imagePullPolicy: IfNotPresent
+        command: ["sh", "-c", "apt update -y && apt install socat -y && (socat TCP-LISTEN:3600,fork TCP:127.0.0.1:50001 &) && alembic upgrade head && uvicorn budsim.main:app --host 0.0.0.0 --port 3002"]
+        ports:
+        - containerPort: 3002
+        env:
+        {{ $root := . }}
+        {{- range $key, $value := .Values.microservices.budsim.env }}
+          - name: {{ $key }}
+            value: {{ tpl $value $root | quote }}
+        {{- end }}
+        envFrom:
+          - configMapRef:
+              name: {{ .Release.Name}}-bud-global
+        resources:
+          limits:
+            memory: 32768Mi
+            cpu: 2
+          requests:
+            memory: 256Mi
+            cpu: 250m
+        volumeMounts:
+        - name: models-registry
+          mountPath: /data/models-registry
+      volumes:
+      - name: models-registry
+        persistentVolumeClaim:
+          claimName: {{ .Release.Name }}-bud-models-registry
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-budsim
+spec:
+  ports:
+  - port: 3002
+    targetPort: 3002
+  selector:
+    app: {{ .Release.Name }}-budsim
+  type: ClusterIP

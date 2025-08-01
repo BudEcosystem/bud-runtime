@@ -1,0 +1,227 @@
+// Color variables matching bud-dashboard
+$bg-main: #101010;
+$bg-sidebar: #0A0A0A;
+$bg-card: #18191b;
+$border-color: #1F1F1F;
+$text-white: #EEEEEE;
+$text-gray: #B3B3B3;
+$text-dark-gray: #757575;
+$primary-color: #965CDE;
+$hover-bg: rgba(150, 92, 222, 0.1);
+
+.dashboardContainer {
+  display: flex;
+  height: 100vh;
+  background: $bg-main;
+  overflow: hidden;
+}
+
+// Sidebar styles
+.sideBar {
+  width: 240px;
+  background: $bg-sidebar;
+  border-right: 1px solid $border-color;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  position: relative;
+  z-index: 100;
+}
+
+.topSection {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-bottom: 1rem;
+}
+
+.logo {
+  padding: 2rem 1.5rem;
+  border-bottom: 1px solid $border-color;
+
+  a {
+    display: block;
+  }
+}
+
+.navigation {
+  padding: 1rem 0;
+}
+
+.navItem {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 1.5rem;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  position: relative;
+  gap: 0.75rem;
+
+  &:hover {
+    background: $hover-bg;
+
+    .label {
+      color: $text-white !important;
+    }
+
+    .shortcut {
+      opacity: 1;
+    }
+  }
+
+  &.active {
+    background: $hover-bg;
+
+    &::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 3px;
+      background: $primary-color;
+    }
+
+    .label,
+    .activeLabel {
+      color: $primary-color !important;
+    }
+  }
+}
+
+.iconWrapper {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+
+  .icon {
+    filter: brightness(0) invert(0.5);
+  }
+
+  .active & .icon,
+  .navItem:hover & .icon {
+    filter: brightness(0) invert(1);
+  }
+}
+
+.label {
+  flex: 1;
+  font-size: 0.875rem;
+  color: $text-gray;
+  transition: color 0.2s ease;
+}
+
+.shortcut {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.375rem;
+  background: $border-color;
+  border-radius: 4px;
+  font-size: 0.625rem;
+  color: $text-gray;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+
+  .cmdIcon {
+    font-size: 0.625rem;
+  }
+}
+
+.bottomSection {
+  border-top: 1px solid $border-color;
+  padding: 1rem 0;
+}
+
+.userSection {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid $border-color;
+  margin-top: 1rem;
+}
+
+.userInfo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+}
+
+.userDetails {
+  overflow: hidden;
+
+  span {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+.logoutBtn {
+  background: none;
+  border: none;
+  color: $text-gray;
+  cursor: pointer;
+  padding: 0.5rem;
+  transition: color 0.2s ease;
+  font-size: 1.25rem;
+
+  &:hover {
+    color: $text-white;
+  }
+}
+
+// Main content styles
+.mainContent {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.header {
+  height: 60px;
+  border-bottom: 1px solid $border-color;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2rem;
+  background: $bg-sidebar;
+}
+
+.headerLeft,
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.pageContent {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: $bg-main;
+}
+
+// Tooltip styles
+.tooltip {
+  :global(.ant-tooltip-inner) {
+    background: $bg-card;
+    color: $text-white;
+    border: 1px solid $border-color;
+    font-size: 0.75rem;
+  }
+
+  :global(.ant-tooltip-arrow) {
+    &::before {
+      background: $bg-card;
+      border: 1px solid $border-color;
+    }
+  }
+}

@@ -1,0 +1,90 @@
+{{- if (default .Values.ingress.enabled false) }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Release.Name }}
+  annotations:
+    kubernetes.io/tls-acme: "true"
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: {{ .Values.ingress.hosts.budadmin }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-budadmin
+                port:
+                  number: 3000
+    - host: {{ .Values.ingress.hosts.budplayground }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-budplayground
+                port:
+                  number: 3000
+    - host: {{ .Values.ingress.hosts.budapp }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-budapp
+                port:
+                  number: 9082
+    - host: {{ .Values.ingress.hosts.budgateway }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-budproxy
+                port:
+                  number: 3000
+    - host: {{ .Values.ingress.hosts.novuapi }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-api
+                port:
+                  number: 3000
+    - host: {{ .Values.ingress.hosts.novuws }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-ws
+                port:
+                  number: 3002
+  tls:
+    - hosts:
+        - {{ .Values.ingress.hosts.budadmin }}
+      secretName: {{ .Release.Name }}-budadmin-acme-cert
+    - hosts:
+        - {{ .Values.ingress.hosts.budplayground }}
+      secretName: {{ .Release.Name }}-budplayground-acme-cert
+    - hosts:
+        - {{ .Values.ingress.hosts.budapp }}
+      secretName: {{ .Release.Name }}-budapp-acme-cert
+    - hosts:
+        - {{ .Values.ingress.hosts.budgateway }}
+      secretName: {{ .Release.Name }}-budgateway-acme-cert
+    - hosts:
+        - {{ .Values.ingress.hosts.novuapi }}
+      secretName: {{ .Release.Name }}-novuapi-acme-cert
+    - hosts:
+        - {{ .Values.ingress.hosts.novuws }}
+      secretName: {{ .Release.Name }}-novuws-acme-cert
+{{ end }}

@@ -93,7 +93,7 @@ const PromptScoreDetail = () => {
           prompt: item.prompt,
           response: item.response,
           scores: [
-            { harmfulness: (item.harmfulness_input ?? 0 + item.harmfulness_output ?? 0) / 2 },
+            { harmfulness: ((item.harmfulness_input ?? 0) + (item.harmfulness_output ?? 0)) / 2 },
             { sensitive_info: ((item.sensitive_info_input ?? 0) + (item.sensitive_info_output ?? 0)) / 2 },
             { prompt_injection: item.prompt_injection_input || item.prompt_injection_output || 0 },
             { hallucination: item.hallucination_output || item.hallucination_output || 0 }

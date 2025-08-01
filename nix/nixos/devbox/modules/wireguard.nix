@@ -5,11 +5,6 @@
   ...
 }:
 let
-  nameServer = [
-    "1.1.1.1"
-    "8.8.8.8"
-  ];
-
   wgInterface = "wg";
   wanInterface = "eth0";
   port = 51820;
@@ -49,6 +44,7 @@ let
 in
 {
   sops.secrets."misc/wireguard" = { };
+  services.k3s.extraFlags = [ "--tls-san 10.54.132.1" ];
 
   networking = {
     nat = {
@@ -60,27 +56,21 @@ in
     firewall = {
       allowedUDPPorts = [ port ];
       interfaces.${wgInterface} = {
-        allowedTCPPortRanges = [{
-          from = 1;
-          to = 65535;
-        }];
-        allowedUDPPortRanges = [{
-          from = 1;
-          to = 65535;
-        }];
+        allowedTCPPortRanges = [
+          {
+            from = 1;
+            to = 65535;
+          }
+        ];
+        allowedUDPPortRanges = [
+          {
+            from = 1;
+            to = 65535;
+          }
+        ];
       };
     };
 
     wg-quick.interfaces.${wgInterface}.configFile = builtins.toString wgConf;
-  };
-
-  services.dnsmasq = {
-    enable = true;
-    settings = {
-      bind-interfaces = true;
-      server = nameServer;
-      interface = [ wgInterface ];
-      no-dhcp-interface = wgInterface;
-    };
   };
 }

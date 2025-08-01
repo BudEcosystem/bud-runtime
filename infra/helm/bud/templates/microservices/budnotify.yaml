@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-budnotify
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-budnotify
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-budnotify
+      annotations:
+        dapr.io/enabled: "true"
+        dapr.io/app-id: "budnotify"
+        dapr.io/app-port: "3000"
+    spec:
+      containers:
+      - name: budnotify
+        image: {{ .Values.microservices.budnotify.image }}
+        imagePullPolicy: IfNotPresent
+        command: ["sh", "-c", "uvicorn notify.main:app --host 0.0.0.0 --port 3000"]
+        ports:
+        - containerPort: 3000
+        envFrom:
+          - configMapRef:
+              name: {{ .Release.Name}}-bud-global
+        resources:
+          limits:
+            memory: 512Mi
+            cpu: 500m
+          requests:
+            memory: 256Mi
+            cpu: 250m
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-budnotify
+spec:
+  ports:
+  - port: 3000
+    targetPort: 3000
+  selector:
+    app: {{ .Release.Name }}-budnotify
+  type: ClusterIP

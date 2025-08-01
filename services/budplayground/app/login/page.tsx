@@ -19,20 +19,6 @@ export default function Login() {
     const [isInvalidApiKey, setIsInvalidApiKey] = useState(false);
     const [key, setKey] = useState("");
 
-    useEffect(() => {
-        // Get access_key from URL parameters
-        const params = new URLSearchParams(window.location.search);
-        const accessKey = params.get('access_token');
-
-        if (accessKey) {
-            // setKey(accessKey);
-            // Automatically validate the access key
-            handleAdd(accessKey);
-        } else {
-          hideLoader();
-        }
-    }, [handleAdd, hideLoader]);
-
     const handleAdd = async (accessKey?: string) => {
         if(!accessKey) {
           form.submit();
@@ -48,6 +34,20 @@ export default function Login() {
         }
         hideLoader();
     }
+
+    useEffect(() => {
+        // Get access_key from URL parameters
+        const params = new URLSearchParams(window.location.search);
+        const accessKey = params.get('access_token');
+
+        if (accessKey) {
+            // setKey(accessKey);
+            // Automatically validate the access key
+            handleAdd(accessKey);
+        } else {
+          hideLoader();
+        }
+    }, [handleAdd, hideLoader]);
     return (
       <div className={`w-full h-screen logginBg box-border relative overflow-hidden ${isLoading ? 'opacity-0' : 'opacity-100'}`}>
         <div className="loginWrap w-full h-full loginBg-glass flex justify-between box-border ">
