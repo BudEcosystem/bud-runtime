@@ -21,7 +21,8 @@ from typing import List
 
 from fastapi import Depends, HTTPException, Query, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import ExpiredSignatureError, JWTError
+from jwt.exceptions import ExpiredSignatureError
+from jwt.exceptions import PyJWTError as JWTError
 from keycloak import KeycloakAuthenticationError, KeycloakGetError, KeycloakInvalidTokenError
 from sqlalchemy.orm import Session
 from typing_extensions import Annotated
