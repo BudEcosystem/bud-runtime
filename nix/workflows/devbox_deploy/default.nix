@@ -1,18 +1,16 @@
 {
   writeShellApplication,
-  gnugrep,
-  gnused,
-  git,
-  nix,
+  sops,
+  opentofu,
+  jq,
 }:
 writeShellApplication {
   name = "bumper";
 
   runtimeInputs = [
-    gnugrep
-    gnused
-    git
-    nix
+    sops
+    opentofu
+    jq
   ];
 
   text = builtins.readFile ./script.sh;

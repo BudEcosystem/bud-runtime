@@ -11,3 +11,13 @@ resource "cloudflare_dns_record" "master" {
   content = module.azure.master_ip
   proxied = false
 }
+
+
+resource "cloudflare_dns_record" "argo" {
+  zone_id = local.zone_id
+  name = "argo.dev"
+  ttl = 3600
+  type = "A"
+  content = module.azure.master_ip
+  proxied = false
+}

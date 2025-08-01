@@ -2,7 +2,9 @@
   self,
   mkShell,
   nixfmt-rfc-style,
+
   sops,
+  age,
 
   k3d,
   kubectl,
@@ -28,9 +30,8 @@ mkShell {
     yaml-language-server
     openssl
     sops
-
+    age
     nixfmt-rfc-style
-
     terraform-ls
     opentofu
     azure-cli
