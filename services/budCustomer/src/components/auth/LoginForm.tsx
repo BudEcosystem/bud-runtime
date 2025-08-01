@@ -29,7 +29,7 @@ const LoginForm = ({ onSubmit }: LoginPageModalProps) => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
   const [mounted, setMounted] = useState(false);
-  
+
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -222,7 +222,7 @@ const LoginForm = ({ onSubmit }: LoginPageModalProps) => {
       </form>
 
       <div className="mt-[2.2rem] flex justify-center">
-        <Text_12_400_EEEEEE 
+        <Text_12_400_EEEEEE
           className="cursor-pointer"
           onClick={() => {
             setActivePage(4);
@@ -231,7 +231,7 @@ const LoginForm = ({ onSubmit }: LoginPageModalProps) => {
           Forgot password?
         </Text_12_400_EEEEEE>
       </div>
-      
+
       {authError && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}

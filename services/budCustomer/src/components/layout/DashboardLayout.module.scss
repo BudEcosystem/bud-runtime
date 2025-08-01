@@ -38,7 +38,7 @@ $hover-bg: rgba(150, 92, 222, 0.1);
 .logo {
   padding: 2rem 1.5rem;
   border-bottom: 1px solid $border-color;
-  
+
   a {
     display: block;
   }
@@ -56,22 +56,22 @@ $hover-bg: rgba(150, 92, 222, 0.1);
   transition: all 0.2s ease;
   position: relative;
   gap: 0.75rem;
-  
+
   &:hover {
     background: $hover-bg;
-    
+
     .label {
       color: $text-white !important;
     }
-    
+
     .shortcut {
       opacity: 1;
     }
   }
-  
+
   &.active {
     background: $hover-bg;
-    
+
     &::before {
       content: '';
       position: absolute;
@@ -81,7 +81,7 @@ $hover-bg: rgba(150, 92, 222, 0.1);
       width: 3px;
       background: $primary-color;
     }
-    
+
     .label,
     .activeLabel {
       color: $primary-color !important;
@@ -96,11 +96,11 @@ $hover-bg: rgba(150, 92, 222, 0.1);
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  
+
   .icon {
     filter: brightness(0) invert(0.5);
   }
-  
+
   .active & .icon,
   .navItem:hover & .icon {
     filter: brightness(0) invert(1);
@@ -125,7 +125,7 @@ $hover-bg: rgba(150, 92, 222, 0.1);
   color: $text-gray;
   opacity: 0;
   transition: opacity 0.2s ease;
-  
+
   .cmdIcon {
     font-size: 0.625rem;
   }
@@ -154,7 +154,7 @@ $hover-bg: rgba(150, 92, 222, 0.1);
 
 .userDetails {
   overflow: hidden;
-  
+
   span {
     display: block;
     white-space: nowrap;
@@ -171,7 +171,7 @@ $hover-bg: rgba(150, 92, 222, 0.1);
   padding: 0.5rem;
   transition: color 0.2s ease;
   font-size: 1.25rem;
-  
+
   &:hover {
     color: $text-white;
   }
@@ -217,7 +217,7 @@ $hover-bg: rgba(150, 92, 222, 0.1);
     border: 1px solid $border-color;
     font-size: 0.75rem;
   }
-  
+
   :global(.ant-tooltip-arrow) {
     &::before {
       background: $bg-card;

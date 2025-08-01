@@ -34,20 +34,20 @@ export default function Login() {
     try {
       // Mock authentication logic - replace with your actual authentication
       console.log("Login attempt:", payload);
-      
+
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
+
       // Mock success - replace with actual authentication
       if (payload.email && payload.password) {
         // Store auth token or user data
         localStorage.setItem("auth_token", "mock_token");
         setAuthError('');
-        
+
         // Redirect to dashboard
         router.push("/dashboard");
       }
-      
+
       hideLoader();
     } catch (error: any) {
       console.error("Login error:", error);

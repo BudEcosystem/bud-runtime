@@ -65,9 +65,9 @@ export default function ApiKeysPage() {
 
   const handleCreateKey = () => {
     if (!newKeyLabel.trim()) return;
-    
+
     const mockKey = `sk-proj-${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}`;
-    
+
     const newApiKey: ApiKey = {
       id: Date.now().toString(),
       label: newKeyLabel,
@@ -77,7 +77,7 @@ export default function ApiKeysPage() {
       usage: 0,
       status: "active"
     };
-    
+
     setApiKeys([newApiKey, ...apiKeys]);
     setNewKey(mockKey);
     setNewKeyLabel("");
@@ -86,7 +86,7 @@ export default function ApiKeysPage() {
   };
 
   const handleRevokeKey = (id: string) => {
-    setApiKeys(apiKeys.map(key => 
+    setApiKeys(apiKeys.map(key =>
       key.id === id ? { ...key, status: "revoked" as const } : key
     ));
   };
@@ -150,9 +150,9 @@ export default function ApiKeysPage() {
       dataIndex: 'status',
       key: 'status',
       render: (status: string) => (
-        <Text_13_400_EEEEEE 
-          style={{ 
-            color: status === 'active' ? '#479D5F' : '#EC7575' 
+        <Text_13_400_EEEEEE
+          style={{
+            color: status === 'active' ? '#479D5F' : '#EC7575'
           }}
         >
           {status.charAt(0).toUpperCase() + status.slice(1)}
@@ -292,7 +292,7 @@ export default function ApiKeysPage() {
                 Save this key now. You won't be able to see it again!
               </Text_13_400_EEEEEE>
             </div>
-            
+
             <div className="bg-[#1F1F1F] border border-[#2F2F2F] rounded-[8px] p-[1rem] flex items-center justify-between">
               <code className="text-[#EEEEEE] text-[0.875rem] break-all">{newKey}</code>
               <Button

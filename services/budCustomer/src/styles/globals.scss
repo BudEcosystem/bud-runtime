@@ -117,15 +117,15 @@ body {
   &.ant-segmented {
     background: transparent !important;
     padding: 0 !important;
-    
+
     .ant-segmented-item {
       color: #757575 !important;
       background: transparent !important;
-      
+
       &:hover {
         color: #B3B3B3 !important;
       }
-      
+
       &.ant-segmented-item-selected {
         background: rgba(150, 92, 222, 0.2) !important;
         color: #EEEEEE !important;
@@ -139,12 +139,12 @@ body {
   .text-balance {
     text-wrap: balance;
   }
-  
+
   .no-scrollbar {
     -ms-overflow-style: none;  /* IE and Edge */
     scrollbar-width: none;  /* Firefox */
   }
-  
+
   .no-scrollbar::-webkit-scrollbar {
     display: none;  /* Chrome, Safari and Opera */
   }

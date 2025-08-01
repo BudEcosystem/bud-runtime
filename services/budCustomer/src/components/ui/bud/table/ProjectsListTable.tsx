@@ -215,7 +215,7 @@ const ProjectsListTable = () => {
               Credentials Per Project
             </Text_16_600_FFFFFF>
             <div className='flex items-center justify-between'>
-              <SearchHeaderInput 
+              <SearchHeaderInput
                 placeholder="Search by name"
                 value={searchValue}
                 onChange={setSearchValue}

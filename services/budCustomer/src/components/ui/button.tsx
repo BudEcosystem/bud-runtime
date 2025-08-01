@@ -25,13 +25,13 @@ export function PrimaryButton({
   text,
   ...props
 }: PrimaryButtonProps) {
-  
+
   return (
     <button
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`flex justify-center items-center h-[1.75rem] border-[.5px] border-[#965CDE] font-normal bg-[#1E0C34] hover:bg-[#965CDE] transition-colors duration-200 rounded-md ${classNames} 
+      className={`flex justify-center items-center h-[1.75rem] border-[.5px] border-[#965CDE] font-normal bg-[#1E0C34] hover:bg-[#965CDE] transition-colors duration-200 rounded-md ${classNames}
         ${disabled ? '!bg-[#1E0C34] hover:!bg-[#1E0C34] border-[#965CDE] text-[#888888] cursor-not-allowed' : 'bg-[#1E0C34] hover:bg-[#965CDE]'} `}
       style={{
         minWidth: '4rem',
@@ -48,17 +48,17 @@ export function PrimaryButton({
   );
 }
 
-export function SecondaryButton({ 
-  classNames = '', 
+export function SecondaryButton({
+  classNames = '',
   onClick,
   disabled,
   type = "button",
   children,
   text,
-  ...props 
+  ...props
 }: any) {
   return (
-    <button 
+    <button
       type={type}
       onClick={onClick}
       disabled={disabled}

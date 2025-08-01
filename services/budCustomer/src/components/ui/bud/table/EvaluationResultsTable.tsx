@@ -69,7 +69,7 @@ const data = [
 
 function EvaluationResultsTable() {
         const { hasPermission } = useUser()
-    
+
     const { reset } = useDeployModel();
     const { getProject } = useProjects();
     const [searchValue, setSearchValue] = useState('');
@@ -203,5 +203,3 @@ function EvaluationResultsTable() {
 };
 
 export default EvaluationResultsTable;
-
-

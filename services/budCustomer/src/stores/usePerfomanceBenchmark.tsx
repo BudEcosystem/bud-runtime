@@ -143,11 +143,11 @@ export const usePerfomanceBenchmark = create<{
   setSelectedCredentials: (credentials: any | null) => {
     set({ selectedCredentials: credentials });
   },
-  
+
   setSelectedModel: (model: any) => {
     set({ selectedModel: model });
   },
-  
+
   setNodeMetrics: (nodeMetrics: any) => {
     set({ nodeMetrics: nodeMetrics });
     set({ filteredNodeMetrics: get().nodeMetrics });
@@ -156,7 +156,7 @@ export const usePerfomanceBenchmark = create<{
   setSearchText: (text: string) => {
     set({ searchText: text });
   },
-  
+
   setFilteredNodes: (text: string) => {
     get().setSearchText(text);
     let nodeMetrics = get().nodeMetrics;
@@ -168,7 +168,7 @@ export const usePerfomanceBenchmark = create<{
 
   setRunAsSimulation: (runAsSimulation: boolean) =>
     set({ runAsSimulation: runAsSimulation }),
-    
+
   setEvalWith: (evalWith: string) => set({ evalWith: evalWith }),
 
   setCurrentWorkflow: (workflow: WorkflowType) =>
@@ -199,14 +199,14 @@ export const usePerfomanceBenchmark = create<{
     // Stub implementation
     return {};
   },
-  
+
   setLoading: (loading: boolean) => set({ loading }),
-  
+
   deleteWorkflow: async (id: string, suppressToast?: boolean) => {
     // Stub implementation
     return {};
   },
-  
+
   createWorkflow: (projectId: string) => {
     // Stub implementation
   },
@@ -214,7 +214,7 @@ export const usePerfomanceBenchmark = create<{
   setSelectedCluster: (cluster: any) => {
     set({ selectedCluster: cluster });
   },
-  
+
   setSelecteUnselectAll: (selectAll: boolean) => {
     if (selectAll) {
       set({ selectedNodes: [] });
@@ -225,7 +225,7 @@ export const usePerfomanceBenchmark = create<{
       );
     }
   },
-  
+
   setSelectedNodes: (node: Node) => {
     set((state) => {
       const isAlreadySelected = state.selectedNodes.some(

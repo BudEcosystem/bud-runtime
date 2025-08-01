@@ -91,7 +91,7 @@ export default function UsagePage() {
   };
 
   const toggleAlert = (id: string) => {
-    setAlerts(alerts.map(alert => 
+    setAlerts(alerts.map(alert =>
       alert.id === id ? { ...alert, isActive: !alert.isActive } : alert
     ));
   };
@@ -176,8 +176,8 @@ export default function UsagePage() {
               <Text_12_400_B3B3B3 className="mb-[1rem]">
                 of {(billingPlan.quotaLimit / 1000).toFixed(0)}K tokens
               </Text_12_400_B3B3B3>
-              <Progress 
-                percent={getUsagePercentage()} 
+              <Progress
+                percent={getUsagePercentage()}
                 strokeColor="#4077E6"
                 trailColor="#2F2F2F"
                 showInfo={false}
@@ -197,8 +197,8 @@ export default function UsagePage() {
               <Text_12_400_B3B3B3 className="mb-[1rem]">
                 of {billingPlan.requestsLimit.toLocaleString()} requests
               </Text_12_400_B3B3B3>
-              <Progress 
-                percent={getRequestsPercentage()} 
+              <Progress
+                percent={getRequestsPercentage()}
                 strokeColor="#479D5F"
                 trailColor="#2F2F2F"
                 showInfo={false}
@@ -270,7 +270,7 @@ export default function UsagePage() {
                 Add Alert
               </Button>
             </Flex>
-            
+
             <div className="space-y-[1rem]">
               {alerts.map((alert) => (
                 <div key={alert.id} className="bg-[#1F1F1F] rounded-[8px] p-[1rem]">
@@ -343,7 +343,7 @@ export default function UsagePage() {
                   ]}
                 />
               </div>
-              
+
               <div>
                 <Text_12_400_B3B3B3 className="mb-[0.5rem]">Threshold</Text_12_400_B3B3B3>
                 <Input

@@ -156,12 +156,12 @@ export default function BatchesPage() {
       key: 'status',
       render: (status: string) => (
         <Flex align="center" gap={8}>
-          <Icon 
-            icon={getStatusIcon(status)} 
+          <Icon
+            icon={getStatusIcon(status)}
             className={`text-[1rem] ${status === 'processing' ? 'animate-spin' : ''}`}
             style={{ color: getStatusColor(status) }}
           />
-          <Tag 
+          <Tag
             color={getStatusColor(status)}
             className="border-0 px-[0.75rem] py-[0.25rem] text-[0.75rem] uppercase"
           >
@@ -180,8 +180,8 @@ export default function BatchesPage() {
             <Text_12_400_B3B3B3>{record.completedRequests}/{record.totalRequests}</Text_12_400_B3B3B3>
             <Text_12_400_B3B3B3>{record.progress}%</Text_12_400_B3B3B3>
           </Flex>
-          <Progress 
-            percent={record.progress} 
+          <Progress
+            percent={record.progress}
             strokeColor={getStatusColor(record.status)}
             trailColor="#2F2F2F"
             showInfo={false}
@@ -374,7 +374,7 @@ export default function BatchesPage() {
             <Text_14_400_B3B3B3 className="mb-[1.5rem]">
               Upload a JSONL file containing your batch requests
             </Text_14_400_B3B3B3>
-            
+
             <div className="space-y-[1rem]">
               <div>
                 <Text_12_400_B3B3B3 className="mb-[0.5rem]">Job Name</Text_12_400_B3B3B3>
@@ -383,7 +383,7 @@ export default function BatchesPage() {
                   className="bg-[#1F1F1F] border-[#2F2F2F]"
                 />
               </div>
-              
+
               <div>
                 <Text_12_400_B3B3B3 className="mb-[0.5rem]">Select Model</Text_12_400_B3B3B3>
                 <select className="w-full bg-[#1F1F1F] border border-[#2F2F2F] text-[#EEEEEE] px-[0.75rem] py-[0.5rem] rounded-[6px]">
@@ -393,7 +393,7 @@ export default function BatchesPage() {
                   <option>Claude 3 Sonnet</option>
                 </select>
               </div>
-              
+
               <div>
                 <Text_12_400_B3B3B3 className="mb-[0.5rem]">Upload JSONL File</Text_12_400_B3B3B3>
                 <div className="border-2 border-dashed border-[#2F2F2F] rounded-[8px] p-[2rem] text-center cursor-pointer hover:border-[#965CDE] transition-colors">
@@ -447,7 +447,7 @@ export default function BatchesPage() {
                   </div>
                   <div>
                     <Text_12_400_757575>Status</Text_12_400_757575>
-                    <Tag 
+                    <Tag
                       color={getStatusColor(selectedBatch.status)}
                       className="border-0 px-[0.75rem] py-[0.25rem] text-[0.75rem] uppercase mt-[0.25rem]"
                     >
@@ -458,8 +458,8 @@ export default function BatchesPage() {
 
                 <div>
                   <Text_12_400_757575>Progress</Text_12_400_757575>
-                  <Progress 
-                    percent={selectedBatch.progress} 
+                  <Progress
+                    percent={selectedBatch.progress}
                     strokeColor={getStatusColor(selectedBatch.status)}
                     trailColor="#2F2F2F"
                     className="mt-[0.5rem]"

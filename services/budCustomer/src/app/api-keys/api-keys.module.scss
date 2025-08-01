@@ -9,25 +9,25 @@ $primary-color: #965CDE;
 
 .apiKeysTable {
   width: 100%;
-  
+
   :global {
     .ant-table {
       background: transparent;
       color: $text-white;
     }
-    
+
     .ant-table-fixed {
       table-layout: auto;
     }
-    
+
     .ant-table-container {
       background: transparent;
     }
-    
+
     .ant-table-content {
       background: transparent;
     }
-    
+
     .ant-table-thead > tr > th {
       background: transparent;
       border-bottom: none;
@@ -37,12 +37,12 @@ $primary-color: #965CDE;
       padding: 1rem 1.5rem 1.5rem;
       text-transform: uppercase;
       letter-spacing: 0.05em;
-      
+
       &::before {
         display: none;
       }
     }
-    
+
     .ant-table-tbody > tr > td {
       border-bottom: 1px solid rgba($border-color, 0.2);
       padding: 1.25rem 1.5rem;
@@ -50,58 +50,58 @@ $primary-color: #965CDE;
       font-size: 0.875rem;
       vertical-align: middle;
     }
-    
+
     .ant-table-tbody > tr {
       background: transparent;
-      
+
       &:hover > td {
         background: rgba(#1A1A1A, 0.5);
       }
     }
-    
+
     .ant-table-tbody > tr:last-child > td {
       border-bottom: none;
     }
-    
+
     .ant-empty-normal {
       color: $text-gray;
     }
-    
+
     // Fix pagination styles if present
     .ant-pagination {
       .ant-pagination-item {
         background: transparent;
         border-color: $border-color;
-        
+
         a {
           color: $text-gray;
         }
-        
+
         &:hover {
           border-color: $primary-color;
-          
+
           a {
             color: $primary-color;
           }
         }
-        
+
         &.ant-pagination-item-active {
           background: rgba($primary-color, 0.2);
           border-color: $primary-color;
-          
+
           a {
             color: $primary-color;
           }
         }
       }
     }
-    
+
     // Ensure all table cells have proper styling
     .ant-table-cell {
       background: transparent !important;
       color: inherit;
     }
-    
+
     // Fix any white backgrounds
     .ant-table-wrapper {
       background: transparent;
@@ -115,50 +115,50 @@ $primary-color: #965CDE;
       background: $bg-card;
       border: 1px solid $border-color;
     }
-    
+
     .ant-modal-header {
       background: $bg-card;
       border-bottom: 1px solid $border-color;
     }
-    
+
     .ant-modal-title {
       color: $text-white;
     }
-    
+
     .ant-modal-close {
       color: $text-gray;
-      
+
       &:hover {
         color: $text-white;
       }
     }
-    
+
     .ant-modal-footer {
       border-top: 1px solid $border-color;
     }
-    
+
     .ant-input {
       background: #1F1F1F;
       border-color: #2F2F2F;
       color: $text-white;
-      
+
       &::placeholder {
         color: $text-dark-gray;
       }
-      
+
       &:hover,
       &:focus {
         border-color: $primary-color;
         box-shadow: none;
       }
     }
-    
+
     .ant-btn {
       &:not(.ant-btn-primary) {
         background: transparent;
         border-color: $border-color;
         color: $text-gray;
-        
+
         &:hover {
           background: rgba(#252525, 0.5);
           border-color: $primary-color;

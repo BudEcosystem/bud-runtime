@@ -109,13 +109,13 @@ axiosInstance.interceptors.response.use(
           console.error("Token refresh failed:", refreshErr);
           isRefreshing = false;
           refreshSubscribers = [];
-          
+
           if (!isRedirecting) {
             isRedirecting = true;
             localStorage.clear();
             window.location.replace("/login");
           }
-          
+
           return Promise.reject(refreshErr);
         });
     } else if (status === 401) {
@@ -137,7 +137,7 @@ axiosInstance.interceptors.response.use(
 const refreshToken = async () => {
   try {
     const refreshTokenValue = localStorage.getItem("refresh_token");
-    
+
     if (!refreshTokenValue) {
       throw new Error("No refresh token found");
     }

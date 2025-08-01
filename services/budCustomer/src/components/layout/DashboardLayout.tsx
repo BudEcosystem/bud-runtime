@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Image, Badge, Avatar } from "antd";
 import { Icon } from "@iconify/react/dist/iconify.js";
-import { 
+import {
   Text_10_400_B3B3B3,
   Text_12_300_B3B3B3,
   Text_12_400_B3B3B3,
@@ -158,8 +158,8 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
           className="absolute -right-3 top-8 w-6 h-6 bg-[#1A1A1A] border border-[#2A2A2A] rounded-full flex items-center justify-center hover:bg-[#252525] transition-colors z-10"
           aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
-          <Icon 
-            icon={isCollapsed ? "material-symbols:chevron-right" : "material-symbols:chevron-left"} 
+          <Icon
+            icon={isCollapsed ? "material-symbols:chevron-right" : "material-symbols:chevron-left"}
             className="text-sm text-[#B3B3B3]"
           />
         </button>
@@ -174,7 +174,7 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
               className={`${isCollapsed ? 'mb-4 mx-auto' : 'mb-6'} transition-all duration-300`}
             />
           </Link>
-          
+
           {/* Notifications */}
           {!isCollapsed && (
             <div className="bg-[#1A1A1A] rounded-lg p-3 mb-6 cursor-pointer hover:bg-[#252525] transition-colors">
@@ -198,7 +198,7 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
           {tabs.map((tab) => {
             const active = isActive(tab.route);
             const hovered = isHovered === tab.route;
-            
+
             return (
               <Link
                 key={tab.route}
@@ -243,14 +243,14 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
         <div className={`${isCollapsed ? 'p-4' : 'p-6'} border-t border-[#1F1F1F] transition-all duration-300`}>
           {isCollapsed ? (
             <div className="flex flex-col items-center gap-3">
-              <Avatar 
-                size={32} 
+              <Avatar
+                size={32}
                 style={{ backgroundColor: '#965CDE' }}
               >
                 <Icon icon="mdi:user" className="text-lg" />
               </Avatar>
-              <button 
-                onClick={handleLogout} 
+              <button
+                onClick={handleLogout}
                 className="text-[#757575] hover:text-white transition-colors p-2"
                 title="Logout"
               >
@@ -261,8 +261,8 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
             <>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <Avatar 
-                    size={36} 
+                  <Avatar
+                    size={36}
                     style={{ backgroundColor: '#965CDE' }}
                     className="flex-shrink-0"
                   >
@@ -273,8 +273,8 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
                     <Text_12_300_B3B3B3>admin@bud.studio</Text_12_300_B3B3B3>
                   </div>
                 </div>
-                <button 
-                  onClick={handleLogout} 
+                <button
+                  onClick={handleLogout}
                   className="text-[#757575] hover:text-white transition-colors p-2"
                 >
                   <Icon icon="material-symbols:logout" className="text-xl" />

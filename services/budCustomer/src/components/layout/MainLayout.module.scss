@@ -22,10 +22,10 @@ $border-color: #212225;
   display: flex;
   flex-direction: column;
   transition: width 0.3s ease;
-  
+
   &.collapsed {
     width: $sidebar-collapsed-width;
-    
+
     .logo img {
       width: 40px;
     }
@@ -35,7 +35,7 @@ $border-color: #212225;
 .logo {
   padding: 2rem;
   border-bottom: 1px solid $border-color;
-  
+
   img {
     width: 100px;
     height: auto;
@@ -57,16 +57,16 @@ $border-color: #212225;
   text-decoration: none;
   transition: all 0.3s ease;
   position: relative;
-  
+
   &:hover {
     color: $text-white;
     background: rgba($primary-color, 0.1);
   }
-  
+
   &.active {
     color: $primary-color;
     background: rgba($primary-color, 0.15);
-    
+
     &::before {
       content: "";
       position: absolute;
@@ -77,13 +77,13 @@ $border-color: #212225;
       background: $primary-color;
     }
   }
-  
+
   .icon {
     width: 20px;
     height: 20px;
     filter: brightness(0) invert(0.7);
   }
-  
+
   &.active .icon,
   &:hover .icon {
     filter: brightness(0) invert(1);
@@ -107,12 +107,12 @@ $border-color: #212225;
   color: $text-gray;
   cursor: pointer;
   transition: all 0.3s ease;
-  
+
   &:hover {
     border-color: $primary-color;
     color: $primary-color;
   }
-  
+
   img {
     width: 20px;
     height: 20px;
@@ -144,7 +144,7 @@ $border-color: #212225;
   font-size: 1.5rem;
   cursor: pointer;
   padding: 0.5rem;
-  
+
   &:hover {
     color: $primary-color;
   }
@@ -162,17 +162,17 @@ $border-color: #212225;
   border: none;
   cursor: pointer;
   padding: 0.5rem;
-  
+
   img {
     width: 24px;
     height: 24px;
     filter: brightness(0) invert(0.7);
   }
-  
+
   &:hover img {
     filter: brightness(0) invert(1);
   }
-  
+
   .badge {
     position: absolute;
     top: 0;
@@ -191,14 +191,14 @@ $border-color: #212225;
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  
+
   img {
     width: 32px;
     height: 32px;
     border-radius: 50%;
     border: 2px solid $border-color;
   }
-  
+
   span {
     font-size: 0.875rem;
     color: $text-gray;

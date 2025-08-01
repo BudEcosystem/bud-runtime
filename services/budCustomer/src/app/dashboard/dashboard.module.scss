@@ -11,14 +11,14 @@ $warning-color: #DE9C5C;
 .dashboard {
   .header {
     margin-bottom: 2rem;
-    
+
     h1 {
       font-size: 2rem;
       font-weight: 600;
       color: $text-white;
       margin-bottom: 0.5rem;
     }
-    
+
     p {
       color: $text-gray;
       font-size: 1rem;
@@ -42,13 +42,13 @@ $warning-color: #DE9C5C;
   align-items: center;
   gap: 1.5rem;
   transition: all 0.3s ease;
-  
+
   &:hover {
     transform: translateY(-2px);
     border-color: $primary-color;
     box-shadow: 0 4px 12px rgba($primary-color, 0.2);
   }
-  
+
   .statIcon {
     width: 48px;
     height: 48px;
@@ -57,35 +57,35 @@ $warning-color: #DE9C5C;
     display: flex;
     align-items: center;
     justify-content: center;
-    
+
     img {
       width: 24px;
       height: 24px;
       filter: brightness(0) invert(1);
     }
   }
-  
+
   .statContent {
     flex: 1;
-    
+
     h3 {
       font-size: 0.875rem;
       color: $text-gray;
       margin-bottom: 0.5rem;
       font-weight: 400;
     }
-    
+
     .statValue {
       font-size: 1.75rem;
       font-weight: 600;
       color: $text-white;
       margin: 0;
     }
-    
+
     .statChange {
       font-size: 0.75rem;
       color: $success-color;
-      
+
       &.negative {
         color: $warning-color;
       }
@@ -98,7 +98,7 @@ $warning-color: #DE9C5C;
   grid-template-columns: 1fr 1fr;
   gap: 2rem;
   margin-bottom: 2rem;
-  
+
   @media (max-width: 1024px) {
     grid-template-columns: 1fr;
   }
@@ -117,18 +117,18 @@ $warning-color: #DE9C5C;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 1.5rem;
-  
+
   h2 {
     font-size: 1.25rem;
     font-weight: 500;
     color: $text-white;
   }
-  
+
   .viewAll {
     color: $primary-color;
     text-decoration: none;
     font-size: 0.875rem;
-    
+
     &:hover {
       text-decoration: underline;
     }
@@ -149,42 +149,42 @@ $warning-color: #DE9C5C;
   background: rgba($bg-hover, 0.5);
   border-radius: 8px;
   transition: background 0.3s ease;
-  
+
   &:hover {
     background: $bg-hover;
   }
-  
+
   .activityInfo {
     h4 {
       font-size: 1rem;
       color: $text-white;
       margin-bottom: 0.25rem;
     }
-    
+
     p {
       font-size: 0.875rem;
       color: $text-gray;
     }
   }
-  
+
   .activityStats {
     display: flex;
     flex-direction: column;
     align-items: flex-end;
     gap: 0.25rem;
-    
+
     .tokens {
       font-size: 0.875rem;
       color: $text-gray;
     }
-    
+
     .cost {
       font-size: 1rem;
       color: $primary-color;
       font-weight: 500;
     }
   }
-  
+
   .time {
     font-size: 0.75rem;
     color: $text-light-gray;
@@ -203,26 +203,26 @@ $warning-color: #DE9C5C;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 0.5rem;
-    
+
     .modelName {
       font-size: 0.875rem;
       color: $text-white;
     }
-    
+
     .usagePercent {
       font-size: 0.875rem;
       color: $text-gray;
       font-weight: 500;
     }
   }
-  
+
   .usageBar {
     width: 100%;
     height: 8px;
     background: rgba($border-color, 0.5);
     border-radius: 4px;
     overflow: hidden;
-    
+
     .usageProgress {
       height: 100%;
       border-radius: 4px;
@@ -257,24 +257,24 @@ $warning-color: #DE9C5C;
   gap: 1rem;
   text-decoration: none;
   transition: all 0.3s ease;
-  
+
   &:hover {
     background: $bg-hover;
     border-color: $primary-color;
     transform: translateY(-2px);
-    
+
     img {
       transform: scale(1.1);
     }
   }
-  
+
   img {
     width: 32px;
     height: 32px;
     filter: brightness(0) invert(0.8);
     transition: transform 0.3s ease;
   }
-  
+
   span {
     font-size: 0.875rem;
     color: $text-gray;

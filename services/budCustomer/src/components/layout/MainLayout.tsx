@@ -70,13 +70,13 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           >
             ☰
           </button>
-          
+
           <div className={styles.headerRight}>
             <button className={styles.notificationBtn}>
               <img src="/icons/notification.png" alt="Notifications" />
               <span className={styles.badge}>3</span>
             </button>
-            
+
             <div className={styles.userInfo}>
               <img src="/icons/user.png" alt="User" />
               <span>demo@example.com</span>

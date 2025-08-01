@@ -58,7 +58,7 @@ export const useDrawer = create<{
     get().closeDrawer();
     const currentFlow = get().currentFlow;
     if (!currentFlow) return;
-    
+
     set(() => {
       return {
         // 1 item in the list
@@ -123,14 +123,14 @@ export const useDrawer = create<{
 
     const foundFlowSteps = drawerFlows[foundFlow].steps;
     const foundStep = foundFlowSteps.find((s) => s.id === step);
-    
+
     if (!foundStep) {
       errorToast("Step not found");
       return;
     }
-    
+
     const foundStepIndex = foundStep.step;
-    
+
     if (!foundStepIndex) {
       errorToast("Step index not found");
       return;
@@ -156,14 +156,14 @@ export const useDrawer = create<{
 
     const foundFlowSteps = drawerFlows[foundFlow].steps;
     const foundStep = foundFlowSteps.find((s) => s.id === step);
-    
+
     if (!foundStep) {
       errorToast("Step not found");
       return;
     }
-    
+
     const foundStepIndex = foundStep.step;
-    
+
     if (!foundStepIndex) {
       errorToast("Step index not found");
       return;

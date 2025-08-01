@@ -31,7 +31,7 @@ function TextAreaInput(props: BudInputProps) {
       hasFeedback
     >
       <div className="floating-textarea mt-2">
-        <FloatLabel 
+        <FloatLabel
           label={<InfoLabel text={props.label} content={props.info}
             required={props.required}
           />}

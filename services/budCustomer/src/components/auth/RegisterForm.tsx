@@ -32,7 +32,7 @@ const RegisterForm = ({ onSubmit }: RegisterFormProps) => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
   const [mounted, setMounted] = useState(false);
-  
+
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -46,13 +46,13 @@ const RegisterForm = ({ onSubmit }: RegisterFormProps) => {
       if (field === 'password' || field === 'confirmPassword') return value.length >= 8;
       return value.length > 0;
     }) && formData.password === formData.confirmPassword;
-    
+
     setSubmittable(isFormValid);
   }, [formData, emailRegex]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    
+
     // Clear errors when user starts typing
     if (value) {
       setErrors(prev => ({ ...prev, [field]: '' }));
@@ -62,7 +62,7 @@ const RegisterForm = ({ onSubmit }: RegisterFormProps) => {
 
   const validateField = (field: string, value: string) => {
     let error = '';
-    
+
     switch (field) {
       case 'email':
         if (!value) error = 'Please input your email!';
@@ -89,7 +89,7 @@ const RegisterForm = ({ onSubmit }: RegisterFormProps) => {
         if (!value) error = 'Please input your role!';
         break;
     }
-    
+
     setErrors(prev => ({ ...prev, [field]: error }));
     return !error;
   };
@@ -97,7 +97,7 @@ const RegisterForm = ({ onSubmit }: RegisterFormProps) => {
   const handleRegister = (e: { preventDefault: () => void }) => {
     e.preventDefault();
     if (!submittable) return;
-    
+
     const { confirmPassword, ...submitData } = formData;
     onSubmit(submitData);
   };
@@ -186,7 +186,7 @@ const RegisterForm = ({ onSubmit }: RegisterFormProps) => {
               <div className="text-red-500 text-xs mt-1">{errors.password}</div>
             )}
           </div>
-          
+
           <div className="flex-1">
             <div className="relative">
               <Text_12_300_EEEEEE className="absolute px-1 bg-black -top-1 left-2 inline-block tracking-[.035rem] z-10">
@@ -283,7 +283,7 @@ const RegisterForm = ({ onSubmit }: RegisterFormProps) => {
       <div className="mt-[2.2rem] flex justify-center">
         <Text_12_400_EEEEEE className="cursor-pointer">
           Already have an account?{" "}
-          <span 
+          <span
             className="text-[#965CDE] cursor-pointer"
             onClick={() => setActivePage(1)}
           >
@@ -291,7 +291,7 @@ const RegisterForm = ({ onSubmit }: RegisterFormProps) => {
           </span>
         </Text_12_400_EEEEEE>
       </div>
-      
+
       {authError && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}

@@ -12,18 +12,18 @@ $primary-color: #965CDE;
     background: $bg-card !important;
     border-color: $border-color !important;
     color: $text-white;
-    
+
     &::placeholder {
       color: $text-dark-gray;
     }
-    
+
     &:hover,
     &:focus {
       border-color: $primary-color !important;
       box-shadow: none !important;
     }
   }
-  
+
   :global(.ant-input-prefix) {
     margin-right: 0.75rem;
   }
@@ -41,13 +41,13 @@ $primary-color: #965CDE;
   font-size: 0.875rem;
   cursor: pointer;
   transition: all 0.3s ease;
-  
+
   &:hover {
     background: darken($bg-card, 2%);
     color: $text-white;
     border-color: lighten($border-color, 10%);
   }
-  
+
   &.active {
     background: rgba($primary-color, 0.2);
     border-color: $primary-color;
@@ -69,7 +69,7 @@ $primary-color: #965CDE;
   height: 36px;
   padding: 0 1rem;
   font-size: 0.875rem;
-  
+
   &:hover {
     background: darken($bg-card, 2%) !important;
     border-color: $primary-color !important;

@@ -7,10 +7,10 @@ interface TagsProps {
   className?: string;
 }
 
-const Tags: React.FC<TagsProps> = ({ 
-  tags = [], 
-  color = 'blue', 
-  className = '' 
+const Tags: React.FC<TagsProps> = ({
+  tags = [],
+  color = 'blue',
+  className = ''
 }) => {
   if (!tags || tags.length === 0) {
     return null;

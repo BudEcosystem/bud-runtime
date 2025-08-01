@@ -14,8 +14,8 @@ interface BudStepAlertProps {
   cancelText?: string;
 }
 
-const BudStepAlert: React.FC<BudStepAlertProps> = ({ 
-  children, 
+const BudStepAlert: React.FC<BudStepAlertProps> = ({
+  children,
   type = "info",
   className = "",
   title,
@@ -33,7 +33,7 @@ const BudStepAlert: React.FC<BudStepAlertProps> = ({
       {(cancelAction || confirmAction) && (
         <div className="flex gap-2 mt-4">
           {cancelAction && (
-            <button 
+            <button
               onClick={cancelAction}
               className="px-3 py-1 bg-gray-600 text-white rounded text-sm"
             >
@@ -41,7 +41,7 @@ const BudStepAlert: React.FC<BudStepAlertProps> = ({
             </button>
           )}
           {confirmAction && (
-            <button 
+            <button
               onClick={confirmAction}
               className="px-3 py-1 bg-red-600 text-white rounded text-sm"
             >

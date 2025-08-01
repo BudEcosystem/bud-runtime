@@ -44,20 +44,20 @@ export default function Register() {
     try {
       // Mock registration logic - replace with your actual registration
       console.log("Registration attempt:", formData);
-      
+
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
+
       // Mock success - replace with actual registration
       if (formData.email && formData.password) {
         // Store auth token or user data
         localStorage.setItem("auth_token", "mock_token");
         setAuthError('');
-        
+
         // Redirect to dashboard
         router.push("/dashboard");
       }
-      
+
       hideLoader();
     } catch (error: any) {
       console.error("Registration error:", error);
@@ -71,17 +71,17 @@ export default function Register() {
     try {
       // Mock authentication logic
       console.log("Login attempt:", payload);
-      
+
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
+
       // Mock success
       if (payload.email && payload.password) {
         localStorage.setItem("auth_token", "mock_token");
         setAuthError('');
         router.push("/dashboard");
       }
-      
+
       hideLoader();
     } catch (error: any) {
       console.error("Login error:", error);

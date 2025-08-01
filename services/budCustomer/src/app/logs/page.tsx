@@ -42,7 +42,7 @@ const defaultFilter = {
 
 function SortIcon({ sortOrder }: { sortOrder: string | null | undefined }) {
   if (!sortOrder) return null;
-  
+
   return sortOrder === 'descend' ? (
     <svg xmlns="http://www.w3.org/2000/svg" width="12" height="13" viewBox="0 0 12 13" fill="none">
       <path fillRule="evenodd" clipRule="evenodd" d="M6.00078 2.10938C6.27692 2.10938 6.50078 2.33324 6.50078 2.60938L6.50078 9.40223L8.84723 7.05578C9.04249 6.86052 9.35907 6.86052 9.55433 7.05578C9.7496 7.25104 9.7496 7.56763 9.55433 7.76289L6.35433 10.9629C6.15907 11.1582 5.84249 11.1582 5.64723 10.9629L2.44723 7.76289C2.25197 7.56763 2.25197 7.25104 2.44723 7.05578C2.64249 6.86052 2.95907 6.86052 3.15433 7.05578L5.50078 9.40223L5.50078 2.60938C5.50078 2.33324 5.72464 2.10938 6.00078 2.10938Z" fill="#B3B3B3" />
@@ -195,12 +195,12 @@ export default function APIKeysPage() {
 
   const filteredKeys = apiKeys.filter(key => {
     const statusMatch = !filter.status || key.status === filter.status;
-    const searchMatch = searchQuery === "" || 
+    const searchMatch = searchQuery === "" ||
       key.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       key.key.toLowerCase().includes(searchQuery.toLowerCase()) ||
       key.user_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
       key.description.toLowerCase().includes(searchQuery.toLowerCase());
-    
+
     let dateMatch = true;
     if (filter.dateRange) {
       const keyDate = dayjs(key.created_at);
@@ -230,7 +230,7 @@ export default function APIKeysPage() {
       render: (key: string) => (
         <div className="flex items-center gap-2">
           <Text_12_400_EEEEEE className='font-mono text-xs'>{key}</Text_12_400_EEEEEE>
-          <button 
+          <button
             className="text-[#965CDE] hover:text-[#7B4BC3] text-xs"
             onClick={(e) => {
               e.stopPropagation();
@@ -248,7 +248,7 @@ export default function APIKeysPage() {
       key: 'status',
       width: 100,
       render: (status: string) => (
-        <Tag 
+        <Tag
           color={getStatusColor(status)}
           className="border-0 px-[0.5rem] py-[0.125rem] text-[0.75rem]"
         >
@@ -263,19 +263,19 @@ export default function APIKeysPage() {
       key: 'usage',
       width: 150,
       render: (_: any, record: APIKey) => {
-        const percentage = record.usage_limit 
+        const percentage = record.usage_limit
           ? Math.round((record.usage_count / record.usage_limit) * 100)
           : 0;
         return (
           <div className="flex flex-col gap-1">
             <Text_12_400_EEEEEE className='whitespace-nowrap'>
-              {record.usage_count.toLocaleString()} 
+              {record.usage_count.toLocaleString()}
               {record.usage_limit ? ` / ${record.usage_limit.toLocaleString()}` : ' (Unlimited)'}
             </Text_12_400_EEEEEE>
             {record.usage_limit && (
               <div className="w-full bg-[#1F1F1F] rounded-full h-1.5">
-                <div 
-                  className="bg-[#965CDE] h-1.5 rounded-full" 
+                <div
+                  className="bg-[#965CDE] h-1.5 rounded-full"
                   style={{ width: `${Math.min(percentage, 100)}%` }}
                 />
               </div>
@@ -503,7 +503,7 @@ export default function APIKeysPage() {
                       </div>
                     </div>
                   }
-                  trigger={['click']} 
+                  trigger={['click']}
                 >
                   <div
                     className="group h-9 px-3 flex items-center cursor-pointer rounded-md hover:bg-[#1F1F1F] transition-colors"

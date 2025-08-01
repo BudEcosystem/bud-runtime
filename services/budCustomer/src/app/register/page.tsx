@@ -11,10 +11,10 @@ export default function Register() {
     try {
       // Mock registration logic - replace with your actual registration
       console.log("Registration attempt:", data);
-      
+
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
+
       // Redirect to login after successful registration
       router.push("/login");
     } catch (error) {

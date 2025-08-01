@@ -185,7 +185,7 @@ $transition-speed: 0.3s;
 
       &.error {
         border-color: $error-color;
-        
+
         &:focus {
           border-color: $error-color;
           box-shadow: 0 0 0 2px rgba($error-color, 0.2);
@@ -317,11 +317,11 @@ $transition-speed: 0.3s;
   text-align: center;
   font-size: 0.75rem;
   color: $text-gray;
-  
+
   a {
     color: $primary-color;
     text-decoration: none;
-    
+
     &:hover {
       text-decoration: underline;
     }
@@ -363,11 +363,11 @@ $transition-speed: 0.3s;
   .loginWrapper {
     flex-direction: column;
   }
-  
+
   .leftPanel {
     display: none;
   }
-  
+
   .rightPanel {
     width: 100%;
 

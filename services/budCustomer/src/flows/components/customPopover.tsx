@@ -8,11 +8,11 @@ interface CustomPopoverProps {
   customClassName?: string;
 }
 
-export default function CustomPopover({ 
-  title, 
-  children, 
+export default function CustomPopover({
+  title,
+  children,
   contentClassNames,
-  customClassName 
+  customClassName
 }: CustomPopoverProps) {
   return (
     <Popover

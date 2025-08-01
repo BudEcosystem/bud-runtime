@@ -1,5 +1,5 @@
 1. Authentication & Authorization
-Allow users to register and log in with their credentials, including additional info like company, purpose, and role. 
+Allow users to register and log in with their credentials, including additional info like company, purpose, and role.
 🔧 Backend
 Database:
 
@@ -232,7 +232,7 @@ GET /invoices: list/download invoices(Phase II)
 Backend:
 
 1. Admin can set input cost / 1M tokens, output cost / 1 M tokens
-2. Admin can set an hourly cost for different 
+2. Admin can set an hourly cost for different
 3. Admin can see token cost automatically for different cloud model providers
 4. Admin can edit the GA cost
 

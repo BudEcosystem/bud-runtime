@@ -17,7 +17,7 @@ export const useUsers = create<{
   loading: false,
   getUsers: async (params?: { page?: number; limit?: number; search?: boolean | string }) => {
     set({ loading: true });
-    
+
     try {
       // Mock implementation - replace with actual API call
       const mockUsers: User[] = [
@@ -39,8 +39,8 @@ export const useUsers = create<{
 
       // Filter by search if provided
       const searchTerm = typeof params?.search === 'string' ? params.search : '';
-      const filteredUsers = searchTerm 
-        ? mockUsers.filter(user => 
+      const filteredUsers = searchTerm
+        ? mockUsers.filter(user =>
             user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             user.email.toLowerCase().includes(searchTerm.toLowerCase())
           )

@@ -102,71 +102,71 @@ export const useProjects = create<{
   setSelectedProject: (project: Project) => {
     set({ selectedProject: project });
   },
-  
+
   getProjects: async (page: any, limit: any, search?: string) => {
     // Stub implementation
     return Promise.resolve({ projects: [], total_record: 0, total_pages: 0 });
   },
-  
+
   getProjectTags: async () => {
     // Stub implementation
   },
-  
+
   getGlobalProjects: async (page: any, limit: any, search?: string) => {
     // Stub implementation
   },
-  
+
   createProject: async (data: any): Promise<any> => {
     // Stub implementation
     return Promise.resolve({});
   },
-  
+
   deleteProject: async (projectId: string, router: any): Promise<any> => {
     // Stub implementation
     return Promise.resolve({});
   },
-  
+
   updateProject: async (projectId: string, data: any) => {
     // Stub implementation
     return Promise.resolve({});
   },
-  
+
   inviteMembers: async (projectId: string, data: any, toast: boolean = true) => {
     // Stub implementation
     return Promise.resolve({});
   },
-  
+
   getGlobalProject: async (projectId: string) => {
     // Stub implementation
   },
-  
+
   getProject: async (projectId) => {
     // Stub implementation
   },
-  
+
   setSelectedProjectId: (projectId: string) => {
     set({ selectedProjectId: projectId });
   },
-  
+
   setProjectValues: (values: any) => {
     set({ projectValues: values });
   },
-  
+
   removeMembers: async (projectId: string, userIds: string[]) => {
     // Stub implementation
     return Promise.resolve({});
   },
-  
+
   getMembers: async (projectId: string) => {
     // Stub implementation
     return Promise.resolve({});
   },
-  
+
   updatePermissions: async (projectId: string, userId: string, permissions: Permission[]) => {
     // Stub implementation
     return Promise.resolve({});
   },
-  
+
   getClusters: async (projectId: string) => {
     // Stub implementation
     return Promise.resolve({});

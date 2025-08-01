@@ -67,6 +67,8 @@ repos:
         additional_dependencies:
           - "pydantic>=1.10.4"
           - ujson
+          - types-requests
+          - types-PyYAML
           - types-ujson
           - fastapi
           - sqlalchemy

@@ -13,12 +13,12 @@ $primary-color: #965CDE;
       background: $bg-card !important;
       border-color: $border-color !important;
       color: $text-white !important;
-      
+
       &:hover {
         border-color: $primary-color !important;
       }
     }
-    
+
     .ant-select-arrow {
       color: $text-dark-gray;
     }
@@ -31,32 +31,32 @@ $primary-color: #965CDE;
       background: transparent;
       color: $text-white;
     }
-    
+
     .ant-table-thead > tr > th {
       background: rgba(#252525, 0.5);
       border-bottom: 1px solid $border-color;
       color: $text-dark-gray;
       font-weight: 400;
       padding: 1rem 1.5rem;
-      
+
       &::before {
         display: none;
       }
     }
-    
+
     .ant-table-tbody > tr > td {
       border-bottom: 1px solid rgba($border-color, 0.5);
       padding: 1rem 1.5rem;
     }
-    
+
     .ant-table-tbody > tr:last-child > td {
       border-bottom: none;
     }
-    
+
     .ant-table-tbody > tr:hover > td {
       background: rgba(#252525, 0.3);
     }
-    
+
     .ant-empty-normal {
       color: $text-gray;
     }
@@ -69,50 +69,50 @@ $primary-color: #965CDE;
       background: $bg-card;
       border: 1px solid $border-color;
     }
-    
+
     .ant-modal-header {
       background: $bg-card;
       border-bottom: 1px solid $border-color;
     }
-    
+
     .ant-modal-title {
       color: $text-white;
     }
-    
+
     .ant-modal-close {
       color: $text-gray;
-      
+
       &:hover {
         color: $text-white;
       }
     }
-    
+
     .ant-modal-footer {
       border-top: 1px solid $border-color;
     }
-    
+
     .ant-input {
       background: #1F1F1F;
       border-color: #2F2F2F;
       color: $text-white;
-      
+
       &::placeholder {
         color: $text-dark-gray;
       }
-      
+
       &:hover,
       &:focus {
         border-color: $primary-color;
         box-shadow: none;
       }
     }
-    
+
     .ant-btn {
       &:not(.ant-btn-primary) {
         background: transparent;
         border-color: $border-color;
         color: $text-gray;
-        
+
         &:hover {
           background: rgba(#252525, 0.5);
           border-color: $primary-color;
@@ -120,13 +120,13 @@ $primary-color: #965CDE;
         }
       }
     }
-    
+
     .ant-select {
       .ant-select-selector {
         background: #1F1F1F;
         border-color: #2F2F2F;
         color: $text-white;
-        
+
         &:hover,
         &:focus {
           border-color: $primary-color;

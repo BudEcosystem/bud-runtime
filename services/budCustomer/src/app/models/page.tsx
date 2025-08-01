@@ -72,7 +72,7 @@ const mockModels: Model[] = [
     updated_at: "2024-01-20"
   },
   {
-    id: "2", 
+    id: "2",
     name: "Claude-3.5-Sonnet",
     author: "Anthropic",
     description: "Claude 3.5 Sonnet delivers better-than-Opus capabilities, faster-than-Sonnet speeds.",
@@ -127,7 +127,7 @@ const mockModels: Model[] = [
   {
     id: "4",
     name: "DALL-E 3",
-    author: "OpenAI", 
+    author: "OpenAI",
     description: "Most advanced image generation model with exceptional quality and prompt adherence.",
     provider_type: "cloud_model",
     model_size: 50,
@@ -158,7 +158,7 @@ const mockModels: Model[] = [
     description: "State-of-the-art speech recognition model supporting 99+ languages.",
     provider_type: "model",
     model_size: 1.5,
-    icon: "/icons/openAi.png", 
+    icon: "/icons/openAi.png",
     status: "Available",
     modality: {
       text: { input: false, output: true },
@@ -286,7 +286,7 @@ export default function ModelsPage() {
                       <Icon icon="ph:star" className="text-xs" />
                       <Text_12_400_B3B3B3 className="text-[#965CDE]">0</Text_12_400_B3B3B3>
                     </div>
-                    
+
                     <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-[#1F1F1F] text-[#B3B3B3]">
                       <Icon icon="ph:hard-drives" className="text-xs" />
                       <Text_12_400_B3B3B3>{model.provider_type === "cloud_model" ? "Cloud" : "Local"}</Text_12_400_B3B3B3>

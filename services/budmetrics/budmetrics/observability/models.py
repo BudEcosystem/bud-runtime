@@ -1170,7 +1170,7 @@ class QueryCache:
         """Generate cache key from query and params."""
         key_data = {"query": query, "params": params or {}}
         key_str = orjson.dumps(dict(sorted(key_data.items(), key=lambda x: x[0])))
-        return hashlib.md5(key_str).hexdigest()
+        return hashlib.md5(key_str, usedforsecurity=False).hexdigest()
 
     async def get(self, query: str, params: Optional[dict[str, Any]] = None) -> Optional[Any]:
         """Get cached result if available and not expired."""

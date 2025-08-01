@@ -20,7 +20,7 @@ class AzureAksManager(TerraformClusterManager):
 
     def _copy_terraform_files(self) -> None:
         """Create Terraform files for Azure AKS cluster."""
-        prefix = f"{hashlib.md5(self.config.cluster_name.encode()).hexdigest()}"
+        prefix = f"{hashlib.md5(self.config.cluster_name.encode(), usedforsecurity=False).hexdigest()}"
         self.temp_dir = tempfile.mkdtemp(prefix=prefix)
         self.unique_state_name = f"{prefix}-aks-{uuid4()}"  # TODO : change this to more identifiable one
 
