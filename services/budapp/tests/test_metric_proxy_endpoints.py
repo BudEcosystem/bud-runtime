@@ -3,10 +3,12 @@
 import pytest
 from datetime import datetime, timedelta
 import uuid
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import Mock, patch, AsyncMock, MagicMock
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 import aiohttp
+
+from budapp.commons.exceptions import ClientException
 
 from budapp.metric_ops.schemas import (
     InferenceListRequest,
@@ -121,44 +123,45 @@ class TestMetricProxyEndpoints:
             Mock(all=Mock(return_value=[mock_user.id])),  # Project membership check
         ]
 
-        # Create a mock for aiohttp.ClientSession that properly implements async context manager
-        from unittest.mock import create_autospec
+        # Mock project membership check to return the user ID in list
+        with patch('budapp.project_ops.crud.ProjectDataManager.get_active_user_ids_in_project') as mock_membership:
+            mock_membership.return_value = [mock_user.id]  # Return actual list
 
-        # Create mock response
-        mock_response = Mock()
-        mock_response.status = 200
-        mock_response.json = AsyncMock(return_value=sample_inference_response)
+            # Create a proper async context manager mock for aiohttp.ClientSession
+            mock_response = Mock()
+            mock_response.status = 200
+            mock_response.json = AsyncMock(return_value=sample_inference_response)
 
-        # Create mock session with post method returning a context manager
-        mock_session = Mock()
-        mock_post_context = Mock()
-        mock_post_context.__aenter__ = AsyncMock(return_value=mock_response)
-        mock_post_context.__aexit__ = AsyncMock(return_value=None)
-        mock_session.post = Mock(return_value=mock_post_context)
+            mock_session = Mock()
+            # Create async context manager for the POST request
+            mock_post_context = AsyncMock()
+            mock_post_context.__aenter__ = AsyncMock(return_value=mock_response)
+            mock_post_context.__aexit__ = AsyncMock(return_value=None)
+            mock_session.post.return_value = mock_post_context
 
-        # Create mock session context manager
-        mock_session_context = Mock()
-        mock_session_context.__aenter__ = AsyncMock(return_value=mock_session)
-        mock_session_context.__aexit__ = AsyncMock(return_value=None)
+            # Create async context manager for the session itself
+            mock_session_context = AsyncMock()
+            mock_session_context.__aenter__ = AsyncMock(return_value=mock_session)
+            mock_session_context.__aexit__ = AsyncMock(return_value=None)
 
-        with patch('aiohttp.ClientSession', return_value=mock_session_context):
+            with patch('aiohttp.ClientSession', return_value=mock_session_context):
 
-            service = BudMetricService(mock_db_session)
-            request = InferenceListRequest(
-                project_id=uuid.UUID(mock_project.id),
-                from_date=datetime.utcnow() - timedelta(days=7),
-                limit=10,
-                offset=0
-            )
+                service = BudMetricService(mock_db_session)
+                request = InferenceListRequest(
+                    project_id=uuid.UUID(mock_project.id),
+                    from_date=datetime.utcnow() - timedelta(days=7),
+                    limit=10,
+                    offset=0
+                )
 
-            response = await service.list_inferences(request, mock_user)
+                response = await service.list_inferences(request, mock_user)
 
-            assert response is not None, "Response should not be None"
-            assert response.total_count == 1
-            assert len(response.items) == 1
-            assert response.items[0].project_name == "Test Project"
-            assert response.items[0].endpoint_name == "Test Endpoint"
-            assert response.items[0].model_display_name == "gpt-4"
+                assert response is not None, "Response should not be None"
+                assert response.total_count == 1
+                assert len(response.items) == 1
+                assert response.items[0].project_name == "Test Project"
+                assert response.items[0].endpoint_name == "Test Endpoint"
+                assert response.items[0].model_display_name == "gpt-4"
 
     @pytest.mark.asyncio
     async def test_list_inferences_access_denied(self, mock_db_session, mock_user):
@@ -175,11 +178,11 @@ class TestMetricProxyEndpoints:
             from_date=datetime.utcnow() - timedelta(days=7)
         )
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(ClientException) as exc_info:
             await service.list_inferences(request, mock_user)
 
         assert exc_info.value.status_code == 404
-        assert "Project not found" in str(exc_info.value.detail)
+        assert "Project not found" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_get_inference_details_success(self, mock_db_session, mock_user, mock_project):
@@ -187,9 +190,10 @@ class TestMetricProxyEndpoints:
         from budapp.metric_ops.services import BudMetricService
 
         inference_id = str(uuid.uuid4())
+        current_time = datetime.utcnow()
         sample_detail_response = {
             "inference_id": inference_id,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": current_time.isoformat(),
             "project_id": mock_project.id,
             "endpoint_id": str(uuid.uuid4()),
             "model_id": str(uuid.uuid4()),
@@ -207,27 +211,44 @@ class TestMetricProxyEndpoints:
             ],
             "system_prompt": "You are helpful",
             "output": "Hi there!",
-            "finish_reason": "stop"
+            "finish_reason": "stop",
+            "request_arrival_time": current_time.isoformat(),
+            "request_forward_time": current_time.isoformat(),
+            "feedback_count": 0
         }
 
-        # Mock database queries
+        # Mock database queries and project membership
         mock_db_session.execute = Mock()
         mock_db_session.execute.return_value.scalar_one_or_none.return_value = mock_project
 
-        # Mock budmetrics client
-        with patch('budapp.metric_ops.services.aiohttp.ClientSession') as mock_session:
+        with patch('budapp.project_ops.crud.ProjectDataManager.get_active_user_ids_in_project') as mock_membership:
+            mock_membership.return_value = [mock_user.id]
+
+            # Create proper async context manager mock for aiohttp.ClientSession
             mock_response = Mock()
             mock_response.status = 200
             mock_response.json = AsyncMock(return_value=sample_detail_response)
-            mock_session.return_value.__aenter__.return_value.get.return_value.__aenter__.return_value = mock_response
 
-            service = BudMetricService(mock_db_session)
-            response = await service.get_inference_details(inference_id, mock_user)
+            mock_session = Mock()
+            # Create async context manager for the GET request
+            mock_get_context = AsyncMock()
+            mock_get_context.__aenter__ = AsyncMock(return_value=mock_response)
+            mock_get_context.__aexit__ = AsyncMock(return_value=None)
+            mock_session.get.return_value = mock_get_context
 
-            assert response.inference_id == inference_id
-            assert response.model_name == "gpt-4"
-            assert len(response.messages) == 2
-            assert response.messages[0]["role"] == "user"
+            # Create async context manager for the session itself
+            mock_session_context = AsyncMock()
+            mock_session_context.__aenter__ = AsyncMock(return_value=mock_session)
+            mock_session_context.__aexit__ = AsyncMock(return_value=None)
+
+            with patch('aiohttp.ClientSession', return_value=mock_session_context):
+                service = BudMetricService(mock_db_session)
+                response = await service.get_inference_details(inference_id, mock_user)
+
+                assert str(response.inference_id) == inference_id
+                assert response.model_name == "gpt-4"
+                assert len(response.messages) == 2
+                assert response.messages[0]["role"] == "user"
 
     @pytest.mark.asyncio
     async def test_get_inference_details_not_found(self, mock_db_session, mock_user):
@@ -235,15 +256,26 @@ class TestMetricProxyEndpoints:
         from budapp.metric_ops.services import BudMetricService
 
         # Mock budmetrics client returning 404
-        with patch('budapp.metric_ops.services.aiohttp.ClientSession') as mock_session:
-            mock_response = Mock()
-            mock_response.status_code = 404
-            mock_response.text = "Inference not found"
-            mock_session.return_value.__aenter__.return_value.get.return_value.__aenter__.return_value = mock_response
+        mock_response = Mock()
+        mock_response.status = 404
+        mock_response.json = AsyncMock(return_value={"error": "Inference not found"})
 
+        # Create proper async context manager mock for aiohttp.ClientSession
+        mock_session = Mock()
+        mock_get_context = AsyncMock()
+        mock_get_context.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_get_context.__aexit__ = AsyncMock(return_value=None)
+        mock_session.get.return_value = mock_get_context
+
+        # Create async context manager for the session itself
+        mock_session_context = AsyncMock()
+        mock_session_context.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session_context.__aexit__ = AsyncMock(return_value=None)
+
+        with patch('aiohttp.ClientSession', return_value=mock_session_context):
             service = BudMetricService(mock_db_session)
 
-            with pytest.raises(HTTPException) as exc_info:
+            with pytest.raises(ClientException) as exc_info:
                 await service.get_inference_details(str(uuid.uuid4()), mock_user)
 
             assert exc_info.value.status_code == 404
@@ -254,44 +286,57 @@ class TestMetricProxyEndpoints:
         from budapp.metric_ops.services import BudMetricService
 
         inference_id = str(uuid.uuid4())
-        sample_feedback_response = [
-            {
-                "feedback_id": str(uuid.uuid4()),
-                "inference_id": inference_id,
-                "created_at": datetime.utcnow().isoformat(),
-                "feedback_type": "boolean",
-                "metric_name": "helpful",
-                "value": 1
-            },
-            {
-                "feedback_id": str(uuid.uuid4()),
-                "inference_id": inference_id,
-                "created_at": datetime.utcnow().isoformat(),
-                "feedback_type": "float",
-                "metric_name": "quality_rating",
-                "value": 4.5
-            }
-        ]
+        sample_feedback_response = {
+            "inference_id": inference_id,
+            "feedback_items": [
+                {
+                    "feedback_id": str(uuid.uuid4()),
+                    "feedback_type": "boolean",
+                    "metric_name": "helpful",
+                    "value": 1,
+                    "created_at": datetime.utcnow().isoformat()
+                },
+                {
+                    "feedback_id": str(uuid.uuid4()),
+                    "feedback_type": "float",
+                    "metric_name": "quality_rating",
+                    "value": 4.5,
+                    "created_at": datetime.utcnow().isoformat()
+                }
+            ],
+            "total_count": 2
+        }
 
         # Mock getting inference details first (for access check)
         with patch.object(BudMetricService, 'get_inference_details') as mock_get_details:
             mock_get_details.return_value = Mock(project_id=mock_project.id)
 
-            # Mock budmetrics client
-            with patch('budapp.metric_ops.services.aiohttp.ClientSession') as mock_session:
-                mock_response = Mock()
-                mock_response.status = 200
-                mock_response.json = AsyncMock(return_value=sample_feedback_response)
-                mock_session.return_value.__aenter__.return_value.get.return_value.__aenter__.return_value = mock_response
+            # Create proper async context manager mock for aiohttp.ClientSession
+            mock_response = Mock()
+            mock_response.status = 200
+            mock_response.json = AsyncMock(return_value=sample_feedback_response)
 
+            mock_session = Mock()
+            # Create async context manager for the GET request
+            mock_get_context = AsyncMock()
+            mock_get_context.__aenter__ = AsyncMock(return_value=mock_response)
+            mock_get_context.__aexit__ = AsyncMock(return_value=None)
+            mock_session.get.return_value = mock_get_context
+
+            # Create async context manager for the session itself
+            mock_session_context = AsyncMock()
+            mock_session_context.__aenter__ = AsyncMock(return_value=mock_session)
+            mock_session_context.__aexit__ = AsyncMock(return_value=None)
+
+            with patch('aiohttp.ClientSession', return_value=mock_session_context):
                 service = BudMetricService(mock_db_session)
                 response = await service.get_inference_feedback(inference_id, mock_user)
 
-                assert len(response) == 2
-                assert response[0].feedback_type == "boolean"
-                assert response[0].metric_name == "helpful"
-                assert response[1].feedback_type == "float"
-                assert response[1].value == 4.5
+                assert len(response.feedback_items) == 2
+                assert response.feedback_items[0].feedback_type == "boolean"
+                assert response.feedback_items[0].metric_name == "helpful"
+                assert response.feedback_items[1].feedback_type == "float"
+                assert response.feedback_items[1].value == 4.5
 
     @pytest.mark.asyncio
     async def test_enrichment_with_missing_entities(self, mock_db_session, mock_user, mock_project):
@@ -303,13 +348,14 @@ class TestMetricProxyEndpoints:
                 "inference_id": str(uuid.uuid4()),
                 "timestamp": datetime.utcnow().isoformat(),
                 "project_id": mock_project.id,
-                "endpoint_id": "non-existent-endpoint",
-                "model_id": "non-existent-model",
+                "endpoint_id": str(uuid.uuid4()),  # Use valid UUID format
+                "model_id": str(uuid.uuid4()),     # Use valid UUID format
                 "model_name": "unknown-model",
                 "model_provider": "unknown",
                 "is_success": True,
                 "input_tokens": 100,
                 "output_tokens": 200,
+                "total_tokens": 300,
                 "response_time_ms": 500,
                 "cost": 0.003,
                 "cached": False,
@@ -318,7 +364,8 @@ class TestMetricProxyEndpoints:
             }],
             "total_count": 1,
             "offset": 0,
-            "limit": 10
+            "limit": 10,
+            "has_more": False
         }
 
         # Mock database queries
@@ -330,22 +377,37 @@ class TestMetricProxyEndpoints:
             Mock(scalars=Mock(return_value=Mock(all=Mock(return_value=[])))),  # No models found
         ]
 
-        # Mock budmetrics client
-        with patch('budapp.metric_ops.services.aiohttp.ClientSession') as mock_session:
+        # Mock project membership check to return the user ID in list
+        with patch('budapp.project_ops.crud.ProjectDataManager.get_active_user_ids_in_project') as mock_membership:
+            mock_membership.return_value = [mock_user.id]
+
+            # Create proper async context manager mock for aiohttp.ClientSession
             mock_response = Mock()
             mock_response.status = 200
             mock_response.json = AsyncMock(return_value=sample_response)
-            mock_session.return_value.__aenter__.return_value.post.return_value.__aenter__.return_value = mock_response
 
-            service = BudMetricService(mock_db_session)
-            request = InferenceListRequest(
-                project_id=uuid.UUID(mock_project.id),
-                from_date=datetime.utcnow() - timedelta(days=7)
-            )
-            response = await service.list_inferences(request, mock_user)
+            mock_session = Mock()
+            # Create async context manager for the POST request
+            mock_post_context = AsyncMock()
+            mock_post_context.__aenter__ = AsyncMock(return_value=mock_response)
+            mock_post_context.__aexit__ = AsyncMock(return_value=None)
+            mock_session.post.return_value = mock_post_context
 
-            # Should still return data, but without enriched names
-            assert response.total_count == 1
-            assert response.items[0].project_name == "Test Project"
-            assert response.items[0].endpoint_name is None
-            assert response.items[0].model_display_name is None
+            # Create async context manager for the session itself
+            mock_session_context = AsyncMock()
+            mock_session_context.__aenter__ = AsyncMock(return_value=mock_session)
+            mock_session_context.__aexit__ = AsyncMock(return_value=None)
+
+            with patch('aiohttp.ClientSession', return_value=mock_session_context):
+                service = BudMetricService(mock_db_session)
+                request = InferenceListRequest(
+                    project_id=uuid.UUID(mock_project.id),
+                    from_date=datetime.utcnow() - timedelta(days=7)
+                )
+                response = await service.list_inferences(request, mock_user)
+
+                # Should still return data, but without enriched names
+                assert response.total_count == 1
+                assert response.items[0].project_name == "Test Project"
+                assert response.items[0].endpoint_name is None
+                assert response.items[0].model_display_name is None
