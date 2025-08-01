@@ -1,9 +1,9 @@
-name: "BudApp: Build and Push Nightly Docker Image"
+name: "BudMetrics: Build and Push Nightly Docker Image"
 
 on:
   push:
     paths:
-      - 'services/budapp/**'
+      - 'services/budmetrics/**'
     branches:
       - master
 
@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./services/budapp
+        working-directory: ./services/budcluster
 
     steps:
       - name: Checkout code
@@ -27,20 +27,10 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Save private key to file
-        run: |
-          echo "${{ secrets.PRIVATE_KEY }}" > private_key.pem
-          chmod 600 private_key.pem
-
-      - name: Save public key to file
-        run: |
-          echo "${{ secrets.PUBLIC_KEY }}" > public_key.pem
-          chmod 600 public_key.pem
-
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
           file: ./deploy/Dockerfile
-          tags: budstudio/budapp:nightly
+          tags: budstudio/budmetrics:nightly
