@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { Table } from "antd";
-import { useCloudProviders } from "@/hooks/useCloudProviders";
 import {
   Text_14_400_EEEEEE,
   Text_14_600_EEEEEE,
@@ -96,7 +95,6 @@ const CloudProvidersListTable = () => {
         rowKey="id"
         bordered={false}
         virtual
-        footer={null}
       />
     </div>
   );

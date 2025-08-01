@@ -210,11 +210,11 @@ const SelectInput: React.FC<SelectInputProps> = ({
   const [isSearchVisible, setIsSearchVisible] = useState<boolean>(true);
   const [filteredItems, setFilteredItems] = useState(selectItems);
 
-  const handleSearch = (event) => {
+  const handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
     const value = event?.target?.value?.toLowerCase();
     setSearchTerm(value);
     setFilteredItems(
-      selectItems.filter((item) =>
+      selectItems.filter((item: any) =>
         (renderItem ? renderItem(item) : item.label || item)?.toLowerCase()?.includes(value)
       )
     );
@@ -300,7 +300,7 @@ const SelectInput: React.FC<SelectInputProps> = ({
             )}
 
             {filteredItems &&
-              filteredItems.map((item, index) => (
+              filteredItems.map((item: any, index: number) => (
                 <Select.Item
                   className="h-[1.75rem] py-[.5rem] px-[.8rem] w-full hover:bg-[#18191B] rounded-md cursor-pointer border-none shadow-none outline-0 leading-[100%]"
                   key={index}
@@ -335,11 +335,11 @@ const SelectCustomInput: React.FC<SelectInputProps> = ({
   const [isSearchVisible, setIsSearchVisible] = useState<boolean>(true);
   const [filteredItems, setFilteredItems] = useState(selectItems);
 
-  const handleSearch = (event) => {
+  const handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
     const value = event?.target?.value?.toLowerCase();
     setSearchTerm(value);
     setFilteredItems(
-      selectItems.filter((item) =>
+      selectItems.filter((item: any) =>
         (renderItem ? renderItem(item) : item.label || item)
           ?.toLowerCase()
           ?.includes(value)
@@ -426,7 +426,7 @@ const SelectCustomInput: React.FC<SelectInputProps> = ({
               />
             )}
             {filteredItems &&
-              filteredItems.map((item, index) => (
+              filteredItems.map((item: any, index: number) => (
                 <Select.Item
                   className="h-[1.75rem] py-[.5rem] px-[.8rem] w-full hover:bg-[#18191B] rounded-md cursor-pointer border-none shadow-none outline-0 leading-[100%]"
                   key={index}

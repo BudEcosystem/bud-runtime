@@ -1,4 +1,4 @@
-import { StylesConfig } from "react-select";
+import { StylesConfig } from "../../../../../node_modules/react-select/dist";
 import chroma from "chroma-js";
 
 export interface ColourOption {
@@ -180,7 +180,7 @@ export function getChromeColor(color: string) {
 export function getChromeColorHex(color: string, alpha?: number): string {
   try {
     // Return a hex code with alpha (e.g. "#RRGGBBAA")
-    return chroma(color).alpha(alpha || 0.1).css('hex8');
+    return chroma(color).alpha(alpha || 0.1).hex();
   } catch (error) {
     return "transparent";
   }

@@ -12,13 +12,13 @@ import { useDrawer } from "@/hooks/useDrawer";
 import { Credentials, useProprietaryCredentials } from "@/stores/useProprietaryCredentials";
 import { useCloudProviders } from "@/hooks/useCloudProviders";
 import { Plus } from 'lucide-react';
-import { useLoader } from "@/context/appContext";
+import { useLoader } from "@/context/authContext";
 
 const defaultFilter = {
-  name: undefined,
+  name: undefined as string | undefined,
 }
 
-function SortIcon({ sortOrder }: { sortOrder: string }) {
+function SortIcon({ sortOrder }: { sortOrder: string | null }) {
   return sortOrder ? sortOrder === 'descend' ?
     <svg xmlns="http://www.w3.org/2000/svg" width="12" height="13" viewBox="0 0 12 13" fill="none">
       <path fillRule="evenodd" clipRule="evenodd" d="M6.00078 2.10938C6.27692 2.10938 6.50078 2.33324 6.50078 2.60938L6.50078 9.40223L8.84723 7.05578C9.04249 6.86052 9.35907 6.86052 9.55433 7.05578C9.7496 7.25104 9.7496 7.56763 9.55433 7.76289L6.35433 10.9629C6.15907 11.1582 5.84249 11.1582 5.64723 10.9629L2.44723 7.76289C2.25197 7.56763 2.25197 7.25104 2.44723 7.05578C2.64249 6.86052 2.95907 6.86052 3.15433 7.05578L5.50078 9.40223L5.50078 2.60938C5.50078 2.33324 5.72464 2.10938 6.00078 2.10938Z" fill="#B3B3B3" />
@@ -30,7 +30,7 @@ function SortIcon({ sortOrder }: { sortOrder: string }) {
 }
 
 
-const capitalize = (str) => str?.charAt(0).toUpperCase() + str?.slice(1).toLowerCase();
+const capitalize = (str: string) => str?.charAt(0).toUpperCase() + str?.slice(1).toLowerCase();
 
 
 type ColumnsType<T extends object> = TableProps<T>['columns'];
@@ -59,7 +59,7 @@ const CredentialsListTable = () => {
   }
 
   useEffect(() => {
-    getProviders(currentPage, pageSize);
+    getProviders();
   }, [getProviders]);
   useEffect(() => {
     console.log("searchValue", searchValue);
@@ -132,7 +132,7 @@ const CredentialsListTable = () => {
     }
 
   }
-  const handlePageChange = (currentPage, pageSize) => {
+  const handlePageChange = (currentPage: number, pageSize: number) => {
     setCurrentPage(currentPage);
     setPageSize(pageSize);
   };
@@ -140,12 +140,11 @@ const CredentialsListTable = () => {
   return (
     <div className='pb-[60px] pt-[.4rem] relative CommonCustomPagination'>
       <Table<Credentials>
-        onChange={(pagination, filters, sorter: {
-          order: 'ascend' | 'descend';
-          field: string;
-        }, extra) => {
-          setOrder(sorter.order === 'ascend' ? '' : '-')
-          setOrderBy(sorter.field)
+        onChange={(pagination, filters, sorter, extra) => {
+          if (!Array.isArray(sorter) && sorter.field) {
+            setOrder(sorter.order === 'ascend' ? '' : '-')
+            setOrderBy(sorter.field as string)
+          }
         }}
         columns={[
           {
@@ -214,7 +213,7 @@ const CredentialsListTable = () => {
         }}
         dataSource={credentials}
         bordered={false}
-        footer={null}
+        footer={() => null}
         virtual
         onRow={(record, rowIndex) => {
           return {
@@ -235,11 +234,8 @@ const CredentialsListTable = () => {
             <div className='flex items-center justify-between'>
               <SearchHeaderInput
                 placeholder={'Search by name'}
-                searchValue={searchValue}
-                setSearchValue={setSearchValue}
-                initialWidth="w-[2rem]"
-                iconWidth="1rem"
-                iconHeight="1rem"
+                value={searchValue}
+                onChange={setSearchValue}
               />
               <Popover
                 color="#161616"

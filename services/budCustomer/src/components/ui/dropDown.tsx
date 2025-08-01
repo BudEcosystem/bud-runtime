@@ -2,7 +2,7 @@ import React, { useContext } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Box, Button, Flex } from "@radix-ui/themes";
 import { Text_12_300_EEEEEE, Text_12_400_FFFFFF } from "./text";
-import CustomPopover from "src/flows/components/customPopover";
+import CustomPopover from "@/flows/components/customPopover";
 import { ConfigProvider, Select, Image, Form } from "antd";
 import FloatLabel from "./bud/dataEntry/FloatLabel";
 import InfoLabel from "./bud/dataEntry/InfoLabel";
@@ -29,7 +29,7 @@ const CustomDropdownMenu: React.FC<DropDownProps> = ({
   contentRenderItem,
   align,
 }) => {
-  const handleSelect = (value) => {
+  const handleSelect = (value: any) => {
     onSelect(value);
   };
   return (
@@ -52,7 +52,7 @@ const CustomDropdownMenu: React.FC<DropDownProps> = ({
       >
         {contentRenderItem ? (
           <>
-            {contentRenderItem.map((item, index) => (
+            {contentRenderItem.map((item: any, index: number) => (
               <DropdownMenu.Item
                 className={`h-[1.75] px-[1rem] py-[.5rem] rounded rounded-md hover:bg-[#18191B] outline-none cursor-pointer ${itemsClassNames}`}
                 key={index}
@@ -64,7 +64,7 @@ const CustomDropdownMenu: React.FC<DropDownProps> = ({
           </>
         ) : (
           <>
-            {items.map((item, index) => (
+            {items.map((item: any, index: number) => (
               <DropdownMenu.Item
                 className={`h-[1.75] px-[1rem] py-[.5rem] rounded rounded-md hover:bg-[#18191B] outline-none cursor-pointer ${itemsClassNames}`}
                 key={index}
@@ -106,6 +106,7 @@ export const BudDropdownMenu = (props: BudDropdownMenuProps) => {
     <Form.Item name={props.name} rules={props.rules}  hasFeedback className={`${props.formItemClassnames}`}>
       <div className="floating-textarea">
         <FloatLabel
+        value={values?.[props.name] || props.value}
         label={<InfoLabel
           text={props.label} content={props.infoText || props.placeholder} />}>
       <div className="custom-select-two w-full rounded-[6px] relative">

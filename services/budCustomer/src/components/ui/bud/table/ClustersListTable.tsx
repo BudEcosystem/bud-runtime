@@ -17,13 +17,13 @@ import { useOverlay } from '@/context/overlayContext';
 import NoDataFount from '../../noDataFount';
 import useHandleRouteChange from '@/lib/useHandleRouteChange';
 import Tags from '@/flows/components/DrawerTags';
-import { useLoaderOnLoding } from '@/hooks/useLoaderOnLoading';
+import { useLoaderOnLoading } from '@/hooks/useLoaderOnLoading';
 const statusMapping = {
     'available': '#3EC564',
     'not_available': '#EC7575',
 }
 
-const capitalize = (str) => str?.charAt(0).toUpperCase() + str?.slice(1).toLowerCase();
+const capitalize = (str: string) => str?.charAt(0).toUpperCase() + str?.slice(1).toLowerCase();
 
 
 type ColumnsType<T extends object> = TableProps<T>['columns'];
@@ -43,7 +43,7 @@ interface DataType {
     id?: string;
 }
 
-function SortIcon({ sortOrder }: { sortOrder: string }) {
+function SortIcon({ sortOrder }: { sortOrder: string | null }) {
     return sortOrder ? sortOrder === 'descend' ?
         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="13" viewBox="0 0 12 13" fill="none">
             <path fillRule="evenodd" clipRule="evenodd" d="M6.00078 2.10938C6.27692 2.10938 6.50078 2.33324 6.50078 2.60938L6.50078 9.40223L8.84723 7.05578C9.04249 6.86052 9.35907 6.86052 9.55433 7.05578C9.7496 7.25104 9.7496 7.56763 9.55433 7.76289L6.35433 10.9629C6.15907 11.1582 5.84249 11.1582 5.64723 10.9629L2.44723 7.76289C2.25197 7.56763 2.25197 7.25104 2.44723 7.05578C2.64249 6.86052 2.95907 6.86052 3.15433 7.05578L5.50078 9.40223L5.50078 2.60938C5.50078 2.33324 5.72464 2.10938 6.00078 2.10938Z" fill="#B3B3B3" />
@@ -65,7 +65,7 @@ function ClustersListTable() {
     const { getClusterById } = useCluster();
     const [order, setOrder] = useState<'-' | ''>('');
     const [orderBy, setOrderBy] = useState<string>('created_at');
-    useLoaderOnLoding(loading);
+    useLoaderOnLoading(loading);
 
     useHandleRouteChange(() => {
         notification.destroy();
@@ -158,9 +158,9 @@ function ClustersListTable() {
                         sorter: true,
                         render: (status) => (
                             <span>
-                                <ProjectTags
-                                    name={capitalize(status)}
-                                    color={statusMapping[status]}
+                                <Tags
+                                    tags={[capitalize(status)]}
+                                    color={statusMapping[status as keyof typeof statusMapping]}
                                 />
                             </span>
                         ),
@@ -182,7 +182,7 @@ function ClustersListTable() {
                         render: (text, record) => <div className='min-w-[130px]'>
                             <div className='flex flex-row items-center visible-on-hover'>
                                 <PrimaryButton
-                                    onClick={async (event) => {
+                                    onClick={async (event: React.MouseEvent) => {
                                         event.stopPropagation();
                                         await getClusterById(record.id);
                                         router.push(`/clusters/${record.id}`)
@@ -200,7 +200,6 @@ function ClustersListTable() {
                     return cluster.name?.toLowerCase().includes(searchValue.toLowerCase())
                 })}
                 bordered={false}
-                footer={null}
                 virtual
                 onRow={(record, rowIndex) => {
                     return {
@@ -209,12 +208,12 @@ function ClustersListTable() {
                         }
                     }
                 }}
-                onChange={(pagination, filters, sorter: {
-                    order: 'ascend' | 'descend';
-                    field: string;
-                }, extra) => {
-                    setOrder(sorter.order === 'ascend' ? '' : '-')
-                    setOrderBy(sorter.field)
+                onChange={(pagination, filters, sorter, extra) => {
+                    const singleSorter = Array.isArray(sorter) ? sorter[0] : sorter;
+                    if (singleSorter && singleSorter.order && singleSorter.field) {
+                        setOrder(singleSorter.order === 'ascend' ? '' : '-')
+                        setOrderBy(singleSorter.field as string)
+                    }
                 }}
                 showSorterTooltip={true}
 
@@ -226,8 +225,8 @@ function ClustersListTable() {
                         <div className='flex items-center justify-between gap-x-[.4rem]'>
                             <SearchHeaderInput
                                 placeholder={'Search by name'}
-                                searchValue={searchValue}
-                                setSearchValue={setSearchValue}
+                                value={searchValue}
+                                onChange={setSearchValue}
                             />
                         </div>
                     </div>
@@ -235,8 +234,8 @@ function ClustersListTable() {
                 locale={{
                     emptyText: (
                         <NoDataFount
-                            classNames="h-[20vh]"
-                            textMessage={`No clusters found`}
+                            className="h-[20vh]"
+                            message={`No clusters found`}
                         />
                     ),
                 }}

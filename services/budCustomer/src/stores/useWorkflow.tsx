@@ -1,15 +1,14 @@
 import { tempApiBaseUrl } from "@/components/environment";
-import { errorToast, successToast } from "@/components/toast";
-import { TagListeItem } from "src/flows/components/TagsList";
-import { Provider } from "src/hooks/useCloudProviders";
-import { Cluster } from "src/hooks/useCluster";
-import { Model, ScanResult } from "src/hooks/useModels";
-import { Project } from "src/hooks/useProjects";
-import { IDeploymentTemplate } from "src/hooks/useTemplates";
+import { TagListeItem } from "@/flows/components/TagsList";
+import { Provider } from "@/hooks/useCloudProviders";
+import { Cluster } from "@/hooks/useCluster";
+import { Model, ScanResult } from "@/hooks/useModels";
+import { Project } from "@/hooks/useProjects";
+import { IDeploymentTemplate } from "@/hooks/useTemplates";
 import { AppRequest } from "@/services/api/requests";
 import { create } from "zustand";
 import { Credentials } from "./useProprietaryCredentials";
-import { Endpoint } from "src/hooks/useEndPoint";
+import { Endpoint } from "@/hooks/useEndPoint";
 import { QuantizeConfig } from "./useDeployModel";
 
 type BudSimulatorPayload = {
@@ -159,7 +158,7 @@ export type WorkflowType = {
 export const useWorkflow = create<{
     workflowList: WorkflowListItem[];
     getWorkflowList: () => void;
-}>((set, get) => ({
+}>((set) => ({
     workflowList: [],
     getWorkflowList: async () => {
         try {

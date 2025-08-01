@@ -116,7 +116,7 @@ export function BudForm(props: BudFormProps) {
       className="ant-header-breadcrumb"
     >
       <Text_12_400_5B6168 className="h-[18px] py-[.7rem]">&nbsp;</Text_12_400_5B6168>
-    </div> : <DrawerBreadCrumbNavigation items={step.navigation} />}
+    </div> : <DrawerBreadCrumbNavigation items={step?.navigation || []} />}
     {isExpandedView ? null : cancelAlert && (<div className={`flex-initial z-20 border-1 border-[red] form-layout !mb-[0] top-[1rem] relative`}>
       <BudStepAlert
         cancelAction={() => {

@@ -1,10 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Button, Image, notification, Table } from 'antd';
+import { Button, notification, Table } from 'antd';
 import ProjectTags from '@/flows/components/ProjectTags';
 import { Model } from '@/hooks/useModels';
 import { Cluster } from '@/hooks/useCluster';
-import { assetBaseUrl } from '@/components/environment';
-import { PrimaryButton, SecondaryButton } from '../form/Buttons';
+import { PrimaryButton } from '../form/Buttons';
 import { useRouter as useRouter } from "next/router";
 import { useDrawer } from '@/hooks/useDrawer';
 import { useDeployModel } from '@/stores/useDeployModel';
@@ -13,7 +12,6 @@ import { Text_12_300_EEEEEE, Text_12_400_EEEEEE, Text_16_600_FFFFFF } from '../.
 import SearchHeaderInput from '@/flows/components/SearchHeaderInput';
 import { useEndPoints } from "@/hooks/useEndPoint";
 import { formatDate } from '@/utils/formatDate';
-import { openWarning } from '@/components/warningMessage';
 import NoDataFount from '../../noDataFount';
 import useHandleRouteChange from '@/lib/useHandleRouteChange';
 import { PermissionEnum, useUser } from '@/stores/useUser';
@@ -21,9 +19,9 @@ import { endpointStatusMapping } from '@/lib/colorMapping';
 import { errorToast, successToast } from '@/components/toast';
 import { SortIcon } from './SortIcon';
 import { useConfirmAction } from '@/hooks/useConfirmAction';
-import { useLoaderOnLoding } from '@/hooks/useLoaderOnLoading';
+import { useLoaderOnLoading } from '@/hooks/useLoaderOnLoading';
 import { IconOnlyRender } from '@/flows/components/BudIconRender';
-const capitalize = (str) => str?.charAt(0).toUpperCase() + str?.slice(1).toLowerCase();
+const capitalize = (str: string) => str?.charAt(0).toUpperCase() + str?.slice(1).toLowerCase();
 
 interface DataType {
     key?: string;
@@ -40,7 +38,6 @@ interface DataType {
 
 function DeploymentListTable() {
     const [isMounted, setIsMounted] = useState(false);
-    const [selectedRow, setSelectedRow] = useState<DataType | null>(null);
     const [confirmLoading, setConfirmLoading] = useState(false);
     const [confirmVisible, setConfirmVisible] = useState(false);
     const { reset } = useDeployModel();
@@ -53,7 +50,7 @@ function DeploymentListTable() {
     const [order, setOrder] = useState<'-' | ''>('');
     const [orderBy, setOrderBy] = useState<string>('created_at');
     const { hasProjectPermission, hasPermission } = useUser();
-    useLoaderOnLoding(loading);
+    useLoaderOnLoading(loading);
     const { contextHolder, openConfirm } = useConfirmAction()
 
     const page = 1;
@@ -68,7 +65,7 @@ function DeploymentListTable() {
             order_by: `${order}${orderBy}`,
         })
     }
-    const setEndpointDetails = (id, projectId) => {
+    const setEndpointDetails = (id: string, projectId: string) => {
         getEndpointClusterDetails(id, projectId);
     }
 
@@ -98,12 +95,11 @@ function DeploymentListTable() {
         return () => clearTimeout(timer);
     }, [searchValue, order, orderBy]);
 
-    const confirmDelete = (record) => {
+    const confirmDelete = (record: DataType) => {
         if (record?.status === 'deleting' || record?.status === 'deleted') {
             errorToast('Deployment is in deleting state, please wait for it to complete');
             return;
         }
-        setSelectedRow(record);
         setConfirmVisible(true);
         openConfirm({
             message: `You're about to delete the ${record?.name} deployment`,
@@ -119,7 +115,7 @@ function DeploymentListTable() {
                     return;
                 };
                 setConfirmLoading(true);
-                const result = await deleteEndPoint(record?.id, projectId as string);
+                const result = await deleteEndPoint(record?.id!, projectId as string);
                 if (result?.data) {
                     await getData();
                     successToast('Deployment deleted successfully');
@@ -214,14 +210,14 @@ function DeploymentListTable() {
                             render: (text, record) => <div className='min-w-[130px]'>
                                 <div className='flex flex-row items-center visible-on-hover'
                                     style={{
-                                        display: confirmVisible && 'flex'
+                                        display: confirmVisible ? 'flex' : undefined
                                     }}
                                 >
                                     <PrimaryButton
                                         permission={hasPermission(PermissionEnum.ModelManage)}
-                                        onClick={async (event) => {
+                                        onClick={async (event: React.MouseEvent) => {
                                             event.stopPropagation();
-                                            await getEndpointClusterDetails(record.id, projectId as string);
+                                            await getEndpointClusterDetails(record.id!, projectId as string);
                                             openDrawer('use-model', { endpoint: record });
                                         }}
                                     >
@@ -247,23 +243,22 @@ function DeploymentListTable() {
                     pagination={false}
                     dataSource={endPoints}
                     bordered={false}
-                    footer={null}
+                    footer={undefined}
                     virtual
                     onRow={(record, rowIndex) => {
                         return {
-                            onClick: async event => {
+                            onClick: async (event) => {
                                 router.push(`/projects/${projectId}/deployments/${record.id}`)
-                                setEndpointDetails(record.id, projectId as string);
+                                setEndpointDetails(record.id!, projectId as string);
                                 setPageSource('Projects')
                             }
                         }
                     }}
-                    onChange={(pagination, filters, sorter: {
-                        order: 'ascend' | 'descend';
-                        field: string;
-                    }, extra) => {
-                        setOrder(sorter.order === 'ascend' ? '' : '-')
-                        setOrderBy(sorter.field)
+                    onChange={(pagination, filters, sorter, extra) => {
+                        if (!Array.isArray(sorter) && sorter.order && sorter.field) {
+                            setOrder(sorter.order === 'ascend' ? '' : '-')
+                            setOrderBy(sorter.field as string)
+                        }
                     }}
                     showSorterTooltip={true}
 
@@ -275,8 +270,8 @@ function DeploymentListTable() {
                             <div className='flex items-center justify-between gap-x-[.8rem]'>
                                 <SearchHeaderInput
                                     placeholder={'Search by name'}
-                                    searchValue={searchValue}
-                                    setSearchValue={setSearchValue}
+                                    value={searchValue}
+                                    onChange={setSearchValue}
                                 />
                                 {(hasPermission(PermissionEnum.ProjectManage) || hasProjectPermission(projectId as string, PermissionEnum.EndpointManage)) && <PrimaryButton
                                     onClick={() => {
@@ -298,8 +293,8 @@ function DeploymentListTable() {
                     locale={{
                         emptyText: (
                             <NoDataFount
-                                classNames="h-[20vh]"
-                                textMessage={`No deployments`}
+                                className="h-[20vh]"
+                                message={`No deployments`}
                             />
                         ),
                     }}

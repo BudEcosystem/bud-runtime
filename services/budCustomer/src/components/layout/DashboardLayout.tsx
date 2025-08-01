@@ -3,7 +3,7 @@ import React, { ReactNode, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Image, Badge, Avatar } from "antd";
-import { Icon } from "@iconify/react";
+import { Icon } from "@iconify/react/dist/iconify.js";
 import { 
   Text_10_400_B3B3B3,
   Text_12_300_B3B3B3,
@@ -246,7 +246,6 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
               <Avatar 
                 size={32} 
                 style={{ backgroundColor: '#965CDE' }}
-                title="Admin"
               >
                 <Icon icon="mdi:user" className="text-lg" />
               </Avatar>

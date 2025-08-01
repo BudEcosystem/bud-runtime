@@ -1,7 +1,7 @@
 import React from "react";
 import { Image, Checkbox } from "antd";
-import { Text_10_400_B3B3B3, Text_14_400_EEEEEE } from "../text";
-import Tags from "src/flows/components/DrawerTags";
+import { Text_10_400_B3B3B3, Text_14_400_EEEEEE } from "./text";
+import ProjectTags from "@/flows/components/ProjectTags";
 import { assetBaseUrl } from "@/components/environment";
 
 
@@ -46,18 +46,18 @@ export default function EndpointCardWithCheckBox({
             </Text_14_400_EEEEEE>
             <div className="flex justify-start items-center gap-[.5rem]">
               {/* {data.tags.map((item, index) => ( */}
-              <Tags
+              <ProjectTags
                 // key={index}
                 name={data.cluster?.name}
                 color="#D1B854"
-                classNames="py-[.32rem] "
+                tagClass="py-[.32rem] "
                 textClass="leading-[100%] text-[.625rem] font-[400]"
               />
-              <Tags
+              <ProjectTags
                 // key={index}
                 name={`${data.model?.modality}`}
                 color="#D1B854"
-                classNames="py-[.32rem] "
+                tagClass="py-[.32rem] "
                 textClass="leading-[100%] text-[.625rem] font-[400]"
               />
               {/* ))} */}

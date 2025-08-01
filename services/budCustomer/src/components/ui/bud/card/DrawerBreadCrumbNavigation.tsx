@@ -117,7 +117,7 @@ function DrawerBreadCrumbNavigation({
         <button onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
-          if (step.confirmClose) {
+          if (step?.confirmClose) {
             return setCancelAlert(true);
           }
           closeDrawer();
@@ -128,7 +128,7 @@ function DrawerBreadCrumbNavigation({
           </svg>
         </button>
         <button onClick={() => {
-          if (!currentWorkflow) {
+          if (!currentWorkflow || !step) {
             return closeDrawer();
           };
           document.getElementById("bud-drawer")?.classList.toggle("hide-drawer");

@@ -3,7 +3,7 @@ import { Avatar, Form, FormRule, Select, Image, Space } from "antd";
 import { axiosInstance } from "@/services/api/requests";
 import { BudFormContext } from "../context/BudFormContext";
 import { Text_12_300_EEEEEE, Text_12_400_EEEEEE } from "../../text";
-import CreatableSelect from "react-select/creatable";
+import CreatableSelect from "../../../../../node_modules/react-select/creatable/dist";
 import {
   colourOptions,
   colourStyles,
@@ -11,11 +11,11 @@ import {
   randomColor,
 } from "./TagsInputData";
 import { Cross1Icon } from "@radix-ui/react-icons";
-import { components } from "react-select";
+import { components } from "../../../../../node_modules/react-select/dist";
 import CustomPopover from "@/flows/components/customPopover";
 import { errorToast } from "@/components/toast";
 import CustomDropDown from "@/flows/components/CustomDropDown";
-import { useUsers } from "@/hooks/useUsers";
+import { useUsers, User } from "@/hooks/useUsers";
 
 interface SelectProps {
   name: string;
@@ -31,12 +31,13 @@ export default function ProjectUsersInput(props: SelectProps) {
   const { users, getUsers } = useUsers();
   const { name: fieldName } = props;
   const { form } = useContext(BudFormContext);
-  const [options, setOptions] = useState([]);
+  const [options, setOptions] = useState<(User & { label: string; value: string })[]>([]);
   const [scopes, setScopes] = useState("endpoint:view");
-  const ref = React.useRef(null);
+  const ref = React.useRef<any>(null);
 
   const scopeOptions = [
     {
+      key: "endpoint:manage",
       label: "Manage",
       value: "endpoint:manage",
       onClick: async () => {
@@ -45,6 +46,7 @@ export default function ProjectUsersInput(props: SelectProps) {
       },
     },
     {
+      key: "endpoint:view",
       label: "View",
       value: "endpoint:view",
       onClick: async () => {
@@ -54,7 +56,7 @@ export default function ProjectUsersInput(props: SelectProps) {
     },
   ];
 
-  const DropdownButtonContent = ({ scope }) => {
+  const DropdownButtonContent = ({ scope }: { scope: string }) => {
     if (scope == "endpoint:view") {
       return <Text_12_400_EEEEEE>View</Text_12_400_EEEEEE>;
     }
@@ -128,7 +130,7 @@ export default function ProjectUsersInput(props: SelectProps) {
           const searchText = inputValue.toLowerCase();
           return (
             option.label.toLowerCase().includes(searchText) || // Match label (name)
-            option.data.email?.toLowerCase().includes(searchText) // Match email
+            (option as any).email?.toLowerCase().includes(searchText) // Match email
           );
         }}
         styles={{
@@ -162,15 +164,21 @@ export default function ProjectUsersInput(props: SelectProps) {
               /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
             if (!emailRegex.test(inputValue)) {
               errorToast("Please enter a valid email address");
-              ref.current.select.clearValue();
-              ref.current.select.focus();
+              if (ref.current?.select) {
+                ref.current.select.clearValue();
+                ref.current.select.focus();
+              }
               return;
             }
 
             const color = randomColor();
             const newOption = {
+              id: `temp-${Date.now()}`,
+              name: inputValue,
+              email: inputValue,
               label: inputValue,
               value: color.value,
+              color: color.value,
               scopes: [scopes],
             };
             setOptions([...options, newOption]);
@@ -259,7 +267,7 @@ export default function ProjectUsersInput(props: SelectProps) {
                         e.stopPropagation();
                         form.setFieldsValue({
                           [fieldName]: selected.filter(
-                            (item) => item.label !== props.data.label
+                            (item: any) => item.label !== props.data.label
                           ),
                         });
                       }}
@@ -292,7 +300,7 @@ export default function ProjectUsersInput(props: SelectProps) {
               colourOptions.find((option) => option.value === props.data.value)
                 ?.value || "#FFF";
             const selectedTag = selected?.find(
-              (tag) => tag.label === props.data.label
+              (tag: any) => tag.label === props.data.label
             );
             return (
               <div
@@ -314,7 +322,7 @@ export default function ProjectUsersInput(props: SelectProps) {
                       e.stopPropagation();
                       form.setFieldsValue({
                         [fieldName]: selected.filter(
-                          (item) => item.label !== props.data.label
+                          (item: any) => item.label !== props.data.label
                         ),
                       });
                     }

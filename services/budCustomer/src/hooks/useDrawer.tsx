@@ -1,6 +1,6 @@
 import { errorToast } from "@/components/toast";
 import { FormProgressStatus, FormProgressType } from "@/components/ui/bud/progress/FormProgress";
-import { StepComponentsType } from "src/flows";
+import { StepComponentsType } from "@/flows";
 import { create } from "zustand";
 import drawerFlows, { Flow } from "./drawerFlows";
 
@@ -30,9 +30,9 @@ export const useDrawer = create<{
   closeDrawer: () => void;
   currentFlow: Flow | null;
   setCurrentFlow: (flow: Flow) => void;
-  step: DrawerStepParsedType;
-  expandedStep: DrawerStepParsedType;
-  previousStep?: StepComponentsType;
+  step: DrawerStepParsedType | null;
+  expandedStep: DrawerStepParsedType | null;
+  previousStep: StepComponentsType | null;
   setPreviousStep: (step: StepComponentsType) => void;
   cancelAlert: boolean;
   setCancelAlert: (value: boolean) => void;
@@ -49,25 +49,28 @@ export const useDrawer = create<{
   },
   showMinimizedItem: false,
   minmizedProcessList: [],
-  timeout: null,
+  timeout: undefined,
   closeExpandedStep: () => {
     set({ expandedStep: null });
   },
   minimizeProcess: (step: DrawerStepParsedType) => {
     get().timeout && clearTimeout(get().timeout);
     get().closeDrawer();
-    set((state) => {
+    const currentFlow = get().currentFlow;
+    if (!currentFlow) return;
+    
+    set(() => {
       return {
         // 1 item in the list
         minmizedProcessList: [{
           step: step,
-          flow: get().currentFlow,
+          flow: currentFlow,
         }],
         showMinimizedItem: true,
         cancelAlert: false,
         // Hide the minimized item after 5 seconds
         timeout: setTimeout(() => {
-          set((state) => {
+          set(() => {
             return {
               showMinimizedItem: false,
             };
@@ -119,11 +122,17 @@ export const useDrawer = create<{
     }
 
     const foundFlowSteps = drawerFlows[foundFlow].steps;
-    const foundStepIndex = foundFlowSteps.find((s) => s.id === step).step;
-    const foundStep = foundFlowSteps.find((s) => s.id === step)
-
-    if (!foundStepIndex) {
+    const foundStep = foundFlowSteps.find((s) => s.id === step);
+    
+    if (!foundStep) {
       errorToast("Step not found");
+      return;
+    }
+    
+    const foundStepIndex = foundStep.step;
+    
+    if (!foundStepIndex) {
+      errorToast("Step index not found");
       return;
     }
     console.groupEnd();
@@ -146,13 +155,17 @@ export const useDrawer = create<{
     }
 
     const foundFlowSteps = drawerFlows[foundFlow].steps;
-    const foundStepIndex = foundFlowSteps.find((s) => s.id === step).step;
-    const foundStep = foundFlowSteps.find((s) => s.id === step)
-
-
-
-    if (!foundStepIndex) {
+    const foundStep = foundFlowSteps.find((s) => s.id === step);
+    
+    if (!foundStep) {
       errorToast("Step not found");
+      return;
+    }
+    
+    const foundStepIndex = foundStep.step;
+    
+    if (!foundStepIndex) {
+      errorToast("Step index not found");
       return;
     }
     console.groupEnd();
@@ -175,7 +188,7 @@ export const useDrawer = create<{
   closeDrawer: () => {
     set({ isDrawerOpen: false, currentFlow: null, step: null, previousStep: null, expandedStep: null, isFailed: false, drawerProps: null, expandedDrawerProps: null });
   },
-  currentFlow: "run-model-evaluations",
+  currentFlow: null,
   // currentFlow: "view-model",
   // currentFlow: "deploy-model",
   setCurrentFlow: (flow: Flow) => {
@@ -183,7 +196,6 @@ export const useDrawer = create<{
   },
   // get current flow
   step: null,
-  progress: [],
   cancelAlert: false,
   setCancelAlert: (value: boolean) => {
     set({ cancelAlert: value });

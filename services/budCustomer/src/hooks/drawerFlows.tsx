@@ -5,10 +5,10 @@ import {
 import { useProjects } from "./useProjects";
 import { useModels } from "./useModels";
 import { useWorkers } from "./useWorkers";
-import { StepComponents } from "src/flows";
+import { StepComponents } from "@/flows";
 import { useEndPoints } from "./useEndPoint";
-import { useDeployModel } from "src/stores/useDeployModel";
-import ChooseCloudSource from "src/flows/Cluster/ChooseCloudSource";
+import { useDeployModel } from "@/stores/useDeployModel";
+import ChooseCloudSource from "@/flows/Cluster/ChooseCloudSource";
 import { create } from "domain";
 
 export type DrawerStepType = {
@@ -1031,7 +1031,7 @@ const securityScan: DrawerFlowType = {
       id: "security-scan-status",
       navigation: () => [
         "Model",
-        `${useModels.getState().selectedModel?.name || useDeployModel.getState().currentWorkflow.workflow_steps.model.name}`,
+        `${useModels.getState().selectedModel?.name || useDeployModel.getState().currentWorkflow?.workflow_steps?.model?.name || 'Model'}`,
         "Security Scan",
       ],
       confirmClose: true,

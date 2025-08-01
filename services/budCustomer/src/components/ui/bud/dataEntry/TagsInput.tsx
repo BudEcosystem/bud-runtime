@@ -2,8 +2,8 @@ import React, { useContext, useEffect, useState } from "react";
 import { Form, FormRule, Image } from "antd";
 import { BudFormContext } from "../context/BudFormContext";
 import { Text_12_300_EEEEEE, Text_12_400_808080 } from "../../text";
-import { components, MenuPlacement } from 'react-select';
-import CreatableSelect from "react-select/creatable";
+import { components, MenuPlacement } from '../../../../../node_modules/react-select/dist';
+import CreatableSelect from "../../../../../node_modules/react-select/creatable/dist";
 import {
   colourOptions,
   colourStyles,
@@ -73,7 +73,7 @@ export default function TagsInput(props: SelectProps) {
     props.onChange && props.onChange(updated);
   }, [selected]);
 
-  const handleCreate = (inputValue) => {
+  const handleCreate = (inputValue: string) => {
     try {
       // check if tag already exists
       const tagExists = options.find((tag) => tag.name === inputValue);
@@ -152,7 +152,7 @@ export default function TagsInput(props: SelectProps) {
         }}
         placeholder={props.placeholder}
         onKeyDown={(e: any) => {
-          if (e.key === "Enter" && !ref.current.state.focusedOption) {
+          if (e.key === "Enter" && !(ref.current as any)?.state?.focusedOption) {
             e.preventDefault();
             return;
           }

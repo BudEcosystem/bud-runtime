@@ -22,7 +22,7 @@ const notCompleted = <li className="flex w-full items-center after:content-[''] 
 function FormProgress() {
   const { step } = useDrawer()
 
-  if (step.progress.length === 0) {
+  if (!step || step.progress.length === 0) {
     return null;
   }
   // include either current step or unique steps

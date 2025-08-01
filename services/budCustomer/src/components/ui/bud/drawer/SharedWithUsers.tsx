@@ -6,6 +6,9 @@ import { ProjectMember } from '@/hooks/useProjects';
 export default function SharedWithUsers({
     users_count,
     users_colours,
+}: {
+    users_count: number;
+    users_colours: string[];
 }) {
     // Generate avatars with corresponding colors or fallback to transparent
     const usersArray = Array(users_count)

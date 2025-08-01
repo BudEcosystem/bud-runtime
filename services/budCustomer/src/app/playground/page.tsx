@@ -13,7 +13,7 @@ import {
   Text_19_600_EEEEEE,
   Text_24_500_EEEEEE
 } from "@/components/ui/text";
-import { Icon } from "@iconify/react";
+import { Icon } from "@iconify/react/dist/iconify.js";
 import styles from "./playground.module.scss";
 
 const { TextArea } = Input;

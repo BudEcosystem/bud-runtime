@@ -3,7 +3,7 @@ import React from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button, Card, Row, Col, Flex } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
-import { Icon } from "@iconify/react";
+import { Icon } from "@iconify/react/dist/iconify.js";
 import {
   Text_12_400_757575,
   Text_12_400_B3B3B3,

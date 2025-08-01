@@ -31,9 +31,12 @@ function TextAreaInput(props: BudInputProps) {
       hasFeedback
     >
       <div className="floating-textarea mt-2">
-        <FloatLabel label={<InfoLabel text={props.label} content={props.info}
-          required={props.required}
-        />}>
+        <FloatLabel 
+          label={<InfoLabel text={props.label} content={props.info}
+            required={props.required}
+          />}
+          value={props.value}
+        >
           <TextArea
             name={props.name}
             placeholder={props.placeholder}
@@ -41,7 +44,7 @@ function TextAreaInput(props: BudInputProps) {
             style={props.style}
             value={props.value}
             disabled={props.disabled}
-            onChange={props.onChange ? (e) => props.onChange(e.target.value) : undefined}
+            onChange={props.onChange ? (e) => props.onChange!(e.target.value) : undefined}
             onClick={props.onClick}
             onFocus={props.onFocus}
             onBlur={props.onBlur}

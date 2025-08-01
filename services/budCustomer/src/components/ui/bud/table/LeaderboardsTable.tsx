@@ -7,7 +7,7 @@ import {
 } from "../../text";
 import NoDataFount from "../../noDataFount";
 
-function SortIcon({ sortOrder }: { sortOrder: string }) {
+function SortIcon({ sortOrder }: { sortOrder: string | null }) {
   return sortOrder ? (
     sortOrder === "descend" ? (
       <svg
@@ -48,7 +48,7 @@ function LeaderboardsTable({ data, leaderboardClasses }: { data: LeaderBoardItem
   const [order, setOrder] = useState<string>("");
 
   const rows = useMemo(() => {
-    let horizontalRows = [];
+    let horizontalRows: any[] = [];
 
     data?.forEach((item) => {
       Object.keys(item.benchmarks).forEach((key) => {
@@ -73,7 +73,7 @@ function LeaderboardsTable({ data, leaderboardClasses }: { data: LeaderBoardItem
       });
     });
     // merge the rows
-    const mergedRows = [];
+    const mergedRows: any[] = [];
 
     horizontalRows.forEach((row) => {
       const existingRow = mergedRows.find(
@@ -107,7 +107,7 @@ function LeaderboardsTable({ data, leaderboardClasses }: { data: LeaderBoardItem
             title: "Benchmark",
             dataIndex: "label",
             key: "label",
-            render: (text) => <Text_12_300_EEEEEE>{text}</Text_12_300_EEEEEE>,
+            render: (text: any) => <Text_12_300_EEEEEE>{text}</Text_12_300_EEEEEE>,
             sortIcon: SortIcon,
           },
           {
@@ -116,7 +116,7 @@ function LeaderboardsTable({ data, leaderboardClasses }: { data: LeaderBoardItem
             title: "Type",
             dataIndex: "dataset",
             key: "dataset",
-            render: (text) => <ProjectTags color="#D1B854" name={text || 'N/A'} />,
+            render: (text: any) => <ProjectTags color="#D1B854" name={text || 'N/A'} />,
             sortIcon: SortIcon,
           },
           data
@@ -128,7 +128,7 @@ function LeaderboardsTable({ data, leaderboardClasses }: { data: LeaderBoardItem
                 title: "Selected Model",
                 dataIndex: item.model?.uri,
                 key: item.model?.uri,
-                render: (text) => (
+                render: (text: any) => (
                   <Text_12_300_EEEEEE>{text}</Text_12_300_EEEEEE>
                 ),
                 sortIcon: SortIcon,
@@ -137,7 +137,7 @@ function LeaderboardsTable({ data, leaderboardClasses }: { data: LeaderBoardItem
             title: "Selected Model",
             dataIndex: "selected",
             key: "selected",
-            render: (text) => <Text_12_300_EEEEEE>{text}</Text_12_300_EEEEEE>,
+            render: (text: any) => <Text_12_300_EEEEEE>{text}</Text_12_300_EEEEEE>,
             sortIcon: SortIcon,
           },
           ...data
@@ -149,7 +149,7 @@ function LeaderboardsTable({ data, leaderboardClasses }: { data: LeaderBoardItem
                 title: <Tooltip placement="topLeft" title={item.model?.uri}>{item.model?.uri}</Tooltip>,
                 dataIndex: item.model?.uri,
                 key: item.model?.uri,
-                render: (text) => (
+                render: (text: any) => (
                   <Text_12_300_EEEEEE className="">
                     {text}
                   </Text_12_300_EEEEEE>
@@ -161,26 +161,20 @@ function LeaderboardsTable({ data, leaderboardClasses }: { data: LeaderBoardItem
         pagination={false}
         dataSource={rows}
         bordered={false}
-        footer={null}
         virtual
-        onChange={(
-          pagination,
-          filters,
-          sorter: {
-            order: "ascend" | "descend";
-            field: string;
-          },
-          extra
-        ) => {
-          setOrder(sorter.order === "ascend" ? "" : "-");
-          setOrderBy(sorter.field);
+        onChange={(pagination, filters, sorter, extra) => {
+          const singleSorter = Array.isArray(sorter) ? sorter[0] : sorter;
+          if (singleSorter && singleSorter.order && singleSorter.field) {
+            setOrder(singleSorter.order === "ascend" ? "" : "-");
+            setOrderBy(singleSorter.field as string);
+          }
         }}
         showSorterTooltip={true}
         locale={{
           emptyText: (
             <NoDataFount
-              classNames="h-[20vh]"
-              textMessage={`Data not available`}
+              className="h-[20vh]"
+              message={`Data not available`}
             />
           ),
         }}

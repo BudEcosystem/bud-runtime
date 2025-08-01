@@ -11,10 +11,10 @@ import {
 import { SecondaryButton } from "../form/Buttons";
 import { BudFormContext } from "../context/BudFormContext";
 
-const ShareLink: React.FC = (props: {
+const ShareLink: React.FC<{
   placeholder: string;
   rules: FormRule[];
-}) => {
+}> = (props) => {
   const { form } = useContext(BudFormContext);
   return (
     <div className="flex flex-row items-center justify-between pt-[0rem] pb-[.5rem]">

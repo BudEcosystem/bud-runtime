@@ -1,7 +1,7 @@
 import React from "react";
-import { Text_15_600_EEEEEE, Text_16_400_FFFFFF, Text_38_400_EEEEEE } from "../text";
+import { Text_15_600_EEEEEE, Text_16_400_FFFFFF, Text_38_400_EEEEEE } from "./text";
 import { Image } from "antd";
-import Tags from "src/flows/components/DrawerTags";
+import ProjectTags from "@/flows/components/ProjectTags";
 
 export type GeneralCardsProps = {
   name: string;
@@ -54,11 +54,11 @@ const CardWithBgAndTag: React.FC<GeneralCardsProps> = ({
         </div>
         {tag && (
           <div className="flex mt-[.85rem]">
-            <Tags
+            <ProjectTags
               name={tag.value}
               color={tag.tagColor}
               textClass="text-[0.8125rem]"
-              classNames="!py-[.2rem]"
+              tagClass="!py-[.2rem]"
             />
           </div>
         )}
