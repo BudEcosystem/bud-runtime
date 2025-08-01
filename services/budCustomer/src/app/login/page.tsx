@@ -13,7 +13,7 @@ interface DataInterface {
 
 export default function Login() {
   const { activePage, setActivePage, setAuthError, authError } = useAuthNavigation();
-  const { isLoading, showLoader, hideLoader } = useLoader();
+  const { showLoader, hideLoader } = useLoader();
   const router = useRouter();
   const [isBackToLogin, setIsBackToLogin] = useState(false);
 
