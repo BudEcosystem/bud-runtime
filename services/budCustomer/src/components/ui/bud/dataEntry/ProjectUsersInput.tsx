@@ -1,9 +1,9 @@
 import React, { useCallback, useContext, useEffect, useState } from "react";
 import { Avatar, Form, FormRule, Select, Image, Space } from "antd";
-import { axiosInstance } from "@/services/api/requests";
+import { axiosInstance } from "../../../../services/api/requests";
 import { BudFormContext } from "../context/BudFormContext";
 import { Text_12_300_EEEEEE, Text_12_400_EEEEEE } from "../../text";
-import CreatableSelect from "../../../../../node_modules/react-select/creatable/dist";
+import CreatableSelect from "react-select/creatable";
 import {
   colourOptions,
   colourStyles,
@@ -11,11 +11,11 @@ import {
   randomColor,
 } from "./TagsInputData";
 import { Cross1Icon } from "@radix-ui/react-icons";
-import { components } from "../../../../../node_modules/react-select/dist";
-import CustomPopover from "@/flows/components/customPopover";
-import { errorToast } from "@/components/toast";
-import CustomDropDown from "@/flows/components/CustomDropDown";
-import { useUsers, User } from "@/hooks/useUsers";
+import { components } from "react-select";
+import CustomPopover from "../../../../flows/components/customPopover";
+import { errorToast } from "../../../../components/toast";
+import CustomDropDown from "../../../../flows/components/CustomDropDown";
+import { useUsers, User } from "../../../../hooks/useUsers";
 
 interface SelectProps {
   name: string;

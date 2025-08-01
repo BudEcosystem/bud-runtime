@@ -2,8 +2,8 @@ import React, { useContext, useEffect, useState } from "react";
 import { Form, FormRule, Image } from "antd";
 import { BudFormContext } from "../context/BudFormContext";
 import { Text_12_300_EEEEEE, Text_12_400_808080 } from "../../text";
-import { components, MenuPlacement } from '../../../../../node_modules/react-select/dist';
-import CreatableSelect from "../../../../../node_modules/react-select/creatable/dist";
+import { components, MenuPlacement } from 'react-select';
+import CreatableSelect from "react-select/creatable";
 import {
   colourOptions,
   colourStyles,
@@ -11,7 +11,7 @@ import {
   randomColor,
 } from "./TagsInputData";
 import { Cross1Icon } from "@radix-ui/react-icons";
-import CustomPopover from "@/flows/components/customPopover";
+import CustomPopover from "../../../../flows/components/customPopover";
 
 export type Tag = {
   name: string;

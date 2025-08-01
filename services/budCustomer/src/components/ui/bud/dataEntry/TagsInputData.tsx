@@ -1,4 +1,4 @@
-import { StylesConfig } from "../../../../../node_modules/react-select/dist";
+import { StylesConfig } from "react-select";
 import chroma from "chroma-js";
 
 export interface ColourOption {
