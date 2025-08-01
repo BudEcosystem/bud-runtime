@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 from typing import List, Optional
 from uuid import UUID, uuid4
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, Uuid
+from sqlalchemy import DECIMAL, Boolean, DateTime, Enum, ForeignKey, Integer, String, Uuid
 from sqlalchemy.dialects.postgresql import ARRAY as PG_ARRAY
 from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
 from sqlalchemy.dialects.postgresql import JSONB
@@ -109,6 +109,9 @@ class Endpoint(Base, TimestampMixin):
     )
     publication_history: Mapped[list["PublicationHistory"]] = relationship(
         "PublicationHistory", back_populates="endpoint", cascade="all, delete-orphan"
+    )
+    pricing_history: Mapped[list["DeploymentPricing"]] = relationship(
+        "DeploymentPricing", back_populates="endpoint", cascade="all, delete-orphan"
     )
 
     @hybrid_property
@@ -210,6 +213,44 @@ class Adapter(Base, TimestampMixin):
             created_at=datetime.fromisoformat(data.get("created_at")),
             modified_at=datetime.fromisoformat(data.get("modified_at")),
         )
+
+
+class DeploymentPricing(Base, TimestampMixin):
+    """Deployment pricing model for tracking endpoint pricing history."""
+
+    __tablename__ = "deployment_pricing"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    endpoint_id: Mapped[UUID] = mapped_column(ForeignKey("endpoint.id", ondelete="CASCADE"), nullable=False)
+    input_cost: Mapped[float] = mapped_column(DECIMAL(10, 6), nullable=False)
+    output_cost: Mapped[float] = mapped_column(DECIMAL(10, 6), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="USD")
+    per_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=1000)
+    is_current: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_by: Mapped[UUID] = mapped_column(ForeignKey("user.id"), nullable=False)
+
+    # Relationships
+    endpoint: Mapped[Endpoint] = relationship("Endpoint", back_populates="pricing_history")
+    created_user: Mapped["User"] = relationship("User", foreign_keys=[created_by])
+
+    def to_dict(self):
+        """Convert the DeploymentPricing instance to a dictionary.
+
+        Returns:
+            dict: A dictionary representation of the DeploymentPricing instance.
+        """
+        return {
+            "id": str(self.id),
+            "endpoint_id": str(self.endpoint_id),
+            "input_cost": float(self.input_cost),
+            "output_cost": float(self.output_cost),
+            "currency": self.currency,
+            "per_tokens": self.per_tokens,
+            "is_current": self.is_current,
+            "created_by": str(self.created_by),
+            "created_at": self.created_at.isoformat(),
+            "modified_at": self.modified_at.isoformat(),
+        }
 
 
 class PublicationHistory(Base, TimestampMixin):

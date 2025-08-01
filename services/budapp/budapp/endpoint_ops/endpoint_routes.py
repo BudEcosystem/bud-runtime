@@ -43,13 +43,16 @@ from .schemas import (
     AddAdapterRequest,
     AddWorkerRequest,
     DeleteWorkerRequest,
+    DeploymentPricingResponse,
     DeploymentSettingsResponse,
     EndpointFilter,
     EndpointPaginatedResponse,
     ModelClusterDetailResponse,
+    PricingHistoryResponse,
     PublicationHistoryResponse,
     PublishEndpointResponse,
     UpdateDeploymentSettingsRequest,
+    UpdatePricingRequest,
     UpdatePublicationStatusRequest,
     WorkerDetailResponse,
     WorkerInfoFilter,
@@ -673,17 +676,31 @@ async def update_publication_status(
 ) -> Union[PublishEndpointResponse, ErrorResponse]:
     """Update publication status of an endpoint (publish/unpublish)."""
     try:
+        # Convert pricing to dict if provided
+        pricing_data = None
+        if request.pricing:
+            pricing_data = request.pricing.model_dump()
+
         endpoint = await EndpointService(session).update_publication_status(
             endpoint_id=endpoint_id,
             action=request.action,
             current_user_id=current_user.id,
             action_metadata=request.action_metadata,
+            pricing=pricing_data,
         )
+        # Get current pricing if published
+        pricing_response = None
+        if endpoint.is_published:
+            current_pricing = await EndpointService(session).get_current_pricing(endpoint_id)
+            if current_pricing:
+                pricing_response = DeploymentPricingResponse.model_validate(current_pricing)
+
         return PublishEndpointResponse(
             endpoint_id=endpoint.id,
             is_published=endpoint.is_published,
             published_date=endpoint.published_date,
             published_by=endpoint.published_by,
+            pricing=pricing_response,
             message=f"Endpoint {request.action}ed successfully",
         ).to_http_response()
     except ClientException as e:
@@ -693,6 +710,146 @@ async def update_publication_status(
         logger.exception(f"Failed to update publication status: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to update publication status"
+        ).to_http_response()
+
+
+@endpoint_router.put(
+    "/{endpoint_id}/pricing",
+    responses={
+        status.HTTP_200_OK: {
+            "model": DeploymentPricingResponse,
+            "description": "Successfully updated pricing",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Invalid request data",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Endpoint not found",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Failed to update pricing",
+        },
+    },
+    description="Update pricing for a published endpoint",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
+async def update_endpoint_pricing(
+    endpoint_id: UUID,
+    request: UpdatePricingRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    x_resource_type: Annotated[Optional[str], Header()] = None,
+    x_entity_id: Annotated[Optional[str], Header()] = None,
+) -> Union[DeploymentPricingResponse, ErrorResponse]:
+    """Update pricing for a published endpoint."""
+    try:
+        pricing = await EndpointService(session).update_pricing(
+            endpoint_id=endpoint_id,
+            pricing_data=request.model_dump(),
+            current_user_id=current_user.id,
+        )
+        return DeploymentPricingResponse.model_validate(pricing)
+    except ClientException as e:
+        logger.exception(f"Failed to update pricing: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to update pricing: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to update pricing"
+        ).to_http_response()
+
+
+@endpoint_router.get(
+    "/{endpoint_id}/pricing",
+    responses={
+        status.HTTP_200_OK: {
+            "model": DeploymentPricingResponse,
+            "description": "Successfully retrieved current pricing",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Endpoint or pricing not found",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Failed to get pricing",
+        },
+    },
+    description="Get current pricing for an endpoint",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
+async def get_endpoint_pricing(
+    endpoint_id: UUID,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    x_resource_type: Annotated[Optional[str], Header()] = None,
+    x_entity_id: Annotated[Optional[str], Header()] = None,
+) -> Union[DeploymentPricingResponse, ErrorResponse]:
+    """Get current pricing for an endpoint."""
+    try:
+        pricing = await EndpointService(session).get_current_pricing(endpoint_id)
+        if not pricing:
+            return ErrorResponse(
+                code=status.HTTP_404_NOT_FOUND,
+                message=f"No pricing found for endpoint {endpoint_id}",
+            ).to_http_response()
+        return DeploymentPricingResponse.model_validate(pricing)
+    except ClientException as e:
+        logger.exception(f"Failed to get pricing: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to get pricing: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get pricing"
+        ).to_http_response()
+
+
+@endpoint_router.get(
+    "/{endpoint_id}/pricing/history",
+    responses={
+        status.HTTP_200_OK: {
+            "model": PricingHistoryResponse,
+            "description": "Successfully retrieved pricing history",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Endpoint not found",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Failed to get pricing history",
+        },
+    },
+    description="Get pricing history for an endpoint",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
+async def get_pricing_history(
+    endpoint_id: UUID,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    x_resource_type: Annotated[Optional[str], Header()] = None,
+    x_entity_id: Annotated[Optional[str], Header()] = None,
+) -> Union[PricingHistoryResponse, ErrorResponse]:
+    """Get pricing history for an endpoint."""
+    try:
+        result = await EndpointService(session).get_pricing_history(
+            endpoint_id=endpoint_id,
+            page=page,
+            limit=limit,
+        )
+        return PricingHistoryResponse(**result).to_http_response()
+    except ClientException as e:
+        logger.exception(f"Failed to get pricing history: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to get pricing history: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get pricing history"
         ).to_http_response()
 
 

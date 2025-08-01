@@ -21,7 +21,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 from uuid import UUID, uuid4
 
-from jose import jwt
+import jwt
 
 from budapp.auth.schemas import AccessTokenData, AuthToken
 from budapp.commons import logging
