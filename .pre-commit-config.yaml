@@ -1,3 +1,4 @@
+# Pre-commit configuration - Updated to fix CI issues
 repos:
   # General file checks
   - repo: https://github.com/pre-commit/pre-commit-hooks
