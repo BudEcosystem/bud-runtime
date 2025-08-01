@@ -1,0 +1,6 @@
+{
+  callPackage,
+}:
+{
+  devbox = callPackage ./devbox { };
+}
