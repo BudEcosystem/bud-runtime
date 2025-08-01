@@ -1,7 +1,7 @@
 {
   system.autoUpgrade = {
     enable = true;
-    flake = "github:budstudio/bud-runtime#devbox";
+    flake = "github:BudEcosystem/bud-runtime#devbox";
     flags = [ "-L" ];
     dates = "hourly";
   };
