@@ -17,9 +17,9 @@ resource "cloudflare_dns_record" "dev" {
   ])
 
   zone_id = local.zone_id
-  name = each.key
-  ttl = 3600
-  type = "A"
+  name    = each.key
+  ttl     = 3600
+  type    = "A"
   content = module.azure.master_ip
   proxied = false
 }
