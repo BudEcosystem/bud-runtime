@@ -5,7 +5,8 @@ from datetime import datetime, timedelta
 import uuid
 from unittest.mock import Mock, patch, AsyncMock
 from fastapi import HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
+import aiohttp
 
 from budapp.metric_ops.schemas import (
     InferenceListRequest,
@@ -64,25 +65,26 @@ def mock_model():
 @pytest.fixture
 def mock_db_session():
     """Mock database session."""
-    session = Mock(spec=AsyncSession)
+    session = Mock(spec=Session)
     return session
 
 
 @pytest.fixture
-def sample_inference_response():
+def sample_inference_response(mock_project, mock_endpoint, mock_model):
     """Sample inference response from budmetrics."""
     return {
         "items": [{
             "inference_id": str(uuid.uuid4()),
             "timestamp": datetime.utcnow().isoformat(),
-            "project_id": str(uuid.uuid4()),
-            "endpoint_id": str(uuid.uuid4()),
-            "model_id": str(uuid.uuid4()),
+            "project_id": str(mock_project.id),  # Use mock project ID
+            "endpoint_id": str(mock_endpoint.id),  # Use mock endpoint ID
+            "model_id": str(mock_model.id),  # Use mock model ID
             "model_name": "gpt-4",
             "model_provider": "openai",
             "is_success": True,
             "input_tokens": 150,
             "output_tokens": 250,
+            "total_tokens": 400,  # Required field
             "response_time_ms": 1234,
             "cost": 0.0045,
             "cached": False,
@@ -91,7 +93,8 @@ def sample_inference_response():
         }],
         "total_count": 1,
         "offset": 0,
-        "limit": 10
+        "limit": 10,
+        "has_more": False  # Required field
     }
 
 
@@ -106,22 +109,41 @@ class TestMetricProxyEndpoints:
         from budapp.metric_ops.services import BudMetricService
 
         # Mock database queries
-        mock_db_session.execute = AsyncMock()
+        mock_db_session.execute = Mock()
+        mock_db_session.scalars = Mock()
         mock_db_session.execute.side_effect = [
             Mock(scalar_one_or_none=Mock(return_value=mock_project)),  # Project query
             Mock(scalars=Mock(return_value=Mock(all=Mock(return_value=[mock_project])))),  # Projects batch query
             Mock(scalars=Mock(return_value=Mock(all=Mock(return_value=[mock_endpoint])))),  # Endpoints batch query
             Mock(scalars=Mock(return_value=Mock(all=Mock(return_value=[mock_model])))),  # Models batch query
         ]
+        mock_db_session.scalars.side_effect = [
+            Mock(all=Mock(return_value=[mock_user.id])),  # Project membership check
+        ]
 
-        # Mock budmetrics client
-        with patch('budapp.metric_ops.services.aiohttp.ClientSession') as mock_session:
-            mock_response = Mock()
-            mock_response.status = 200
-            mock_response.json = AsyncMock(return_value=sample_inference_response)
-            mock_session.return_value.__aenter__.return_value.post.return_value.__aenter__.return_value = mock_response
+        # Create a mock for aiohttp.ClientSession that properly implements async context manager
+        from unittest.mock import create_autospec
 
-            service = BudMetricService()
+        # Create mock response
+        mock_response = Mock()
+        mock_response.status = 200
+        mock_response.json = AsyncMock(return_value=sample_inference_response)
+
+        # Create mock session with post method returning a context manager
+        mock_session = Mock()
+        mock_post_context = Mock()
+        mock_post_context.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_post_context.__aexit__ = AsyncMock(return_value=None)
+        mock_session.post = Mock(return_value=mock_post_context)
+
+        # Create mock session context manager
+        mock_session_context = Mock()
+        mock_session_context.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session_context.__aexit__ = AsyncMock(return_value=None)
+
+        with patch('aiohttp.ClientSession', return_value=mock_session_context):
+
+            service = BudMetricService(mock_db_session)
             request = InferenceListRequest(
                 project_id=uuid.UUID(mock_project.id),
                 from_date=datetime.utcnow() - timedelta(days=7),
@@ -129,14 +151,14 @@ class TestMetricProxyEndpoints:
                 offset=0
             )
 
-            service.set_db_session(mock_db_session)
             response = await service.list_inferences(request, mock_user)
 
+            assert response is not None, "Response should not be None"
             assert response.total_count == 1
             assert len(response.items) == 1
             assert response.items[0].project_name == "Test Project"
             assert response.items[0].endpoint_name == "Test Endpoint"
-            assert response.items[0].model_display_name == "GPT-4"
+            assert response.items[0].model_display_name == "gpt-4"
 
     @pytest.mark.asyncio
     async def test_list_inferences_access_denied(self, mock_db_session, mock_user):
@@ -144,17 +166,17 @@ class TestMetricProxyEndpoints:
         from budapp.metric_ops.services import BudMetricService
 
         # Mock project not found
-        mock_db_session.execute = AsyncMock()
+        mock_db_session.execute = Mock()
         mock_db_session.execute.return_value.scalar_one_or_none.return_value = None
 
-        service = BudMetricService()
+        service = BudMetricService(mock_db_session)
         request = InferenceListRequest(
             project_id=uuid.uuid4(),
             from_date=datetime.utcnow() - timedelta(days=7)
         )
 
         with pytest.raises(HTTPException) as exc_info:
-            await service.list_inferences(request, mock_db_session, mock_user)
+            await service.list_inferences(request, mock_user)
 
         assert exc_info.value.status_code == 404
         assert "Project not found" in str(exc_info.value.detail)
@@ -189,7 +211,7 @@ class TestMetricProxyEndpoints:
         }
 
         # Mock database queries
-        mock_db_session.execute = AsyncMock()
+        mock_db_session.execute = Mock()
         mock_db_session.execute.return_value.scalar_one_or_none.return_value = mock_project
 
         # Mock budmetrics client
@@ -199,8 +221,7 @@ class TestMetricProxyEndpoints:
             mock_response.json = AsyncMock(return_value=sample_detail_response)
             mock_session.return_value.__aenter__.return_value.get.return_value.__aenter__.return_value = mock_response
 
-            service = BudMetricService()
-            service.set_db_session(mock_db_session)
+            service = BudMetricService(mock_db_session)
             response = await service.get_inference_details(inference_id, mock_user)
 
             assert response.inference_id == inference_id
@@ -220,10 +241,9 @@ class TestMetricProxyEndpoints:
             mock_response.text = "Inference not found"
             mock_session.return_value.__aenter__.return_value.get.return_value.__aenter__.return_value = mock_response
 
-            service = BudMetricService()
+            service = BudMetricService(mock_db_session)
 
             with pytest.raises(HTTPException) as exc_info:
-                service.set_db_session(mock_db_session)
                 await service.get_inference_details(str(uuid.uuid4()), mock_user)
 
             assert exc_info.value.status_code == 404
@@ -264,8 +284,7 @@ class TestMetricProxyEndpoints:
                 mock_response.json = AsyncMock(return_value=sample_feedback_response)
                 mock_session.return_value.__aenter__.return_value.get.return_value.__aenter__.return_value = mock_response
 
-                service = BudMetricService()
-                service.set_db_session(mock_db_session)
+                service = BudMetricService(mock_db_session)
                 response = await service.get_inference_feedback(inference_id, mock_user)
 
                 assert len(response) == 2
@@ -303,7 +322,7 @@ class TestMetricProxyEndpoints:
         }
 
         # Mock database queries
-        mock_db_session.execute = AsyncMock()
+        mock_db_session.execute = Mock()
         mock_db_session.execute.side_effect = [
             Mock(scalar_one_or_none=Mock(return_value=mock_project)),  # Project query
             Mock(scalars=Mock(return_value=Mock(all=Mock(return_value=[mock_project])))),  # Projects batch
@@ -318,13 +337,11 @@ class TestMetricProxyEndpoints:
             mock_response.json = AsyncMock(return_value=sample_response)
             mock_session.return_value.__aenter__.return_value.post.return_value.__aenter__.return_value = mock_response
 
-            service = BudMetricService()
+            service = BudMetricService(mock_db_session)
             request = InferenceListRequest(
                 project_id=uuid.UUID(mock_project.id),
                 from_date=datetime.utcnow() - timedelta(days=7)
             )
-
-            service.set_db_session(mock_db_session)
             response = await service.list_inferences(request, mock_user)
 
             # Should still return data, but without enriched names
