@@ -56,7 +56,7 @@ class EndpointDataManager(DataManagerUtils):
 
     async def get_all_active_endpoints(
         self,
-        project_id: UUID,
+        project_id: Optional[UUID],
         offset: int = 0,
         limit: int = 10,
         filters: Dict[str, Any] = {},
@@ -102,9 +102,7 @@ class EndpointDataManager(DataManagerUtils):
                 .join(Model)
                 .outerjoin(ClusterModel)
                 .filter(or_(*search_conditions))
-                .filter(
-                    and_(EndpointModel.status != EndpointStatusEnum.DELETED, EndpointModel.project_id == project_id)
-                )
+                .filter(EndpointModel.status != EndpointStatusEnum.DELETED)
             )
             count_stmt = (
                 select(func.count())
@@ -112,9 +110,7 @@ class EndpointDataManager(DataManagerUtils):
                 .join(Model)
                 .outerjoin(ClusterModel)
                 .filter(and_(*search_conditions))
-                .filter(
-                    and_(EndpointModel.status != EndpointStatusEnum.DELETED, EndpointModel.project_id == project_id)
-                )
+                .filter(EndpointModel.status != EndpointStatusEnum.DELETED)
             )
         else:
             stmt = select(EndpointModel).join(Model).outerjoin(ClusterModel)
@@ -122,12 +118,11 @@ class EndpointDataManager(DataManagerUtils):
             for key, value in filters.items():
                 stmt = stmt.filter(getattr(EndpointModel, key) == value)
                 count_stmt = count_stmt.filter(getattr(EndpointModel, key) == value)
-            stmt = stmt.filter(
-                and_(EndpointModel.status != EndpointStatusEnum.DELETED, EndpointModel.project_id == project_id)
-            )
-            count_stmt = count_stmt.filter(
-                and_(EndpointModel.status != EndpointStatusEnum.DELETED, EndpointModel.project_id == project_id)
-            )
+            stmt = stmt.filter(EndpointModel.status != EndpointStatusEnum.DELETED)
+            count_stmt = count_stmt.filter(EndpointModel.status != EndpointStatusEnum.DELETED)
+            if project_id:
+                stmt = stmt.filter(EndpointModel.project_id == project_id)
+                count_stmt = count_stmt.filter(EndpointModel.project_id == project_id)
 
         # Calculate count before applying limit and offset
         count = self.execute_scalar(count_stmt)

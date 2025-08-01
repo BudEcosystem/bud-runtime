@@ -190,15 +190,16 @@ class BudMetricService(SessionMixin):
         # Check user access to the specified project if filtered
         if request.project_id:
             # Verify user has access to the project
-            project = await ProjectDataManager(self.session).get_by_id(ProjectModel, request.project_id)
+            project = await ProjectDataManager(self.session).retrieve_project_by_fields(
+                {"id": request.project_id}, missing_ok=True
+            )
             if not project:
                 raise ClientException("Project not found", status_code=status.HTTP_404_NOT_FOUND)
 
             # Check if user is member of the project
             from ..project_ops.services import ProjectService
 
-            project_service = ProjectService()
-            project_service.set_db_session(self.session)
+            project_service = ProjectService(self.session)
             try:
                 await project_service.check_project_membership(request.project_id, current_user.id)
             except HTTPException as e:
@@ -226,6 +227,10 @@ class BudMetricService(SessionMixin):
 
                 # Enrich response with names
                 await self._enrich_inference_list(response_data)
+
+                # Add required message field for SuccessResponse
+                if "message" not in response_data:
+                    response_data["message"] = "Successfully retrieved inference list"
 
                 # Convert to response model
                 return InferenceListResponse(**response_data)
@@ -271,15 +276,16 @@ class BudMetricService(SessionMixin):
                 # Check user access to the project
                 project_id = response_data.get("project_id")
                 if project_id:
-                    project = await ProjectDataManager(self.session).get_by_id(ProjectModel, UUID(project_id))
+                    project = await ProjectDataManager(self.session).retrieve_project_by_fields(
+                        {"id": UUID(project_id)}, missing_ok=True
+                    )
                     if not project:
                         raise ClientException("Access denied", status_code=status.HTTP_403_FORBIDDEN)
 
                     # Check if user is member of the project
                     from ..project_ops.services import ProjectService
 
-                    project_service = ProjectService()
-                    project_service.set_db_session(self.session)
+                    project_service = ProjectService(self.session)
                     try:
                         await project_service.check_project_membership(UUID(project_id), current_user.id)
                     except HTTPException as e:
@@ -289,6 +295,10 @@ class BudMetricService(SessionMixin):
 
                 # Enrich response with names
                 await self._enrich_inference_detail(response_data)
+
+                # Add required message field for SuccessResponse
+                if "message" not in response_data:
+                    response_data["message"] = "Successfully retrieved inference details"
 
                 # Convert to response model
                 return InferenceDetailResponse(**response_data)
@@ -332,6 +342,10 @@ class BudMetricService(SessionMixin):
                         status_code=response.status,
                     )
 
+                # Add required message field for SuccessResponse
+                if "message" not in response_data:
+                    response_data["message"] = "Successfully retrieved inference feedback"
+
                 # Convert to response model
                 return InferenceFeedbackResponse(**response_data)
 
@@ -346,25 +360,64 @@ class BudMetricService(SessionMixin):
     async def _enrich_inference_list(self, response_data: Dict) -> None:
         """Enrich inference list with project, endpoint, and model names."""
         try:
-            from sqlalchemy import select
-
             items = response_data.get("items", [])
             if not items:
                 return
 
             # Collect unique IDs
-            # project_ids: Set[UUID] = set()
-            # model_ids: Set[UUID] = set()
-            # endpoint_ids: Set[UUID] = set()
+            project_ids: Set[UUID] = set()
+            model_ids: Set[UUID] = set()
+            endpoint_ids: Set[UUID] = set()
 
-            for _item in items:
-                # The items are already InferenceListItem-like dicts from budmetrics
-                # They don't have these IDs directly, we need to fetch from another call
-                # For now, we'll skip enrichment of list items
-                pass
+            for item in items:
+                # The items now have IDs from budmetrics
+                if project_id := item.get("project_id"):
+                    project_ids.add(UUID(project_id))
+                if endpoint_id := item.get("endpoint_id"):
+                    endpoint_ids.add(UUID(endpoint_id))
+                if model_id := item.get("model_id"):
+                    model_ids.add(UUID(model_id))
 
-            # TODO: Implement batch query to get project/endpoint/model IDs for inferences
-            # This would require another budmetrics endpoint or database access
+            # Fetch names for all IDs
+            project_names = {}
+            endpoint_names = {}
+            model_names = {}
+
+            if project_ids:
+                # Query projects (including all statuses)
+                from sqlalchemy import select
+
+                stmt = select(ProjectModel).where(ProjectModel.id.in_(list(project_ids)))
+                result = self.session.execute(stmt)
+                projects = result.scalars().all()
+                project_names = {str(p.id): p.name for p in projects}
+
+            if endpoint_ids:
+                # Query endpoints (including all statuses, even deleted)
+                from sqlalchemy import select
+
+                stmt = select(EndpointModel).where(EndpointModel.id.in_(list(endpoint_ids)))
+                result = self.session.execute(stmt)
+                endpoints = result.scalars().all()
+                endpoint_names = {str(e.id): e.name for e in endpoints}
+
+            if model_ids:
+                # Query models (including all statuses, even deleted)
+                from sqlalchemy import select
+
+                stmt = select(Model).where(Model.id.in_(list(model_ids)))
+                result = self.session.execute(stmt)
+                models = result.scalars().all()
+                model_names = {str(m.id): m.name for m in models}
+
+            # Add names to the response items
+            for item in items:
+                if project_id := item.get("project_id"):
+                    item["project_name"] = project_names.get(str(project_id))
+                if endpoint_id := item.get("endpoint_id"):
+                    item["endpoint_name"] = endpoint_names.get(str(endpoint_id))
+                if model_id := item.get("model_id"):
+                    item["model_display_name"] = model_names.get(str(model_id))
 
         except Exception as e:
             logger.warning(f"Failed to enrich inference list: {e}")
@@ -372,8 +425,6 @@ class BudMetricService(SessionMixin):
     async def _enrich_inference_detail(self, response_data: Dict) -> None:
         """Enrich inference detail with project, endpoint, and model names."""
         try:
-            from sqlalchemy import select
-
             # Get the IDs from response
             project_id = response_data.get("project_id")
             endpoint_id = response_data.get("endpoint_id")
@@ -381,17 +432,23 @@ class BudMetricService(SessionMixin):
 
             # Fetch names
             if project_id:
-                project = await ProjectDataManager(self.session).get_by_id(ProjectModel, UUID(project_id))
+                project = await ProjectDataManager(self.session).retrieve_project_by_fields(
+                    {"id": UUID(project_id)}, missing_ok=True
+                )
                 if project:
                     response_data["project_name"] = project.name
 
             if endpoint_id:
-                endpoint = await EndpointDataManager(self.session).get_by_id(EndpointModel, UUID(endpoint_id))
+                endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+                    EndpointModel, {"id": UUID(endpoint_id)}, missing_ok=True
+                )
                 if endpoint:
                     response_data["endpoint_name"] = endpoint.name
 
             if model_id:
-                model = await ModelDataManager(self.session).get_by_id(Model, UUID(model_id))
+                model = await ModelDataManager(self.session).retrieve_by_fields(
+                    Model, {"id": UUID(model_id)}, missing_ok=True
+                )
                 if model:
                     response_data["model_display_name"] = model.name
 

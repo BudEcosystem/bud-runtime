@@ -516,7 +516,7 @@ class ObservabilityMetricsService:
             }
 
         # Use parameterized query with placeholders
-        placeholders = ",".join([f"{{id_{i}:UUID}}" for i in range(len(inference_ids))])
+        placeholders = ",".join([f"%(id_{i})s" for i in range(len(inference_ids))])
         # Safe: placeholders are generated programmatically, not from user input
         existing_check_query = f"""
         SELECT inference_id
@@ -525,7 +525,7 @@ class ObservabilityMetricsService:
         """  # nosec B608
 
         # Create params dict
-        params = {f"id_{i}": id for i, id in enumerate(inference_ids)}
+        params = {f"id_{i}": inference_id for i, inference_id in enumerate(inference_ids)}
 
         existing_records = await self.clickhouse_client.execute_query(existing_check_query, params)
         existing_ids = {str(row[0]) for row in existing_records} if existing_records else set()
@@ -697,7 +697,10 @@ class ObservabilityMetricsService:
             mi.response_time_ms,
             mid.cost,
             mid.is_success,
-            mi.cached
+            mi.cached,
+            mid.project_id,
+            mid.endpoint_id,
+            mid.model_id
         FROM ModelInference mi
         INNER JOIN ModelInferenceDetails mid ON mi.inference_id = mid.inference_id
         LEFT JOIN ChatInference ci ON mi.inference_id = ci.id
@@ -729,6 +732,9 @@ class ObservabilityMetricsService:
                     cost=row[9],
                     is_success=bool(row[10]),
                     cached=bool(row[11]),
+                    project_id=row[12],
+                    endpoint_id=row[13],
+                    model_id=row[14],
                 )
             )
 
@@ -768,8 +774,8 @@ class ObservabilityMetricsService:
             mi.model_provider_name,
             mid.model_id,
             mi.system,
-            mi.input_messages,
-            mi.output,
+            coalesce(ci.input, mi.input_messages) as input_messages,
+            coalesce(ci.output, mi.output) as output,
             ci.function_name,
             ci.variant_name,
             ci.episode_id,
@@ -807,68 +813,103 @@ class ObservabilityMetricsService:
         import json
 
         try:
-            messages = json.loads(row[6]) if row[6] else []
-        except json.JSONDecodeError:
-            messages = []
+            if row[6]:
+                if isinstance(row[6], str):
+                    parsed_data = json.loads(row[6])
+                    # Handle the case where the JSON contains {"messages": [...]}
+                    if isinstance(parsed_data, dict) and "messages" in parsed_data:
+                        messages = parsed_data["messages"]
+                    elif isinstance(parsed_data, list):
+                        messages = parsed_data
+                    else:
+                        messages = []
+                elif isinstance(row[6], list):
+                    messages = row[6]
+                else:
+                    messages = []
+            else:
+                messages = []
+        except (json.JSONDecodeError, TypeError) as e:
+            logger.warning(f"Failed to parse messages for inference {inference_id}: {e}")
+            # Try to parse as a simple message format
+            messages = [{"role": "user", "content": row[6]}] if row[6] and isinstance(row[6], str) else []
 
-        # Get feedback count
-        feedback_count_query = """
-        SELECT COUNT(*) FROM (
-            SELECT target_id FROM BooleanMetricFeedback WHERE target_id = %(inference_id)s
-            UNION ALL
-            SELECT target_id FROM FloatMetricFeedback WHERE target_id = %(inference_id)s
-            UNION ALL
-            SELECT target_id FROM CommentFeedback WHERE target_id = %(inference_id)s
-            UNION ALL
-            SELECT target_id FROM DemonstrationFeedback WHERE target_id = %(inference_id)s
-        )
-        """
-        feedback_params = {"inference_id": inference_id}
-        feedback_result = await self.clickhouse_client.execute_query(feedback_count_query, feedback_params)
-        feedback_count = feedback_result[0][0] if feedback_result else 0
+        # Skip feedback queries for now
+        feedback_count = 0
+        average_rating = None
 
-        # Get average rating from float metrics
-        avg_rating_query = """
-        SELECT AVG(value)
-        FROM FloatMetricFeedback
-        WHERE target_id = %(inference_id)s
-            AND metric_name IN ('rating', 'score', 'quality')
-        """
-        rating_result = await self.clickhouse_client.execute_query(avg_rating_query, feedback_params)
-        average_rating = rating_result[0][0] if rating_result and rating_result[0][0] else None
+        # Combine system prompt with messages if it exists
+        combined_messages = []
+        if row[5]:  # system_prompt exists
+            combined_messages.append({"role": "system", "content": str(row[5])})
 
-        return InferenceDetailResponse(
-            object="inference_detail",
-            inference_id=row[0],
-            timestamp=row[1],
-            model_name=row[2],
-            model_provider=row[3] or "unknown",
-            model_id=row[4],
-            system_prompt=row[5],
-            messages=messages,
-            output=row[7] or "",
-            function_name=row[8],
-            variant_name=row[9],
-            episode_id=row[10],
-            input_tokens=row[11] or 0,
-            output_tokens=row[12] or 0,
-            response_time_ms=row[13] or 0,
-            ttft_ms=row[14],
-            processing_time_ms=row[15],
-            request_ip=row[16],
-            request_arrival_time=row[17],
-            request_forward_time=row[18],
-            project_id=row[19],
-            endpoint_id=row[20],
-            is_success=bool(row[21]),
-            cached=bool(row[22]),
-            finish_reason=row[23],
-            cost=row[24],
-            raw_request=row[25],
-            raw_response=row[26],
-            feedback_count=feedback_count,
-            average_rating=average_rating,
-        )
+        # Add the parsed messages
+        combined_messages.extend(messages)
+
+        # Add the assistant's response as the last message
+        if row[7]:  # output exists
+            try:
+                # Try to parse the output as JSON if it's a JSON string
+                output_content = json.loads(row[7])
+                # Keep the parsed JSON content as is
+                content = output_content
+            except (json.JSONDecodeError, TypeError):
+                # If it's not JSON or parsing fails, use as is
+                content = str(row[7])
+
+            combined_messages.append({"role": "assistant", "content": content})
+
+        try:
+            # Handle UUID fields properly - keep as UUID objects or convert strings to UUID
+            def safe_uuid(value):
+                if value is None:
+                    return None
+                if isinstance(value, UUID):
+                    return value
+                try:
+                    return UUID(str(value))
+                except (ValueError, TypeError):
+                    return None
+
+            # Handle potential UUID conversion for episode_id
+            episode_id = safe_uuid(row[10])
+
+            return InferenceDetailResponse(
+                object="inference_detail",
+                inference_id=safe_uuid(row[0]),  # Keep as UUID
+                timestamp=row[1],
+                model_name=str(row[2]) if row[2] else "",
+                model_provider=str(row[3]) if row[3] else "unknown",
+                model_id=safe_uuid(row[4]),  # Keep as UUID
+                system_prompt=str(row[5]) if row[5] else None,  # Keep for backward compatibility
+                messages=combined_messages,  # Now includes system, user, and assistant messages
+                output=str(row[7]) if row[7] else "",  # Keep for backward compatibility
+                function_name=str(row[8]) if row[8] else None,
+                variant_name=str(row[9]) if row[9] else None,
+                episode_id=episode_id,
+                input_tokens=int(row[11]) if row[11] else 0,
+                output_tokens=int(row[12]) if row[12] else 0,
+                response_time_ms=int(row[13]) if row[13] else 0,
+                ttft_ms=int(row[14]) if row[14] else None,
+                processing_time_ms=int(row[15]) if row[15] else None,
+                request_ip=str(row[16]) if row[16] else None,
+                request_arrival_time=row[17],
+                request_forward_time=row[18],
+                project_id=safe_uuid(row[19]),  # Keep as UUID
+                endpoint_id=safe_uuid(row[20]),  # Keep as UUID
+                is_success=bool(row[21]) if row[21] is not None else True,
+                cached=bool(row[22]) if row[22] is not None else False,
+                finish_reason=str(row[23]) if row[23] else None,
+                cost=float(row[24]) if row[24] else None,
+                raw_request=str(row[25]) if row[25] else None,
+                raw_response=str(row[26]) if row[26] else None,
+                feedback_count=feedback_count,
+                average_rating=average_rating,
+            )
+        except Exception as e:
+            logger.error(f"Failed to create InferenceDetailResponse: {e}")
+            logger.error(f"Row data: {row}")
+            raise ValueError(f"Failed to process inference data: {str(e)}") from e
 
     async def get_inference_feedback(self, inference_id: str) -> InferenceFeedbackResponse:
         """Get all feedback associated with an inference.
@@ -948,23 +989,25 @@ class ObservabilityMetricsService:
             )
 
         # Get demonstration feedback
-        demo_query = """
-        SELECT id, demonstration, created_at
-        FROM DemonstrationFeedback
-        WHERE target_id = %(inference_id)s
-        ORDER BY created_at DESC
-        """
-        demo_results = await self.clickhouse_client.execute_query(demo_query, params)
-        for row in demo_results:
-            feedback_items.append(
-                FeedbackItem(
-                    feedback_id=row[0],
-                    feedback_type="demonstration",
-                    metric_name=None,
-                    value=row[1],
-                    created_at=row[2],
-                )
-            )
+        # TODO: DemonstrationFeedback table might not exist or has different schema
+        # Commenting out for now
+        # demo_query = """
+        # SELECT id, demonstration, created_at
+        # FROM DemonstrationFeedback
+        # WHERE target_id = %(inference_id)s
+        # ORDER BY created_at DESC
+        # """
+        # demo_results = await self.clickhouse_client.execute_query(demo_query, params)
+        # for row in demo_results:
+        #     feedback_items.append(
+        #         FeedbackItem(
+        #             feedback_id=row[0],
+        #             feedback_type="demonstration",
+        #             metric_name=None,
+        #             value=row[1],
+        #             created_at=row[2],
+        #         )
+        #     )
 
         # Sort all feedback by created_at
         feedback_items.sort(key=lambda x: x.created_at, reverse=True)

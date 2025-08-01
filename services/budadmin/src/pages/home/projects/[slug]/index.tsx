@@ -270,13 +270,13 @@ const ProjectDetailsPage = () => {
                   </svg>
                   {activeTab === "5" ?
                     <Text_14_600_EEEEEE >
-                      Inferences</Text_14_600_EEEEEE>
+                      Observability</Text_14_600_EEEEEE>
                     :
-                    <Text_14_600_B3B3B3 >Inferences</Text_14_600_B3B3B3>
+                    <Text_14_600_B3B3B3 >Observability</Text_14_600_B3B3B3>
                   }
                 </div>,
                 key: '5',
-                children: <InferenceListView />
+                children: <InferenceListView projectId={selectedProjectId} />
               },
             ]}
           />

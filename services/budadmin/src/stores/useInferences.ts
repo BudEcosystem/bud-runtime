@@ -131,7 +131,7 @@ interface InferenceStore {
 
 // Default filters
 const defaultFilters: InferenceFilters = {
-  from_date: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), // Last 24 hours
+  from_date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(), // Last 30 days
   sort_by: 'timestamp',
   sort_order: 'desc',
 };
@@ -192,19 +192,27 @@ export const useInferences = create<InferenceStore>((set, get) => ({
 
       const response = await AppRequest.Post('/metrics/inferences/list', requestBody);
 
-      if (response.data.code === 200) {
+      console.log('Inference API Response:', response.data); // Debug log
+
+      // Check if response is successful (could be 200 or undefined)
+      if (response.data && response.data.items) {
+        const data = response.data;
+
+        console.log('Parsed items:', data.items); // Debug log
+        console.log('Setting state with items count:', data.items.length); // Debug log
+
         set({
-          inferences: response.data.items || [],
+          inferences: data.items,
           pagination: {
-            offset: response.data.offset,
-            limit: response.data.limit,
-            total_count: response.data.total_count,
-            has_more: response.data.has_more,
+            offset: data.offset || 0,
+            limit: data.limit || 50,
+            total_count: data.total_count || 0,
+            has_more: data.has_more || false,
           },
           isLoading: false,
         });
       } else {
-        throw new Error(response.data.message || 'Failed to fetch inferences');
+        throw new Error(response.data?.message || 'Failed to fetch inferences');
       }
     } catch (error: any) {
       const errorMsg = error?.response?.data?.message || error?.message || 'Failed to fetch inferences';
@@ -226,10 +234,10 @@ export const useInferences = create<InferenceStore>((set, get) => ({
           isLoadingDetail: false,
         });
       } else {
-        throw new Error(response.data.message || 'Failed to fetch inference details');
+        throw new Error(response.data.message || 'Failed to fetch observability details');
       }
     } catch (error: any) {
-      const errorMsg = error?.response?.data?.message || error?.message || 'Failed to fetch inference details';
+      const errorMsg = error?.response?.data?.message || error?.message || 'Failed to fetch observability details';
       message.error(errorMsg);
       set({ error: errorMsg, isLoadingDetail: false });
     }

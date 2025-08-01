@@ -357,7 +357,7 @@ const InferenceDetailModal: React.FC<InferenceDetailModalProps> = ({
 
   return (
     <Modal
-      title="Inference Details"
+      title="Observability Details"
       visible={visible}
       onCancel={onClose}
       width={900}
@@ -446,7 +446,7 @@ const InferenceDetailModal: React.FC<InferenceDetailModalProps> = ({
           </TabPane>
         </Tabs>
       ) : (
-        <Empty description="Failed to load inference details" />
+        <Empty description="Failed to load observability details" />
       )}
     </Modal>
   );

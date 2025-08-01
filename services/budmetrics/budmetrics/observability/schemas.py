@@ -284,6 +284,9 @@ class InferenceListItem(BaseModel):
     cost: Optional[float] = None
     is_success: bool
     cached: bool
+    project_id: Optional[UUID] = None
+    endpoint_id: Optional[UUID] = None
+    model_id: Optional[UUID] = None
 
 
 class InferenceListResponse(ResponseBase):

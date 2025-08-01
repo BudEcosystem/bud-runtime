@@ -91,7 +91,9 @@ async def list_all_endpoints(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
     filters: Annotated[EndpointFilter, Depends()],
-    project_id: UUID = Query(description="List endpoints by project id"),
+    project_id: Optional[UUID] = Query(
+        None, description="List endpoints by project id. If not provided, returns all endpoints across all projects."
+    ),
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=0),
     order_by: Optional[List[str]] = Depends(parse_ordering_fields),

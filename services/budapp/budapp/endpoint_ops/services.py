@@ -107,7 +107,7 @@ class EndpointService(SessionMixin):
 
     async def get_all_endpoints(
         self,
-        project_id: UUID,
+        project_id: Optional[UUID],
         offset: int = 0,
         limit: int = 10,
         filters: Dict = {},
@@ -120,8 +120,9 @@ class EndpointService(SessionMixin):
             # Otherwise it will perform global search on all fields
             filters.pop("status", None)
 
-        # Validate project_id
-        await ProjectDataManager(self.session).retrieve_by_fields(ProjectModel, {"id": project_id})
+        if project_id:
+            # Validate project_id if provided
+            await ProjectDataManager(self.session).retrieve_by_fields(ProjectModel, {"id": project_id})
 
         return await EndpointDataManager(self.session).get_all_active_endpoints(
             project_id, offset, limit, filters, order_by, search
