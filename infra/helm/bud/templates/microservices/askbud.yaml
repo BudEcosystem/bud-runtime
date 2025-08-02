@@ -12,6 +12,7 @@ spec:
       labels:
         app: {{ .Release.Name }}-askbud
       annotations:
+        date: "{{ now }}"
         dapr.io/enabled: "true"
         dapr.io/app-id: "askbud"
         dapr.io/app-port: "3000"
@@ -20,7 +21,7 @@ spec:
       containers:
       - name: askbud
         image: {{ .Values.microservices.askbud.image }}
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         command: ["sh", "-c", "uvicorn askbud.main:app --host 0.0.0.0 --port 3000"]
         ports:
         - containerPort: 3000

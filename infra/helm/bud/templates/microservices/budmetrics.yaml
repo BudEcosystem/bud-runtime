@@ -12,6 +12,7 @@ spec:
       labels:
         app: {{ .Release.Name }}-budmetrics
       annotations:
+        date: "{{ now }}"
         dapr.io/enabled: "true"
         dapr.io/app-id: "budmetrics"
         dapr.io/app-port: "3005"
@@ -19,7 +20,7 @@ spec:
       containers:
       - name: {{ .Release.Name }}-budmetrics
         image: {{ .Values.microservices.budmetrics.image }}
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         command: ["sh", "-c", "python3 scripts/migrate_clickhouse.py && uvicorn budmetrics.main:app --host 0.0.0.0 --port 3005"]
         ports:
         - containerPort: 3005

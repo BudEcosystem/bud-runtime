@@ -7,8 +7,7 @@
     ./disko.nix
 
     ./modules/k3s.nix
-    ./modules/wireguard.nix
-    ./modules/auto.nix
+    ./modules/cd
   ];
 
   boot.loader.systemd-boot.enable = true;
