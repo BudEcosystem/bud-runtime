@@ -8,7 +8,11 @@ from pydantic import ValidationError
 
 from budmetrics.commons.schemas import BulkCloudEventBase
 from budmetrics.observability.schemas import (
+    InferenceDetailResponse,
     InferenceDetailsMetrics,
+    InferenceFeedbackResponse,
+    InferenceListRequest,
+    InferenceListResponse,
     ObservabilityMetricsRequest,
     ObservabilityMetricsResponse,
 )
@@ -196,5 +200,96 @@ async def get_analytics(request: ObservabilityMetricsRequest) -> Response:
         response = ErrorResponse(message=f"Error getting analytics: {str(e)}")
     # finally:
     #     await service.close()
+
+    return response.to_http_response()
+
+
+@observability_router.post("/inferences/list", tags=["Observability"])
+async def list_inference_requests(request: InferenceListRequest) -> Response:
+    """List inference requests with pagination and filtering.
+
+    This endpoint retrieves inference requests from ClickHouse with support for:
+    - Pagination (offset/limit)
+    - Filtering by project, endpoint, model, date range, success status
+    - Token range and latency filtering
+    - Sorting by timestamp, tokens, latency, or cost
+
+    Args:
+        request (InferenceListRequest): The list request parameters.
+
+    Returns:
+        HTTP response containing paginated inference list.
+    """
+    response: Union[InferenceListResponse, ErrorResponse]
+
+    try:
+        response = await service.list_inferences(request)
+    except ValidationError as e:
+        logger.error(f"Validation error: {e}")
+        response = ErrorResponse(message=f"Validation error: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error listing inferences: {e}")
+        response = ErrorResponse(message=f"Error listing inferences: {str(e)}")
+
+    return response.to_http_response()
+
+
+@observability_router.get("/inferences/{inference_id}", tags=["Observability"])
+async def get_inference_details(inference_id: str) -> Response:
+    """Get complete details for a single inference.
+
+    This endpoint retrieves full inference details including:
+    - Complete prompt and response content
+    - Model and provider information
+    - Performance metrics (latency, TTFT, tokens)
+    - Request metadata and timestamps
+    - Feedback summary
+
+    Args:
+        inference_id (str): The UUID of the inference to retrieve.
+
+    Returns:
+        HTTP response containing detailed inference information.
+    """
+    response: Union[InferenceDetailResponse, ErrorResponse]
+
+    try:
+        response = await service.get_inference_details(inference_id)
+    except ValidationError as e:
+        logger.error(f"Validation error: {e}")
+        response = ErrorResponse(message=f"Validation error: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error getting inference details: {e}")
+        response = ErrorResponse(message=f"Error getting inference details: {str(e)}")
+
+    return response.to_http_response()
+
+
+@observability_router.get("/inferences/{inference_id}/feedback", tags=["Observability"])
+async def get_inference_feedback(inference_id: str) -> Response:
+    """Get all feedback associated with an inference.
+
+    This endpoint retrieves all feedback types for an inference:
+    - Boolean metrics
+    - Float metrics
+    - Comment feedback
+    - Demonstration feedback
+
+    Args:
+        inference_id (str): The UUID of the inference.
+
+    Returns:
+        HTTP response containing aggregated feedback data.
+    """
+    response: Union[InferenceFeedbackResponse, ErrorResponse]
+
+    try:
+        response = await service.get_inference_feedback(inference_id)
+    except ValidationError as e:
+        logger.error(f"Validation error: {e}")
+        response = ErrorResponse(message=f"Validation error: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error getting inference feedback: {e}")
+        response = ErrorResponse(message=f"Error getting inference feedback: {str(e)}")
 
     return response.to_http_response()

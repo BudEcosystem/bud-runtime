@@ -26,6 +26,7 @@
               "pages": [
                 "features/gateway",
                 "features/multi-lora-support",
+                "features/observability",
                 "features/images",
                 "features/settings",
                 "features/navigation",

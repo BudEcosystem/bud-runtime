@@ -57,24 +57,21 @@ repos:
       - id: ruff-format
         types_or: [python, pyi, jupyter]
 
-  # Python type checking (MyPy) - TEMPORARILY DISABLED due to extensive type errors requiring major refactoring
-  # TODO: Re-enable after fixing type errors in services
-  # - repo: https://github.com/pre-commit/mirrors-mypy
-  #   rev: v1.11.0
-  #   hooks:
-  #     - id: mypy
-  #       types_or: [python, pyi]
-  #       files: ^services/(budcluster|budsim|budmodel|budmetrics|budnotify|ask-bud)/ # TODO: add budapp back
-  #       exclude: ^services/.*/(setup\.py|tests/conftest\.py|alembic/.*\.py)$
-  #       additional_dependencies:
-  #         - "pydantic>=1.10.4"
-  #         - ujson
-  #         - types-requests
-  #         - types-PyYAML
-  #         - types-ujson
-  #         - fastapi
-  #         - sqlalchemy
-  #       args: [--ignore-missing-imports]
+  # Python type checking (MyPy)
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.11.0
+    hooks:
+      - id: mypy
+        types_or: [python, pyi]
+        files: ^services/(budnotify|ask-bud)/ # TODO: add budapp|budmetrics|budcluster|budsim|budmodel back
+        exclude: ^services/.*/(setup\.py|tests/conftest\.py|alembic/.*\.py)$
+        additional_dependencies:
+          - "pydantic>=1.10.4"
+          - ujson
+          - types-ujson
+          - fastapi
+          - sqlalchemy
+        args: [--ignore-missing-imports]
 
   # Rust formatting and linting (for budgateway)
   - repo: local

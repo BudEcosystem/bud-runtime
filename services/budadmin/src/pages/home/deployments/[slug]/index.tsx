@@ -116,8 +116,8 @@ const ProjectDetailsPage = () => {
                 `${clusterDetails?.name}`
               ]}
               urls={[
-                `/home/${pageSource.toLocaleLowerCase()}`,
-                `/home/${pageSource.toLocaleLowerCase()}/${projectId ? projectId : clusterDetails?.cluster?.id}`,
+                `/${pageSource.toLocaleLowerCase()}`,
+                `/${pageSource.toLocaleLowerCase()}/${projectId ? projectId : clusterDetails?.cluster?.id}`,
                 ``
               ]}
             />

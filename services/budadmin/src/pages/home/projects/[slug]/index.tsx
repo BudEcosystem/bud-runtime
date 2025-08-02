@@ -27,6 +27,7 @@ import useHandleRouteChange from "@/lib/useHandleRouteChange";
 import { PermissionEnum, useUser } from "src/stores/useUser";
 import ComingSoon from "@/components/ui/comingSoon";
 import ClustersListTable from "@/components/ui/bud/table/ClustersListTable";
+import InferenceListView from "./inferences";
 
 const ProjectDetailsPage = () => {
   const { hasProjectPermission, hasPermission } = useUser();
@@ -261,6 +262,21 @@ const ProjectDetailsPage = () => {
                 </div>,
                 key: '4',
                 children: <ClustersListTable />
+              },
+              {
+                label: <div className="flex items-center gap-[0.375rem]">
+                  <svg xmlns="http://www.w3.org/2000/svg" width=".875rem" height=".875rem" viewBox="0 0 14 15" fill="none">
+                    <path fillRule="evenodd" clipRule="evenodd" d="M1.75 2.11719C1.50828 2.11719 1.3125 2.31296 1.3125 2.55469V12.4922C1.3125 12.7339 1.50828 12.9297 1.75 12.9297H12.25C12.4917 12.9297 12.6875 12.7339 12.6875 12.4922V4.74219C12.6875 4.50046 12.4917 4.30469 12.25 4.30469H7.875C7.71148 4.30469 7.56147 4.21718 7.48353 4.07718L6.39147 2.11719H1.75ZM0.4375 2.55469C0.4375 1.82951 1.02483 1.24219 1.75 1.24219H6.625C6.78852 1.24219 6.93853 1.3297 7.01647 1.4697L8.10853 3.42969H12.25C12.9752 3.42969 13.5625 4.01701 13.5625 4.74219V12.4922C13.5625 13.2174 12.9752 13.8047 12.25 13.8047H1.75C1.02483 13.8047 0.4375 13.2174 0.4375 12.4922V2.55469Z" fill="#B3B3B3"/>
+                  </svg>
+                  {activeTab === "5" ?
+                    <Text_14_600_EEEEEE >
+                      Observability</Text_14_600_EEEEEE>
+                    :
+                    <Text_14_600_B3B3B3 >Observability</Text_14_600_B3B3B3>
+                  }
+                </div>,
+                key: '5',
+                children: <InferenceListView projectId={selectedProjectId} />
               },
             ]}
           />

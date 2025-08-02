@@ -140,7 +140,6 @@ createEndPoint: (data: any) => Promise<any>;
     set({ pageTitle: title });
   },
 getEndpointClusterDetails: async (endpointId: string, projectId?) => {
-    console.log("projectId projectId", projectId)
     set({ loading: true });
     const url = `${tempApiBaseUrl}/endpoints/${endpointId}/model-cluster-detail`;
 
@@ -167,19 +166,29 @@ getEndpointClusterDetails: async (endpointId: string, projectId?) => {
     const url = `${tempApiBaseUrl}/endpoints/`;
     set({ loading: true });
     try {
+      const params: any = {
+        page: page,
+        limit: limit,
+        search: name ? true : false,
+        name: name ? name : undefined,
+        order_by: order_by,
+      };
+
+      // Only add project_id if it's provided (not null)
+      if (id) {
+        params.project_id = id;
+      }
+
+      const headers: any = {};
+      // Only add headers if id is provided
+      if (id) {
+        headers["x-resource-type"] = "project";
+        headers["x-entity-id"] = id;
+      }
+
       const response: any = await AppRequest.Get(url, {
-        params: {
-          project_id: id,
-          page: page,
-          limit: limit,
-          search: name ? true : false,
-          name: name ? name : undefined,
-          order_by: order_by,
-        },
-        headers: {
-          "x-resource-type": "project",
-          "x-entity-id": id,
-        },
+        params,
+        headers,
       });
       const listData = response.data;
       // const updatedListData =
