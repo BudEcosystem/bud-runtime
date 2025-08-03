@@ -2639,7 +2639,7 @@ async fn test_dummy_only_embedded_gateway_no_config() {
     };
 
     // Sleep to allow time for data to be inserted into ClickHouse (trailing writes from API)
-    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
     // Check if ClickHouse is ok - ChatInference Table
     let clickhouse = get_clickhouse().await;
