@@ -56,6 +56,15 @@ class PromptExecutorService:
             ClientException: If validation or execution fails
         """
         try:
+            # Validate content field exists in schemas
+            if request.output_schema and "properties" in request.output_schema:
+                if "content" not in request.output_schema["properties"]:
+                    raise ClientException(status_code=400, message="Output schema must contain a 'content' field")
+
+            if request.input_schema and "properties" in request.input_schema:
+                if "content" not in request.input_schema["properties"]:
+                    raise ClientException(status_code=400, message="Input schema must contain a 'content' field")
+
             # Execute the prompt with input_data from request
             result = await self.executor.execute(
                 deployment_name=request.deployment_name,

@@ -17,11 +17,12 @@
 """Prompt executors for running AI prompts."""
 
 import logging
-from typing import Any, Dict, List, Optional, Type, Union
+from typing import Any, Dict, List, Optional, Type, Union, get_args, get_origin
 
 from pydantic import BaseModel, ValidationError
 from pydantic_ai import Agent
 from pydantic_ai.models.openai import ModelSettings as OpenAIModelSettings
+from pydantic_ai.output import NativeOutput
 
 from budprompt.commons.exceptions import PromptExecutionException, SchemaGenerationException
 from budprompt.shared.providers import BudServeProvider
@@ -32,6 +33,34 @@ from .utils import validate_input_data_type
 
 
 logger = logging.getLogger(__name__)
+
+
+def _contains_pydantic_model(output_type: Any) -> bool:
+    """Check if a type contains a Pydantic BaseModel.
+
+    Handles:
+    - Direct BaseModel: MyModel
+    - List of BaseModel: List[MyModel]
+    - Union with BaseModel: Union[str, MyModel]
+    - Nested combinations: List[Union[str, MyModel]]
+    """
+    # Direct BaseModel check
+    if isinstance(output_type, type) and issubclass(output_type, BaseModel):
+        return True
+
+    # Get origin and args for generic types
+    origin = get_origin(output_type)
+    args = get_args(output_type)
+
+    if origin is list and args:
+        # List[SomeType] - check the item type
+        return _contains_pydantic_model(args[0])
+
+    if origin is Union and args:
+        # Union[Type1, Type2, ...] - check if any type is BaseModel
+        return any(_contains_pydantic_model(arg) for arg in args)
+
+    return False
 
 
 class SimplePromptExecutor:
@@ -94,12 +123,7 @@ class SimplePromptExecutor:
                 validated_input = input_data
 
             # Handle output type
-            if output_schema is not None:
-                # Structured output: create Pydantic model
-                output_type = await self._get_pydantic_model(output_schema, "OutputModel")
-            else:
-                # Unstructured output: use str type
-                output_type = str
+            output_type = await self._get_output_type(output_schema)
 
             # Create AI agent with appropriate output type
             agent = await self._create_agent(deployment_name, model_settings, output_type, system_prompt)
@@ -124,6 +148,30 @@ class SimplePromptExecutor:
             logger.error(f"Prompt execution failed: {str(e)}")
             raise PromptExecutionException("Failed to execute prompt")
 
+    async def _get_output_type(self, output_schema: Optional[Dict[str, Any]]) -> Any:
+        """Extract output type from schema's content field.
+
+        Args:
+            output_schema: JSON schema with content field
+
+        Returns:
+            The type of the content field, wrapped in NativeOutput if it contains BaseModel
+        """
+        if output_schema is None:
+            return str
+
+        # Generate Pydantic model from schema
+        output_model = await self._get_pydantic_model(output_schema, "OutputModel")
+
+        # Extract type from content field using Pydantic v2 field access
+        output_type = output_model.__pydantic_fields__["content"].annotation
+
+        # Return NativeOutput if type contains BaseModel, otherwise return raw type
+        if _contains_pydantic_model(output_type):
+            return NativeOutput(output_type)
+        else:
+            return output_type
+
     async def _get_pydantic_model(self, schema: Dict[str, Any], model_name: str) -> Type[BaseModel]:
         """Convert JSON schema to Pydantic model.
 
@@ -144,7 +192,7 @@ class SimplePromptExecutor:
         self,
         deployment_name: str,
         model_settings: ModelSettings,
-        output_type: Union[Type[BaseModel], Type[str]],
+        output_type: Union[Type[BaseModel], Type[str], NativeOutput],
         system_prompt: str,
     ) -> Agent:
         """Create Pydantic AI agent.

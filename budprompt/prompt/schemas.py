@@ -97,11 +97,11 @@ class PromptExecuteResponse(SuccessResponse):
 
     Attributes:
         success: Whether the execution was successful
-        data: The generated output data (Dict for structured, str for unstructured)
+        data: The generated output data (any supported type)
         error: Error message if execution failed
         metadata: Additional metadata about the execution
     """
 
-    data: Optional[Union[Dict[str, Any], str]] = Field(
-        None, description="Generated output (Dict for structured, str for unstructured)"
+    data: Optional[Any] = Field(
+        None, description="Generated output (can be any supported type: dict, str, int, float, bool, list)"
     )

@@ -120,7 +120,7 @@ class PydanticModelGenerator:
                 output_model_type=DataModelType.PydanticV2BaseModel,
                 use_standard_collections=True,
                 field_constraints=True,
-                use_annotated=True,
+                use_annotated=False,
                 class_name=model_name,
             )
 
