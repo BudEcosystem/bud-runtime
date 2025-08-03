@@ -794,7 +794,9 @@ class ObservabilityMetricsService:
             mi.finish_reason,
             mid.cost,
             mi.raw_request,
-            mi.raw_response
+            mi.raw_response,
+            mi.gateway_request,
+            mi.gateway_response
         FROM ModelInference mi
         INNER JOIN ModelInferenceDetails mid ON mi.inference_id = mid.inference_id
         LEFT JOIN ChatInference ci ON mi.inference_id = ci.id
@@ -903,6 +905,8 @@ class ObservabilityMetricsService:
                 cost=float(row[24]) if row[24] else None,
                 raw_request=str(row[25]) if row[25] else None,
                 raw_response=str(row[26]) if row[26] else None,
+                gateway_request=str(row[27]) if row[27] else None,
+                gateway_response=str(row[28]) if row[28] else None,
                 feedback_count=feedback_count,
                 average_rating=average_rating,
             )

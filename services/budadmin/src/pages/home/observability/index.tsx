@@ -3,6 +3,7 @@ import { Button, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { DownloadOutlined, ReloadOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { format } from 'date-fns';
+import { formatTimestamp } from '@/utils/formatDate';
 import { useRouter } from 'next/router';
 import { useInferences, InferenceListItem } from '@/stores/useInferences';
 import InferenceFilters from '@/components/inferences/InferenceFilters';
@@ -16,6 +17,7 @@ import { formatDate } from 'src/utils/formatDate';
 import { useLoaderOnLoding } from 'src/hooks/useLoaderOnLoading';
 import DashBoardLayout from '../layout';
 import PageHeader from '@/components/ui/pageHeader';
+import { ClientTimestamp } from '@/components/ui/ClientTimestamp';
 
 const { Text } = Typography;
 
@@ -75,7 +77,7 @@ const ObservabilityPage: React.FC = () => {
       key: 'timestamp',
       width: 180,
       render: (timestamp: string) => (
-        <Text_12_400_EEEEEE>{format(new Date(timestamp), 'MMM dd, HH:mm:ss')}</Text_12_400_EEEEEE>
+        <Text_12_400_EEEEEE><ClientTimestamp timestamp={timestamp} /></Text_12_400_EEEEEE>
       ),
       sorter: true,
       sortIcon: SortIcon,

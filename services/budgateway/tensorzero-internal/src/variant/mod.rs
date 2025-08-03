@@ -77,6 +77,8 @@ pub struct InferenceConfig<'a, 'request> {
     /// to have different cache keys.
     /// This field should only ever be forwarded to `ModelInferenceRequest`
     pub extra_cache_key: Option<String>,
+    /// The original request received by the gateway from the client
+    pub gateway_request: Option<String>,
 }
 
 /// Maps to the subset of Config that applies to the current inference request.
@@ -115,6 +117,7 @@ impl<'a> BatchInferenceConfig<'a> {
                 extra_body: Default::default(),
                 extra_headers: Default::default(),
                 extra_cache_key: None,
+                gateway_request: None, // Not supported for batch inference requests
             },
         )
         .collect()
@@ -131,6 +134,8 @@ pub struct ModelUsedInfo {
     pub inference_params: InferenceParams,
     pub previous_model_inference_results: Vec<ModelInferenceResponseWithMetadata>,
     pub cached: bool,
+    /// The original request received by the gateway from the client
+    pub gateway_request: Option<String>,
 }
 
 pub trait Variant {
@@ -542,6 +547,7 @@ where
                 n: inference_params.chat_completion.n,
                 logit_bias: inference_params.chat_completion.logit_bias.clone(),
                 user: inference_params.chat_completion.user.clone(),
+                gateway_request: inference_config.gateway_request.clone(),
             }
         }
         FunctionConfig::Json(json_config) => {
@@ -619,6 +625,7 @@ where
                 n: inference_params.chat_completion.n,
                 logit_bias: inference_params.chat_completion.logit_bias.clone(),
                 user: inference_params.chat_completion.user.clone(),
+                gateway_request: inference_config.gateway_request.clone(),
             }
         }
     })
@@ -714,6 +721,7 @@ async fn infer_model_request_stream<'request>(
         system,
         input_messages,
         cached,
+        gateway_request: None, // TODO: This should be passed from the request
     };
     let config_type = function.config_type();
     let stream =

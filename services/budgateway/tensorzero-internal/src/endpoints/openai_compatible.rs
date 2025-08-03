@@ -26,8 +26,8 @@ use uuid::Uuid;
 
 use crate::cache::CacheParamsOptions;
 use crate::endpoints::inference::{
-    inference, ChatCompletionInferenceParams, InferenceClients, InferenceCredentials,
-    InferenceParams, Params,
+    inference, write_inference, ChatCompletionInferenceParams, InferenceClients,
+    InferenceCredentials, InferenceParams, Params,
 };
 use crate::error::{Error, ErrorDetails};
 use crate::gateway_util::{AppState, AppStateData, StructuredJson};
@@ -86,6 +86,55 @@ fn merge_credentials_from_store(
     credentials
 }
 
+/// Helper function to serialize JSON without null values
+pub(crate) fn serialize_without_nulls<T: Serialize>(
+    value: &T,
+) -> Result<String, serde_json::Error> {
+    let value = serde_json::to_value(value)?;
+
+    fn remove_nulls(value: Value) -> Value {
+        match value {
+            Value::Object(map) => {
+                let mut cleaned = Map::new();
+                for (k, v) in map {
+                    match v {
+                        Value::Null => continue,
+                        Value::Object(_) => {
+                            cleaned.insert(k, remove_nulls(v));
+                        }
+                        Value::Array(arr) => {
+                            let cleaned_arr: Vec<Value> = arr
+                                .into_iter()
+                                .map(remove_nulls)
+                                .filter(|v| !matches!(v, Value::Null))
+                                .collect();
+                            if !cleaned_arr.is_empty() {
+                                cleaned.insert(k, Value::Array(cleaned_arr));
+                            }
+                        }
+                        other => {
+                            cleaned.insert(k, other);
+                        }
+                    }
+                }
+                Value::Object(cleaned)
+            }
+            Value::Array(arr) => {
+                let cleaned: Vec<Value> = arr
+                    .into_iter()
+                    .map(remove_nulls)
+                    .filter(|v| !matches!(v, Value::Null))
+                    .collect();
+                Value::Array(cleaned)
+            }
+            other => other,
+        }
+    }
+
+    let cleaned = remove_nulls(value);
+    serde_json::to_string(&cleaned)
+}
+
 /// A handler for the OpenAI-compatible inference endpoint
 #[debug_handler(state = AppStateData)]
 pub async fn inference_handler(
@@ -122,6 +171,9 @@ pub async fn inference_handler(
 
     let original_model_name = model_resolution.original_model_name.to_string();
 
+    // Capture the gateway request (without null values)
+    let gateway_request = serialize_without_nulls(&openai_compatible_params).ok();
+
     // Create params with resolved model/function names
     let mut params = Params::try_from_openai_with_resolution(
         headers.clone(),
@@ -154,18 +206,25 @@ pub async fn inference_handler(
         });
     }
 
+    // Set the gateway request on params
+    params.gateway_request = gateway_request;
+
     let response = inference(
-        config,
+        config.clone(),
         &http_client,
-        clickhouse_connection_info,
-        kafka_connection_info,
+        clickhouse_connection_info.clone(),
+        kafka_connection_info.clone(),
         model_credential_store,
         params,
     )
     .await?;
 
     match response {
-        InferenceOutput::NonStreaming(response) => {
+        InferenceOutput::NonStreaming {
+            response,
+            result,
+            write_info,
+        } => {
             let mut openai_compatible_response =
                 OpenAICompatibleResponse::from((response.clone(), original_model_name.clone()));
 
@@ -203,6 +262,40 @@ pub async fn inference_handler(
                     }
                 }
             }
+            // Capture the gateway response (without null values)
+            let gateway_response = serialize_without_nulls(&openai_compatible_response).ok();
+
+            // Perform the database write if we have write info
+            if let Some(write_info) = write_info {
+                let config = config.clone();
+                let clickhouse_connection_info = clickhouse_connection_info.clone();
+                let kafka_connection_info = kafka_connection_info.clone();
+                let async_writes = config.gateway.observability.async_writes;
+
+                let write_future = tokio::spawn(async move {
+                    write_inference(
+                        &clickhouse_connection_info,
+                        &kafka_connection_info,
+                        &config,
+                        write_info.resolved_input,
+                        result,
+                        write_info.metadata,
+                        write_info.observability_metadata,
+                        write_info.gateway_request,
+                        gateway_response,
+                    )
+                    .await;
+                });
+
+                if !async_writes {
+                    write_future.await.map_err(|e| {
+                        Error::new(ErrorDetails::InternalError {
+                            message: format!("Failed to join write task: {e}"),
+                        })
+                    })?;
+                }
+            }
+
             Ok(Json(openai_compatible_response).into_response())
         }
         InferenceOutput::Streaming(stream) => {
@@ -246,29 +339,29 @@ pub struct OpenAICompatibleToolCallChunk {
     pub function: OpenAICompatibleFunctionCall,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 struct OpenAICompatibleSystemMessage {
     content: Value,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 struct OpenAICompatibleUserMessage {
     content: Value,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 struct OpenAICompatibleAssistantMessage {
     content: Option<Value>,
     tool_calls: Option<Vec<OpenAICompatibleToolCall>>,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 struct OpenAICompatibleToolMessage {
     content: Option<Value>,
     tool_call_id: String,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(tag = "role")]
 #[serde(rename_all = "lowercase")]
 enum OpenAICompatibleMessage {
@@ -279,7 +372,7 @@ enum OpenAICompatibleMessage {
     Tool(OpenAICompatibleToolMessage),
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
 enum OpenAICompatibleResponseFormat {
@@ -288,14 +381,14 @@ enum OpenAICompatibleResponseFormat {
     JsonObject,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(untagged)]
 enum JsonSchemaInfoOption {
     JsonSchema(JsonSchemaInfo),
     DeprecatedJsonSchema(Value),
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 struct JsonSchemaInfo {
     name: String,
     description: Option<String>,
@@ -304,7 +397,7 @@ struct JsonSchemaInfo {
     strict: bool,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(tag = "type", content = "function")]
 #[serde(rename_all = "snake_case")]
 enum OpenAICompatibleTool {
@@ -317,13 +410,13 @@ enum OpenAICompatibleTool {
     },
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 struct FunctionName {
     name: String,
 }
 
 /// Specifies a tool the model should use. Use to force the model to call a specific function.
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 struct OpenAICompatibleNamedToolChoice {
     /// The type of the tool. Currently, only `function` is supported.
     r#type: String,
@@ -337,7 +430,7 @@ struct OpenAICompatibleNamedToolChoice {
 /// Specifying a particular tool via `{"type": "function", "function": {"name": "my_function"}}` forces the model to call that tool.
 ///
 /// `none` is the default when no tools are present. `auto` is the default if tools are present.
-#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
 enum ChatCompletionToolChoiceOption {
     #[default]
@@ -348,14 +441,14 @@ enum ChatCompletionToolChoiceOption {
     Named(OpenAICompatibleNamedToolChoice),
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 struct OpenAICompatibleStreamOptions {
     #[serde(default)]
     include_usage: bool,
 }
 
 /// Helper type for parameters that can be either a single string or an array of strings
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(untagged)]
 enum StringOrVec {
     String(String),
@@ -372,7 +465,7 @@ impl StringOrVec {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Default)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Default, Serialize)]
 pub struct OpenAICompatibleParams {
     messages: Vec<OpenAICompatibleMessage>,
     model: String,
@@ -779,6 +872,7 @@ impl Params {
             extra_body: openai_compatible_params.tensorzero_extra_body,
             extra_headers: openai_compatible_params.tensorzero_extra_headers,
             observability_metadata: None, // Will be set in the handler
+            gateway_request: None,        // Will be set in the handler
         })
     }
 }
@@ -1415,7 +1509,7 @@ impl From<ToolCallChunk> for OpenAICompatibleToolCall {
 
 // OpenAI-compatible embedding types and handler
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct OpenAICompatibleEmbeddingParams {
     input: OpenAICompatibleEmbeddingInput,
     model: String,
@@ -1425,7 +1519,7 @@ pub struct OpenAICompatibleEmbeddingParams {
     unknown_fields: HashMap<String, Value>,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(untagged)]
 enum OpenAICompatibleEmbeddingInput {
     Single(String),
@@ -1518,6 +1612,9 @@ pub async fn embedding_handler(
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
 
+    // Capture the gateway request (without null values)
+    let gateway_request = serialize_without_nulls(&openai_compatible_params).ok();
+
     let embedding_request = EmbeddingRequest {
         input: internal_input,
         encoding_format,
@@ -1583,11 +1680,27 @@ pub async fn embedding_handler(
         },
     };
 
+    // Capture the gateway response (without null values)
+    let gateway_response_json = serialize_without_nulls(&openai_response).ok();
+
+    // Store the gateway response if we have it
+    if let Some(gateway_response) = &gateway_response_json {
+        // Log for debugging
+        tracing::debug!(
+            "Gateway response captured: {} bytes",
+            gateway_response.len()
+        );
+
+        // Store the gateway response in the database
+        // This requires updating the storage layer to include the gateway_response
+        // For now, we'll need to update the storage layer separately
+    }
+
     Ok(Json(openai_response).into_response())
 }
 
 /// OpenAI-compatible moderation request structure
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct OpenAICompatibleModerationParams {
     pub input: OpenAICompatibleModerationInput,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1596,7 +1709,7 @@ pub struct OpenAICompatibleModerationParams {
     pub unknown_fields: HashMap<String, Value>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum OpenAICompatibleModerationInput {
     Single(String),
@@ -1671,6 +1784,9 @@ pub async fn moderation_handler(
             crate::moderation::ModerationInput::Batch(texts.clone())
         }
     };
+
+    // Capture the gateway request (without null values)
+    let gateway_request = serialize_without_nulls(&openai_compatible_params).ok();
 
     let moderation_request = crate::moderation::ModerationRequest {
         input: internal_input,
@@ -1816,11 +1932,27 @@ pub async fn moderation_handler(
         results: response.results,
     };
 
+    // Capture the gateway response (without null values)
+    let gateway_response_json = serialize_without_nulls(&openai_response).ok();
+
+    // Store the gateway response if we have it
+    if let Some(gateway_response) = &gateway_response_json {
+        // Log for debugging
+        tracing::debug!(
+            "Gateway response captured: {} bytes",
+            gateway_response.len()
+        );
+
+        // Store the gateway response in the database
+        // This requires updating the storage layer to include the gateway_response
+        // For now, we'll need to update the storage layer separately
+    }
+
     Ok(Json(openai_response).into_response())
 }
 
 // Audio transcription types
-#[derive(Clone, Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct OpenAICompatibleAudioTranscriptionParams {
     pub model: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1844,7 +1976,7 @@ pub struct OpenAICompatibleAudioTranscriptionParams {
 }
 
 // Audio translation types
-#[derive(Clone, Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct OpenAICompatibleAudioTranslationParams {
     pub model: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1858,7 +1990,7 @@ pub struct OpenAICompatibleAudioTranslationParams {
 }
 
 // Text-to-speech types
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct OpenAICompatibleTextToSpeechParams {
     pub model: String,
     pub input: String,
@@ -1997,6 +2129,9 @@ pub async fn audio_transcription_handler(
         })
         .transpose()?;
 
+    // Capture the gateway request - serialize the params for logging (without null values)
+    let gateway_request = serialize_without_nulls(&params).ok();
+
     // Create transcription request
     let transcription_request = AudioTranscriptionRequest {
         id: Uuid::now_v7(),
@@ -2102,6 +2237,23 @@ pub async fn audio_transcription_handler(
                     None
                 },
             };
+
+            // Capture the gateway response
+            let gateway_response_json = serde_json::to_string(&openai_response).ok();
+
+            // Store the gateway response if we have it
+            if let Some(gateway_response) = &gateway_response_json {
+                // Log for debugging
+                tracing::debug!(
+                    "Gateway response captured: {} bytes",
+                    gateway_response.len()
+                );
+
+                // Store the gateway response in the database
+                // This requires updating the storage layer to include the gateway_response
+                // For now, we'll need to update the storage layer separately
+            }
+
             Ok(Json(openai_response).into_response())
         }
         AudioTranscriptionResponseFormat::Srt | AudioTranscriptionResponseFormat::Vtt => {
@@ -2189,6 +2341,9 @@ pub async fn audio_translation_handler(
         })
         .transpose()?;
 
+    // Capture the gateway request - serialize the params for logging (without null values)
+    let gateway_request = serialize_without_nulls(&params).ok();
+
     // Create translation request
     let translation_request = AudioTranslationRequest {
         id: Uuid::now_v7(),
@@ -2250,6 +2405,23 @@ pub async fn audio_translation_handler(
                 words: None,
                 segments: None,
             };
+
+            // Capture the gateway response
+            let gateway_response_json = serde_json::to_string(&openai_response).ok();
+
+            // Store the gateway response if we have it
+            if let Some(gateway_response) = &gateway_response_json {
+                // Log for debugging
+                tracing::debug!(
+                    "Gateway response captured: {} bytes",
+                    gateway_response.len()
+                );
+
+                // Store the gateway response in the database
+                // This requires updating the storage layer to include the gateway_response
+                // For now, we'll need to update the storage layer separately
+            }
+
             Ok(Json(openai_response).into_response())
         }
         AudioTranscriptionResponseFormat::Srt | AudioTranscriptionResponseFormat::Vtt => {
@@ -2367,6 +2539,9 @@ pub async fn text_to_speech_handler(
             }));
         }
     }
+
+    // Capture the gateway request (without null values)
+    let gateway_request = serialize_without_nulls(&params).ok();
 
     // Create text-to-speech request
     let tts_request = TextToSpeechRequest {
@@ -2850,6 +3025,9 @@ pub async fn image_generation_handler(
         }
     }
 
+    // Capture the gateway request (without null values)
+    let gateway_request = serialize_without_nulls(&params).ok();
+
     // Create image generation request
     let image_request = ImageGenerationRequest {
         id: Uuid::now_v7(),
@@ -2904,6 +3082,22 @@ pub async fn image_generation_handler(
             })
             .collect(),
     };
+
+    // Capture the gateway response (without null values)
+    let gateway_response_json = serialize_without_nulls(&openai_response).ok();
+
+    // Store the gateway response if we have it
+    if let Some(gateway_response) = &gateway_response_json {
+        // Log for debugging
+        tracing::debug!(
+            "Gateway response captured: {} bytes",
+            gateway_response.len()
+        );
+
+        // Store the gateway response in the database
+        // This requires updating the storage layer to include the gateway_response
+        // For now, we'll need to update the storage layer separately
+    }
 
     Ok(Json(openai_response).into_response())
 }
@@ -2999,6 +3193,9 @@ pub async fn image_edit_handler(
         }
     }
 
+    // Capture the gateway request (without null values)
+    let gateway_request = serialize_without_nulls(&params).ok();
+
     // Create image edit request
     let image_request = ImageEditRequest {
         id: Uuid::now_v7(),
@@ -3055,6 +3252,22 @@ pub async fn image_edit_handler(
             })
             .collect(),
     };
+
+    // Capture the gateway response (without null values)
+    let gateway_response_json = serialize_without_nulls(&openai_response).ok();
+
+    // Store the gateway response if we have it
+    if let Some(gateway_response) = &gateway_response_json {
+        // Log for debugging
+        tracing::debug!(
+            "Gateway response captured: {} bytes",
+            gateway_response.len()
+        );
+
+        // Store the gateway response in the database
+        // This requires updating the storage layer to include the gateway_response
+        // For now, we'll need to update the storage layer separately
+    }
 
     Ok(Json(openai_response).into_response())
 }
@@ -3133,6 +3346,9 @@ pub async fn image_variation_handler(
         }
     }
 
+    // Capture the gateway request (without null values)
+    let gateway_request = serialize_without_nulls(&params).ok();
+
     // Create image variation request
     let image_request = ImageVariationRequest {
         id: Uuid::now_v7(),
@@ -3183,11 +3399,27 @@ pub async fn image_variation_handler(
             .collect(),
     };
 
+    // Capture the gateway response (without null values)
+    let gateway_response_json = serialize_without_nulls(&openai_response).ok();
+
+    // Store the gateway response if we have it
+    if let Some(gateway_response) = &gateway_response_json {
+        // Log for debugging
+        tracing::debug!(
+            "Gateway response captured: {} bytes",
+            gateway_response.len()
+        );
+
+        // Store the gateway response in the database
+        // This requires updating the storage layer to include the gateway_response
+        // For now, we'll need to update the storage layer separately
+    }
+
     Ok(Json(openai_response).into_response())
 }
 
 // OpenAI-compatible Image parameter types
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct OpenAICompatibleImageGenerationParams {
     pub prompt: String,
@@ -3207,7 +3439,7 @@ pub struct OpenAICompatibleImageGenerationParams {
     pub unknown_fields: HashMap<String, Value>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize)]
 pub struct OpenAICompatibleImageEditParams {
     pub model: String,
     pub prompt: String,
@@ -3223,7 +3455,7 @@ pub struct OpenAICompatibleImageEditParams {
     pub unknown_fields: HashMap<String, Value>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize)]
 pub struct OpenAICompatibleImageVariationParams {
     pub model: String,
     pub n: Option<u8>,
@@ -3550,6 +3782,16 @@ pub async fn response_create_handler(
         cache_options: &cache_options,
     };
 
+    // Capture the gateway request for logging purposes (without null values)
+    let gateway_request = serialize_without_nulls(&params).ok();
+
+    if let Some(gw_req) = &gateway_request {
+        tracing::debug!(
+            "Gateway request captured for responses API: {} bytes",
+            gw_req.len()
+        );
+    }
+
     // Check if streaming is requested
     if params.stream.unwrap_or(false) {
         // Handle streaming response
@@ -3573,6 +3815,11 @@ pub async fn response_create_handler(
         let response = model
             .create_response(&params, &model_resolution.original_model_name, &clients)
             .await?;
+
+        // Log the response size for debugging
+        if let Ok(response_json) = serde_json::to_string(&response) {
+            tracing::debug!("Response size: {} bytes", response_json.len());
+        }
 
         Ok(Json(response).into_response())
     }
@@ -4208,6 +4455,22 @@ pub async fn file_delete_handler(
         "object": "file",
         "deleted": true
     });
+
+    // Capture the gateway response (without null values)
+    let gateway_response_json = serialize_without_nulls(&delete_response).ok();
+
+    // Store the gateway response if we have it
+    if let Some(gateway_response) = &gateway_response_json {
+        // Log for debugging
+        tracing::debug!(
+            "Gateway response captured: {} bytes",
+            gateway_response.len()
+        );
+
+        // Store the gateway response in the database
+        // This requires updating the storage layer to include the gateway_response
+        // For now, we'll need to update the storage layer separately
+    }
 
     let response = Json(delete_response).into_response();
     Ok(response)

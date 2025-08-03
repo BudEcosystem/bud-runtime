@@ -347,6 +347,8 @@ class InferenceDetailResponse(ResponseBase):
     # Raw data (optional)
     raw_request: Optional[str] = None
     raw_response: Optional[str] = None
+    gateway_request: Optional[str] = None
+    gateway_response: Optional[str] = None
 
     # Feedback summary
     feedback_count: int

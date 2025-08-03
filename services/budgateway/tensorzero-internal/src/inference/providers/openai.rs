@@ -871,6 +871,7 @@ impl ModerationProvider for OpenAIProvider {
                 request: request_body,
                 raw_response,
                 input: request.input.clone(),
+                moderation_request: request,
             }
             .try_into()?)
         } else {
@@ -3228,6 +3229,7 @@ struct OpenAIModerationResponseWithMetadata<'a> {
     request: OpenAIModerationRequest<'a>,
     raw_response: String,
     input: ModerationInput,
+    moderation_request: &'a ModerationRequest,
 }
 
 impl<'a> TryFrom<OpenAIEmbeddingResponseWithMetadata<'a>> for EmbeddingProviderResponse {
@@ -3296,6 +3298,7 @@ impl<'a> TryFrom<OpenAIModerationResponseWithMetadata<'a>> for ModerationProvide
             request,
             raw_response,
             input,
+            moderation_request,
         } = response;
         let raw_request = serde_json::to_string(&request).map_err(|e| {
             Error::new(ErrorDetails::InferenceServer {

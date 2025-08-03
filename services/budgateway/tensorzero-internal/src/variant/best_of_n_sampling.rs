@@ -701,6 +701,7 @@ impl EvaluatorConfig {
                 extra_headers,
                 extra_cache_key: inference_config.extra_cache_key.clone(),
                 logprobs: inference_params.chat_completion.logprobs,
+                gateway_request: inference_config.gateway_request.clone(),
                 ..Default::default()
             },
             skipped_indices,

@@ -23,3 +23,67 @@ export const formatDate = (dateString: string | Date | number): string => {
   // return format(date, 'Do MMMM yyyy'); // Return formatted date string
   return format(date, 'dd MMM, yyyy'); // Return formatted date string
 };
+
+// Format timestamp with time (for tables)
+export const formatTimestamp = (dateString: string | Date | number): string => {
+  if(!dateString) return '';
+
+  try {
+    let dateStr = dateString;
+
+    // If it's a string without timezone indicator, assume it's UTC and add 'Z'
+    if (typeof dateString === 'string') {
+      const hasTimezone = dateString.endsWith('Z') ||
+                         dateString.match(/[+-]\d{2}:\d{2}$/) ||
+                         dateString.match(/[+-]\d{4}$/);
+
+      if (!hasTimezone) {
+        dateStr = dateString + 'Z';
+      }
+    }
+
+    const date = new Date(dateStr);
+    if(isNaN(date.getTime())) return '';
+
+    // For client-side use, prefer the ClientTimestamp component
+    // This function is kept for non-React contexts
+    return format(date, 'MMM dd, HH:mm:ss');
+  } catch (error) {
+    console.error('Error formatting timestamp:', dateString, error);
+    return '';
+  }
+};
+
+// Format timestamp with full date and time (with timezone)
+export const formatTimestampWithTZ = (dateString: string | Date | number): string => {
+  if(!dateString) return '';
+
+  try {
+    let dateStr = dateString;
+
+    // If it's a string without timezone indicator, assume it's UTC and add 'Z'
+    if (typeof dateString === 'string') {
+      const hasTimezone = dateString.endsWith('Z') ||
+                         dateString.match(/[+-]\d{2}:\d{2}$/) ||
+                         dateString.match(/[+-]\d{4}$/);
+
+      if (!hasTimezone) {
+        dateStr = dateString + 'Z';
+      }
+    }
+
+    const date = new Date(dateStr);
+    if(isNaN(date.getTime())) return '';
+
+    // Get timezone abbreviation
+    const timeZoneAbbr = new Intl.DateTimeFormat('en-US', {
+      timeZoneName: 'short'
+    }).formatToParts(date).find(part => part.type === 'timeZoneName')?.value || '';
+
+    // date-fns format() automatically converts to local timezone
+    return `${format(date, 'MMM dd, yyyy HH:mm:ss')} ${timeZoneAbbr}`;
+  } catch (error) {
+    console.error('Error formatting timestamp with TZ:', dateString, error);
+    return '';
+  }
+};
