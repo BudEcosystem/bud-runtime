@@ -16,7 +16,7 @@
 
 """Pydantic schemas for the prompt module."""
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 from budmicroframe.commons.schemas import SuccessResponse
 from pydantic import BaseModel, Field
@@ -48,11 +48,11 @@ class Message(BaseModel):
     """Message structure for prompt execution.
 
     Attributes:
-        role: The role of the message sender (user, assistant, system)
+        role: The role of the message sender (user, assistant, developer)
         content: The content of the message
     """
 
-    role: str = Field(default="user")
+    role: Literal["user", "assistant", "developer"] = Field(default="user")
     content: str = Field(..., min_length=1)
 
 

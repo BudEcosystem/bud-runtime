@@ -16,11 +16,21 @@
 
 """Prompt executors for running AI prompts."""
 
+import json
 import logging
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Type, Union, get_args, get_origin
 
 from pydantic import BaseModel, ValidationError
 from pydantic_ai import Agent
+from pydantic_ai.messages import (
+    ModelMessage,
+    ModelRequest,
+    ModelResponse,
+    SystemPromptPart,
+    TextPart,
+    UserPromptPart,
+)
 from pydantic_ai.models.openai import ModelSettings as OpenAIModelSettings
 from pydantic_ai.output import NativeOutput
 
@@ -29,6 +39,7 @@ from budprompt.shared.providers import BudServeProvider
 
 from .schema_builder import PydanticModelGenerator
 from .schemas import Message, ModelSettings
+from .template_renderer import render_template
 from .utils import validate_input_data_type
 
 
@@ -122,17 +133,26 @@ class SimplePromptExecutor:
                 # Unstructured input: use string directly
                 validated_input = input_data
 
+            # Prepare context for template rendering
+            context = self._prepare_template_context(validated_input, input_schema is not None)
+
+            # Render system prompt with Jinja2
+            rendered_system_prompt = render_template(system_prompt, context)
+
             # Handle output type
             output_type = await self._get_output_type(output_schema)
 
             # Create AI agent with appropriate output type
-            agent = await self._create_agent(deployment_name, model_settings, output_type, system_prompt)
+            agent = await self._create_agent(deployment_name, model_settings, output_type, rendered_system_prompt)
 
-            # Prepare messages
-            prompt_messages = self._prepare_messages(messages, validated_input, input_schema is not None)
+            # Build message history from all messages
+            message_history = self._build_message_history(messages, context)
 
-            # Execute the agent
-            result = await self._run_agent(agent, prompt_messages)
+            # Get user prompt from input_data
+            user_prompt = self._prepare_user_prompt(input_data)
+
+            # Execute the agent with both history and current prompt
+            result = await self._run_agent(agent, user_prompt, message_history)
 
             # Process and return result
             if output_schema is not None:
@@ -142,11 +162,11 @@ class SimplePromptExecutor:
                 # Unstructured output: return as string
                 return result
 
-        except (SchemaGenerationException, ValidationError):
+        except (SchemaGenerationException, ValidationError, PromptExecutionException):
             raise
         except Exception as e:
             logger.error(f"Prompt execution failed: {str(e)}")
-            raise PromptExecutionException("Failed to execute prompt")
+            raise PromptExecutionException("Failed to execute prompt") from e
 
     async def _get_output_type(self, output_schema: Optional[Dict[str, Any]]) -> Any:
         """Extract output type from schema's content field.
@@ -229,37 +249,88 @@ class SimplePromptExecutor:
 
         return agent
 
-    def _prepare_messages(self, messages: List[Message], input_data: Any = None, is_structured: bool = True) -> str:
-        """Prepare messages for the agent.
+    def _prepare_template_context(self, input_data: Any, is_structured: bool) -> Dict[str, Any]:
+        """Prepare context for Jinja2 template rendering.
 
         Args:
-            messages: List of messages
-            input_data: Validated input data (Pydantic model for structured, string for unstructured)
+            input_data: Validated input data
             is_structured: Whether the input is structured
 
         Returns:
-            Formatted prompt string
+            Context dictionary for template rendering
         """
-        # For now, we'll concatenate user messages
-        # In future, we can add support for message templates with Jinja2
-        user_messages = [msg.content for msg in messages if msg.role == "user"]
+        context = {}
 
         if input_data is not None:
             if is_structured and hasattr(input_data, "model_dump"):
-                # Structured input: add as JSON context
-                user_messages.append(f"Input data: {input_data.model_dump()}")
-            elif not is_structured and isinstance(input_data, str):
-                # Unstructured input: add string directly
-                user_messages.append(input_data)
+                # Structured input: use model fields as context
+                context = input_data.model_dump()
+            elif isinstance(input_data, dict):
+                # Direct dict input
+                context = input_data
+            elif isinstance(input_data, str):
+                # Unstructured string input
+                context["input"] = input_data
 
-        return "\n\n".join(user_messages)
+        return context
 
-    async def _run_agent(self, agent: Agent, prompt: str) -> Any:
-        """Run the agent with the prepared prompt.
+    def _build_message_history(self, messages: List[Message], context: Dict[str, Any]) -> List[ModelMessage]:
+        """Build message history from messages list.
+
+        Args:
+            messages: List of messages with roles and content
+            context: Context for template rendering
+
+        Returns:
+            List of Pydantic AI ModelMessage objects
+        """
+        message_history = []
+
+        for msg in messages:
+            # Render message content with Jinja2
+            rendered_content = render_template(msg.content, context)
+
+            if msg.role == "user":
+                # Create user message
+                message_history.append(ModelRequest(parts=[UserPromptPart(content=rendered_content)]))
+            elif msg.role == "assistant":
+                # Create assistant message
+                message_history.append(
+                    ModelResponse(
+                        parts=[TextPart(content=rendered_content)],
+                        timestamp=datetime.now(timezone.utc),
+                    )
+                )
+            elif msg.role == "developer":
+                # Developer messages are system-level instructions
+                message_history.append(ModelRequest(parts=[SystemPromptPart(content=rendered_content)]))
+
+        return message_history
+
+    def _prepare_user_prompt(self, input_data: Optional[Union[Dict[str, Any], str]]) -> Optional[str]:
+        """Prepare the user prompt from input data.
+
+        Args:
+            input_data: The input data from the request (string or dict)
+
+        Returns:
+            The user prompt as a string, or None if no input data
+        """
+        if input_data is None:
+            return None
+        elif isinstance(input_data, str):
+            return input_data
+        else:
+            # Convert dict to JSON string for structured input
+            return json.dumps(input_data)
+
+    async def _run_agent(self, agent: Agent, user_prompt: Optional[str], message_history: List[ModelMessage]) -> Any:
+        """Run the agent with message history and current prompt.
 
         Args:
             agent: Configured AI agent
-            prompt: Prepared prompt string
+            user_prompt: Current user prompt from input_data
+            message_history: Conversation history from messages
 
         Returns:
             Agent execution result
@@ -268,8 +339,14 @@ class SimplePromptExecutor:
             PromptExecutionException: If execution fails
         """
         try:
-            result = await agent.run(prompt)
+            # Always pass both user_prompt and message_history
+            # Pydantic AI will handle None user_prompt appropriately
+            result = await agent.run(
+                user_prompt=user_prompt,
+                message_history=message_history,
+            )
+
             return result.output
         except Exception as e:
             logger.error(f"Agent execution failed: {str(e)}")
-            raise PromptExecutionException("Agent execution failed")
+            raise PromptExecutionException("Agent execution failed") from e
