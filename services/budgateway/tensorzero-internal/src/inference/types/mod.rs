@@ -1853,6 +1853,8 @@ mod tests {
             model_provider_name: "test_provider".into(),
             model_name: "test_model".into(),
             cached: false,
+            gateway_request: None,
+            gateway_response: None,
         }];
         let chat_inference_response = ChatInferenceResult::new(
             inference_id,
@@ -1903,6 +1905,8 @@ mod tests {
             model_provider_name: "test_provider".into(),
             model_name: "test_model".into(),
             cached: false,
+            gateway_request: None,
+            gateway_response: None,
         }];
 
         let weather_tool_config = get_temperature_tool_config();
@@ -1955,6 +1959,8 @@ mod tests {
             model_provider_name: "test_provider".into(),
             model_name: "test_model".into(),
             cached: false,
+            gateway_request: None,
+            gateway_response: None,
         }];
 
         let chat_inference_response = ChatInferenceResult::new(
@@ -2003,6 +2009,8 @@ mod tests {
             model_provider_name: "test_provider".into(),
             model_name: "test_model".into(),
             cached: false,
+            gateway_request: None,
+            gateway_response: None,
         }];
 
         let chat_inference_response = ChatInferenceResult::new(
@@ -2071,6 +2079,8 @@ mod tests {
             model_provider_name: "test_provider".into(),
             model_name: "test_model".into(),
             cached: false,
+            gateway_request: None,
+            gateway_response: None,
         }];
 
         let chat_inference_response = ChatInferenceResult::new(
@@ -2157,6 +2167,8 @@ mod tests {
             model_provider_name: "test_provider".into(),
             model_name: "test_model".into(),
             cached: false,
+            gateway_request: None,
+            gateway_response: None,
         }];
 
         let chat_inference_response = ChatInferenceResult::new(
@@ -2250,6 +2262,8 @@ mod tests {
             model_provider_name: "test_provider".into(),
             model_name: "test_model".into(),
             cached: false,
+            gateway_request: None,
+            gateway_response: None,
         }];
 
         let chat_inference_response = ChatInferenceResult::new(
@@ -2301,6 +2315,8 @@ mod tests {
             model_provider_name: "test_provider".into(),
             model_name: "test_model".into(),
             cached: false,
+            gateway_request: None,
+            gateway_response: None,
         }];
 
         let chat_inference_response = ChatInferenceResult::new(
@@ -2374,6 +2390,8 @@ mod tests {
             model_provider_name: "test_provider".into(),
             model_name: "test_model".into(),
             cached: false,
+            gateway_request: None,
+            gateway_response: None,
         }];
 
         let chat_inference_response = ChatInferenceResult::new(
@@ -2431,6 +2449,8 @@ mod tests {
             model_provider_name: "test_provider".into(),
             model_name: "test_model".into(),
             cached: false,
+            gateway_request: None,
+            gateway_response: None,
         }];
 
         let chat_inference_response = ChatInferenceResult::new(

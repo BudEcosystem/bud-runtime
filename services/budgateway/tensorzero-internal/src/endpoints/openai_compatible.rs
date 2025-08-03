@@ -1613,7 +1613,7 @@ pub async fn embedding_handler(
         .map(|s| s.to_string());
 
     // Capture the gateway request (without null values)
-    let gateway_request = serialize_without_nulls(&openai_compatible_params).ok();
+    let _gateway_request = serialize_without_nulls(&openai_compatible_params).ok();
 
     let embedding_request = EmbeddingRequest {
         input: internal_input,
@@ -1786,7 +1786,7 @@ pub async fn moderation_handler(
     };
 
     // Capture the gateway request (without null values)
-    let gateway_request = serialize_without_nulls(&openai_compatible_params).ok();
+    let _gateway_request = serialize_without_nulls(&openai_compatible_params).ok();
 
     let moderation_request = crate::moderation::ModerationRequest {
         input: internal_input,
@@ -2130,7 +2130,7 @@ pub async fn audio_transcription_handler(
         .transpose()?;
 
     // Capture the gateway request - serialize the params for logging (without null values)
-    let gateway_request = serialize_without_nulls(&params).ok();
+    let _gateway_request = serialize_without_nulls(&params).ok();
 
     // Create transcription request
     let transcription_request = AudioTranscriptionRequest {
@@ -2342,7 +2342,7 @@ pub async fn audio_translation_handler(
         .transpose()?;
 
     // Capture the gateway request - serialize the params for logging (without null values)
-    let gateway_request = serialize_without_nulls(&params).ok();
+    let _gateway_request = serialize_without_nulls(&params).ok();
 
     // Create translation request
     let translation_request = AudioTranslationRequest {
@@ -2541,7 +2541,7 @@ pub async fn text_to_speech_handler(
     }
 
     // Capture the gateway request (without null values)
-    let gateway_request = serialize_without_nulls(&params).ok();
+    let _gateway_request = serialize_without_nulls(&params).ok();
 
     // Create text-to-speech request
     let tts_request = TextToSpeechRequest {
@@ -3026,7 +3026,7 @@ pub async fn image_generation_handler(
     }
 
     // Capture the gateway request (without null values)
-    let gateway_request = serialize_without_nulls(&params).ok();
+    let _gateway_request = serialize_without_nulls(&params).ok();
 
     // Create image generation request
     let image_request = ImageGenerationRequest {
@@ -3194,7 +3194,7 @@ pub async fn image_edit_handler(
     }
 
     // Capture the gateway request (without null values)
-    let gateway_request = serialize_without_nulls(&params).ok();
+    let _gateway_request = serialize_without_nulls(&params).ok();
 
     // Create image edit request
     let image_request = ImageEditRequest {
@@ -3347,7 +3347,7 @@ pub async fn image_variation_handler(
     }
 
     // Capture the gateway request (without null values)
-    let gateway_request = serialize_without_nulls(&params).ok();
+    let _gateway_request = serialize_without_nulls(&params).ok();
 
     // Create image variation request
     let image_request = ImageVariationRequest {

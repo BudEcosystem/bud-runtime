@@ -3298,7 +3298,7 @@ impl<'a> TryFrom<OpenAIModerationResponseWithMetadata<'a>> for ModerationProvide
             request,
             raw_response,
             input,
-            moderation_request,
+            moderation_request: _,
         } = response;
         let raw_request = serde_json::to_string(&request).map_err(|e| {
             Error::new(ErrorDetails::InferenceServer {
@@ -6361,6 +6361,7 @@ mod tests {
             structural_tag: None,
             guided_decoding_backend: None,
             guided_whitespace_pattern: None,
+            gateway_request: None,
         };
 
         let openai_request = OpenAIRequest::new("gpt-4", &request_with_new_params).unwrap();

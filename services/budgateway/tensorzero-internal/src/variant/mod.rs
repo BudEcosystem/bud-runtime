@@ -798,6 +798,7 @@ mod tests {
             extra_body: Default::default(),
             extra_headers: Default::default(),
             extra_cache_key: None,
+            gateway_request: None,
         };
 
         // Define common inference parameters
@@ -935,6 +936,7 @@ mod tests {
             extra_body: Default::default(),
             extra_headers: Default::default(),
             extra_cache_key: None,
+            gateway_request: None,
         };
         let json_mode = JsonMode::ImplicitTool;
 
@@ -1040,6 +1042,7 @@ mod tests {
             extra_body: Default::default(),
             extra_headers: Default::default(),
             extra_cache_key: None,
+            gateway_request: None,
         };
 
         // Test case 1: Successful inference with ChatCompletionConfig and FunctionConfigChat
@@ -1348,6 +1351,7 @@ mod tests {
             extra_body: Default::default(),
             extra_headers: Default::default(),
             extra_cache_key: None,
+            gateway_request: None,
         };
 
         let model_name = "dummy_chat_model";
