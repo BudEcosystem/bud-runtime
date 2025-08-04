@@ -1382,7 +1382,7 @@ async fn test_fast_inference_then_feedback() {
 
                 // Send the inference request.
                 let response = client.inference(inference_payload).await.unwrap();
-                let response = if let tensorzero::InferenceOutput::NonStreaming(response) = response {
+                let response = if let tensorzero::InferenceOutput::NonStreaming { response, .. } = response {
                     response
                 } else {
                     panic!("Expected non-streaming response");

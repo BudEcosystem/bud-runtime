@@ -64,9 +64,9 @@ export interface InferenceDetail {
   finish_reason?: string;
   cost?: number;
 
-  // Raw data (optional)
-  raw_request?: string;
-  raw_response?: string;
+  // Gateway data (optional)
+  gateway_request?: any;
+  gateway_response?: any;
 
   // Feedback summary
   feedback_count: number;

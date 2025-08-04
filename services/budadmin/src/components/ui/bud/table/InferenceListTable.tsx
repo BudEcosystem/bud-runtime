@@ -12,8 +12,9 @@ import NoDataFount from '../../noDataFount';
 import { PrimaryButton, SecondaryButton } from '../form/Buttons';
 import ProjectTags from 'src/flows/components/ProjectTags';
 import { SortIcon } from './SortIcon';
-import { formatDate } from 'src/utils/formatDate';
+import { formatDate, formatTimestamp } from 'src/utils/formatDate';
 import { useLoaderOnLoding } from 'src/hooks/useLoaderOnLoading';
+import { ClientTimestamp } from '../../ClientTimestamp';
 
 const { Text } = Typography;
 
@@ -86,7 +87,7 @@ const InferenceListTable: React.FC<InferenceListTableProps> = ({ projectId: prop
       key: 'timestamp',
       width: 180,
       render: (timestamp: string) => (
-        <Text_12_400_EEEEEE>{format(new Date(timestamp), 'MMM dd, HH:mm:ss')}</Text_12_400_EEEEEE>
+        <Text_12_400_EEEEEE><ClientTimestamp timestamp={timestamp} /></Text_12_400_EEEEEE>
       ),
       sorter: true,
       sortIcon: SortIcon,

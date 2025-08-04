@@ -16,6 +16,7 @@
 
 """The metric ops services. Contains business logic for metric ops."""
 
+import json
 from typing import Dict, List, Optional, Set
 from uuid import UUID
 
@@ -296,11 +297,28 @@ class BudMetricService(SessionMixin):
                 # Enrich response with names
                 await self._enrich_inference_detail(response_data)
 
+                logger.info(f"Response data: {response_data}")
+
                 # Add required message field for SuccessResponse
                 if "message" not in response_data:
                     response_data["message"] = "Successfully retrieved inference details"
 
-                # Convert to response model
+                # Parse gateway_request and gateway_response from JSON strings if present
+                if "gateway_request" in response_data and response_data["gateway_request"]:
+                    try:
+                        response_data["gateway_request"] = json.loads(response_data["gateway_request"])
+                    except (json.JSONDecodeError, TypeError):
+                        # If parsing fails, set to None (schema expects Dict or None)
+                        response_data["gateway_request"] = None
+
+                if "gateway_response" in response_data and response_data["gateway_response"]:
+                    try:
+                        response_data["gateway_response"] = json.loads(response_data["gateway_response"])
+                    except (json.JSONDecodeError, TypeError):
+                        # If parsing fails, set to None (schema expects Dict or None)
+                        response_data["gateway_response"] = None
+
+                # Convert to response model - extra fields will be ignored due to extra="ignore" in model config
                 return InferenceDetailResponse(**response_data)
 
         except ClientException:
