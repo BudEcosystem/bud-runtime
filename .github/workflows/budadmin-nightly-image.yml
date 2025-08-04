@@ -12,9 +12,6 @@ jobs:
     name: Build and Push Docker Image
     runs-on: ubuntu-latest
     continue-on-error: false
-    defaults:
-        run:
-          working-directory: ./services/budadmin
 
     steps:
       - name: Checkout code
@@ -32,7 +29,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ./services/budadmin
           push: true
           file: ./Dockerfile
           tags: budstudio/bud-dashboard:nightly
