@@ -26,6 +26,7 @@ export interface GetExperimentsPayload {
 
 export interface ExperimentData {
   id: string;
+  name?: string;
   experimentName: string;
   models: string;
   traits: string;
@@ -117,6 +118,7 @@ export const useEvaluations = create<{
   getExperimentMetrics: (id: string) => Promise<any>;
   getExperimentBenchmarks: (id: string) => Promise<any>;
   getExperimentRuns: (id: string) => Promise<any>;
+  createExperiment: (payload: any) => Promise<any>;
 }>((set, get) => ({
   loading: false,
   evaluationsList: [],
@@ -275,6 +277,19 @@ export const useEvaluations = create<{
       return response.data;
     } catch (error) {
       console.error("Error fetching experiment runs:", error);
+      throw error;
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  createExperiment: async (payload: any) => {
+    set({ loading: true });
+    try {
+      const response: any = await AppRequest.Post(`${tempApiBaseUrl}/experiments/`, payload);
+      return response.data;
+    } catch (error) {
+      console.error("Error creating experiment:", error);
       throw error;
     } finally {
       set({ loading: false });
