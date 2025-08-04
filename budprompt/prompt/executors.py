@@ -180,6 +180,43 @@ class SimplePromptExecutor:
         # Use the model generator to create Pydantic model from schema
         return self.model_generator.from_json_schema(schema, model_name)
 
+    def _convert_to_openai_settings(self, model_settings: ModelSettings) -> OpenAIModelSettings:
+        """Convert ModelSettings to OpenAIModelSettings with automatic extra_body routing.
+
+        Parameters not in OpenAIModelSettings are automatically routed to extra_body.
+
+        Args:
+            model_settings: Our ModelSettings with all parameters
+
+        Returns:
+            OpenAIModelSettings with BudEcosystem params in extra_body
+        """
+        # Get all fields from OpenAIModelSettings using the __annotations__
+        openai_fields = set(OpenAIModelSettings.__annotations__.keys())
+
+        # Get our settings as dict, excluding None values
+        all_settings = model_settings.model_dump(exclude_none=True)
+
+        # Separate OpenAI settings from extra settings
+        openai_settings = {}
+        extra_settings = {}
+
+        for key, value in all_settings.items():
+            if key == "stop_sequences":
+                # Special case: rename to 'stop' for OpenAI
+                openai_settings["stop"] = value
+            elif key in openai_fields:
+                openai_settings[key] = value
+            else:
+                # Everything else goes to extra_body
+                extra_settings[key] = value
+
+        # Add extra settings to extra_body if any exist
+        if extra_settings:
+            openai_settings["extra_body"] = extra_settings
+
+        return OpenAIModelSettings(**openai_settings)
+
     async def _create_agent(
         self,
         deployment_name: str,
@@ -187,30 +224,23 @@ class SimplePromptExecutor:
         output_type: Union[Type[BaseModel], Type[str], NativeOutput],
         system_prompt: str,
     ) -> Agent:
-        """Create Pydantic AI agent.
+        """Create Pydantic AI agent with automatic parameter routing.
 
         Args:
             deployment_name: Model deployment name
-            model_settings: Model configuration
+            model_settings: Model configuration with all parameters
             output_type: Output type (Pydantic model for structured, str for unstructured)
             system_prompt: System prompt
 
         Returns:
             Configured AI agent
         """
+        # Convert our ModelSettings to OpenAIModelSettings
+        # This automatically routes BudEcosystem parameters to extra_body
+        openai_settings = self._convert_to_openai_settings(model_settings)
+
         # Create model using BudServeProvider
-        model = self.provider.get_model(
-            model_name=deployment_name,
-            settings=OpenAIModelSettings(
-                temperature=model_settings.temperature,
-                max_tokens=model_settings.max_tokens,
-                top_p=model_settings.top_p,
-                frequency_penalty=model_settings.frequency_penalty,
-                presence_penalty=model_settings.presence_penalty,
-                stop=model_settings.stop_sequences if model_settings.stop_sequences else None,
-                seed=model_settings.seed,
-            ),
-        )
+        model = self.provider.get_model(model_name=deployment_name, settings=openai_settings)
 
         # Create agent with output type
         agent = Agent(

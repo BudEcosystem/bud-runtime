@@ -25,7 +25,10 @@ from pydantic import BaseModel, Field
 class ModelSettings(BaseModel):
     """Model settings for LLM configuration.
 
-    Attributes:
+    Supports all OpenAI and BudEcosystem parameters. Parameters not in
+    OpenAIModelSettings are automatically routed to extra_body.
+
+    Standard OpenAI parameters:
         temperature: Controls randomness in the model's output (0-2)
         max_tokens: Maximum number of tokens to generate
         top_p: Controls diversity of the output (0-1)
@@ -33,15 +36,66 @@ class ModelSettings(BaseModel):
         presence_penalty: Penalizes tokens based on presence in the text (-2 to 2)
         stop_sequences: List of sequences where the model will stop generating
         seed: Random seed for reproducibility
+        timeout: Request timeout in seconds
+        parallel_tool_calls: Allow parallel tool calls
+        logprobs: Return token log probabilities
+        logit_bias: Token likelihood modifications
+        extra_headers: Additional HTTP headers
+
+    BudEcosystem-specific parameters (auto-routed to extra_body):
+        max_completion_tokens: Alternative to max_tokens (OpenAI compatibility)
+        stream_options: Streaming configuration
+        response_format: Output format control
+        tool_choice: Tool selection strategy
+        chat_template: Custom chat template
+        chat_template_kwargs: Template parameters (e.g., {'enable_thinking': true})
+        mm_processor_kwargs: Multi-modal processor parameters
+        guided_json: JSON schema for guided generation
+        guided_regex: Regex pattern for guided generation
+        guided_choice: List of allowed values
+        guided_grammar: Grammar for guided generation
+        structural_tag: Structural generation tag
+        guided_decoding_backend: Backend for guided decoding
+        guided_whitespace_pattern: Whitespace pattern for guided generation
     """
 
-    temperature: float = Field(default=0.7, ge=0.0, le=2.0)
-    max_tokens: int = Field(default=2000, gt=0)
-    top_p: float = Field(default=0.9, ge=0.0, le=1.0)
-    frequency_penalty: float = Field(default=0.0, ge=-2.0, le=2.0)
-    presence_penalty: float = Field(default=0.0, ge=-2.0, le=2.0)
-    stop_sequences: List[str] = Field(default_factory=list)
-    seed: Optional[int] = None
+    # Standard OpenAI-compatible parameters
+    temperature: float = Field(default=0.7, ge=0.0, le=2.0, description="Sampling temperature")
+    max_tokens: int = Field(default=2000, gt=0, description="Maximum tokens to generate")
+    top_p: float = Field(default=0.9, ge=0.0, le=1.0, description="Nucleus sampling parameter")
+    frequency_penalty: float = Field(default=0.0, ge=-2.0, le=2.0, description="Penalize repeated tokens")
+    presence_penalty: float = Field(default=0.0, ge=-2.0, le=2.0, description="Penalize tokens based on presence")
+    stop_sequences: List[str] = Field(default_factory=list, description="Stop generation sequences")
+    seed: Optional[int] = Field(None, description="Random seed for reproducibility")
+
+    # Additional pydantic-ai supported parameters
+    timeout: Optional[float] = Field(None, description="Request timeout in seconds")
+    parallel_tool_calls: Optional[bool] = Field(None, description="Allow parallel tool calls")
+    logprobs: Optional[bool] = Field(None, description="Return token log probabilities")
+    logit_bias: Optional[Dict[str, int]] = Field(None, description="Token likelihood modifications")
+    extra_headers: Optional[Dict[str, str]] = Field(None, description="Additional HTTP headers")
+
+    # BudEcosystem-specific parameters (will go to extra_body)
+    max_completion_tokens: Optional[int] = Field(None, description="Alternative to max_tokens (OpenAI compatibility)")
+    stream_options: Optional[Dict[str, Any]] = Field(None, description="Streaming configuration")
+    response_format: Optional[Dict[str, Any]] = Field(None, description="Output format control")
+    tool_choice: Optional[Union[str, Dict[str, Any]]] = Field(None, description="Tool selection strategy")
+
+    # Template customization
+    chat_template: Optional[str] = Field(None, description="Custom chat template")
+    chat_template_kwargs: Optional[Dict[str, Any]] = Field(
+        None, description="Template parameters (e.g., {'enable_thinking': true})"
+    )
+    mm_processor_kwargs: Optional[Dict[str, Any]] = Field(None, description="Multi-modal processor parameters")
+
+    # Guided generation parameters
+    guided_json: Optional[Dict[str, Any]] = Field(None, description="JSON schema for guided generation")
+    guided_regex: Optional[str] = Field(None, description="Regex pattern for guided generation")
+    guided_choice: Optional[List[str]] = Field(None, description="List of allowed values")
+    guided_grammar: Optional[str] = Field(None, description="Grammar for guided generation")
+    structural_tag: Optional[str] = Field(None, description="Structural generation tag")
+    guided_decoding_backend: Optional[str] = Field(None, description="Backend for guided decoding")
+    guided_whitespace_pattern: Optional[str] = Field(None, description="Whitespace pattern for guided generation")
 
 
 class Message(BaseModel):
