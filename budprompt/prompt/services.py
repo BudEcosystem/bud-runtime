@@ -17,7 +17,7 @@
 """Services for the prompt module."""
 
 import logging
-from typing import Any, Dict, Union
+from typing import Any, AsyncGenerator, Dict, Union
 
 from budmicroframe.commons.exceptions import ClientException
 from pydantic import ValidationError
@@ -43,29 +43,37 @@ class PromptExecutorService:
         """Initialize the PromptExecutorService."""
         self.executor = SimplePromptExecutor()
 
-    async def execute_prompt(self, request: PromptExecuteRequest) -> Union[Dict[str, Any], str]:
+    async def execute_prompt(
+        self, request: PromptExecuteRequest
+    ) -> Union[Dict[str, Any], str, AsyncGenerator[str, None]]:
         """Execute a prompt based on the request.
 
         Args:
             request: Prompt execution request
 
         Returns:
-            The result of the prompt execution
+            The result of the prompt execution or a generator for streaming
 
         Raises:
             ClientException: If validation or execution fails
         """
         try:
             # Validate content field exists in schemas
-            if request.output_schema and "properties" in request.output_schema:
-                if "content" not in request.output_schema["properties"]:
-                    raise ClientException(status_code=400, message="Output schema must contain a 'content' field")
+            if (
+                request.output_schema
+                and "properties" in request.output_schema
+                and "content" not in request.output_schema["properties"]
+            ):
+                raise ClientException(status_code=400, message="Output schema must contain a 'content' field")
 
-            if request.input_schema and "properties" in request.input_schema:
-                if "content" not in request.input_schema["properties"]:
-                    raise ClientException(status_code=400, message="Input schema must contain a 'content' field")
+            if (
+                request.input_schema
+                and "properties" in request.input_schema
+                and "content" not in request.input_schema["properties"]
+            ):
+                raise ClientException(status_code=400, message="Input schema must contain a 'content' field")
 
-            # Execute the prompt with input_data from request
+            # Execute the prompt with input_data from request and stream parameter
             result = await self.executor.execute(
                 deployment_name=request.deployment_name,
                 model_settings=request.model_settings,
@@ -74,17 +82,15 @@ class PromptExecutorService:
                 system_prompt=request.system_prompt,
                 messages=request.messages,
                 input_data=request.input_data,
+                stream=request.stream,
             )
-
-            # Clean up temporary modules
-            clean_model_cache()
 
             return result
 
         except ValidationError as e:
             # Input validation errors -> 400 Bad Request
             logger.error(f"Input validation failed: {str(e)}")
-            raise ClientException(status_code=400, message="Invalid input data")
+            raise ClientException(status_code=400, message="Invalid input data") from e
 
         except SchemaGenerationException as e:
             # Schema generation errors -> 400 Bad Request
@@ -92,7 +98,7 @@ class PromptExecutorService:
             raise ClientException(
                 status_code=400,
                 message=e.message,  # Use the custom exception's message
-            )
+            ) from e
 
         except PromptExecutionException as e:
             # Prompt execution errors -> 500 Internal Server Error
@@ -100,9 +106,12 @@ class PromptExecutorService:
             raise ClientException(
                 status_code=500,
                 message=e.message,  # Use the custom exception's message
-            )
+            ) from e
 
         except Exception as e:
             # Let unhandled exceptions bubble up
             logger.error(f"Unexpected error: {str(e)}")
             raise
+        finally:
+            # Always clean up temporary modules
+            clean_model_cache()

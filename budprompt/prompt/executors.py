@@ -18,8 +18,9 @@
 
 import json
 import logging
+from dataclasses import asdict
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Type, Union
+from typing import Any, AsyncGenerator, Dict, List, Optional, Type, Union
 
 from pydantic import BaseModel, ValidationError
 from pydantic_ai import Agent
@@ -67,7 +68,8 @@ class SimplePromptExecutor:
         system_prompt: str,
         messages: List[Message],
         input_data: Optional[Union[Dict[str, Any], str]] = None,
-    ) -> Union[Dict[str, Any], str]:
+        stream: bool = False,
+    ) -> Union[Dict[str, Any], str, AsyncGenerator[str, None]]:
         """Execute a prompt with structured or unstructured input and output.
 
         Args:
@@ -78,9 +80,10 @@ class SimplePromptExecutor:
             system_prompt: System prompt to guide the model
             messages: List of messages for context
             input_data: Input data to process (Dict for structured, str for unstructured)
+            stream: Whether to stream the response
 
         Returns:
-            Output data (Dict for structured, str for unstructured)
+            Output data (Dict for structured, str for unstructured) or AsyncGenerator for streaming
 
         Raises:
             SchemaGenerationException: If schema conversion fails
@@ -123,16 +126,13 @@ class SimplePromptExecutor:
             # Get user prompt from input_data
             user_prompt = self._prepare_user_prompt(input_data)
 
-            # Execute the agent with both history and current prompt
-            result = await self._run_agent(agent, user_prompt, message_history)
-
-            # Process and return result
-            if output_schema is not None:
-                # Structured output: return as dict
-                return result.model_dump() if hasattr(result, "model_dump") else result
+            # Check if streaming is requested
+            if stream:
+                # Return the stream generator
+                return self._run_agent_stream(agent, user_prompt, message_history, output_schema)
             else:
-                # Unstructured output: return as string
-                return result
+                # Execute the agent with both history and current prompt
+                return await self._run_agent(agent, user_prompt, message_history, output_schema)
 
         except (SchemaGenerationException, ValidationError, PromptExecutionException):
             raise
@@ -296,16 +296,23 @@ class SimplePromptExecutor:
             # Convert dict to JSON string for structured input
             return json.dumps(input_data)
 
-    async def _run_agent(self, agent: Agent, user_prompt: Optional[str], message_history: List[ModelMessage]) -> Any:
+    async def _run_agent(
+        self,
+        agent: Agent,
+        user_prompt: Optional[str],
+        message_history: List[ModelMessage],
+        output_schema: Optional[Dict[str, Any]],
+    ) -> Any:
         """Run the agent with message history and current prompt.
 
         Args:
             agent: Configured AI agent
             user_prompt: Current user prompt from input_data
             message_history: Conversation history from messages
+            output_schema: Output schema to determine result processing
 
         Returns:
-            Agent execution result
+            Agent execution result (dict for structured, string for unstructured)
 
         Raises:
             PromptExecutionException: If execution fails
@@ -318,7 +325,56 @@ class SimplePromptExecutor:
                 message_history=message_history,
             )
 
-            return result.output
+            # Process and return result based on output schema
+            if output_schema is not None:
+                # Structured output: return as dict
+                return result.output.model_dump() if hasattr(result.output, "model_dump") else result.output
+            else:
+                # Unstructured output: return as string
+                return result.output
         except Exception as e:
             logger.error(f"Agent execution failed: {str(e)}")
             raise PromptExecutionException("Agent execution failed") from e
+
+    async def _run_agent_stream(
+        self,
+        agent: Agent,
+        user_prompt: Optional[str],
+        message_history: List[ModelMessage],
+        output_schema: Optional[Dict[str, Any]],
+    ) -> AsyncGenerator[str, None]:
+        """Run agent with streaming and yield SSE-formatted chunks.
+
+        Args:
+            agent: Configured AI agent
+            user_prompt: Current user prompt from input_data
+            message_history: Conversation history from messages
+            output_schema: Output schema to determine streaming type
+
+        Yields:
+            SSE-formatted string chunks with data: prefix and double newlines
+        """
+        try:
+            # Use async context manager for run_stream
+            async with agent.run_stream(user_prompt=user_prompt, message_history=message_history) as stream_result:
+                logger.info("Starting streaming with stream_structured()...")
+
+                # Use stream_structured() for getting structured messages
+                # This works for both structured and unstructured outputs
+                async for message, last_message in stream_result.stream_structured():
+                    logger.debug(f"Received message type: {type(message)}, last_message: {last_message}")
+
+                    # Handle ModelResponse dataclass
+                    if isinstance(message, ModelResponse):
+                        # Convert ModelResponse to dict using asdict
+                        message_dict = asdict(message)
+                        message_dict["timestamp"] = datetime.now().isoformat()
+                        message_dict["end"] = last_message
+
+                        # Format as SSE with proper data prefix and newlines
+                        yield f"data: {json.dumps(message_dict)}\n\n"
+
+        except Exception as e:
+            logger.error(f"Error during streaming: {str(e)}")
+            # Send error in SSE format
+            yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
