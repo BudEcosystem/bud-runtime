@@ -25,6 +25,15 @@ spec:
         ports:
         - containerPort: 9082
         env:
+          - name: PRIVATE_KEY_PATH
+            value: "/app/keys/rsa-private-key.pem"
+          - name: PRIVATE_KEY_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Release.Name }}-rsa-keys
+                key: private-key-password
+          - name: PUBLIC_KEY_PATH
+            value: "/app/keys/rsa-public-key.pem"
         {{ $root := . }}
         {{- range $key, $value := .Values.microservices.budapp.env }}
           - name: {{ $key }}
@@ -45,6 +54,9 @@ spec:
           mountPath: /datadisk/add_model_dir
         - name: static-dir
           mountPath: /data/static-dir
+        - name: rsa-keys
+          mountPath: /app/keys
+          readOnly: true
       volumes:
       - name: add-dir-budmo
         persistentVolumeClaim:
@@ -52,6 +64,10 @@ spec:
       - name: static-dir
         persistentVolumeClaim:
           claimName: {{ .Release.Name }}-bud-static-dir
+      - name: rsa-keys
+        secret:
+          secretName: {{ .Release.Name }}-rsa-keys
+          defaultMode: 0444
 ---
 apiVersion: v1
 kind: Service
