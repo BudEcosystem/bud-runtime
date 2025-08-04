@@ -1,6 +1,7 @@
 name: "BudApp: Build and Push Nightly Docker Image"
 
 on:
+  workflow_dispatch:
   push:
     paths:
       - 'services/budapp/**'
@@ -42,5 +43,5 @@ jobs:
         with:
           context: ./services/budapp
           push: true
-          file: ./deploy/Dockerfile
+          file: ./services/budapp/deploy/Dockerfile
           tags: budstudio/budapp:nightly

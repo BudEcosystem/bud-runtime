@@ -1,6 +1,7 @@
 name: "BudNotify: Build and Push Nightly Docker Image"
 
 on:
+  workflow_dispatch:
   push:
     paths:
       - 'services/budnotify/**'
@@ -29,5 +30,5 @@ jobs:
         with:
           context: ./services/budnotify
           push: true
-          file: ./deploy/Dockerfile
+          file: ./services/budnotify/deploy/Dockerfile
           tags: budstudio/budnotify:nightly
