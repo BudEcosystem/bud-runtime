@@ -119,6 +119,16 @@ class UserBase(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     email: EmailStr = Field(min_length=1, max_length=100)
 
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        """Validate that name contains only letters, spaces, hyphens, and apostrophes."""
+        import re
+
+        if not re.match(r"^[a-zA-Z\s\-']+$", value):
+            raise ValueError("Name can only contain letters, spaces, hyphens, and apostrophes")
+        return value.strip()
+
 
 class UserCreate(UserBase):
     """Create user schema."""
