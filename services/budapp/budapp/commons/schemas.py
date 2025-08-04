@@ -42,6 +42,21 @@ lowercase_string = Annotated[str, StringConstraints(to_lower=True)]
 ContentType = TypeVar("ContentType")
 
 
+def to_camel(string: str) -> str:
+    """Convert snake_case to camelCase."""
+    components = string.split("_")
+    return components[0] + "".join(x.title() for x in components[1:])
+
+
+class CamelCaseModel(BaseModel):
+    """Base model with camelCase field aliases."""
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+
 class CloudEventBase(BaseModel):
     """Base class for handling HTTP requests with cloud event compatible validation.
 

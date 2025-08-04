@@ -404,6 +404,22 @@ class UserTypeEnum(StrEnum):
     CLIENT = auto()
 
 
+class OAuthProviderEnum(StrEnum):
+    """Define supported OAuth providers.
+
+    Attributes:
+        GOOGLE (str): Google OAuth provider.
+        LINKEDIN (str): LinkedIn OAuth provider.
+        GITHUB (str): GitHub OAuth provider.
+        MICROSOFT (str): Microsoft Entra (Azure AD) OAuth provider.
+    """
+
+    GOOGLE = auto()
+    LINKEDIN = auto()
+    GITHUB = auto()
+    MICROSOFT = auto()
+
+
 class PermissionEnum(Enum):
     """Enumeration of system permissions.
 

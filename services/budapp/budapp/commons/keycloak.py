@@ -2228,3 +2228,103 @@ class KeycloakManager:
             None
         """
         pass
+
+    async def configure_identity_provider(self, realm_name: str, provider_config: dict) -> None:
+        """Configure an identity provider in Keycloak.
+
+        Args:
+            realm_name: The name of the realm
+            provider_config: Configuration dictionary containing provider details
+
+        Returns:
+            None
+        """
+        try:
+            realm_admin = self.get_realm_admin(realm_name)
+
+            # Extract provider details from config
+            alias = provider_config.get("alias")
+            provider_id = provider_config.get("providerId")
+            client_id = provider_config.get("clientId")
+            client_secret = provider_config.get("clientSecret")
+            config = provider_config.get("config", {})
+
+            if not all([alias, provider_id, client_id, client_secret]):
+                raise ValueError("Missing required provider configuration fields")
+
+            # Build the identity provider representation
+            idp_representation = {
+                "alias": alias,
+                "providerId": provider_id,
+                "enabled": True,
+                "storeToken": False,
+                "trustEmail": True,
+                "linkOnly": False,
+                "firstBrokerLoginFlowAlias": "first broker login",
+                "config": {
+                    "clientId": client_id,
+                    "clientSecret": client_secret,
+                    "syncMode": "IMPORT",
+                    "useJwksUrl": "true",
+                    **config,  # Merge provider-specific config
+                },
+            }
+
+            # Create or update the identity provider
+            try:
+                realm_admin.create_idp(payload=idp_representation)
+                logger.info(f"Identity provider {alias} created successfully in realm {realm_name}")
+            except Exception as e:
+                if "409" in str(e):  # Provider already exists
+                    # Update existing provider
+                    realm_admin.update_idp(alias=alias, payload=idp_representation)
+                    logger.info(f"Identity provider {alias} updated successfully in realm {realm_name}")
+                else:
+                    raise
+
+        except Exception as e:
+            logger.error(f"Failed to configure identity provider in realm {realm_name}: {str(e)}")
+            raise
+
+    def get_broker_login_url(
+        self, realm_name: str, provider: str, redirect_uri: str, state: str, client_id: str = None
+    ) -> str:
+        """Generate OAuth broker login URL for Keycloak.
+
+        Args:
+            realm_name: The Keycloak realm name
+            provider: The OAuth provider alias (e.g., 'google', 'github')
+            redirect_uri: The redirect URI after successful authentication
+            state: The state parameter for CSRF protection
+            client_id: Optional client ID (defaults to 'default-internal-client')
+
+        Returns:
+            The complete OAuth broker login URL
+        """
+        from urllib.parse import urlencode
+
+        # Use the default client if not specified
+        if not client_id:
+            client_id = "default-internal-client"
+
+        # Construct the Keycloak broker login URL
+        base_url = app_settings.keycloak_server_url.rstrip("/")
+
+        # Convert host.docker.internal to localhost for browser access
+        if "host.docker.internal" in base_url:
+            base_url = base_url.replace("host.docker.internal", "localhost")
+
+        # Use the standard Keycloak authorization endpoint with identity provider hint
+        params = {
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
+            "response_type": "code",
+            "scope": "openid email profile",
+            "state": state,
+            "kc_idp_hint": provider,  # This tells Keycloak to use the specified identity provider
+        }
+
+        auth_url = f"{base_url}/realms/{realm_name}/protocol/openid-connect/auth?{urlencode(params)}"
+
+        logger.debug(f"Generated broker login URL for provider {provider} in realm {realm_name}")
+        return auth_url
