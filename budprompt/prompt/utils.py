@@ -17,9 +17,10 @@
 """Utility functions for prompt execution."""
 
 import sys
-from typing import Any, Dict
+from typing import Any, Dict, Union, get_args, get_origin
 
 from budmicroframe.commons import logging
+from pydantic import BaseModel
 
 from budprompt.commons.exceptions import SchemaGenerationException
 
@@ -29,10 +30,44 @@ logger = logging.get_logger(__name__)
 
 def clean_model_cache():
     """Clean up any temporary modules from sys.modules."""
-    modules_to_remove = [key for key in sys.modules.keys() if key.startswith("temp_models_")]
+    modules_to_remove = [key for key in sys.modules if key.startswith("temp_models_")]
     for module_name in modules_to_remove:
         logger.debug("Removing module from sys.modules: %s", module_name)
         del sys.modules[module_name]
+
+
+def contains_pydantic_model(output_type: Any) -> bool:
+    """Check if a type contains a Pydantic BaseModel.
+
+    Handles:
+    - Direct BaseModel: MyModel
+    - List of BaseModel: List[MyModel]
+    - Union with BaseModel: Union[str, MyModel]
+    - Nested combinations: List[Union[str, MyModel]]
+
+    Args:
+        output_type: The type to check
+
+    Returns:
+        True if the type contains a Pydantic BaseModel, False otherwise
+    """
+    # Direct BaseModel check
+    if isinstance(output_type, type) and issubclass(output_type, BaseModel):
+        return True
+
+    # Get origin and args for generic types
+    origin = get_origin(output_type)
+    args = get_args(output_type)
+
+    if origin is list and args:
+        # List[SomeType] - check the item type
+        return contains_pydantic_model(args[0])
+
+    if origin is Union and args:
+        # Union[Type1, Type2, ...] - check if any type is BaseModel
+        return any(contains_pydantic_model(arg) for arg in args)
+
+    return False
 
 
 def validate_input_data_type(input_data: Any, input_schema: Dict[str, Any] = None) -> None:

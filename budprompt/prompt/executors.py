@@ -19,7 +19,7 @@
 import json
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Type, Union, get_args, get_origin
+from typing import Any, Dict, List, Optional, Type, Union
 
 from pydantic import BaseModel, ValidationError
 from pydantic_ai import Agent
@@ -40,38 +40,10 @@ from budprompt.shared.providers import BudServeProvider
 from .schema_builder import PydanticModelGenerator
 from .schemas import Message, ModelSettings
 from .template_renderer import render_template
-from .utils import validate_input_data_type
+from .utils import contains_pydantic_model, validate_input_data_type
 
 
 logger = logging.getLogger(__name__)
-
-
-def _contains_pydantic_model(output_type: Any) -> bool:
-    """Check if a type contains a Pydantic BaseModel.
-
-    Handles:
-    - Direct BaseModel: MyModel
-    - List of BaseModel: List[MyModel]
-    - Union with BaseModel: Union[str, MyModel]
-    - Nested combinations: List[Union[str, MyModel]]
-    """
-    # Direct BaseModel check
-    if isinstance(output_type, type) and issubclass(output_type, BaseModel):
-        return True
-
-    # Get origin and args for generic types
-    origin = get_origin(output_type)
-    args = get_args(output_type)
-
-    if origin is list and args:
-        # List[SomeType] - check the item type
-        return _contains_pydantic_model(args[0])
-
-    if origin is Union and args:
-        # Union[Type1, Type2, ...] - check if any type is BaseModel
-        return any(_contains_pydantic_model(arg) for arg in args)
-
-    return False
 
 
 class SimplePromptExecutor:
@@ -187,7 +159,7 @@ class SimplePromptExecutor:
         output_type = output_model.__pydantic_fields__["content"].annotation
 
         # Return NativeOutput if type contains BaseModel, otherwise return raw type
-        if _contains_pydantic_model(output_type):
+        if contains_pydantic_model(output_type):
             return NativeOutput(output_type)
         else:
             return output_type
