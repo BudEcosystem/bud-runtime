@@ -35,4 +35,4 @@ jobs:
           context: ./services/budadmin
           push: true
           file: ./services/budadmin/Dockerfile
-          tags: budstudio/bud-dashboard:${{ env.RELEASE_TAG }}
+          tags: budstudio/budadmin:${{ env.RELEASE_TAG }}
