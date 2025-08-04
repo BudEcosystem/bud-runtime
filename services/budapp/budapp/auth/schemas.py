@@ -125,9 +125,10 @@ class UserBase(BaseModel):
         """Validate that name contains only letters, spaces, hyphens, and apostrophes."""
         import re
 
-        if not re.match(r"^[a-zA-Z\s\-']+$", value):
+        stripped_value = value.strip()
+        if not re.match(r"^[a-zA-Z\s\-']+$", stripped_value):
             raise ValueError("Name can only contain letters, spaces, hyphens, and apostrophes")
-        return value.strip()
+        return stripped_value
 
 
 class UserCreate(UserBase):
