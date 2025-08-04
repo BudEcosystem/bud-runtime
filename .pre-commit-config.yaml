@@ -33,6 +33,7 @@ repos:
               services/budgateway/docs/.*\.md|
               services/budgateway/CLAUDE\.md|
               services/budgateway/ci/dummy-gcp-credentials\.json|
+              infra/helm/bud/charts/novu/values\.yaml|
               services/budgateway/tensorzero-internal/src/inference/providers/gcp_vertex_gemini\.rs|
               \.env\.sample
           )$
