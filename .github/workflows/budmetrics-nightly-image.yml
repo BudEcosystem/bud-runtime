@@ -1,6 +1,7 @@
 name: "BudMetrics: Build and Push Nightly Docker Image"
 
 on:
+  workflow_dispatch:
   push:
     paths:
       - 'services/budmetrics/**'
@@ -29,5 +30,5 @@ jobs:
         with:
           context: ./services/budcluster
           push: true
-          file: ./deploy/Dockerfile
+          file: ./services/budcluster/deploy/Dockerfile
           tags: budstudio/budmetrics:nightly
