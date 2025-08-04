@@ -1,7 +1,9 @@
 import base64
+import ipaddress
 import random
 import secrets
 import string
+from typing import List, Optional
 
 
 async def generate_random_string(length: int) -> str:
@@ -34,3 +36,28 @@ def generate_secure_api_key(credential_type: str = "client") -> str:
     prefix = type_map.get(credential_type, "client")
 
     return f"bud_{prefix}_{encoded}"
+
+
+def validate_ip_whitelist(ip_list: Optional[List[str]]) -> bool:
+    """Validate a list of IP addresses.
+
+    Args:
+        ip_list: List of IP addresses to validate
+
+    Returns:
+        bool: True if all IPs are valid, False otherwise
+
+    Raises:
+        ValueError: If any IP address is invalid
+    """
+    if not ip_list:
+        return True
+
+    for ip in ip_list:
+        try:
+            # This will validate both IPv4 and IPv6 addresses
+            ipaddress.ip_address(ip)
+        except ValueError:
+            raise ValueError(f"Invalid IP address: {ip}")
+
+    return True

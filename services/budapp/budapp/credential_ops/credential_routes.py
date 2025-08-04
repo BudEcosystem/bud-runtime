@@ -9,7 +9,7 @@ from typing_extensions import Union
 
 from budapp.commons import logging
 from budapp.commons.api_utils import pubsub_api_endpoint
-from budapp.commons.constants import CredentialTypeEnum
+from budapp.commons.constants import ApiCredentialTypeEnum, CredentialTypeEnum
 from budapp.commons.dependencies import get_current_active_user, get_session, parse_ordering_fields
 from budapp.commons.exceptions import ClientException
 from budapp.commons.schemas import (

@@ -34,7 +34,7 @@ from budapp.user_ops.crud import UserDataManager
 
 from ..project_ops.models import Project as ProjectModel
 from .crud import CloudProviderDataManager, CredentialDataManager, ProprietaryCredentialDataManager
-from .helpers import generate_secure_api_key
+from .helpers import generate_secure_api_key, validate_ip_whitelist
 from .models import CloudCredentials, CloudProviders
 from .models import Credential as CredentialModel
 from .models import ProprietaryCredential as ProprietaryCredentialModel
@@ -117,9 +117,19 @@ class CredentialService(SessionMixin):
         if db_user.user_type == UserTypeEnum.CLIENT:
             # Client users should only create client_app credentials
             credential_type = ApiCredentialTypeEnum.CLIENT_APP
-        elif db_user.user_type == UserTypeEnum.ADMIN and request.credential_type == ApiCredentialTypeEnum.CLIENT_APP:
-            # Admin users can create any type, but default to admin_app if not specified
-            credential_type = ApiCredentialTypeEnum.ADMIN_APP
+        elif db_user.user_type == UserTypeEnum.ADMIN:
+            # Admin users can create any type - use what they requested or default to admin_app
+            if request.credential_type is None:
+                credential_type = ApiCredentialTypeEnum.ADMIN_APP
+            else:
+                credential_type = request.credential_type
+
+        # Validate IP whitelist if provided
+        if request.ip_whitelist:
+            try:
+                validate_ip_whitelist(request.ip_whitelist)
+            except ValueError as e:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
         # Generate new credential using secure method
         api_key = generate_secure_api_key(credential_type.value)
@@ -346,12 +356,98 @@ class CredentialService(SessionMixin):
                 str(k): v for k, v in credential_update_data["model_budgets"].items()
             }
 
+        # Validate IP whitelist if provided in update
+        if credential_update_data.get("ip_whitelist", None):
+            try:
+                validate_ip_whitelist(credential_update_data["ip_whitelist"])
+            except ValueError as e:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
         # Update the credential in the database
         db_credential = await CredentialDataManager(self.session).update_credential_by_fields(
             db_credential, credential_update_data
         )
 
         return db_credential
+
+    async def validate_api_key(self, api_key: str, client_ip: Optional[str] = None) -> bool:
+        """Validate an API key including expiry and IP whitelist checks.
+
+        Args:
+            api_key: The plain API key to validate
+            client_ip: The client's IP address (optional, for IP whitelist validation)
+
+        Returns:
+            bool: True if the credential is valid, False otherwise
+        """
+        # Hash the API key to match what's stored in the database
+        hashed_key = CredentialModel.set_hashed_key(api_key)
+        return await self.is_credential_valid(hashed_key, client_ip)
+
+    async def is_credential_valid(self, hashed_key: str, client_ip: Optional[str] = None) -> bool:
+        """Validate a credential including expiry and IP whitelist checks.
+
+        Args:
+            hashed_key: The hashed API key to validate
+            client_ip: The client's IP address (optional, for IP whitelist validation)
+
+        Returns:
+            bool: True if the credential is valid, False otherwise
+        """
+        try:
+            # Check if credential exists in cache first
+            redis_service = RedisService()
+            cached_result = await redis_service.get(f"credential_valid:{hashed_key}")
+            if cached_result is not None:
+                # If cached and has IP whitelist, we still need to validate the IP
+                if cached_result == "valid_no_ip_whitelist":
+                    return True
+                elif cached_result == "valid_with_ip_whitelist":
+                    # Continue to IP validation below
+                    pass
+                else:
+                    return False
+
+            # Retrieve credential from database
+            db_credential = await CredentialDataManager(self.session).retrieve_by_fields(
+                CredentialModel, {"hashed_key": hashed_key}, missing_ok=True
+            )
+
+            if not db_credential:
+                return False
+
+            # Check if credential is expired
+            if db_credential.expiry and db_credential.expiry < datetime.now(UTC):
+                logger.info(f"Credential {db_credential.id} is expired")
+                await redis_service.set(f"credential_valid:{hashed_key}", "invalid", ex=300)  # Cache for 5 minutes
+                return False
+
+            # Check IP whitelist if configured
+            if db_credential.ip_whitelist and isinstance(db_credential.ip_whitelist, list):
+                if not client_ip:
+                    logger.warning(f"Credential {db_credential.id} requires IP whitelist but no client IP provided")
+                    return False
+
+                if client_ip not in db_credential.ip_whitelist:
+                    logger.info(f"Client IP {client_ip} not in whitelist for credential {db_credential.id}")
+                    return False
+
+                # Valid credential with IP whitelist - cache briefly since IP might change
+                await redis_service.set(f"credential_valid:{hashed_key}", "valid_with_ip_whitelist", ex=60)
+            else:
+                # Valid credential without IP whitelist - cache for longer
+                await redis_service.set(f"credential_valid:{hashed_key}", "valid_no_ip_whitelist", ex=300)
+
+            # Update last used timestamp
+            await CredentialDataManager(self.session).update_credential_by_fields(
+                db_credential, {"last_used_at": datetime.now(UTC)}
+            )
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Error validating credential: {e}")
+            return False
 
     # @cache(
     #     key_func=lambda s, api_key, endpoint_name: f"router_config:{api_key}:{endpoint_name}",
