@@ -18,6 +18,7 @@
   terraform-ls,
   opentofu,
   azure-cli,
+  graphviz,
   jq, # nixos-anywhere terraform module
 
   shfmt,
@@ -44,6 +45,7 @@ mkShell {
     jq
     pre-commit
     nodejs
+    graphviz
   ];
 
   shellHook = ''

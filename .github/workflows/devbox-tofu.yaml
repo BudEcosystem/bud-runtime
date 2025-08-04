@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  tofu-deploy:
+  apply:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repository
@@ -21,4 +21,4 @@ jobs:
     - name: Deploy Devbox
       env:
         SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
-      run: nix run .#workflows.devbox_deploy
+      run: nix run .#workflows.devbox_tofu_apply

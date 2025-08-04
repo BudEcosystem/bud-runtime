@@ -3,5 +3,5 @@
   self,
 }:
 {
-  devbox_deploy = callPackage ./devbox_deploy { };
+  devbox_tofu_apply = callPackage ./devbox_tofu_apply { };
 }

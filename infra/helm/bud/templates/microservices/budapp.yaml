@@ -12,6 +12,7 @@ spec:
       labels:
         app: {{ .Release.Name}}-budapp
       annotations:
+        date: "{{ now }}"
         dapr.io/enabled: "true"
         dapr.io/app-id: "budapp"
         dapr.io/app-port: "9082"
@@ -19,7 +20,7 @@ spec:
       containers:
       - name: {{ .Release.Name}}-budapp
         image: {{ .Values.microservices.budapp.image }}
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         command: ["sh", "-c", "alembic -c ./budapp/alembic.ini upgrade head && uvicorn budapp.main:app --host 0.0.0.0 --port 9082"]
         ports:
         - containerPort: 9082

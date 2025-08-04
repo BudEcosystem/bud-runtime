@@ -12,6 +12,7 @@ spec:
       labels:
         app: {{ .Release.Name }}-budplayground
       annotations:
+        date: "{{ now }}"
         dapr.io/enabled: "true"
         dapr.io/app-id: "budplayground"
         dapr.io/app-port: "3000"
@@ -19,7 +20,7 @@ spec:
       containers:
       - name: {{ .Release.Name }}-budplayground
         image: {{ .Values.microservices.budplayground.image }}
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         ports:
         - containerPort: 3000
         env:

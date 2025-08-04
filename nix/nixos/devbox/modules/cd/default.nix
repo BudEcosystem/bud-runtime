@@ -1,0 +1,6 @@
+{
+  imports = [
+    ./helm
+    ./nixos.nix
+  ];
+}
