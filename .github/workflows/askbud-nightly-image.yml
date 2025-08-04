@@ -1,18 +1,16 @@
-name: "BudAdmin: Build and Push Nightly Docker Image"
+name: "AskBud: Build and Push Nightly Docker Image"
 
 on:
   workflow_dispatch:
   push:
     paths:
-      - 'services/budadmin/**'
+      - 'services/ask-bud/**'
     branches:
       - master
 
 jobs:
   build-and-push:
-    name: Build and Push Docker Image
     runs-on: ubuntu-latest
-    continue-on-error: false
 
     steps:
       - name: Checkout code
@@ -31,6 +29,6 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           push: true
-          context: ./services/budadmin
-          file: ./services/budadmin/Dockerfile
-          tags: budstudio/budadmin:nightly
+          context: ./services/ask-bud
+          file: ./services/ask-bud/deploy/Dockerfile
+          tags: budstudio/askbud:nightly
