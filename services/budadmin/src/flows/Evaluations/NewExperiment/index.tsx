@@ -12,7 +12,7 @@ import { useEvaluations } from "src/hooks/useEvaluations";
 import { useProjects } from "src/hooks/useProjects";
 import TextInput from "src/flows/components/TextInput";
 
-const NewExperimentForm = React.memo(() => {
+const NewExperimentForm = React.memo(function NewExperimentForm() {
   const [options] = useState([]);
 
 
