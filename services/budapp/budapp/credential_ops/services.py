@@ -9,7 +9,14 @@ from fastapi.exceptions import HTTPException
 
 from budapp.commons import logging
 from budapp.commons.config import app_settings
-from budapp.commons.constants import EndpointStatusEnum, ModelProviderTypeEnum, PermissionEnum, ProjectStatusEnum
+from budapp.commons.constants import (
+    ApiCredentialTypeEnum,
+    EndpointStatusEnum,
+    ModelProviderTypeEnum,
+    PermissionEnum,
+    ProjectStatusEnum,
+    UserTypeEnum,
+)
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.security import RSAHandler
 from budapp.endpoint_ops.crud import AdapterDataManager, EndpointDataManager
@@ -23,10 +30,11 @@ from budapp.permissions.crud import PermissionDataManager, ProjectPermissionData
 from budapp.project_ops.crud import ProjectDataManager
 from budapp.project_ops.services import ProjectService
 from budapp.shared.redis_service import RedisService, cache
+from budapp.user_ops.crud import UserDataManager
 
 from ..project_ops.models import Project as ProjectModel
 from .crud import CloudProviderDataManager, CredentialDataManager, ProprietaryCredentialDataManager
-from .helpers import generate_random_string
+from .helpers import generate_secure_api_key
 from .models import CloudCredentials, CloudProviders
 from .models import Credential as CredentialModel
 from .models import ProprietaryCredential as ProprietaryCredentialModel
@@ -94,13 +102,27 @@ class CredentialService(SessionMixin):
             max_budget=db_credential.max_budget,
             model_budgets=db_credential.model_budgets,
             id=db_credential.id,
+            credential_type=db_credential.credential_type,
+            ip_whitelist=db_credential.ip_whitelist,
         )
 
         return credential_response
 
     async def add_or_generate_credential(self, request: CredentialRequest, user_id: UUID) -> CredentialModel:
-        # Generate new credential if type is BUDSERVE
-        api_key = f"budserve_{await generate_random_string(40)}"
+        # Get user information to determine credential type
+        db_user = await UserDataManager(self.session).retrieve_user_by_fields({"id": user_id})
+
+        # Automatically set credential_type based on user_type if not explicitly provided
+        credential_type = request.credential_type
+        if db_user.user_type == UserTypeEnum.CLIENT:
+            # Client users should only create client_app credentials
+            credential_type = ApiCredentialTypeEnum.CLIENT_APP
+        elif db_user.user_type == UserTypeEnum.ADMIN and request.credential_type == ApiCredentialTypeEnum.CLIENT_APP:
+            # Admin users can create any type, but default to admin_app if not specified
+            credential_type = ApiCredentialTypeEnum.ADMIN_APP
+
+        # Generate new credential using secure method
+        api_key = generate_secure_api_key(credential_type.value)
 
         expiry = datetime.now(UTC) + timedelta(days=request.expiry) if request.expiry else None
         credential_data = BudCredentialCreate(
@@ -111,6 +133,8 @@ class CredentialService(SessionMixin):
             key=api_key,
             max_budget=request.max_budget,
             model_budgets=request.model_budgets,
+            credential_type=credential_type,
+            ip_whitelist=request.ip_whitelist,
         )
 
         # Insert credential in to database
@@ -224,6 +248,8 @@ class CredentialService(SessionMixin):
                     model_budgets=db_credential.model_budgets,
                     id=db_credential.id,
                     last_used_at=db_credential.last_used_at,
+                    credential_type=db_credential.credential_type,
+                    ip_whitelist=db_credential.ip_whitelist,
                 )
             )
         return bud_serve_credentials

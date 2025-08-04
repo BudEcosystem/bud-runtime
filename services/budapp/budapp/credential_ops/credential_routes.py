@@ -133,8 +133,8 @@ async def get_router_config(
         500: {"model": ErrorResponse},
     },
     description=f"""Add or generate a new credential for user. Valid credential types:
-    {", ".join([value.value for value in CredentialTypeEnum])}.
-    For budserve credential type, project_id, expiry(None or 30, 60) are required.""",
+    {", ".join([value.value for value in ApiCredentialTypeEnum])}.
+    Project_id and expiry(None or 30, 60) are required.""",
 )
 async def add_credential(
     credential: CredentialRequest,
@@ -142,7 +142,7 @@ async def add_credential(
     session: Annotated[Session, Depends(get_session)],
 ):
     credential_response = await CredentialService(session).add_credential(current_user.id, credential)
-    logger.info(f"API-Key credential added: {credential_response.key}")
+    logger.info(f"API-Key credential added: {credential_response.id}")
 
     return SingleResponse(message="Credential added successfully", result=credential_response)
 
