@@ -27,11 +27,16 @@ for chart in "$helm_path"/*; do
 		echo "" > "$chart/secrets.yaml"
 	fi
 
+	rm -rf "$chart/charts"
 	helm dependency update "$chart"
+
+	# do not exit if a single chart fails
+	set +e
 	KUBECONFIG="/etc/rancher/k3s/k3s.yaml" helm upgrade \
 		--install \
 		--namespace "$namespace" \
 		--create-namespace \
 		--values "$chart/secrets.yaml" \
 		"$release_name" "$chart"
+	set -e
 done
