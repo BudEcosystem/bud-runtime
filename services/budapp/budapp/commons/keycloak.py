@@ -505,8 +505,8 @@ class KeycloakManager:
 
             return user_id
         except KeycloakPostError as e:
-            error_msg = str(e)
-            if "User exists with same email" in error_msg:
+            # A 409 Conflict status code typically indicates that the user already exists.
+            if e.response_code == 409:
                 logger.error(f"User with email {user.email} already exists in Keycloak realm {realm_name}")
                 from budapp.commons.exceptions import ClientException
 
