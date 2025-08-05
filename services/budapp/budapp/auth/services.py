@@ -357,9 +357,8 @@ class AuthService(SessionMixin):
 
             return db_user
 
-        except Exception as e:
-            logger.error(f"Failed to register user: {e}")
-            raise ClientException(detail="Failed to register user")
-
         except BudNotifyException as e:
             logger.error(f"Failed to add user to budnotify subscribers: {e}")
+        except Exception as e:
+            logger.error(f"Failed to register user: {e}")
+            raise e
