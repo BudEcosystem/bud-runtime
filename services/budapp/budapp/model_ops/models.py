@@ -125,6 +125,8 @@ class Model(Base, TimestampMixin):
         ),
         nullable=False,
     )
+    token_limit: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    max_input_tokens: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
     endpoints: Mapped[list["Endpoint"]] = relationship(back_populates="model")
     adapters: Mapped[list["Adapter"]] = relationship(back_populates="model")

@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-budplayground
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-budplayground
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-budplayground
+      annotations:
+        date: "{{ now }}"
+        dapr.io/enabled: "true"
+        dapr.io/app-id: "budplayground"
+        dapr.io/app-port: "3000"
+    spec:
+      containers:
+      - name: {{ .Release.Name }}-budplayground
+        image: {{ .Values.microservices.budplayground.image }}
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3000
+        env:
+        {{ $root := . }}
+        {{- range $key, $value := .Values.microservices.budplayground.env }}
+          - name: {{ $key }}
+            value: {{ tpl $value $root | quote }}
+        {{- end }}
+        envFrom:
+          - configMapRef:
+              name: {{ .Release.Name}}-bud-global
+        resources:
+          limits:
+            memory: 512Mi
+            cpu: 1
+          requests:
+            memory: 256Mi
+            cpu: 250m
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-budplayground
+spec:
+  ports:
+  - port: 3000
+    targetPort: 3000
+  selector:
+    app: {{ .Release.Name }}-budplayground
+  type: ClusterIP

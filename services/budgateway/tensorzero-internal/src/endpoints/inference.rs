@@ -109,6 +109,9 @@ pub struct Params {
     /// Observability metadata from auth middleware
     #[serde(skip)]
     pub observability_metadata: Option<ObservabilityMetadata>,
+    /// The original request received by the gateway from the client
+    #[serde(skip)]
+    pub gateway_request: Option<String>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -141,6 +144,7 @@ struct InferenceMetadata {
     pub extra_body: UnfilteredInferenceExtraBody,
     pub extra_headers: UnfilteredInferenceExtraHeaders,
     pub observability_metadata: Option<ObservabilityMetadata>,
+    pub gateway_request: Option<String>,
 }
 
 pub type InferenceCredentials = HashMap<String, SecretString>;
@@ -184,16 +188,58 @@ pub async fn inference_handler(
     params.observability_metadata = observability_metadata;
 
     let inference_output = inference(
-        config,
+        config.clone(),
         &http_client,
-        clickhouse_connection_info,
-        kafka_connection_info,
+        clickhouse_connection_info.clone(),
+        kafka_connection_info.clone(),
         model_credential_store,
         params,
     )
     .await?;
     match inference_output {
-        InferenceOutput::NonStreaming(response) => Ok(Json(response).into_response()),
+        InferenceOutput::NonStreaming {
+            response,
+            result,
+            write_info,
+        } => {
+            // Serialize the response to capture what we're sending back to the client (without null values)
+            let gateway_response =
+                super::openai_compatible::serialize_without_nulls(&response).ok();
+
+            // Perform the database write if we have write info
+            if let Some(write_info) = write_info {
+                let async_writes = config.gateway.observability.async_writes;
+                let config = config.clone();
+                let clickhouse_connection_info = clickhouse_connection_info.clone();
+                let kafka_connection_info = kafka_connection_info.clone();
+
+                let write_future = tokio::spawn(async move {
+                    write_inference(
+                        &clickhouse_connection_info,
+                        &kafka_connection_info,
+                        &config,
+                        write_info.resolved_input,
+                        result,
+                        write_info.metadata,
+                        write_info.observability_metadata,
+                        write_info.gateway_request,
+                        gateway_response,
+                    )
+                    .await;
+                });
+
+                if !async_writes {
+                    write_future.await.map_err(|e| {
+                        Error::new(ErrorDetails::InternalError {
+                            message: format!("Failed to await ClickHouse inference write: {e:?}"),
+                        })
+                    })?;
+                }
+            }
+
+            let response_json = Json(response);
+            Ok(response_json.into_response())
+        }
         InferenceOutput::Streaming(stream) => {
             let event_stream = prepare_serialized_events(stream);
 
@@ -208,14 +254,27 @@ pub type InferenceStream =
     Pin<Box<dyn Stream<Item = Result<InferenceResponseChunk, Error>> + Send>>;
 
 pub enum InferenceOutput {
-    NonStreaming(InferenceResponse),
+    NonStreaming {
+        response: InferenceResponse,
+        result: InferenceResult,
+        write_info: Option<WriteInfo>,
+    },
     Streaming(InferenceStream),
+}
+
+pub struct WriteInfo {
+    pub resolved_input: ResolvedInput,
+    pub metadata: InferenceDatabaseInsertMetadata,
+    pub observability_metadata: Option<ObservabilityMetadata>,
+    pub gateway_request: Option<String>,
 }
 
 impl std::fmt::Debug for InferenceOutput {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            InferenceOutput::NonStreaming(response) => write!(f, "NonStreaming({response:?})"),
+            InferenceOutput::NonStreaming { response, .. } => {
+                write!(f, "NonStreaming({response:?})")
+            }
             InferenceOutput::Streaming(_) => write!(f, "Streaming"),
         }
     }
@@ -376,6 +435,7 @@ pub async fn inference(
         extra_cache_key: None,
         extra_body: Default::default(),
         extra_headers: Default::default(),
+        gateway_request: params.gateway_request.clone(),
     };
     // Merge credentials from the credential store with the provided credentials
     let mut merged_credentials = params.credentials.clone();
@@ -473,6 +533,10 @@ pub async fn inference(
                 extra_body,
                 extra_headers,
                 observability_metadata: params.observability_metadata,
+                gateway_request: params
+                    .gateway_request
+                    .clone()
+                    .or(model_used_info.gateway_request),
             };
 
             let stream = create_stream(
@@ -510,57 +574,42 @@ pub async fn inference(
                 }
             };
 
-            if !dryrun {
-                // Spawn a thread for a trailing write to ClickHouse so that it doesn't block the response
+            // Prepare write info if not dryrun
+            let write_info = if !dryrun {
                 let extra_body = inference_config.extra_body.clone();
                 let extra_headers = inference_config.extra_headers.clone();
-                let result_to_write = result.clone();
                 let write_metadata = InferenceDatabaseInsertMetadata {
                     function_name: function_name.to_string(),
                     variant_name: variant_name.to_string(),
                     episode_id,
                     tool_config,
                     processing_time: Some(start_time.elapsed()),
-                    tags: params.tags,
+                    tags: params.tags.clone(),
                     extra_body,
                     extra_headers,
                 };
-
-                let async_writes = config.gateway.observability.async_writes;
-                // Always spawn a tokio task here. This ensures that 'write_inference' will
-                // not be cancelled partway through execution if the outer '/inference' request
-                // is cancelled. This reduces the chances that we only write to some tables and not others
-                // (but this is inherently best-effort due to ClickHouse's lack of transactions).
-                let config = config.clone();
-                let kafka_connection_info = kafka_connection_info.clone();
-                let write_future = tokio::spawn(async move {
-                    write_inference(
-                        &clickhouse_connection_info,
-                        &kafka_connection_info,
-                        &config,
-                        resolved_input,
-                        result_to_write,
-                        write_metadata,
-                        params.observability_metadata.clone(),
-                    )
-                    .await;
-                });
-                if !async_writes {
-                    write_future.await.map_err(|e| {
-                        Error::new(ErrorDetails::InternalError {
-                            message: format!("Failed to await ClickHouse inference write: {e:?}"),
-                        })
-                    })?;
-                }
-            }
+                Some(WriteInfo {
+                    resolved_input: resolved_input.clone(),
+                    metadata: write_metadata,
+                    observability_metadata: params.observability_metadata.clone(),
+                    gateway_request: params.gateway_request.clone(),
+                })
+            } else {
+                None
+            };
 
             if !params.include_original_response {
                 result.set_original_response(None);
             }
 
-            let response = InferenceResponse::new(result, episode_id, variant_name.to_string());
+            let response =
+                InferenceResponse::new(result.clone(), episode_id, variant_name.to_string());
 
-            return Ok(InferenceOutput::NonStreaming(response));
+            return Ok(InferenceOutput::NonStreaming {
+                response,
+                result,
+                write_info,
+            });
         }
     }
 
@@ -644,17 +693,26 @@ fn create_stream(
 ) -> impl Stream<Item = Result<InferenceResponseChunk, Error>> + Send {
     async_stream::stream! {
         let mut buffer = vec![];
+        let mut gateway_response_chunks = vec![];
+
         while let Some(chunk) = stream.next().await {
             match chunk {
                 Ok(chunk) => {
                     buffer.push(chunk.clone());
-                    if let Some(chunk) = prepare_response_chunk(&metadata, chunk) {
-                        yield Ok(chunk);
+                    if let Some(response_chunk) = prepare_response_chunk(&metadata, chunk) {
+                        // Capture the serialized chunk for gateway_response
+                        if let Ok(chunk_json) = serde_json::to_string(&response_chunk) {
+                            gateway_response_chunks.push(format!("data: {}\n\n", chunk_json));
+                        }
+                        yield Ok(response_chunk);
                     }
                 }
                 Err(e) => yield Err(e),
             }
         }
+
+        // Add the final [DONE] event
+        gateway_response_chunks.push("data: [DONE]\n\n".to_string());
         if !metadata.dryrun {
             // IMPORTANT: The following code will not be reached if the stream is interrupted.
             // Only do things that would be ok to skip in that case.
@@ -685,6 +743,7 @@ fn create_stream(
                 extra_body,
                 extra_headers,
                 observability_metadata,
+                gateway_request,
             } = metadata;
 
             let config = config.clone();
@@ -733,6 +792,13 @@ fn create_stream(
 
                         let clickhouse_connection_info = clickhouse_connection_info.clone();
                         let kafka_connection_info = kafka_connection_info.clone();
+                        // Concatenate all chunks to form the complete gateway response
+                        let gateway_response = if gateway_response_chunks.is_empty() {
+                            None
+                        } else {
+                            Some(gateway_response_chunks.join(""))
+                        };
+
                         write_inference(
                             &clickhouse_connection_info,
                             &kafka_connection_info,
@@ -741,6 +807,8 @@ fn create_stream(
                             inference_response,
                             write_metadata,
                             observability_metadata,
+                            gateway_request,
+                            gateway_response,
                         ).await;
 
                 }
@@ -854,7 +922,7 @@ async fn write_file(
     Ok(())
 }
 
-async fn write_inference(
+pub async fn write_inference(
     clickhouse_connection_info: &ClickHouseConnectionInfo,
     kafka_connection_info: &crate::kafka::KafkaConnectionInfo,
     config: &Config<'_>,
@@ -862,6 +930,8 @@ async fn write_inference(
     result: InferenceResult,
     metadata: InferenceDatabaseInsertMetadata,
     observability_metadata: Option<ObservabilityMetadata>,
+    gateway_request: Option<String>,
+    gateway_response: Option<String>,
 ) {
     let mut futures: Vec<Pin<Box<dyn Future<Output = ()> + Send>>> = Vec::new();
     if config.gateway.observability.enabled.unwrap_or(true) {
@@ -883,6 +953,18 @@ async fn write_inference(
             }
         }
     }
+
+    // Update model inference results with gateway fields if provided
+    let mut result = result;
+    for model_result in result.mut_model_inference_results() {
+        if let Some(gw_request) = &gateway_request {
+            model_result.gateway_request = Some(gw_request.clone());
+        }
+        if let Some(gw_response) = &gateway_response {
+            model_result.gateway_response = Some(gw_response.clone());
+        }
+    }
+
     let model_responses: Vec<serde_json::Value> = result.get_serialized_model_inferences();
 
     // Clone for Kafka before moving into ClickHouse writes
@@ -1376,6 +1458,7 @@ mod tests {
             extra_body: Default::default(),
             extra_headers: Default::default(),
             observability_metadata: None,
+            gateway_request: None,
         };
 
         let result = prepare_response_chunk(&inference_metadata, chunk).unwrap();
@@ -1428,6 +1511,7 @@ mod tests {
             extra_body: Default::default(),
             extra_headers: Default::default(),
             observability_metadata: None,
+            gateway_request: None,
         };
 
         let result = prepare_response_chunk(&inference_metadata, chunk).unwrap();

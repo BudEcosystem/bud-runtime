@@ -1,0 +1,495 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap');
+
+/* Font definitions */
+@font-face {
+  font-family: "IBM_Plex_Mono";
+  src: url("/font/IBM_Plex_Mono/IBMPlexMono-Medium.ttf") format("truetype");
+}
+
+.ibm {
+  font-family: "IBM_Plex_Mono", monospace !important;
+}
+
+.open-sans {
+  font-family: "Open Sans", sans-serif;
+}
+
+/* CSS Variables */
+:root {
+  --foreground-rgb: 255, 255, 255;
+  --background-start-rgb: #000000;
+  --background-end-rgb: #000000;
+  --color-background: #101010;
+  --color-primary: #965CDE;
+  --color-border: #1F1F1F;
+  --color-card-bg: #1A1A1A;
+  --color-hover: #252525;
+
+  /* Tailwind CSS variables for shadcn/ui compatibility */
+  --background: 0 0% 6.3%; /* #101010 equivalent */
+  --foreground: 0 0% 93.3%; /* #EEEEEE equivalent */
+  --card: 0 0% 12.2%; /* #1F1F1F equivalent */
+  --card-foreground: 0 0% 100%; /* #FFFFFF */
+  --popover: 0 0% 6.3%; /* #101010 equivalent */
+  --popover-foreground: 0 0% 100%; /* #FFFFFF */
+  --primary: 0 0% 100%; /* #FFFFFF */
+  --primary-foreground: 0 0% 6.3%; /* #101010 */
+  --secondary: 0 0% 12.2%; /* #1F1F1F equivalent */
+  --secondary-foreground: 0 0% 100%; /* #FFFFFF */
+  --muted: 0 0% 12.2%; /* #1F1F1F equivalent */
+  --muted-foreground: 0 0% 70.2%; /* #B3B3B3 equivalent */
+  --accent: 0 0% 12.2%; /* #1F1F1F equivalent */
+  --accent-foreground: 0 0% 100%; /* #FFFFFF */
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 0 0% 12.2%; /* #1F1F1F equivalent */
+  --input: 0 0% 12.2%; /* #1F1F1F equivalent */
+  --ring: 0 0% 70.2%; /* #B3B3B3 equivalent */
+  --radius: 0.5rem;
+  --accent-9: #965CDE !important;
+  --primary-text: #FFFFFF;
+}
+
+/* Base styles */
+* {
+  box-sizing: border-box;
+  font-family: "Open Sans", sans-serif !important;
+  @apply border-border;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  font-size: 16px;
+  font-family: "Open Sans", sans-serif !important;
+  font-optical-sizing: auto;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: #101010;
+  overflow-y: hidden;
+  @apply bg-background text-foreground;
+}
+
+/* Ant Design Dark Theme Overrides */
+.ant-table {
+  background: transparent !important;
+}
+
+.ant-table-thead > tr > th {
+  background: transparent !important;
+  color: #757575 !important;
+  border-bottom: none !important;
+}
+
+.ant-table-tbody > tr > td {
+  background: transparent !important;
+  border-bottom-color: rgba(31, 31, 31, 0.3) !important;
+}
+
+.ant-table-tbody > tr:hover > td {
+  background: rgba(26, 26, 26, 0.5) !important;
+}
+
+.ant-table-wrapper {
+  background: transparent !important;
+}
+
+.ant-table-container {
+  background: transparent !important;
+}
+
+/* Ensure the app defaults to dark theme for BUD components */
+html {
+  color-scheme: dark;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+/* Radix UI Theme overrides */
+.radix-themes {
+  --cursor-button: pointer;
+  --cursor-checkbox: pointer;
+  --cursor-disabled: default;
+  --cursor-link: pointer;
+  --cursor-menu-item: pointer;
+  --cursor-radio: pointer;
+  --cursor-slider-thumb: grab;
+  --cursor-slider-thumb-active: grabbing;
+  --cursor-switch: pointer;
+  --color-background: #101010 !important;
+  --default-font-family: "Open Sans", sans-serif !important;
+  --heading-font-family: "Open Sans", sans-serif !important;
+  --code-font-family: "Open Sans", sans-serif !important;
+  --strong-font-family: "Open Sans", sans-serif !important;
+  --em-font-family: "Open Sans", sans-serif !important;
+  --quote-font-family: "Open Sans", sans-serif !important;
+
+  Button {
+    cursor: pointer;
+  }
+}
+
+/* Scrollbar styles */
+.custom-scrollbar::-webkit-scrollbar {
+  width: .25rem;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #1F1F1F;
+  border-radius: .25rem;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #1F1F1F;
+  border-radius: .25rem;
+}
+
+/* Dashboard specific styles */
+.cardBG {
+  background: #18191b;
+  transition: all 0.3s ease;
+}
+
+.boardPageView {
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.boardMainContainer {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 0 2rem;
+}
+
+/* Ant Design overrides */
+.antSegmented {
+  &.ant-segmented {
+    background: transparent !important;
+    padding: 0 !important;
+
+    .ant-segmented-item {
+      color: #757575 !important;
+      background: transparent !important;
+
+      &:hover {
+        color: #B3B3B3 !important;
+      }
+
+      &.ant-segmented-item-selected {
+        background: rgba(150, 92, 222, 0.2) !important;
+        color: #EEEEEE !important;
+      }
+    }
+  }
+}
+
+/* Utility classes */
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;  /* Chrome, Safari and Opera */
+  }
+}
+
+/* Chart card styles */
+.cardSetTwo {
+  height: 425px;
+}
+
+/* Responsive breakpoints */
+@media (min-width: 1680px) {
+  .cardSetTwo {
+    height: 425px;
+  }
+}
+
+/* BUD-specific background colors for direct Tailwind usage */
+.bud-bg-primary {
+  background-color: #101010;
+}
+
+.bud-bg-secondary {
+  background-color: #1F1F1F;
+}
+
+.bud-text-primary {
+  color: #FFFFFF;
+}
+
+.bud-text-secondary {
+  color: #EEEEEE;
+}
+
+.bud-text-muted {
+  color: #B3B3B3;
+}
+
+.bud-text-disabled {
+  color: #757575;
+}
+
+.bud-border {
+  border-color: #1F1F1F;
+}
+
+.bud-purple {
+  color: #965CDE;
+}
+
+.bud-bg-purple {
+  background-color: #965CDE;
+}
+
+/* Authentication Layout Styles */
+.logginBg:after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 150px;
+  height: 300px;
+  background: #3F344B;
+  filter: blur(40px);
+  opacity: 0.2;
+  transform: rotate(45deg);
+  z-index: -1;
+}
+
+.logginBg::before {
+  content: '';
+  position: absolute;
+  bottom: -150px;
+  right: -150px;
+  width: 350px;
+  height: 350px;
+  background: #1a1a1a;
+  background: radial-gradient(circle, #965cdee6 0%, #f5edfe1a 28%, #101010 60%);
+  filter: blur(40px);
+  opacity: 0.2;
+  transform: rotate(45deg);
+  z-index: -1;
+}
+
+.login-left-bg {
+  background-size: 100%;
+  background-repeat: no-repeat;
+  overflow-y: auto;
+  background-position: bottom;
+  background-size: cover;
+}
+
+.loginBg-glass {
+  /* Glass morphism effect placeholder */
+}
+
+.loginBg {
+  background-image: url(/images/login-bg.png);
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  width: 100%;
+  height: 100%;
+}
+
+.loginRight {
+  height: 100vh;
+}
+
+.loginRight .leftLogo {
+  padding: 0 7% 15%;
+  width: 100%;
+}
+
+/* Animated gradient overlays for Game of Life background */
+.gol-bg::after {
+  content: "";
+  position: absolute;
+  bottom: -400px;
+  left: -250px;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, #51169a 0%, #0a0411 100%);
+  filter: blur(48.8px);
+  transform: rotate(318deg);
+  z-index: 1;
+  animation: moveDown 8s ease-in-out infinite alternate;
+}
+
+.gol-bg::before {
+  content: '';
+  position: absolute;
+  bottom: -470px;
+  right: -200px;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, #2011CB 0%, #472A9B 100%);
+  mix-blend-mode: screen;
+  filter: blur(48.80000305175781px);
+  transform: rotate(145deg);
+  z-index: 2;
+  animation: moveUp 8s ease-in-out infinite alternate;
+  border-radius: 30%;
+}
+
+/* Animation keyframes for gradient movements */
+@keyframes moveUp {
+  0% {
+    transform: rotate(145deg) translateY(0);
+  }
+  100% {
+    transform: rotate(145deg) translateY(-200px);
+  }
+}
+
+@keyframes moveDown {
+  0% {
+    transform: rotate(318deg) translateX(500px);
+  }
+  100% {
+    transform: rotate(318deg) translateX(200px);
+  }
+}
+
+/* Responsive adjustments for gradient overlays */
+@media only screen and (min-width: 1920px) {
+  .gol-bg::after {
+    bottom: -66%;
+    left: -30%;
+  }
+  .gol-bg::before {
+    bottom: -75%;
+    right: -27%;
+  }
+}
+
+/* Logo text gradient effect */
+.logo-text {
+  background: linear-gradient(253deg,
+      #fff 19%,
+      #fff 31.88%,
+      #fff 70.09%,
+      rgba(255, 255, 255, 0.39) 95.34%,
+      #fff 111.89%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Logs Table Styles */
+.logs-table .ant-table {
+  background: transparent;
+}
+
+.logs-table .ant-table-thead > tr > th {
+  background: transparent;
+  border-bottom: 1px solid #1F1F1F;
+  padding: 1rem 1.5rem;
+  color: #757575;
+  font-weight: 400;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.logs-table .ant-table-thead > tr > th::before {
+  display: none !important;
+}
+
+.logs-table .ant-table-tbody > tr > td {
+  border-bottom: 1px solid rgba(31, 31, 31, 0.5);
+  padding: 1rem 1.5rem;
+  background: transparent;
+}
+
+.logs-table .ant-table-tbody > tr:hover > td {
+  background: rgba(37, 37, 37, 0.3);
+}
+
+.logs-table .ant-table-tbody > tr.ant-table-expanded-row > td {
+  background: transparent;
+  padding: 0 1.5rem 1.5rem !important;
+}
+
+.logs-table .ant-table-tbody > tr:last-child > td {
+  border-bottom: none;
+}
+
+.logs-table .ant-pagination {
+  margin-top: 1.5rem;
+}
+
+.logs-table .ant-pagination-item,
+.logs-table .ant-pagination-prev .ant-pagination-item-link,
+.logs-table .ant-pagination-next .ant-pagination-item-link {
+  background: transparent;
+  border-color: #1F1F1F;
+}
+
+.logs-table .ant-pagination-item a {
+  color: #B3B3B3;
+}
+
+.logs-table .ant-pagination-item:hover,
+.logs-table .ant-pagination-prev:hover .ant-pagination-item-link,
+.logs-table .ant-pagination-next:hover .ant-pagination-item-link {
+  border-color: #965CDE;
+}
+
+.logs-table .ant-pagination-item:hover a {
+  color: #965CDE;
+}
+
+.logs-table .ant-pagination-item-active {
+  background: rgba(150, 92, 222, 0.2);
+  border-color: #965CDE;
+}
+
+.logs-table .ant-pagination-item-active a {
+  color: #965CDE;
+}
+
+/* Logs Page Search Input */
+.ant-input-search .ant-input-affix-wrapper {
+  background: #1A1A1A !important;
+  border-color: #1F1F1F !important;
+}
+
+.ant-input-search .ant-input-affix-wrapper:hover,
+.ant-input-search .ant-input-affix-wrapper:focus-within {
+  border-color: #965CDE !important;
+}
+
+.ant-input-search .ant-input {
+  background: transparent !important;
+  color: #EEEEEE;
+}
+
+.ant-input-search .ant-input::placeholder {
+  color: #757575;
+}
+
+.ant-input-search .ant-input-prefix,
+.ant-input-search .ant-input-suffix {
+  color: #757575;
+}

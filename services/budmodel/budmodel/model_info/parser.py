@@ -180,7 +180,7 @@ def get_license_details(model_card: ModelCard, model_name: str) -> Dict[str, Any
     def url_exists(url: str) -> bool:
         """Check if a URL exists by attempting to open it."""
         try:
-            urllib.request.urlopen(url)
+            urllib.request.urlopen(url, timeout=30)
             return True
         except urllib.error.URLError:
             return False

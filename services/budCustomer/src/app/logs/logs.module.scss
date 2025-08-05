@@ -1,0 +1,173 @@
+// Color variables
+$bg-main: #101010;
+$bg-card: #18191b;
+$border-color: #1F1F1F;
+$text-white: #EEEEEE;
+$text-gray: #B3B3B3;
+$text-dark-gray: #757575;
+$primary-color: #965CDE;
+
+.searchInput {
+  :global {
+    .ant-input-affix-wrapper {
+      background: $bg-card !important;
+      border-color: $border-color !important;
+
+      &:hover,
+      &:focus-within {
+        border-color: $primary-color !important;
+      }
+    }
+
+    .ant-input {
+      background: transparent !important;
+      color: $text-white;
+
+      &::placeholder {
+        color: $text-dark-gray;
+      }
+    }
+
+    .ant-input-prefix {
+      color: $text-dark-gray;
+    }
+  }
+}
+
+.selectFilter {
+  :global {
+    .ant-select-selector {
+      background: $bg-card !important;
+      border-color: $border-color !important;
+      color: $text-white !important;
+
+      &:hover {
+        border-color: $primary-color !important;
+      }
+    }
+
+    .ant-select-arrow {
+      color: $text-dark-gray;
+    }
+  }
+}
+
+.rangePicker {
+  :global {
+    .ant-picker {
+      background: $bg-card !important;
+      border-color: $border-color !important;
+
+      &:hover,
+      &.ant-picker-focused {
+        border-color: $primary-color !important;
+      }
+    }
+
+    .ant-picker-input > input {
+      color: $text-white !important;
+
+      &::placeholder {
+        color: $text-dark-gray;
+      }
+    }
+
+    .ant-picker-suffix,
+    .ant-picker-separator {
+      color: $text-dark-gray;
+    }
+  }
+}
+
+.logsTable {
+  :global {
+    .ant-table {
+      background: transparent;
+      color: $text-white;
+    }
+
+    .ant-table-thead > tr > th {
+      background: rgba(#252525, 0.5);
+      border-bottom: 1px solid $border-color;
+      color: $text-dark-gray;
+      font-weight: 400;
+      padding: 1rem 1.5rem;
+
+      &::before {
+        display: none;
+      }
+    }
+
+    .ant-table-tbody > tr > td {
+      border-bottom: 1px solid rgba($border-color, 0.5);
+      padding: 1rem 1.5rem;
+    }
+
+    .ant-table-tbody > tr:last-child > td {
+      border-bottom: none;
+    }
+
+    .ant-table-tbody > tr:hover > td {
+      background: rgba(#252525, 0.3);
+    }
+
+    .ant-table-expanded-row > td {
+      background: transparent;
+      padding: 0 1.5rem 1.5rem !important;
+    }
+
+    .ant-pagination {
+      .ant-pagination-item {
+        background: transparent;
+        border-color: $border-color;
+
+        a {
+          color: $text-gray;
+        }
+
+        &:hover {
+          border-color: $primary-color;
+
+          a {
+            color: $primary-color;
+          }
+        }
+
+        &.ant-pagination-item-active {
+          background: rgba($primary-color, 0.2);
+          border-color: $primary-color;
+
+          a {
+            color: $primary-color;
+          }
+        }
+      }
+
+      .ant-pagination-prev,
+      .ant-pagination-next {
+        .ant-pagination-item-link {
+          background: transparent;
+          border-color: $border-color;
+          color: $text-gray;
+
+          &:hover {
+            border-color: $primary-color;
+            color: $primary-color;
+          }
+        }
+      }
+
+      .ant-select {
+        .ant-select-selector {
+          background: $bg-card;
+          border-color: $border-color;
+          color: $text-white;
+        }
+      }
+    }
+
+    .ant-empty-normal {
+      color: $text-gray;
+    }
+  }
+}

@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-budcluster
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-budcluster
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-budcluster
+      annotations:
+        date: "{{ now }}"
+        dapr.io/enabled: "true"
+        dapr.io/app-id: "budcluster"
+        dapr.io/app-port: "3003"
+        dapr.io/volume-mounts: "crypto-keys:/mnt/crypto-keys"
+    spec:
+      containers:
+      - name: {{ .Release.Name }}-budcluster
+        image: {{ .Values.microservices.budcluster.image }}
+        imagePullPolicy: Always
+        command: ["sh", "-c", "alembic -c ./budcluster/alembic.ini upgrade head && uvicorn budcluster.main:app --host 0.0.0.0 --port 3003"]
+        ports:
+        - containerPort: 3003
+        env:
+        {{ $root := . }}
+        {{- range $key, $value := .Values.microservices.budcluster.env }}
+          - name: {{ $key }}
+            value: {{ tpl $value $root | quote }}
+        {{- end }}
+        envFrom:
+          - configMapRef:
+              name: {{ .Release.Name}}-bud-global
+        resources:
+          limits:
+            memory: 32768Mi
+            cpu: 1
+          requests:
+            memory: 256Mi
+            cpu: 250m
+        volumeMounts:
+        - name: crypto-keys
+          mountPath: /root/.cache/budserve/keys
+        - name: models-registry
+          mountPath: /data/models-registry
+      volumes:
+      - name: crypto-keys
+        secret:
+          secretName: {{ .Release.Name }}-dapr-crypto
+      - name: models-registry
+        persistentVolumeClaim:
+          claimName: {{ .Release.Name }}-bud-models-registry
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-budcluster
+spec:
+  ports:
+  - port: 3003
+    targetPort: 3003
+  selector:
+    app: {{ .Release.Name }}-budcluster
+  type: ClusterIP

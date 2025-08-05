@@ -117,7 +117,12 @@ def custom_openapi() -> Any:
     )
 
     for route in app.routes:
-        if hasattr(route, "endpoint") and hasattr(route.endpoint, "is_pubsub_api"):
+        if (
+            hasattr(route, "endpoint")
+            and hasattr(route.endpoint, "is_pubsub_api")
+            and hasattr(route, "path")
+            and hasattr(route, "methods")
+        ):
             request_model = route.endpoint.request_model
             path = route.path
             method = list(route.methods)[0].lower()
@@ -143,4 +148,4 @@ def custom_openapi() -> Any:
     return app.openapi_schema
 
 
-app.openapi = custom_openapi
+app.openapi = custom_openapi  # type: ignore[method-assign]

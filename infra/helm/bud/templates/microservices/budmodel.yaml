@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-budmodel
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-budmodel
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-budmodel
+      annotations:
+        date: "{{ now }}"
+        dapr.io/enabled: "true"
+        dapr.io/app-id: "budmodel"
+        dapr.io/app-port: "3004"
+    spec:
+      containers:
+      - name: {{ .Release.Name }}-budmodel
+        image: {{ .Values.microservices.budmodel.image }}
+        imagePullPolicy: Always
+        command: ["sh", "-c", "apt install clamav clamav-daemon -y && freshclam && sed -i 's|^LocalSocket .*|LocalSocket /tmp/clamd.ctl|' /etc/clamav/clamd.conf && nohup clamd -c /etc/clamav/clamd.conf && nohup aria2c --enable-rpc --rpc-listen-all --rpc-listen-port 6800 --dir /data/models-registry --max-concurrent-downloads 5 > aria2.log 2>&1 & sleep 2 && alembic -c ./alembic.ini upgrade head && uvicorn budmodel.main:app --host 0.0.0.0 --port 3004"]
+        ports:
+        - containerPort: 3004
+        env:
+        {{ $root := . }}
+        {{- range $key, $value := .Values.microservices.budmodel.env }}
+          - name: {{ $key }}
+            value: {{ tpl $value $root | quote }}
+        {{- end }}
+        envFrom:
+          - configMapRef:
+              name: {{ .Release.Name}}-bud-global
+        resources:
+          limits:
+            memory: 32768Mi
+            cpu: 1
+          requests:
+            memory: 256Mi
+            cpu: 250m
+        volumeMounts:
+        - name: models-registry
+          mountPath: /data/models-registry
+        - name: add-dir-budmo
+          mountPath: /datadisk/add_model_dir
+      volumes:
+      - name: models-registry
+        persistentVolumeClaim:
+          claimName: {{ .Release.Name }}-bud-models-registry
+      - name: add-dir-budmo
+        persistentVolumeClaim:
+          claimName: {{ .Release.Name }}-bud-add-dir-budmo
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-budmodel
+spec:
+  ports:
+  - port: 3004
+    targetPort: 3004
+  selector:
+    app: {{ .Release.Name }}-budmodel
+  type: ClusterIP

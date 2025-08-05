@@ -154,12 +154,12 @@ const ExperimentsTable = () => {
   const columns: ColumnsType<ExperimentData> = [
     {
       title: "Experiment name",
-      dataIndex: "experimentName",
-      key: "experimentName",
+      dataIndex: "name",
+      key: "name",
       render: (text) => <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>,
       sorter: true,
       sortOrder:
-        orderBy === "experimentName"
+        orderBy === "name"
           ? order === "-"
             ? "descend"
             : "ascend"

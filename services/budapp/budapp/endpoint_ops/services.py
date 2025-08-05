@@ -70,6 +70,7 @@ from ..workflow_ops.schemas import WorkflowUtilCreate
 from ..workflow_ops.services import WorkflowService, WorkflowStepService
 from .crud import AdapterDataManager, EndpointDataManager, PublicationHistoryDataManager
 from .models import Adapter as AdapterModel
+from .models import DeploymentPricing
 from .models import Endpoint as EndpointModel
 from .schemas import (
     AddAdapterRequest,
@@ -81,6 +82,7 @@ from .schemas import (
     AWSSageMakerConfig,
     AzureConfig,
     DeepSeekConfig,
+    DeploymentPricingResponse,
     EndpointCreate,
     FireworksConfig,
     GCPVertexConfig,
@@ -105,7 +107,7 @@ class EndpointService(SessionMixin):
 
     async def get_all_endpoints(
         self,
-        project_id: UUID,
+        project_id: Optional[UUID],
         offset: int = 0,
         limit: int = 10,
         filters: Dict = {},
@@ -118,8 +120,9 @@ class EndpointService(SessionMixin):
             # Otherwise it will perform global search on all fields
             filters.pop("status", None)
 
-        # Validate project_id
-        await ProjectDataManager(self.session).retrieve_by_fields(ProjectModel, {"id": project_id})
+        if project_id:
+            # Validate project_id if provided
+            await ProjectDataManager(self.session).retrieve_by_fields(ProjectModel, {"id": project_id})
 
         return await EndpointDataManager(self.session).get_all_active_endpoints(
             project_id, offset, limit, filters, order_by, search
@@ -2604,7 +2607,12 @@ class EndpointService(SessionMixin):
             # Don't raise exception - cache update failure shouldn't block settings update
 
     async def update_publication_status(
-        self, endpoint_id: UUID, action: str, current_user_id: UUID, action_metadata: Optional[dict] = None
+        self,
+        endpoint_id: UUID,
+        action: str,
+        current_user_id: UUID,
+        action_metadata: Optional[dict] = None,
+        pricing: Optional[dict] = None,
     ) -> EndpointModel:
         """Update the publication status of an endpoint (publish/unpublish).
 
@@ -2613,12 +2621,13 @@ class EndpointService(SessionMixin):
             action (str): The action to perform ("publish" or "unpublish").
             current_user_id (UUID): The ID of the user performing the action.
             action_metadata (Optional[dict]): Additional metadata about the action.
+            pricing (Optional[dict]): Pricing information (required when action="publish").
 
         Returns:
             EndpointModel: The updated endpoint.
 
         Raises:
-            ClientException: If endpoint not found or invalid action.
+            ClientException: If endpoint not found, invalid action, or missing pricing when publishing.
         """
         # Retrieve the endpoint
         endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
@@ -2659,6 +2668,13 @@ class EndpointService(SessionMixin):
                 message=f"Cannot publish endpoint in {endpoint.status} state. Endpoint must be in RUNNING state to be published.",
             )
 
+        # Validate pricing is provided when publishing
+        if action == "publish" and not pricing:
+            raise ClientException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                message="Pricing information is required when publishing an endpoint.",
+            )
+
         # Capture previous state for history
         previous_state = {
             "is_published": endpoint.is_published,
@@ -2670,6 +2686,27 @@ class EndpointService(SessionMixin):
         action_time = datetime.now(timezone.utc)
         is_published = action == "publish"
         published_date = action_time if is_published else None
+
+        # Handle pricing for publish action
+        if is_published and pricing:
+            # Begin transaction to ensure atomicity
+            try:
+                # Update previous pricing records to not current
+                await EndpointDataManager(self.session).update_previous_pricing(endpoint_id)
+
+                # Create new pricing record
+                await EndpointDataManager(self.session).create_deployment_pricing(
+                    endpoint_id=endpoint_id,
+                    pricing_data=pricing,
+                    created_by=current_user_id,
+                )
+            except Exception as e:
+                logger.error(f"Failed to create pricing for endpoint {endpoint_id}: {e}")
+                self.session.rollback()
+                raise ClientException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    message="Failed to create pricing for endpoint",
+                )
 
         endpoint = await EndpointDataManager(self.session).update_publication_status(
             endpoint_id=endpoint_id,
@@ -2696,8 +2733,128 @@ class EndpointService(SessionMixin):
             new_state=new_state,
         )
 
+        # Invalidate catalog cache when publication status changes
+        redis_service = RedisService()
+        await redis_service.invalidate_catalog_cache(endpoint_id=str(endpoint_id))
+
         logger.info(f"Endpoint {endpoint_id} {action}ed successfully by user {current_user_id}")
         return endpoint
+
+    async def get_current_pricing(self, endpoint_id: UUID) -> Optional["DeploymentPricing"]:
+        """Get the current pricing for an endpoint.
+
+        Args:
+            endpoint_id (UUID): The ID of the endpoint.
+
+        Returns:
+            Optional[DeploymentPricing]: The current pricing record, or None if not found.
+        """
+        return await EndpointDataManager(self.session).get_current_pricing(endpoint_id)
+
+    async def update_pricing(
+        self, endpoint_id: UUID, pricing_data: Dict[str, Any], current_user_id: UUID
+    ) -> DeploymentPricing:
+        """Update pricing for a published endpoint.
+
+        Args:
+            endpoint_id (UUID): The ID of the endpoint.
+            pricing_data (Dict[str, Any]): New pricing information.
+            current_user_id (UUID): The ID of the user updating pricing.
+
+        Returns:
+            DeploymentPricing: The new pricing record.
+
+        Raises:
+            ClientException: If endpoint not found or not published.
+        """
+        # Verify endpoint exists and is published
+        endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+            EndpointModel,
+            {"id": endpoint_id},
+            exclude_fields={"status": EndpointStatusEnum.DELETED},
+            missing_ok=True,
+        )
+        if not endpoint:
+            raise ClientException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                message=f"Endpoint with ID {endpoint_id} not found",
+            )
+
+        if not endpoint.is_published:
+            raise ClientException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                message="Cannot update pricing for unpublished endpoint",
+            )
+
+        try:
+            # Begin transaction
+            # Deactivate current pricing
+            await EndpointDataManager(self.session).update_previous_pricing(endpoint_id)
+
+            # Create new pricing record
+            new_pricing = await EndpointDataManager(self.session).create_deployment_pricing(
+                endpoint_id=endpoint_id,
+                pricing_data=pricing_data,
+                created_by=current_user_id,
+            )
+
+            # Invalidate catalog cache when pricing changes
+            redis_service = RedisService()
+            await redis_service.invalidate_catalog_cache(endpoint_id=str(endpoint_id))
+
+            logger.info(f"Pricing updated for endpoint {endpoint_id} by user {current_user_id}")
+            return new_pricing
+
+        except Exception as e:
+            logger.error(f"Failed to update pricing for endpoint {endpoint_id}: {e}")
+            self.session.rollback()
+            raise ClientException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message="Failed to update pricing",
+            )
+
+    async def get_pricing_history(self, endpoint_id: UUID, page: int = 1, limit: int = 20) -> dict:
+        """Get pricing history for an endpoint.
+
+        Args:
+            endpoint_id (UUID): The ID of the endpoint.
+            page (int): Page number for pagination.
+            limit (int): Number of items per page.
+
+        Returns:
+            dict: Dictionary containing pricing history and pagination info.
+
+        Raises:
+            ClientException: If endpoint not found.
+        """
+        # Verify endpoint exists
+        endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+            EndpointModel,
+            {"id": endpoint_id},
+            exclude_fields={"status": EndpointStatusEnum.DELETED},
+            missing_ok=True,
+        )
+        if not endpoint:
+            raise ClientException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                message=f"Endpoint with ID {endpoint_id} not found",
+            )
+
+        # Get pricing history
+        offset = (page - 1) * limit
+        pricing_history, total_count = await EndpointDataManager(self.session).get_pricing_history(
+            endpoint_id=endpoint_id,
+            offset=offset,
+            limit=limit,
+        )
+
+        return {
+            "pricing_history": [DeploymentPricingResponse.model_validate(p) for p in pricing_history],
+            "page": page,
+            "limit": limit,
+            "total_record": total_count,
+            "code": status.HTTP_200_OK,
+        }
 
     async def get_publication_history(self, endpoint_id: UUID, page: int = 1, limit: int = 20) -> dict:
         """Get publication history for an endpoint.

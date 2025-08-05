@@ -454,6 +454,9 @@ pub struct ModelInferenceRequest<'a> {
     pub logit_bias: Option<HashMap<String, f32>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user: Option<String>,
+    /// The original request received by the gateway from the client
+    #[serde(skip)]
+    pub gateway_request: Option<String>,
 }
 
 // Helper used by serde to omit the field when false
@@ -535,6 +538,12 @@ pub struct ModelInferenceResponse {
     pub model_provider_name: Arc<str>,
     pub cached: bool,
     pub finish_reason: Option<FinishReason>,
+    /// The original request received by the gateway from the client
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gateway_request: Option<String>,
+    /// The response sent by the gateway back to the client
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gateway_response: Option<String>,
 }
 
 /// Finally, in the Variant we convert the ModelInferenceResponse into a ModelInferenceResponseWithMetadata
@@ -554,6 +563,12 @@ pub struct ModelInferenceResponseWithMetadata {
     pub model_name: Arc<str>,
     pub cached: bool,
     pub finish_reason: Option<FinishReason>,
+    /// The original request received by the gateway from the client
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gateway_request: Option<String>,
+    /// The response sent by the gateway back to the client
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gateway_response: Option<String>,
 }
 
 impl ModelInferenceResponseWithMetadata {
@@ -763,6 +778,10 @@ pub struct ModelInferenceDatabaseInsert {
     pub ttft_ms: Option<u32>,
     pub cached: bool,
     pub finish_reason: Option<FinishReason>,
+    /// The original request received by the gateway from the client
+    pub gateway_request: Option<String>,
+    /// The response sent by the gateway back to the client
+    pub gateway_response: Option<String>,
 }
 
 #[cfg(test)]
@@ -846,13 +865,15 @@ impl ModelInferenceResponse {
             output: provider_inference_response.output,
             system: provider_inference_response.system,
             input_messages: provider_inference_response.input_messages,
-            raw_request: provider_inference_response.raw_request,
-            raw_response: provider_inference_response.raw_response,
+            raw_request: provider_inference_response.raw_request.clone(),
+            raw_response: provider_inference_response.raw_response.clone(),
             usage: provider_inference_response.usage,
             latency: provider_inference_response.latency,
             finish_reason: provider_inference_response.finish_reason,
             model_provider_name,
             cached,
+            gateway_request: Some(provider_inference_response.raw_request),
+            gateway_response: Some(provider_inference_response.raw_response),
         }
     }
 
@@ -879,6 +900,8 @@ impl ModelInferenceResponse {
             finish_reason: cache_lookup.finish_reason,
             model_provider_name: Arc::from(model_provider_name),
             cached: true,
+            gateway_request: None, // Cache lookups don't have gateway data
+            gateway_response: None,
         }
     }
 }
@@ -899,6 +922,8 @@ impl ModelInferenceResponseWithMetadata {
             model_provider_name: model_inference_response.model_provider_name,
             model_name,
             cached: model_inference_response.cached,
+            gateway_request: model_inference_response.gateway_request,
+            gateway_response: model_inference_response.gateway_response,
         }
     }
 }
@@ -952,6 +977,8 @@ impl ModelInferenceDatabaseInsert {
             model_name: result.model_name.to_string(),
             cached: result.cached,
             finish_reason: result.finish_reason,
+            gateway_request: result.gateway_request,
+            gateway_response: result.gateway_response,
         }
     }
 }
@@ -1652,6 +1679,7 @@ pub async fn collect_chunks(args: CollectChunksArgs<'_, '_>) -> Result<Inference
         extra_body,
         extra_headers,
         extra_cache_key: None,
+        gateway_request: None, // Not available in batch context
     };
     function
         .prepare_response(
@@ -1825,6 +1853,8 @@ mod tests {
             model_provider_name: "test_provider".into(),
             model_name: "test_model".into(),
             cached: false,
+            gateway_request: None,
+            gateway_response: None,
         }];
         let chat_inference_response = ChatInferenceResult::new(
             inference_id,
@@ -1875,6 +1905,8 @@ mod tests {
             model_provider_name: "test_provider".into(),
             model_name: "test_model".into(),
             cached: false,
+            gateway_request: None,
+            gateway_response: None,
         }];
 
         let weather_tool_config = get_temperature_tool_config();
@@ -1927,6 +1959,8 @@ mod tests {
             model_provider_name: "test_provider".into(),
             model_name: "test_model".into(),
             cached: false,
+            gateway_request: None,
+            gateway_response: None,
         }];
 
         let chat_inference_response = ChatInferenceResult::new(
@@ -1975,6 +2009,8 @@ mod tests {
             model_provider_name: "test_provider".into(),
             model_name: "test_model".into(),
             cached: false,
+            gateway_request: None,
+            gateway_response: None,
         }];
 
         let chat_inference_response = ChatInferenceResult::new(
@@ -2043,6 +2079,8 @@ mod tests {
             model_provider_name: "test_provider".into(),
             model_name: "test_model".into(),
             cached: false,
+            gateway_request: None,
+            gateway_response: None,
         }];
 
         let chat_inference_response = ChatInferenceResult::new(
@@ -2129,6 +2167,8 @@ mod tests {
             model_provider_name: "test_provider".into(),
             model_name: "test_model".into(),
             cached: false,
+            gateway_request: None,
+            gateway_response: None,
         }];
 
         let chat_inference_response = ChatInferenceResult::new(
@@ -2222,6 +2262,8 @@ mod tests {
             model_provider_name: "test_provider".into(),
             model_name: "test_model".into(),
             cached: false,
+            gateway_request: None,
+            gateway_response: None,
         }];
 
         let chat_inference_response = ChatInferenceResult::new(
@@ -2273,6 +2315,8 @@ mod tests {
             model_provider_name: "test_provider".into(),
             model_name: "test_model".into(),
             cached: false,
+            gateway_request: None,
+            gateway_response: None,
         }];
 
         let chat_inference_response = ChatInferenceResult::new(
@@ -2346,6 +2390,8 @@ mod tests {
             model_provider_name: "test_provider".into(),
             model_name: "test_model".into(),
             cached: false,
+            gateway_request: None,
+            gateway_response: None,
         }];
 
         let chat_inference_response = ChatInferenceResult::new(
@@ -2403,6 +2449,8 @@ mod tests {
             model_provider_name: "test_provider".into(),
             model_name: "test_model".into(),
             cached: false,
+            gateway_request: None,
+            gateway_response: None,
         }];
 
         let chat_inference_response = ChatInferenceResult::new(

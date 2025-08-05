@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-askbud
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-askbud
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-askbud
+      annotations:
+        date: "{{ now }}"
+        dapr.io/enabled: "true"
+        dapr.io/app-id: "askbud"
+        dapr.io/app-port: "3000"
+        dapr.io/volume-mounts: "crypto-keys:/mnt/crypto-keys"
+    spec:
+      containers:
+      - name: askbud
+        image: {{ .Values.microservices.askbud.image }}
+        imagePullPolicy: Always
+        command: ["sh", "-c", "uvicorn askbud.main:app --host 0.0.0.0 --port 3000"]
+        ports:
+        - containerPort: 3000
+        env:
+        {{ $root := . }}
+        {{- range $key, $value := .Values.microservices.askbud.env }}
+          - name: {{ $key }}
+            value: {{ tpl $value $root | quote }}
+        {{- end }}
+        envFrom:
+          - configMapRef:
+              name: {{ .Release.Name}}-bud-global
+        resources:
+          limits:
+            memory: 512Mi
+            cpu: 1
+          requests:
+            memory: 256Mi
+            cpu: 250m
+        volumeMounts:
+        - name: crypto-keys
+          mountPath: /root/.cache/budserve/keys
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+      volumes:
+      - name: crypto-keys
+        secret:
+          secretName: {{ .Release.Name }}-dapr-crypto
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: askbud
+spec:
+  ports:
+  - port: 3000
+    targetPort: 3000
+  selector:
+    app: {{ .Release.Name }}-askbud
+  type: ClusterIP

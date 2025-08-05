@@ -205,7 +205,9 @@ def save_benchmark_request_metrics(budapp_benchmark_id, request_metrics: list[di
         with requests.Session() as session:
             for metric in request_metrics:
                 metric["benchmark_id"] = str(budapp_benchmark_id)
-            response = session.post(add_benchmark_request_metrics_endpoint, json={"metrics": request_metrics})
+            response = session.post(
+                add_benchmark_request_metrics_endpoint, json={"metrics": request_metrics}, timeout=30
+            )
             response_data = response.json()
 
         if response.status_code >= 400 or response_data.get("object") == "error":

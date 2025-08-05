@@ -56,7 +56,7 @@ class EndpointDataManager(DataManagerUtils):
 
     async def get_all_active_endpoints(
         self,
-        project_id: UUID,
+        project_id: Optional[UUID],
         offset: int = 0,
         limit: int = 10,
         filters: Dict[str, Any] = {},
@@ -102,9 +102,7 @@ class EndpointDataManager(DataManagerUtils):
                 .join(Model)
                 .outerjoin(ClusterModel)
                 .filter(or_(*search_conditions))
-                .filter(
-                    and_(EndpointModel.status != EndpointStatusEnum.DELETED, EndpointModel.project_id == project_id)
-                )
+                .filter(EndpointModel.status != EndpointStatusEnum.DELETED)
             )
             count_stmt = (
                 select(func.count())
@@ -112,9 +110,7 @@ class EndpointDataManager(DataManagerUtils):
                 .join(Model)
                 .outerjoin(ClusterModel)
                 .filter(and_(*search_conditions))
-                .filter(
-                    and_(EndpointModel.status != EndpointStatusEnum.DELETED, EndpointModel.project_id == project_id)
-                )
+                .filter(EndpointModel.status != EndpointStatusEnum.DELETED)
             )
         else:
             stmt = select(EndpointModel).join(Model).outerjoin(ClusterModel)
@@ -122,12 +118,11 @@ class EndpointDataManager(DataManagerUtils):
             for key, value in filters.items():
                 stmt = stmt.filter(getattr(EndpointModel, key) == value)
                 count_stmt = count_stmt.filter(getattr(EndpointModel, key) == value)
-            stmt = stmt.filter(
-                and_(EndpointModel.status != EndpointStatusEnum.DELETED, EndpointModel.project_id == project_id)
-            )
-            count_stmt = count_stmt.filter(
-                and_(EndpointModel.status != EndpointStatusEnum.DELETED, EndpointModel.project_id == project_id)
-            )
+            stmt = stmt.filter(EndpointModel.status != EndpointStatusEnum.DELETED)
+            count_stmt = count_stmt.filter(EndpointModel.status != EndpointStatusEnum.DELETED)
+            if project_id:
+                stmt = stmt.filter(EndpointModel.project_id == project_id)
+                count_stmt = count_stmt.filter(EndpointModel.project_id == project_id)
 
         # Calculate count before applying limit and offset
         count = self.execute_scalar(count_stmt)
@@ -476,6 +471,99 @@ class EndpointDataManager(DataManagerUtils):
         endpoint = result.scalar_one()
         self.session.commit()
         return endpoint
+
+    async def create_deployment_pricing(
+        self, endpoint_id: UUID, pricing_data: Dict[str, Any], created_by: UUID
+    ) -> "DeploymentPricing":
+        """Create a new deployment pricing record.
+
+        Args:
+            endpoint_id (UUID): The ID of the endpoint.
+            pricing_data (Dict[str, Any]): Pricing information containing input_cost, output_cost, currency, per_tokens.
+            created_by (UUID): The ID of the user creating the pricing.
+
+        Returns:
+            DeploymentPricing: The created pricing record.
+        """
+        from .models import DeploymentPricing
+
+        pricing = DeploymentPricing(
+            endpoint_id=endpoint_id,
+            input_cost=pricing_data["input_cost"],
+            output_cost=pricing_data["output_cost"],
+            currency=pricing_data.get("currency", "USD"),
+            per_tokens=pricing_data.get("per_tokens", 1000),
+            is_current=True,
+            created_by=created_by,
+        )
+        self.session.add(pricing)
+        self.session.commit()
+        return pricing
+
+    async def update_previous_pricing(self, endpoint_id: UUID) -> None:
+        """Set is_current=False for all previous pricing records of an endpoint.
+
+        Args:
+            endpoint_id (UUID): The ID of the endpoint.
+        """
+        from .models import DeploymentPricing
+
+        stmt = (
+            update(DeploymentPricing)
+            .where(and_(DeploymentPricing.endpoint_id == endpoint_id, DeploymentPricing.is_current))
+            .values(is_current=False)
+        )
+        self.session.execute(stmt)
+        # Don't commit here, let the caller handle transaction
+
+    async def get_current_pricing(self, endpoint_id: UUID) -> Optional["DeploymentPricing"]:
+        """Get the current pricing for an endpoint.
+
+        Args:
+            endpoint_id (UUID): The ID of the endpoint.
+
+        Returns:
+            Optional[DeploymentPricing]: The current pricing record, or None if not found.
+        """
+        from .models import DeploymentPricing
+
+        stmt = select(DeploymentPricing).where(
+            and_(DeploymentPricing.endpoint_id == endpoint_id, DeploymentPricing.is_current)
+        )
+        return self.scalar_one_or_none(stmt)
+
+    async def get_pricing_history(
+        self, endpoint_id: UUID, offset: int = 0, limit: int = 10
+    ) -> Tuple[List["DeploymentPricing"], int]:
+        """Get pricing history for an endpoint with pagination.
+
+        Args:
+            endpoint_id (UUID): The ID of the endpoint.
+            offset (int): Pagination offset.
+            limit (int): Pagination limit.
+
+        Returns:
+            Tuple[List[DeploymentPricing], int]: List of pricing records and total count.
+        """
+        from .models import DeploymentPricing
+
+        # Count query
+        count_stmt = (
+            select(func.count()).select_from(DeploymentPricing).where(DeploymentPricing.endpoint_id == endpoint_id)
+        )
+        count = self.execute_scalar(count_stmt)
+
+        # Data query
+        stmt = (
+            select(DeploymentPricing)
+            .where(DeploymentPricing.endpoint_id == endpoint_id)
+            .order_by(desc(DeploymentPricing.created_at))
+            .limit(limit)
+            .offset(offset)
+        )
+        result = self.scalars_all(stmt)
+
+        return result, count
 
     async def get_published_endpoints_count(self, project_id: Optional[UUID] = None) -> int:
         """Get count of published endpoints.

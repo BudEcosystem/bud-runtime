@@ -1,0 +1,93 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name}}-budapp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name}}-budapp
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name}}-budapp
+      annotations:
+        date: "{{ now }}"
+        dapr.io/enabled: "true"
+        dapr.io/app-id: "budapp"
+        dapr.io/app-port: "9082"
+    spec:
+      containers:
+      - name: {{ .Release.Name}}-budapp
+        image: {{ .Values.microservices.budapp.image }}
+        imagePullPolicy: Always
+        command: ["sh", "-c", "alembic -c ./budapp/alembic.ini upgrade head && uvicorn budapp.main:app --host 0.0.0.0 --port 9082"]
+        ports:
+        - containerPort: 9082
+        env:
+          - name: PRIVATE_KEY_PATH
+            value: "/app/keys/rsa-private-key.pem"
+          - name: PRIVATE_KEY_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Release.Name }}-rsa-keys
+                key: private-key-password
+          - name: PUBLIC_KEY_PATH
+            value: "/app/keys/rsa-public-key.pem"
+        {{ $root := . }}
+        {{- range $key, $value := .Values.microservices.budapp.env }}
+          - name: {{ $key }}
+            value: {{ tpl $value $root | quote }}
+        {{- end }}
+        envFrom:
+          - configMapRef:
+              name: {{ .Release.Name}}-bud-global
+        resources:
+          limits:
+            memory: 32768Mi
+            cpu: 2
+          requests:
+            memory: 256Mi
+            cpu: 250m
+        volumeMounts:
+        - name: add-dir-budmo
+          mountPath: /datadisk/add_model_dir
+        - name: static-dir
+          mountPath: /data/static-dir
+        - name: rsa-keys
+          mountPath: /app/keys
+          readOnly: true
+      volumes:
+      - name: add-dir-budmo
+        persistentVolumeClaim:
+          claimName: {{ .Release.Name }}-bud-add-dir-budmo
+      - name: static-dir
+        persistentVolumeClaim:
+          claimName: {{ .Release.Name }}-bud-static-dir
+      - name: rsa-keys
+        secret:
+          secretName: {{ .Release.Name }}-rsa-keys
+          defaultMode: 0444
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-budapp
+spec:
+  ports:
+  - port: 9082
+    targetPort: 9082
+  selector:
+    app: {{ .Release.Name }}-budapp
+  type: ClusterIP
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Name }}-bud-static-dir
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi

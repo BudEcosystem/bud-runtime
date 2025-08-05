@@ -2,21 +2,28 @@
   self,
   mkShell,
   nixfmt-rfc-style,
+
   sops,
+  age,
 
   k3d,
   kubectl,
   kubernetes-helm,
   helm-ls,
-  yaml-language-server,
   openssl,
+
+  yaml-language-server,
+  nodejs,
 
   terraform-ls,
   opentofu,
   azure-cli,
+  graphviz,
+  jq, # nixos-anywhere terraform module
+
   shfmt,
   bash-language-server,
-  jq, # nixos-anywhere terraform module
+  pre-commit,
 }:
 
 mkShell {
@@ -28,15 +35,17 @@ mkShell {
     yaml-language-server
     openssl
     sops
-
+    age
     nixfmt-rfc-style
-
     terraform-ls
     opentofu
     azure-cli
     shfmt
     bash-language-server
     jq
+    pre-commit
+    nodejs
+    graphviz
   ];
 
   shellHook = ''
@@ -54,6 +63,6 @@ mkShell {
     export_sops_secret_silent s3 access_key AWS_ACCESS_KEY_ID
     export_sops_secret_silent s3 secret_key AWS_SECRET_ACCESS_KEY
 
-    export PS1="\033[0;35m[bud-infra]\033[0m $PS1"
+    export PS1="\033[0;35m[bud]\033[0m $PS1"
   '';
 }

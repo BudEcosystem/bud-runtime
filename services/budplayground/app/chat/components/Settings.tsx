@@ -105,12 +105,6 @@ export default function SettingsList({chatId}: {chatId: string}) {
 
     }, [hasHydrated, addSettingPreset, currentSettingPreset, setCurrentSettingPreset, settingPresets.length]);
 
-    useEffect(() => {
-        if (settingPresets.length > 0) {
-            initComponents();
-        }
-    }, [settings, initComponents, settingPresets.length]);
-
     const handleAddPreset = (name: string) => {
         if (!name) return;
         const newPreset = {
@@ -155,7 +149,7 @@ export default function SettingsList({chatId}: {chatId: string}) {
     };
 
 
-    const initComponents = () => {
+    const initComponents = React.useCallback(() => {
         const components = [
             {
                 title: "Presets",
@@ -373,7 +367,13 @@ export default function SettingsList({chatId}: {chatId: string}) {
             },
         ];
         setComponents(components);
-    }
+    }, [settings, settingPresets, changePreset, handleAddPreset, handleChange, chatId]);
+
+    useEffect(() => {
+        if (settingPresets.length > 0) {
+            initComponents();
+        }
+    }, [settings, settingPresets.length, initComponents]);
 
 
     return (
