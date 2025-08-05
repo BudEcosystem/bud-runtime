@@ -24,6 +24,8 @@
   shfmt,
   bash-language-server,
   pre-commit,
+  ruff,
+  mypy,
 }:
 
 mkShell {
@@ -46,6 +48,8 @@ mkShell {
     pre-commit
     nodejs
     graphviz
+    ruff
+    mypy
   ];
 
   shellHook = ''

@@ -7,7 +7,7 @@ spec:
   version: v1
   metadata:
     - name: redisHost
-      value: {{ .Release.Name }}-valkey-primary
+      value: {{ .Release.Name }}-valkey-primary:6379
     - name: redisPassword
       value: {{ .Values.valkey.auth.password }}
     - name: actorStateStore

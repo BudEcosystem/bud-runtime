@@ -1,15 +1,15 @@
-import sys
 import os
+import sys
 from typing import Any, Union
-import pytest
 
+import pytest
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, project_root)
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
-    parser.addoption("--dapr-http-port", action="store", default=3500, type=int, help="Dapr HTTP port")
+    parser.addoption("--dapr-http-port", action="store", default=3510, type=int, help="Dapr HTTP port")
     parser.addoption("--dapr-api-token", action="store", default=None, type=str, help="Dapr API token")
 
 

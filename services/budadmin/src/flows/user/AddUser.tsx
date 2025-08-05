@@ -4,13 +4,14 @@ import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
 import { Text_12_300_EEEEEE, Text_12_400_757575, Text_12_400_B3B3B3, Text_12_400_EEEEEE, Text_12_600_EEEEEE, Text_14_400_EEEEEE } from "@/components/ui/text";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useState } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
 import { Badge, Checkbox, ConfigProvider, Dropdown, Image, Select, Space, Table } from "antd";
 import { errorToast, successToast } from "@/components/toast";
 import Tags from "../components/DrawerTags";
 import DrawerCard from "@/components/ui/bud/card/DrawerCard";
 import TextInput from "../components/TextInput";
+import SelectInput from "../components/SelectInput";
 import CustomPopover from "../components/customPopover";
 import SearchHeaderInput from "../components/SearchHeaderInput";
 import { useUsers } from "src/hooks/useUsers";
@@ -64,23 +65,17 @@ const Permissions = [
 
 export default function AddUser() {
   const [generatedPassword, setGeneratedPassword] = useState("");
-  const [formData, setFormData] = React.useState<{ [key: string]: string }>();
   const [selectedPermissions, setSelectedPermissions] = useState<any>(Permissions);
   const { isLoading, showLoader, hideLoader } = useLoader();
   const { openDrawerWithStep } = useDrawer();
   const { closeDrawer } = useDrawer();
   const { userDetails, addUser, createdUser, setCreatedUser } = useUsers();
-  const [userRole, setUserRole] = useState(userDetails?.role || []);
+  const [userRole, setUserRole] = useState(userDetails?.role || "");
   const [userType, setUserType] = useState("client");
 
   const handlePasswordChange = (password: string) => {
     setGeneratedPassword(password);
   };
-
-
-  useEffect(() => {
-    setFormData((prev) => ({ ...prev, role: userRole, user_type: userType }))
-  }, [userRole, userType]);
 
   const primaryTableData = [
     {
@@ -116,23 +111,18 @@ export default function AddUser() {
   ]
 
 
-  const ExpandableTable = ({ data }: { data?: any }) => {
+  const handleCheckboxChange = React.useCallback((permissionName: string) => {
+    setSelectedPermissions((prevPermissions) =>
+      prevPermissions.map((perm) =>
+        perm.name === permissionName
+          ? { ...perm, has_permission: !perm.has_permission }
+          : perm
+      )
+    );
+  }, []);
+
+  const ExpandableTable = React.memo(function ExpandableTable({ selectedPermissions, handleCheckboxChange, primaryTableData }: { selectedPermissions: any; handleCheckboxChange: (permissionName: string) => void; primaryTableData: any[] }) {
     const [expandedRow, setExpandedRow] = useState<number | null>(null);
-
-    const handleCheckboxChange = (permissionName: string) => {
-      console.log('permissionName', permissionName)
-      setSelectedPermissions((prevPermissions) =>
-        prevPermissions.map((perm) =>
-          perm.name === permissionName
-            ? { ...perm, has_permission: !perm.has_permission }
-            : perm
-        )
-      );
-    };
-
-    useEffect(()=>{
-      console.log('selectedPermissions', selectedPermissions)
-    },[selectedPermissions])
     return (
       <div className="table mt-[.6rem] w-full border border-[#1F1F1F]">
         <div className="tHead flex items-center px-[.55rem] bg-[#121212]">
@@ -183,18 +173,15 @@ export default function AddUser() {
         </div>
       </div>
     )
-  }
+  });
 
 
-  const handleSubmit = async() => {
-    if (!formData?.name || !formData?.email || !formData?.role) {
-      errorToast('Please fill in all required fields');
-      return;
-    }
+  const handleSubmit = async (formValues: any) => {
     const data = {
-      ...formData,
+      ...formValues,
+      role: userRole,
       password: generatedPassword,
-      permissions: selectedPermissions,
+      permissions: userType == 'admin' ? selectedPermissions : [],
       user_type: userType,
     };
     setCreatedUser(data)
@@ -212,10 +199,11 @@ export default function AddUser() {
   return (
     <BudForm
       data={{
+        role: userRole,
+        user_type: userType
       }}
       onNext={(formData) => {
-        handleSubmit()
-
+        handleSubmit(formData)
       }}
       nextText="Save"
 
@@ -235,179 +223,96 @@ export default function AddUser() {
             descriptionClass="pt-[.3rem]"
           />
           <DrawerCard>
-            <TextInput
-              name="name"
-              label="Name"
-              value={formData?.name || ''}
-              onChange={(value) => setFormData((prev) => ({ ...prev, name: value }))}
-              placeholder="Enter Name"
-              rules={[{ required: true, message: "Please enter name" }]}
-              ClassNames="mt-[.55rem]"
-              formItemClassnames="pb-[.6rem] mb-[1.4rem]"
-              infoText="Enter the user name"
-              InputClasses="py-[.5rem]"
-            />
-            <TextInput
-              name="email"
-              label="Email"
-              value={formData?.email || ''}
-              onChange={(value) => setFormData((prev) => ({ ...prev, email: value }))}
-              placeholder="Enter Email"
-              rules={[
-                { required: true, message: "Please enter email" },
-                {
-                  pattern: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
-                  message: "Please enter a valid email address"
-                }
+            <div key="name-input">
+              <TextInput
+                name="name"
+                label="Name"
+                placeholder="Enter Name"
+                rules={[{ required: true, message: "Please enter name" }]}
+                ClassNames="mt-[.55rem]"
+                formItemClassnames="pb-[.6rem] mb-[1.4rem]"
+                infoText="Enter the user name"
+                InputClasses="py-[.5rem]"
+              />
+            </div>
+            <div key="email-input">
+              <TextInput
+                name="email"
+                label="Email"
+                placeholder="Enter Email"
+                rules={[
+                  { required: true, message: "Please enter email" },
+                  {
+                    pattern: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
+                    message: "Please enter a valid email address"
+                  }
+                ]}
+                ClassNames="mt-[0rem]"
+                formItemClassnames="pb-[.6rem] mb-[1.4rem]"
+                infoText="Enter the user email"
+                InputClasses="py-[.5rem]"
+                type="email"
+              />
+            </div>
+            <SelectInput
+              name="role"
+              label="Role"
+              placeholder="Select Role"
+              rules={[{ required: true, message: "Please select a role" }]}
+              infoText="This is the Role"
+              options={[
+                { label: "Admin", value: "admin" },
+                { label: "Developer", value: "developer" },
+                { label: "Tester", value: "tester" },
+                { label: "DevOps", value: "devops" },
               ]}
-              ClassNames="mt-[0rem]"
-              formItemClassnames="pb-[.6rem] mb-[1.4rem]"
-              infoText="Enter the user email"
-              InputClasses="py-[.5rem]"
-              type="email"
+              onChange={(value) => setUserRole(value)}
+              tagRender={(props) => {
+                const { label, value, closable } = props;
+                return (
+                  <Tags
+                    name={label}
+                    color="#D1B854"
+                    closable={closable}
+                    classNames="text-center justify-center items-center my-[.4rem]"
+                    onClose={() => {
+                      setUserRole((prevRoles: any) => prevRoles.filter((role: any) => role !== value));
+                    }}
+                  />
+                );
+              }}
             />
-            <div
-              className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]`}
-            >
-              <div className="w-full">
-                <Text_12_300_EEEEEE className="absolute h-[3px] bg-[#0d0d0d] top-[0rem] left-[.75rem] px-[0.025rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap bg-[#0d0d0d] pl-[.35rem] pr-[.55rem]">
-                  Role
-                  <b className="text-[#FF4D4F]">*</b>
-                  <CustomPopover title="This is the Role" >
-                    <Image
-                      src="/images/info.png"
-                      preview={false}
-                      alt="info"
-                      style={{ width: '.75rem', height: '.75rem' }}
-                    />
-                  </CustomPopover>
-                </Text_12_300_EEEEEE>
-              </div>
-              <div className="custom-select-two w-full rounded-[6px] relative">
-                <ConfigProvider
-                  theme={{
-                    token: {
-                      colorTextPlaceholder: '#808080',
-                    },
-                    components: {
-                      Select: {
-                        // multipleItemHeightSM: 16
-                      }
-                    }
-                  }}
-                >
-                  <Select
-                    suffixIcon={
-                      <Image
-                      src="/images/icons/dropD.png"
-                      preview={false}
-                      alt="info"
-                      style={{ width: 'auto', height: 'auto' }}
-                    />
-                    }
-                    placeholder="Select Role"
-                    style={{
-                      backgroundColor: "transparent",
-                      color: "#EEEEEE",
-                      border: "0.5px solid #757575",
-                      width: "100%",
-                    }}
-                    size="large"
-                    className="drawerInp !bg-[transparent] text-[#EEEEEE] font-[300] text-[.75rem] shadow-none w-full indent-[.5rem] border-0 outline-0 hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] outline-none"
-                    options={[
-                      { label: "Admin", value: "admin" },
-                      { label: "Developer", value: "developer" },
-                      { label: "Tester", value: "tester" },
-                      { label: "DevOps", value: "devops" },
-                    ]}
-                    value={userRole} // Controlled state
-                    onChange={(value) => setUserRole(value)}
-                    tagRender={(props) => {
-                      const { label, value, closable, onClose } = props;
-                      return (
-                        <Tags
-                          name={label}
-                          color="#D1B854"
-                          closable={closable}
-                          classNames="text-center justify-center items-center my-[.4rem]"
-                          onClose={() => {
-                            setUserRole((prevRoles) => prevRoles.filter((role) => role !== value));
-                          }}
-                        />
-                      );
-                    }}
-                  />
-                </ConfigProvider>
-              </div>
-            </div>
-            <div
-              className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0] mt-[1.4rem]`}
-            >
-              <div className="w-full">
-                <Text_12_300_EEEEEE className="absolute h-[3px] bg-[#0d0d0d] top-[0rem] left-[.75rem] px-[0.025rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap bg-[#0d0d0d] pl-[.35rem] pr-[.55rem]">
-                  User Type
-                  <b className="text-[#FF4D4F]">*</b>
-                  <CustomPopover title="Select user type (Admin or Client)" >
-                    <Image
-                      src="/images/info.png"
-                      preview={false}
-                      alt="info"
-                      style={{ width: '.75rem', height: '.75rem' }}
-                    />
-                  </CustomPopover>
-                </Text_12_300_EEEEEE>
-              </div>
-              <div className="custom-select-two w-full rounded-[6px] relative">
-                <ConfigProvider
-                  theme={{
-                    token: {
-                      colorTextPlaceholder: '#808080',
-                    },
-                    components: {
-                      Select: {
-                        // multipleItemHeightSM: 16
-                      }
-                    }
-                  }}
-                >
-                  <Select
-                    suffixIcon={
-                      <Image
-                      src="/images/icons/dropD.png"
-                      preview={false}
-                      alt="info"
-                      style={{ width: 'auto', height: 'auto' }}
-                    />
-                    }
-                    placeholder="Select User Type"
-                    style={{
-                      backgroundColor: "transparent",
-                      color: "#EEEEEE",
-                      border: "0.5px solid #757575",
-                      width: "100%",
-                    }}
-                    size="large"
-                    className="drawerInp !bg-[transparent] text-[#EEEEEE] font-[300] text-[.75rem] shadow-none w-full indent-[.5rem] border-0 outline-0 hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] outline-none"
-                    options={[
-                      { label: "Client", value: "client" },
-                      { label: "Admin", value: "admin" },
-                    ]}
-                    value={userType} // Controlled state
-                    onChange={(value) => setUserType(value)}
-                  />
-                </ConfigProvider>
-              </div>
-            </div>
+            <SelectInput
+              name="user_type"
+              label="User Type"
+              placeholder="Select User Type"
+              rules={[{ required: true, message: "Please select user type" }]}
+              infoText="Select user type (Admin or Client)"
+              formItemClassnames="mt-[1.4rem]"
+              options={[
+                { label: "Client", value: "client" },
+                { label: "Admin", value: "admin" },
+              ]}
+              onChange={(value) => setUserType(value)}
+            />
           </DrawerCard>
-          <div className="px-[1.45rem] pt-[1.45rem]">
-            <div className='flex flex-col justify-start items-start  py-[.6rem] gap-[.25rem]'>
-              <Text_14_400_EEEEEE>Permissions</Text_14_400_EEEEEE>
-              <Text_12_400_757575>Select user permissions for each module</Text_12_400_757575>
+          {userType == 'admin' && (
+            <div className="px-[1.45rem] pt-[1.45rem]">
+              <div className='flex flex-col justify-start items-start  py-[.6rem] gap-[.25rem]'>
+                <Text_14_400_EEEEEE>Permissions</Text_14_400_EEEEEE>
+                <Text_12_400_757575>Select user permissions for each module</Text_12_400_757575>
+              </div>
+
+              <div className="pb-[1.6rem]">
+                <ExpandableTable
+                  selectedPermissions={selectedPermissions}
+                  handleCheckboxChange={handleCheckboxChange}
+                  primaryTableData={primaryTableData}
+                />
+              </div>
+
             </div>
-            <div className="pb-[1.6rem]">
-              <ExpandableTable />
-            </div>
-          </div>
+          )}
         </BudDrawerLayout>
       </BudWraperBox>
     </BudForm>

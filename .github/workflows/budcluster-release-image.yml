@@ -1,6 +1,7 @@
 name: "BudCluster: Build and Push Docker Image on Release"
 
 on:
+  workflow_dispatch:
   release:
     types: [created]
 
@@ -33,5 +34,5 @@ jobs:
         with:
           context: ./services/budcluster
           push: true
-          file: ./deploy/Dockerfile
+          file: ./services/budcluster/deploy/Dockerfile
           tags: budstudio/budcluster:${{ env.RELEASE_TAG }}

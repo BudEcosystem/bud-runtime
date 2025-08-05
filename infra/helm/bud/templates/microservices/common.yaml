@@ -29,3 +29,15 @@ spec:
   resources:
     requests:
       storage: 20Gi
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Release.Name }}-rsa-keys
+type: Opaque
+data:
+  # openssl genrsa -aes256 -out private.key 2048
+  rsa-private-key.pem: {{ .Values.microservices.rsaKeys.privateKey | b64enc | quote }}
+  private-key-password: {{ .Values.microservices.rsaKeys.privateKeyPassword | b64enc | quote }}
+  # openssl rsa -in private.pem -pubout -out public.pem
+  rsa-public-key.pem: {{ .Values.microservices.rsaKeys.publicKey | b64enc | quote }}

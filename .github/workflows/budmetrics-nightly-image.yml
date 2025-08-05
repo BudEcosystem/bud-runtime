@@ -1,6 +1,7 @@
 name: "BudMetrics: Build and Push Nightly Docker Image"
 
 on:
+  workflow_dispatch:
   push:
     paths:
       - 'services/budmetrics/**'
@@ -27,7 +28,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ./services/budcluster
+          context: ./services/budmetrics
           push: true
-          file: ./deploy/Dockerfile
+          file: ./services/budmetrics/deploy/Dockerfile
           tags: budstudio/budmetrics:nightly
