@@ -115,4 +115,3 @@ spec:
   storageClassName: local-path
   hostPath:
     path: /datadisk/pvc/bud-notify-pv  # Adjust this path as needed
-

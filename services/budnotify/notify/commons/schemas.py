@@ -16,10 +16,10 @@
 
 """Contains Pydantic schemas used for data validation and serialization within the microservices."""
 
+import datetime
 import re
 from http import HTTPStatus
 from typing import Any, ClassVar, Dict, List, Optional, Set, Tuple, Type, Union
-import datetime
 
 from fastapi.responses import JSONResponse
 from pydantic import (
@@ -86,9 +86,7 @@ class CloudEventBase(BaseModel):
     traceparent: Optional[str] = None
 
     type: Optional[str] = None
-    time: str = Field(
-        default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat() + "Z"
-    )  # type: ignore
+    time: str = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat() + "Z")  # type: ignore
     debug: bool = Field(default=False)
 
     def is_pubsub(self) -> bool:

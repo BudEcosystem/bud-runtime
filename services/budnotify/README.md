@@ -12,7 +12,7 @@ The project consists of several containers:
 - **MongoDB**: The database for Novu.
 - **Novu Containers**: Various services of the Novu notification platform (excluding the web component for production).
 - **Dapr Containers**: Various services of the Dapr platform.
-  
+
 ### Prerequisites
 
 - Docker and Docker Compose installed.
@@ -34,7 +34,7 @@ The project consists of several containers:
     cp example.env .env
     ```
 4. **Start project**:
-    
+
     Use the following command to bring up all the services, including Dapr:
     ```bash
     cd bud-serve-notify

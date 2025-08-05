@@ -355,12 +355,12 @@ class DaprService(DaprClient):
             resp = self.get_state(store_name=store_name, key=key)
             etag = resp.etag
 
-        assert concurrency is None or hasattr(
-            Concurrency, concurrency
-        ), f"{concurrency} is not a valid concurrency, choose from (first_write, last_write)"
-        assert consistency is None or hasattr(
-            Consistency, consistency
-        ), f"{consistency} is not a valid consistency, choose from (eventual, strong)"
+        assert concurrency is None or hasattr(Concurrency, concurrency), (
+            f"{concurrency} is not a valid concurrency, choose from (first_write, last_write)"
+        )
+        assert consistency is None or hasattr(Consistency, consistency), (
+            f"{consistency} is not a valid consistency, choose from (eventual, strong)"
+        )
 
         concurrency = concurrency or "unspecified"
         consistency = consistency or "unspecified"
