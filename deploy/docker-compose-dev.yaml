@@ -1,10 +1,12 @@
 include:
   - ./docker-compose-redis.yaml
+  - ./docker-compose-mongodb.yaml
+  - ./docker-compose-novu.yaml
 
 services:
-  app:
-    image: bud-microframe/$APP_NAME:$NAMESPACE
-    container_name: bud-mf-$NAMESPACE-$APP_NAME
+  budnotify:
+    image: bud-serve/$APP_NAME:$NAMESPACE
+    container_name: bud-serve-$NAMESPACE-$APP_NAME
     build:
       context: ..
       dockerfile: ./deploy/Dockerfile
@@ -18,17 +20,18 @@ services:
       DAPR_GRPC_PORT: ${DAPR_GRPC_PORT:-}
       DAPR_API_METHOD_INVOCATION_PROTOCOL: ${DAPR_API_METHOD_INVOCATION_PROTOCOL:-grpc}
       DAPR_API_TOKEN: ${DAPR_API_TOKEN:-}
+      ENABLE_PROFILER: ${ENABLE_PROFILER:-}
     ports:
       - "$DAPR_GRPC_PORT:$DAPR_GRPC_PORT" # Dapr instances communicate over gRPC so gRPC port needs to be exposed
       - "$DAPR_HTTP_PORT:$DAPR_HTTP_PORT" # Expose Dapr HTTP port for service invocation
       - "$APP_PORT:$APP_PORT" # Expose app port for debugging purposes
     depends_on:
-      - redis
-      - placement
+      - budnotify-redis
+      - budnotify-placement
     networks:
       - bud-microframe-nw
-  sidecar:
-    container_name: bud-mf-$NAMESPACE-$APP_NAME-dapr
+  budnotify-sidecar:
+    container_name: bud-serve-$NAMESPACE-$APP_NAME-dapr
     image: "daprio/daprd:edge"
     command: [
       "./daprd",
@@ -48,10 +51,10 @@ services:
       - "${DAPR_APP_CONFIG:-../.dapr/appconfig-dev.yaml}:/config/appconfig.yaml" # Mount the config file for the runtime to use. The mounted location must match the --config argument.
       - "../secrets.json:/secrets.json" # Mount the secrets file for the runtime to use. The mounted location must match the local-secretstore.yaml secretsFile value.
     depends_on:
-      - app
-    network_mode: "service:app" # Attach the sidecar service to the app network namespace
-  placement:
-    container_name: bud-mf-$NAMESPACE-placement
+      - budnotify
+    network_mode: "service:budnotify" # Attach the sidecar service to the app network namespace
+  budnotify-placement:
+    container_name: bud-serve-$NAMESPACE-$APP_NAME-placement
     image: "daprio/placement:edge"
     command: [ "./placement", "--port", "50006" ]
     ports:

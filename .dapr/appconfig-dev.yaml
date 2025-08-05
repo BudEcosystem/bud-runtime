@@ -13,4 +13,4 @@ spec:
     scopes:
       - storeName: local-secretstore
         defaultAccess: allow
-        deniedSecrets: [ ]
+        deniedSecrets: []
