@@ -35,7 +35,8 @@ use crate::inference::types::extra_body::UnfilteredInferenceExtraBody;
 use crate::inference::types::extra_headers::UnfilteredInferenceExtraHeaders;
 use crate::inference::types::{
     current_timestamp, ContentBlockChatOutput, ContentBlockChunk, File, FileKind, FinishReason,
-    Input, InputMessage, InputMessageContent, Role, TextKind, Usage,
+    Input, InputMessage, InputMessageContent, ResolvedInput, ResolvedInputMessage,
+    ResolvedInputMessageContent, Role, TextKind, Usage,
 };
 use crate::tool::{
     DynamicToolParams, Tool, ToolCall, ToolCallChunk, ToolCallOutput, ToolChoice, ToolResult,
@@ -1554,7 +1555,7 @@ pub async fn embedding_handler(
         config,
         http_client,
         clickhouse_connection_info,
-        kafka_connection_info: _,
+        kafka_connection_info,
         authentication_info: _,
         model_credential_store,
         ..
@@ -1665,15 +1666,15 @@ pub async fn embedding_handler(
         object: "list".to_string(),
         data: response
             .embeddings
-            .into_iter()
+            .iter()
             .enumerate()
             .map(|(index, embedding)| OpenAICompatibleEmbeddingData {
                 object: "embedding".to_string(),
-                embedding,
+                embedding: embedding.clone(),
                 index,
             })
             .collect(),
-        model: original_model_name,
+        model: original_model_name.clone(),
         usage: OpenAICompatibleEmbeddingUsage {
             prompt_tokens: response.usage.input_tokens,
             total_tokens: response.usage.input_tokens,
@@ -1681,19 +1682,135 @@ pub async fn embedding_handler(
     };
 
     // Capture the gateway response (without null values)
-    let gateway_response_json = serialize_without_nulls(&openai_response).ok();
+    let gateway_response = serialize_without_nulls(&openai_response).ok();
 
-    // Store the gateway response if we have it
-    if let Some(gateway_response) = &gateway_response_json {
-        // Log for debugging
-        tracing::debug!(
-            "Gateway response captured: {} bytes",
-            gateway_response.len()
+    // Write to observability database if enabled
+    if config.gateway.observability.enabled.unwrap_or(true) {
+        // Create the InferenceResult for observability
+        let inference_id = Uuid::now_v7();
+
+        // Create a ModelInferenceResponseWithMetadata for the embedding
+        let model_inference = crate::inference::types::ModelInferenceResponseWithMetadata {
+            id: Uuid::now_v7(),
+            created: response.created,
+            output: vec![], // Embeddings don't have ContentBlockOutput
+            system: None,
+            input_messages: vec![], // Could convert from embedding input if needed
+            raw_request: response.raw_request.clone(),
+            raw_response: response.raw_response.clone(),
+            usage: response.usage.clone(),
+            latency: response.latency.clone(),
+            model_provider_name: response.embedding_provider_name.clone(),
+            model_name: Arc::from(original_model_name.as_str()),
+            cached: response.cached,
+            finish_reason: None,
+            gateway_request: None,
+            gateway_response: None,
+        };
+
+        let result = crate::inference::types::InferenceResult::Embedding(
+            crate::inference::types::EmbeddingInferenceResult {
+                inference_id,
+                created: response.created,
+                embeddings: response.embeddings.clone(),
+                embedding_dimensions: response.embeddings.first()
+                    .map(|e| e.len() as u32)
+                    .unwrap_or(0),
+                input_count: response.embeddings.len() as u32,
+                usage: response.usage.clone(),
+                model_inference_results: vec![model_inference], // Now populated with model inference
+                inference_params: crate::endpoints::inference::InferenceParams::default(),
+                original_response: Some(response.raw_response.clone()),
+            },
         );
 
-        // Store the gateway response in the database
-        // This requires updating the storage layer to include the gateway_response
-        // For now, we'll need to update the storage layer separately
+        // Extract observability metadata from headers (set by auth middleware)
+        let observability_metadata = if let (Some(project_id), Some(endpoint_id), Some(model_id)) = (
+            headers
+                .get("x-tensorzero-project-id")
+                .and_then(|v| v.to_str().ok()),
+            headers
+                .get("x-tensorzero-endpoint-id")
+                .and_then(|v| v.to_str().ok()),
+            headers
+                .get("x-tensorzero-model-id")
+                .and_then(|v| v.to_str().ok()),
+        ) {
+            Some(super::inference::ObservabilityMetadata {
+                project_id: project_id.to_string(),
+                endpoint_id: endpoint_id.to_string(),
+                model_id: model_id.to_string(),
+            })
+        } else {
+            None
+        };
+
+        // Use defaults for embedding requests since they don't have function/variant context
+        let episode_id = Uuid::now_v7();
+        let metadata = crate::endpoints::inference::InferenceDatabaseInsertMetadata {
+            function_name: "tensorzero::embedding".to_string(),  // Default function name for embeddings
+            variant_name: original_model_name.clone(),           // Use model name as variant
+            episode_id,
+            tool_config: None,
+            processing_time: Some(match response.latency {
+                crate::inference::types::Latency::NonStreaming { response_time } => response_time,
+                _ => std::time::Duration::from_millis(0),
+            }),
+            tags: HashMap::new(),
+            extra_body: UnfilteredInferenceExtraBody::default(),
+            extra_headers: crate::inference::types::extra_headers::UnfilteredInferenceExtraHeaders::default(),
+        };
+
+        // Convert EmbeddingInput to ResolvedInput for write_inference
+        let resolved_input = ResolvedInput {
+            messages: vec![ResolvedInputMessage {
+                role: Role::User,
+                content: match &embedding_request.input {
+                    crate::embeddings::EmbeddingInput::Single(text) => vec![
+                        ResolvedInputMessageContent::Text {
+                            value: serde_json::Value::String(text.clone()),
+                        }
+                    ],
+                    crate::embeddings::EmbeddingInput::Batch(texts) => texts.iter().map(|text| {
+                        ResolvedInputMessageContent::Text {
+                            value: serde_json::Value::String(text.clone()),
+                        }
+                    }).collect(),
+                },
+            }],
+            system: None,
+        };
+
+        // Write to observability database asynchronously
+        let config_clone = config.clone();
+        let clickhouse_info = clickhouse_connection_info.clone();
+        let kafka_info = kafka_connection_info.clone();
+        let gateway_request_json = _gateway_request;
+        let gateway_response_json = gateway_response.clone();
+        let async_writes = config.gateway.observability.async_writes;
+
+        let write_future = tokio::spawn(async move {
+            write_inference(
+                &clickhouse_info,
+                &kafka_info,
+                &config_clone,
+                resolved_input,
+                result,
+                metadata,
+                observability_metadata,
+                gateway_request_json,
+                gateway_response_json,
+            )
+            .await;
+        });
+
+        if !async_writes {
+            write_future.await.map_err(|e| {
+                Error::new(ErrorDetails::InternalError {
+                    message: format!("Failed to join write task: {e}"),
+                })
+            })?;
+        }
     }
 
     Ok(Json(openai_response).into_response())

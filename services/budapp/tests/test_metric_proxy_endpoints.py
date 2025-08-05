@@ -151,7 +151,8 @@ class TestMetricProxyEndpoints:
                     project_id=uuid.UUID(mock_project.id),
                     from_date=datetime.utcnow() - timedelta(days=7),
                     limit=10,
-                    offset=0
+                    offset=0,
+                    endpoint_type="embedding"  # Test the new endpoint_type filter
                 )
 
                 response = await service.list_inferences(request, mock_user)
