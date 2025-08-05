@@ -15,5 +15,12 @@
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJzvzpqulvlwby+7PQUKD6JOPJvyjAi70M+TlsenDIxn athul@accubits.com"
       ];
     };
+    "karthik" = {
+      isNormalUser = true;
+      extraGroups = [ "wheel" ];
+      openssh.authorizedKeys.keys = [
+        "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDuWOGURjVpOcHpQolKCWGYuVYn+03K7mXy+KYzUCsG+Hlgsq0i8FN/OD/rx1A4TY1PbYi9epYjamFDPjMdBrwXPn0sRlWcHse8/49hdjXhhsQbZX8IkYK4YEKVrDyPqeek36RCwU1X9MWcEYFbKxZzU2Ho4Lz3pWb0mb8G5q/R0R1D5Q2Dqzxwkw9/9bGn0V/j76PHenZmxmEKAzNDYLl0rDdqcxYB/xNuzgAi6tt05fs32RcPMIHnDROwOmhl7P2AOPjaVr8SfkNbIc+/YknUkpFXTGmbO9LPhtSGH0z1v+8x9ABDWVXnJ6AM5T5URafxpI48GFh4UMLtdLMMEFZZ karthik@accubits.com"
+      ];
+    };
   };
 }
