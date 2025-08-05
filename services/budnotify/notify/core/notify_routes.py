@@ -20,8 +20,11 @@ from fastapi import APIRouter, Response, status
 
 from notify.commons import logging
 from notify.commons.api_utils import pubsub_api_endpoint
+from notify.commons.exceptions import NovuApiClientException
+from notify.commons.schemas import ErrorResponse
 
 from .schemas import NotificationRequest, NotificationResponse
+from .services import NotificationService
 
 
 logger = logging.get_logger(__name__)
@@ -31,44 +34,62 @@ notify_router = APIRouter()
 
 @notify_router.post(
     "/notifications",
-    response_model=NotificationResponse,
-    status_code=status.HTTP_201_CREATED,
-    description="Create a notification. Can be used for both API and PubSub. Refer to NotificationRequest schema for details.",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": NotificationResponse,
+            "description": "Successfully triggered notification",
+        },
+    },
+    status_code=status.HTTP_200_OK,
+    description="Triggers a notification. Can be used for both API and PubSub. Refer to NotificationRequest schema for details.",
     tags=["Notifications"],
 )
 @pubsub_api_endpoint(NotificationRequest)
-async def create_notification(notification: NotificationRequest) -> Response:
-    """Create a new notification based on the provided request.
+async def trigger_notification(notification: NotificationRequest) -> Response:
+    """Triggers a notification using the provided notification data.
 
-    This function processes the incoming notification request, creates a new notification,
-    and returns a response with the created notification's details.
+    This method processes a request to trigger a notification and interacts with the
+    NotificationService to send the event through Novu. The response includes the status,
+    transaction ID, and acknowledgment of the triggered notification.
 
     Args:
-        notification (NotificationRequest): The notification request object containing
-                                            the details of the notification to be created.
+        notification (NotificationRequest): The request object containing notification details
+            such as name, recipients, and payload.
 
     Returns:
-        Response: A `NotificationResponse` with the created notification's ID and a success message,
-        with HTTP status code 201 (Created).
-
-    Raises:
-        HTTPException: If there's an error during the notification creation process.
-
-    Example:
-        >>> notification_request = NotificationRequest(...)
-        >>> response = await create_notification(notification_request)
-        >>> response.status_code
-        201
-        >>> response.json()
-        {
-            "object": "info",
-            "message": "Notification created",
-            "notification_id": "1234567890"
-        }
+        Response: A response object containing the status of the notification triggering
+        process and related information.
     """
-    # TODO: Implement bulk subscription support
-    logger.debug("Creating notification: %s", notification)
-
-    return NotificationResponse(
-        object="info", message="Notification created", notification_id="", code=status.HTTP_200_OK
-    ).to_http_response()
+    logger.debug("Received request to trigger a notification")
+    try:
+        event_data = await NotificationService().trigger_novu_notification_event(notification)
+        logger.info(f"Triggered notification successfully. Status: {event_data.status}")
+        return NotificationResponse(
+            object="notification",
+            message="",
+            acknowledged=event_data.acknowledged,
+            status=event_data.status,
+            transaction_id=event_data.transaction_id,
+            code=status.HTTP_200_OK,
+        ).to_http_response()
+    except NovuApiClientException:
+        return ErrorResponse(
+            code=status.HTTP_400_BAD_REQUEST,
+            type="BadRequest",
+            message="Failed to trigger notification",
+        )
+    except Exception as err:
+        logger.exception(f"Unexpected error occurred while triggering notification. {err}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            type="InternalServerError",
+            message="Unexpected error occurred while triggering notification.",
+        )

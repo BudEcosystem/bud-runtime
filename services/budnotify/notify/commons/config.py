@@ -16,13 +16,14 @@
 
 """Manages application and secret configurations, utilizing environment variables and Dapr's configuration store for syncing."""
 
+import os
 from datetime import datetime, timedelta, timezone
 from distutils.util import strtobool
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from dapr.conf import settings as dapr_settings
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, DirectoryPath, Field, model_validator
 from pydantic_settings import BaseSettings
 
 from notify.__about__ import __version__
@@ -192,6 +193,27 @@ class AppConfig(BaseConfig):
         "grpc", json_schema_extra=SyncDetails(sync=True).model_dump(exclude_unset=True)
     )
 
+    novu_api_base_url: str = Field(
+        "http://budnotify-api:3000",
+        alias="NOVU_API_BASE_URL",
+    )
+
+    # Base Directory
+    base_dir: DirectoryPath = Path(__file__).parent.parent.parent
+
+    # Seeder
+    seeder_path: str = Field(
+        default=os.path.join(base_dir, "seeders"),
+        alias="SEEDER_PATH",
+    )
+
+    # Profiling
+    profiler_enabled: bool = Field(False, alias="ENABLE_PROFILER")
+
+    pubsub_name: Optional[str] = None
+    pubsub_topic: Optional[str] = None
+    dead_letter_topic: Optional[str] = None
+
     @model_validator(mode="before")
     @classmethod
     def resolve_env(cls, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -285,6 +307,30 @@ class SecretsConfig(BaseConfig):
     """
 
     dapr_api_token: Optional[str] = Field(None, alias="DAPR_API_TOKEN")
+
+    # Novu
+    novu_user_email: str = Field(
+        "admin@bud.studio",
+        json_schema_extra=SyncDetails(
+            sync=True,
+            alias="novu_credentials.email",
+        ).model_dump(exclude_unset=True),
+    )
+    novu_user_password: str = Field(
+        "Admin@1234",
+        json_schema_extra=SyncDetails(
+            sync=True,
+            alias="novu_credentials.password",
+        ).model_dump(exclude_unset=True),
+    )
+
+    # Novu environments
+    novu_dev_api_key: Optional[str] = None
+    novu_dev_app_id: Optional[str] = None
+    novu_dev_env_id: Optional[str] = None
+    novu_prod_api_key: Optional[str] = None
+    novu_prod_app_id: Optional[str] = None
+    novu_prod_env_id: Optional[str] = None
 
 
 app_settings = AppConfig()
