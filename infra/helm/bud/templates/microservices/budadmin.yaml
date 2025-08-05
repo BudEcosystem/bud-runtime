@@ -24,6 +24,8 @@ spec:
         ports:
         - containerPort: 3000
         env:
+          - name: ENTRYPOINT_BUDNOTIFY_SERVICE
+            value: "{{ .Release.Name }}-budnotify:3000"
         {{ $root := . }}
         {{- range $key, $value := .Values.microservices.budadmin.env }}
           - name: {{ $key }}

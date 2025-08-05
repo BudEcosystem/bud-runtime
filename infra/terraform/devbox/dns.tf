@@ -5,8 +5,7 @@ locals {
 
 resource "cloudflare_dns_record" "dev" {
   for_each = toset([
-    "dev",
-    "argo.dev",
+    # prod required
     "admin.dev",
     "playground.dev",
     "gateway.dev",
@@ -14,6 +13,10 @@ resource "cloudflare_dns_record" "dev" {
     "ask.dev",
     "api.novu.dev",
     "ws.novu.dev",
+
+    # for dev only
+    "dev",
+    "cloak.dev",
   ])
 
   zone_id = local.zone_id
