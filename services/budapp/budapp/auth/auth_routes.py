@@ -69,7 +69,7 @@ auth_router = APIRouter(prefix="/auth", tags=["auth"])
     },
     description="Register a user with email and password",
 )
-@rate_limit(max_requests=3, window_seconds=600)  # 3 requests per 10 minutes
+@rate_limit(max_requests=3, window_seconds=10 * 60)  # 3 requests per 10 minutes
 async def register_user(
     request: Request, user: UserCreate, session: Annotated[Session, Depends(get_session)]
 ) -> Union[UserRegisterResponse, ErrorResponse]:
