@@ -107,14 +107,19 @@ class ExperimentService:
         Raises:
             HTTPException(status_code=500): If database insertion fails.
         """
+        # Create experiment without project_id initially
         ev = ExperimentModel(
             name=req.name,
             description=req.description,
-            project_id=req.project_id,
+            # project_id=req.project_id,  # Commented out - made optional
             created_by=user_id,
             status="active",
             tags=req.tags or [],
         )
+        
+        # Only set project_id if provided
+        if req.project_id:
+            ev.project_id = req.project_id
         try:
             self.session.add(ev)
             self.session.commit()
@@ -1021,7 +1026,8 @@ class ExperimentWorkflowService:
         """
         if step_number == 1:
             # Basic Info validation
-            required_fields = ["name", "project_id"]
+            # project_id is now optional, only name is required
+            required_fields = ["name"]  # Removed project_id from required fields
             for field in required_fields:
                 if field not in stage_data or not stage_data[field]:
                     raise HTTPException(
@@ -1253,11 +1259,15 @@ class ExperimentWorkflowService:
         experiment = ExperimentModel(
             name=combined_data.name,
             description=combined_data.description,
-            project_id=combined_data.project_id,
+            # project_id=combined_data.project_id,  # Commented out - made optional
             created_by=current_user_id,
             status=ExperimentStatusEnum.ACTIVE.value,
             tags=combined_data.tags or [],
         )
+        
+        # Only set project_id if provided
+        if combined_data.project_id:
+            experiment.project_id = combined_data.project_id
         self.session.add(experiment)
         self.session.flush()
 

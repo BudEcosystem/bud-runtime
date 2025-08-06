@@ -17,7 +17,7 @@ class CreateExperimentRequest(BaseModel):
 
     name: str = Field(..., description="The name of the experiment.")
     description: Optional[str] = Field(None, description="The description of the experiment.")
-    project_id: UUID4 = Field(..., description="The project ID for the experiment.")
+    project_id: Optional[UUID4] = Field(None, description="The project ID for the experiment (optional).")
     tags: Optional[List[str]] = Field(None, description="List of tags for the experiment.")
 
 
@@ -27,7 +27,7 @@ class Experiment(BaseModel):
     id: UUID4 = Field(..., description="The UUID of the experiment.")
     name: str = Field(..., description="The name of the experiment.")
     description: Optional[str] = Field(None, description="The description of the experiment.")
-    project_id: UUID4 = Field(..., description="The project ID for the experiment.")
+    project_id: Optional[UUID4] = Field(None, description="The project ID for the experiment.")
     tags: Optional[List[str]] = Field(None, description="List of tags for the experiment.")
 
     class Config:
