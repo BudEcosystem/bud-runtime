@@ -193,10 +193,7 @@ def list_datasets(
                 try:
                     trait_id_list.append(uuid.UUID(tid.strip()))
                 except ValueError:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Invalid UUID format for trait_id: {tid}"
-                    )
+                    raise HTTPException(status_code=400, detail=f"Invalid UUID format for trait_id: {tid}")
 
         filters = DatasetFilter(
             name=name,

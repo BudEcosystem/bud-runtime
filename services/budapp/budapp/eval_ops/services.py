@@ -116,7 +116,7 @@ class ExperimentService:
             status="active",
             tags=req.tags or [],
         )
-        
+
         # Only set project_id if provided
         if req.project_id:
             ev.project_id = req.project_id
@@ -1264,7 +1264,7 @@ class ExperimentWorkflowService:
             status=ExperimentStatusEnum.ACTIVE.value,
             tags=combined_data.tags or [],
         )
-        
+
         # Only set project_id if provided
         if combined_data.project_id:
             experiment.project_id = combined_data.project_id
