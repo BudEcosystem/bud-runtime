@@ -19,6 +19,7 @@
     "@types/lodash": "^4.17.20",
     "@types/uuid": "^10.0.0",
     "antd": "^5.26.6",
+    "axios": "^1.11.0",
     "chroma-js": "^3.1.2",
     "classnames": "^2.5.1",
     "dayjs": "^1.11.13",
@@ -32,6 +33,7 @@
     "react-dom": "19.1.0",
     "react-select": "^5.10.2",
     "react-use": "^17.6.0",
+    "typescript": "^5.9.2",
     "uuid": "^11.1.0",
     "zustand": "^5.0.6"
   },
@@ -44,7 +46,6 @@
     "postcss": "^8.4.49",
     "sass": "^1.89.2",
     "tailwindcss": "^3.4.17",
-    "tailwindcss-animate": "^1.0.7",
-    "typescript": "^5"
+    "tailwindcss-animate": "^1.0.7"
   }
 }
