@@ -301,24 +301,32 @@ class TestProjectFilteringCRUD:
         from budapp.project_ops.crud import ProjectDataManager
 
         mock_session = MagicMock(spec=AsyncSession)
+
+        # Create a mock result that works with sync calls
+        mock_execute_result = MagicMock()
+        mock_execute_result.all.return_value = []
+        mock_execute_result.scalars.return_value.all.return_value = []
+        mock_execute_result.scalar.return_value = 0
+
+        # Make session.execute return the mock result directly (not as a coroutine)
+        mock_session.execute.return_value = mock_execute_result
+
         crud = ProjectDataManager(mock_session)
 
-        # Mock the database query
-        mock_result = MagicMock()
-        mock_result.scalars.return_value.all.return_value = []
-        mock_result.scalar.return_value = 0
+        with patch.object(crud, "execute_all", return_value=[]) as mock_execute_all:
+            with patch.object(crud, "execute_scalar", return_value=0) as mock_execute_scalar:
+                filters = {
+                    "status": ProjectStatusEnum.ACTIVE,
+                    "benchmark": False,
+                    "project_type": ProjectTypeEnum.ADMIN_APP.value,
+                }
 
-        with patch.object(crud.session, "execute", return_value=mock_result) as mock_execute:
-            filters = {
-                "status": ProjectStatusEnum.ACTIVE,
-                "benchmark": False,
-                "project_type": ProjectTypeEnum.ADMIN_APP.value,
-            }
+                await crud.get_all_active_projects(offset=0, limit=10, filters=filters, order_by=[], search=False)
 
-            await crud.get_all_active_projects(offset=0, limit=10, filters=filters, order_by=[], search=False)
-
-            # Verify execute was called
-            mock_execute.assert_called()
+                # Verify execute_all was called
+                mock_execute_all.assert_called()
+                # Verify execute_scalar was called for count
+                mock_execute_scalar.assert_called()
 
     @pytest.mark.asyncio
     async def test_crud_filter_validation(self):
@@ -328,6 +336,10 @@ class TestProjectFilteringCRUD:
 
         mock_session = MagicMock(spec=AsyncSession)
         crud = ProjectDataManager(mock_session)
+
+        # Mock the execute methods to avoid actual database calls
+        crud.execute_all = MagicMock(return_value=[])
+        crud.execute_scalar = MagicMock(return_value=0)
 
         # Test with invalid field
         with pytest.raises(ClientException) as exc_info:
