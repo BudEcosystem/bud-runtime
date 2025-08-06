@@ -1,0 +1,51 @@
+{{- if (default .Values.microservices.budcustomer.enabled false) }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-budcustomer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-budcustomer
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-budcustomer
+      annotations:
+        date: "{{ now }}"
+    spec:
+      containers:
+      - name: {{ .Release.Name }}-budcustomer
+        image: {{ .Values.microservices.budcustomer.image }}
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3000
+        env:
+          - name: ENTRYPOINT_BUDNOTIFY_SERVICE
+            value: "{{ .Release.Name }}-budnotify:3000"
+        {{ $root := . }}
+        {{- range $key, $value := .Values.microservices.budcustomer.env }}
+          - name: {{ $key }}
+            value: {{ tpl $value $root | quote }}
+        {{- end }}
+        resources:
+          limits:
+            memory: 512Mi
+            cpu: 1
+          requests:
+            memory: 256Mi
+            cpu: 250m
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-budcustomer
+spec:
+  ports:
+  - port: 3000
+    targetPort: 3000
+  selector:
+    app: {{ .Release.Name }}-budcustomer
+  type: ClusterIP
+{{ end }}

@@ -17,11 +17,11 @@ image_push() {
 	package="packages.$1.container_budcustomer"
 
 	nix build ".#$package" -L
-	image_tag="$(docker image load -i result | cut -d' ' -f3)"
+	image_tag="$(docker image load -i result | cut -d' ' -f3 | head -n1)"
 	# tag="${image_tag##*:}"
 	image="${image_tag%%:*}"
 
-	note "updating $image_tag with $package"
+	note "updating $image:$2 with $package"
 	docker image tag "$image_tag" "$image:$2"
 	docker push "$image:$2"
 }

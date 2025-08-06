@@ -38,6 +38,16 @@ spec:
                 name: {{ .Release.Name }}-budadmin
                 port:
                   number: 3000
+    - host: {{ .Values.ingress.hosts.budcustomer }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-budcustomer
+                port:
+                  number: 3000
     - host: {{ .Values.ingress.hosts.budplayground }}
       http:
         paths:
@@ -69,6 +79,9 @@ spec:
                 port:
                   number: 3000
   tls:
+    - hosts:
+        - {{ .Values.ingress.hosts.budcustomer }}
+      secretName: {{ .Release.Name }}-budcustomer-acme-cert
     - hosts:
         - {{ .Values.ingress.hosts.keycloak }}
       secretName: {{ .Release.Name }}-keycloak-acme-cert
