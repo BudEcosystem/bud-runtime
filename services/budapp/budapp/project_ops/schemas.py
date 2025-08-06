@@ -43,7 +43,7 @@ class ProjectBase(BaseModel):
     description: str | None = None
     tags: List[Tag] | None = None
     icon: str | None = None
-    project_type: ProjectTypeEnum | None = Field(default=ProjectTypeEnum.CLIENT_APP)
+    project_type: ProjectTypeEnum = Field(default=ProjectTypeEnum.CLIENT_APP)
 
 
 # class ProjectRequest(ProjectBase):
