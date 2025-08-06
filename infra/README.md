@@ -70,7 +70,7 @@ The infrastructure is structured as a layered architecture, with Helm charts def
 ## Directory Structure and Components
 
 ### [infra/helm](./infra/helm)
-Contains Helm charts for deploying Kubernetes workloads. The cd polls this directory every minute for changes, automatically applying updates when new commits are merged to the `master` branch.
+Contains Helm charts for deploying Kubernetes workloads. The continuous deployment (CD) system polls this directory every minute for changes, automatically applying updates when new commits are merged to the `master` branch.
 
 - **[infra/helm/bud](./infra/helm/bud)**: Helm chart for the `bud` application stack.
   - **Purpose**: Deploys a suite of microservices and dependencies for the `bud` application.
