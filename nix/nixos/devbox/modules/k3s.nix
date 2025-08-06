@@ -14,5 +14,6 @@
     role = "server";
     tokenFile = config.sops.secrets."misc/k3s_token".path;
     clusterInit = true;
+    extraFlags = [ "--write-kubeconfig-group users" ];
   };
 }

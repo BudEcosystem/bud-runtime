@@ -21,4 +21,4 @@ jobs:
     - name: Deploy Devbox
       env:
         SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
-      run: nix run .#workflows.devbox_tofu_apply
+      run: nix run .#workflow_devbox_tofu_apply

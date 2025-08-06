@@ -1,4 +1,4 @@
-{ lib, pkgs, ... }:
+{ lib, ... }:
 
 {
   imports = [
@@ -13,5 +13,4 @@
 
   boot.loader.systemd-boot.enable = true;
   system.stateVersion = lib.mkForce "25.11";
-  environment.systemPackages = [ pkgs.kubectl ];
 }

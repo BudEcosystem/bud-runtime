@@ -23,7 +23,11 @@
 
   shfmt,
   bash-language-server,
+  typescript-language-server,
+  prefetch-npm-deps,
   pre-commit,
+  ruff,
+  mypy,
 }:
 
 mkShell {
@@ -46,6 +50,10 @@ mkShell {
     pre-commit
     nodejs
     graphviz
+    ruff
+    mypy
+    typescript-language-server
+    prefetch-npm-deps
   ];
 
   shellHook = ''

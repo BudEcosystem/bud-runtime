@@ -1,0 +1,8 @@
+[
+    {
+        "providerId": "novu",
+        "channel": "in_app",
+        "active": true,
+        "credentials": {}
+    }
+]
