@@ -105,7 +105,7 @@ Contains Terraform configurations for provisioning Azure infrastructure. Automat
 ### [nix](./nix)
 Manages NixOS configurations and images for the Kubernetes cluster. polls this directory every hour for NixOS configuration changes, automatically applying updates when new commits are merged to the `master` branch.
 
-- **[nix/images](./nix/images)**: Nix configurations for building oci container images.
+- **[nix/images](./nix/images)**: Nix configurations for building OCI container images.
   - **Purpose**: Defines reproducible container images.
 
 - **[nix/nixos](./nix/nixos)**: NixOS system configurations.
