@@ -23,7 +23,6 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from budapp.commons.database import Base, TimestampMixin
-from budapp.permissions.models import ProjectPermission
 
 from ..commons.constants import ProjectStatusEnum, ProjectTypeEnum
 from ..permissions.models import ProjectPermission
