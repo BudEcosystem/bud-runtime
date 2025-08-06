@@ -30,12 +30,15 @@ from budapp.user_ops.models import Tenant, TenantClient, TenantUserMapping
 from budapp.user_ops.models import User as UserModel
 from budapp.user_ops.schemas import TenantClientSchema, UserCreate
 
-from ..commons.constants import PermissionEnum
+from ..commons.constants import PermissionEnum, ProjectStatusEnum, ProjectTypeEnum
 from ..commons.exceptions import BudNotifyException
 from ..core.schemas import SubscriberCreate
 from ..permissions.schemas import PermissionList
+from ..permissions.service import PermissionService
+from ..project_ops.models import Project as ProjectModel
+from ..project_ops.schemas import ProjectUserAdd
 from ..shared.notification_service import BudNotifyHandler
-from .schemas import LogoutRequest, RefreshTokenRequest, RefreshTokenResponse, UserLogin, UserLoginData
+from .schemas import LogoutRequest, RefreshTokenRequest, RefreshTokenResponse, ResourceCreate, UserLogin, UserLoginData
 
 
 logger = logging.get_logger(__name__)
@@ -354,6 +357,45 @@ class AuthService(SessionMixin):
             logger.info("User added to budnotify subscriber")
 
             _ = await UserDataManager(self.session).update_subscriber_status(user_ids=[db_user.id], is_subscriber=True)
+
+            # Create a default project for CLIENT users
+            if user.user_type == UserTypeEnum.CLIENT:
+                try:
+                    # Create default project for the client user
+                    default_project = ProjectModel(
+                        name="My First Project",
+                        description="This is your default project.",
+                        created_by=db_user.id,
+                        status=ProjectStatusEnum.ACTIVE,
+                        benchmark=False,
+                        project_type=ProjectTypeEnum.CLIENT_APP.value,
+                    )
+
+                    # Insert the project into database
+                    await UserDataManager(self.session).insert_one(default_project)
+                    logger.info(f"Default project created for client user: {db_user.email}")
+
+                    # Associate the user with the project
+                    default_project.users.append(db_user)
+                    await self.session.commit()
+
+                    # Create permissions for the project in Keycloak
+                    permission_service = PermissionService(self.session)
+                    payload = ResourceCreate(
+                        resource_id=str(default_project.id),
+                        resource_type="project",
+                        scopes=["view", "manage"],
+                    )
+                    await permission_service.create_resource_permission_by_user(db_user, payload)
+
+                    logger.info(
+                        f"User {db_user.email} associated with default project: {default_project.name} with full permissions"
+                    )
+
+                except Exception as project_error:
+                    logger.error(f"Failed to create default project for user {db_user.email}: {project_error}")
+                    # Don't fail the registration if project creation fails
+                    # The user can create projects manually later
 
             return db_user
 
