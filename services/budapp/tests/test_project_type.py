@@ -126,10 +126,19 @@ class TestProjectModel:
             description="Test Description",
             created_by=uuid4(),
         )
-        # The default should be set at the database level
-        # This is more of a model configuration check
-        # This is more of a model configuration check
-        assert project.project_type == ProjectTypeEnum.CLIENT_APP
+        # The default is set at the database level, not in Python instantiation
+        # When creating an instance without specifying project_type, it will be None
+        # until saved to the database where the server_default applies
+        assert project.project_type is None
+
+        # If we explicitly set it to the default value
+        project_with_type = Project(
+            name="Test Project",
+            description="Test Description",
+            created_by=uuid4(),
+            project_type=ProjectTypeEnum.CLIENT_APP.value,
+        )
+        assert project_with_type.project_type == ProjectTypeEnum.CLIENT_APP.value
 
     def test_project_model_with_project_type(self):
         """Test Project model accepts project_type."""
