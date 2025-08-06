@@ -39,7 +39,7 @@ class TestDefaultProjectType:
             email=user_data.email,
             user_type=UserTypeEnum.CLIENT.value,
             status=UserStatusEnum.ACTIVE.value,
-            color=UserColorEnum.BLUE.value,
+            color=UserColorEnum.COLOR_1.value,
             is_superuser=False,
         )
 
@@ -115,7 +115,7 @@ class TestDefaultProjectType:
             email=user_data.email,
             user_type=UserTypeEnum.ADMIN.value,
             status=UserStatusEnum.ACTIVE.value,
-            color=UserColorEnum.RED.value,
+            color=UserColorEnum.COLOR_2.value,
             is_superuser=True,
         )
 
@@ -180,7 +180,7 @@ class TestDefaultProjectType:
             email=user_data.email,
             user_type=UserTypeEnum.CLIENT.value,
             status=UserStatusEnum.ACTIVE.value,
-            color=UserColorEnum.GREEN.value,
+            color=UserColorEnum.COLOR_3.value,
             is_superuser=False,
         )
 
