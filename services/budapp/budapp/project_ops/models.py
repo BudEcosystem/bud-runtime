@@ -25,7 +25,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from budapp.commons.database import Base, TimestampMixin
 from budapp.permissions.models import ProjectPermission
 
-from ..commons.constants import ProjectStatusEnum
+from ..commons.constants import ProjectStatusEnum, ProjectTypeEnum
 from ..permissions.models import ProjectPermission
 
 
@@ -55,6 +55,15 @@ class Project(Base, TimestampMixin):
         ),
         nullable=False,
         default=ProjectStatusEnum.ACTIVE,
+    )
+    project_type: Mapped[str] = mapped_column(
+        Enum(
+            ProjectTypeEnum,
+            name="project_type_enum",
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        nullable=False,
+        default=ProjectTypeEnum.CLIENT_APP,
     )
     benchmark: Mapped[bool] = mapped_column(Boolean, default=False)
     created_by: Mapped[UUID] = mapped_column(ForeignKey("user.id"), nullable=False)

@@ -852,6 +852,20 @@ class ProjectStatusEnum(StrEnum):
     DELETED = auto()
 
 
+class ProjectTypeEnum(StrEnum):
+    """Enumeration of project types in the system.
+
+    This enum defines the different types of projects that can exist in the Bud ecosystem.
+
+    Attributes:
+        CLIENT_APP: Represents a client application project.
+        ADMIN_APP: Represents an admin application project.
+    """
+
+    CLIENT_APP = auto()
+    ADMIN_APP = auto()
+
+
 # Bud Notify Workflow
 BUD_NOTIFICATION_WORKFLOW = "bud-notification"
 BUD_INTERNAL_WORKFLOW = "bud-internal"
