@@ -13,9 +13,6 @@ spec:
         app: {{ .Release.Name }}-budadmin
       annotations:
         date: "{{ now }}"
-        dapr.io/enabled: "true"
-        dapr.io/app-id: "budadmin"
-        dapr.io/app-port: "3000"
     spec:
       containers:
       - name: {{ .Release.Name }}-budadmin
