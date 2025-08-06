@@ -5,9 +5,9 @@ from uuid import uuid4
 
 import pytest
 
-from budapp.auth.schemas import UserRegister
+from budapp.auth.schemas import UserCreate
 from budapp.auth.services import AuthService
-from budapp.commons.constants import ProjectTypeEnum, UserColorEnum, UserStatusEnum, UserTypeEnum
+from budapp.commons.constants import ProjectTypeEnum, UserColorEnum, UserRoleEnum, UserStatusEnum, UserTypeEnum
 from budapp.project_ops.models import Project as ProjectModel
 from budapp.user_ops.models import User as UserModel
 
@@ -24,13 +24,12 @@ class TestDefaultProjectType:
         mock_session.refresh = AsyncMock()
 
         # Create test user data
-        user_data = UserRegister(
+        user_data = UserCreate(
             name="Test Client",
             email="testclient@example.com",
             password="TestPassword123!",
-            confirm_password="TestPassword123!",
+            role=UserRoleEnum.DEVELOPER,
             user_type=UserTypeEnum.CLIENT,
-            tenant_id=str(uuid4()),
         )
 
         # Mock the created user
@@ -101,13 +100,12 @@ class TestDefaultProjectType:
         mock_session.refresh = AsyncMock()
 
         # Create test admin user data
-        user_data = UserRegister(
+        user_data = UserCreate(
             name="Test Admin",
             email="testadmin@example.com",
             password="TestPassword123!",
-            confirm_password="TestPassword123!",
+            role=UserRoleEnum.ADMIN,
             user_type=UserTypeEnum.ADMIN,
-            tenant_id=str(uuid4()),
         )
 
         # Mock the created user
@@ -167,13 +165,12 @@ class TestDefaultProjectType:
         mock_session.refresh = AsyncMock()
 
         # Create test user data
-        user_data = UserRegister(
+        user_data = UserCreate(
             name="Test Client",
             email="testclient@example.com",
             password="TestPassword123!",
-            confirm_password="TestPassword123!",
+            role=UserRoleEnum.DEVELOPER,
             user_type=UserTypeEnum.CLIENT,
-            tenant_id=str(uuid4()),
         )
 
         # Mock the created user
