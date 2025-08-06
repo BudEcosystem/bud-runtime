@@ -34,7 +34,6 @@
       supportedSystems = lib.platforms.unix;
       forAllSystems = f: lib.genAttrs supportedSystems (forSystem f);
       forLinuxSystems = f: lib.genAttrs lib.platforms.linux (forSystem f);
-      pkgs = import nixpkgs { system = "x86_64-linux"; };
 
       makeNixos =
         host: system:
@@ -72,6 +71,7 @@
             { system, pkgs }:
             {
               workflow_devbox_tofu_apply = pkgs.callPackage ./nix/workflows/devbox_tofu_apply { };
+              workflow_dockerhub_budcustomer = pkgs.callPackage ./nix/workflows/dockerhub_budcustomer { };
               budcustomer = pkgs.callPackage ./nix/packages/budcustomer.nix { };
             }
           ))
