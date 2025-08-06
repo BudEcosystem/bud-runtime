@@ -70,14 +70,19 @@
           (forAllSystems (
             { system, pkgs }:
             {
-              workflows = pkgs.callPackage ./nix/workflows { inherit self; };
+              workflow_devbox_tofu_apply = pkgs.callPackage ./nix/workflows/devbox_tofu_apply { };
+              workflow_dockerhub_budcustomer = pkgs.callPackage ./nix/workflows/dockerhub_budcustomer { };
+              budcustomer = pkgs.callPackage ./nix/packages/budcustomer.nix { };
             }
           ))
           (
             forLinuxSystems (
               { system, pkgs }:
               {
-                images = pkgs.callPackage ./nix/images { };
+                container_devbox = pkgs.callPackage ./nix/container/devbox { };
+                container_budcustomer = pkgs.callPackage ./nix/container/budcustomer.nix {
+                  budcustomer = self.packages.${system}.budcustomer;
+                };
               }
             )
           );

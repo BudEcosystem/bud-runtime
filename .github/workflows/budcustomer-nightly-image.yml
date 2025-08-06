@@ -1,11 +1,14 @@
-name: "DevBox: tofu deploy"
+name: "BudCustomer: Build and Push Nightly Docker Image"
 on:
   push:
     branches:
       - 'master'
     paths:
-      - infra/terraform/azure
-      - infra/terraform/devbox
+      - services/budCustomer
+      - nix/workflows/dockerhub_budcustomer
+      - nix/workflows/secrets.yaml
+      - flake.lock
+      - flake.nix
   workflow_dispatch:
 
 jobs:
@@ -21,4 +24,4 @@ jobs:
     - name: Deploy Devbox
       env:
         SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
-      run: nix run .#workflow_devbox_tofu_apply
+      run: nix run .#workflow_dockerhub_budcustomer
