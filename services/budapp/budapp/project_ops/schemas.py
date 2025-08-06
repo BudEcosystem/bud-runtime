@@ -179,6 +179,7 @@ class ProjectCreateRequest(ProjectBase):
 
 class ProjectFilter(BaseModel):
     name: str | None = None
+    project_type: ProjectTypeEnum | None = None
 
 
 class PaginatedTagsResponse(PaginatedSuccessResponse):
