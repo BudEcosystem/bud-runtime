@@ -57,9 +57,31 @@ class TestDefaultProjectType:
 
         with patch("budapp.auth.services.UserDataManager") as MockUserDataManager:
             with patch("budapp.auth.services.PermissionService") as MockPermissionService:
-                # Setup mocks
-                mock_user_dm = MockUserDataManager.return_value
-                mock_user_dm.insert_one = AsyncMock(side_effect=capture_project)
+                with patch("budapp.auth.services.KeycloakManager") as MockKeycloakManager:
+                    # Setup mocks
+                    mock_keycloak = MockKeycloakManager.return_value
+                    mock_keycloak.create_user = AsyncMock(return_value={"id": "keycloak-user-id"})
+
+                    mock_user_dm = MockUserDataManager.return_value
+                    mock_user_dm.insert_one = AsyncMock(side_effect=capture_project)
+
+                # Mock retrieve_by_fields to return appropriate values based on model type
+                async def mock_retrieve_by_fields(model_class, fields, missing_ok=True):
+                    if model_class.__name__ == "User":
+                        return None  # No existing user with this email
+                    elif model_class.__name__ == "Tenant":
+                        # Return a mock tenant
+                        mock_tenant = MagicMock()
+                        mock_tenant.id = uuid4()
+                        return mock_tenant
+                    elif model_class.__name__ == "TenantClient":
+                        # Return a mock tenant client
+                        mock_tenant_client = MagicMock()
+                        mock_tenant_client.id = uuid4()
+                        return mock_tenant_client
+                    return None
+
+                mock_user_dm.retrieve_by_fields = AsyncMock(side_effect=mock_retrieve_by_fields)
                 mock_user_dm.get_user_by_email = AsyncMock(return_value=None)
                 mock_user_dm.insert_user = AsyncMock(return_value=mock_user)
                 mock_user_dm.update_subscriber_status = AsyncMock(return_value=True)
@@ -131,30 +153,52 @@ class TestDefaultProjectType:
 
         with patch("budapp.auth.services.UserDataManager") as MockUserDataManager:
             with patch("budapp.auth.services.PermissionService") as MockPermissionService:
-                # Setup mocks
-                mock_user_dm = MockUserDataManager.return_value
-                mock_user_dm.insert_one = AsyncMock(side_effect=track_project_creation)
-                mock_user_dm.get_user_by_email = AsyncMock(return_value=None)
-                mock_user_dm.insert_user = AsyncMock(return_value=mock_user)
-                mock_user_dm.update_subscriber_status = AsyncMock(return_value=True)
+                with patch("budapp.auth.services.KeycloakManager") as MockKeycloakManager:
+                    # Setup mocks
+                    mock_keycloak = MockKeycloakManager.return_value
+                    mock_keycloak.create_user = AsyncMock(return_value={"id": "keycloak-user-id"})
 
-                mock_permission_service = MockPermissionService.return_value
-                mock_permission_service.create_resource_permission_by_user = AsyncMock()
+                    mock_user_dm = MockUserDataManager.return_value
+                    mock_user_dm.insert_one = AsyncMock(side_effect=track_project_creation)
 
-                # Create auth service and register user
-                auth_service = AuthService(mock_session)
-                result = await auth_service.register_user(user_data)
+                    # Mock retrieve_by_fields to return appropriate values based on model type
+                    async def mock_retrieve_by_fields(model_class, fields, missing_ok=True):
+                        if model_class.__name__ == "User":
+                            return None  # No existing user with this email
+                        elif model_class.__name__ == "Tenant":
+                            # Return a mock tenant
+                            mock_tenant = MagicMock()
+                            mock_tenant.id = uuid4()
+                            return mock_tenant
+                        elif model_class.__name__ == "TenantClient":
+                            # Return a mock tenant client
+                            mock_tenant_client = MagicMock()
+                            mock_tenant_client.id = uuid4()
+                            return mock_tenant_client
+                        return None
 
-                # Verify user was created
-                assert result is not None
-                assert result.email == user_data.email
-                assert result.user_type == UserTypeEnum.ADMIN.value
+                    mock_user_dm.retrieve_by_fields = AsyncMock(side_effect=mock_retrieve_by_fields)
+                    mock_user_dm.get_user_by_email = AsyncMock(return_value=None)
+                    mock_user_dm.insert_user = AsyncMock(return_value=mock_user)
+                    mock_user_dm.update_subscriber_status = AsyncMock(return_value=True)
 
-                # Verify NO default project was created for admin user
-                assert project_created is False
+                    mock_permission_service = MockPermissionService.return_value
+                    mock_permission_service.create_resource_permission_by_user = AsyncMock()
 
-                # Verify permissions were NOT created (no project to create permissions for)
-                mock_permission_service.create_resource_permission_by_user.assert_not_called()
+                    # Create auth service and register user
+                    auth_service = AuthService(mock_session)
+                    result = await auth_service.register_user(user_data)
+
+                    # Verify user was created
+                    assert result is not None
+                    assert result.email == user_data.email
+                    assert result.user_type == UserTypeEnum.ADMIN.value
+
+                    # Verify NO default project was created for admin user
+                    assert project_created is False
+
+                    # Verify permissions were NOT created (no project to create permissions for)
+                    mock_permission_service.create_resource_permission_by_user.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_client_user_project_creation_failure_doesnt_fail_registration(self):
@@ -186,33 +230,55 @@ class TestDefaultProjectType:
 
         with patch("budapp.auth.services.UserDataManager") as MockUserDataManager:
             with patch("budapp.auth.services.PermissionService") as MockPermissionService:
-                # Setup mocks
-                mock_user_dm = MockUserDataManager.return_value
-                # Make project creation fail
-                mock_user_dm.insert_one = AsyncMock(side_effect=Exception("Database error"))
-                mock_user_dm.get_user_by_email = AsyncMock(return_value=None)
-                mock_user_dm.insert_user = AsyncMock(return_value=mock_user)
-                mock_user_dm.update_subscriber_status = AsyncMock(return_value=True)
+                with patch("budapp.auth.services.KeycloakManager") as MockKeycloakManager:
+                    # Setup mocks
+                    mock_keycloak = MockKeycloakManager.return_value
+                    mock_keycloak.create_user = AsyncMock(return_value={"id": "keycloak-user-id"})
 
-                mock_permission_service = MockPermissionService.return_value
-                mock_permission_service.create_resource_permission_by_user = AsyncMock()
+                    mock_user_dm = MockUserDataManager.return_value
+                    # Make project creation fail
+                    mock_user_dm.insert_one = AsyncMock(side_effect=Exception("Database error"))
 
-                # Create auth service and register user
-                auth_service = AuthService(mock_session)
+                    # Mock retrieve_by_fields to return appropriate values based on model type
+                    async def mock_retrieve_by_fields(model_class, fields, missing_ok=True):
+                        if model_class.__name__ == "User":
+                            return None  # No existing user with this email
+                        elif model_class.__name__ == "Tenant":
+                            # Return a mock tenant
+                            mock_tenant = MagicMock()
+                            mock_tenant.id = uuid4()
+                            return mock_tenant
+                        elif model_class.__name__ == "TenantClient":
+                            # Return a mock tenant client
+                            mock_tenant_client = MagicMock()
+                            mock_tenant_client.id = uuid4()
+                            return mock_tenant_client
+                        return None
 
-                # User registration should still succeed even if project creation fails
-                result = await auth_service.register_user(user_data)
+                    mock_user_dm.retrieve_by_fields = AsyncMock(side_effect=mock_retrieve_by_fields)
+                    mock_user_dm.get_user_by_email = AsyncMock(return_value=None)
+                    mock_user_dm.insert_user = AsyncMock(return_value=mock_user)
+                    mock_user_dm.update_subscriber_status = AsyncMock(return_value=True)
 
-                # Verify user was created successfully
-                assert result is not None
-                assert result.email == user_data.email
-                assert result.user_type == UserTypeEnum.CLIENT.value
+                    mock_permission_service = MockPermissionService.return_value
+                    mock_permission_service.create_resource_permission_by_user = AsyncMock()
 
-                # Verify project creation was attempted but failed
-                mock_user_dm.insert_one.assert_called()
+                    # Create auth service and register user
+                    auth_service = AuthService(mock_session)
 
-                # Verify permissions were NOT created (project creation failed)
-                mock_permission_service.create_resource_permission_by_user.assert_not_called()
+                    # User registration should still succeed even if project creation fails
+                    result = await auth_service.register_user(user_data)
+
+                    # Verify user was created successfully
+                    assert result is not None
+                    assert result.email == user_data.email
+                    assert result.user_type == UserTypeEnum.CLIENT.value
+
+                    # Verify project creation was attempted but failed
+                    mock_user_dm.insert_one.assert_called()
+
+                    # Verify permissions were NOT created (project creation failed)
+                    mock_permission_service.create_resource_permission_by_user.assert_not_called()
 
 
 class TestProjectCreationEndpoint:
