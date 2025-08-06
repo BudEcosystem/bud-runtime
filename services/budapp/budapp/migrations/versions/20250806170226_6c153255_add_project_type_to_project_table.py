@@ -24,19 +24,21 @@ def upgrade() -> None:
     # Create the project_type_enum type
     sa.Enum("client_app", "admin_app", name="project_type_enum").create(op.get_bind())
 
-    # Add project_type column to project table with default value
+    # Add project_type column to project table with temporary nullable
     op.add_column(
         "project",
         sa.Column(
             "project_type",
             postgresql.ENUM("client_app", "admin_app", name="project_type_enum", create_type=False),
-            nullable=False,
-            server_default="client_app",
+            nullable=True,
         ),
     )
 
-    # Remove the server default after setting existing rows
-    op.alter_column("project", "project_type", server_default=None)
+    # Set all existing projects to admin_app for backward compatibility
+    op.execute("UPDATE project SET project_type = 'admin_app' WHERE project_type IS NULL")
+
+    # Now make the column non-nullable with client_app as default for new projects
+    op.alter_column("project", "project_type", nullable=False, server_default="client_app")
 
 
 def downgrade() -> None:
