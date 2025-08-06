@@ -137,7 +137,7 @@ def require_permissions(
             if current_user.is_superuser:
                 return await func(current_user=current_user, session=session, *args, **kwargs)
 
-            if permissions and permissions == [PermissionEnum.CLIENT_ACCESS]:
+            if permissions == [PermissionEnum.CLIENT_ACCESS]:
                 return await func(current_user=current_user, session=session, *args, **kwargs)
 
             # Check if resource-based permission check is needed
