@@ -812,8 +812,8 @@ async def list_catalog_models(
         # Calculate offset
         offset = (page - 1) * limit
 
-        # Convert filter to dictionary
-        filters_dict = filters.model_dump(exclude_none=True)
+        # Convert filter to dictionary, ensuring enums are converted to values
+        filters_dict = filters.model_dump(exclude_none=True, mode="json")
 
         # Get models from catalog service
         db_models, count = await ModelCatalogService(session).get_published_models(
