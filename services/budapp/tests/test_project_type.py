@@ -128,7 +128,8 @@ class TestProjectModel:
         )
         # The default should be set at the database level
         # This is more of a model configuration check
-        assert hasattr(project, "project_type")
+        # This is more of a model configuration check
+        assert project.project_type == ProjectTypeEnum.CLIENT_APP
 
     def test_project_model_with_project_type(self):
         """Test Project model accepts project_type."""
