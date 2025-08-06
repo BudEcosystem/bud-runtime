@@ -331,7 +331,7 @@ class TestProjectFilteringCRUD:
     @pytest.mark.asyncio
     async def test_crud_filter_validation(self):
         """Test that CRUD layer validates filter fields."""
-        from budapp.commons.exceptions import ClientException
+        from budapp.commons.exceptions import DatabaseException
         from budapp.project_ops.crud import ProjectDataManager
 
         mock_session = MagicMock(spec=AsyncSession)
@@ -342,11 +342,11 @@ class TestProjectFilteringCRUD:
         crud.execute_scalar = MagicMock(return_value=0)
 
         # Test with invalid field
-        with pytest.raises(ClientException) as exc_info:
+        with pytest.raises(DatabaseException) as exc_info:
             filters = {"invalid_field": "value"}
             await crud.get_all_active_projects(offset=0, limit=10, filters=filters, order_by=[], search=False)
 
-        assert "invalid_field" in str(exc_info.value.message)
+        assert "invalid_field" in str(exc_info.value)
 
 
 class TestClientUserAutoFiltering:
