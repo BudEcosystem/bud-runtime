@@ -12,6 +12,7 @@ from budapp.eval_ops.models import ExpDataset as DatasetModel
 from budapp.eval_ops.models import (
     ExpDatasetVersion,
     ExperimentStatusEnum,
+    ExpTrait,
     RunStatusEnum,
 )
 from budapp.eval_ops.models import Experiment as ExperimentModel
@@ -644,6 +645,9 @@ class ExperimentService:
                     # Filter by domains (JSONB contains any of the specified domains)
                     for domain in filters.domains:
                         q = q.filter(DatasetModel.domains.contains([domain]))
+                if filters.trait_ids:
+                    # Filter by trait UUIDs through the many-to-many relationship
+                    q = q.join(DatasetModel.traits).filter(ExpTrait.id.in_(filters.trait_ids))
 
             # Get total count before applying pagination
             total_count = q.count()

@@ -178,17 +178,32 @@ def list_datasets(
     modalities: Annotated[Optional[str], Query(description="Filter by modalities (comma-separated)")] = None,
     language: Annotated[Optional[str], Query(description="Filter by languages (comma-separated)")] = None,
     domains: Annotated[Optional[str], Query(description="Filter by domains (comma-separated)")] = None,
+    trait_ids: Annotated[Optional[str], Query(description="Filter by trait UUIDs (comma-separated)")] = None,
 ):
     """List datasets with optional filtering and pagination."""
     try:
         offset = (page - 1) * limit
 
         # Parse comma-separated filters
+        trait_id_list = None
+        if trait_ids:
+            # Convert comma-separated UUIDs to list of UUID objects
+            trait_id_list = []
+            for tid in trait_ids.split(","):
+                try:
+                    trait_id_list.append(uuid.UUID(tid.strip()))
+                except ValueError:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Invalid UUID format for trait_id: {tid}"
+                    )
+
         filters = DatasetFilter(
             name=name,
             modalities=modalities.split(",") if modalities else None,
             language=language.split(",") if language else None,
             domains=domains.split(",") if domains else None,
+            trait_ids=trait_id_list,
         )
 
         datasets, total_count = ExperimentService(session).list_datasets(offset=offset, limit=limit, filters=filters)

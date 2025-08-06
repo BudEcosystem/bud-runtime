@@ -282,6 +282,7 @@ class DatasetFilter(BaseModel):
     modalities: Optional[List[str]] = Field(None, description="Filter by modalities.")
     language: Optional[List[str]] = Field(None, description="Filter by languages.")
     domains: Optional[List[str]] = Field(None, description="Filter by domains.")
+    trait_ids: Optional[List[UUID4]] = Field(None, description="Filter by trait UUIDs.")
 
 
 class CreateDatasetRequest(BaseModel):
