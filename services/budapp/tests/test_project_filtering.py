@@ -1,0 +1,390 @@
+"""Unit and integration tests for project filtering with project_type field."""
+
+import json
+from typing import Any, Dict
+from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import uuid4
+
+import pytest
+from fastapi import status
+from fastapi.testclient import TestClient
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from budapp.auth.schemas import User
+from budapp.commons.constants import ProjectStatusEnum, ProjectTypeEnum, UserStatusEnum
+from budapp.project_ops.models import Project
+from budapp.project_ops.schemas import ProjectFilter
+
+
+class TestProjectFilterSchema:
+    """Test ProjectFilter schema with project_type field."""
+
+    def test_project_filter_with_project_type(self):
+        """Test ProjectFilter accepts project_type field."""
+        filter_data = {
+            "name": "test",
+            "project_type": ProjectTypeEnum.ADMIN_APP,
+        }
+        project_filter = ProjectFilter(**filter_data)
+        assert project_filter.name == "test"
+        assert project_filter.project_type == ProjectTypeEnum.ADMIN_APP
+
+    def test_project_filter_without_project_type(self):
+        """Test ProjectFilter works without project_type field."""
+        filter_data = {"name": "test"}
+        project_filter = ProjectFilter(**filter_data)
+        assert project_filter.name == "test"
+        assert project_filter.project_type is None
+
+    def test_project_filter_empty(self):
+        """Test empty ProjectFilter."""
+        project_filter = ProjectFilter()
+        assert project_filter.name is None
+        assert project_filter.project_type is None
+
+    def test_project_filter_model_dump(self):
+        """Test model_dump excludes None values."""
+        # With project_type
+        filter_with_type = ProjectFilter(project_type=ProjectTypeEnum.CLIENT_APP)
+        assert filter_with_type.model_dump(exclude_none=True) == {
+            "project_type": ProjectTypeEnum.CLIENT_APP
+        }
+
+        # Without project_type
+        filter_without_type = ProjectFilter(name="test")
+        assert filter_without_type.model_dump(exclude_none=True) == {"name": "test"}
+
+        # Empty filter
+        empty_filter = ProjectFilter()
+        assert empty_filter.model_dump(exclude_none=True) == {}
+
+
+class TestProjectFilteringAPI:
+    """Test project filtering API endpoints."""
+
+    @pytest.fixture
+    def mock_user(self):
+        """Create a mock user for testing."""
+        return User(
+            id=uuid4(),
+            email="test@example.com",
+            name="Test User",
+            status=UserStatusEnum.ACTIVE,
+        )
+
+    @pytest.fixture
+    def mock_projects(self):
+        """Create mock projects with different project_types."""
+        base_time = "2024-01-01T00:00:00"
+        projects = [
+            {
+                "id": str(uuid4()),
+                "name": "Client Project 1",
+                "description": "First client project",
+                "project_type": ProjectTypeEnum.CLIENT_APP.value,
+                "status": ProjectStatusEnum.ACTIVE,
+                "benchmark": False,
+                "created_at": base_time,
+                "modified_at": base_time,
+                "created_by": str(uuid4()),
+            },
+            {
+                "id": str(uuid4()),
+                "name": "Client Project 2",
+                "description": "Second client project",
+                "project_type": ProjectTypeEnum.CLIENT_APP.value,
+                "status": ProjectStatusEnum.ACTIVE,
+                "benchmark": False,
+                "created_at": base_time,
+                "modified_at": base_time,
+                "created_by": str(uuid4()),
+            },
+            {
+                "id": str(uuid4()),
+                "name": "Admin Project 1",
+                "description": "First admin project",
+                "project_type": ProjectTypeEnum.ADMIN_APP.value,
+                "status": ProjectStatusEnum.ACTIVE,
+                "benchmark": False,
+                "created_at": base_time,
+                "modified_at": base_time,
+                "created_by": str(uuid4()),
+            },
+            {
+                "id": str(uuid4()),
+                "name": "Admin Project 2",
+                "description": "Second admin project",
+                "project_type": ProjectTypeEnum.ADMIN_APP.value,
+                "status": ProjectStatusEnum.ACTIVE,
+                "benchmark": False,
+                "created_at": base_time,
+                "modified_at": base_time,
+                "created_by": str(uuid4()),
+            },
+        ]
+        return projects
+
+    @pytest.mark.asyncio
+    async def test_filter_by_client_app_type(self, client: TestClient, mock_user, mock_projects):
+        """Test filtering projects by CLIENT_APP type."""
+        client_projects = [p for p in mock_projects if p["project_type"] == ProjectTypeEnum.CLIENT_APP.value]
+
+        with patch("budapp.project_ops.project_routes.get_current_active_user", return_value=mock_user):
+            with patch("budapp.project_ops.project_routes.ProjectService") as mock_service:
+                mock_service_instance = mock_service.return_value
+                mock_service_instance.get_all_active_projects = AsyncMock(
+                    return_value=(client_projects, len(client_projects))
+                )
+
+                response = client.get("/projects/?project_type=client_app")
+
+                assert response.status_code == status.HTTP_200_OK
+                data = response.json()
+                assert data["total_record"] == 2
+                assert len(data["projects"]) == 2
+                assert all(p["project_type"] == "client_app" for p in data["projects"])
+
+                # Verify the service was called with correct filters
+                mock_service_instance.get_all_active_projects.assert_called_once()
+                call_args = mock_service_instance.get_all_active_projects.call_args
+                filters_dict = call_args[0][3]  # Fourth argument is filters_dict
+                assert filters_dict.get("project_type") == ProjectTypeEnum.CLIENT_APP
+
+    @pytest.mark.asyncio
+    async def test_filter_by_admin_app_type(self, client: TestClient, mock_user, mock_projects):
+        """Test filtering projects by ADMIN_APP type."""
+        admin_projects = [p for p in mock_projects if p["project_type"] == ProjectTypeEnum.ADMIN_APP.value]
+
+        with patch("budapp.project_ops.project_routes.get_current_active_user", return_value=mock_user):
+            with patch("budapp.project_ops.project_routes.ProjectService") as mock_service:
+                mock_service_instance = mock_service.return_value
+                mock_service_instance.get_all_active_projects = AsyncMock(
+                    return_value=(admin_projects, len(admin_projects))
+                )
+
+                response = client.get("/projects/?project_type=admin_app")
+
+                assert response.status_code == status.HTTP_200_OK
+                data = response.json()
+                assert data["total_record"] == 2
+                assert len(data["projects"]) == 2
+                assert all(p["project_type"] == "admin_app" for p in data["projects"])
+
+    @pytest.mark.asyncio
+    async def test_filter_without_project_type(self, client: TestClient, mock_user, mock_projects):
+        """Test getting all projects without project_type filter."""
+        with patch("budapp.project_ops.project_routes.get_current_active_user", return_value=mock_user):
+            with patch("budapp.project_ops.project_routes.ProjectService") as mock_service:
+                mock_service_instance = mock_service.return_value
+                mock_service_instance.get_all_active_projects = AsyncMock(
+                    return_value=(mock_projects, len(mock_projects))
+                )
+
+                response = client.get("/projects/")
+
+                assert response.status_code == status.HTTP_200_OK
+                data = response.json()
+                assert data["total_record"] == 4
+                assert len(data["projects"]) == 4
+
+                # Verify no project_type filter was passed
+                mock_service_instance.get_all_active_projects.assert_called_once()
+                call_args = mock_service_instance.get_all_active_projects.call_args
+                filters_dict = call_args[0][3]
+                assert "project_type" not in filters_dict
+
+    @pytest.mark.asyncio
+    async def test_combined_filters(self, client: TestClient, mock_user, mock_projects):
+        """Test combining project_type filter with other filters."""
+        filtered_projects = [
+            p for p in mock_projects
+            if p["project_type"] == ProjectTypeEnum.ADMIN_APP.value and "Admin" in p["name"]
+        ]
+
+        with patch("budapp.project_ops.project_routes.get_current_active_user", return_value=mock_user):
+            with patch("budapp.project_ops.project_routes.ProjectService") as mock_service:
+                mock_service_instance = mock_service.return_value
+                mock_service_instance.get_all_active_projects = AsyncMock(
+                    return_value=(filtered_projects, len(filtered_projects))
+                )
+
+                response = client.get("/projects/?name=Admin&project_type=admin_app&page=1&limit=10")
+
+                assert response.status_code == status.HTTP_200_OK
+                data = response.json()
+                assert data["page"] == 1
+                assert data["limit"] == 10
+
+                # Verify combined filters were passed
+                mock_service_instance.get_all_active_projects.assert_called_once()
+                call_args = mock_service_instance.get_all_active_projects.call_args
+                filters_dict = call_args[0][3]
+                assert filters_dict.get("name") == "Admin"
+                assert filters_dict.get("project_type") == ProjectTypeEnum.ADMIN_APP
+
+    @pytest.mark.asyncio
+    async def test_invalid_project_type(self, client: TestClient, mock_user):
+        """Test filtering with invalid project_type value."""
+        with patch("budapp.project_ops.project_routes.get_current_active_user", return_value=mock_user):
+            response = client.get("/projects/?project_type=invalid_type")
+
+            # Should return validation error
+            assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    @pytest.mark.asyncio
+    async def test_case_sensitivity(self, client: TestClient, mock_user, mock_projects):
+        """Test that project_type filter handles different cases."""
+        client_projects = [p for p in mock_projects if p["project_type"] == ProjectTypeEnum.CLIENT_APP.value]
+
+        with patch("budapp.project_ops.project_routes.get_current_active_user", return_value=mock_user):
+            with patch("budapp.project_ops.project_routes.ProjectService") as mock_service:
+                mock_service_instance = mock_service.return_value
+                mock_service_instance.get_all_active_projects = AsyncMock(
+                    return_value=(client_projects, len(client_projects))
+                )
+
+                # Test different case variations
+                for case_variant in ["CLIENT_APP", "client_app", "Client_App"]:
+                    response = client.get(f"/projects/?project_type={case_variant.lower()}")
+                    assert response.status_code == status.HTTP_200_OK
+
+    @pytest.mark.asyncio
+    async def test_pagination_with_project_type(self, client: TestClient, mock_user, mock_projects):
+        """Test pagination works correctly with project_type filter."""
+        admin_projects = [p for p in mock_projects if p["project_type"] == ProjectTypeEnum.ADMIN_APP.value]
+
+        with patch("budapp.project_ops.project_routes.get_current_active_user", return_value=mock_user):
+            with patch("budapp.project_ops.project_routes.ProjectService") as mock_service:
+                mock_service_instance = mock_service.return_value
+                # Return only first page
+                mock_service_instance.get_all_active_projects = AsyncMock(
+                    return_value=(admin_projects[:1], len(admin_projects))
+                )
+
+                response = client.get("/projects/?project_type=admin_app&page=1&limit=1")
+
+                assert response.status_code == status.HTTP_200_OK
+                data = response.json()
+                assert data["page"] == 1
+                assert data["limit"] == 1
+                assert data["total_record"] == 2
+                assert len(data["projects"]) == 1
+
+    @pytest.mark.asyncio
+    async def test_sorting_with_project_type(self, client: TestClient, mock_user, mock_projects):
+        """Test sorting works correctly with project_type filter."""
+        client_projects = sorted(
+            [p for p in mock_projects if p["project_type"] == ProjectTypeEnum.CLIENT_APP.value],
+            key=lambda x: x["name"],
+            reverse=True
+        )
+
+        with patch("budapp.project_ops.project_routes.get_current_active_user", return_value=mock_user):
+            with patch("budapp.project_ops.project_routes.ProjectService") as mock_service:
+                mock_service_instance = mock_service.return_value
+                mock_service_instance.get_all_active_projects = AsyncMock(
+                    return_value=(client_projects, len(client_projects))
+                )
+
+                response = client.get("/projects/?project_type=client_app&order_by=-name")
+
+                assert response.status_code == status.HTTP_200_OK
+                data = response.json()
+                # Verify projects are sorted
+                project_names = [p["name"] for p in data["projects"]]
+                assert project_names == sorted(project_names, reverse=True)
+
+
+class TestProjectFilteringCRUD:
+    """Test CRUD layer filtering functionality."""
+
+    @pytest.mark.asyncio
+    async def test_crud_filter_by_project_type(self):
+        """Test that CRUD layer correctly filters by project_type."""
+        from budapp.project_ops.crud import ProjectDataManager
+
+        mock_session = MagicMock(spec=AsyncSession)
+        crud = ProjectDataManager(mock_session)
+
+        # Mock the database query
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = []
+        mock_result.scalar.return_value = 0
+
+        with patch.object(crud.session, "execute", return_value=mock_result) as mock_execute:
+            filters = {
+                "status": ProjectStatusEnum.ACTIVE,
+                "benchmark": False,
+                "project_type": ProjectTypeEnum.ADMIN_APP.value,
+            }
+
+            await crud.get_all_active_projects(
+                offset=0, limit=10, filters=filters, order_by=[], search=False
+            )
+
+            # Verify execute was called
+            mock_execute.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_crud_filter_validation(self):
+        """Test that CRUD layer validates filter fields."""
+        from budapp.project_ops.crud import ProjectDataManager
+        from budapp.commons.exceptions import ClientException
+
+        mock_session = MagicMock(spec=AsyncSession)
+        crud = ProjectDataManager(mock_session)
+
+        # Test with invalid field
+        with pytest.raises(ClientException) as exc_info:
+            filters = {"invalid_field": "value"}
+            await crud.get_all_active_projects(
+                offset=0, limit=10, filters=filters, order_by=[], search=False
+            )
+
+        assert "invalid_field" in str(exc_info.value.message)
+
+
+class TestBackwardCompatibility:
+    """Test backward compatibility of project_type filtering."""
+
+    @pytest.mark.asyncio
+    async def test_api_without_project_type_param(self, client: TestClient):
+        """Test that API works without project_type parameter (backward compatibility)."""
+        mock_user = User(
+            id=uuid4(),
+            email="test@example.com",
+            name="Test User",
+            status=UserStatusEnum.ACTIVE,
+        )
+
+        with patch("budapp.project_ops.project_routes.get_current_active_user", return_value=mock_user):
+            with patch("budapp.project_ops.project_routes.ProjectService") as mock_service:
+                mock_service_instance = mock_service.return_value
+                mock_service_instance.get_all_active_projects = AsyncMock(return_value=([], 0))
+
+                # Old API call without project_type
+                response = client.get("/projects/?name=test&page=1&limit=20")
+
+                assert response.status_code == status.HTTP_200_OK
+
+                # Verify filters don't include project_type
+                call_args = mock_service_instance.get_all_active_projects.call_args
+                filters_dict = call_args[0][3]
+                assert "project_type" not in filters_dict
+                assert filters_dict.get("name") == "test"
+
+    def test_schema_backward_compatibility(self):
+        """Test that ProjectFilter schema maintains backward compatibility."""
+        # Old usage without project_type
+        old_filter = ProjectFilter(name="test")
+        assert old_filter.name == "test"
+        assert old_filter.project_type is None
+
+        # New usage with project_type
+        new_filter = ProjectFilter(name="test", project_type=ProjectTypeEnum.CLIENT_APP)
+        assert new_filter.name == "test"
+        assert new_filter.project_type == ProjectTypeEnum.CLIENT_APP
+
+        # Empty filter still works
+        empty_filter = ProjectFilter()
+        assert empty_filter.model_dump(exclude_none=True) == {}
