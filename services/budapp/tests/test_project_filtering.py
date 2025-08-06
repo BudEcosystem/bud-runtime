@@ -10,10 +10,10 @@ from fastapi import status
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from budapp.auth.schemas import User
 from budapp.commons.constants import ProjectStatusEnum, ProjectTypeEnum, UserStatusEnum, UserTypeEnum
 from budapp.project_ops.models import Project
 from budapp.project_ops.schemas import ProjectFilter
+from budapp.user_ops.schemas import User
 
 
 class TestProjectFilterSchema:
