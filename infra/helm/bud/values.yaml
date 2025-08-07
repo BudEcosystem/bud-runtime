@@ -16,20 +16,114 @@ microservices:
         image: budstudio/budproxy:nightly
     askbud:
         image: budstudio/askbud:0.1.0
+        env:
+            INFERENCE_MODEL: qwen3-32b
     budapp:
         image: budstudio/budapp:nightly
+        env:
+            APP_CONFIG: '{}'
+            PSQL_HOST: '{{ $.Release.Name }}-postgresql'
+            SECRETS_PSQL_USER: budapp
+            SECRETS_PSQL_PASSWORD: budapp
+            PSQL_USER: budapp
+            PSQL_PASSWORD: budapp
+            SECRETS_POSTGRES_USER: budapp
+            SECRETS_POSTGRES_PASSWORD: budapp
+            POSTGRES_USER: budapp
+            POSTGRES_PASSWORD: budapp
+            PSQL_PORT: "5432"
+            PSQL_DB_NAME: budapp
+            STATIC_DIR: /data/static-dir
+            GRAFANA_SCHEME: http
+            GRAFANA_URL: '{{ $.Release.Name }}-grafana'
+            KEYCLOAK_SERVER_URL: http://{{ $.Release.Name }}-keycloak/
+            KEYCLOAK_REALM_NAME: '{{ .Values.keycloak.adminRealm }}'
+            KEYCLOAK_ADMIN_USERNAME: '{{ .Values.keycloak.auth.adminUser }}'
+            KEYCLOAK_ADMIN_PASSWORD: '{{ .Values.keycloak.auth.adminPassword }}'
+            KEYCLOAK_VERIFY_SSL: "false"
+            DEFAULT_REALM_NAME: bud-keycloak
+            CLOUD_MODEL_SEEDER_ENGINE: tensorzero
+            BUD_CONNECT_BASE_URL: https://budconnect.bud.studio
     budcluster:
         image: budstudio/budcluster:nightly
+        env:
+            BUD_SERVE_URL: https://app.dev.bud.studio
+            APP_CONFIG: '{}'
+            NOTIFY_SERVICE_NAME: '{{ .Release.Name }}-budnotify'
+            NOTIFY_SERVICE_TOPIC: notificationMessages
+            CONFIGSTORE_NAME: '{{ .Release.Name }}-configstore'
+            SECRETSTORE_SECRET_NAME: '{{ .Release.Name }}-secretstore'
+            LOG_LEVEL: DEBUG
+            PSQL_HOST: '{{ $.Release.Name }}-postgresql'
+            SECRETS_PSQL_USER: budcluster
+            SECRETS_PSQL_PASSWORD: budcluster
+            PSQL_USER: budcluster
+            PSQL_PASSWORD: budcluster
+            PSQL_PORT: "5432"
+            PSQL_DB_NAME: budcluster
+            VALIDATE_CERTS: "false"
+            NODE_INFO_COLLECTOR_IMAGE_CPU: budstudio/node-info-collector-cpu:0.1.0
+            NODE_INFO_COLLECTOR_IMAGE_CUDA: budimages.azurecr.io/budecosystem/node-info-collector-cuda:latest
+            NODE_INFO_COLLECTOR_IMAGE_HPU: budimages.azurecr.io/budecosystem/node-info-collector-hpu:latest
+            NODE_INFO_LABELER_IMAGE: budimages.azurecr.io/budecosystem/node-device-labeler:latest
+            ENGINE_CONTAINER_PORT: "8000"
+            REGISTRY_SERVER: https://budimages.azurecr.io
+            LITELLM_PROXY_SERVER_IMAGE: ghcr.io/berriai/litellm:main-latest
+            RSA_KEY_NAME: rsa-private-key.pem
+            MINIO_BUCKET: models-registry
+            MINIO_ENDPOINT: '{{ .Release.Name }}-minio'
+            MINIO_SECURE: "false"
+            VOLUME_TYPE: nfs
+            QUANTIZATION_JOB_IMAGE: budimages.azurecr.io/budecosystem/bud-quantization-cpu:0.02
     budmetrics:
         image: budstudio/budmetrics:nightly
+        env:
+            #deadlink
+            INFERENCE_URL: http://172.184.137.177:8502/classify
+            CLICKHOUSE_HOST: '{{ .Release.Name }}-clickhouse'
+            CLICKHOUSE_PORT: "9000"
+            CLICKHOUSE_DB_NAME: budproxy
+            SECRETS_CLICKHOUSE_USER: '{{ .Values.clickhouse.auth.username }}'
+            SECRETS_CLICKHOUSE_PASSWORD: '{{ .Values.clickhouse.auth.password }}'
     budmodel:
         image: budstudio/budmodel:0.1.0
+        env:
+            PSQL_HOST: '{{ $.Release.Name }}-postgresql'
+            PSQL_USER: budmodel
+            PSQL_PASSWORD: budmodel
+            PSQL_PORT: "5432"
+            PSQL_DB_NAME: budmodel
+            LOG_LEVEL: DEBUG
     budplayground:
         image: budstudio/budplayground:latest
+        env:
+            NEXT_PUBLIC_TEMP_API_BASE_URL: https://app.dev.bud.studio
+            NEXT_PUBLIC_COPY_CODE_API_BASE_URL: https://gateway.dev.bud.studio/
+            # deadlink (502 Bad Gateway)
+            NEXT_PUBLIC_BASE_URL: https://api-dev.bud.studio/
+            NEXT_PUBLIC_VERCEL_ENV: preview
+            NODE_TLS_REJECT_UNAUTHORIZED: "0"
     budsim:
         image: budstudio/budsim:nightly
+        env:
+            LOG_LEVEL: INFO
+            SECRETS_PSQL_USER: budsim
+            SECRETS_PSQL_PASSWORD: budsim
+            PSQL_DB_NAME: budsim
+            DAPR_HOST_IP: 127.0.0.1
     budadmin:
         image: budstudio/budadmin:latest
+        env:
+            BASE_URL: https://app.dev.bud.studio
+            NEXT_PUBLIC_BASE_URL: https://app.dev.bud.studio
+            NEXT_PUBLIC_TEMP_API_BASE_URL: https://app.dev.bud.studio
+            NEXT_PUBLIC_NOVU_SOCKET_URL: https://ws.novu.dev.bud.studio
+            NEXT_PUBLIC_NOVU_BASE_URL: https://api.novu.dev.bud.studio
+            NEXT_PUBLIC_COPY_CODE_API_BASE_URL: https://gateway.dev.bud.studio/
+            NEXT_PUBLIC_PLAYGROUND_URL: https://playground.dev.bud.studio
+            NEXT_PUBLIC_ASK_BUD_URL: https://ask.dev.bud.studio/v1
+            NEXT_PUBLIC_ASK_BUD_MODEL: qwen3-32b
+            NEXT_PUBLIC_VERCEL_ENV: preview
     budcustomer:
         enabled: true
         image: budstudio/budcustomer:nightly
@@ -41,3 +135,232 @@ microservices:
             NEXT_PUBLIC_COPY_CODE_API_BASE_URL: “https://{{ .Values.ingress.hosts.budgateway }}”
     budnotify:
         image: budstudio/budnotify:latest
+    global:
+        env:
+            PROMETHEUS_URL: https://metric.bud.studio
+            BUD_SERVE_URL: https://app.dev.bud.studio
+            CORS_ORIGINS: http://localhost:3000,https://admin.dev.bud.studio,https://playground.dev.bud.studio,https://customer.dev.bud.studio
+            # deadlink
+            BUD_LLM_BASE_URL: http://20.66.97.208/v1/
+            #deadlink
+            EVAL_MANIFEST_URL: https://eval-datasets.bud.eco/v2/manifest.json
+            #deadlink
+            S3_LOCAL_STACK: http://localhost:4566
+            DAPR_BASE_URL: http://localhost:3500
+            DAPR_HOST_IP: 127.0.0.1
+            WIDGET_EMBED_PATH: http://{{ .Release.Name }}-embed:4701/embed.umd.min.js
+            MONGO_URL: mongodb://{{ index .Values.mongodb.auth.usernames 0 }}:{{ index .Values.mongodb.auth.passwords 0 }}@{{ .Release.Name }}-mongodb:27017/{{ index .Values.mongodb.auth.databases 0 }}
+            REACT_APP_WS_URL: http://{{ .Release.Name }}-ws:3000
+            FRONT_BASE_URL: http://{{ .Release.Name }}-web:4200
+            HOST_NAME: http://{{ .Release.Name }}-web:4200
+            WIDGET_URL: http://{{ .Release.Name }}-web:4200
+            API_BASE_URL: http://{{ .Release.Name }}-api:3000
+            API_ROOT_URL: http://{{ .Release.Name }}-api:3000
+            NOVU_API_BASE_URL: http://{{ .Release.Name }}-api:3000
+            ADD_MODEL_DIR: /datadisk/add_model_dir
+            API_CONTEXT_PATH: ""
+            APP_CONFIG: '{}'
+            APP_NAME: budapp
+            APP_PORT_BUDAPP: "9082"
+            APP_PORT_BUDPROXY: "3000"
+            AWS_ACCESS_KEY_ID: test
+            AWS_SECRET_ACCESS_KEY: test
+            BUD_CLUSTER_APP_ID: budcluster
+            BUD_CONNECT_URL: https://budconnect.bud.studio
+            BUD_LLM_MODEL: qwen3-32b
+            BUD_METRICS_APP_ID: budmetrics
+            BUD_MODEL_APP_ID: budmodel
+            BUD_NOTIFY_APP_ID: budnotify
+            BUD_SIMULATOR_APP_ID: budsim
+            CI: "true"
+            CLICKHOUSE_USER: '{{ .Values.clickhouse.auth.username }}'
+            CLICKHOUSE_PASSWORD: '{{ .Values.clickhouse.auth.password }}'
+            CONFIGSTORE_NAME: '{{ .Release.Name }}-configstore'
+            DISABLE_USER_REGISTRATION: "false"
+            DOCKER_REDIS_SERVICE_PORT: "6379"
+            ENGINE_CONTAINER_PORT: "8000"
+            EVAL_SYNC_ENABLED: "true"
+            EVAL_SYNC_LOCAL_MODE: "true"
+            EVAL_SYNC_USE_BUNDLES: "false"
+            GENERATION_COUNT: "10"
+            GLOBAL_CONTEXT_PATH: ""
+            IS_MULTI_TENANCY_ENABLED: "true"
+            IS_TOPIC_NOTIFICATION_ENABLED: "true"
+            LITELLM_PROXY_SERVER_IMAGE: ghcr.io/berriai/litellm:main-latest
+            LOG_LEVEL: DEBUG
+            MINIO_ACCESS_KEY: '{{ .Values.minio.auth.rootUser }}'
+            MINIO_BUCKET: models-registry
+            MINIO_ENDPOINT: '{{ .Release.Name }}-minio'
+            MINIO_MODEL_BUCKET: model-info
+            MINIO_SECRET_KEY: '{{ .Values.minio.auth.rootPassword }}'
+            MINIO_SECURE: "true"
+            MODEL_DOWNLOAD_DIR: /data/models-registry
+            MODEL_DOWNLOAD_DIR_MAX_SIZE: "500"
+            MODEL_REGISTRY_DIR: /data/models-registry
+            MONGO_MAX_POOL_SIZE: "200"
+            MONGO_MIN_POOL_SIZE: "100"
+            NEW_RELIC_APP_NAME: budnotify
+            NEW_RELIC_NO_CONFIG_FILE: "true"
+            NODE_ENV: production
+            NODE_INFO_COLLECTOR_IMAGE_CPU: budstudio/node-info-collector-cpu:0.1.0
+            NODE_INFO_COLLECTOR_IMAGE_CUDA: budimages.azurecr.io/budecosystem/node-info-collector-cuda:latest
+            NODE_INFO_COLLECTOR_IMAGE_HPU: budimages.azurecr.io/budecosystem/node-info-collector-hpu:latest
+            NODE_INFO_LABELER_IMAGE: budimages.azurecr.io/budecosystem/node-device-labeler:latest
+            NODE_VERSION: 20.11.1
+            NOTIFY_SERVICE_NAME: budnotify
+            NOTIFY_SERVICE_TOPIC: notificationMessages
+            NX_DAEMON: "false"
+            PGADMIN_DEFAULT_EMAIL: user@bud.studio
+            PGADMIN_DEFAULT_PASSWORD: budpassword
+            PGADMIN_PORT: "8888"
+            POPULATION_SIZE: "50"
+            PORT: "3000"
+            POSTGRES_DB: budapp_v2
+            POSTGRES_DB_NAME_BUDAPP: budapp_v2
+            POSTGRES_HOST: '{{ $.Release.Name }}-postgresql'
+            POSTGRES_PASSWORD: mypassword
+            POSTGRES_PORT_BUDAPP: "5432"
+            POSTGRES_USER: myuser
+            PSQL_DB_NAME_BUDCLUSTER: budcluster
+            PSQL_DB_NAME_BUDMETRICS: budmetrics
+            PSQL_DB_NAME_BUDMODEL: budmodel
+            PSQL_DB_NAME_BUDSIM: budsim
+            PSQL_HOST: '{{ $.Release.Name }}-postgresql'
+            PSQL_PASSWORD: myuser
+            PSQL_POOL_SIZE: "100"
+            PSQL_PORT: "5432"
+            PSQL_PORT_BUDMETRICS: "5431"
+            PSQL_USER: myuser
+            REDIS_CACHE_SERVICE_HOST: ""
+            REDIS_CACHE_SERVICE_PORT: "6379"
+            REDIS_DB_INDEX: "5"
+            REDIS_HOST: '{{ .Release.Name }}-valkey-primary'
+            REDIS_PASSWORD: '{{ .Values.valkey.auth.password }}'
+            REDIS_PASSWORD_BUDAPP: '{{ .Values.valkey.auth.password }}'
+            REDIS_PORT: "6379"
+            REDIS_URI: '{{ .Release.Name }}-valkey-primary:6379'
+            REGISTRY_SERVER: https://budimages.azurecr.io
+            S3_BUCKET_NAME: novu-local
+            S3_REGION: us-east-1
+            # TODO
+            SECRETSTORE_NAME: secretstore
+            SECRETSTORE_SECRET_NAME: '{{ .Release.Name }}-secretstore'
+            # TODO
+            SECRETS_POSTGRES_PASSWORD: myuser
+            SECRETS_POSTGRES_USER: myuser
+            SECRETS_PSQL_PASSWORD: myuser
+            SECRETS_PSQL_PASSWORD_BUDAPP: myuser
+            SECRETS_PSQL_USER: myuser
+            SECRETS_PSQL_USER_BUDAPP: myuser
+            SENTRY_DSN: ""
+            TENSORZERO_REDIS_URL: redis://default:{{ .Values.valkey.auth.password}}@{{ .Release.Name }}-valkey-primary:6379/2
+            VALIDATE_CERTS: "false"
+            VLLM_CPU_IMAGE: budimages.azurecr.io/budecosystem/bud-runtime-cpu:0.11
+            VLLM_CUDA_IMAGE: budimages.azurecr.io/budecosystem/bud-runtime-cuda:0.02
+            VLLM_HPU_IMAGE: budimages.azurecr.io/budecosystem/bud-runtime-hpu:latest
+            WEB_CONTEXT_PATH: ""
+            WS_CONTEXT_PATH: ""
+            WS_PORT: "3000"
+            YARN_VERSION: 1.22.19
+            RSA_KEY_NAME: rsa-private-key.pem
+valkey:
+    enabled: true
+    architecture: standalone
+    auth:
+        password: bud
+clickhouse:
+    enabled: true
+    replicaCount: 1
+    shards: 1
+    auth:
+        username: bud
+        password: bud
+    keeper:
+        replicaCount: 1
+clickhouseExtra:
+    autoCreateDB:
+        - budproxy
+postgresql:
+    enabled: true
+    architecture: standalone
+    auth:
+        postgresPassword: bud
+        username: bud
+        password: bud
+postgresqlExtra:
+    autoCreateDB:
+        - budapp
+        - budproxy
+        - budcluster
+        - budsim
+        - keycloak
+        - budmodel
+        # migrated from old chart
+        - myuser
+keycloak:
+    proxy: edge
+    resources:
+        limits:
+            memory: 2Gi
+    enabled: true
+    postgresql:
+        enabled: false
+    externalDatabase:
+        host: '{{ $.Release.Name }}-postgresql'
+        user: keycloak
+        password: keycloak
+        database: keycloak
+kafka:
+    enabled: true
+    clusterId: bud
+    controller:
+        replicaCount: 1
+    tls:
+        existingSecret: kafka-jks
+        keystorePassword: jksPassword
+        truststorePassword: jksPassword
+    sasl:
+        client:
+            users:
+                - budproxy
+                - dapr
+            passwords:
+                - budproxy
+                - dapr
+mongodb:
+    enabled: true
+    architecture: standalone
+    auth:
+        enabled: true
+        usernames:
+            - novu_user
+        passwords:
+            - novu_password
+        databases:
+            - novu_db
+novu:
+    api:
+        env:
+            DISABLE_USER_REGISTRATION: false
+    store:
+        encryption-key: bud-Kf9yLjGPLOz939Y1GM0nJckVoVyF
+    externalDatabase:
+        host: panda-mongodb
+        username: novu_user
+        password: novu_password
+        database: novu_db
+    externalRedis:
+        host: panda-valkey-primary
+        existingSecret: panda-novu-externalredis
+    externalS3:
+        existingSecret: panda-novu-externals3
+dapr:
+    enabled: true
+minio:
+    enabled: true
+    provisioning:
+        enabled: true
+        buckets:
+            - name: novu-local
+            - name: models-registry
+            - name: model-info
