@@ -137,24 +137,33 @@ class TestProjectCreationHappyPath:
                 with patch('budapp.project_ops.services.UserDataManager') as mock_user_manager:
                     with patch('budapp.project_ops.services.KeycloakManager') as mock_keycloak:
                         with patch('budapp.project_ops.services.PermissionService') as mock_permission:
-                            # Configure mocks
-                            mock_retrieve.return_value = None  # No existing project
-                            mock_project.name = minimal_project_data["name"]
-                            mock_project.project_type = ProjectTypeEnum.CLIENT_APP.value
-                            mock_insert.return_value = mock_project
+                            with patch.object(service, 'add_users_to_project', new_callable=AsyncMock) as mock_add_users:
+                                # Configure mocks
+                                mock_retrieve.return_value = None  # No existing project
+                                mock_project.name = minimal_project_data["name"]
+                                mock_project.project_type = ProjectTypeEnum.CLIENT_APP.value
+                                mock_insert.return_value = mock_project
 
-                            mock_user_manager_instance = MagicMock()
-                            mock_user_manager_instance.retrieve_by_fields = AsyncMock(return_value=mock_user)
-                            mock_user_manager.return_value = mock_user_manager_instance
+                                mock_user_manager_instance = MagicMock()
+                                mock_user_manager_instance.retrieve_by_fields = AsyncMock(return_value=mock_user)
+                                mock_user_manager.return_value = mock_user_manager_instance
 
-                            # Act
-                            result = await service.create_project(minimal_project_data, mock_user.id)
+                                # Configure PermissionService mock
+                                mock_permission_instance = MagicMock()
+                                mock_permission_instance.create_resource_permission_by_user = AsyncMock(return_value=None)
+                                mock_permission.return_value = mock_permission_instance
 
-                            # Assert
-                            assert result.id == mock_project.id
-                            assert result.name == minimal_project_data["name"]
-                            assert result.project_type == ProjectTypeEnum.CLIENT_APP.value
-                            mock_insert.assert_called_once()
+                                # Configure add_users_to_project mock
+                                mock_add_users.return_value = mock_project
+
+                                # Act
+                                result = await service.create_project(minimal_project_data, mock_user.id)
+
+                                # Assert
+                                assert result.id == mock_project.id
+                                assert result.name == minimal_project_data["name"]
+                                assert result.project_type == ProjectTypeEnum.CLIENT_APP.value
+                                mock_insert.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_create_project_with_all_fields(self, mock_session, mock_user, mock_project, valid_project_data):
@@ -179,6 +188,11 @@ class TestProjectCreationHappyPath:
                             mock_user_manager_instance = MagicMock()
                             mock_user_manager_instance.retrieve_by_fields = AsyncMock(return_value=mock_user)
                             mock_user_manager.return_value = mock_user_manager_instance
+
+                            # Configure PermissionService mock
+                            mock_permission_instance = MagicMock()
+                            mock_permission_instance.create_resource_permission_by_user = AsyncMock(return_value=None)
+                            mock_permission.return_value = mock_permission_instance
 
                             # Act
                             result = await service.create_project(valid_project_data, mock_user.id)
@@ -214,6 +228,11 @@ class TestProjectCreationHappyPath:
                             mock_user_manager_instance.retrieve_by_fields = AsyncMock(return_value=mock_user)
                             mock_user_manager.return_value = mock_user_manager_instance
 
+                            # Configure PermissionService mock
+                            mock_permission_instance = MagicMock()
+                            mock_permission_instance.create_resource_permission_by_user = AsyncMock(return_value=None)
+                            mock_permission.return_value = mock_permission_instance
+
                             # Act
                             result = await service.create_project(project_data, mock_user.id)
 
@@ -243,6 +262,11 @@ class TestProjectCreationHappyPath:
                             mock_user_manager_instance = MagicMock()
                             mock_user_manager_instance.retrieve_by_fields = AsyncMock(return_value=mock_user)
                             mock_user_manager.return_value = mock_user_manager_instance
+
+                            # Configure PermissionService mock
+                            mock_permission_instance = MagicMock()
+                            mock_permission_instance.create_resource_permission_by_user = AsyncMock(return_value=None)
+                            mock_permission.return_value = mock_permission_instance
 
                             # Act
                             result = await service.create_project(project_data, mock_user.id)
@@ -382,6 +406,11 @@ class TestProjectCreationAuthorization:
                             mock_user_manager_instance.retrieve_by_fields = AsyncMock(return_value=mock_superuser)
                             mock_user_manager.return_value = mock_user_manager_instance
 
+                            # Configure PermissionService mock
+                            mock_permission_instance = MagicMock()
+                            mock_permission_instance.create_resource_permission_by_user = AsyncMock(return_value=None)
+                            mock_permission.return_value = mock_permission_instance
+
                             # Act
                             result = await service.create_project(project_data, mock_superuser.id)
 
@@ -514,7 +543,7 @@ class TestProjectCreationIntegration:
                             mock_keycloak.return_value = mock_keycloak_instance
 
                             mock_permission_instance = MagicMock()
-                            mock_permission_instance.create_resource_permission = AsyncMock()
+                            mock_permission_instance.create_resource_permission_by_user = AsyncMock(return_value=None)
                             mock_permission.return_value = mock_permission_instance
 
                             # Act
