@@ -1,15 +1,13 @@
 name: "BudAdmin: Build and Push Docker Image on Release"
 
 on:
+  workflow_dispatch:
   release:
     types: [created]
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./services/budadmin
 
     steps:
       - name: Checkout repository
@@ -34,7 +32,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ./services/budadmin
           push: true
-          file: ./Dockerfile
-          tags: budstudio/bud-dashboard:${{ env.RELEASE_TAG }}
+          file: ./services/budadmin/Dockerfile
+          tags: budstudio/budadmin:${{ env.RELEASE_TAG }}

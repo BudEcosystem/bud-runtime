@@ -77,6 +77,7 @@ impl Variant for ChainOfThoughtConfig {
             extra_body: inference_config.extra_body.clone(),
             extra_cache_key: inference_config.extra_cache_key.clone(),
             extra_headers: inference_config.extra_headers.clone(),
+            gateway_request: inference_config.gateway_request.clone(),
         };
         let inference_result = self
             .inner

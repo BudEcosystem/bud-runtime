@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Modal, Tabs, Spin, Descriptions, Tag, Space, Typography, Button, message, Divider, Rate, Timeline, Empty } from 'antd';
 import { CopyOutlined, DownloadOutlined } from '@ant-design/icons';
 import { format } from 'date-fns';
+import { formatTimestamp, formatTimestampWithTZ } from '@/utils/formatDate';
 import { useInferences } from '@/stores/useInferences';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { monokai } from 'react-syntax-highlighter/dist/cjs/styles/hljs';
@@ -184,15 +185,15 @@ const InferenceDetailModal: React.FC<InferenceDetailModalProps> = ({
 
     return (
       <div>
-        {selectedInference.raw_request && (
+        {selectedInference.gateway_request && (
           <div style={{ marginBottom: 24 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <Title level={5}>Raw Request</Title>
+              <Title level={5}>Gateway Request</Title>
               <Space>
                 <Button
                   size="small"
                   icon={<CopyOutlined />}
-                  onClick={() => copyToClipboard(selectedInference.raw_request!, 'Raw request')}
+                  onClick={() => copyToClipboard(JSON.stringify(selectedInference.gateway_request, null, 2), 'Gateway request')}
                 >
                   Copy
                 </Button>
@@ -200,7 +201,7 @@ const InferenceDetailModal: React.FC<InferenceDetailModalProps> = ({
                   size="small"
                   icon={<DownloadOutlined />}
                   onClick={() => downloadAsFile(
-                    selectedInference.raw_request!,
+                    JSON.stringify(selectedInference.gateway_request, null, 2),
                     `request_${selectedInference.inference_id}.json`
                   )}
                 >
@@ -214,21 +215,21 @@ const InferenceDetailModal: React.FC<InferenceDetailModalProps> = ({
                 style={monokai}
                 customStyle={{ borderRadius: 8 }}
               >
-                {selectedInference.raw_request}
+                {JSON.stringify(selectedInference.gateway_request, null, 2)}
               </SyntaxHighlighter>
             </div>
           </div>
         )}
 
-        {selectedInference.raw_response && (
+        {selectedInference.gateway_response && (
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <Title level={5}>Raw Response</Title>
+              <Title level={5}>Gateway Response</Title>
               <Space>
                 <Button
                   size="small"
                   icon={<CopyOutlined />}
-                  onClick={() => copyToClipboard(selectedInference.raw_response!, 'Raw response')}
+                  onClick={() => copyToClipboard(JSON.stringify(selectedInference.gateway_response, null, 2), 'Gateway response')}
                 >
                   Copy
                 </Button>
@@ -236,7 +237,7 @@ const InferenceDetailModal: React.FC<InferenceDetailModalProps> = ({
                   size="small"
                   icon={<DownloadOutlined />}
                   onClick={() => downloadAsFile(
-                    selectedInference.raw_response!,
+                    JSON.stringify(selectedInference.gateway_response, null, 2),
                     `response_${selectedInference.inference_id}.json`
                   )}
                 >
@@ -250,7 +251,7 @@ const InferenceDetailModal: React.FC<InferenceDetailModalProps> = ({
                 style={monokai}
                 customStyle={{ borderRadius: 8 }}
               >
-                {selectedInference.raw_response}
+                {JSON.stringify(selectedInference.gateway_response, null, 2)}
               </SyntaxHighlighter>
             </div>
           </div>
@@ -379,7 +380,7 @@ const InferenceDetailModal: React.FC<InferenceDetailModalProps> = ({
                   </Space>
                 </Descriptions.Item>
                 <Descriptions.Item label="Timestamp" span={2}>
-                  {format(new Date(selectedInference.timestamp), 'MMM dd, yyyy HH:mm:ss')}
+                  {formatTimestampWithTZ(selectedInference.timestamp)}
                 </Descriptions.Item>
                 <Descriptions.Item label="Model">
                   {selectedInference.model_display_name || selectedInference.model_name}
@@ -433,7 +434,7 @@ const InferenceDetailModal: React.FC<InferenceDetailModalProps> = ({
             </div>
           </TabPane>
 
-          <TabPane tab="Raw Data" key="raw">
+          <TabPane tab="Gateway Data" key="raw">
             <div style={{ padding: 24 }}>
               {renderRawData()}
             </div>

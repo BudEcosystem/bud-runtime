@@ -21,7 +21,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional, Union
 from uuid import UUID
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator
 
 from ..commons.schemas import SuccessResponse
 
@@ -114,6 +114,8 @@ class InferenceListResponse(SuccessResponse):
 class InferenceDetailResponse(SuccessResponse):
     """Response schema for detailed inference information with enriched data."""
 
+    model_config = ConfigDict(extra="ignore", validate_assignment=True)
+
     # Core info
     inference_id: UUID
     timestamp: datetime
@@ -161,6 +163,8 @@ class InferenceDetailResponse(SuccessResponse):
     # Raw data (optional)
     raw_request: Optional[str] = None
     raw_response: Optional[str] = None
+    gateway_request: Optional[Dict[str, Any]] = None
+    gateway_response: Optional[Dict[str, Any]] = None
 
     # Feedback summary
     feedback_count: int

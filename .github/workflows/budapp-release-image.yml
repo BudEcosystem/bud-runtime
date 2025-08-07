@@ -1,6 +1,7 @@
 name: "BudApp: Build and Push Docker Image on Release"
 
 on:
+  workflow_dispatch:
   release:
     types: [created]
 
@@ -44,7 +45,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ./services/budapp
           push: true
-          file: ./deploy/Dockerfile
+          file: ./services/budapp/deploy/Dockerfile
           tags: budstudio/budapp:${{ env.RELEASE_TAG }}

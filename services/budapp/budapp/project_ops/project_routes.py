@@ -33,7 +33,7 @@ from budapp.commons.exceptions import ClientException
 from budapp.commons.schemas import ErrorResponse, SuccessResponse
 from budapp.user_ops.schemas import User
 
-from ..commons.constants import PermissionEnum
+from ..commons.constants import PermissionEnum, ProjectTypeEnum, UserTypeEnum
 from ..commons.permission_handler import require_permissions
 from ..user_ops.schemas import UserFilter
 from .schemas import (
@@ -276,6 +276,11 @@ async def get_all_projects(
     offset = (page - 1) * limit
     filters_dict = filters.model_dump(exclude_none=True)
 
+    # Auto-filter by project_type for client users
+    if current_user.user_type == UserTypeEnum.CLIENT:
+        # Client users should only see CLIENT_APP projects
+        filters_dict["project_type"] = ProjectTypeEnum.CLIENT_APP.value
+
     try:
         db_projects, count = await ProjectService(session).get_all_active_projects(
             current_user, offset, limit, filters_dict, order_by, search
@@ -443,6 +448,17 @@ async def retrieve_project(
     """Retrieve a single active project."""
     try:
         db_project, endpoints_count = await ProjectService(session).retrieve_active_project_details(project_id)
+
+        # Check if client user is trying to access non-CLIENT_APP project
+        if (
+            current_user.user_type == UserTypeEnum.CLIENT
+            and db_project.project_type != ProjectTypeEnum.CLIENT_APP.value
+        ):
+            raise ClientException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                message="Access denied: Client users can only access client application projects",
+            )
+
         logger.info(f"Project retrieved: {project_id}")
     except ClientException as e:
         logger.exception(f"Failed to retrieve project: {e}")

@@ -343,6 +343,7 @@ This project is licensed under the AGPL-3.0 license - see the [LICENSE](./LICENS
 - [Next.js](https://nextjs.org/) for the React framework
 - [Kubernetes](https://kubernetes.io/) for container orchestration
 - [Helm](https://helm.sh/) for package management
+- [TensorZero](https://www.tensorzero.com/) for initial version of the gateway.
 
 ---
 

@@ -980,7 +980,7 @@ pub async fn test_url_image_inference_with_provider_and_store(
             .await
             .unwrap();
 
-        let InferenceOutput::NonStreaming(response) = response else {
+        let InferenceOutput::NonStreaming { response, .. } = response else {
             panic!("Expected non-streaming inference response");
         };
 
@@ -1040,7 +1040,7 @@ pub async fn test_base64_pdf_inference_with_provider_and_store(
             .await
             .unwrap();
 
-        let InferenceOutput::NonStreaming(response) = response else {
+        let InferenceOutput::NonStreaming { response, .. } = response else {
             panic!("Expected non-streaming inference response");
         };
 
@@ -1102,7 +1102,7 @@ pub async fn test_base64_image_inference_with_provider_and_store(
             .await
             .unwrap();
 
-        let InferenceOutput::NonStreaming(response) = response else {
+        let InferenceOutput::NonStreaming { response, .. } = response else {
             panic!("Expected non-streaming inference response");
         };
 
@@ -7804,7 +7804,7 @@ pub async fn test_dynamic_tool_use_inference_request_with_provider(
     }).await.unwrap();
 
     match response {
-        tensorzero::InferenceOutput::NonStreaming(response) => {
+        tensorzero::InferenceOutput::NonStreaming { response, .. } => {
             let response_json = serde_json::to_value(&response).unwrap();
 
             println!("API response: {response_json:#?}");

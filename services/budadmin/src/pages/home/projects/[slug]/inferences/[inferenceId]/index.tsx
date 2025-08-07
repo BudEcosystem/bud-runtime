@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { Card, Descriptions, Tag, Spin, Button, Divider, Typography, Row, Col, Statistic, message, Tooltip, Flex } from 'antd';
 import { ArrowLeftOutlined, CopyOutlined, DownloadOutlined } from '@ant-design/icons';
 import { format } from 'date-fns';
+import { formatTimestampWithTZ } from '@/utils/formatDate';
 import { AppRequest } from 'src/pages/api/requests';
 import { useLoaderOnLoding } from 'src/hooks/useLoaderOnLoading';
 import { Text_11_400_808080, Text_12_400_B3B3B3, Text_12_400_EEEEEE, Text_12_600_EEEEEE, Text_14_600_EEEEEE, Text_16_600_FFFFFF, Text_20_400_FFFFFF, Text_26_600_FFFFFF } from '@/components/ui/text';
@@ -43,8 +44,8 @@ interface InferenceDetail {
   cached: boolean;
   finish_reason?: string;
   cost?: number;
-  raw_request?: string;
-  raw_response?: string;
+  gateway_request?: any;
+  gateway_response?: any;
   feedback_count: number;
   average_rating?: number;
 }
@@ -245,7 +246,7 @@ const InferenceDetailPage: React.FC = () => {
 
                 <div>
                   <Text_12_400_B3B3B3 className="mb-1">Timestamp</Text_12_400_B3B3B3>
-                  <Text_12_600_EEEEEE>{format(new Date(inferenceData.timestamp), 'MMM dd, yyyy HH:mm:ss')}</Text_12_600_EEEEEE>
+                  <Text_12_600_EEEEEE>{formatTimestampWithTZ(inferenceData.timestamp)}</Text_12_600_EEEEEE>
                 </div>
 
                 <div>
@@ -428,15 +429,15 @@ const InferenceDetailPage: React.FC = () => {
           </div>
 
 
-          {/* Raw Request */}
-          {inferenceData.raw_request && (
+          {/* Gateway Request */}
+          {inferenceData.gateway_request && (
             <div className="flex items-center flex-col border border-[#1F1F1F] rounded-[.4rem] px-[1.4rem] py-[1.3rem] pb-[1.1rem] w-full bg-[#101010] mb-[1.6rem]">
               <div className="w-full">
                 <div className="flex justify-between items-center mb-4">
-                  <Text_14_600_EEEEEE className="text-[#EEEEEE]">Raw Request</Text_14_600_EEEEEE>
+                  <Text_14_600_EEEEEE className="text-[#EEEEEE]">Gateway Request</Text_14_600_EEEEEE>
                   <div className="flex gap-2">
                     <Tooltip
-                      title={copiedId === 'raw_request' ? 'Copied!' : 'Copy'}
+                      title={copiedId === 'gateway_request' ? 'Copied!' : 'Copy'}
                       placement="top"
                     >
                       <Button
@@ -444,9 +445,9 @@ const InferenceDetailPage: React.FC = () => {
                         icon={<CopyOutlined />}
                         onClick={() => {
                           try {
-                            copyToClipboard(JSON.stringify(JSON.parse(inferenceData.raw_request), null, 2), 'raw_request');
+                            copyToClipboard(JSON.stringify(inferenceData.gateway_request, null, 2), 'gateway_request');
                           } catch {
-                            copyToClipboard(inferenceData.raw_request, 'raw_request');
+                            copyToClipboard(JSON.stringify(inferenceData.gateway_request), 'gateway_request');
                           }
                         }}
                         className="bg-[#1F1F1F] border-[#1F1F1F] text-[#EEEEEE] hover:bg-[#2F2F2F]"
@@ -459,9 +460,9 @@ const InferenceDetailPage: React.FC = () => {
                       icon={<DownloadOutlined />}
                       onClick={() => {
                         try {
-                          downloadJson(JSON.parse(inferenceData.raw_request), 'raw_request');
+                          downloadJson(inferenceData.gateway_request, 'gateway_request');
                         } catch {
-                          downloadJson(inferenceData.raw_request, 'raw_request');
+                          downloadJson(inferenceData.gateway_request, 'gateway_request');
                         }
                       }}
                       className="bg-[#1F1F1F] border-[#1F1F1F] text-[#EEEEEE] hover:bg-[#2F2F2F]"
@@ -474,9 +475,9 @@ const InferenceDetailPage: React.FC = () => {
                   <pre className="text-[#B3B3B3] mb-0 text-sm">
                     <code>{(() => {
                       try {
-                        return JSON.stringify(JSON.parse(inferenceData.raw_request), null, 2);
+                        return JSON.stringify(inferenceData.gateway_request, null, 2);
                       } catch {
-                        return inferenceData.raw_request;
+                        return JSON.stringify(inferenceData.gateway_request);
                       }
                     })()}</code>
                   </pre>
@@ -485,15 +486,15 @@ const InferenceDetailPage: React.FC = () => {
             </div>
           )}
 
-          {/* Raw Response */}
-          {inferenceData.raw_response && (
+          {/* Gateway Response */}
+          {inferenceData.gateway_response && (
             <div className="flex items-center flex-col border border-[#1F1F1F] rounded-[.4rem] px-[1.4rem] py-[1.3rem] pb-[1.1rem] w-full bg-[#101010] mb-[1.6rem]">
               <div className="w-full">
                 <div className="flex justify-between items-center mb-4">
-                  <Text_14_600_EEEEEE className="text-[#EEEEEE]">Raw Response</Text_14_600_EEEEEE>
+                  <Text_14_600_EEEEEE className="text-[#EEEEEE]">Gateway Response</Text_14_600_EEEEEE>
                   <div className="flex gap-2">
                     <Tooltip
-                      title={copiedId === 'raw_response' ? 'Copied!' : 'Copy'}
+                      title={copiedId === 'gateway_response' ? 'Copied!' : 'Copy'}
                       placement="top"
                     >
                       <Button
@@ -501,9 +502,9 @@ const InferenceDetailPage: React.FC = () => {
                         icon={<CopyOutlined />}
                         onClick={() => {
                           try {
-                            copyToClipboard(JSON.stringify(JSON.parse(inferenceData.raw_response), null, 2), 'raw_response');
+                            copyToClipboard(JSON.stringify(inferenceData.gateway_response, null, 2), 'gateway_response');
                           } catch {
-                            copyToClipboard(inferenceData.raw_response, 'raw_response');
+                            copyToClipboard(JSON.stringify(inferenceData.gateway_response), 'gateway_response');
                           }
                         }}
                         className="bg-[#1F1F1F] border-[#1F1F1F] text-[#EEEEEE] hover:bg-[#2F2F2F]"
@@ -516,9 +517,9 @@ const InferenceDetailPage: React.FC = () => {
                       icon={<DownloadOutlined />}
                       onClick={() => {
                         try {
-                          downloadJson(JSON.parse(inferenceData.raw_response), 'raw_response');
+                          downloadJson(inferenceData.gateway_response, 'gateway_response');
                         } catch {
-                          downloadJson(inferenceData.raw_response, 'raw_response');
+                          downloadJson(inferenceData.gateway_response, 'gateway_response');
                         }
                       }}
                       className="bg-[#1F1F1F] border-[#1F1F1F] text-[#EEEEEE] hover:bg-[#2F2F2F]"
@@ -531,9 +532,9 @@ const InferenceDetailPage: React.FC = () => {
                   <pre className="text-[#B3B3B3] mb-0 text-sm">
                     <code>{(() => {
                       try {
-                        return JSON.stringify(JSON.parse(inferenceData.raw_response), null, 2);
+                        return JSON.stringify(inferenceData.gateway_response, null, 2);
                       } catch {
-                        return inferenceData.raw_response;
+                        return JSON.stringify(inferenceData.gateway_response);
                       }
                     })()}</code>
                   </pre>

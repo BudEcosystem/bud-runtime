@@ -1,22 +1,21 @@
-locals {
-  # bud.studio
-  zone_id = "1f83390b02ecdecfb95d3964721d9fcb"
-}
-
 resource "cloudflare_dns_record" "dev" {
   for_each = toset([
-    "dev",
-    "argo.dev",
-    "admin.dev",
-    "playground.dev",
-    "gateway.dev",
-    "app.dev",
-    "ask.dev",
-    "api.novu.dev",
-    "ws.novu.dev",
+    # prod required
+    "admin.${var.environment}",
+    "customer.${var.environment}",
+    "playground.${var.environment}",
+    "gateway.${var.environment}",
+    "app.${var.environment}",
+    "ask.${var.environment}",
+    "api.novu.${var.environment}",
+    "ws.novu.${var.environment}",
+
+    # for dev only
+    var.environment,
+    "cloak.${var.environment}",
   ])
 
-  zone_id = local.zone_id
+  zone_id = var.zone_id
   name    = each.key
   ttl     = 3600
   type    = "A"

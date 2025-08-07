@@ -1,16 +1,18 @@
 {
   writeShellApplication,
+  coreutils,
+  docker,
+  nix,
   sops,
-  opentofu,
-  jq,
 }:
 writeShellApplication {
-  name = "bumper";
+  name = "devbox_tofu_apply";
 
   runtimeInputs = [
     sops
-    opentofu
-    jq
+    nix
+    docker
+    coreutils
   ];
 
   text = builtins.readFile ./script.sh;

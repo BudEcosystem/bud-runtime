@@ -6,7 +6,7 @@ echo "Environment variables: "
 printenv | grep NEXT_PUBLIC_
 
 # Fetch dynamic environment variable
-NEXT_PUBLIC_NOVU_APP_ID=$(curl -s --retry 5 --connect-timeout 600 --max-time 600 --location 'http://notify-service:3000/settings/credentials' \
+NEXT_PUBLIC_NOVU_APP_ID=$(curl -s --retry 5 --connect-timeout 600 --max-time 600 --location "http://$ENTRYPOINT_BUDNOTIFY_SERVICE/settings/credentials" \
   --header 'accept: application/json' | jq -r '.prod_app_id')
 
 # Export it so it's available in printenv

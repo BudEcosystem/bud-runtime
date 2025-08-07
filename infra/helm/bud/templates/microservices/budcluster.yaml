@@ -12,6 +12,7 @@ spec:
       labels:
         app: {{ .Release.Name }}-budcluster
       annotations:
+        date: "{{ now }}"
         dapr.io/enabled: "true"
         dapr.io/app-id: "budcluster"
         dapr.io/app-port: "3003"
@@ -20,7 +21,7 @@ spec:
       containers:
       - name: {{ .Release.Name }}-budcluster
         image: {{ .Values.microservices.budcluster.image }}
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         command: ["sh", "-c", "alembic -c ./budcluster/alembic.ini upgrade head && uvicorn budcluster.main:app --host 0.0.0.0 --port 3003"]
         ports:
         - containerPort: 3003

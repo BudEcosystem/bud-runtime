@@ -1,15 +1,13 @@
 name: "BudSim: Build and Push Docker Image on Release"
 
 on:
+  workflow_dispatch:
   release:
     types: [created]
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./services/budsim
 
     steps:
       - name: Checkout repository
@@ -34,7 +32,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ./services/budsim
           push: true
-          file: ./deploy/Dockerfile
+          file: ./services/budsim/deploy/Dockerfile
           tags: budstudio/budsim:${{ env.RELEASE_TAG }}

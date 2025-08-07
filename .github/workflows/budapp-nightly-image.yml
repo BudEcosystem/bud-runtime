@@ -1,6 +1,7 @@
 name: "BudApp: Build and Push Nightly Docker Image"
 
 on:
+  workflow_dispatch:
   push:
     paths:
       - 'services/budapp/**'
@@ -40,7 +41,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ./services/budapp
           push: true
-          file: ./deploy/Dockerfile
+          file: ./services/budapp/deploy/Dockerfile
           tags: budstudio/budapp:nightly

@@ -12,6 +12,7 @@ spec:
       labels:
         app: {{ .Release.Name }}-budadmin
       annotations:
+        date: "{{ now }}"
         dapr.io/enabled: "true"
         dapr.io/app-id: "budadmin"
         dapr.io/app-port: "3000"
@@ -19,10 +20,12 @@ spec:
       containers:
       - name: {{ .Release.Name }}-budadmin
         image: {{ .Values.microservices.budadmin.image }}
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         ports:
         - containerPort: 3000
         env:
+          - name: ENTRYPOINT_BUDNOTIFY_SERVICE
+            value: "{{ .Release.Name }}-budnotify:3000"
         {{ $root := . }}
         {{- range $key, $value := .Values.microservices.budadmin.env }}
           - name: {{ $key }}

@@ -3884,6 +3884,11 @@ class ModelCatalogService(SessionMixin):
                 capabilities.extend(tag_names)
 
             # Build catalog item
+            # Handle provider_type - convert enum to string if needed
+            provider_type_value = model.provider_type
+            if hasattr(provider_type_value, "value"):
+                provider_type_value = provider_type_value.value
+
             catalog_item = {
                 "id": str(model.id),
                 "name": model.name,
@@ -3896,7 +3901,7 @@ class ModelCatalogService(SessionMixin):
                 "use_cases": model.use_cases,
                 "author": model.author,
                 "model_size": model.model_size,
-                "provider_type": model.provider_type,
+                "provider_type": provider_type_value,
                 "published_date": endpoint.published_date.isoformat() if endpoint.published_date else None,
                 "endpoint_id": str(endpoint.id),
                 "supported_endpoints": model.supported_endpoints,
@@ -3964,6 +3969,11 @@ class ModelCatalogService(SessionMixin):
             capabilities.extend(tag_names)
 
         # Build catalog item
+        # Handle provider_type - convert enum to string if needed
+        provider_type_value = model.provider_type
+        if hasattr(provider_type_value, "value"):
+            provider_type_value = provider_type_value.value
+
         catalog_item = {
             "id": str(model.id),
             "name": model.name,
@@ -3976,7 +3986,7 @@ class ModelCatalogService(SessionMixin):
             "use_cases": model.use_cases,
             "author": model.author,
             "model_size": model.model_size,
-            "provider_type": model.provider_type,
+            "provider_type": provider_type_value,
             "published_date": endpoint.published_date.isoformat() if endpoint.published_date else None,
             "endpoint_id": str(endpoint.id),
             "supported_endpoints": model.supported_endpoints,

@@ -83,8 +83,8 @@ async fn main() {
         .await
         .expect("Failed to run inference");
     match res {
-        InferenceOutput::NonStreaming(data) => {
-            tracing::info!("Inference output: {:?}", data);
+        InferenceOutput::NonStreaming { response, .. } => {
+            tracing::info!("Inference output: {:?}", response);
         }
         InferenceOutput::Streaming(mut stream) => {
             let mut stdout = std::io::stdout().lock();

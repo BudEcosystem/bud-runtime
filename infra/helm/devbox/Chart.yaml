@@ -11,10 +11,3 @@ maintainers:
   - name: "sinanmohd"
     email: "sinan@sinanmohd.com"
     url: "https://www.sinanmohd.com"
-
-dependencies:
-  - name: argo-cd
-    alias: argo
-    version: 8.2.4
-    repository: https://argoproj.github.io/argo-helm
-    condition: argo.enabled

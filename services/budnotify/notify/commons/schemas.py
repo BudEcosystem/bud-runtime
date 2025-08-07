@@ -16,13 +16,23 @@
 
 """Contains Pydantic schemas used for data validation and serialization within the microservices."""
 
+import datetime
 import re
 from http import HTTPStatus
-from typing import Any, ClassVar, Dict, Optional, Set, Tuple, Type, Union
+from typing import Any, ClassVar, Dict, List, Optional, Set, Tuple, Type, Union
 
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, create_model, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    create_model,
+    model_validator,
+)
 from typing_extensions import Annotated
+
+from .constants import WorkflowStatus
 
 
 lowercase_string = Annotated[str, StringConstraints(to_lower=True)]
@@ -67,8 +77,7 @@ class CloudEventBase(BaseModel):
     topic: Optional[str] = None
     pubsubname: Optional[str] = None
     source: Optional[str] = None
-
-    out_topic: Optional[str] = None
+    source_topic: Optional[str] = None
 
     data: Optional[Dict[str, Any]] = None
 
@@ -76,8 +85,9 @@ class CloudEventBase(BaseModel):
     tracestate: Optional[str] = None
     traceparent: Optional[str] = None
 
-    type: str
-    time: str
+    type: Optional[str] = None
+    time: str = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat() + "Z")  # type: ignore
+    debug: bool = Field(default=False)
 
     def is_pubsub(self) -> bool:
         """Check if the event is a PubSub event."""
@@ -112,7 +122,7 @@ class CloudEventBase(BaseModel):
         }
 
         # Create the inner model
-        DataModel = create_model(f"{cls.__name__}Schema" ** inner_fields)  # type: ignore
+        DataModel = create_model(f"{cls.__name__}Schema", **inner_fields)  # type: ignore
 
         # Add the data field with the inner model
         outer_fields["data"] = (DataModel, Field(...))
@@ -265,6 +275,20 @@ class SuccessResponse(ResponseBase):
         return data
 
 
+class PaginatedSuccessResponse(SuccessResponse):
+    """Define a paginated success response with optional message and parameters.
+
+    Inherits from `SuccessResponse` and specifies default values and validation for success responses.
+
+    Attributes:
+        page (int): The current page number.
+        limit (int): The number of items per page.
+    """
+
+    page: int
+    limit: int
+
+
 class ErrorResponse(ResponseBase):
     """Define an error response with a code and type derived from the status code.
 
@@ -302,3 +326,21 @@ class ErrorResponse(ResponseBase):
         data["message"] = data.get("message") or HTTPStatus(data["code"]).description
 
         return data
+
+
+class WorkflowStep(BaseModel):
+    """Define a workflow step."""
+
+    id: str
+    title: str
+    description: str
+
+
+class WorkflowMetadataResponse(ResponseBase):
+    """Define a workflow metadata response."""
+
+    object: lowercase_string = "workflow_metadata"
+    workflow_id: str
+    steps: List[WorkflowStep]
+    status: WorkflowStatus
+    eta: int

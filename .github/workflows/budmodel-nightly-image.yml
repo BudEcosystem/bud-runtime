@@ -1,6 +1,7 @@
 name: "BudModel: Build and Push Nightly Docker Image"
 
 on:
+  workflow_dispatch:
   push:
     paths:
       - 'services/budmodel/**'
@@ -10,9 +11,6 @@ on:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./services/budmodel
 
     steps:
       - name: Checkout code
@@ -30,7 +28,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ./services/budmodel
           push: true
-          file: ./deploy/Dockerfile
+          file: ./services/budmodel/deploy/Dockerfile
           tags: budstudio/budmodel:nightly
