@@ -287,17 +287,26 @@ class AuthService(SessionMixin):
 
             # Set default permissions for CLIENT users
             if user.user_type == UserTypeEnum.CLIENT:
-                # Assign CLIENT_ACCESS permission to client users
-                client_permission = PermissionList(name=PermissionEnum.CLIENT_ACCESS, has_permission=True)
+                # Assign all client permissions
+                client_permissions = [
+                    PermissionList(name=PermissionEnum.CLIENT_ACCESS, has_permission=True),
+                    PermissionList(name=PermissionEnum.PROJECT_VIEW, has_permission=True),
+                    PermissionList(name=PermissionEnum.PROJECT_MANAGE, has_permission=True),
+                ]
+
                 if user.permissions:
                     # Add to existing permissions if not already present
-                    permission_names = {p.name for p in user.permissions}
-                    if PermissionEnum.CLIENT_ACCESS not in permission_names:
-                        user.permissions.append(client_permission)
+                    existing_permission_names = {p.name for p in user.permissions}
+                    for client_perm in client_permissions:
+                        if client_perm.name not in existing_permission_names:
+                            user.permissions.append(client_perm)
                 else:
-                    # Set as the only permission for client users
-                    user.permissions = [client_permission]
-                logger.debug("Assigned CLIENT_ACCESS permission to client user: %s", user.email)
+                    # Set client permissions for client users
+                    user.permissions = client_permissions
+                logger.debug(
+                    "Assigned client permissions (CLIENT_ACCESS, PROJECT_VIEW, PROJECT_MANAGE) to client user: %s",
+                    user.email,
+                )
 
             # Process permissions to add implicit view permissions for manage permissions
             if user.permissions:
