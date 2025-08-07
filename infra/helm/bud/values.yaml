@@ -22,17 +22,11 @@ microservices:
         image: budstudio/budapp:nightly
         env:
             APP_CONFIG: '{}'
-            PSQL_HOST: '{{ $.Release.Name }}-postgresql'
-            SECRETS_PSQL_USER: budapp
-            SECRETS_PSQL_PASSWORD: budapp
-            PSQL_USER: budapp
-            PSQL_PASSWORD: budapp
-            SECRETS_POSTGRES_USER: budapp
-            SECRETS_POSTGRES_PASSWORD: budapp
-            POSTGRES_USER: budapp
-            POSTGRES_PASSWORD: budapp
+            SECRETS_PSQL_USER: budapp2
+            SECRETS_PSQL_PASSWORD: budapp2
+            PSQL_DB_NAME: budapp2
             PSQL_PORT: "5432"
-            PSQL_DB_NAME: budapp
+            PSQL_HOST: '{{ $.Release.Name }}-postgresql'
             STATIC_DIR: /data/static-dir
             GRAFANA_SCHEME: http
             GRAFANA_URL: '{{ $.Release.Name }}-grafana'
@@ -290,6 +284,7 @@ postgresql:
 postgresqlExtra:
     autoCreateDB:
         - budapp
+        - budapp2
         - budproxy
         - budcluster
         - budsim
