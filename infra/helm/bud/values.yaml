@@ -88,9 +88,9 @@ microservices:
     budmodel:
         image: budstudio/budmodel:0.1.0
         env:
+            SECRETS_PSQL_USER: budmodel
+            SECRETS_PSQL_PASSWORD: budmodel
             PSQL_HOST: '{{ $.Release.Name }}-postgresql'
-            PSQL_USER: budmodel
-            PSQL_PASSWORD: budmodel
             PSQL_PORT: "5432"
             PSQL_DB_NAME: budmodel
             LOG_LEVEL: DEBUG
