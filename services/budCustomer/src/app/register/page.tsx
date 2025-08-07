@@ -24,7 +24,7 @@ export default function Register() {
         name: formData.name,
         email: formData.email,
         password: formData.password,
-        role: "user", // Default role for new registrations
+        role: formData.role, // Default role for new registrations
         company: formData.company,
         purpose: formData.purpose,
         user_type: "client"
