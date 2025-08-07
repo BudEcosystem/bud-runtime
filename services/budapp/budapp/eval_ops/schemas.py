@@ -1,10 +1,11 @@
 # budapp/eval_ops/schemas.py
 
+from datetime import datetime
 from typing import List, Optional
 
 from pydantic import UUID4, BaseModel, Field
 
-from budapp.commons.schemas import SuccessResponse
+from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse
 from budapp.eval_ops.models import RunStatusEnum
 
 
@@ -16,10 +17,8 @@ class CreateExperimentRequest(BaseModel):
 
     name: str = Field(..., description="The name of the experiment.")
     description: Optional[str] = Field(None, description="The description of the experiment.")
-    project_id: UUID4 = Field(..., description="The project ID for the experiment.")
+    project_id: Optional[UUID4] = Field(None, description="The project ID for the experiment (optional).")
     tags: Optional[List[str]] = Field(None, description="List of tags for the experiment.")
-    model_ids: List[UUID4] = Field(..., description="List of model IDs to evaluate.")
-    dataset_ids: List[UUID4] = Field(..., description="List of dataset IDs to evaluate against.")
 
 
 class Experiment(BaseModel):
@@ -28,7 +27,7 @@ class Experiment(BaseModel):
     id: UUID4 = Field(..., description="The UUID of the experiment.")
     name: str = Field(..., description="The name of the experiment.")
     description: Optional[str] = Field(None, description="The description of the experiment.")
-    project_id: UUID4 = Field(..., description="The project ID for the experiment.")
+    project_id: Optional[UUID4] = Field(None, description="The project ID for the experiment.")
     tags: Optional[List[str]] = Field(None, description="List of tags for the experiment.")
 
     class Config:
@@ -43,8 +42,8 @@ class CreateExperimentResponse(SuccessResponse):
     experiment: Experiment = Field(..., description="The created experiment.")
 
 
-class ListExperimentsResponse(SuccessResponse):
-    """The response to list experiments."""
+class ListExperimentsResponse(PaginatedSuccessResponse):
+    """The response to list experiments with pagination."""
 
     experiments: List[Experiment] = Field(..., description="The experiments.")
 
@@ -60,6 +59,12 @@ class UpdateExperimentResponse(SuccessResponse):
     """Response schema for updating an experiment."""
 
     experiment: Experiment = Field(..., description="The updated experiment.")
+
+
+class GetExperimentResponse(SuccessResponse):
+    """Response schema for getting an experiment by ID."""
+
+    experiment: Experiment = Field(..., description="The requested experiment.")
 
 
 class DeleteExperimentResponse(SuccessResponse):
@@ -81,6 +86,8 @@ class Run(BaseModel):
     dataset_version_id: UUID4 = Field(..., description="The UUID of the dataset version.")
     status: RunStatusEnum = Field(..., description="Current status of the run.")
     config: Optional[dict] = Field(None, description="Run-specific configuration.")
+    created_at: Optional[datetime] = Field(None, description="Timestamp when the run was created.")
+    updated_at: Optional[datetime] = Field(None, description="Timestamp when the run was last updated.")
 
     class Config:
         """Pydantic model configuration."""
@@ -136,6 +143,24 @@ class DeleteRunResponse(SuccessResponse):
     """Response schema for deleting a run."""
 
     pass
+
+
+# ------------------------ Configure Runs Schemas ------------------------
+
+
+class ConfigureRunsRequest(BaseModel):
+    """Request to configure runs for an experiment."""
+
+    model_ids: List[UUID4] = Field(..., description="List of model IDs to evaluate.")
+    dataset_ids: List[UUID4] = Field(..., description="List of dataset IDs to evaluate against.")
+    evaluation_config: Optional[dict] = Field(None, description="Default evaluation configuration for runs.")
+
+
+class ConfigureRunsResponse(SuccessResponse):
+    """Response after configuring runs for an experiment."""
+
+    runs: List[Run] = Field(..., description="List of created runs.")
+    total_runs: int = Field(..., description="Total number of runs created.")
 
 
 # ------------------------ Dataset Schemas (Keep existing) ------------------------
@@ -257,6 +282,7 @@ class DatasetFilter(BaseModel):
     modalities: Optional[List[str]] = Field(None, description="Filter by modalities.")
     language: Optional[List[str]] = Field(None, description="Filter by languages.")
     domains: Optional[List[str]] = Field(None, description="Filter by domains.")
+    trait_ids: Optional[List[UUID4]] = Field(None, description="Filter by trait UUIDs.")
 
 
 class CreateDatasetRequest(BaseModel):
@@ -374,6 +400,53 @@ class ExperimentWorkflowStepData(BaseModel):
 
     # Step 4 data - Performance Point
     performance_point: Optional[int] = Field(None, ge=0, le=100, description="Performance point value between 0-100")
+
+
+# ------------------------ Evaluation Workflow Schemas ------------------------
+
+
+class EvaluationWorkflowStepRequest(BaseModel):
+    """Base request for evaluation workflow steps."""
+
+    workflow_id: Optional[UUID4] = Field(None, description="Workflow ID (required for steps 2-5)")
+    step_number: int = Field(..., description="Current step number (1-5)", ge=1, le=5)
+    workflow_total_steps: int = Field(default=5, description="Total steps in workflow")
+    trigger_workflow: bool = Field(default=False, description="Whether to trigger workflow completion")
+    stage_data: dict = Field(..., description="Step-specific data")
+
+
+class EvaluationWorkflowResponse(SuccessResponse):
+    """Response for evaluation workflow steps."""
+
+    workflow_id: UUID4 = Field(..., description="Workflow ID")
+    current_step: int = Field(..., description="Current step number")
+    total_steps: int = Field(..., description="Total steps in workflow")
+    is_complete: bool = Field(..., description="Whether workflow is complete")
+    next_step: Optional[int] = Field(None, description="Next step number (null if complete)")
+    next_step_data: Optional[dict] = Field(None, description="Data for next step")
+    status: str = Field(..., description="Workflow status")
+    runs_created: Optional[int] = Field(None, description="Number of runs created (only on completion)")
+    data: Optional[dict] = Field(None, description="Accumulated workflow data from all steps")
+
+
+# Step-specific schemas for evaluation workflow
+class EvaluationBasicInfoData(BaseModel):
+    """Step 1: Basic information for evaluation."""
+
+    name: str = Field(..., description="Evaluation name")
+    description: Optional[str] = Field(None, description="Evaluation description")
+
+
+class EvaluationTraitsData(BaseModel):
+    """Step 2: Trait selection for evaluation."""
+
+    trait_ids: List[UUID4] = Field(..., description="Selected trait IDs")
+
+
+class EvaluationDatasetsData(BaseModel):
+    """Step 3: Dataset selection for evaluation."""
+
+    dataset_ids: List[UUID4] = Field(..., description="Selected dataset IDs")
 
     # Step 5 data - Finalization
     run_name: Optional[str] = None
