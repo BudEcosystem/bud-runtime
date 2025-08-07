@@ -234,6 +234,17 @@ class InferenceListRequest(BaseModel):
     min_tokens: Optional[int] = None
     max_tokens: Optional[int] = None
     max_latency_ms: Optional[int] = None
+    endpoint_type: Optional[
+        Literal[
+            "chat",
+            "embedding",
+            "audio_transcription",
+            "audio_translation",
+            "text_to_speech",
+            "image_generation",
+            "moderation",
+        ]
+    ] = None
 
     # Sorting
     sort_by: Literal["timestamp", "tokens", "latency", "cost"] = "timestamp"
@@ -287,6 +298,7 @@ class InferenceListItem(BaseModel):
     project_id: Optional[UUID] = None
     endpoint_id: Optional[UUID] = None
     model_id: Optional[UUID] = None
+    endpoint_type: str = "chat"  # New field to identify inference type
 
 
 class InferenceListResponse(ResponseBase):
@@ -372,3 +384,57 @@ class InferenceFeedbackResponse(ResponseBase):
     inference_id: UUID
     feedback_items: List[FeedbackItem]
     total_count: int
+
+
+# New schemas for different inference types
+class EmbeddingInferenceDetail(BaseModel):
+    """Schema for embedding inference details."""
+
+    embeddings: List[List[float]]
+    embedding_dimensions: int
+    input_count: int
+    input_text: str
+
+
+class AudioInferenceDetail(BaseModel):
+    """Schema for audio inference details."""
+
+    audio_type: Literal["transcription", "translation", "text_to_speech"]
+    input: str
+    output: str
+    language: Optional[str] = None
+    duration_seconds: Optional[float] = None
+    file_size_bytes: Optional[int] = None
+    response_format: Optional[str] = None
+
+
+class ImageInferenceDetail(BaseModel):
+    """Schema for image generation inference details."""
+
+    prompt: str
+    image_count: int
+    size: str
+    quality: str
+    style: Optional[str] = None
+    images: List[Dict[str, Any]]  # List of image data
+
+
+class ModerationInferenceDetail(BaseModel):
+    """Schema for moderation inference details."""
+
+    input: str
+    results: List[Dict[str, Any]]
+    flagged: bool
+    categories: Dict[str, bool]
+    category_scores: Dict[str, float]
+
+
+class EnhancedInferenceDetailResponse(InferenceDetailResponse):
+    """Enhanced response schema for detailed inference information supporting all types."""
+
+    # Type-specific details (only one will be populated based on endpoint_type)
+    endpoint_type: str
+    embedding_details: Optional[EmbeddingInferenceDetail] = None
+    audio_details: Optional[AudioInferenceDetail] = None
+    image_details: Optional[ImageInferenceDetail] = None
+    moderation_details: Optional[ModerationInferenceDetail] = None

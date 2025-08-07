@@ -57,6 +57,17 @@ class InferenceListRequest(BaseModel):
     min_tokens: Optional[int] = None
     max_tokens: Optional[int] = None
     max_latency_ms: Optional[int] = None
+    endpoint_type: Optional[
+        Literal[
+            "chat",
+            "embedding",
+            "audio_transcription",
+            "audio_translation",
+            "text_to_speech",
+            "image_generation",
+            "moderation",
+        ]
+    ] = None
 
     # Sorting
     sort_by: Literal["timestamp", "tokens", "latency", "cost"] = "timestamp"
@@ -99,6 +110,7 @@ class InferenceListItem(BaseModel):
     cost: Optional[float] = None
     is_success: bool
     cached: bool
+    endpoint_type: str = "chat"  # Default to chat for backward compatibility
 
 
 class InferenceListResponse(SuccessResponse):
@@ -159,6 +171,7 @@ class InferenceDetailResponse(SuccessResponse):
     cached: bool
     finish_reason: Optional[str] = None
     cost: Optional[float] = None
+    endpoint_type: Optional[str] = None
 
     # Raw data (optional)
     raw_request: Optional[str] = None

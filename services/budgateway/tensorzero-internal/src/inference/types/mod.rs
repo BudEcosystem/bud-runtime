@@ -600,6 +600,12 @@ impl ModelInferenceResponseWithMetadata {
 pub enum InferenceResult {
     Chat(ChatInferenceResult),
     Json(JsonInferenceResult),
+    Embedding(EmbeddingInferenceResult),
+    AudioTranscription(AudioTranscriptionInferenceResult),
+    AudioTranslation(AudioTranslationInferenceResult),
+    TextToSpeech(TextToSpeechInferenceResult),
+    ImageGeneration(ImageGenerationInferenceResult),
+    Moderation(ModerationInferenceResult),
 }
 
 #[derive(Clone, Debug)]
@@ -625,6 +631,121 @@ pub struct JsonInferenceResult {
     pub inference_params: InferenceParams,
     pub original_response: Option<String>,
     pub finish_reason: Option<FinishReason>,
+}
+
+#[derive(Clone, Debug)]
+pub struct EmbeddingInferenceResult {
+    pub inference_id: Uuid,
+    pub created: u64,
+    pub embeddings: Vec<Vec<f32>>,
+    pub embedding_dimensions: u32,
+    pub input_count: u32,
+    pub usage: Usage,
+    pub model_inference_results: Vec<ModelInferenceResponseWithMetadata>,
+    pub inference_params: InferenceParams,
+    pub original_response: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct AudioTranscriptionInferenceResult {
+    pub inference_id: Uuid,
+    pub created: u64,
+    pub text: String,
+    pub language: Option<String>,
+    pub duration_seconds: Option<f32>,
+    pub words: Option<Vec<WordTimestamp>>,
+    pub segments: Option<Vec<SegmentTimestamp>>,
+    pub usage: Usage,
+    pub model_inference_results: Vec<ModelInferenceResponseWithMetadata>,
+    pub inference_params: InferenceParams,
+    pub original_response: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct AudioTranslationInferenceResult {
+    pub inference_id: Uuid,
+    pub created: u64,
+    pub text: String,
+    pub language: Option<String>,
+    pub duration_seconds: Option<f32>,
+    pub usage: Usage,
+    pub model_inference_results: Vec<ModelInferenceResponseWithMetadata>,
+    pub inference_params: InferenceParams,
+    pub original_response: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct TextToSpeechInferenceResult {
+    pub inference_id: Uuid,
+    pub created: u64,
+    pub audio_data: Vec<u8>,
+    pub audio_format: String,
+    pub duration_seconds: Option<f32>,
+    pub usage: Usage,
+    pub model_inference_results: Vec<ModelInferenceResponseWithMetadata>,
+    pub inference_params: InferenceParams,
+    pub original_response: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct ImageGenerationInferenceResult {
+    pub inference_id: Uuid,
+    pub created: u64,
+    pub images: Vec<ImageData>,
+    pub image_count: u8,
+    pub size: String,
+    pub quality: String,
+    pub style: Option<String>,
+    pub usage: Usage,
+    pub model_inference_results: Vec<ModelInferenceResponseWithMetadata>,
+    pub inference_params: InferenceParams,
+    pub original_response: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct ModerationInferenceResult {
+    pub inference_id: Uuid,
+    pub created: u64,
+    pub results: Vec<ModerationResult>,
+    pub usage: Usage,
+    pub model_inference_results: Vec<ModelInferenceResponseWithMetadata>,
+    pub inference_params: InferenceParams,
+    pub original_response: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct WordTimestamp {
+    pub word: String,
+    pub start: f32,
+    pub end: f32,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SegmentTimestamp {
+    pub id: u64,
+    pub seek: u64,
+    pub start: f32,
+    pub end: f32,
+    pub text: String,
+    pub tokens: Vec<u64>,
+    pub temperature: f32,
+    pub avg_logprob: f32,
+    pub compression_ratio: f32,
+    pub no_speech_prob: f32,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ImageData {
+    pub url: Option<String>,
+    pub base64: Option<String>,
+    pub revised_prompt: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ModerationResult {
+    pub flagged: bool,
+    pub categories: HashMap<String, bool>,
+    pub category_scores: HashMap<String, f32>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -759,6 +880,106 @@ pub struct JsonInferenceDatabaseInsert {
 pub enum InferenceDatabaseInsert {
     Chat(ChatInferenceDatabaseInsert),
     Json(JsonInferenceDatabaseInsert),
+    Embedding(EmbeddingInferenceDatabaseInsert),
+    AudioTranscription(AudioInferenceDatabaseInsert),
+    AudioTranslation(AudioInferenceDatabaseInsert),
+    TextToSpeech(AudioInferenceDatabaseInsert),
+    ImageGeneration(ImageInferenceDatabaseInsert),
+    Moderation(ModerationInferenceDatabaseInsert),
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct EmbeddingInferenceDatabaseInsert {
+    pub id: Uuid,
+    pub function_name: String,
+    pub variant_name: String,
+    pub episode_id: Uuid,
+    #[serde(deserialize_with = "deserialize_json_string")]
+    pub input: ResolvedInput,
+    #[serde(deserialize_with = "deserialize_json_string")]
+    pub embeddings: Vec<Vec<f32>>,
+    pub embedding_dimensions: u32,
+    pub input_count: u32,
+    #[serde(deserialize_with = "deserialize_json_string")]
+    pub inference_params: InferenceParams,
+    pub processing_time_ms: Option<u32>,
+    pub tags: HashMap<String, String>,
+    #[serde(default)]
+    pub extra_body: UnfilteredInferenceExtraBody,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct AudioInferenceDatabaseInsert {
+    pub id: Uuid,
+    pub function_name: String,
+    pub variant_name: String,
+    pub episode_id: Uuid,
+    pub audio_type: AudioType,
+    #[serde(deserialize_with = "deserialize_json_string")]
+    pub input: String,
+    #[serde(deserialize_with = "deserialize_json_string")]
+    pub output: String,
+    pub language: Option<String>,
+    pub duration_seconds: Option<f32>,
+    pub file_size_bytes: Option<u64>,
+    pub response_format: String,
+    #[serde(deserialize_with = "deserialize_json_string")]
+    pub inference_params: InferenceParams,
+    pub processing_time_ms: Option<u32>,
+    pub tags: HashMap<String, String>,
+    #[serde(default)]
+    pub extra_body: UnfilteredInferenceExtraBody,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone, Copy)]
+#[serde(rename_all = "snake_case")]
+pub enum AudioType {
+    Transcription = 1,
+    Translation = 2,
+    TextToSpeech = 3,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ImageInferenceDatabaseInsert {
+    pub id: Uuid,
+    pub function_name: String,
+    pub variant_name: String,
+    pub episode_id: Uuid,
+    pub prompt: String,
+    pub image_count: u8,
+    pub size: String,
+    pub quality: String,
+    pub style: Option<String>,
+    pub response_format: String,
+    #[serde(deserialize_with = "deserialize_json_string")]
+    pub images: Vec<ImageData>,
+    #[serde(deserialize_with = "deserialize_json_string")]
+    pub inference_params: InferenceParams,
+    pub processing_time_ms: Option<u32>,
+    pub tags: HashMap<String, String>,
+    #[serde(default)]
+    pub extra_body: UnfilteredInferenceExtraBody,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ModerationInferenceDatabaseInsert {
+    pub id: Uuid,
+    pub function_name: String,
+    pub variant_name: String,
+    pub episode_id: Uuid,
+    #[serde(deserialize_with = "deserialize_json_string")]
+    pub input: String,
+    #[serde(deserialize_with = "deserialize_json_string")]
+    pub results: Vec<ModerationResult>,
+    pub flagged: bool,
+    pub categories: HashMap<String, bool>,
+    pub category_scores: HashMap<String, f32>,
+    #[serde(deserialize_with = "deserialize_json_string")]
+    pub inference_params: InferenceParams,
+    pub processing_time_ms: Option<u32>,
+    pub tags: HashMap<String, String>,
+    #[serde(default)]
+    pub extra_body: UnfilteredInferenceExtraBody,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -782,6 +1003,13 @@ pub struct ModelInferenceDatabaseInsert {
     pub gateway_request: Option<String>,
     /// The response sent by the gateway back to the client
     pub gateway_response: Option<String>,
+    /// The type of endpoint that generated this inference
+    #[serde(default = "default_endpoint_type")]
+    pub endpoint_type: String,
+}
+
+fn default_endpoint_type() -> String {
+    "chat".to_string()
 }
 
 #[cfg(test)]
@@ -928,8 +1156,201 @@ impl ModelInferenceResponseWithMetadata {
     }
 }
 
+impl EmbeddingInferenceDatabaseInsert {
+    pub fn new(
+        embedding_result: EmbeddingInferenceResult,
+        input: ResolvedInput,
+        metadata: InferenceDatabaseInsertMetadata,
+    ) -> Self {
+        let processing_time_ms = metadata
+            .processing_time
+            .map(|duration| duration.as_millis() as u32);
+
+        Self {
+            id: embedding_result.inference_id,
+            function_name: metadata.function_name,
+            variant_name: metadata.variant_name,
+            episode_id: metadata.episode_id,
+            input,
+            embeddings: embedding_result.embeddings,
+            embedding_dimensions: embedding_result.embedding_dimensions,
+            input_count: embedding_result.input_count,
+            inference_params: embedding_result.inference_params,
+            processing_time_ms,
+            tags: metadata.tags,
+            extra_body: metadata.extra_body,
+        }
+    }
+}
+
+impl AudioInferenceDatabaseInsert {
+    pub fn new_transcription(
+        audio_result: AudioTranscriptionInferenceResult,
+        input: String,
+        metadata: InferenceDatabaseInsertMetadata,
+    ) -> Self {
+        let processing_time_ms = metadata
+            .processing_time
+            .map(|duration| duration.as_millis() as u32);
+
+        Self {
+            id: audio_result.inference_id,
+            function_name: metadata.function_name,
+            variant_name: metadata.variant_name,
+            episode_id: metadata.episode_id,
+            audio_type: AudioType::Transcription,
+            input,
+            output: audio_result.text,
+            language: audio_result.language,
+            duration_seconds: audio_result.duration_seconds,
+            file_size_bytes: None,               // Will be set from the handler
+            response_format: "json".to_string(), // Default, will be overridden
+            inference_params: audio_result.inference_params,
+            processing_time_ms,
+            tags: metadata.tags,
+            extra_body: metadata.extra_body,
+        }
+    }
+
+    pub fn new_translation(
+        audio_result: AudioTranslationInferenceResult,
+        input: String,
+        metadata: InferenceDatabaseInsertMetadata,
+    ) -> Self {
+        let processing_time_ms = metadata
+            .processing_time
+            .map(|duration| duration.as_millis() as u32);
+
+        Self {
+            id: audio_result.inference_id,
+            function_name: metadata.function_name,
+            variant_name: metadata.variant_name,
+            episode_id: metadata.episode_id,
+            audio_type: AudioType::Translation,
+            input,
+            output: audio_result.text,
+            language: audio_result.language,
+            duration_seconds: audio_result.duration_seconds,
+            file_size_bytes: None,               // Will be set from the handler
+            response_format: "json".to_string(), // Default, will be overridden
+            inference_params: audio_result.inference_params,
+            processing_time_ms,
+            tags: metadata.tags,
+            extra_body: metadata.extra_body,
+        }
+    }
+
+    pub fn new_text_to_speech(
+        tts_result: TextToSpeechInferenceResult,
+        input: String,
+        metadata: InferenceDatabaseInsertMetadata,
+    ) -> Self {
+        let processing_time_ms = metadata
+            .processing_time
+            .map(|duration| duration.as_millis() as u32);
+
+        Self {
+            id: tts_result.inference_id,
+            function_name: metadata.function_name,
+            variant_name: metadata.variant_name,
+            episode_id: metadata.episode_id,
+            audio_type: AudioType::TextToSpeech,
+            input,
+            output: format!(
+                "{} bytes of {} audio",
+                tts_result.audio_data.len(),
+                tts_result.audio_format
+            ),
+            language: None,
+            duration_seconds: tts_result.duration_seconds,
+            file_size_bytes: Some(tts_result.audio_data.len() as u64),
+            response_format: tts_result.audio_format,
+            inference_params: tts_result.inference_params,
+            processing_time_ms,
+            tags: metadata.tags,
+            extra_body: metadata.extra_body,
+        }
+    }
+}
+
+impl ImageInferenceDatabaseInsert {
+    pub fn new(
+        image_result: ImageGenerationInferenceResult,
+        prompt: String,
+        metadata: InferenceDatabaseInsertMetadata,
+    ) -> Self {
+        let processing_time_ms = metadata
+            .processing_time
+            .map(|duration| duration.as_millis() as u32);
+
+        Self {
+            id: image_result.inference_id,
+            function_name: metadata.function_name,
+            variant_name: metadata.variant_name,
+            episode_id: metadata.episode_id,
+            prompt,
+            image_count: image_result.image_count,
+            size: image_result.size,
+            quality: image_result.quality,
+            style: image_result.style,
+            response_format: "url".to_string(), // Default, will be overridden
+            images: image_result.images,
+            inference_params: image_result.inference_params,
+            processing_time_ms,
+            tags: metadata.tags,
+            extra_body: metadata.extra_body,
+        }
+    }
+}
+
+impl ModerationInferenceDatabaseInsert {
+    pub fn new(
+        moderation_result: ModerationInferenceResult,
+        input: String,
+        metadata: InferenceDatabaseInsertMetadata,
+    ) -> Self {
+        let processing_time_ms = metadata
+            .processing_time
+            .map(|duration| duration.as_millis() as u32);
+
+        let flagged = moderation_result.results.iter().any(|r| r.flagged);
+        let mut categories = HashMap::new();
+        let mut category_scores = HashMap::new();
+
+        // Aggregate categories and scores from all results
+        for result in &moderation_result.results {
+            for (key, value) in &result.categories {
+                categories.insert(key.clone(), *value);
+            }
+            for (key, value) in &result.category_scores {
+                category_scores.insert(key.clone(), *value);
+            }
+        }
+
+        Self {
+            id: moderation_result.inference_id,
+            function_name: metadata.function_name,
+            variant_name: metadata.variant_name,
+            episode_id: metadata.episode_id,
+            input,
+            results: moderation_result.results,
+            flagged,
+            categories,
+            category_scores,
+            inference_params: moderation_result.inference_params,
+            processing_time_ms,
+            tags: metadata.tags,
+            extra_body: metadata.extra_body,
+        }
+    }
+}
+
 impl ModelInferenceDatabaseInsert {
-    pub fn new(result: ModelInferenceResponseWithMetadata, inference_id: Uuid) -> Self {
+    pub fn new(
+        result: ModelInferenceResponseWithMetadata,
+        inference_id: Uuid,
+        endpoint_type: &str,
+    ) -> Self {
         let (latency_ms, ttft_ms) = match result.latency {
             Latency::Streaming {
                 ttft,
@@ -979,6 +1400,7 @@ impl ModelInferenceDatabaseInsert {
             finish_reason: result.finish_reason,
             gateway_request: result.gateway_request,
             gateway_response: result.gateway_response,
+            endpoint_type: endpoint_type.to_string(),
         }
     }
 }
@@ -1017,6 +1439,20 @@ impl InferenceResult {
         match self {
             InferenceResult::Chat(chat_result) => &chat_result.model_inference_results,
             InferenceResult::Json(json_result) => &json_result.model_inference_results,
+            InferenceResult::Embedding(embedding_result) => {
+                &embedding_result.model_inference_results
+            }
+            InferenceResult::AudioTranscription(audio_result) => {
+                &audio_result.model_inference_results
+            }
+            InferenceResult::AudioTranslation(audio_result) => {
+                &audio_result.model_inference_results
+            }
+            InferenceResult::TextToSpeech(tts_result) => &tts_result.model_inference_results,
+            InferenceResult::ImageGeneration(image_result) => &image_result.model_inference_results,
+            InferenceResult::Moderation(moderation_result) => {
+                &moderation_result.model_inference_results
+            }
         }
     }
 
@@ -1025,11 +1461,19 @@ impl InferenceResult {
         let inference_id = match self {
             InferenceResult::Chat(chat_result) => chat_result.inference_id,
             InferenceResult::Json(json_result) => json_result.inference_id,
+            InferenceResult::Embedding(embedding_result) => embedding_result.inference_id,
+            InferenceResult::AudioTranscription(audio_result) => audio_result.inference_id,
+            InferenceResult::AudioTranslation(audio_result) => audio_result.inference_id,
+            InferenceResult::TextToSpeech(tts_result) => tts_result.inference_id,
+            InferenceResult::ImageGeneration(image_result) => image_result.inference_id,
+            InferenceResult::Moderation(moderation_result) => moderation_result.inference_id,
         };
+        let endpoint_type = self.endpoint_type();
         model_inference_responses
             .iter()
             .map(|r| {
-                let model_inference = ModelInferenceDatabaseInsert::new(r.clone(), inference_id);
+                let model_inference =
+                    ModelInferenceDatabaseInsert::new(r.clone(), inference_id, endpoint_type);
                 match serde_json::to_value(model_inference) {
                     Ok(v) => v,
                     Err(e) => {
@@ -1050,6 +1494,12 @@ impl InferenceResult {
         match self {
             InferenceResult::Chat(chat_result) => &chat_result.usage,
             InferenceResult::Json(json_result) => &json_result.usage,
+            InferenceResult::Embedding(embedding_result) => &embedding_result.usage,
+            InferenceResult::AudioTranscription(audio_result) => &audio_result.usage,
+            InferenceResult::AudioTranslation(audio_result) => &audio_result.usage,
+            InferenceResult::TextToSpeech(tts_result) => &tts_result.usage,
+            InferenceResult::ImageGeneration(image_result) => &image_result.usage,
+            InferenceResult::Moderation(moderation_result) => &moderation_result.usage,
         }
     }
 
@@ -1057,6 +1507,12 @@ impl InferenceResult {
         match self {
             InferenceResult::Chat(chat_result) => chat_result.usage = usage,
             InferenceResult::Json(json_result) => json_result.usage = usage,
+            InferenceResult::Embedding(embedding_result) => embedding_result.usage = usage,
+            InferenceResult::AudioTranscription(audio_result) => audio_result.usage = usage,
+            InferenceResult::AudioTranslation(audio_result) => audio_result.usage = usage,
+            InferenceResult::TextToSpeech(tts_result) => tts_result.usage = usage,
+            InferenceResult::ImageGeneration(image_result) => image_result.usage = usage,
+            InferenceResult::Moderation(moderation_result) => moderation_result.usage = usage,
         }
     }
 
@@ -1064,6 +1520,24 @@ impl InferenceResult {
         match self {
             InferenceResult::Chat(chat_result) => chat_result.original_response = original_response,
             InferenceResult::Json(json_result) => json_result.original_response = original_response,
+            InferenceResult::Embedding(embedding_result) => {
+                embedding_result.original_response = original_response
+            }
+            InferenceResult::AudioTranscription(audio_result) => {
+                audio_result.original_response = original_response
+            }
+            InferenceResult::AudioTranslation(audio_result) => {
+                audio_result.original_response = original_response
+            }
+            InferenceResult::TextToSpeech(tts_result) => {
+                tts_result.original_response = original_response
+            }
+            InferenceResult::ImageGeneration(image_result) => {
+                image_result.original_response = original_response
+            }
+            InferenceResult::Moderation(moderation_result) => {
+                moderation_result.original_response = original_response
+            }
         }
     }
 
@@ -1071,6 +1545,35 @@ impl InferenceResult {
         match self {
             InferenceResult::Chat(chat_result) => &mut chat_result.model_inference_results,
             InferenceResult::Json(json_result) => &mut json_result.model_inference_results,
+            InferenceResult::Embedding(embedding_result) => {
+                &mut embedding_result.model_inference_results
+            }
+            InferenceResult::AudioTranscription(audio_result) => {
+                &mut audio_result.model_inference_results
+            }
+            InferenceResult::AudioTranslation(audio_result) => {
+                &mut audio_result.model_inference_results
+            }
+            InferenceResult::TextToSpeech(tts_result) => &mut tts_result.model_inference_results,
+            InferenceResult::ImageGeneration(image_result) => {
+                &mut image_result.model_inference_results
+            }
+            InferenceResult::Moderation(moderation_result) => {
+                &mut moderation_result.model_inference_results
+            }
+        }
+    }
+
+    pub fn endpoint_type(&self) -> &str {
+        match self {
+            InferenceResult::Chat(_) => "chat",
+            InferenceResult::Json(_) => "json",
+            InferenceResult::Embedding(_) => "embedding",
+            InferenceResult::AudioTranscription(_) => "audio_transcription",
+            InferenceResult::AudioTranslation(_) => "audio_translation",
+            InferenceResult::TextToSpeech(_) => "text_to_speech",
+            InferenceResult::ImageGeneration(_) => "image_generation",
+            InferenceResult::Moderation(_) => "moderation",
         }
     }
 
@@ -1078,6 +1581,18 @@ impl InferenceResult {
         match self {
             InferenceResult::Chat(chat_result) => chat_result.model_inference_results,
             InferenceResult::Json(json_result) => json_result.model_inference_results,
+            InferenceResult::Embedding(embedding_result) => {
+                embedding_result.model_inference_results
+            }
+            InferenceResult::AudioTranscription(audio_result) => {
+                audio_result.model_inference_results
+            }
+            InferenceResult::AudioTranslation(audio_result) => audio_result.model_inference_results,
+            InferenceResult::TextToSpeech(tts_result) => tts_result.model_inference_results,
+            InferenceResult::ImageGeneration(image_result) => image_result.model_inference_results,
+            InferenceResult::Moderation(moderation_result) => {
+                moderation_result.model_inference_results
+            }
         }
     }
 }
@@ -3415,5 +3930,183 @@ mod tests {
             }
             _ => panic!("Expected thought block"),
         }
+    }
+
+    #[test]
+    fn test_embedding_database_insert_creation() {
+        use std::collections::HashMap;
+        use uuid::Uuid;
+        use crate::endpoints::inference::InferenceDatabaseInsertMetadata;
+        use crate::inference::types::extra_body::UnfilteredInferenceExtraBody;
+
+        let inference_id = Uuid::now_v7();
+        let embeddings = vec![vec![0.1, 0.2, 0.3], vec![0.4, 0.5, 0.6]];
+
+        let embedding_result = EmbeddingInferenceResult {
+            inference_id,
+            created: 1642694400,
+            embeddings: embeddings.clone(),
+            embedding_dimensions: 3,
+            input_count: 2,
+            usage: Usage {
+                input_tokens: 10,
+                output_tokens: 0,
+            },
+            model_inference_results: vec![],
+            inference_params: Default::default(),
+            original_response: None,
+        };
+
+        let input = ResolvedInput {
+            system: None,
+            messages: vec![],
+        };
+
+        let metadata = InferenceDatabaseInsertMetadata {
+            function_name: "test-embedding-function".to_string(),
+            variant_name: "test-variant".to_string(),
+            episode_id: Uuid::now_v7(),
+            tool_config: None,
+            processing_time: Some(std::time::Duration::from_millis(150)),
+            tags: HashMap::new(),
+            extra_body: UnfilteredInferenceExtraBody::default(),
+            extra_headers: Default::default(),
+        };
+
+        let database_insert = EmbeddingInferenceDatabaseInsert::new(embedding_result, input, metadata);
+
+        assert_eq!(database_insert.id, inference_id);
+        assert_eq!(database_insert.function_name, "test-embedding-function");
+        assert_eq!(database_insert.variant_name, "test-variant");
+        assert_eq!(database_insert.embeddings, embeddings);
+        assert_eq!(database_insert.embedding_dimensions, 3);
+        assert_eq!(database_insert.input_count, 2);
+        assert_eq!(database_insert.processing_time_ms, Some(150));
+    }
+
+    #[test]
+    fn test_audio_transcription_database_insert_creation() {
+        use std::collections::HashMap;
+        use uuid::Uuid;
+        use crate::endpoints::inference::InferenceDatabaseInsertMetadata;
+        use crate::inference::types::extra_body::UnfilteredInferenceExtraBody;
+
+        let inference_id = Uuid::now_v7();
+
+        let audio_result = AudioTranscriptionInferenceResult {
+            inference_id,
+            created: 1642694400,
+            text: "Hello world transcription".to_string(),
+            language: Some("en".to_string()),
+            duration_seconds: Some(2.5),
+            words: None,
+            segments: None,
+            usage: Usage {
+                input_tokens: 0,
+                output_tokens: 5,
+            },
+            model_inference_results: vec![],
+            inference_params: Default::default(),
+            original_response: None,
+        };
+
+        let metadata = InferenceDatabaseInsertMetadata {
+            function_name: "test-transcription-function".to_string(),
+            variant_name: "test-variant".to_string(),
+            episode_id: Uuid::now_v7(),
+            tool_config: None,
+            processing_time: Some(std::time::Duration::from_millis(2500)),
+            tags: HashMap::new(),
+            extra_body: UnfilteredInferenceExtraBody::default(),
+            extra_headers: Default::default(),
+        };
+
+        let database_insert = AudioInferenceDatabaseInsert::new_transcription(
+            audio_result,
+            "test_audio.wav".to_string(),
+            metadata,
+        );
+
+        assert_eq!(database_insert.id, inference_id);
+        assert_eq!(database_insert.function_name, "test-transcription-function");
+        assert_eq!(database_insert.audio_type as u8, AudioType::Transcription as u8);
+        assert_eq!(database_insert.input, "test_audio.wav");
+        assert_eq!(database_insert.output, "Hello world transcription");
+        assert_eq!(database_insert.language, Some("en".to_string()));
+        assert_eq!(database_insert.duration_seconds, Some(2.5));
+        assert_eq!(database_insert.processing_time_ms, Some(2500));
+    }
+
+    #[test]
+    fn test_moderation_database_insert_creation() {
+        use std::collections::HashMap;
+        use uuid::Uuid;
+        use crate::endpoints::inference::InferenceDatabaseInsertMetadata;
+        use crate::inference::types::extra_body::UnfilteredInferenceExtraBody;
+
+        let inference_id = Uuid::now_v7();
+
+        let mut categories = HashMap::new();
+        categories.insert("hate".to_string(), false);
+        categories.insert("violence".to_string(), true);
+        categories.insert("harassment".to_string(), false);
+
+        let mut category_scores = HashMap::new();
+        category_scores.insert("hate".to_string(), 0.1);
+        category_scores.insert("violence".to_string(), 0.8);
+        category_scores.insert("harassment".to_string(), 0.2);
+
+        let results = vec![ModerationResult {
+            flagged: true,
+            categories: categories.clone(),
+            category_scores: category_scores.clone(),
+        }];
+
+        let moderation_result = ModerationInferenceResult {
+            inference_id,
+            created: 1642694400,
+            results: results.clone(),
+            usage: Usage {
+                input_tokens: 8,
+                output_tokens: 0,
+            },
+            model_inference_results: vec![],
+            inference_params: Default::default(),
+            original_response: None,
+        };
+
+        let metadata = InferenceDatabaseInsertMetadata {
+            function_name: "test-moderation-function".to_string(),
+            variant_name: "test-variant".to_string(),
+            episode_id: Uuid::now_v7(),
+            tool_config: None,
+            processing_time: Some(std::time::Duration::from_millis(100)),
+            tags: HashMap::new(),
+            extra_body: UnfilteredInferenceExtraBody::default(),
+            extra_headers: Default::default(),
+        };
+
+        let database_insert = ModerationInferenceDatabaseInsert::new(
+            moderation_result,
+            "This is some content to moderate".to_string(),
+            metadata,
+        );
+
+        assert_eq!(database_insert.id, inference_id);
+        assert_eq!(database_insert.function_name, "test-moderation-function");
+        assert_eq!(database_insert.input, "This is some content to moderate");
+        assert_eq!(database_insert.results.len(), results.len());
+        assert_eq!(database_insert.flagged, true); // Should be true since one result is flagged
+        assert_eq!(database_insert.categories, categories);
+        assert_eq!(database_insert.category_scores, category_scores);
+        assert_eq!(database_insert.processing_time_ms, Some(100));
+    }
+
+    #[test]
+    fn test_audio_type_numeric_values() {
+        // Test that AudioType enum values match the ClickHouse Enum8 values
+        assert_eq!(AudioType::Transcription as u8, 1);
+        assert_eq!(AudioType::Translation as u8, 2);
+        assert_eq!(AudioType::TextToSpeech as u8, 3);
     }
 }

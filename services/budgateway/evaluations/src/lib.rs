@@ -17,8 +17,8 @@ use tensorzero_internal::endpoints::inference::{
 };
 use tensorzero_internal::evaluations::{EvaluationConfig, EvaluatorConfig};
 use tensorzero_internal::inference::types::{
-    ChatInferenceResult, InferenceResult, Input, InternalJsonInferenceOutput,
-    JsonInferenceResult, Usage, current_timestamp
+    current_timestamp, ChatInferenceResult, InferenceResult, Input, InternalJsonInferenceOutput,
+    JsonInferenceResult, Usage,
 };
 use tensorzero_internal::tool::DynamicToolParams;
 use tensorzero_internal::{
@@ -531,18 +531,16 @@ impl ThrottledTensorZeroClient {
         let inference_response: InferenceResponse = response.json().await?;
         // Create a dummy result to match the new InferenceOutput structure
         let dummy_result = match &inference_response {
-            InferenceResponse::Chat(chat_response) => {
-                InferenceResult::Chat(ChatInferenceResult {
-                    inference_id: chat_response.inference_id,
-                    created: current_timestamp(),
-                    content: chat_response.content.clone(),
-                    usage: Usage::default(),
-                    model_inference_results: vec![],
-                    inference_params: InferenceParams::default(),
-                    original_response: None,
-                    finish_reason: None,
-                })
-            }
+            InferenceResponse::Chat(chat_response) => InferenceResult::Chat(ChatInferenceResult {
+                inference_id: chat_response.inference_id,
+                created: current_timestamp(),
+                content: chat_response.content.clone(),
+                usage: Usage::default(),
+                model_inference_results: vec![],
+                inference_params: InferenceParams::default(),
+                original_response: None,
+                finish_reason: None,
+            }),
             InferenceResponse::Json(json_response) => {
                 InferenceResult::Json(JsonInferenceResult {
                     inference_id: json_response.inference_id,
@@ -550,7 +548,7 @@ impl ThrottledTensorZeroClient {
                     output: InternalJsonInferenceOutput {
                         raw: json_response.output.raw.clone(),
                         parsed: json_response.output.parsed.clone(),
-                        auxiliary_content: vec![],  // Not available in response
+                        auxiliary_content: vec![], // Not available in response
                         json_block_index: None,
                     },
                     usage: Usage::default(),

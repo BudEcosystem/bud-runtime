@@ -581,6 +581,10 @@ impl EvaluatorConfig {
                         _ => skipped_indices.push(i),
                     }
                 }
+                _ => {
+                    // Other inference types are not supported for best-of-n sampling
+                    skipped_indices.push(i);
+                }
             }
         }
         let template_context = json!({

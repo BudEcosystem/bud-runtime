@@ -55,6 +55,7 @@ const InferenceFilters: React.FC<InferenceFiltersProps> = ({ projectId, onFilter
       maxTokens: 'max_tokens',
       maxLatency: 'max_latency_ms',
       endpointId: 'endpoint_id',
+      endpointType: 'endpoint_type',
     };
 
     Object.keys(changedValues).forEach((key) => {
@@ -202,10 +203,11 @@ const InferenceFilters: React.FC<InferenceFiltersProps> = ({ projectId, onFilter
           maxTokens: filters.max_tokens,
           maxLatency: filters.max_latency_ms,
           endpointId: filters.endpoint_id,
+          endpointType: filters.endpoint_type,
         }}
       >
         <Row gutter={16}>
-          <Col span={8}>
+          <Col span={7}>
             <Form.Item
               label={<span className="text-[#B3B3B3]">Date Range</span>}
               name="dateRange"
@@ -220,7 +222,30 @@ const InferenceFilters: React.FC<InferenceFiltersProps> = ({ projectId, onFilter
             </Form.Item>
           </Col>
 
-          <Col span={5}>
+          <Col span={4}>
+            <Form.Item
+              label={<span className="text-[#B3B3B3]">Type</span>}
+              name="endpointType"
+            >
+              <Select
+                style={{ width: '100%' }}
+                placeholder="All Types"
+                allowClear
+                className="bg-[#1A1A1A]"
+                dropdownStyle={{ backgroundColor: '#1A1A1A' }}
+              >
+                <Option value="chat">Chat</Option>
+                <Option value="embedding">Embedding</Option>
+                <Option value="audio_transcription">Audio Transcription</Option>
+                <Option value="audio_translation">Audio Translation</Option>
+                <Option value="text_to_speech">Text to Speech</Option>
+                <Option value="image_generation">Image Generation</Option>
+                <Option value="moderation">Moderation</Option>
+              </Select>
+            </Form.Item>
+          </Col>
+
+          <Col span={4}>
             <Form.Item
               label={<span className="text-[#B3B3B3]">Deployment</span>}
               name="endpointId"
@@ -273,7 +298,7 @@ const InferenceFilters: React.FC<InferenceFiltersProps> = ({ projectId, onFilter
             </Form.Item>
           </Col>
 
-          <Col span={5}>
+          <Col span={3}>
             <Form.Item
               label={<span className="text-[#B3B3B3]">Max Latency (ms)</span>}
               name="maxLatency"

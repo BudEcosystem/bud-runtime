@@ -1,5 +1,5 @@
 [gateway]
-bind_address = "0.0.0.0:3001"
+bind_address = "0.0.0.0:3002"
 debug = true
 
 [gateway.authentication]

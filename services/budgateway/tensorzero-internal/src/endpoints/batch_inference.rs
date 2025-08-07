@@ -970,6 +970,10 @@ pub async fn write_completed_batch_inference<'a>(
                 let json_inference = JsonInferenceDatabaseInsert::new(json_result, input, metadata);
                 inference_rows_to_write.push(InferenceDatabaseInsert::Json(json_inference));
             }
+            _ => {
+                // Other inference types are not supported in batch processing yet
+                tracing::warn!("Unsupported inference type for batch processing");
+            }
         }
     }
     // Write all the *Inference rows to the database

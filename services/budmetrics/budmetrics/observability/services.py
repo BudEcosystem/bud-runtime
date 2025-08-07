@@ -14,15 +14,19 @@ from budmetrics.observability.models import (
     QueryBuilder,
 )
 from budmetrics.observability.schemas import (
+    AudioInferenceDetail,
     CacheMetric,
     CountMetric,
+    EmbeddingInferenceDetail,
+    EnhancedInferenceDetailResponse,
     FeedbackItem,
-    InferenceDetailResponse,
+    ImageInferenceDetail,
     InferenceFeedbackResponse,
     InferenceListItem,
     InferenceListRequest,
     InferenceListResponse,
     MetricsData,
+    ModerationInferenceDetail,
     ObservabilityMetricsRequest,
     ObservabilityMetricsResponse,
     PerformanceMetric,
@@ -648,6 +652,10 @@ class ObservabilityMetricsService:
             where_conditions.append("mi.response_time_ms <= %(max_latency_ms)s")
             params["max_latency_ms"] = request.max_latency_ms
 
+        if request.endpoint_type:
+            where_conditions.append("mi.endpoint_type = %(endpoint_type)s")
+            params["endpoint_type"] = request.endpoint_type
+
         where_clause = " AND ".join(where_conditions)
 
         # Build ORDER BY clause - validate sort_by to prevent injection
@@ -689,8 +697,22 @@ class ObservabilityMetricsService:
             mi.inference_id,
             mi.timestamp,
             mi.model_name,
-            substring(coalesce(ci.input, mi.input_messages), 1, 100) as prompt_preview,
-            substring(coalesce(ci.output, mi.output), 1, 100) as response_preview,
+            CASE
+                WHEN mi.endpoint_type = 'chat' THEN substring(coalesce(ci.input, mi.input_messages), 1, 100)
+                WHEN mi.endpoint_type = 'embedding' THEN substring(ei.input, 1, 100)
+                WHEN mi.endpoint_type IN ('audio_transcription', 'audio_translation', 'text_to_speech') THEN substring(ai.input, 1, 100)
+                WHEN mi.endpoint_type = 'image_generation' THEN substring(ii.prompt, 1, 100)
+                WHEN mi.endpoint_type = 'moderation' THEN substring(modi.input, 1, 100)
+                ELSE substring(mi.input_messages, 1, 100)
+            END as prompt_preview,
+            CASE
+                WHEN mi.endpoint_type = 'chat' THEN substring(coalesce(ci.output, mi.output), 1, 100)
+                WHEN mi.endpoint_type = 'embedding' THEN concat('Generated ', toString(ei.input_count), ' embeddings')
+                WHEN mi.endpoint_type IN ('audio_transcription', 'audio_translation', 'text_to_speech') THEN substring(ai.output, 1, 100)
+                WHEN mi.endpoint_type = 'image_generation' THEN concat('Generated ', toString(ii.image_count), ' images')
+                WHEN mi.endpoint_type = 'moderation' THEN if(modi.flagged, 'Content flagged', 'Content passed')
+                ELSE substring(mi.output, 1, 100)
+            END as response_preview,
             mi.input_tokens,
             mi.output_tokens,
             mi.input_tokens + mi.output_tokens as total_tokens,
@@ -700,10 +722,15 @@ class ObservabilityMetricsService:
             mi.cached,
             mid.project_id,
             mid.endpoint_id,
-            mid.model_id
+            mid.model_id,
+            coalesce(mi.endpoint_type, 'chat') as endpoint_type
         FROM ModelInference mi
         INNER JOIN ModelInferenceDetails mid ON mi.inference_id = mid.inference_id
-        LEFT JOIN ChatInference ci ON mi.inference_id = ci.id
+        LEFT JOIN ChatInference ci ON mi.inference_id = ci.id AND mi.endpoint_type = 'chat'
+        LEFT JOIN EmbeddingInference ei ON mi.inference_id = ei.id AND mi.endpoint_type = 'embedding'
+        LEFT JOIN AudioInference ai ON mi.inference_id = ai.id AND mi.endpoint_type IN ('audio_transcription', 'audio_translation', 'text_to_speech')
+        LEFT JOIN ImageInference ii ON mi.inference_id = ii.id AND mi.endpoint_type = 'image_generation'
+        LEFT JOIN ModerationInference modi ON mi.inference_id = modi.id AND mi.endpoint_type = 'moderation'
         WHERE {where_clause}
         ORDER BY {order_by}
         LIMIT %(limit)s OFFSET %(offset)s
@@ -735,6 +762,7 @@ class ObservabilityMetricsService:
                     project_id=row[12],
                     endpoint_id=row[13],
                     model_id=row[14],
+                    endpoint_type=row[15],
                 )
             )
 
@@ -749,7 +777,7 @@ class ObservabilityMetricsService:
             has_more=has_more,
         )
 
-    async def get_inference_details(self, inference_id: str) -> InferenceDetailResponse:
+    async def get_inference_details(self, inference_id: str) -> EnhancedInferenceDetailResponse:
         """Get complete details for a single inference.
 
         Args:
@@ -796,7 +824,8 @@ class ObservabilityMetricsService:
             mi.raw_request,
             mi.raw_response,
             mi.gateway_request,
-            mi.gateway_response
+            mi.gateway_response,
+            coalesce(mi.endpoint_type, 'chat') as endpoint_type
         FROM ModelInference mi
         INNER JOIN ModelInferenceDetails mid ON mi.inference_id = mid.inference_id
         LEFT JOIN ChatInference ci ON mi.inference_id = ci.id
@@ -810,6 +839,7 @@ class ObservabilityMetricsService:
             raise ValueError("Inference not found")
 
         row = results[0]
+        endpoint_type = row[29]  # Get endpoint_type
 
         # Parse messages from JSON string
         import json
@@ -876,7 +906,83 @@ class ObservabilityMetricsService:
             # Handle potential UUID conversion for episode_id
             episode_id = safe_uuid(row[10])
 
-            return InferenceDetailResponse(
+            # Fetch type-specific details based on endpoint_type
+            embedding_details = None
+            audio_details = None
+            image_details = None
+            moderation_details = None
+
+            if endpoint_type == "embedding":
+                embedding_query = """
+                SELECT embeddings, embedding_dimensions, input_count, input
+                FROM EmbeddingInference
+                WHERE id = %(inference_id)s
+                """
+                embedding_results = await self.clickhouse_client.execute_query(embedding_query, params)
+                if embedding_results:
+                    emb_row = embedding_results[0]
+                    embedding_details = EmbeddingInferenceDetail(
+                        embeddings=json.loads(emb_row[0]) if isinstance(emb_row[0], str) else emb_row[0],
+                        embedding_dimensions=emb_row[1],
+                        input_count=emb_row[2],
+                        input_text=emb_row[3],
+                    )
+
+            elif endpoint_type in ["audio_transcription", "audio_translation", "text_to_speech"]:
+                audio_query = """
+                SELECT audio_type, input, output, language, duration_seconds, file_size_bytes, response_format
+                FROM AudioInference
+                WHERE id = %(inference_id)s
+                """
+                audio_results = await self.clickhouse_client.execute_query(audio_query, params)
+                if audio_results:
+                    audio_row = audio_results[0]
+                    audio_details = AudioInferenceDetail(
+                        audio_type=audio_row[0],
+                        input=audio_row[1],
+                        output=audio_row[2],
+                        language=audio_row[3],
+                        duration_seconds=audio_row[4],
+                        file_size_bytes=audio_row[5],
+                        response_format=audio_row[6],
+                    )
+
+            elif endpoint_type == "image_generation":
+                image_query = """
+                SELECT prompt, image_count, size, quality, style, images
+                FROM ImageInference
+                WHERE id = %(inference_id)s
+                """
+                image_results = await self.clickhouse_client.execute_query(image_query, params)
+                if image_results:
+                    img_row = image_results[0]
+                    image_details = ImageInferenceDetail(
+                        prompt=img_row[0],
+                        image_count=img_row[1],
+                        size=img_row[2],
+                        quality=img_row[3],
+                        style=img_row[4],
+                        images=json.loads(img_row[5]) if isinstance(img_row[5], str) else [],
+                    )
+
+            elif endpoint_type == "moderation":
+                moderation_query = """
+                SELECT input, results, flagged, categories, category_scores
+                FROM ModerationInference
+                WHERE id = %(inference_id)s
+                """
+                moderation_results = await self.clickhouse_client.execute_query(moderation_query, params)
+                if moderation_results:
+                    mod_row = moderation_results[0]
+                    moderation_details = ModerationInferenceDetail(
+                        input=mod_row[0],
+                        results=json.loads(mod_row[1]) if isinstance(mod_row[1], str) else [],
+                        flagged=mod_row[2],
+                        categories=mod_row[3],
+                        category_scores=mod_row[4],
+                    )
+
+            return EnhancedInferenceDetailResponse(
                 object="inference_detail",
                 inference_id=safe_uuid(row[0]),  # Keep as UUID
                 timestamp=row[1],
@@ -909,6 +1015,11 @@ class ObservabilityMetricsService:
                 gateway_response=str(row[28]) if row[28] else None,
                 feedback_count=feedback_count,
                 average_rating=average_rating,
+                endpoint_type=endpoint_type,
+                embedding_details=embedding_details,
+                audio_details=audio_details,
+                image_details=image_details,
+                moderation_details=moderation_details,
             )
         except Exception as e:
             logger.error(f"Failed to create InferenceDetailResponse: {e}")
