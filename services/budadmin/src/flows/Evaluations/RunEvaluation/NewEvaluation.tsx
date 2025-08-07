@@ -16,12 +16,20 @@ import { BudFormContext } from "@/components/ui/bud/context/BudFormContext";
 import { useDeployModel } from "src/stores/useDeployModel";
 import { isValidModelName } from "@/lib/utils";
 import TextAreaInput from "@/components/ui/bud/dataEntry/TextArea";
+import { useRouter } from "next/router";
+import { useEvaluations } from "src/hooks/useEvaluations";
+import { successToast, errorToast } from "@/components/toast";
 
 
 export default function NewEvaluation() {
-  const { openDrawerWithStep } = useDrawer()
+  const { openDrawerWithStep, drawerProps } = useDrawer()
   const { currentWorkflow, updateModelDetailsLocal, updateCredentialsLocal, localModelDetails, deleteWorkflow } = useDeployModel();
   const { values, form } = useContext(BudFormContext);
+  const router = useRouter();
+  const { createEvaluationWorkflow } = useEvaluations();
+
+  // Get experiment ID from drawer props
+  const experimentId = drawerProps?.experimentId as string;
 
 
 
@@ -32,8 +40,34 @@ export default function NewEvaluation() {
         openDrawerWithStep('select-use-case')
       }}
 
-      onNext={async () => {
-        openDrawerWithStep('select-model-new-evaluation')
+      onNext={async (values) => {
+        try {
+          // Check if experimentId is available
+          if (!experimentId) {
+            errorToast("Experiment ID not found");
+            return;
+          }
+
+          // Prepare payload for step 1
+          const payload = {
+            step_number: 1,
+            stage_data: {
+              name: values.EvaluationName,
+              description: values.Description
+            }
+          };
+
+          // Call the API
+          const response = await createEvaluationWorkflow(experimentId, payload);
+
+          successToast("Evaluation workflow created successfully");
+
+          // Navigate to next step
+          openDrawerWithStep('select-model-new-evaluation');
+        } catch (error) {
+          console.error("Failed to create evaluation workflow:", error);
+          errorToast("Failed to create evaluation workflow");
+        }
       }}
     >
       <BudWraperBox>

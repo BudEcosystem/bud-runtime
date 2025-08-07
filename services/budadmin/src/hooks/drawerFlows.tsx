@@ -3485,7 +3485,7 @@ const newExperiment: DrawerFlowType = {
           title: "New Experiment",
         },
       ],
-      confirmClose: true,
+      confirmClose: false,
     },
     {
       navigation: () => ["Experiments", "New Experiment"],
@@ -3498,7 +3498,7 @@ const newExperiment: DrawerFlowType = {
           title: "New Experiment",
         },
       ],
-      confirmClose: true,
+      confirmClose: false,
     },
   ],
 };

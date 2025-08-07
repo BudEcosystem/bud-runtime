@@ -34,39 +34,38 @@ const DeploymentSpecificationConfig: React.FC = (props: {}) => {
       </div>
       <div className="px-[1.4rem] pt-[2.15rem] w-full">
         <div className="flex gap-[1.5rem] w-full flex-row mb-[1.3rem]">
-          <Form.Item
-            hasFeedback
-            name={"deployment_name"}
-            className={`flex items-start rounded-[6px] relative !bg-[transparent] w-[48%] mb-[0]`}
-            rules={[
-              {
-                required: true,
-                message: "Please enter deployment name",
-              },
-              {
-                max: 50,
-                message: "Deployment name should be less than 50 characters",
-              },
-              {
-                pattern: endpointNameRegex,
-                message:
-                  "Deployment name should contain only alphanumeric characters and hyphens",
-              },
-            ]}
-          >
-            <div className="w-full">
-              <Text_12_300_EEEEEE className="absolute px-1.5 bg-[#101010] -top-1.5 left-1.5 tracking-[.035rem] z-10 flex items-center gap-1 text-[.75rem] text-[#EEEEEE] font-[400]">
-                Deployment&nbsp;Name
-                <CustomPopover title="A unique name to identify your deployment.">
-                  <Image
-                    preview={false}
-                    src="/images/info.png"
-                    alt="info"
-                    style={{ width: ".75rem" }}
-                  />
-                </CustomPopover>
-              </Text_12_300_EEEEEE>
-            </div>
+          <div className="w-[48%] relative">
+            <Text_12_300_EEEEEE className="absolute px-1.5 bg-[#101010] -top-1.5 left-1.5 tracking-[.035rem] z-10 flex items-center gap-1 text-[.75rem] text-[#EEEEEE] font-[400]">
+              Deployment&nbsp;Name
+              <CustomPopover title="A unique name to identify your deployment.">
+                <Image
+                  preview={false}
+                  src="/images/info.png"
+                  alt="info"
+                  style={{ width: ".75rem" }}
+                />
+              </CustomPopover>
+            </Text_12_300_EEEEEE>
+            <Form.Item
+              hasFeedback
+              name={"deployment_name"}
+              className={`flex items-start rounded-[6px] relative !bg-[transparent] mb-[0]`}
+              rules={[
+                {
+                  required: true,
+                  message: "Please enter deployment name",
+                },
+                {
+                  max: 50,
+                  message: "Deployment name should be less than 50 characters",
+                },
+                {
+                  pattern: endpointNameRegex,
+                  message:
+                    "Deployment name should contain only alphanumeric characters and hyphens",
+                },
+              ]}
+            >
             <Input
               placeholder="Name Your Deployment"
               style={{
@@ -83,38 +82,38 @@ const DeploymentSpecificationConfig: React.FC = (props: {}) => {
                   ...deploymentSpecifcation,
                   deployment_name: e.target.value,
                 });
-              }}
-              className="drawerInp py-[.65rem] bg-transparent text-[#EEEEEE] font-[300] border-[0.5px] border-[#757575] rounded-[6px] hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] text-[.75rem] shadow-none w-full indent-[.4rem]"
-            />
-          </Form.Item>
-          <Form.Item
-            name={"concurrent_requests"}
-            hasFeedback
-            rules={[
-              {
-                required: true,
-                message: "Please enter concurrent requests",
-              },
-              {
-                min: 1,
-                message: "Concurrent requests should be greater than 0",
-              },
-            ]}
-            className={`flex items-start rounded-[6px] relative !bg-[transparent]  w-[48%] mb-[0]`}
-          >
-            <div className="w-full">
-              <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1">
-                Concurrent&nbsp;Request
-                <CustomPopover title="The number of requests you want the model to handle at the same time.">
-                  <Image
-                    preview={false}
-                    src="/images/info.png"
-                    alt="info"
-                    style={{ width: ".75rem", height: ".75rem" }}
-                  />
-                </CustomPopover>
-              </Text_12_300_EEEEEE>
-            </div>
+                }}
+                className="drawerInp py-[.65rem] bg-transparent text-[#EEEEEE] font-[300] border-[0.5px] border-[#757575] rounded-[6px] hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] text-[.75rem] shadow-none w-full indent-[.4rem]"
+              />
+            </Form.Item>
+          </div>
+          <div className="w-[48%] relative">
+            <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1">
+              Concurrent&nbsp;Request
+              <CustomPopover title="The number of requests you want the model to handle at the same time.">
+                <Image
+                  preview={false}
+                  src="/images/info.png"
+                  alt="info"
+                  style={{ width: ".75rem", height: ".75rem" }}
+                />
+              </CustomPopover>
+            </Text_12_300_EEEEEE>
+            <Form.Item
+              name={"concurrent_requests"}
+              hasFeedback
+              rules={[
+                {
+                  required: true,
+                  message: "Please enter concurrent requests",
+                },
+                {
+                  min: 1,
+                  message: "Concurrent requests should be greater than 0",
+                },
+              ]}
+              className={`flex items-start rounded-[6px] relative !bg-[transparent] mb-[0]`}
+            >
             <Input
               type="number"
               placeholder="Enter value"
@@ -137,27 +136,28 @@ const DeploymentSpecificationConfig: React.FC = (props: {}) => {
                 setDeploymentSpecification({
                   ...deploymentSpecifcation,
                   concurrent_requests: e.target.value,
-                });
-              }}
-              size="large"
-              className="drawerInp py-[.65rem] bg-transparent text-[#EEEEEE] font-[300] border-[0.5px] border-[#757575] rounded-[6px] hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] text-[.75rem] shadow-none w-full indent-[.4rem]"
-            />
-          </Form.Item>
+                  });
+                }}
+                size="large"
+                className="drawerInp py-[.65rem] bg-transparent text-[#EEEEEE] font-[300] border-[0.5px] border-[#757575] rounded-[6px] hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] text-[.75rem] shadow-none w-full indent-[.4rem]"
+              />
+            </Form.Item>
+          </div>
         </div>
         <div className="flex gap-[1rem] w-full flex-row">
-          <div className="w-full">
+          <div className="w-full relative">
+            <Text_12_300_EEEEEE className="absolute px-1.4 tracking-[.035rem] flex items-center gap-1">
+              Context&nbsp;Length
+              <CustomPopover title="The maximum input length you want the model can process.">
+                <Image
+                  preview={false}
+                  src="/images/info.png"
+                  alt="info"
+                  style={{ width: ".75rem", height: ".75rem" }}
+                />
+              </CustomPopover>
+            </Text_12_300_EEEEEE>
             <Form.Item name={"avg_context_length"} hasFeedback>
-              <Text_12_300_EEEEEE className="absolute px-1.4 tracking-[.035rem] flex items-center gap-1">
-                Context&nbsp;Length
-                <CustomPopover title="The maximum input length you want the model can process.">
-                  <Image
-                    preview={false}
-                    src="/images/info.png"
-                    alt="info"
-                    style={{ width: ".75rem", height: ".75rem" }}
-                  />
-                </CustomPopover>
-              </Text_12_300_EEEEEE>
               <div className="flex items-end justify-center mt-[.8rem] gap-[.75rem]">
                 <div className="text-[#757575] text-[.75rem] h-[1.6rem]">
                   30
@@ -235,19 +235,19 @@ const DeploymentSpecificationConfig: React.FC = (props: {}) => {
           </div>
         </div>
         <div className="flex gap-[1rem] w-full flex-row">
-          <div className="w-full">
+          <div className="w-full relative">
+            <Text_12_300_EEEEEE className="absolute px-1.4 tracking-[.035rem] flex items-center gap-1">
+              Sequence&nbsp;Length
+              <CustomPopover title="The maximum sequence length you want the model can process.">
+                <Image
+                  preview={false}
+                  src="/images/info.png"
+                  alt="info"
+                  style={{ width: ".75rem", height: ".75rem" }}
+                />
+              </CustomPopover>
+            </Text_12_300_EEEEEE>
             <Form.Item name={"avg_sequence_length"} hasFeedback>
-              <Text_12_300_EEEEEE className="absolute px-1.4 tracking-[.035rem] flex items-center gap-1">
-                Sequence&nbsp;Length
-                <CustomPopover title="The maximum sequence length you want the model can process.">
-                  <Image
-                    preview={false}
-                    src="/images/info.png"
-                    alt="info"
-                    style={{ width: ".75rem", height: ".75rem" }}
-                  />
-                </CustomPopover>
-              </Text_12_300_EEEEEE>
               <div className="flex items-end justify-center mt-[.8rem] gap-[.75rem]">
                 <div className="text-[#757575] text-[.75rem] h-[1.6rem]">
                   10

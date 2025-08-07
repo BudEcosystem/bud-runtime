@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import DrawerCard from "@/components/ui/bud/card/DrawerCard";
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
@@ -10,11 +10,26 @@ import { successToast } from "@/components/toast";
 import { useDrawer } from "src/hooks/useDrawer";
 import { useEvaluations } from "src/hooks/useEvaluations";
 import { useProjects } from "src/hooks/useProjects";
+import { useModels } from "src/hooks/useModels";
 import TextInput from "src/flows/components/TextInput";
+import SelectInput from "src/flows/components/SelectInput";
 
 const NewExperimentForm = React.memo(function NewExperimentForm() {
   const [options] = useState([]);
+  const [modelOptions, setModelOptions] = useState([]);
+  const { fetchModels } = useModels();
 
+  useEffect(() => {
+    fetchModels({ page: 1, limit: 100 }).then((models) => {
+      if (models) {
+        const options = models.map((model) => ({
+          label: model.name,
+          value: model.id
+        }));
+        setModelOptions(options);
+      }
+    });
+  }, [fetchModels]);
 
   return (
     <DrawerCard>
@@ -43,6 +58,15 @@ const NewExperimentForm = React.memo(function NewExperimentForm() {
         ClassNames="mt-[.4rem]"
         InputClasses="py-[.5rem]"
       />
+      <SelectInput
+        name="model"
+        label="Model"
+        placeholder="Select a model (optional)"
+        options={modelOptions}
+        ClassNames="mt-[.4rem]"
+        SelectClasses="py-[.5rem]"
+        infoText="Select the model you want to use for this experiment"
+      />
       <TagsInput
         label="Tags"
         options={options}
@@ -55,10 +79,16 @@ const NewExperimentForm = React.memo(function NewExperimentForm() {
               if (value && value.length > 10) {
                 return Promise.reject("Maximum 10 tags allowed");
               }
-              if (value && value.some((tag: string) => tag.length > 20)) {
+              if (value && value.some((tag: any) => {
+                const tagName = typeof tag === 'string' ? tag : tag.name;
+                return tagName && tagName.length > 20;
+              })) {
                 return Promise.reject("Each tag must be 20 characters or less");
               }
-              if (value && value.some((tag: string) => !/^[a-zA-Z0-9\-_]+$/.test(tag))) {
+              if (value && value.some((tag: any) => {
+                const tagName = typeof tag === 'string' ? tag : tag.name;
+                return tagName && !/^[a-zA-Z0-9\-_]+$/.test(tagName);
+              })) {
                 return Promise.reject("Tags can only contain letters, numbers, hyphens, and underscores");
               }
               return Promise.resolve();
@@ -98,7 +128,7 @@ const NewExperimentForm = React.memo(function NewExperimentForm() {
 
 export default function NewExperimentDrawer() {
   const { openDrawerWithStep } = useDrawer();
-  const { createExperiment } = useEvaluations();
+  const { createExperiment, getExperiments } = useEvaluations();
   const { selectedProject } = useProjects();
 
   const handleSubmit = async (values: any) => {
@@ -119,19 +149,29 @@ export default function NewExperimentDrawer() {
         throw new Error("Invalid description");
       }
 
-      // Map form values to API payload format
+      // Map form values to API payload format matching the expected input
       const payload = {
         name: cleanedName,
         description: cleanedDescription,
-        project_id: selectedProject?.id || "36feef53-e271-4282-9de5-993b211a1c57", // Hardcoded as fallback
+        project_id: selectedProject?.id || "92ba4cb7-6ab8-49be-b211-a69a1b78feb4",
         tags: cleanedTags
       };
 
       // Call the API to create experiment
-      await createExperiment(payload);
+      const response = await createExperiment(payload);
+
+      // Refresh the experiments list
+      await getExperiments({
+        page: 1,
+        limit: 10
+      });
 
       successToast("Experiment created successfully");
-      openDrawerWithStep("new-experiment-success");
+
+      // Pass the experiment ID to the success screen
+      openDrawerWithStep("new-experiment-success", {
+        experimentId: response.id || response.experiment?.id || response.data?.id
+      });
     } catch (error) {
       console.error("Failed to create experiment:", error);
     }
@@ -143,7 +183,7 @@ export default function NewExperimentDrawer() {
         experimentName: "",
         tags: [],
         description: "",
-        model: undefined,
+        model: "",
       }}
       onNext={handleSubmit}
       nextText="Create"
