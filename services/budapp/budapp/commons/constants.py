@@ -276,14 +276,32 @@ ModelSourceEnum = create_dynamic_enum(
     ],
 )
 
-CredentialTypeEnum = Enum(
-    "CredentialTypeEnum",
+# Keep the old CredentialTypeEnum for ProprietaryCredential compatibility
+ProprietaryCredentialTypeEnum = Enum(
+    "ProprietaryCredentialTypeEnum",
     {
         name: member.value
         for name, member in ModelSourceEnum.__members__.items()
         if member not in [ModelSourceEnum.LOCAL]
     },
 )
+
+# Alias for backward compatibility
+CredentialTypeEnum = ProprietaryCredentialTypeEnum
+
+
+class ApiCredentialTypeEnum(str, Enum):
+    """Enumeration of API credential types.
+
+    This enum defines the types of API credentials that can be created.
+
+    Attributes:
+        CLIENT_APP (str): Client application credentials for external API access.
+        ADMIN_APP (str): Administrative application credentials with elevated permissions.
+    """
+
+    CLIENT_APP = "client_app"
+    ADMIN_APP = "admin_app"
 
 
 class ModelProviderTypeEnum(Enum):
