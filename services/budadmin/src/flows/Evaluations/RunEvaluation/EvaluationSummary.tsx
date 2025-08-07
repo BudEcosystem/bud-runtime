@@ -4,6 +4,7 @@ import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
 import React from "react";
 import { useDrawer } from "src/hooks/useDrawer";
+import { useEvaluations } from "src/hooks/useEvaluations";
 import { Input } from 'antd';
 import { SearchOutlined } from "@ant-design/icons";
 import { Text_12_400_757575, Text_12_600_EEEEEE, Text_14_400_EEEEEE, Text_14_600_EEEEEE } from "@/components/ui/text";
@@ -17,7 +18,12 @@ import { Model } from "src/hooks/useModels";
 
 
 export default function EvaluationSummary() {
-  // Mock evaluation data - replace with actual API call
+  const { getWorkflowData, workflowData, currentWorkflow, loading } = useEvaluations();
+  const [isLoadingData, setIsLoadingData] = React.useState(true);
+  const [evaluations, setEvaluations] = React.useState<Evaluation[]>([]);
+  const [selectedModelData, setSelectedModelData] = React.useState<Model | null>(null);
+
+  // Mock evaluation data - will be replaced with actual data
   const mockEvaluations: Evaluation[] = [
     {
       id: "eval-1",
@@ -157,7 +163,70 @@ export default function EvaluationSummary() {
   const [selectedEvaluation, setSelectedEvaluation] = React.useState<Evaluation | null>(null);
   const { openDrawerWithStep } = useDrawer();
 
-  const filteredEvaluations = mockEvaluations.filter((evaluation) =>
+  // Fetch workflow data on component mount
+  React.useEffect(() => {
+    const fetchWorkflowData = async () => {
+      try {
+        setIsLoadingData(true);
+
+        // Get experiment ID and workflow ID from currentWorkflow or props
+        if (currentWorkflow?.experiment_id && currentWorkflow?.workflow_id) {
+          const data = await getWorkflowData(
+            currentWorkflow.experiment_id,
+            currentWorkflow.workflow_id
+          );
+
+          // Extract data from workflow response
+          if (data) {
+            // Set evaluations from workflow data if available
+            if (data.evaluations) {
+              setEvaluations(data.evaluations);
+            } else {
+              // Fallback to mock data if no evaluations in response
+              setEvaluations(mockEvaluations);
+            }
+
+            // Set selected model from workflow data if available
+            if (data.selected_model) {
+              setSelectedModelData(data.selected_model);
+            } else if (data.workflow_steps?.stage_data?.selected_model) {
+              setSelectedModelData(data.workflow_steps.stage_data.selected_model);
+            } else {
+              // Fallback to mock model
+              setSelectedModelData(selectedModel);
+            }
+
+            // Update deployment specs if available in workflow data
+            if (data.deployment_specs) {
+              detDeploymentSpecs(data.deployment_specs);
+            } else if (data.workflow_steps?.stage_data?.deployment_specs) {
+              detDeploymentSpecs(data.workflow_steps.stage_data.deployment_specs);
+            }
+          } else {
+            // Use mock data if no workflow data
+            setEvaluations(mockEvaluations);
+            setSelectedModelData(selectedModel);
+          }
+        } else {
+          // Use mock data if no workflow IDs available
+          console.log('No workflow IDs available, using mock data');
+          setEvaluations(mockEvaluations);
+          setSelectedModelData(selectedModel);
+        }
+      } catch (error) {
+        console.error('Error fetching workflow data:', error);
+        // Fallback to mock data on error
+        setEvaluations(mockEvaluations);
+        setSelectedModelData(selectedModel);
+      } finally {
+        setIsLoadingData(false);
+      }
+    };
+
+    fetchWorkflowData();
+  }, [currentWorkflow?.experiment_id, currentWorkflow?.workflow_id]);
+
+  const filteredEvaluations = evaluations.filter((evaluation) =>
     evaluation.name.toLowerCase().includes(search.toLowerCase()) ||
     evaluation.description?.toLowerCase().includes(search.toLowerCase()) ||
     evaluation.tags?.some(tag => tag.toLowerCase().includes(search.toLowerCase()))
@@ -187,7 +256,7 @@ export default function EvaluationSummary() {
         <BudDrawerLayout>
           <DrawerTitleCard
             title="Selected Evaluations"
-            description="Description for ..."
+            description={isLoadingData ? "Loading workflow data..." : "Review the selected evaluations and model configuration"}
             classNames="pt-[.8rem]"
             descriptionClass="pt-[.3rem]"
           />
@@ -200,18 +269,18 @@ export default function EvaluationSummary() {
 
                       <div className="mr-[1.05rem] shrink-0 grow-0 flex items-center justify-center">
                         <IconRender
-                          icon={selectedModel?.icon || selectedModel?.icon}
+                          icon={selectedModelData?.icon || selectedModelData?.icon}
                           size={44}
                           imageSize={28}
-                          type={selectedModel?.provider_type}
-                          model={selectedModel}
+                          type={selectedModelData?.provider_type}
+                          model={selectedModelData}
                         />
                       </div>
                       <div>
                         <Text_14_400_EEEEEE className="mb-[0.65rem] leading-[140%]">
-                          {selectedModel?.name}
+                          {selectedModelData?.name}
                         </Text_14_400_EEEEEE>
-                        <ModelTags model={selectedModel} maxTags={3} />
+                        <ModelTags model={selectedModelData} maxTags={3} />
                       </div>
                     </div>
                   </Text_14_600_EEEEEE>

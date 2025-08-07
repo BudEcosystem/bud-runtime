@@ -15,12 +15,13 @@ import { Text_12_300_EEEEEE, Text_24_600_EEEEEE } from "@/components/ui/text";
 import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
 
 const NewExperimentSuccess: React.FC = () => {
-  const { closeDrawer } = useDrawer();
+  const { closeDrawer, drawerProps } = useDrawer();
   const { currentWorkflow, getWorkflow } = useDeployModel();
   const { getEndpointClusterDetails } = useEndPoints();
   const { getWorkers } = useWorkers();
   const router = useRouter();
-  const projectId = router.query.projectId as string
+  const projectId = router.query.projectId as string;
+  const experimentId = drawerProps?.experimentId;
   React.useEffect(() => {
     getWorkflow();
   }, []);
@@ -62,8 +63,10 @@ const NewExperimentSuccess: React.FC = () => {
             </div>
             <PrimaryButton
               onClick={() => {
-                //reset();
                 closeDrawer();
+                if (experimentId) {
+                  router.push(`/home/evaluations/experiments/${experimentId}`);
+                }
               }}
             >
               <div className="flex items-center justify-center gap">

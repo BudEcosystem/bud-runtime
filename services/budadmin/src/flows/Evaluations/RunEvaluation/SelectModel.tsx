@@ -8,6 +8,8 @@ import { useDrawer } from "src/hooks/useDrawer";
 import { useModels } from "src/hooks/useModels";
 import ModelFilter from "@/components/ui/bud/deploymentDrawer/ModelFilter";
 import { usePerfomanceBenchmark } from "src/stores/usePerfomanceBenchmark";
+import { useEvaluations } from "src/hooks/useEvaluations";
+import { successToast, errorToast } from "@/components/toast";
 
 export default function SelectModelForNewEvaluation() {
   const [page, setPage] = React.useState(1);
@@ -19,8 +21,9 @@ export default function SelectModelForNewEvaluation() {
     fetchModels
   } = useModels();
   const [search, setSearch] = React.useState("");
-  const { openDrawerWithStep} = useDrawer();
+  const { openDrawerWithStep, drawerProps } = useDrawer();
   const { setSelectedModel, selectedModel, stepFive} = usePerfomanceBenchmark();
+  const { createEvaluationWorkflow, currentWorkflow } = useEvaluations();
 
   useEffect(() => {
     fetchModels({
@@ -39,17 +42,52 @@ export default function SelectModelForNewEvaluation() {
   return (
     <BudForm
       data={{}}
-      // disableNext={!selectedModel?.id}
-      // onNext={async () => {
-      //   openDrawerWithStep("Benchmark-Configuration");
-      // }}
+      disableNext={!selectedModel?.id}
       onBack={async () => {
         openDrawerWithStep("new-evaluation");
-      }
-      }
+      }}
       backText="Back"
-      onNext={() => {
-        openDrawerWithStep("select-traits");
+      onNext={async () => {
+        try {
+          // Check if we have the required data
+          if (!selectedModel?.id) {
+            errorToast("Please select a model");
+            return;
+          }
+
+          if (!currentWorkflow?.workflow_id) {
+            errorToast("Workflow not found. Please start over.");
+            return;
+          }
+
+          // Get experiment ID from workflow or drawer props
+          const experimentId = currentWorkflow.experiment_id || drawerProps?.experimentId;
+
+          if (!experimentId) {
+            errorToast("Experiment ID not found");
+            return;
+          }
+
+          // Prepare payload for step 2
+          const payload = {
+            step_number: 2,
+            workflow_id: currentWorkflow.workflow_id,
+            stage_data: {
+              model_id: selectedModel.id
+            }
+          };
+
+          // Call the API
+          const response = await createEvaluationWorkflow(experimentId, payload);
+
+          successToast("Model selected successfully");
+
+          // Navigate to next step
+          openDrawerWithStep("select-traits");
+        } catch (error) {
+          console.error("Failed to update evaluation workflow:", error);
+          errorToast("Failed to select model");
+        }
       }}
       nextText="Next"
     >
