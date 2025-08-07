@@ -155,7 +155,7 @@ export const useUsers = create<{
   },
 
   addUser: async (payload) => {
-    const response: any = await AppRequest.Post(`/users`, payload);
+    const response: any = await AppRequest.Post(`/users/`, payload);
     if (response) {
       get().getUsers({ page: 1, limit: 10, order_by: "-created_at" });
     }

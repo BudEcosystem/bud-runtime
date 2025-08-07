@@ -47,6 +47,7 @@ axiosInstance.interceptors.request.use(
 
     const isPublicEndpoint =
       config.url?.includes("auth/login") ||
+      config.url?.includes("auth/register") ||
       config.url?.includes("users/reset-password") ||
       config.url?.includes("auth/refresh-token");
 
@@ -197,6 +198,10 @@ const Post = (
     headers?: any;
   }
 ) => {
+  console.log(`[API] POST request to: ${endPoint}`);
+  console.log(`[API] Full URL: ${baseUrl}${endPoint}`);
+  console.log(`[API] Payload:`, payload);
+
   const finalConfig: any = {
     ...config,
     headers: {

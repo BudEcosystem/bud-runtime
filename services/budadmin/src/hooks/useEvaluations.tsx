@@ -12,6 +12,7 @@ export interface GetEvaluationsPayload {
   modalities?: string;
   language?: string;
   domains?: string;
+  trait_ids?: string[];
 }
 
 export interface GetExperimentsPayload {
@@ -70,6 +71,18 @@ export interface TraitSimple {
   exps_ids: string[];
 }
 
+// Evaluation workflow type
+export interface EvaluationWorkflow {
+  workflow_id: string;
+  experiment_id: string;
+  current_step: number;
+  total_steps: number;
+  status: string;
+  workflow_steps: any; // This will store step-specific data
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface MetaLinks {
   manifest_id: string;
 }
@@ -110,26 +123,32 @@ export const useEvaluations = create<{
   experimentMetrics: any;
   experimentBenchmarks: any;
   experimentRuns: any;
+  currentWorkflow: EvaluationWorkflow | null;
+  workflowData: any;
 
   getEvaluations: (payload?: GetEvaluationsPayload) => Promise<any>;
   getTraits: (payload?: any) => Promise<any>;
   getExperiments: (payload?: GetExperimentsPayload) => Promise<any>;
   getExperimentDetails: (id: string) => Promise<any>;
-  getExperimentMetrics: (id: string) => Promise<any>;
-  getExperimentBenchmarks: (id: string) => Promise<any>;
   getExperimentRuns: (id: string) => Promise<any>;
   createExperiment: (payload: any) => Promise<any>;
+  createEvaluationWorkflow: (experimentId: string, payload: any) => Promise<any>;
+  setCurrentWorkflow: (workflow: EvaluationWorkflow | null) => void;
+  getCurrentWorkflow: () => EvaluationWorkflow | null;
+  getWorkflowData: (experimentId: string, workflowId: string) => Promise<any>;
 }>((set, get) => ({
   loading: false,
   evaluationsList: [],
   traitsList: [],
-  evaluationsListTotal: null,
+  evaluationsListTotal: 0,
   experimentsList: [],
-  experimentsListTotal: null,
+  experimentsListTotal: 0,
   experimentDetails: null,
   experimentMetrics: null,
   experimentBenchmarks: null,
   experimentRuns: null,
+  currentWorkflow: null,
+  workflowData: null,
 
   getEvaluations: async (payload) => {
     set({ loading: true });
@@ -143,9 +162,14 @@ export const useEvaluations = create<{
       if (payload?.modalities) params.append('modalities', payload.modalities);
       if (payload?.language) params.append('language', payload.language);
       if (payload?.domains) params.append('domains', payload.domains);
+      if (payload?.trait_ids && payload.trait_ids.length > 0) {
+        console.log('Adding trait_ids to params:', payload.trait_ids);
+        payload.trait_ids.forEach(id => params.append('trait_ids', id));
+      }
 
       const queryString = params.toString();
       const url = `${tempApiBaseUrl}/experiments/datasets${queryString ? `?${queryString}` : ''}`;
+      console.log('Fetching evaluations with URL:', url);
 
       const response: any = await AppRequest.Get(url);
       set({ evaluationsList: response.data.datasets });
@@ -213,10 +237,14 @@ export const useEvaluations = create<{
       // const url = `${tempApiBaseUrl}/experiments${queryString ? `?${queryString}` : ''}`;
 
       const response: any = await AppRequest.Get(url);
-      set({ experimentsList: response.data.experiments || response.data || [] });
-      set({ experimentsListTotal: response.data.total || response.total || 0 });
+      // Ensure experimentsList is always an array
+      const experiments = response.data?.experiments || response.data || [];
+      const experimentsArray = Array.isArray(experiments) ? experiments : [];
 
-      return response.data;
+      set({ experimentsList: experimentsArray });
+      set({ experimentsListTotal: response.data?.total || response.total || 0 });
+
+      return { experiments: experimentsArray, total: response.data?.total || response.total || 0 };
     } catch (error) {
       console.error("Error fetching experiments:", error);
       // Return empty data on error
@@ -241,42 +269,19 @@ export const useEvaluations = create<{
     }
   },
 
-  getExperimentMetrics: async (id: string) => {
-    set({ loading: true });
-    try {
-      const response: any = await AppRequest.Get(`${tempApiBaseUrl}/experiments/${id}/metrics`);
-      set({ experimentMetrics: response.data });
-      return response.data;
-    } catch (error) {
-      console.error("Error fetching experiment metrics:", error);
-      throw error;
-    } finally {
-      set({ loading: false });
-    }
-  },
-
-  getExperimentBenchmarks: async (id: string) => {
-    set({ loading: true });
-    try {
-      const response: any = await AppRequest.Get(`${tempApiBaseUrl}/experiments/${id}/benchmarks`);
-      set({ experimentBenchmarks: response.data });
-      return response.data;
-    } catch (error) {
-      console.error("Error fetching experiment benchmarks:", error);
-      throw error;
-    } finally {
-      set({ loading: false });
-    }
-  },
-
   getExperimentRuns: async (id: string) => {
     set({ loading: true });
     try {
       const response: any = await AppRequest.Get(`${tempApiBaseUrl}/experiments/${id}/runs`);
-      set({ experimentRuns: response.data });
-      return response.data;
+      // Ensure experimentRuns is always an array or object with array properties
+      const runs = response.data;
+      const runsData = Array.isArray(runs) ? { runsHistory: runs } : runs;
+      set({ experimentRuns: runsData });
+      return runsData;
     } catch (error) {
       console.error("Error fetching experiment runs:", error);
+      // Set empty array on error
+      set({ experimentRuns: { runsHistory: [] } });
       throw error;
     } finally {
       set({ loading: false });
@@ -290,6 +295,75 @@ export const useEvaluations = create<{
       return response.data;
     } catch (error) {
       console.error("Error creating experiment:", error);
+      throw error;
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  createEvaluationWorkflow: async (experimentId: string, payload: any) => {
+    set({ loading: true });
+    try {
+      const response: any = await AppRequest.Post(`${tempApiBaseUrl}/experiments/${experimentId}/evaluations/workflow`, payload);
+
+      // Save the workflow response in currentWorkflow
+      const currentWorkflowData = get().currentWorkflow;
+
+      // Merge stage_data from payload into workflow_steps
+      const updatedWorkflowSteps = {
+        ...currentWorkflowData?.workflow_steps,
+        ...response.data.workflow_steps,
+        ...response.data,
+        // Explicitly merge the stage_data from the current payload
+        stage_data: {
+          ...currentWorkflowData?.workflow_steps?.stage_data,
+          ...payload.stage_data
+        }
+      };
+
+      const workflow: EvaluationWorkflow = {
+        workflow_id: response.data.workflow_id || response.data.id || payload.workflow_id,
+        experiment_id: experimentId,
+        current_step: payload.step_number || response.data.current_step || 1,
+        total_steps: response.data.total_steps || 5,
+        status: response.data.status || 'in_progress',
+        workflow_steps: updatedWorkflowSteps,
+        created_at: response.data.created_at || currentWorkflowData?.created_at,
+        updated_at: response.data.updated_at || new Date().toISOString()
+      };
+
+      console.log('Saving workflow with steps:', workflow.workflow_steps);
+      set({ currentWorkflow: workflow });
+      return response.data;
+    } catch (error) {
+      console.error("Error creating evaluation workflow:", error);
+      throw error;
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  setCurrentWorkflow: (workflow: EvaluationWorkflow | null) => {
+    set({ currentWorkflow: workflow });
+  },
+
+  getCurrentWorkflow: () => {
+    return get().currentWorkflow;
+  },
+
+  getWorkflowData: async (experimentId: string, workflowId: string) => {
+    set({ loading: true });
+    try {
+      const url = `${tempApiBaseUrl}/experiments/${experimentId}/evaluations/workflow/${workflowId}`;
+      console.log('Fetching workflow data with URL:', url);
+
+      const response: any = await AppRequest.Get(url);
+      console.log('Workflow data response:', response.data);
+
+      set({ workflowData: response.data });
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching workflow data:", error);
       throw error;
     } finally {
       set({ loading: false });

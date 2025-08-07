@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   Text_12_300_EEEEEE,
   Text_12_400_808080,
@@ -230,6 +231,17 @@ const LoginForm = ({ onSubmit }: LoginPageModalProps) => {
         >
           Forgot password?
         </Text_12_400_EEEEEE>
+      </div>
+
+      <div className="mt-[1rem] flex justify-center items-center gap-1">
+        <Text_12_400_808080>
+          Don't have an account?
+        </Text_12_400_808080>
+        <Link href="/register">
+          <Text_12_400_EEEEEE className="cursor-pointer hover:underline">
+            Sign up
+          </Text_12_400_EEEEEE>
+        </Link>
       </div>
 
       {authError && (
