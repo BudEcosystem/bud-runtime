@@ -272,8 +272,17 @@ const ExperimentsTable = () => {
 
   // Since filtering is now handled by the API, we can directly use the experiments list
   const filteredData = useMemo(() => {
-    // Use sample data if experimentsList is empty or undefined
-    if (!experimentsList || experimentsList.length === 0) {
+    console.log("experimentsList:", experimentsList);
+    console.log("Is array:", Array.isArray(experimentsList));
+
+    // Ensure experimentsList is an array
+    if (!experimentsList || !Array.isArray(experimentsList)) {
+      console.log("Using sample experiments because experimentsList is not an array");
+      return sampleExperiments;
+    }
+    // Use sample data if experimentsList is empty
+    if (experimentsList.length === 0) {
+      console.log("Using sample experiments because experimentsList is empty");
       return sampleExperiments;
     }
     return experimentsList;
@@ -355,7 +364,7 @@ const ExperimentsTable = () => {
       <div className="userTable evalTable relative CommonCustomPagination">
         <Table<ExperimentData>
           columns={columns}
-          dataSource={filteredData}
+          dataSource={Array.isArray(filteredData) ? filteredData : []}
           pagination={{
             className: 'small-pagination',
             current: currentPage,

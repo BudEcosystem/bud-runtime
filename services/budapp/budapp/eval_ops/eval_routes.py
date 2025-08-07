@@ -8,14 +8,19 @@ from budapp.commons import logging
 from budapp.commons.dependencies import get_current_active_user, get_session
 from budapp.commons.schemas import ErrorResponse
 from budapp.eval_ops.schemas import (
+    ConfigureRunsRequest,
+    ConfigureRunsResponse,
     CreateExperimentRequest,
     CreateExperimentResponse,
     DatasetFilter,
     DeleteExperimentResponse,
     DeleteRunResponse,
+    EvaluationWorkflowResponse,
+    EvaluationWorkflowStepRequest,
     ExperimentWorkflowResponse,
     ExperimentWorkflowStepRequest,
     GetDatasetResponse,
+    GetExperimentResponse,
     GetRunResponse,
     ListDatasetsResponse,
     ListExperimentsResponse,
@@ -26,7 +31,7 @@ from budapp.eval_ops.schemas import (
     UpdateRunRequest,
     UpdateRunResponse,
 )
-from budapp.eval_ops.services import ExperimentService, ExperimentWorkflowService
+from budapp.eval_ops.services import EvaluationWorkflowService, ExperimentService, ExperimentWorkflowService
 from budapp.user_ops.models import User
 
 
@@ -51,7 +56,10 @@ def create_experiment(
 ):
     """Create a new experiment.
 
-    - **request**: Payload containing `name`, `description`, and `project_id`.
+    Creates an experiment with basic information only. Use POST /{experiment_id}/runs
+    to configure the model-dataset evaluation runs afterward.
+
+    - **request**: Payload containing `name`, `description`, `project_id`, and optional `tags`.
     - **session**: Database session dependency.
     - **current_user**: The authenticated user creating the experiment.
 
@@ -82,16 +90,27 @@ def create_experiment(
 def list_experiments(
     session: Annotated[Session, Depends(get_session)],
     current_user: Annotated[User, Depends(get_current_active_user)],
+    project_id: Annotated[Optional[uuid.UUID], Query(description="Filter by project ID")] = None,
+    id: Annotated[Optional[uuid.UUID], Query(description="Filter by experiment ID")] = None,
+    page: Annotated[int, Query(ge=1, description="Page number")] = 1,
+    limit: Annotated[int, Query(ge=1, le=100, description="Items per page")] = 10,
 ):
-    """List all experiments for the current user.
+    """List all experiments for the current user with pagination.
 
     - **session**: Database session dependency.
     - **current_user**: The authenticated user whose experiments are listed.
+    - **project_id**: Optional filter by project ID.
+    - **id**: Optional filter by experiment ID.
+    - **page**: Page number (default: 1).
+    - **limit**: Items per page (default: 10, max: 100).
 
-    Returns a `ListExperimentsResponse` containing a list of experiments.
+    Returns a `ListExperimentsResponse` containing a paginated list of experiments.
     """
     try:
-        experiments = ExperimentService(session).list_experiments(current_user.id)
+        offset = (page - 1) * limit
+        experiments, total_count = ExperimentService(session).list_experiments(
+            user_id=current_user.id, project_id=project_id, experiment_id=id, offset=offset, limit=limit
+        )
     except Exception as e:
         logger.debug(f"Failed to list experiments: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to list experiments") from e
@@ -101,6 +120,139 @@ def list_experiments(
         object="experiment.list",
         message="Successfully listed experiments",
         experiments=experiments,
+        page=page,
+        limit=limit,
+        total_record=total_count,
+    )
+
+
+@router.get(
+    "/traits",
+    response_model=ListTraitsResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        status.HTTP_400_BAD_REQUEST: {"model": ErrorResponse},
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
+    },
+)
+def list_traits(
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    page: Annotated[int, Query(ge=1, description="Page number")] = 1,
+    limit: Annotated[int, Query(ge=1, description="Results per page")] = 10,
+    name: Annotated[Optional[str], Query(description="Filter by trait name")] = None,
+    unique_id: Annotated[Optional[str], Query(description="Filter by trait UUID")] = None,
+):
+    """List experiment traits with optional filtering and pagination."""
+    try:
+        offset = (page - 1) * limit
+        traits, total_count = ExperimentService(session).list_traits(
+            offset=offset, limit=limit, name=name, unique_id=unique_id
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to list traits") from e
+
+    return ListTraitsResponse(
+        code=status.HTTP_200_OK,
+        object="trait.list",
+        message="Successfully listed traits",
+        traits=traits,
+        total_record=total_count,
+        page=page,
+        limit=limit,
+    )
+
+
+@router.get(
+    "/datasets",
+    response_model=ListDatasetsResponse,
+    status_code=status.HTTP_200_OK,
+    responses={status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse}},
+)
+def list_datasets(
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    page: Annotated[int, Query(ge=1, description="Page number")] = 1,
+    limit: Annotated[int, Query(ge=1, description="Results per page")] = 10,
+    name: Annotated[Optional[str], Query(description="Filter by dataset name")] = None,
+    modalities: Annotated[Optional[str], Query(description="Filter by modalities (comma-separated)")] = None,
+    language: Annotated[Optional[str], Query(description="Filter by languages (comma-separated)")] = None,
+    domains: Annotated[Optional[str], Query(description="Filter by domains (comma-separated)")] = None,
+    trait_ids: Annotated[Optional[str], Query(description="Filter by trait UUIDs (comma-separated)")] = None,
+):
+    """List datasets with optional filtering and pagination."""
+    try:
+        offset = (page - 1) * limit
+
+        # Parse comma-separated filters
+        trait_id_list = None
+        if trait_ids:
+            # Convert comma-separated UUIDs to list of UUID objects
+            trait_id_list = []
+            for tid in trait_ids.split(","):
+                try:
+                    trait_id_list.append(uuid.UUID(tid.strip()))
+                except ValueError:
+                    raise HTTPException(status_code=400, detail=f"Invalid UUID format for trait_id: {tid}")
+
+        filters = DatasetFilter(
+            name=name,
+            modalities=modalities.split(",") if modalities else None,
+            language=language.split(",") if language else None,
+            domains=domains.split(",") if domains else None,
+            trait_ids=trait_id_list,
+        )
+
+        datasets, total_count = ExperimentService(session).list_datasets(offset=offset, limit=limit, filters=filters)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to list datasets") from e
+
+    return ListDatasetsResponse(
+        code=status.HTTP_200_OK,
+        object="dataset.list",
+        message="Successfully listed datasets",
+        datasets=datasets,
+        total_record=total_count,
+        page=page,
+        limit=limit,
+    )
+
+
+@router.get(
+    "/{experiment_id}",
+    response_model=GetExperimentResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
+    },
+)
+def get_experiment(
+    experiment_id: Annotated[uuid.UUID, Path(..., description="ID of experiment to retrieve")],
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+):
+    """Get an experiment by ID.
+
+    - **experiment_id**: UUID of the experiment to retrieve.
+    - **session**: Database session dependency.
+    - **current_user**: The authenticated user requesting the experiment.
+
+    Returns a `GetExperimentResponse` with the requested experiment.
+    """
+    try:
+        experiment = ExperimentService(session).get_experiment(experiment_id, current_user.id)
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.debug(f"Failed to get experiment: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to get experiment") from e
+
+    return GetExperimentResponse(
+        code=status.HTTP_200_OK,
+        object="experiment.get",
+        message="Successfully retrieved experiment",
+        experiment=experiment,
     )
 
 
@@ -115,6 +267,7 @@ def list_experiments(
     },
 )
 def update_experiment(
+    experiment_id: Annotated[uuid.UUID, Path(..., description="ID of experiment to update")],
     request: UpdateExperimentRequest,
     session: Annotated[Session, Depends(get_session)],
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -316,6 +469,48 @@ def list_runs(
     )
 
 
+@router.post(
+    "/{experiment_id}/runs",
+    response_model=ConfigureRunsResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        status.HTTP_400_BAD_REQUEST: {"model": ErrorResponse},
+        status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
+    },
+)
+def configure_runs(
+    experiment_id: Annotated[uuid.UUID, Path(..., description="Experiment ID")],
+    request: ConfigureRunsRequest,
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+):
+    """Configure runs for an experiment by creating model-dataset combinations.
+
+    - **experiment_id**: UUID of the experiment to configure runs for.
+    - **request**: Payload containing model_ids, dataset_ids, and optional evaluation_config.
+    - **session**: Database session dependency.
+    - **current_user**: The authenticated user.
+
+    Returns a `ConfigureRunsResponse` with the created runs.
+    """
+    try:
+        runs = ExperimentService(session).configure_runs(experiment_id, request, current_user.id)
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.debug(f"Failed to configure runs: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to configure runs") from e
+
+    return ConfigureRunsResponse(
+        code=status.HTTP_201_CREATED,
+        object="experiment.runs.configure",
+        message="Successfully configured runs",
+        runs=runs,
+        total_runs=len(runs),
+    )
+
+
 @router.get(
     "/runs/{run_id}",
     response_model=GetRunResponse,
@@ -430,86 +625,6 @@ def delete_run(
 
 
 @router.get(
-    "/traits",
-    response_model=ListTraitsResponse,
-    status_code=status.HTTP_200_OK,
-    responses={
-        status.HTTP_400_BAD_REQUEST: {"model": ErrorResponse},
-        status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
-    },
-)
-def list_traits(
-    session: Annotated[Session, Depends(get_session)],
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    page: Annotated[int, Query(ge=1, description="Page number")] = 1,
-    limit: Annotated[int, Query(ge=1, description="Results per page")] = 10,
-    name: Annotated[Optional[str], Query(description="Filter by trait name")] = None,
-    unique_id: Annotated[Optional[str], Query(description="Filter by trait UUID")] = None,
-):
-    """List experiment traits with optional filtering and pagination."""
-    try:
-        offset = (page - 1) * limit
-        traits, total_count = ExperimentService(session).list_traits(
-            offset=offset, limit=limit, name=name, unique_id=unique_id
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Failed to list traits") from e
-
-    return ListTraitsResponse(
-        code=status.HTTP_200_OK,
-        object="trait.list",
-        message="Successfully listed traits",
-        traits=traits,
-        total_record=total_count,
-        page=page,
-        limit=limit,
-    )
-
-
-@router.get(
-    "/datasets",
-    response_model=ListDatasetsResponse,
-    status_code=status.HTTP_200_OK,
-    responses={status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse}},
-)
-def list_datasets(
-    session: Annotated[Session, Depends(get_session)],
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    page: Annotated[int, Query(ge=1, description="Page number")] = 1,
-    limit: Annotated[int, Query(ge=1, description="Results per page")] = 10,
-    name: Annotated[Optional[str], Query(description="Filter by dataset name")] = None,
-    modalities: Annotated[Optional[str], Query(description="Filter by modalities (comma-separated)")] = None,
-    language: Annotated[Optional[str], Query(description="Filter by languages (comma-separated)")] = None,
-    domains: Annotated[Optional[str], Query(description="Filter by domains (comma-separated)")] = None,
-):
-    """List datasets with optional filtering and pagination."""
-    try:
-        offset = (page - 1) * limit
-
-        # Parse comma-separated filters
-        filters = DatasetFilter(
-            name=name,
-            modalities=modalities.split(",") if modalities else None,
-            language=language.split(",") if language else None,
-            domains=domains.split(",") if domains else None,
-        )
-
-        datasets, total_count = ExperimentService(session).list_datasets(offset=offset, limit=limit, filters=filters)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Failed to list datasets") from e
-
-    return ListDatasetsResponse(
-        code=status.HTTP_200_OK,
-        object="dataset.list",
-        message="Successfully listed datasets",
-        datasets=datasets,
-        total_record=total_count,
-        page=page,
-        limit=limit,
-    )
-
-
-@router.get(
     "/datasets/{dataset_id}",
     response_model=GetDatasetResponse,
     status_code=status.HTTP_200_OK,
@@ -537,3 +652,111 @@ def get_dataset_by_id(
         message="Successfully retrieved dataset",
         dataset=dataset,
     )
+
+
+# ------------------------ Evaluation Workflow Routes ------------------------
+
+
+@router.post(
+    "/{experiment_id}/evaluations/workflow",
+    response_model=EvaluationWorkflowResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        status.HTTP_400_BAD_REQUEST: {"model": ErrorResponse},
+        status.HTTP_403_FORBIDDEN: {"model": ErrorResponse},
+        status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
+        status.HTTP_409_CONFLICT: {"model": ErrorResponse},
+        status.HTTP_422_UNPROCESSABLE_ENTITY: {"model": ErrorResponse},
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
+    },
+)
+async def evaluation_workflow_step(
+    experiment_id: Annotated[uuid.UUID, Path(..., description="ID of experiment to create evaluation for")],
+    request: EvaluationWorkflowStepRequest,
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+):
+    """Process a step in the evaluation creation workflow.
+
+    This endpoint handles a 5-step workflow for creating evaluation runs within an experiment:
+
+    **Step 1: Basic Information**
+    - Provide `name` and optional `description` in `stage_data`
+    - `workflow_id` should be null for first step
+    - `workflow_total_steps` should be 5
+
+    **Step 2: Model Selection**
+    - Provide `model_id` in `stage_data` (select one model from experiment's existing runs)
+    - `workflow_id` from step 1 response required
+
+    **Step 3: Trait Selection**
+    - Provide `trait_ids` array in `stage_data` (minimum 1)
+    - `workflow_id` from previous step required
+
+    **Step 4: Dataset Selection**
+    - Provide `dataset_ids` array in `stage_data` (minimum 1 per trait)
+    - Only datasets linked to selected traits are valid
+    - `workflow_id` from previous step required
+
+    **Step 5: Final Confirmation**
+    - Review summary and set `trigger_workflow=true` to create the runs
+    - `workflow_id` from previous step required
+
+    - **experiment_id**: UUID of the experiment to create evaluation runs for
+    - **request**: Workflow step request with step data
+    - **session**: Database session dependency
+    - **current_user**: The authenticated user creating the evaluation
+
+    Returns an `EvaluationWorkflowResponse` with workflow status and next step data.
+    """
+    try:
+        response = await EvaluationWorkflowService(session).process_evaluation_workflow_step(
+            experiment_id, request, current_user.id
+        )
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.debug(f"Failed to process evaluation workflow step: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to process evaluation workflow step") from e
+
+    return response
+
+
+@router.get(
+    "/{experiment_id}/evaluations/workflow/{workflow_id}",
+    response_model=EvaluationWorkflowResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
+        status.HTTP_403_FORBIDDEN: {"model": ErrorResponse},
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
+    },
+)
+async def get_evaluation_workflow_data(
+    experiment_id: Annotated[uuid.UUID, Path(..., description="ID of experiment")],
+    workflow_id: Annotated[uuid.UUID, Path(..., description="ID of evaluation workflow to retrieve")],
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+):
+    """Get complete evaluation workflow data for review.
+
+    Retrieves all accumulated data from an evaluation workflow, useful for reviewing
+    selections before final submission or resuming an incomplete workflow.
+
+    - **experiment_id**: UUID of the experiment
+    - **workflow_id**: UUID of the evaluation workflow to retrieve
+    - **session**: Database session dependency
+    - **current_user**: The authenticated user
+
+    Returns an `EvaluationWorkflowResponse` with complete workflow data.
+    """
+    try:
+        response = await EvaluationWorkflowService(session).get_evaluation_workflow_data(
+            experiment_id, workflow_id, current_user.id
+        )
+        return response
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.debug(f"Failed to get evaluation workflow data: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to get evaluation workflow data") from e

@@ -11,6 +11,7 @@ import { useAuthNavigation } from "@/context/authContext";
 import { PrimaryButton } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { getChromeColor } from "@/utils/getChromeColor";
+import CustomDropdownMenu from "@/components/ui/dropDown";
 
 type RegisterFormProps = {
   onSubmit: (formData: { [key: string]: string }) => void;
@@ -94,9 +95,14 @@ const RegisterForm = ({ onSubmit }: RegisterFormProps) => {
     return !error;
   };
 
-  const handleRegister = (e: { preventDefault: () => void }) => {
+  const handleRegister = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!submittable) return;
+    e.stopPropagation();
+
+    if (!submittable) {
+      console.log("Form not submittable, returning");
+      return;
+    }
 
     const { confirmPassword, ...submitData } = formData;
     onSubmit(submitData);
@@ -122,6 +128,8 @@ const RegisterForm = ({ onSubmit }: RegisterFormProps) => {
       <form
         onSubmit={handleRegister}
         className="w-[76.6%] mt-[1.6em]"
+        action="#"
+        method="POST"
       >
         {/* Name Field */}
         <div className="mb-[1.8rem]">
@@ -257,15 +265,25 @@ const RegisterForm = ({ onSubmit }: RegisterFormProps) => {
               Role
             </Text_12_300_EEEEEE>
           </div>
-          <input
-            type="text"
-            placeholder="Enter your role"
-            value={formData.role}
-            onChange={(e) => handleInputChange('role', e.target.value)}
-            onBlur={() => validateField('role', formData.role)}
-            className={`h-auto leading-[100%] w-full placeholder:text-xs text-xs text-[#EEEEEE] placeholder:text-[#808080] font-light outline-none border rounded-[6px] pt-[.8rem] pb-[.53rem] px-3 bg-transparent
-              ${errors.role ? 'border-red-500' : 'border-gray-600 focus:border-gray-400'}`}
-          />
+          <div className={`border rounded-[6px] ${errors.role ? 'border-red-500' : 'border-gray-600'}`}>
+            <CustomDropdownMenu
+              items={["Developer", "Tester", "DevOps"]}
+              onSelect={(value: string) => {
+                handleInputChange('role', value.toLowerCase());
+                validateField('role', value.toLowerCase());
+              }}
+              triggerClassNames="w-full"
+              contentClassNames="w-full"
+              triggerRenderItem={
+                <div className="flex items-center justify-between w-full h-auto leading-[100%] text-xs text-[#EEEEEE] font-light pt-[.8rem] pb-[.53rem] px-3">
+                  <span className={formData.role ? '' : 'text-[#808080]'}>
+                    {formData.role ? formData.role.charAt(0).toUpperCase() + formData.role.slice(1) : 'Select your role'}
+                  </span>
+                  <span className="text-[#808080]">▼</span>
+                </div>
+              }
+            />
+          </div>
           {errors.role && (
             <div className="text-red-500 text-xs mt-1">{errors.role}</div>
           )}

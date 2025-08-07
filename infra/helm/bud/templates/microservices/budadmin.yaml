@@ -13,9 +13,6 @@ spec:
         app: {{ .Release.Name }}-budadmin
       annotations:
         date: "{{ now }}"
-        dapr.io/enabled: "true"
-        dapr.io/app-id: "budadmin"
-        dapr.io/app-port: "3000"
     spec:
       containers:
       - name: {{ .Release.Name }}-budadmin
@@ -24,6 +21,12 @@ spec:
         ports:
         - containerPort: 3000
         env:
+          - name: ENTRYPOINT_BUDNOTIFY_SERVICE
+            value: "{{ .Release.Name }}-budnotify:3000"
+          - name: NEXT_PUBLIC_PASSWORD
+            value: {{ .Values.microservices.rsaKeys.privateKeyPassword }}
+          - name: NEXT_PUBLIC_PRIVATE_KEY
+            value: {{ .Values.microservices.rsaKeys.privateKey | b64enc }}
         {{ $root := . }}
         {{- range $key, $value := .Values.microservices.budadmin.env }}
           - name: {{ $key }}

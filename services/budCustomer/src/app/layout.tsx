@@ -1,19 +1,19 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import localFont from 'next/font/local'
 import { AntdRegistry } from "@ant-design/nextjs-registry";
 import { Theme } from "@radix-ui/themes";
 import "@radix-ui/themes/styles.css";
 import "./globals.css";
 import { AuthNavigationProvider, LoaderProvider } from "@/context/authContext";
 
-const geistSans = Geist({
+const geistSans = localFont({
+  src: '../../public/fonts/Geist-VariableFont_wght.ttf',
   variable: "--font-geist-sans",
-  subsets: ["latin"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+const geistMono = localFont({
+  src: '../../public/fonts/GeistMono-VariableFont_wght.ttf',
+  variable: "--font-geist-sans",
 });
 
 export const metadata: Metadata = {

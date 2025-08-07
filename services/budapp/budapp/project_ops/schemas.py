@@ -32,7 +32,7 @@ from pydantic import (
 
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Tag
 
-from ..commons.constants import ClusterStatusEnum, PermissionEnum, UserStatusEnum
+from ..commons.constants import ClusterStatusEnum, PermissionEnum, ProjectTypeEnum, UserStatusEnum
 from ..commons.helpers import validate_icon
 from ..permissions.schemas import PermissionList
 from ..user_ops.schemas import UserInfo
@@ -43,6 +43,7 @@ class ProjectBase(BaseModel):
     description: str | None = None
     tags: List[Tag] | None = None
     icon: str | None = None
+    project_type: ProjectTypeEnum = Field(default=ProjectTypeEnum.CLIENT_APP)
 
 
 # class ProjectRequest(ProjectBase):
@@ -172,10 +173,12 @@ class Project(ProjectBase):
 
 class ProjectCreateRequest(ProjectBase):
     benchmark: bool = False
+    project_type: ProjectTypeEnum = Field(default=ProjectTypeEnum.CLIENT_APP)
 
 
 class ProjectFilter(BaseModel):
     name: str | None = None
+    project_type: ProjectTypeEnum | None = None
 
 
 class PaginatedTagsResponse(PaginatedSuccessResponse):

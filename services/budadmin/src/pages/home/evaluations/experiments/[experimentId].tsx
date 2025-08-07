@@ -76,7 +76,7 @@ const sampletags = [
 ]
 
 const ExperimentDetailsPage = () => {
-  const { openDrawer } = useDrawer();
+  const { openDrawer, openDrawerWithStep } = useDrawer();
   const [isMounted, setIsMounted] = useState(false);
   const router = useRouter();
   const { experimentId } = router.query;
@@ -86,25 +86,93 @@ const ExperimentDetailsPage = () => {
   const {
     loading,
     experimentDetails,
-    experimentMetrics,
-    experimentBenchmarks,
     experimentRuns,
     getExperimentDetails,
-    getExperimentMetrics,
-    getExperimentBenchmarks,
     getExperimentRuns
   } = useEvaluations();
+
+  // Dummy data for experimentMetrics
+  const experimentMetrics = {
+    budgetUsed: 45.67,
+    budgetTotal: 100.00,
+    tokensProcessed: 2500000,
+    runtime: 185, // in minutes
+    processingRate: 13500,
+    currentMetrics: [
+      { evaluation: "Code Generation", gpt4Score: 92.5, claude3Score: 89.3 },
+      { evaluation: "Language Understanding", gpt4Score: 94.2, claude3Score: 93.8 },
+      { evaluation: "Reasoning", gpt4Score: 88.7, claude3Score: 91.2 },
+      { evaluation: "Math Problem Solving", gpt4Score: 85.4, claude3Score: 87.9 }
+    ]
+  };
+
+  // Dummy data for experimentBenchmarks
+  const experimentBenchmarks = {
+    benchmarkProgress: [
+      {
+        id: "bench-1",
+        title: "Multi-Modal Understanding Benchmark",
+        objective: "Evaluate model performance on text and image understanding tasks",
+        currentEvaluation: "Image Captioning",
+        currentModel: "GPT-4 Vision",
+        eta: "2h 30m",
+        processingRate: 125,
+        averageScore: 87.5,
+        status: 'Running' as const,
+        progress: 65
+      },
+      {
+        id: "bench-2",
+        title: "Code Generation Quality",
+        objective: "Test code generation accuracy across multiple programming languages",
+        currentEvaluation: "Python Code Generation",
+        currentModel: "Claude-3",
+        eta: "1h 15m",
+        processingRate: 200,
+        averageScore: 91.2,
+        status: 'Running' as const,
+        progress: 82
+      }
+    ]
+  };
+
+  // Dummy data for runs history
+  const dummyRunsHistory = [
+    {
+      runId: "run-001",
+      model: "GPT-4",
+      status: 'Completed' as const,
+      startedDate: "2024-01-15T10:30:00Z",
+      duration: "2h 15m",
+      benchmarkScore: "92.5%"
+    },
+    {
+      runId: "run-002",
+      model: "Claude-3",
+      status: 'Completed' as const,
+      startedDate: "2024-01-15T13:45:00Z",
+      duration: "2h 30m",
+      benchmarkScore: "91.2%"
+    },
+    {
+      runId: "run-003",
+      model: "Llama-2",
+      status: 'Running' as const,
+      startedDate: "2024-01-15T16:00:00Z",
+      duration: "1h 45m",
+      benchmarkScore: "-"
+    }
+  ];
 
   useEffect(() => {
     if (experimentId && typeof experimentId === 'string') {
       setIsMounted(true);
       // Fetch all experiment data
       getExperimentDetails(experimentId);
-      getExperimentMetrics(experimentId);
-      getExperimentBenchmarks(experimentId);
       getExperimentRuns(experimentId);
     }
   }, [experimentId]);
+
 
   const handleNewEvaluation = () => {
     // Navigate to new evaluation flow
@@ -183,7 +251,7 @@ const ExperimentDetailsPage = () => {
           <div className="w-full pt-[1.8rem]">
             <div className="w-full flex justify-between items-center">
               <Text_28_600_FFFFFF>{experimentDetails?.name || "Loading..."}</Text_28_600_FFFFFF>
-              <PrimaryButton classNames="shadow-purple-glow" textClass="text-[0.8125rem]" onClick={() => openDrawer('run-evaluation')}>Run Evaluation</PrimaryButton>
+              <PrimaryButton classNames="shadow-purple-glow" textClass="text-[0.8125rem]" onClick={() => openDrawerWithStep('new-evaluation', { experimentId })}>Run Evaluation</PrimaryButton>
             </div>
             <div className="flex flex-wrap justify-start items-center gap-[.45rem] mt-[0.8rem] max-w-[80%]">
               {experimentDetails?.tags && (showAllTags ? experimentDetails.tags : experimentDetails.tags.slice(0, 5)).map((tag, index) => (
@@ -271,7 +339,7 @@ const ExperimentDetailsPage = () => {
             <Text_14_400_FFFFFF className="mb-[1rem] leading-[140%]">
               Runs history description history description history description...
             </Text_14_400_FFFFFF>
-            <RunsHistoryTable data={experimentRuns?.runsHistory || experimentRuns || []} />
+            <RunsHistoryTable data={experimentRuns?.runsHistory || experimentRuns || dummyRunsHistory} />
           </div>
         </div>
       </div>
