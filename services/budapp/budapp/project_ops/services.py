@@ -125,6 +125,10 @@ class ProjectService(SessionMixin):
             fields={"id": project_id, "status": ProjectStatusEnum.ACTIVE},
         )
 
+        # Explicitly prevent project_type updates
+        if "project_type" in data:
+            raise ClientException("Project type cannot be modified")
+
         if "name" in data:
             duplicate_project = await ProjectDataManager(self.session).retrieve_by_fields(
                 model=ProjectModel,

@@ -67,7 +67,6 @@ class EditProjectRequest(BaseModel):
     description: str | None = Field(None, max_length=400)
     tags: List[Tag] | None = None
     icon: str | None = None
-    project_type: ProjectTypeEnum | None = None
 
     @field_validator("name", mode="before")
     @classmethod
