@@ -37,7 +37,9 @@ from ..commons.constants import (
     NotificationTypeEnum,
     PermissionEnum,
     ProjectStatusEnum,
+    ProjectTypeEnum,
     UserRoleEnum,
+    UserTypeEnum,
 )
 from ..commons.exceptions import BudNotifyException
 from ..commons.helpers import generate_valid_password, get_hardware_types
@@ -446,14 +448,26 @@ class ProjectService(SessionMixin):
         order_by: List = [],
         search: bool = False,
     ) -> Tuple[List[ProjectModel], int]:
-        filters_dict = filters
+        filters_dict = filters.copy()  # Make a copy to avoid mutating the original
         filters_dict["status"] = ProjectStatusEnum.ACTIVE
         filters_dict["benchmark"] = False
 
+        # CLIENT user access control: restrict to CLIENT_APP projects and participated projects only
+        if current_user.user_type == UserTypeEnum.CLIENT:
+            logger.debug(f"Applying CLIENT user access control for user {current_user.id}")
+            # Force CLIENT users to only see CLIENT_APP type projects
+            filters_dict["project_type"] = ProjectTypeEnum.CLIENT_APP.value
+
+        if filters_dict["project_type"] == ProjectTypeEnum.CLIENT_APP.value:
+            # CLIENT users can only see projects they are associated with (participated projects)
+            result, count = await ProjectDataManager(self.session).get_all_participated_projects(
+                current_user.id, offset, limit, filters_dict, order_by, search
+            )
+            return await self.parse_project_list_results(result), count
+
+        # For non-CLIENT users, use the existing permission-based logic
         permission_manager = PermissionService(self.session)
-
         permission_payload = CheckUserResourceScope(resource_type="project", scope="manage")
-
         is_allowed = await permission_manager.check_resource_permission_by_user(current_user, permission_payload)
         logger.debug(f"User {current_user.id} has project:manage permission: {is_allowed}")
 
