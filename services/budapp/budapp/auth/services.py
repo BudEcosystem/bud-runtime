@@ -353,11 +353,6 @@ class AuthService(SessionMixin):
             await UserDataManager(self.session).insert_one(tenant_user_mapping)
             logger.info(f"User {db_user.email} mapped to tenant {tenant.name}")
 
-            await BudNotifyHandler().create_subscriber(subscriber_data)
-            logger.info("User added to budnotify subscriber")
-
-            _ = await UserDataManager(self.session).update_subscriber_status(user_ids=[db_user.id], is_subscriber=True)
-
             # Create a default project for CLIENT users
             if user.user_type == UserTypeEnum.CLIENT:
                 try:
@@ -396,6 +391,11 @@ class AuthService(SessionMixin):
                     logger.error(f"Failed to create default project for user {db_user.email}: {project_error}")
                     # Don't fail the registration if project creation fails
                     # The user can create projects manually later
+
+            await BudNotifyHandler().create_subscriber(subscriber_data)
+            logger.info("User added to budnotify subscriber")
+
+            _ = await UserDataManager(self.session).update_subscriber_status(user_ids=[db_user.id], is_subscriber=True)
 
             return db_user
 
