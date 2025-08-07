@@ -392,15 +392,20 @@ class AuthService(SessionMixin):
                     # Don't fail the registration if project creation fails
                     # The user can create projects manually later
 
-            await BudNotifyHandler().create_subscriber(subscriber_data)
-            logger.info("User added to budnotify subscriber")
+            try:
+                await BudNotifyHandler().create_subscriber(subscriber_data)
+                logger.info("User added to budnotify subscriber")
 
-            _ = await UserDataManager(self.session).update_subscriber_status(user_ids=[db_user.id], is_subscriber=True)
+                _ = await UserDataManager(self.session).update_subscriber_status(
+                    user_ids=[db_user.id], is_subscriber=True
+                )
+            except BudNotifyException as e:
+                logger.error(
+                    f"Failed to add user to budnotify subscribers for {db_user.email}, but user registration is successful: {e}"
+                )
 
             return db_user
 
-        except BudNotifyException as e:
-            logger.error(f"Failed to add user to budnotify subscribers: {e}")
         except Exception as e:
             logger.error(f"Failed to register user: {e}")
             raise e
