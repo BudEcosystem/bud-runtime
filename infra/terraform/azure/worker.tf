@@ -1,13 +1,30 @@
-resource "azurerm_subnet" "worker" {
+resource "azurerm_subnet" "worker_ipv4" {
   name                 = "${var.prefix}-worker"
   resource_group_name  = azurerm_resource_group.common.name
   virtual_network_name = azurerm_virtual_network.common.name
   address_prefixes     = ["10.177.3.0/24"]
 }
 
-resource "azurerm_public_ip" "worker" {
+resource "azurerm_subnet" "worker_ipv6" {
+  name                 = "${var.prefix}-worker"
+  resource_group_name  = azurerm_resource_group.common.name
+  virtual_network_name = azurerm_virtual_network.common.name
+  address_prefixes     = ["fd12:3456:789a:b00b::/64"]
+}
+
+resource "azurerm_public_ip" "worker_ipv4" {
   for_each            = local.workers
-  name                = "${var.prefix}-worker-${each.key}"
+  ip_version          = "IPv4"
+  name                = "${var.prefix}-worker-${each.key}-ipv4"
+  location            = azurerm_resource_group.common.location
+  resource_group_name = azurerm_resource_group.common.name
+  allocation_method   = "Static"
+}
+
+resource "azurerm_public_ip" "worker_ipv6" {
+  for_each            = local.workers
+  ip_version          = "IPv6"
+  name                = "${var.prefix}-worker-${each.key}-ipv6"
   location            = azurerm_resource_group.common.location
   resource_group_name = azurerm_resource_group.common.name
   allocation_method   = "Static"
@@ -31,14 +48,26 @@ resource "azurerm_network_security_group" "worker" {
   }
 
   security_rule {
-    name                       = "${var.prefix}-worker_inbound_local"
+    name                       = "${var.prefix}-worker_inbound_local_ipv4"
     priority                   = 200
     direction                  = "Inbound"
     access                     = "Allow"
     protocol                   = "*"
     source_port_range          = "*"
     destination_port_range     = "*"
-    source_address_prefix      = one(azurerm_virtual_network.common.address_space)
+    source_address_prefix      = local.private_ip_space.v4
+    destination_address_prefix = "*"
+  }
+
+  security_rule {
+    name                       = "${var.prefix}-worker_inbound_local_ipv6"
+    priority                   = 200
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "*"
+    source_port_range          = "*"
+    destination_port_range     = "*"
+    source_address_prefix      = local.private_ip_space.v6
     destination_address_prefix = "*"
   }
 
@@ -62,10 +91,19 @@ resource "azurerm_network_interface" "worker" {
   resource_group_name = azurerm_resource_group.common.name
 
   ip_configuration {
-    name                          = "worker"
-    subnet_id                     = azurerm_subnet.worker.id
+    primary                       = true
+    name                          = "IPv4"
+    subnet_id                     = azurerm_subnet.worker_ipv4.id
     private_ip_address_allocation = "Dynamic"
-    public_ip_address_id          = azurerm_public_ip.worker[each.key].id
+    public_ip_address_id          = azurerm_public_ip.worker_ipv4[each.key].id
+  }
+
+  ip_configuration {
+    private_ip_address_version    = "IPv6"
+    name                          = "IPv6"
+    subnet_id                     = azurerm_subnet.worker_ipv6.id
+    private_ip_address_allocation = "Dynamic"
+    public_ip_address_id          = azurerm_public_ip.worker_ipv6[each.key].id
   }
 }
 
