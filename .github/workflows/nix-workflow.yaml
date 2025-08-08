@@ -26,4 +26,4 @@ jobs:
     - name: Run Nix Workflow
       env:
         SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
-      run: nix run .#workflow_dockerhub_budcustomer
+      run: nix run .#workflow_${{ github.event.inputs.targetEnv || inputs.targetEnv }}
