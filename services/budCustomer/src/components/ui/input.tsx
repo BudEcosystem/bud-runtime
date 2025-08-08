@@ -1,13 +1,7 @@
 import * as React from "react";
-import { Box, Button, Flex, TextArea, TextField, Text } from "@radix-ui/themes";
-import * as Select from "@radix-ui/react-select";
-import * as Switch from "@radix-ui/react-switch";
-import * as Slider from "@radix-ui/react-slider";
-import { CaretDownIcon, Cross1Icon, FilePlusIcon } from "@radix-ui/react-icons";
+import { Icon } from "@iconify/react";
 import classNames from "classnames";
 import { useState } from "react";
-import * as Checkbox from "@radix-ui/react-checkbox";
-import { CheckIcon } from "@radix-ui/react-icons";
 
 import {
   Text_12_300_44474D,
@@ -50,30 +44,37 @@ const CheckBoxInput: React.FC<CheckBoxInputProps> = ({
   };
 
   return (
-    <Flex align="center">
-      <Checkbox.Root
-        id={id}
-        className={classNames(
-          `w-[0.875rem] h-[0.875rem] border border-[#757575] rounded-[0.25rem] hover:border-[#965CDE] hover:shadow-[0_0_1.9px_1px_rgba(150,92,222,0.6)]`,
-          {
-            "border-[#965CDE] !bg-[#965CDE]": isChecked, // Apply class when checked
-            [className || ""]: className, // Apply any additional className passed as a prop
-          }
-        )}
-        onCheckedChange={handleCheckedChange}
-        checked={isChecked}
-        onClick={onClick}
-        {...props}
-      >
-        <Checkbox.Indicator
-          className={classNames("flex items-center justify-center", {
-            [indicatorClassName || ""]: indicatorClassName, // Apply additional indicator className
-          })}
+    <div className="flex items-center">
+      <label className="relative">
+        <input
+          type="checkbox"
+          id={id}
+          className="sr-only"
+          checked={isChecked}
+          onChange={(e) => handleCheckedChange(e.target.checked)}
+          onClick={onClick}
+          {...props}
+        />
+        <div
+          className={classNames(
+            `w-[0.875rem] h-[0.875rem] border border-[#757575] rounded-[0.25rem] hover:border-[#965CDE] hover:shadow-[0_0_1.9px_1px_rgba(150,92,222,0.6)] cursor-pointer flex items-center justify-center`,
+            {
+              "border-[#965CDE] !bg-[#965CDE]": isChecked,
+              [className || ""]: className,
+            }
+          )}
         >
-          <CheckIcon className="text-[black] h-[100%]" />
-        </Checkbox.Indicator>
-      </Checkbox.Root>
-    </Flex>
+          {isChecked && (
+            <Icon
+              icon="material-symbols:check"
+              className={classNames("text-[black] h-[100%] w-[100%]", {
+                [indicatorClassName || ""]: indicatorClassName,
+              })}
+            />
+          )}
+        </div>
+      </label>
+    </div>
   );
 };
 
@@ -93,27 +94,40 @@ const SliderInput: React.FC<SliderInputProps> = ({
   classThumb,
   defaultValue,
   ...props
-}) => (
-  <Slider.Root
-    className={classNames(
-      `budSlider relative block flex items-center select-none touch-none w-full border border-[#212225] !h-[0.725rem] max-h-[0.725rem] py-[.8rem] px-[.5rem] rounded-md ${className}`
-    )}
-    {...props}
-    defaultValue={defaultValue}
-  >
-    <Slider.Track
-      className={`bg-[#212225] relative grow rounded-full h-[3px] ${classTrack}`}
+}) => {
+  const [value, setValue] = useState(defaultValue || [0]);
+
+  return (
+    <div
+      className={classNames(
+        `budSlider relative block flex items-center select-none touch-none w-full border border-[#212225] !h-[0.725rem] max-h-[0.725rem] py-[.8rem] px-[.5rem] rounded-md ${className}`
+      )}
     >
-      <Slider.Range
-        className={`absolute bg-[#965CDE] rounded-full h-full ${classRange}`}
+      <div className={`bg-[#212225] relative grow rounded-full h-[3px] ${classTrack}`}>
+        <div
+          className={`absolute bg-[#965CDE] rounded-full h-full ${classRange}`}
+          style={{ width: `${(value[0] / (props.max || 100)) * 100}%` }}
+        />
+      </div>
+      <input
+        type="range"
+        className={`absolute w-full h-full opacity-0 cursor-pointer ${classThumb}`}
+        aria-label="Volume"
+        value={value[0]}
+        onChange={(e) => {
+          const newValue = [Number(e.target.value)];
+          setValue(newValue);
+          props.onValueChange?.(newValue);
+        }}
+        {...props}
       />
-    </Slider.Track>
-    <Slider.Thumb
-      className={`block w-[8px] h-[8px] bg-white rounded-full cursor-pointer ${classThumb}`}
-      aria-label="Volume"
-    />
-  </Slider.Root>
-);
+      <div
+        className={`block w-[8px] h-[8px] bg-white rounded-full cursor-pointer absolute ${classThumb}`}
+        style={{ left: `${(value[0] / (props.max || 100)) * 100}%`, transform: 'translateX(-50%)' }}
+      />
+    </div>
+  );
+};
 
 // switch input wraper
 interface SwitchInputProps {
@@ -131,15 +145,46 @@ const SwitchInput: React.FC<SwitchInputProps> = ({
   defaultCheck,
   disabled = false,
   ...props
-}) => (
-  <Switch.Root
-    disabled={disabled}
-    className={`w-[1.4375rem] h-[0.725rem] bg-[#212225] rounded-full relative shadow-none p-[0rem] data-[state=checked]:bg-[#965CDE] outline-none cursor-default border border-[#181925] ${classNameRoot}`}
-    {...props}
-  >
-    <Switch.Thumb className={`block w-[0.55rem] h-[0.55rem] bg-white rounded-full transition-transform duration-100 translate-x-0.5 will-change-transform data-[state=checked]:translate-x-[0.75rem] ${classNameThump}`} />
-  </Switch.Root>
-);
+}) => {
+  const [checked, setChecked] = useState(defaultCheck || false);
+
+  return (
+    <label className={`inline-flex items-center ${className}`}>
+      <input
+        type="checkbox"
+        className="sr-only"
+        checked={checked}
+        disabled={disabled}
+        onChange={(e) => {
+          setChecked(e.target.checked);
+          props.onCheckedChange?.(e.target.checked);
+        }}
+        {...props}
+      />
+      <div
+        className={classNames(
+          `w-[1.4375rem] h-[0.725rem] bg-[#212225] rounded-full relative shadow-none border border-[#181925] cursor-pointer transition-colors duration-200`,
+          {
+            'bg-[#965CDE]': checked,
+            'opacity-50 cursor-not-allowed': disabled,
+          },
+          classNameRoot
+        )}
+      >
+        <div
+          className={classNames(
+            `block w-[0.55rem] h-[0.55rem] bg-white rounded-full transition-transform duration-100 absolute top-1/2 transform -translate-y-1/2`,
+            {
+              'translate-x-0.5': !checked,
+              'translate-x-[0.75rem]': checked,
+            },
+            classNameThump
+          )}
+        />
+      </div>
+    </label>
+  );
+};
 
 // text input wraper
 interface TextInputProps {
@@ -152,13 +197,14 @@ const TextInput: React.FC<TextInputProps> = ({
   className,
   ...props
 }) => (
-  <TextField.Root
-    maxLength={100}
-    className={`w-full place max-w-[350px] text-[0.740625rem] font-light text-[#44474D] h-[1.75rem] content-center	 bg-[#0f0f0f] outline-[.5px] outline-[white] rounded-md border border-[#212225] shadow-none bg-transparent leading-[100%] pt-[.2em] hover:border-[#63656c] ${className}`}
-    {...props}
-  >
+  <div className="relative w-full max-w-[350px]">
+    <input
+      maxLength={100}
+      className={`w-full text-[0.740625rem] font-light text-[#44474D] h-[1.75rem] bg-[#0f0f0f] outline-[.5px] outline-[white] rounded-md border border-[#212225] shadow-none bg-transparent leading-[100%] px-3 hover:border-[#63656c] focus:border-[#965CDE] focus:outline-none ${className}`}
+      {...props}
+    />
     {textFieldSlot && textFieldSlot}
-  </TextField.Root>
+  </div>
 );
 
 // textarea wraper
@@ -170,10 +216,9 @@ const TextAreaInput: React.FC<TextAreaInputProps> = ({
   className,
   ...props
 }) => (
-  <TextArea
-    size="1"
+  <textarea
     style={{ fontSize: "0.740625rem !important" }}
-    className={`w-full max-w-[350px] min-h-[50px] text-[0.740625rem] font-light text-[#44474D] h-[1.75rem] bg-[#0f0f0f] outline-[.5px] outline-[white] rounded-md border border-[#212225] shadow-none bg-transparent placeholder:text-xs placeholder:font-light hover:border-[#63656c] ${className}`}
+    className={`w-full max-w-[350px] min-h-[50px] text-[0.740625rem] font-light text-[#44474D] bg-[#0f0f0f] outline-[.5px] outline-[white] rounded-md border border-[#212225] shadow-none bg-transparent placeholder:text-xs placeholder:font-light hover:border-[#63656c] focus:border-[#965CDE] focus:outline-none resize-vertical px-3 py-2 ${className}`}
     {...props}
   />
 );
@@ -238,83 +283,80 @@ const SelectInput: React.FC<SelectInputProps> = ({
     return () => clearTimeout(timer);
   }, []);
   const [state, setState] = useState("closed");
+  const [isOpen, setIsOpen] = useState(false);
+
+  const handleToggle = () => {
+    if (selectItems?.length === 0) return;
+    const newState = !isOpen;
+    setIsOpen(newState);
+    setState(newState ? "open" : "closed");
+    if (!newState) {
+      setSearchTerm("");
+      setFilteredItems(selectItems);
+    }
+  };
+
+  const handleSelect = (item: any) => {
+    onValueChange(item);
+    setIsOpen(false);
+    setState("closed");
+  };
+
   return (
-    <Select.Root
-      value={value}
-      defaultValue={defaultValue}
-      onValueChange={(newValue) => {
-        onValueChange(newValue);
-      }}
-      {...(isReady ? props : {})}
-      onOpenChange={(open) => {
-        if (!open) {
-          setSearchTerm("");
-          setFilteredItems(selectItems);
-        }
-        setState(open ? "open" : "closed");
-      }}
-    >
-      <Select.Trigger
+    <div className="relative w-full max-w-[350px]">
+      <div
+        onClick={handleToggle}
         className={classNames(
-          `w-full max-w-[350px] h-[1.75rem] px-[.3rem] outline-[.5px] outline-[white] rounded-md border border-[#212225] bg-transparent text-[#FFFFFF] data-[placeholder]:text-[#6A6E76] text-nowrap text-xs font-light outline-[white] cursor-pointer hover:border-[#63656c] ${className}`,
+          `w-full h-[1.75rem] px-[.3rem] outline-[.5px] outline-[white] rounded-md border border-[#212225] bg-transparent text-[#FFFFFF] text-nowrap text-xs font-light cursor-pointer hover:border-[#63656c] flex justify-between items-center`,
           {
             "border-[white]": state === "open",
-          }
+            "opacity-50 cursor-not-allowed": selectItems?.length === 0,
+          },
+          className
         )}
-        // className={`w-full max-w-[350px] h-[1.75rem] px-[.3rem] outline-[.5px] outline-[white] rounded-md border border-[#212225] bg-transparent text-[white] data-[placeholder]:text-[#6A6E76] text-nowrap text-xs font-light cursor-pointer hover:border-[#63656c] ${className}`}
-        disabled={selectItems?.length === 0}
-        asChild={true}
       >
-        <Flex justify="between" align="center" className="w-full">
-          <Box className={`w-[100%] truncate text-left  ${valueClassName}`}>
-            <Select.Value
-              className={`text-white text-left text-nowrap text-[.1rem] font-light leading-[100%] truncate block ${valueClassName}`}
-              placeholder={placeholder}
-            >
-              {value ? value : defaultValue ? defaultValue : placeholder}
-            </Select.Value>
-          </Box>
-          <Select.Icon className="ml-0 text-[#6A6E76] block">
-            <CaretDownIcon className="text-[1.5rem] w-[1.1rem] h-[1.1rem] text-[#ffffff]" />
-          </Select.Icon>
-        </Flex>
-      </Select.Trigger>
-      <Select.Portal>
-        <Select.Content
-          position="popper"
-          className="SelectContentHeight bg-[#111113] text-xs text-[#FFFFFF] border border-[#212225] rounded-md p-[.5rem] box-border "
-        >
-          <Select.ScrollUpButton />
-          <Select.Viewport className="w-full">
-            {isSearchVisible && (
-              <input
-                placeholder="Search"
-                className={`h-7 w-full placeholder:text-xs mb-2 text-xs text-[#EEEEEE] hover:bg-white hover:bg-opacity-[3%] placeholder:text-[#808080] font-light outline-none bg-transparent border border-[#212225] rounded-[5px] py-1 px-2.5`}
-                type="text"
-                value={searchTerm}
-                onChange={handleSearch}
-                onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) =>
-                  e.stopPropagation()
-                }
-              />
-            )}
+        <div className={`w-[100%] truncate text-left ${valueClassName}`}>
+          <span className={`text-white text-left text-nowrap text-[.75rem] font-light leading-[100%] truncate block ${valueClassName} ${!value && !defaultValue ? 'text-[#6A6E76]' : ''}`}>
+            {value ? value : defaultValue ? defaultValue : placeholder}
+          </span>
+        </div>
+        <Icon
+          icon="material-symbols:arrow-drop-down"
+          className="text-[1.1rem] text-[#ffffff] ml-2"
+        />
+      </div>
 
-            {filteredItems &&
-              filteredItems.map((item: any, index: number) => (
-                <Select.Item
-                  className="h-[1.75rem] py-[.5rem] px-[.8rem] w-full hover:bg-[#18191B] rounded-md cursor-pointer border-none shadow-none outline-0 leading-[100%]"
-                  key={index}
-                  value={item}
-                >
-                  <Select.ItemText className="border-none shadow-none text-xs text-left text-[#FFFFFF] font-normal leading-[100%] truncate">
-                    {renderItem ? renderItem(item) : item.label || item}
-                  </Select.ItemText>
-                </Select.Item>
-              ))}
-          </Select.Viewport>
-        </Select.Content>
-      </Select.Portal>
-    </Select.Root>
+      {isOpen && (
+        <div className="absolute top-full left-0 w-full mt-1 bg-[#111113] text-xs text-[#FFFFFF] border border-[#212225] rounded-md p-[.5rem] box-border z-50 max-h-[200px] overflow-y-auto">
+          {isSearchVisible && (
+            <input
+              placeholder="Search"
+              className="h-7 w-full placeholder:text-xs mb-2 text-xs text-[#EEEEEE] hover:bg-white hover:bg-opacity-[3%] placeholder:text-[#808080] font-light outline-none bg-transparent border border-[#212225] rounded-[5px] py-1 px-2.5"
+              type="text"
+              value={searchTerm}
+              onChange={handleSearch}
+              onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) =>
+                e.stopPropagation()
+              }
+            />
+          )}
+
+          {filteredItems &&
+            filteredItems.map((item: any, index: number) => (
+              <div
+                key={index}
+                className="h-[1.75rem] py-[.5rem] px-[.8rem] w-full hover:bg-[#18191B] rounded-md cursor-pointer border-none shadow-none outline-0 leading-[100%]"
+                onClick={() => handleSelect(item)}
+              >
+                <span className="border-none shadow-none text-xs text-left text-[#FFFFFF] font-normal leading-[100%] truncate">
+                  {renderItem ? renderItem(item) : item.label || item}
+                </span>
+              </div>
+            ))
+          }
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -365,82 +407,80 @@ const SelectCustomInput: React.FC<SelectInputProps> = ({
     return () => clearTimeout(timer);
   }, []);
   const [state, setState] = useState("closed");
+  const [isOpen, setIsOpen] = useState(false);
+
+  const handleToggle = () => {
+    if (selectItems.length === 0) return;
+    const newState = !isOpen;
+    setIsOpen(newState);
+    setState(newState ? "open" : "closed");
+    if (!newState) {
+      setSearchTerm("");
+      setFilteredItems(selectItems);
+    }
+  };
+
+  const handleSelect = (item: any) => {
+    onValueChange(item);
+    setIsOpen(false);
+    setState("closed");
+  };
+
   return (
-    <Select.Root
-      defaultValue={defaultValue}
-      value={value}
-      onValueChange={(newValue) => {
-        onValueChange(newValue);
-      }}
-      {...(isReady ? props : {})}
-      onOpenChange={(open) => {
-        if (!open) {
-          setSearchTerm("");
-          setFilteredItems(selectItems);
-        }
-        setState(open ? "open" : "closed");
-      }}
-    >
-      <Select.Trigger
+    <div className="relative w-full max-w-[350px]">
+      <div
+        onClick={handleToggle}
         className={classNames(
-          `w-full max-w-[350px] h-[1.75rem] px-[.3rem] outline-[.5px] outline-[white] rounded-md border border-[#212225] bg-transparent text-[white] data-[placeholder]:text-[#6A6E76] text-nowrap text-xs font-light outline-[white] cursor-pointer hover:border-[#63656c] ${className}`,
+          `w-full h-[1.75rem] px-[.3rem] outline-[.5px] outline-[white] rounded-md border border-[#212225] bg-transparent text-[white] text-nowrap text-xs font-light cursor-pointer hover:border-[#63656c] flex justify-between items-center`,
           {
             "border-[white]": state === "open",
-          }
+            "opacity-50 cursor-not-allowed": selectItems.length === 0,
+          },
+          className
         )}
-        // className={`w-full max-w-[350px] h-[1.75rem] px-[.3rem] outline-[.5px] outline-[white] rounded-md border border-[#212225] bg-transparent text-[white] data-[placeholder]:text-[#6A6E76] text-nowrap text-xs font-light outline-[white] Active:border-[white] ${className}`}
-        disabled={selectItems.length === 0}
-        asChild={true}
       >
-        <Flex justify="between" align="center" className="w-full">
-          <Box className="w-[100%] truncate text-left">
-            <Select.Value
-              className="text-white text-left text-nowrap text-[.1rem] font-light leading-[100%] truncate block"
-              placeholder={placeholder}
-            >
-              {value ? value : defaultValue ? defaultValue : placeholder}
-            </Select.Value>
-          </Box>
-          <Select.Icon className="ml-0 text-[#6A6E76] block">
-            <CaretDownIcon className="text-[1.5rem] w-[1.1rem] h-[1.1rem] text-[#ffffff]" />
-          </Select.Icon>
-        </Flex>
-      </Select.Trigger>
-      <Select.Portal>
-        <Select.Content
-          position="popper"
-          className="content-contstrain bg-[#111113] text-xs text-[#FFFFFF] border border-[#212225] rounded-md p-[.5rem] box-border "
-        >
-          <Select.ScrollUpButton />
-          <Select.Viewport className="w-full">
-            {isSearchVisible && (
-              <input
-                placeholder="Search"
-                className={`h-7 w-full placeholder:text-xs mb-2 text-xs text-[#EEEEEE] hover:bg-white hover:bg-opacity-[3%] placeholder:text-[#808080] font-light outline-none bg-transparent border border-[#212225] rounded-[5px] py-1 px-2.5`}
-                type="text"
-                value={searchTerm}
-                onChange={handleSearch}
-                onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) =>
-                  e.stopPropagation()
-                }
-              />
-            )}
-            {filteredItems &&
-              filteredItems.map((item: any, index: number) => (
-                <Select.Item
-                  className="h-[1.75rem] py-[.5rem] px-[.8rem] w-full hover:bg-[#18191B] rounded-md cursor-pointer border-none shadow-none outline-0 leading-[100%]"
-                  key={index}
-                  value={item}
-                >
-                  <Select.ItemText className="border-none shadow-none text-xs text-left text-[#FFFFFF] font-normal leading-[100%] truncate">
-                    {renderItem ? renderItem(item) : item.label || item}
-                  </Select.ItemText>
-                </Select.Item>
-              ))}
-          </Select.Viewport>
-        </Select.Content>
-      </Select.Portal>
-    </Select.Root>
+        <div className="w-[100%] truncate text-left">
+          <span className={`text-white text-left text-nowrap text-[.75rem] font-light leading-[100%] truncate block ${!value && !defaultValue ? 'text-[#6A6E76]' : ''}`}>
+            {value ? value : defaultValue ? defaultValue : placeholder}
+          </span>
+        </div>
+        <Icon
+          icon="material-symbols:arrow-drop-down"
+          className="text-[1.1rem] text-[#ffffff] ml-2"
+        />
+      </div>
+
+      {isOpen && (
+        <div className="absolute top-full left-0 w-full mt-1 bg-[#111113] text-xs text-[#FFFFFF] border border-[#212225] rounded-md p-[.5rem] box-border z-50 max-h-[200px] overflow-y-auto">
+          {isSearchVisible && (
+            <input
+              placeholder="Search"
+              className="h-7 w-full placeholder:text-xs mb-2 text-xs text-[#EEEEEE] hover:bg-white hover:bg-opacity-[3%] placeholder:text-[#808080] font-light outline-none bg-transparent border border-[#212225] rounded-[5px] py-1 px-2.5"
+              type="text"
+              value={searchTerm}
+              onChange={handleSearch}
+              onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) =>
+                e.stopPropagation()
+              }
+            />
+          )}
+
+          {filteredItems &&
+            filteredItems.map((item: any, index: number) => (
+              <div
+                key={index}
+                className="h-[1.75rem] py-[.5rem] px-[.8rem] w-full hover:bg-[#18191B] rounded-md cursor-pointer border-none shadow-none outline-0 leading-[100%]"
+                onClick={() => handleSelect(item)}
+              >
+                <span className="border-none shadow-none text-xs text-left text-[#FFFFFF] font-normal leading-[100%] truncate">
+                  {renderItem ? renderItem(item) : item.label || item}
+                </span>
+              </div>
+            ))
+          }
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -505,16 +545,15 @@ const FileInput: React.FC<FileInputProps> = ({
             onChange={handleFileChange}
             className="hidden"
           />
-          <Button
+          <button
             onClick={handleClick}
-            size="1"
-            className="flex rounded-md bg-transparent !border !border-dashed !border-[#44474D] text-left !py-[.8rem] items-center justify-start"
+            className="flex rounded-md bg-transparent border border-dashed border-[#44474D] text-left py-[.8rem] px-4 items-center justify-start hover:border-[#965CDE] transition-colors"
           >
-            <FilePlusIcon className="text-[#44474D]" />
+            <Icon icon="material-symbols:note-add-outline" className="text-[#44474D] mr-2" />
             <Text_12_300_44474D className="leading-full">
               Choose Files
             </Text_12_300_44474D>
-          </Button>
+          </button>
         </label>
       )}
       {files.length > 0 && (
@@ -529,9 +568,9 @@ const FileInput: React.FC<FileInputProps> = ({
               </Text_12_400_FFFFFF>
               <button
                 onClick={(e) => handleRemoveFile(index, e)}
-                className="remove-file-btn ml-2"
+                className="remove-file-btn ml-2 hover:text-red-400 transition-colors"
               >
-                <Cross1Icon className="text-red-500" />
+                <Icon icon="material-symbols:close" className="text-red-500" />
               </button>
             </li>
           ))}

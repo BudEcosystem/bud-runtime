@@ -1,5 +1,4 @@
 import React from "react";
-import { Flex, Box } from "@radix-ui/themes";
 
 interface DrawerCardProps {
   children?: React.ReactNode;
@@ -8,9 +7,9 @@ interface DrawerCardProps {
 
 function DrawerCard({ children, classNames }: DrawerCardProps) {
   return (
-    <Box className={`px-[1.4rem] py-[.9rem] rounded-es-lg rounded-ee-lg pb-4 ${classNames}`}>
+    <div className={`px-[1.4rem] py-[.9rem] rounded-es-lg rounded-ee-lg pb-4 ${classNames}`}>
       {children}
-    </Box>
+    </div>
   );
 }
 

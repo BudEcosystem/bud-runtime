@@ -4,7 +4,7 @@ import React, { use, useContext, useEffect } from "react";
 import { BudFormContext } from "../context/BudFormContext";
 import { pxToRem, Text_26_600_FFFFFF } from "../../text";
 import { assetBaseUrl } from "@/components/environment";
-import { Pencil1Icon } from "@radix-ui/react-icons";
+import { Icon } from "@iconify/react";
 import { modelNameRegex, projectNameRegex } from "@/lib/utils";
 import IconRender from "@/flows/components/BudIconRender";
 
@@ -189,7 +189,7 @@ export function NameIconInput({
       >
         {isEdit && (
           <div className="absolute group w-[1.125rem] h-[1.125rem] flex justify-center items-center border-none hover:border-transparent top-[-.45rem] right-[0] z-[1200] rounded-full bg-[#1F1F1F] cursor-pointer">
-            <Pencil1Icon className="w-[0.625rem] h-[0.625rem] text-[#5B6168] group-hover:text-[#FFFFFF] text-[0.875em]" />
+            <Icon icon="material-symbols:edit" className="w-[0.625rem] h-[0.625rem] text-[#5B6168] group-hover:text-[#FFFFFF] text-[0.875em]" />
           </div>
         )}
         <Popover

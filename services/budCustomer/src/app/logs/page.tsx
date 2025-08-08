@@ -8,7 +8,7 @@ import {
   Text_12_400_757575,
   Text_14_400_EEEEEE
 } from "@/components/ui/text";
-import { MixerHorizontalIcon } from "@radix-ui/react-icons";
+import { Icon } from "@iconify/react";
 import { PrimaryButton, SecondaryButton } from "@/components/ui/button";
 import NoDataFount from "@/components/ui/noChartData";
 import dayjs from "dayjs";
@@ -509,7 +509,8 @@ export default function APIKeysPage() {
                     className="group h-9 px-3 flex items-center cursor-pointer rounded-md hover:bg-[#1F1F1F] transition-colors"
                     onClick={() => {}}
                   >
-                    <MixerHorizontalIcon
+                    <Icon
+                      icon="material-symbols:tune"
                       style={{ width: '0.875rem', height: '0.875rem' }}
                       className="text-[#B3B3B3] group-hover:text-[#FFFFFF]"
                     />

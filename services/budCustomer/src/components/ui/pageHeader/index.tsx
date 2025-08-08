@@ -1,6 +1,3 @@
-import {
-  Flex,
-} from "@radix-ui/themes";
 import React, { ComponentType } from "react";
 import {
   Heading_30_600_FFFFFF,
@@ -43,11 +40,10 @@ const PageHeader: React.FC<pageHeaderProps> = ({
             <Text_12_400_B3B3B3 className="pt-[.8rem] pl-[.15rem]">{text}</Text_12_400_B3B3B3>
           )}
         </div>
-        <Flex align="center">
-
+        <div className="flex items-center">
           {rightComponent}
           {buttonLabel && (
-            <Flex align={'center'} justify={'end'} className="">
+            <div className="flex items-center justify-end">
               <PrimaryButton
                 permission={buttonPermission}
                 type="submit"
@@ -59,9 +55,9 @@ const PageHeader: React.FC<pageHeaderProps> = ({
                   {buttonLabel}
                 </div>
               </PrimaryButton>
-            </Flex>
+            </div>
           )}
-        </Flex>
+        </div>
       </div>
     </>
   );

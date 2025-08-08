@@ -3,7 +3,7 @@ import React from "react";
 import { Text_12_400_5B6168, Text_12_400_787B83 } from "../../text";
 import { ShrinkOutlined } from "@ant-design/icons";
 import { useDrawer } from "@/hooks/useDrawer";
-import { Cross1Icon } from "@radix-ui/react-icons";
+// Removed unused Cross1Icon import
 import Link from "next/link";
 import { useWorkflow } from "@/stores/useWorkflow";
 import { useDeployModel } from "@/stores/useDeployModel";
