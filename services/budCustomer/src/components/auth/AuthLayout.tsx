@@ -2,6 +2,7 @@
 import React, { ReactNode } from "react";
 import Image from 'next/image';
 import GameOfLifeBackground from "../ui/GameOfLifeBg";
+import ThemeSwitcher from "../ui/ThemeSwitcher";
 
 interface LayoutProps {
   children: ReactNode;
@@ -32,7 +33,13 @@ const AuthLayout: React.FC<LayoutProps> = ({ children }) => {
             </div>
           </div>
         </div>
-        <div className="loginRight  w-[43.6%] h-full">{children}</div>
+        <div className="loginRight relative w-[43.6%] h-full">
+          {/* Theme Switcher in top right */}
+          <div className="absolute top-4 right-4 z-50">
+            <ThemeSwitcher />
+          </div>
+          {children}
+        </div>
       </div>
     </div>
   );
