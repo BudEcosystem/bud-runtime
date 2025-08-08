@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import localFont from 'next/font/local'
 import { AntdRegistry } from "@ant-design/nextjs-registry";
-import { Theme } from "@radix-ui/themes";
-import "@radix-ui/themes/styles.css";
 import "./globals.css";
 import { AuthNavigationProvider, LoaderProvider } from "@/context/authContext";
 import { ThemeProvider } from "@/context/themeContext";
@@ -33,13 +31,11 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-bud-bg-primary text-bud-text-primary`}
       >
         <ThemeProvider>
-          <Theme appearance="inherit" accentColor="purple" grayColor="slate" radius="medium">
-            <AuthNavigationProvider>
-              <LoaderProvider>
-                <AntdRegistry>{children}</AntdRegistry>
-              </LoaderProvider>
-            </AuthNavigationProvider>
-          </Theme>
+          <AuthNavigationProvider>
+            <LoaderProvider>
+              <AntdRegistry>{children}</AntdRegistry>
+            </LoaderProvider>
+          </AuthNavigationProvider>
         </ThemeProvider>
       </body>
     </html>
