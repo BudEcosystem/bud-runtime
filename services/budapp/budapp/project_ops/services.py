@@ -462,6 +462,11 @@ class ProjectService(SessionMixin):
             # Force CLIENT users to only see CLIENT_APP type projects
             filters_dict["project_type"] = ProjectTypeEnum.CLIENT_APP.value
 
+        elif current_user.user_type == UserTypeEnum.ADMIN:
+            if "project_type" not in filters_dict:
+                # set Default Project type to ADMIN_APP for ADMIN users
+                filters_dict["project_type"] = ProjectTypeEnum.ADMIN_APP.value
+
         if filters_dict["project_type"] == ProjectTypeEnum.CLIENT_APP.value:
             # CLIENT users can only see projects they are associated with (participated projects)
             result, count = await ProjectDataManager(self.session).get_all_participated_projects(
