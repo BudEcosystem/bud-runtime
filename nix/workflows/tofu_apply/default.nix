@@ -6,7 +6,7 @@
   git,
 }:
 writeShellApplication {
-  name = "devbox_tofu_apply";
+  name = "tofu_apply";
 
   runtimeInputs = [
     sops

@@ -7,7 +7,7 @@ let
   port = 80;
 in
 dockerTools.buildLayeredImage {
-  name = "budstudio/devbox";
+  name = "budstudio/status";
   tag = "latest";
   contents = [ caddy ];
 
