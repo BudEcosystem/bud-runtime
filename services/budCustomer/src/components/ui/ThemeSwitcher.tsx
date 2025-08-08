@@ -38,13 +38,13 @@ const ThemeSwitcher: React.FC = () => {
       <div className="flex items-center gap-2 py-1">
         <Icon
           icon={option.icon}
-          className={`w-4 h-4 ${theme === option.key ? 'text-primary' : 'text-gray-500 dark:text-gray-400'}`}
+          className={`w-4 h-4 ${theme === option.key ? 'text-bud-purple' : 'text-bud-text-muted'}`}
         />
-        <span className={theme === option.key ? 'text-primary font-medium' : ''}>
+        <span className={theme === option.key ? 'text-bud-purple font-medium' : 'text-bud-text-primary'}>
           {option.label}
         </span>
         {theme === option.key && (
-          <Icon icon="ph:check" className="w-4 h-4 ml-auto text-primary" />
+          <Icon icon="ph:check" className="w-4 h-4 ml-auto text-bud-purple" />
         )}
       </div>
     ),
@@ -59,11 +59,11 @@ const ThemeSwitcher: React.FC = () => {
     >
       <Button
         type="text"
-        className="flex items-center justify-center w-10 h-10 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+        className="flex items-center justify-center w-10 h-10 rounded-lg hover:bg-bud-bg-hover transition-colors"
         icon={
           <Icon
             icon={currentIcon}
-            className="w-5 h-5 text-gray-600 dark:text-gray-300"
+            className="w-5 h-5 text-bud-text-muted"
           />
         }
       />

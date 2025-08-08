@@ -77,60 +77,69 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     localStorage.setItem('theme', newTheme);
   };
 
-  // Ant Design theme configuration
+  // Ant Design theme configuration using CSS variables
+  const getCSSVarValue = (varName: string) => {
+    if (typeof window !== 'undefined') {
+      return getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+    }
+    return effectiveTheme === 'dark' ?
+      (varName === '--bg-primary' ? '#0A0A0A' : '#965CDE') :
+      (varName === '--bg-primary' ? '#FFFFFF' : '#965CDE');
+  };
+
   const antdThemeConfig = {
     algorithm: effectiveTheme === 'dark' ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
     token: {
-      colorPrimary: '#965CDE',
-      colorBgContainer: effectiveTheme === 'dark' ? '#0A0A0A' : '#FFFFFF',
-      colorBgElevated: effectiveTheme === 'dark' ? '#161616' : '#FFFFFF',
-      colorBgLayout: effectiveTheme === 'dark' ? '#0A0A0A' : '#F5F5F5',
-      colorText: effectiveTheme === 'dark' ? '#EEEEEE' : '#1A1A1A',
-      colorTextSecondary: effectiveTheme === 'dark' ? '#B3B3B3' : '#666666',
-      colorTextTertiary: effectiveTheme === 'dark' ? '#757575' : '#999999',
-      colorBorder: effectiveTheme === 'dark' ? '#1F1F1F' : '#E0E0E0',
-      colorBorderSecondary: effectiveTheme === 'dark' ? '#2F2F2F' : '#D0D0D0',
-      colorFill: effectiveTheme === 'dark' ? '#1F1F1F' : '#F0F0F0',
-      colorFillSecondary: effectiveTheme === 'dark' ? '#161616' : '#F5F5F5',
-      colorFillTertiary: effectiveTheme === 'dark' ? '#0F0F0F' : '#FAFAFA',
+      colorPrimary: getCSSVarValue('--color-purple') || '#965CDE',
+      colorBgContainer: getCSSVarValue('--bg-primary') || (effectiveTheme === 'dark' ? '#0A0A0A' : '#FFFFFF'),
+      colorBgElevated: getCSSVarValue('--bg-card') || (effectiveTheme === 'dark' ? '#161616' : '#FFFFFF'),
+      colorBgLayout: getCSSVarValue('--bg-primary') || (effectiveTheme === 'dark' ? '#0A0A0A' : '#F5F5F5'),
+      colorText: getCSSVarValue('--text-primary') || (effectiveTheme === 'dark' ? '#EEEEEE' : '#1A1A1A'),
+      colorTextSecondary: getCSSVarValue('--text-muted') || (effectiveTheme === 'dark' ? '#B3B3B3' : '#666666'),
+      colorTextTertiary: getCSSVarValue('--text-disabled') || (effectiveTheme === 'dark' ? '#757575' : '#999999'),
+      colorBorder: getCSSVarValue('--border-color') || (effectiveTheme === 'dark' ? '#1F1F1F' : '#E0E0E0'),
+      colorBorderSecondary: getCSSVarValue('--border-secondary') || (effectiveTheme === 'dark' ? '#2F2F2F' : '#D0D0D0'),
+      colorFill: getCSSVarValue('--bg-hover') || (effectiveTheme === 'dark' ? '#1F1F1F' : '#F0F0F0'),
+      colorFillSecondary: getCSSVarValue('--bg-secondary') || (effectiveTheme === 'dark' ? '#161616' : '#F5F5F5'),
+      colorFillTertiary: getCSSVarValue('--bg-tertiary') || (effectiveTheme === 'dark' ? '#0F0F0F' : '#FAFAFA'),
       borderRadius: 8,
       fontSize: 14,
     },
     components: {
       Button: {
-        colorPrimaryHover: '#A76FE8',
-        colorPrimaryActive: '#8549D2',
+        colorPrimaryHover: getCSSVarValue('--color-purple-hover') || '#A76FE8',
+        colorPrimaryActive: getCSSVarValue('--color-purple-active') || '#8549D2',
       },
       Table: {
-        colorBgContainer: effectiveTheme === 'dark' ? '#0A0A0A' : '#FFFFFF',
-        colorBorderSecondary: effectiveTheme === 'dark' ? '#1F1F1F' : '#E0E0E0',
-        rowHoverBg: effectiveTheme === 'dark' ? '#161616' : '#F5F5F5',
+        colorBgContainer: getCSSVarValue('--bg-primary'),
+        colorBorderSecondary: getCSSVarValue('--border-color'),
+        rowHoverBg: getCSSVarValue('--bg-hover'),
       },
       Modal: {
-        contentBg: effectiveTheme === 'dark' ? '#161616' : '#FFFFFF',
-        headerBg: effectiveTheme === 'dark' ? '#161616' : '#FFFFFF',
-        footerBg: effectiveTheme === 'dark' ? '#161616' : '#FFFFFF',
+        contentBg: getCSSVarValue('--bg-modal'),
+        headerBg: getCSSVarValue('--bg-modal'),
+        footerBg: getCSSVarValue('--bg-modal'),
       },
       Input: {
-        colorBgContainer: effectiveTheme === 'dark' ? '#1F1F1F' : '#FFFFFF',
-        colorBorder: effectiveTheme === 'dark' ? '#2F2F2F' : '#D0D0D0',
-        colorText: effectiveTheme === 'dark' ? '#EEEEEE' : '#1A1A1A',
-        colorTextPlaceholder: effectiveTheme === 'dark' ? '#757575' : '#999999',
+        colorBgContainer: getCSSVarValue('--bg-tertiary'),
+        colorBorder: getCSSVarValue('--border-secondary'),
+        colorText: getCSSVarValue('--text-primary'),
+        colorTextPlaceholder: getCSSVarValue('--text-disabled'),
       },
       Select: {
-        colorBgContainer: effectiveTheme === 'dark' ? '#1F1F1F' : '#FFFFFF',
-        colorBorder: effectiveTheme === 'dark' ? '#2F2F2F' : '#D0D0D0',
-        optionSelectedBg: effectiveTheme === 'dark' ? '#2F2F2F' : '#F0F0F0',
+        colorBgContainer: getCSSVarValue('--bg-tertiary'),
+        colorBorder: getCSSVarValue('--border-secondary'),
+        optionSelectedBg: getCSSVarValue('--bg-hover'),
       },
       Tabs: {
-        colorBorderSecondary: effectiveTheme === 'dark' ? '#1F1F1F' : '#E0E0E0',
-        itemActiveColor: effectiveTheme === 'dark' ? '#EEEEEE' : '#1A1A1A',
-        itemColor: effectiveTheme === 'dark' ? '#B3B3B3' : '#666666',
-        itemHoverColor: effectiveTheme === 'dark' ? '#EEEEEE' : '#1A1A1A',
+        colorBorderSecondary: getCSSVarValue('--border-color'),
+        itemActiveColor: getCSSVarValue('--text-primary'),
+        itemColor: getCSSVarValue('--text-muted'),
+        itemHoverColor: getCSSVarValue('--text-primary'),
       },
       Popover: {
-        colorBgElevated: effectiveTheme === 'dark' ? '#161616' : '#FFFFFF',
-        colorText: effectiveTheme === 'dark' ? '#EEEEEE' : '#1A1A1A',
+        colorBgElevated: getCSSVarValue('--bg-card'),
+        colorText: getCSSVarValue('--text-primary'),
       },
     },
   };

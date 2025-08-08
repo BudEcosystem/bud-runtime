@@ -15,6 +15,24 @@
 
   --border-color: #E0E0E0;
   --border-secondary: #D0D0D0;
+  --border-transparent: rgba(255, 255, 255, 0.05);
+
+  /* Accent Colors */
+  --color-purple: #965CDE;
+  --color-purple-hover: #A76FE8;
+  --color-purple-active: #8549D2;
+  --color-yellow: #D1B854;
+  --color-yellow-hover: #E0C968;
+  --color-yellow-active: #B8A248;
+
+  /* Theme-specific colors */
+  --color-primary-text: #1A1A1A;
+  --color-secondary-text: #666666;
+  --color-accent-text: #965CDE;
+  --color-yellow-text: #D1B854;
+  --color-success: #52c41a;
+  --color-warning: #faad14;
+  --color-error: #ff4d4f;
 
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
@@ -37,6 +55,24 @@
 
   --border-color: #1F1F1F;
   --border-secondary: #2F2F2F;
+  --border-transparent: rgba(255, 255, 255, 0.05);
+
+  /* Accent Colors (same across themes) */
+  --color-purple: #965CDE;
+  --color-purple-hover: #A76FE8;
+  --color-purple-active: #8549D2;
+  --color-yellow: #D1B854;
+  --color-yellow-hover: #E0C968;
+  --color-yellow-active: #B8A248;
+
+  /* Theme-specific colors */
+  --color-primary-text: #EEEEEE;
+  --color-secondary-text: #B3B3B3;
+  --color-accent-text: #965CDE;
+  --color-yellow-text: #D1B854;
+  --color-success: #52c41a;
+  --color-warning: #faad14;
+  --color-error: #ff4d4f;
 
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.2);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3);

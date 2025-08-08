@@ -217,7 +217,7 @@ const Text_14_400_787B83 = ({ children, className = "", ...props }: TextProps) =
 );
 const Text_14_400_EEEEEE = ({ children, className = "", ...props }: TextProps) => (
   <div
-    className={`block text-[0.875rem] font-[400] text-[#EEEEEE] ${className}`}
+    className={`block text-[0.875rem] font-[400] text-bud-primary-text ${className}`}
     {...props}
   >
     {children}
@@ -402,11 +402,10 @@ const Text_12_300_EEEEEE = ({ children, className = "", ...props }: TextProps) =
 );
 const Text_12_400_EEEEEE = ({ children, className = "", ...props }: TextProps) => (
   <div
-    className={`block text-xs font-normal ${className}`}
+    className={`block text-xs font-normal text-bud-primary-text ${className}`}
     {...props}
     style={{
-      lineHeight: '.75rem',
-      color: '#EEEEEE'
+      lineHeight: '.75rem'
     }}
   >
     {children}
@@ -795,13 +794,13 @@ const Text_13_400_4077E6 = ({ children, className = "", ...props }: TextProps) =
 );
 
 const Text_13_400_965CDE = ({ children, className = "", ...props }: TextProps) => (
-  <div className={`text-[0.8125rem] text-[#965CDE] leading-[100%] font-[400] ${className}`} {...props}>
+  <div className={`text-[0.8125rem] text-bud-purple leading-[100%] font-[400] ${className}`} {...props}>
     {children}
   </div>
 );
 
 const Text_13_400_D1B854 = ({ children, className = "", ...props }: TextProps) => (
-  <div className={`text-[0.8125rem] text-[#D1B854] leading-[100%] font-[400] ${className}`} {...props}>
+  <div className={`text-[0.8125rem] text-bud-yellow leading-[100%] font-[400] ${className}`} {...props}>
     {children}
   </div>
 );

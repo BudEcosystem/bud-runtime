@@ -10,7 +10,7 @@ interface LayoutProps {
 
 const AuthLayout: React.FC<LayoutProps> = ({ children }) => {
   return (
-    <div className="w-full h-screen logginBg box-border relative">
+    <div className="w-full h-screen logginBg box-border relative overflow-hidden">
       <div className="loginWrap w-full h-full loginBg-glass flex justify-between box-border ">
         <div className="loginLeft relative login-left-bg overflow-hidden rounded-[15px] w-[56.4%] m-[.8rem] p-[.8rem]">
           <GameOfLifeBackground/>
