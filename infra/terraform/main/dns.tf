@@ -2,7 +2,9 @@ locals {
   environments = [
     "stage", # strictly follows stable git branch, this is our current prod
     "dev",   # strictly follows master git branch
-    "test",  # loosely follows master git branch, for testing infra changes
+
+    # personal dev environment
+    "sinan",
   ]
 
   # a service can be only removed if it's not required by all the environments
