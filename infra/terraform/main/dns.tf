@@ -31,13 +31,23 @@ locals {
   ]))
 }
 
-resource "cloudflare_dns_record" "dev" {
+resource "cloudflare_dns_record" "ipv4" {
   for_each = local.services_with_envs
+  zone_id  = var.zone_id
+  name     = each.key
+  ttl      = 3600
+  type     = "A"
+  content  = module.azure.master_ip.v4
+  proxied  = false
+}
 
-  zone_id = var.zone_id
-  name    = each.key
-  ttl     = 3600
-  type    = "A"
-  content = module.azure.master_ip
-  proxied = false
+
+resource "cloudflare_dns_record" "ipv6" {
+  for_each = local.services_with_envs
+  zone_id  = var.zone_id
+  name     = each.key
+  ttl      = 3600
+  type     = "AAAA"
+  content  = module.azure.master_ip.v6
+  proxied  = false
 }

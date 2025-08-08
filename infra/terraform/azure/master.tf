@@ -1,12 +1,21 @@
-resource "azurerm_subnet" "master" {
+resource "azurerm_subnet" "master_ipv4" {
   name                 = "${var.prefix}-master"
   resource_group_name  = azurerm_resource_group.common.name
   virtual_network_name = azurerm_virtual_network.common.name
   address_prefixes     = ["10.177.2.0/24"]
 }
 
+resource "azurerm_subnet" "master_ipv6" {
+  name                 = "${var.prefix}-master"
+  resource_group_name  = azurerm_resource_group.common.name
+  virtual_network_name = azurerm_virtual_network.common.name
+  address_prefixes     = ["fd12:3456:789a:beef::/64"]
+}
+
 resource "azurerm_public_ip" "master" {
+  for_each            = toset(["IPv4", "IPv6"])
   name                = "${var.prefix}-master"
+  ip_version          = each.key
   location            = azurerm_resource_group.common.location
   resource_group_name = azurerm_resource_group.common.name
   allocation_method   = "Static"
@@ -49,10 +58,19 @@ resource "azurerm_network_interface" "master" {
   accelerated_networking_enabled = true
 
   ip_configuration {
-    name                          = "master"
-    subnet_id                     = azurerm_subnet.master.id
+    primary                       = true
+    name                          = "IPv4"
+    subnet_id                     = azurerm_subnet.master_ipv4.id
     private_ip_address_allocation = "Dynamic"
-    public_ip_address_id          = azurerm_public_ip.master.id
+    public_ip_address_id          = azurerm_public_ip.master["IPv4"].id
+  }
+
+  ip_configuration {
+    private_ip_address_version    = "IPv6"
+    name                          = "IPv6"
+    subnet_id                     = azurerm_subnet.master_ipv6.id
+    private_ip_address_allocation = "Dynamic"
+    public_ip_address_id          = azurerm_public_ip.master["IPv6"].id
   }
 }
 
