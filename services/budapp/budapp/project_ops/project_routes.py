@@ -218,9 +218,27 @@ async def create_project(
 ) -> Union[ProjectSuccessResopnse, ErrorResponse]:
     """Create a new project."""
     try:
-        db_project = await ProjectService(session).create_project(
-            project_data.model_dump(exclude_unset=True, exclude_none=True), current_user.id
-        )
+        # Handle project_type based on user type
+        project_dict = project_data.model_dump(exclude_unset=True, exclude_none=True)
+
+        # CLIENT users can only create CLIENT_APP projects
+        if current_user.user_type == UserTypeEnum.CLIENT:
+            project_dict["project_type"] = ProjectTypeEnum.CLIENT_APP.value
+        # ADMIN users can create both types, default to ADMIN_APP if not specified
+        elif current_user.user_type == UserTypeEnum.ADMIN:
+            if "project_type" not in project_dict:
+                project_dict["project_type"] = ProjectTypeEnum.ADMIN_APP.value
+            # Validate the provided project_type for ADMIN users
+            elif project_dict["project_type"] not in [
+                ProjectTypeEnum.CLIENT_APP.value,
+                ProjectTypeEnum.ADMIN_APP.value,
+            ]:
+                raise ClientException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    message=f"Invalid project type: {project_dict['project_type']}",
+                )
+
+        db_project = await ProjectService(session).create_project(project_dict, current_user.id)
     except ClientException as e:
         logger.exception(f"Failed to create project: {e}")
         return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
