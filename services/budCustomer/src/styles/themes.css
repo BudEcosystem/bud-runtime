@@ -1,0 +1,92 @@
+/* Theme CSS Variables */
+:root {
+  /* Light Theme (Default) */
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #F5F5F5;
+  --bg-tertiary: #FAFAFA;
+  --bg-card: #FFFFFF;
+  --bg-hover: #F0F0F0;
+  --bg-modal: #FFFFFF;
+
+  --text-primary: #1A1A1A;
+  --text-secondary: #333333;
+  --text-muted: #666666;
+  --text-disabled: #999999;
+
+  --border-color: #E0E0E0;
+  --border-secondary: #D0D0D0;
+
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+/* Dark Theme */
+[data-theme="dark"] {
+  --bg-primary: #0A0A0A;
+  --bg-secondary: #161616;
+  --bg-tertiary: #1F1F1F;
+  --bg-card: #161616;
+  --bg-hover: #2F2F2F;
+  --bg-modal: #161616;
+
+  --text-primary: #FFFFFF;
+  --text-secondary: #EEEEEE;
+  --text-muted: #B3B3B3;
+  --text-disabled: #757575;
+
+  --border-color: #1F1F1F;
+  --border-secondary: #2F2F2F;
+
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+}
+
+/* Utility classes for smooth theme transitions */
+* {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+/* Override specific elements that shouldn't transition */
+input, textarea, select {
+  transition: none;
+}
+
+/* Custom scrollbar styles */
+[data-theme="dark"] ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: var(--border-secondary);
+  border-radius: 4px;
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: var(--text-disabled);
+}
+
+/* Light theme scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}

@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/text";
 import styles from "./DashboardLayout.module.scss";
 import { useShortCut } from "@/hooks/useShortCut";
+import ThemeSwitcher from "@/components/ui/ThemeSwitcher";
 
 interface LayoutProps {
   children: ReactNode;
@@ -149,13 +150,13 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
   };
 
   return (
-    <div className="flex h-screen bg-black">
+    <div className="flex h-screen bg-bud-bg-primary">
       {/* Sidebar */}
-      <div className={`${isCollapsed ? 'w-[80px]' : 'w-[260px]'} bg-[#0A0A0A] border-r border-[#1F1F1F] flex flex-col relative transition-all duration-300`}>
+      <div className={`${isCollapsed ? 'w-[80px]' : 'w-[260px]'} bg-bud-bg-primary border-r border-bud-border flex flex-col relative transition-all duration-300`}>
         {/* Collapse/Expand Button */}
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="absolute -right-3 top-8 w-6 h-6 bg-[#1A1A1A] border border-[#2A2A2A] rounded-full flex items-center justify-center hover:bg-[#252525] transition-colors z-10"
+          className="absolute -right-3 top-8 w-6 h-6 bg-bud-bg-secondary border border-bud-border-secondary rounded-full flex items-center justify-center hover:bg-bud-bg-tertiary transition-colors z-10"
           aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           <Icon
@@ -177,7 +178,7 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
 
           {/* Notifications */}
           {!isCollapsed && (
-            <div className="bg-[#1A1A1A] rounded-lg p-3 mb-6 cursor-pointer hover:bg-[#252525] transition-colors">
+            <div className="bg-bud-bg-secondary rounded-lg p-3 mb-6 cursor-pointer hover:bg-bud-bg-tertiary transition-colors">
               <Badge count={88} offset={[10, 0]} style={{ backgroundColor: '#965CDE' }}>
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 bg-[#965CDE] rounded flex items-center justify-center">
@@ -205,7 +206,7 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
                 href={tab.route}
                 className={`
                   group flex items-center gap-3 px-3 py-2.5 rounded-lg mb-1 transition-all
-                  ${active ? 'bg-[#1A1A1A] border border-[#965CDE33]' : 'hover:bg-[#1A1A1A]'}
+                  ${active ? 'bg-bud-bg-secondary border border-[#965CDE33]' : 'hover:bg-bud-bg-secondary'}
                   ${isCollapsed ? 'justify-center' : ''}
                 `}
                 onMouseEnter={() => setIsHovered(tab.route)}
@@ -240,7 +241,12 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
         </nav>
 
         {/* User Section */}
-        <div className={`${isCollapsed ? 'p-4' : 'p-6'} border-t border-[#1F1F1F] transition-all duration-300`}>
+        <div className={`${isCollapsed ? 'p-4' : 'p-6'} border-t border-bud-border transition-all duration-300`}>
+          {/* Theme Switcher */}
+          <div className="mb-4 flex justify-center">
+            <ThemeSwitcher />
+          </div>
+
           {isCollapsed ? (
             <div className="flex flex-col items-center gap-3">
               <Avatar
@@ -275,7 +281,7 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
                 </div>
                 <button
                   onClick={handleLogout}
-                  className="text-[#757575] hover:text-white transition-colors p-2"
+                  className="text-bud-text-disabled hover:text-bud-text-primary transition-colors p-2"
                 >
                   <Icon icon="material-symbols:logout" className="text-xl" />
                 </button>

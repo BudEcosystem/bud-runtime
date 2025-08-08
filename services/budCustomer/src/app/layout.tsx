@@ -5,6 +5,7 @@ import { Theme } from "@radix-ui/themes";
 import "@radix-ui/themes/styles.css";
 import "./globals.css";
 import { AuthNavigationProvider, LoaderProvider } from "@/context/authContext";
+import { ThemeProvider } from "@/context/themeContext";
 
 const geistSans = localFont({
   src: '../../public/fonts/Geist-VariableFont_wght.ttf',
@@ -27,17 +28,19 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased dark:bg-[#101010] dark:text-[#EEEEEE]`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-bud-bg-primary text-bud-text-primary`}
       >
-        <Theme appearance="dark" accentColor="purple" grayColor="slate" radius="medium">
-          <AuthNavigationProvider>
-            <LoaderProvider>
-              <AntdRegistry>{children}</AntdRegistry>
-            </LoaderProvider>
-          </AuthNavigationProvider>
-        </Theme>
+        <ThemeProvider>
+          <Theme appearance="inherit" accentColor="purple" grayColor="slate" radius="medium">
+            <AuthNavigationProvider>
+              <LoaderProvider>
+                <AntdRegistry>{children}</AntdRegistry>
+              </LoaderProvider>
+            </AuthNavigationProvider>
+          </Theme>
+        </ThemeProvider>
       </body>
     </html>
   );
