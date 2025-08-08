@@ -70,8 +70,9 @@
           (forAllSystems (
             { system, pkgs }:
             {
-              workflow_devbox_tofu_apply = pkgs.callPackage ./nix/workflows/devbox_tofu_apply { };
+              workflow_tofu_apply = pkgs.callPackage ./nix/workflows/tofu_apply { };
               workflow_dockerhub_budcustomer = pkgs.callPackage ./nix/workflows/dockerhub_budcustomer { };
+
               budcustomer = pkgs.callPackage ./nix/packages/budcustomer.nix { };
             }
           ))
@@ -79,7 +80,7 @@
             forLinuxSystems (
               { system, pkgs }:
               {
-                container_devbox = pkgs.callPackage ./nix/container/devbox { };
+                container_status = pkgs.callPackage ./nix/container/status { };
                 container_budcustomer = pkgs.callPackage ./nix/container/budcustomer.nix {
                   budcustomer = self.packages.${system}.budcustomer;
                 };
@@ -89,7 +90,7 @@
 
       nixosConfigurations = lib.genAttrs [
         "common"
-        "devbox"
+        "master"
       ] (host: makeNixos host "x86_64-linux");
     };
 }

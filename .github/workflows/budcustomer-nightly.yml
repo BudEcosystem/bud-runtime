@@ -1,0 +1,19 @@
+name: "BudCustomer: Nightly Image Update"
+on:
+  push:
+    branches:
+      - 'master'
+    paths:
+      - 'services/budCustomer/**'
+      - 'nix/workflows/dockerhub_budcustomer/**'
+      - 'nix/workflows/secrets.yaml'
+      - 'flake.lock'
+      - 'flake.nix'
+  workflow_dispatch:
+
+jobs:
+  nix-workflow:
+    name: Run Nix Workflow
+    uses: ./.github/workflows/nix-workflow.yaml
+    with:
+      workflow: dockerhub_budcustomer

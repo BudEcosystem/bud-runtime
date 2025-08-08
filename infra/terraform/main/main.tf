@@ -23,12 +23,12 @@ module "azure" {
 
 module "nixos" {
   source    = "github.com/nix-community/nixos-anywhere//terraform/nix-build"
-  attribute = ".#nixosConfigurations.devbox.config.system.build.toplevel"
+  attribute = ".#nixosConfigurations.master.config.system.build.toplevel"
 }
 
 module "disko" {
   source    = "github.com/nix-community/nixos-anywhere//terraform/nix-build"
-  attribute = ".#nixosConfigurations.devbox.config.system.build.diskoScript"
+  attribute = ".#nixosConfigurations.master.config.system.build.diskoScript"
 }
 
 module "install" {
@@ -40,5 +40,5 @@ module "install" {
   target_host        = module.azure.master_ip
   target_user        = local.install_user
   ssh_private_key    = tls_private_key.ssh.private_key_openssh
-  extra_files_script = "${path.module}/decrypt-devbox-sops.sh"
+  extra_files_script = "${path.module}/decrypt-sops-root.sh"
 }
