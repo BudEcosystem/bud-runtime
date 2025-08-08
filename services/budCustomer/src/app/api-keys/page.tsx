@@ -224,7 +224,6 @@ export default function ApiKeysPage() {
               style={{ background: 'transparent' }}
             />
           </div>
-
           {/* Create Key Modal */}
           <Modal
             title={<Text_19_600_EEEEEE>Create New API Key</Text_19_600_EEEEEE>}
