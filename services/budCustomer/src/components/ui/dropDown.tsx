@@ -1,4 +1,6 @@
-import React, { useContext, useState, useRef, useEffect } from "react";
+import React, { useContext } from "react";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import { Box, Button, Flex } from "@radix-ui/themes";
 import { Text_12_300_EEEEEE, Text_12_400_FFFFFF } from "./text";
 import CustomPopover from "@/flows/components/customPopover";
 import { ConfigProvider, Select, Image, Form } from "antd";
@@ -27,74 +29,54 @@ const CustomDropdownMenu: React.FC<DropDownProps> = ({
   contentRenderItem,
   align,
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
   const handleSelect = (value: any) => {
     onSelect(value);
-    setIsOpen(false);
   };
-
-  const getAlignmentClass = () => {
-    switch (align) {
-      case 'end': return 'right-0';
-      case 'center': return 'left-1/2 transform -translate-x-1/2';
-      default: return 'left-0';
-    }
-  };
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
   return (
-    <div className="relative" ref={dropdownRef}>
-      <div
-        className={`outline-none ${triggerClassNames}`}
-        onClick={() => setIsOpen(!isOpen)}
-      >
-        <div className="flex items-center justify-start bg-transparent border-0 outline-none p-[0rem] h-[100%] w-[100%] cursor-pointer">
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger className={`outline-none ${triggerClassNames}`}>
+        {/* <Button variant="soft" className='bg-transparent border-0 outline-none p-[0rem] h-[100%] w-[100%]'>
+        </Button> */}
+        <Flex
+          align="center"
+          justify="start"
+          className="bg-transparent border-0 outline-none p-[0rem] h-[100%] w-[100%]"
+        >
           {triggerRenderItem}
-        </div>
-      </div>
-
-      {isOpen && (
-        <div className={`absolute top-full mt-1 min-w-[140px] rounded-lg bg-[#111113] p-[.5rem] border border-[#212225] z-50 ${getAlignmentClass()} ${contentClassNames}`}>
-          {contentRenderItem ? (
-            <>
-              {contentRenderItem.map((item: any, index: number) => (
-                <div
-                  className={`h-[1.75rem] px-[1rem] py-[.5rem] rounded-md hover:bg-[#18191B] outline-none cursor-pointer ${itemsClassNames}`}
-                  key={index}
-                  onClick={() => handleSelect(item.props.children)}
-                >
-                  {item}
-                </div>
-              ))}
-            </>
-          ) : (
-            <>
-              {items.map((item: any, index: number) => (
-                <div
-                  className={`h-[1.75rem] px-[1rem] py-[.5rem] rounded-md hover:bg-[#18191B] outline-none cursor-pointer ${itemsClassNames}`}
-                  key={index}
-                  onClick={() => handleSelect(item)}
-                >
-                  <Text_12_400_FFFFFF>{item}</Text_12_400_FFFFFF>
-                </div>
-              ))}
-            </>
-          )}
-        </div>
-      )}
-    </div>
+        </Flex>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Content
+        className={`min-w-[140px] rounded rounded-lg bg-[#111113] p-[.5rem] border border-[#212225] ${contentClassNames}`}
+        side="bottom"
+        align={align || "start"}
+      >
+        {contentRenderItem ? (
+          <>
+            {contentRenderItem.map((item: any, index: number) => (
+              <DropdownMenu.Item
+                className={`h-[1.75] px-[1rem] py-[.5rem] rounded rounded-md hover:bg-[#18191B] outline-none cursor-pointer ${itemsClassNames}`}
+                key={index}
+                onSelect={() => handleSelect(item.props.children)}
+              >
+                {item}
+              </DropdownMenu.Item>
+            ))}
+          </>
+        ) : (
+          <>
+            {items.map((item: any, index: number) => (
+              <DropdownMenu.Item
+                className={`h-[1.75] px-[1rem] py-[.5rem] rounded rounded-md hover:bg-[#18191B] outline-none cursor-pointer ${itemsClassNames}`}
+                key={index}
+                onSelect={() => handleSelect(item)}
+              >
+                <Text_12_400_FFFFFF>{item}</Text_12_400_FFFFFF>
+              </DropdownMenu.Item>
+            ))}
+          </>
+        )}
+      </DropdownMenu.Content>
+    </DropdownMenu.Root>
   );
 };
 

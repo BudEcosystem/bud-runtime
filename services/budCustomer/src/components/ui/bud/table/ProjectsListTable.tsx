@@ -1,7 +1,7 @@
 import SearchHeaderInput from "@/flows/components/SearchHeaderInput";
 import { Text_12_300_EEEEEE, Text_12_400_757575, Text_12_400_EEEEEE, Text_14_300_EEEEEE, Text_14_400_EEEEEE, Text_16_600_FFFFFF } from "../../text";
 import { PrimaryButton, SecondaryButton } from "../form/Buttons";
-import { Icon } from "@iconify/react";
+import { MixerHorizontalIcon } from "@radix-ui/react-icons";
 import CustomPopover from "@/flows/components/customPopover";
 import { ConfigProvider, Image, Popover, Select, Table } from "antd";
 import React, { useCallback, useEffect, useState } from "react";
@@ -307,10 +307,10 @@ const ProjectsListTable = () => {
                   className="group h-[1.7rem] text-[#FFFFFF] mx-2 flex items-center cursor-pointer text-xs font-normal leading-3 rounded-[6px] shadow-none bg-transparent"
                   onClick={() => { }}
                 >
-                  <Icon
-                    icon="material-symbols:tune"
+                  <MixerHorizontalIcon
                     style={{ width: '0.875rem', height: '0.875rem' }}
                     className="text-[#B3B3B3] group-hover:text-[#FFFFFF]"
+                  // className="mr-2"
                   />
                 </label>
               </Popover>

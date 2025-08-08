@@ -1,3 +1,4 @@
+import { Box, Flex } from "@radix-ui/themes";
 import React from "react";
 import { Text_12_400_757575, Text_14_400_EEEEEE } from "../../text";
 

@@ -10,7 +10,7 @@ import {
   getChromeColor,
   randomColor,
 } from "./TagsInputData";
-import { Icon } from "@iconify/react";
+import { Cross1Icon } from "@radix-ui/react-icons";
 import CustomPopover from "../../../../flows/components/customPopover";
 
 export type Tag = {
@@ -239,8 +239,7 @@ export default function TagsInput(props: SelectProps) {
                     {props.data.label}
                     <button type="button" className="!text-[#B3B3B3] ">
                       {selectedTag && (
-                        <Icon
-                          icon="material-symbols:close"
+                        <Cross1Icon
                           className="!text-[#B3B3B3] colorFix"
                           style={{
                             width: ".75rem",

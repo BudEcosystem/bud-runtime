@@ -10,7 +10,7 @@ import {
   getChromeColor,
   randomColor,
 } from "./TagsInputData";
-import { Icon } from "@iconify/react";
+import { Cross1Icon } from "@radix-ui/react-icons";
 import { components } from "react-select";
 import CustomPopover from "../../../../flows/components/customPopover";
 import { errorToast } from "../../../../components/toast";
@@ -352,8 +352,7 @@ export default function ProjectUsersInput(props: SelectProps) {
                     <span>{props.data.label}</span>
                     <button type="button" className="text-[#B3B3B3] ">
                       {selectedTag && (
-                        <Icon
-                          icon="material-symbols:close"
+                        <Cross1Icon
                           style={{
                             width: "10px",
                             height: "10px",

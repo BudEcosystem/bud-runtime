@@ -1,4 +1,5 @@
 import * as React from "react";
+import { Text } from "@radix-ui/themes";
 
 export const pxToRem = (px: number) => `${px / 16}rem`;
 
