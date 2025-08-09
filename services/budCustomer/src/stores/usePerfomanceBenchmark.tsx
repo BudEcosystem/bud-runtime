@@ -161,7 +161,7 @@ export const usePerfomanceBenchmark = create<{
     get().setSearchText(text);
     let nodeMetrics = get().nodeMetrics;
     const filtered = Object.values(nodeMetrics || {}).filter((node: any) =>
-      node.hostname?.toLowerCase().includes(get().searchText.toLowerCase())
+      node.hostname?.toLowerCase().includes(get().searchText.toLowerCase()),
     );
     set({ filteredNodeMetrics: filtered });
   },
@@ -221,7 +221,7 @@ export const usePerfomanceBenchmark = create<{
     } else {
       let nodes = get().filteredNodeMetrics;
       Object.keys(nodes || {}).map((key, index) =>
-        get().setSelectedNodes(nodes[key])
+        get().setSelectedNodes(nodes[key]),
       );
     }
   },
@@ -229,13 +229,13 @@ export const usePerfomanceBenchmark = create<{
   setSelectedNodes: (node: Node) => {
     set((state) => {
       const isAlreadySelected = state.selectedNodes.some(
-        (selected) => selected.hostname === node.hostname
+        (selected) => selected.hostname === node.hostname,
       );
 
       return {
         selectedNodes: isAlreadySelected
           ? state.selectedNodes.filter(
-              (selected) => selected.hostname !== node.hostname
+              (selected) => selected.hostname !== node.hostname,
             )
           : [...state.selectedNodes, node],
       };
@@ -245,13 +245,13 @@ export const usePerfomanceBenchmark = create<{
   setSelectedDataset: (dataset: Dataset) => {
     set((state) => {
       const isAlreadySelected = state.selectedDataset.some(
-        (selected) => selected.id === dataset.id
+        (selected) => selected.id === dataset.id,
       );
 
       return {
         selectedDataset: isAlreadySelected
           ? state.selectedDataset.filter(
-              (selected) => selected.id !== dataset.id
+              (selected) => selected.id !== dataset.id,
             )
           : [...state.selectedDataset, dataset],
       };

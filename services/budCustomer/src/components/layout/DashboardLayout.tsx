@@ -2,7 +2,7 @@
 import React, { ReactNode, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Image, Badge, Avatar } from "antd";
+import { Image, Badge, Avatar, Typography } from "antd";
 import { Icon } from "@iconify/react/dist/iconify.js";
 import {
   Text_10_400_B3B3B3,
@@ -11,11 +11,16 @@ import {
   Text_14_400_757575,
   Text_14_400_B3B3B3,
   Text_14_400_EEEEEE,
-  Text_14_600_EEEEEE
+  Text_14_600_EEEEEE,
 } from "@/components/ui/text";
 import styles from "./DashboardLayout.module.scss";
 import { useShortCut } from "@/hooks/useShortCut";
 import ThemeSwitcher from "@/components/ui/ThemeSwitcher";
+import { useTheme } from "@/context/themeContext";
+import ProjectSelector from "@/components/project/ProjectSelector";
+import { useProject } from "@/context/projectContext";
+
+const { Text } = Typography;
 
 interface LayoutProps {
   children: ReactNode;
@@ -45,10 +50,10 @@ function ShortCutComponent({
 
   if (metaKeyPressed) {
     return (
-      <div className="flex inline-flex justify-center items-center text-[0.625rem] py-0.5 bg-[#1F1F1F] rounded-sm text-[#B3B3B3] h-5 w-8 uppercase">
+      <div className="flex inline-flex justify-center items-center text-[0.625rem] py-0.5 bg-bud-bg-secondary rounded-sm text-bud-text-muted h-5 w-8 uppercase">
         <Icon
           icon="ph:command"
-          className="text-[0.625rem] mr-0.5 text-[#B3B3B3]"
+          className="text-[0.625rem] mr-0.5 text-bud-text-muted"
         />
         {cmd}
       </div>
@@ -56,12 +61,10 @@ function ShortCutComponent({
   }
 
   return (
-    <div
-      className="flex inline-flex justify-center items-center text-[0.625rem] py-0.5 bg-[#1F1F1F] rounded-sm text-[#B3B3B3] h-5 w-8 uppercase opacity-0 group-hover:opacity-100 transition-opacity"
-    >
+    <div className="flex inline-flex justify-center items-center text-[0.625rem] py-0.5 bg-bud-bg-secondary rounded-sm text-bud-text-muted h-5 w-8 uppercase opacity-0 group-hover:opacity-100 transition-opacity">
       <Icon
         icon="ph:command"
-        className="text-[0.625rem] mr-0.5 text-[#B3B3B3] group-hover:text-[#EEEEEE]"
+        className="text-[0.625rem] mr-0.5 text-bud-text-muted group-hover:text-bud-text-primary"
       />
       {cmd}
     </div>
@@ -71,79 +74,76 @@ function ShortCutComponent({
 const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
   const pathname = usePathname();
   const router = useRouter();
+  const { effectiveTheme } = useTheme();
   const [isHovered, setIsHovered] = useState<string | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
 
+  // Project context
+  const { currentProject } = useProject();
+
   const tabs: TabItem[] = [
-    {
-      label: "Projects",
-      route: "/projects",
-      icon: "/icons/project.png",
-      iconWhite: "/icons/projectIconWhite.png",
-      shortcut: "1"
-    },
     {
       label: "Models",
       route: "/models",
       icon: "/icons/modelRepo.png",
       iconWhite: "/icons/modelRepoWhite.png",
-      shortcut: "2"
-    },
-    {
-      label: "Clusters",
-      route: "/clusters",
-      icon: "/icons/cluster.png",
-      iconWhite: "/icons/clusterWhite.png",
-      shortcut: "3"
-    },
-    {
-      label: "Dashboard",
-      route: "/dashboard",
-      icon: "/icons/dashboard.png",
-      iconWhite: "/icons/dashboardWhite.png",
-      shortcut: "4"
+      shortcut: "0",
     },
     {
       label: "Playground",
       route: "/playground",
       icon: "/icons/playIcn.png",
       iconWhite: "/icons/playWhite.png",
-      shortcut: "5"
-    },
-    {
-      label: "API Keys",
-      route: "/api-keys",
-      icon: "/icons/key.png",
-      iconWhite: "/icons/keyWhite.png",
-      shortcut: "6"
-    },
-    {
-      label: "Usage & Billing",
-      route: "/usage",
-      icon: "/icons/billing.svg",
-      iconWhite: "/icons/billingWhite.svg",
-      shortcut: "7"
-    },
-    {
-      label: "Logs",
-      route: "/logs",
-      icon: "/icons/logs.svg",
-      iconWhite: "/icons/logsWhite.svg",
-      shortcut: "8"
+      shortcut: "1",
     },
     {
       label: "Batches",
       route: "/batches",
       icon: "/icons/batches.svg",
       iconWhite: "/icons/batchesWhite.svg",
-      shortcut: "9"
-    }
+      shortcut: "2",
+    },
+    {
+      label: "Logs",
+      route: "/logs",
+      icon: "/icons/logs.svg",
+      iconWhite: "/icons/logsWhite.svg",
+      shortcut: "3",
+    },
+    {
+      label: "Usage & Billing",
+      route: "/usage",
+      icon: "/icons/billing.svg",
+      iconWhite: "/icons/billingWhite.svg",
+      shortcut: "4",
+    },
+    {
+      label: "Audit",
+      route: "/audit",
+      icon: "/icons/logs.svg", // Using logs icon as fallback
+      iconWhite: "/icons/logsWhite.svg",
+      shortcut: "5",
+    },
+    {
+      label: "API Keys",
+      route: "/api-keys",
+      icon: "/icons/key.png",
+      iconWhite: "/icons/keyWhite.png",
+      shortcut: "6",
+    },
+    {
+      label: "Projects",
+      route: "/projects",
+      icon: "/icons/project.png",
+      iconWhite: "/icons/projectIconWhite.png",
+      shortcut: "7",
+    },
   ];
 
   const isActive = (route: string) => pathname === route;
 
   const handleLogout = () => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       localStorage.removeItem("auth_token");
     }
     router.push("/login");
@@ -152,7 +152,9 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
   return (
     <div className="flex h-screen bg-bud-bg-primary">
       {/* Sidebar */}
-      <div className={`${isCollapsed ? 'w-[80px]' : 'w-[260px]'} bg-bud-bg-primary border-r border-bud-border flex flex-col relative transition-all duration-300`}>
+      <div
+        className={`${isCollapsed ? "w-[80px]" : "w-[260px]"} bg-bud-bg-primary border-r border-bud-border flex flex-col relative transition-all duration-300`}
+      >
         {/* Collapse/Expand Button */}
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
@@ -160,33 +162,71 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
           aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           <Icon
-            icon={isCollapsed ? "material-symbols:chevron-right" : "material-symbols:chevron-left"}
-            className="text-sm text-[#B3B3B3]"
+            icon={
+              isCollapsed
+                ? "material-symbols:chevron-right"
+                : "material-symbols:chevron-left"
+            }
+            className="text-sm text-bud-text-muted"
           />
         </button>
-        {/* Logo and Notifications */}
-        <div className={`${isCollapsed ? 'p-4' : 'p-6'} transition-all duration-300`}>
-          <Link href="/dashboard">
-            <Image
-              preview={false}
-              width={isCollapsed ? 40 : 80}
-              src={isCollapsed ? "/images/BudIcon.png" : "/images/BudLogo.png"}
-              alt="Bud Logo"
-              className={`${isCollapsed ? 'mb-4 mx-auto' : 'mb-6'} transition-all duration-300`}
-            />
-          </Link>
+        {/* Logo and Theme Switcher */}
+        <div
+          className={`${isCollapsed ? "p-4" : "p-6"} transition-all duration-300`}
+        >
+          <div
+            className={`flex items-center ${isCollapsed ? "justify-center" : "justify-between"} mb-6`}
+          >
+            <Link href="/projects">
+              <Image
+                preview={false}
+                width={isCollapsed ? 40 : 80}
+                src={
+                  effectiveTheme === "light"
+                    ? isCollapsed
+                      ? "/images/BudIcon.png"
+                      : "/BudLogo-white.png"
+                    : isCollapsed
+                      ? "/images/BudIcon.png"
+                      : "/images/BudLogo.png"
+                }
+                alt="Bud Logo"
+              />
+            </Link>
+            {!isCollapsed && (
+              <div className="ml-auto">
+                <ThemeSwitcher />
+              </div>
+            )}
+          </div>
+          {isCollapsed && (
+            <div className="flex justify-center mb-4">
+              <ThemeSwitcher />
+            </div>
+          )}
 
           {/* Notifications */}
           {!isCollapsed && (
-            <div className="bg-bud-bg-secondary rounded-lg p-3 mb-6 cursor-pointer hover:bg-bud-bg-tertiary transition-colors">
-              <Badge count={88} offset={[10, 0]} style={{ backgroundColor: '#965CDE' }}>
+            <div className="bg-bud-bg-secondary rounded-lg p-3 mb-1 cursor-pointer hover:bg-bud-bg-tertiary transition-colors">
+              <Badge
+                count={88}
+                offset={[50, -10]}
+                style={{ backgroundColor: "#965CDE" }}
+              >
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-[#965CDE] rounded flex items-center justify-center">
-                    <Icon icon="heroicons-outline:bell" className="text-white text-lg" />
+                  <div className="w-8 h-8 bg-bud-purple rounded flex items-center justify-center">
+                    <Icon
+                      icon="heroicons-outline:bell"
+                      className="text-white text-lg"
+                    />
                   </div>
                   <div>
-                    <Text_12_400_B3B3B3>88 Notifications</Text_12_400_B3B3B3>
-                    <Text_14_400_EEEEEE>88 Notifications</Text_14_400_EEEEEE>
+                    <Text className="text-bud-text-disabled text-xs block">
+                      88 New
+                    </Text>
+                    <Text className="text-bud-text-primary text-sm">
+                      Notifications
+                    </Text>
                   </div>
                 </div>
               </Badge>
@@ -194,70 +234,117 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
           )}
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 px-3">
-          {tabs.map((tab) => {
-            const active = isActive(tab.route);
-            const hovered = isHovered === tab.route;
-
-            return (
-              <Link
-                key={tab.route}
-                href={tab.route}
-                className={`
-                  group flex items-center gap-3 px-3 py-2.5 rounded-lg mb-1 transition-all
-                  ${active ? 'bg-bud-bg-secondary border border-[#965CDE33]' : 'hover:bg-bud-bg-secondary'}
-                  ${isCollapsed ? 'justify-center' : ''}
-                `}
-                onMouseEnter={() => setIsHovered(tab.route)}
-                onMouseLeave={() => setIsHovered(null)}
-              >
-                <Image
-                  preview={false}
-                  width={20}
-                  height={20}
-                  src={active || hovered ? tab.iconWhite || tab.icon : tab.icon}
-                  alt={tab.label}
-                  title={isCollapsed ? tab.label : undefined}
+        {/* Scrollable Content Area */}
+        <div className="flex-1 overflow-hidden flex flex-col">
+          {/* Project Selector */}
+          <div
+            className={`${isCollapsed ? "px-4" : "px-6"} mb-4 flex-shrink-0`}
+          >
+            {!isCollapsed ? (
+              <>
+                <div className="mb-2">
+                  <Text className="text-bud-text-disabled text-xs uppercase tracking-wider">
+                    Current Project
+                  </Text>
+                </div>
+                <ProjectSelector
+                  onCreateProject={() => router.push("/projects")}
+                  size="small"
+                  className="w-full"
                 />
-                {!isCollapsed && (
-                  <>
-                    <Text_14_400_B3B3B3 className={active ? '!text-white' : ''}>
-                      {tab.label}
-                    </Text_14_400_B3B3B3>
-                    {tab.shortcut && (
-                      <div className="ml-auto">
-                        <ShortCutComponent
-                          cmd={tab.shortcut}
-                          action={() => router.push(tab.route)}
-                        />
-                      </div>
-                    )}
-                  </>
-                )}
-              </Link>
-            );
-          })}
-        </nav>
-
-        {/* User Section */}
-        <div className={`${isCollapsed ? 'p-4' : 'p-6'} border-t border-bud-border transition-all duration-300`}>
-          {/* Theme Switcher */}
-          <div className="mb-4 flex justify-center">
-            <ThemeSwitcher />
+              </>
+            ) : (
+              <div className="flex justify-center">
+                <button
+                  onClick={() => router.push("/projects")}
+                  className="w-10 h-auto rounded-lg bg-bud-bg-secondary border border-bud-border hover:bg-bud-bg-tertiary hover:border-bud-purple transition-all flex items-center justify-center"
+                  title={
+                    currentProject
+                      ? `Current: ${currentProject.name}`
+                      : "Select Project"
+                  }
+                >
+                  {currentProject ? (
+                    <div
+                      className="w-6 h-6 rounded flex items-center justify-center"
+                      style={{ backgroundColor: currentProject.color }}
+                    >
+                      <Icon icon="ph:folder" className="text-white text-sm" />
+                    </div>
+                  ) : (
+                    <Icon
+                      icon="ph:folder-plus"
+                      className="text-bud-text-disabled text-lg"
+                    />
+                  )}
+                </button>
+              </div>
+            )}
           </div>
 
+          {/* Navigation */}
+          <nav className="flex-1 px-3 overflow-y-auto sidebar-scroll">
+            {tabs.map((tab) => {
+              const active = isActive(tab.route);
+              const hovered = isHovered === tab.route;
+
+              return (
+                <Link
+                  key={tab.route}
+                  href={tab.route}
+                  className={`
+                  group flex items-center gap-3 px-3 py-2.5 rounded-lg mb-1 transition-all
+                  ${active ? "bg-bud-bg-secondary border border-bud-purple/20" : "hover:bg-bud-bg-secondary"}
+                  ${isCollapsed ? "justify-center" : ""}
+                `}
+                  onMouseEnter={() => setIsHovered(tab.route)}
+                  onMouseLeave={() => setIsHovered(null)}
+                >
+                  <Image
+                    preview={false}
+                    width={20}
+                    height={20}
+                    src={
+                      active || hovered ? tab.iconWhite || tab.icon : tab.icon
+                    }
+                    alt={tab.label}
+                    title={isCollapsed ? tab.label : undefined}
+                  />
+                  {!isCollapsed && (
+                    <>
+                      <Text
+                        className={`text-bud-text-muted text-sm ${active ? "!text-bud-text-primary" : ""}`}
+                      >
+                        {tab.label}
+                      </Text>
+                      {tab.shortcut && (
+                        <div className="ml-auto">
+                          <ShortCutComponent
+                            cmd={tab.shortcut}
+                            action={() => router.push(tab.route)}
+                          />
+                        </div>
+                      )}
+                    </>
+                  )}
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
+
+        {/* User Section */}
+        <div
+          className={`${isCollapsed ? "p-4" : "p-6"} border-t border-bud-border transition-all duration-300`}
+        >
           {isCollapsed ? (
             <div className="flex flex-col items-center gap-3">
-              <Avatar
-                size={32}
-                style={{ backgroundColor: '#965CDE' }}
-              >
+              <Avatar size={32} style={{ backgroundColor: "#965CDE" }}>
                 <Icon icon="mdi:user" className="text-lg" />
               </Avatar>
               <button
                 onClick={handleLogout}
-                className="text-[#757575] hover:text-white transition-colors p-2"
+                className="text-bud-text-disabled hover:text-bud-text-primary transition-colors p-2"
                 title="Logout"
               >
                 <Icon icon="material-symbols:logout" className="text-xl" />
@@ -269,14 +356,18 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
                 <div className="flex items-center gap-3">
                   <Avatar
                     size={36}
-                    style={{ backgroundColor: '#965CDE' }}
+                    style={{ backgroundColor: "#965CDE" }}
                     className="flex-shrink-0"
                   >
                     <Icon icon="mdi:user" className="text-xl" />
                   </Avatar>
                   <div>
-                    <div className="text-white text-sm font-medium">Admin</div>
-                    <Text_12_300_B3B3B3>admin@bud.studio</Text_12_300_B3B3B3>
+                    <div className="text-bud-text-primary text-sm font-medium">
+                      Admin
+                    </div>
+                    <Text className="text-bud-text-disabled text-xs">
+                      admin@bud.studio
+                    </Text>
                   </div>
                 </div>
                 <button
@@ -285,11 +376,6 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
                 >
                   <Icon icon="material-symbols:logout" className="text-xl" />
                 </button>
-              </div>
-              <div className="mt-2 px-2">
-                <span className="text-xs bg-[#965CDE20] text-[#965CDE] px-2 py-1 rounded">
-                  Super Admin
-                </span>
               </div>
             </>
           )}
@@ -300,13 +386,13 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
         {headerItems && (
-          <div className="bg-[#0A0A0A] border-b border-[#1F1F1F] px-8 py-4">
+          <div className="bg-bud-bg-primary border-b border-bud-border px-8 py-4">
             {headerItems}
           </div>
         )}
 
         {/* Page Content */}
-        <main className="flex-1 bg-black overflow-auto">
+        <main className="flex-1 bg-bud-bg-primary overflow-auto">
           {children}
         </main>
       </div>

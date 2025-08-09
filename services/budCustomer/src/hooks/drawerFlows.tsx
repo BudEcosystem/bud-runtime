@@ -1031,7 +1031,7 @@ const securityScan: DrawerFlowType = {
       id: "security-scan-status",
       navigation: () => [
         "Model",
-        `${useModels.getState().selectedModel?.name || useDeployModel.getState().currentWorkflow?.workflow_steps?.model?.name || 'Model'}`,
+        `${useModels.getState().selectedModel?.name || useDeployModel.getState().currentWorkflow?.workflow_steps?.model?.name || "Model"}`,
         "Security Scan",
       ],
       confirmClose: true,
@@ -2619,271 +2619,271 @@ const addBenchmark: DrawerFlowType = {
   ],
 };
 const addQuantizationFlow: DrawerFlowType = {
-    title: "Add Quantization",
-    description: "Add a new quantization",
-    totalSteps: 7,
-    steps: [
+  title: "Add Quantization",
+  description: "Add a new quantization",
+  totalSteps: 7,
+  steps: [
+    {
+      navigation: () => ["Model", "Add Quantization"],
+      id: "quantization-detail",
+      confirmClose: false,
+      component: StepComponents["quantization-detail"],
+      step: 1,
+      progress: [
         {
-            navigation: () => ["Model", "Add Quantization"],
-            id: "quantization-detail",
-            confirmClose: false,
-            component: StepComponents["quantization-detail"],
-            step: 1,
-            progress: [
-                {
-                    status: FormProgressStatus.inProgress,
-                    title: "Quantization Details",
-                },
-                {
-                    status: FormProgressStatus.notCompleted,
-                    title: "Method",
-                },
-                {
-                    status: FormProgressStatus.notCompleted,
-                    title: "Advanced",
-                },
-                {
-                    status: FormProgressStatus.notCompleted,
-                    title: "Simulation",
-                },
-                {
-                    status: FormProgressStatus.notCompleted,
-                    title: "Select cluster",
-                },
-                {
-                    status: FormProgressStatus.notCompleted,
-                    title: "Running quantization",
-                },
-                {
-                    status: FormProgressStatus.notCompleted,
-                    title: "Result",
-                },
-            ]
+          status: FormProgressStatus.inProgress,
+          title: "Quantization Details",
         },
         {
-            navigation: () => ["Model", "Add Quantization"],
-            id: "quantization-method",
-            confirmClose: true,
-            component: StepComponents["quantization-method"],
-            step: 2,
-            progress: [
-                {
-                    status: FormProgressStatus.completed,
-                    title: "Quantization Details",
-                },
-                {
-                    status: FormProgressStatus.inProgress,
-                    title: "Method",
-                },
-                {
-                    status: FormProgressStatus.notCompleted,
-                    title: "Advanced",
-                },
-                {
-                    status: FormProgressStatus.notCompleted,
-                    title: "Simulation",
-                },
-                {
-                    status: FormProgressStatus.notCompleted,
-                    title: "Select cluster",
-                },
-                {
-                    status: FormProgressStatus.notCompleted,
-                    title: "Running quantization",
-                },
-                {
-                    status: FormProgressStatus.notCompleted,
-                    title: "Result"
-                },
-            ]
+          status: FormProgressStatus.notCompleted,
+          title: "Method",
         },
         {
-            navigation: () => ["Model", "Add Quantization"],
-            id: "advanced-settings",
-            confirmClose: true,
-            component: StepComponents["advanced-settings"],
-            step: 3,
-            progress: [
-                {
-                    status: FormProgressStatus.completed,
-                    title: "Quantization Details",
-                },
-                {
-                    status: FormProgressStatus.completed,
-                    title: "Method",
-                },
-                {
-                    status: FormProgressStatus.inProgress,
-                    title: "Advanced",
-                },
-                {
-                    status: FormProgressStatus.notCompleted,
-                    title: "Simulation",
-                },
-                {
-                    status: FormProgressStatus.notCompleted,
-                    title: "Select cluster",
-                },
-                {
-                    status: FormProgressStatus.notCompleted,
-                    title: "Running quantization",
-                },
-                {
-                    status: FormProgressStatus.notCompleted,
-                    title: "Result"
-                },
-            ]
+          status: FormProgressStatus.notCompleted,
+          title: "Advanced",
         },
         {
-            navigation: () => ["Model", "Add Quantization"],
-            id: "quantization-simulation-status",
-            confirmClose: true,
-            component: StepComponents["quantization-simulation-status"],
-            step: 4,
-            progress: [
-                {
-                    status: FormProgressStatus.completed,
-                    title: "Quantization Details",
-                },
-                {
-                    status: FormProgressStatus.completed,
-                    title: "Method",
-                },
-                {
-                    status: FormProgressStatus.completed,
-                    title: "Advanced",
-                },
-                {
-                    status: FormProgressStatus.inProgress,
-                    title: "Simulation",
-                },
-                {
-                    status: FormProgressStatus.notCompleted,
-                    title: "Select cluster",
-                },
-                {
-                    status: FormProgressStatus.notCompleted,
-                    title: "Running quantization",
-                },
-                {
-                    status: FormProgressStatus.notCompleted,
-                    title: "Result"
-                },
-            ]
+          status: FormProgressStatus.notCompleted,
+          title: "Simulation",
         },
         {
-            navigation: () => ["Model", "Add Quantization"],
-            id: "quantization-select-cluster",
-            confirmClose: true,
-            component: StepComponents["quantization-select-cluster"],
-            step: 5,
-            progress: [
-                {
-                    status: FormProgressStatus.completed,
-                    title: "Quantization Details",
-                },
-                {
-                    status: FormProgressStatus.completed,
-                    title: "Method",
-                },
-                {
-                    status: FormProgressStatus.completed,
-                    title: "Advanced",
-                },
-                {
-                    status: FormProgressStatus.completed,
-                    title: "Simulation",
-                },
-                {
-                    status: FormProgressStatus.inProgress,
-                    title: "Select cluster",
-                },
-                {
-                    status: FormProgressStatus.notCompleted,
-                    title: "Running quantization",
-                },
-                {
-                    status: FormProgressStatus.notCompleted,
-                    title: "Result"
-                },
-            ]
+          status: FormProgressStatus.notCompleted,
+          title: "Select cluster",
         },
         {
-            navigation: () => ["Model", "Add Quantization"],
-            id: "quantization-deployment-status",
-            confirmClose: true,
-            component: StepComponents["quantization-deployment-status"],
-            step: 6,
-            progress: [
-                {
-                    status: FormProgressStatus.completed,
-                    title: "Quantization Details",
-                },
-                {
-                    status: FormProgressStatus.completed,
-                    title: "Method",
-                },
-                {
-                    status: FormProgressStatus.completed,
-                    title: "Advanced",
-                },
-                {
-                    status: FormProgressStatus.completed,
-                    title: "Simulation",
-                },
-                {
-                    status: FormProgressStatus.completed,
-                    title: "Select cluster",
-                },
-                {
-                    status: FormProgressStatus.inProgress,
-                    title: "Running quantization",
-                },
-                {
-                    status: FormProgressStatus.notCompleted,
-                    title: "Result",
-                },
-            ]
+          status: FormProgressStatus.notCompleted,
+          title: "Running quantization",
         },
         {
-            navigation: () => ["Model", "Add Quantization"],
-            id: "quantization-result",
-            confirmClose: true,
-            component: StepComponents["quantization-result"],
-            step: 7,
-            progress: [
-                {
-                    status: FormProgressStatus.completed,
-                    title: "Quantization Details",
-                },
-                {
-                    status: FormProgressStatus.completed,
-                    title: "Method",
-                },
-                {
-                    status: FormProgressStatus.completed,
-                    title: "Advanced",
-                },
-                {
-                    status: FormProgressStatus.completed,
-                    title: "Simulation",
-                },
-                {
-                    status: FormProgressStatus.completed,
-                    title: "Select cluster",
-                },
-                {
-                    status: FormProgressStatus.completed,
-                    title: "Running quantization",
-                },
-                {
-                    status: FormProgressStatus.inProgress,
-                    title: "Result"
-                },
-            ]
-        }
-    ]
-}
+          status: FormProgressStatus.notCompleted,
+          title: "Result",
+        },
+      ],
+    },
+    {
+      navigation: () => ["Model", "Add Quantization"],
+      id: "quantization-method",
+      confirmClose: true,
+      component: StepComponents["quantization-method"],
+      step: 2,
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Quantization Details",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Method",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Advanced",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Simulation",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Select cluster",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Running quantization",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Result",
+        },
+      ],
+    },
+    {
+      navigation: () => ["Model", "Add Quantization"],
+      id: "advanced-settings",
+      confirmClose: true,
+      component: StepComponents["advanced-settings"],
+      step: 3,
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Quantization Details",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Method",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Advanced",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Simulation",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Select cluster",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Running quantization",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Result",
+        },
+      ],
+    },
+    {
+      navigation: () => ["Model", "Add Quantization"],
+      id: "quantization-simulation-status",
+      confirmClose: true,
+      component: StepComponents["quantization-simulation-status"],
+      step: 4,
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Quantization Details",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Method",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Advanced",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Simulation",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Select cluster",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Running quantization",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Result",
+        },
+      ],
+    },
+    {
+      navigation: () => ["Model", "Add Quantization"],
+      id: "quantization-select-cluster",
+      confirmClose: true,
+      component: StepComponents["quantization-select-cluster"],
+      step: 5,
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Quantization Details",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Method",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Advanced",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Simulation",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Select cluster",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Running quantization",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Result",
+        },
+      ],
+    },
+    {
+      navigation: () => ["Model", "Add Quantization"],
+      id: "quantization-deployment-status",
+      confirmClose: true,
+      component: StepComponents["quantization-deployment-status"],
+      step: 6,
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Quantization Details",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Method",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Advanced",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Simulation",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select cluster",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Running quantization",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Result",
+        },
+      ],
+    },
+    {
+      navigation: () => ["Model", "Add Quantization"],
+      id: "quantization-result",
+      confirmClose: true,
+      component: StepComponents["quantization-result"],
+      step: 7,
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Quantization Details",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Method",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Advanced",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Simulation",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select cluster",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Running quantization",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Result",
+        },
+      ],
+    },
+  ],
+};
 
 const runNewSumulation: DrawerFlowType = {
   title: "Simulations & Evaluations",
@@ -3222,132 +3222,132 @@ const runNewSumulation: DrawerFlowType = {
 };
 
 const addAdapter: DrawerFlowType = {
-    title: "Add Adapter",
-    description: "Add a new adapter",
-    totalSteps: 4,
-    steps:[
-      {
-        navigation: () => [
-          "Projects",
-          `${useProjects.getState().selectedProject?.icon} ${useProjects.getState().selectedProject?.name}`,
-          `${useDeployModel.getState().currentWorkflow?.workflow_steps?.endpoint?.name || useEndPoints.getState().clusterDetails?.name}`,
-          "Add Adapter",
-        ],
-        id: "add-adapter-select-model",
-        confirmClose: false,
-        step: 1,
-        component: StepComponents["add-adapter-select-model"],
-        progress: [
-          {
-            "status": FormProgressStatus.inProgress,
-            "title": "Select Model",
-          },
-          {
-            "status": FormProgressStatus.notCompleted,
-            "title": "Adapter details",
-          },
-          {
-            "status": FormProgressStatus.notCompleted,
-            "title": "Deployment status",
-          },
-          {
-            "status": FormProgressStatus.notCompleted,
-            "title": "Deployment result",
-          }
-        ]
-      },
-      {
-        navigation: () => [
-          "Projects",
-          `${useProjects.getState().selectedProject?.icon} ${useProjects.getState().selectedProject?.name}`,
-          `${useDeployModel.getState().currentWorkflow?.workflow_steps?.endpoint?.name || useEndPoints.getState().clusterDetails?.name}`,
-          "Add Adapter",
-        ],
-        id: "add-adapter-detail",
-        confirmClose: false,
-        step: 2,
-        component: StepComponents["add-adapter-detail"],
-        progress: [
-          {
-            "status": FormProgressStatus.completed,
-            "title": "Select Model",
-          },
-          {
-            "status": FormProgressStatus.inProgress,
-            "title": "Adapter details",
-          },
-          {
-            "status": FormProgressStatus.notCompleted,
-            "title": "Deployment status",
-          },
-          {
-            "status": FormProgressStatus.notCompleted,
-            "title": "Deployment result",
-          }
-        ]
-      },
-      {
-        navigation: () => [
-          "Projects",
-          `${useProjects.getState().selectedProject?.icon} ${useProjects.getState().selectedProject?.name}`,
-          `${useDeployModel.getState().currentWorkflow?.workflow_steps?.endpoint?.name || useEndPoints.getState().clusterDetails?.name}`,
-          "Add Adapter",
-        ],
-        id: "add-adapter-status",
-        confirmClose: false,
-        step: 3,
-        component: StepComponents["add-adapter-status"],
-        progress: [
-          {
-            "status": FormProgressStatus.completed,
-            "title": "Select Model",
-          },
-          {
-            "status": FormProgressStatus.completed,
-            "title": "Adapter details",
-          },
-          {
-            "status": FormProgressStatus.inProgress,
-            "title": "Deployment status",
-          },
-          {
-            "status": FormProgressStatus.notCompleted,
-            "title": "Deployment result",
-          }
-        ]
-      },
-      {
-        navigation: () => [
-          "Projects",
-          `${useProjects.getState().selectedProject?.icon} ${useProjects.getState().selectedProject?.name}`,
-          `${useDeployModel.getState().currentWorkflow?.workflow_steps?.endpoint?.name || useEndPoints.getState().clusterDetails?.name}`,
-          "Add Adapter",
-        ],
-        id: "add-adapter-result",
-        confirmClose: false,
-        step: 4,
-        component: StepComponents["add-adapter-result"],
-        progress: [
-          {
-            "status": FormProgressStatus.completed,
-            "title": "Select Model",
-          },
-          {
-            "status": FormProgressStatus.completed,
-            "title": "Adapter details",
-          },
-          {
-            "status": FormProgressStatus.completed,
-            "title": "Deployment status",
-          },
-          {
-            "status": FormProgressStatus.inProgress,
-            "title": "Deployment result",
-          }
-        ]
-      }
-    ]
-}
+  title: "Add Adapter",
+  description: "Add a new adapter",
+  totalSteps: 4,
+  steps: [
+    {
+      navigation: () => [
+        "Projects",
+        `${useProjects.getState().selectedProject?.icon} ${useProjects.getState().selectedProject?.name}`,
+        `${useDeployModel.getState().currentWorkflow?.workflow_steps?.endpoint?.name || useEndPoints.getState().clusterDetails?.name}`,
+        "Add Adapter",
+      ],
+      id: "add-adapter-select-model",
+      confirmClose: false,
+      step: 1,
+      component: StepComponents["add-adapter-select-model"],
+      progress: [
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Select Model",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Adapter details",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Deployment status",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Deployment result",
+        },
+      ],
+    },
+    {
+      navigation: () => [
+        "Projects",
+        `${useProjects.getState().selectedProject?.icon} ${useProjects.getState().selectedProject?.name}`,
+        `${useDeployModel.getState().currentWorkflow?.workflow_steps?.endpoint?.name || useEndPoints.getState().clusterDetails?.name}`,
+        "Add Adapter",
+      ],
+      id: "add-adapter-detail",
+      confirmClose: false,
+      step: 2,
+      component: StepComponents["add-adapter-detail"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Model",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Adapter details",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Deployment status",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Deployment result",
+        },
+      ],
+    },
+    {
+      navigation: () => [
+        "Projects",
+        `${useProjects.getState().selectedProject?.icon} ${useProjects.getState().selectedProject?.name}`,
+        `${useDeployModel.getState().currentWorkflow?.workflow_steps?.endpoint?.name || useEndPoints.getState().clusterDetails?.name}`,
+        "Add Adapter",
+      ],
+      id: "add-adapter-status",
+      confirmClose: false,
+      step: 3,
+      component: StepComponents["add-adapter-status"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Model",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Adapter details",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Deployment status",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Deployment result",
+        },
+      ],
+    },
+    {
+      navigation: () => [
+        "Projects",
+        `${useProjects.getState().selectedProject?.icon} ${useProjects.getState().selectedProject?.name}`,
+        `${useDeployModel.getState().currentWorkflow?.workflow_steps?.endpoint?.name || useEndPoints.getState().clusterDetails?.name}`,
+        "Add Adapter",
+      ],
+      id: "add-adapter-result",
+      confirmClose: false,
+      step: 4,
+      component: StepComponents["add-adapter-result"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Model",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Adapter details",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Deployment status",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Deployment result",
+        },
+      ],
+    },
+  ],
+};
 const deleteAdapter: DrawerFlowType = {
   title: "Deleting Adapter",
   description: "Deleting Adapter",
@@ -3380,9 +3380,7 @@ const editProfile: DrawerFlowType = {
   totalSteps: 1,
   steps: [
     {
-      navigation: () => [
-        "Edit Profile",
-      ],
+      navigation: () => ["Edit Profile"],
       id: "edit-user-profile",
       confirmClose: false,
       step: 1,
@@ -3403,9 +3401,7 @@ const createRoute: DrawerFlowType = {
   totalSteps: 2,
   steps: [
     {
-      navigation: () => [
-        "Create Route",
-      ],
+      navigation: () => ["Create Route"],
       id: "create-route-data",
       confirmClose: false,
       step: 1,
@@ -3422,9 +3418,7 @@ const createRoute: DrawerFlowType = {
       ],
     },
     {
-      navigation: () => [
-        "Create Route",
-      ],
+      navigation: () => ["Create Route"],
       id: "select-endpoints-route",
       confirmClose: false,
       step: 2,
@@ -3477,7 +3471,7 @@ const flows = {
   "edit-user": editUser,
   "reset-password": resetPassword,
   "add-user": addUser,
-  "model_benchmark": addBenchmark,
+  model_benchmark: addBenchmark,
   "add-quantization": addQuantizationFlow,
   "add-new-cloud-provider": addNewCloudProvider,
 
@@ -3496,20 +3490,20 @@ const flows = {
 export const flowMapping: {
   [key: string]: Flow;
 } = {
-    'cloud_model_onboarding': 'add-model-cloud-flow',
-    'local_model_onboarding': 'add-model-local-flow',
-    'model_deployment': 'deploy-model',
-    'cluster_onboarding': 'add-cluster',
-    'model_security_scan': 'security-scan',
-    'cluster_deletion': 'deleting-cluster',
-    'endpoint_deletion': 'deleting-endpoint',
-    'add_worker_to_endpoint': 'add-worker',
-    'endpoint_worker_deletion': 'deleting-worker',
-    'local_model_quantization': 'add-quantization',
-    "add_adapter": "add-adapter",
-    "delete_adapter": "delete-adapter",
-    "model_benchmark": "model_benchmark",
-}
+  cloud_model_onboarding: "add-model-cloud-flow",
+  local_model_onboarding: "add-model-local-flow",
+  model_deployment: "deploy-model",
+  cluster_onboarding: "add-cluster",
+  model_security_scan: "security-scan",
+  cluster_deletion: "deleting-cluster",
+  endpoint_deletion: "deleting-endpoint",
+  add_worker_to_endpoint: "add-worker",
+  endpoint_worker_deletion: "deleting-worker",
+  local_model_quantization: "add-quantization",
+  add_adapter: "add-adapter",
+  delete_adapter: "delete-adapter",
+  model_benchmark: "model_benchmark",
+};
 
 export const inProgressSteps = [
   "deploy-cluster-status",
@@ -3520,9 +3514,9 @@ export const inProgressSteps = [
   "delete-cluster-status",
   "delete-endpoint-status",
   "delete-worker-status",
-    "deploy-quantization-status",
-    "quantization-simulation-status",
-    "quantization-deployment-status",
+  "deploy-quantization-status",
+  "quantization-simulation-status",
+  "quantization-deployment-status",
 ];
 
 export type Flow = keyof typeof flows;

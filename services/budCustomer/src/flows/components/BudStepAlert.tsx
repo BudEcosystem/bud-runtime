@@ -23,7 +23,7 @@ const BudStepAlert: React.FC<BudStepAlertProps> = ({
   cancelAction,
   confirmAction,
   confirmText = "Confirm",
-  cancelText = "Cancel"
+  cancelText = "Cancel",
 }) => {
   return (
     <div className={`p-4 rounded-lg ${className}`}>

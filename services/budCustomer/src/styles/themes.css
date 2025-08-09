@@ -1,35 +1,35 @@
 /* Theme CSS Variables */
 :root {
   /* Light Theme (Default) */
-  --bg-primary: #FFFFFF;
-  --bg-secondary: #F5F5F5;
-  --bg-tertiary: #FAFAFA;
-  --bg-card: #FFFFFF;
-  --bg-hover: #F0F0F0;
-  --bg-modal: #FFFFFF;
+  --bg-primary: #ffffff;
+  --bg-secondary: #f5f5f5;
+  --bg-tertiary: #fafafa;
+  --bg-card: #ffffff;
+  --bg-hover: #f0f0f0;
+  --bg-modal: #ffffff;
 
-  --text-primary: #1A1A1A;
+  --text-primary: #1a1a1a;
   --text-secondary: #333333;
   --text-muted: #666666;
   --text-disabled: #999999;
 
-  --border-color: #E0E0E0;
-  --border-secondary: #D0D0D0;
+  --border-color: #e0e0e0;
+  --border-secondary: #d0d0d0;
   --border-transparent: rgba(255, 255, 255, 0.05);
 
   /* Accent Colors */
-  --color-purple: #965CDE;
-  --color-purple-hover: #A76FE8;
-  --color-purple-active: #8549D2;
-  --color-yellow: #D1B854;
-  --color-yellow-hover: #E0C968;
-  --color-yellow-active: #B8A248;
+  --color-purple: #965cde;
+  --color-purple-hover: #a76fe8;
+  --color-purple-active: #8549d2;
+  --color-yellow: #d1b854;
+  --color-yellow-hover: #e0c968;
+  --color-yellow-active: #b8a248;
 
   /* Theme-specific colors */
-  --color-primary-text: #1A1A1A;
+  --color-primary-text: #1a1a1a;
   --color-secondary-text: #666666;
-  --color-accent-text: #965CDE;
-  --color-yellow-text: #D1B854;
+  --color-accent-text: #965cde;
+  --color-yellow-text: #d1b854;
   --color-success: #52c41a;
   --color-warning: #faad14;
   --color-error: #ff4d4f;
@@ -41,35 +41,35 @@
 
 /* Dark Theme */
 [data-theme="dark"] {
-  --bg-primary: #0A0A0A;
+  --bg-primary: #0a0a0a;
   --bg-secondary: #161616;
-  --bg-tertiary: #1F1F1F;
+  --bg-tertiary: #1f1f1f;
   --bg-card: #161616;
-  --bg-hover: #2F2F2F;
+  --bg-hover: #2f2f2f;
   --bg-modal: #161616;
 
-  --text-primary: #FFFFFF;
-  --text-secondary: #EEEEEE;
-  --text-muted: #B3B3B3;
+  --text-primary: #ffffff;
+  --text-secondary: #eeeeee;
+  --text-muted: #b3b3b3;
   --text-disabled: #757575;
 
-  --border-color: #1F1F1F;
-  --border-secondary: #2F2F2F;
+  --border-color: #1f1f1f;
+  --border-secondary: #2f2f2f;
   --border-transparent: rgba(255, 255, 255, 0.05);
 
   /* Accent Colors (same across themes) */
-  --color-purple: #965CDE;
-  --color-purple-hover: #A76FE8;
-  --color-purple-active: #8549D2;
-  --color-yellow: #D1B854;
-  --color-yellow-hover: #E0C968;
-  --color-yellow-active: #B8A248;
+  --color-purple: #965cde;
+  --color-purple-hover: #a76fe8;
+  --color-purple-active: #8549d2;
+  --color-yellow: #d1b854;
+  --color-yellow-hover: #e0c968;
+  --color-yellow-active: #b8a248;
 
   /* Theme-specific colors */
-  --color-primary-text: #EEEEEE;
-  --color-secondary-text: #B3B3B3;
-  --color-accent-text: #965CDE;
-  --color-yellow-text: #D1B854;
+  --color-primary-text: #eeeeee;
+  --color-secondary-text: #b3b3b3;
+  --color-accent-text: #965cde;
+  --color-yellow-text: #d1b854;
   --color-success: #52c41a;
   --color-warning: #faad14;
   --color-error: #ff4d4f;
@@ -81,11 +81,16 @@
 
 /* Utility classes for smooth theme transitions */
 * {
-  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
 }
 
 /* Override specific elements that shouldn't transition */
-input, textarea, select {
+input,
+textarea,
+select {
   transition: none;
 }
 

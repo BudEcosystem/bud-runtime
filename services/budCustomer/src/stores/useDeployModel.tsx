@@ -145,28 +145,34 @@ export const useDeployModel = create<{
   createWorkerFlow: (
     endpointId: string,
     additionalConcurrency: number,
-    projectId?: string
+    projectId?: string,
   ) => Promise<any>;
-  completeCreateWorkerFlow: (workflowId: string, projectId?: string) => Promise<any>;
+  completeCreateWorkerFlow: (
+    workflowId: string,
+    projectId?: string,
+  ) => Promise<any>;
   getQuantizationMethods: () => Promise<any>;
   createQuantizationWorkflow: (
     model_name: string,
     type: string,
-    hardware: string
+    hardware: string,
   ) => Promise<any>;
   updateQuantizationMethod: (method: string) => Promise<any>;
   updateQuantizationAdvanced: (
     weight: QuantizeConfig,
-    activation: QuantizeConfig
+    activation: QuantizeConfig,
   ) => Promise<any>;
   updateQuantizationCluster: (clusterId: string) => Promise<any>;
   cancelQuantizationDeployment: (id: string) => Promise<any>;
   createAddAdapterWorkflow: (
     endpointId: string,
     adapterModelId: string,
-    projectId?: string
+    projectId?: string,
   ) => Promise<any>;
-  updateAdapterDetailWorkflow: (adapterName: string, projectId?: string) => Promise<any>;
+  updateAdapterDetailWorkflow: (
+    adapterName: string,
+    projectId?: string,
+  ) => Promise<any>;
   startRequest: () => void;
   endRequest: () => void;
 }>((set, get) => ({
@@ -196,14 +202,14 @@ export const useDeployModel = create<{
   setProviderType: (id: string) => {
     set({
       providerType: get().providerTypeList.find(
-        (provider) => provider.id === id
+        (provider) => provider.id === id,
       ),
     });
   },
   setModalityType: (id: any) => {
     set({
       modalityType: get().modalityTypeList.find(
-        (modality) => modality.id === id
+        (modality) => modality.id === id,
       ),
     });
   },
@@ -405,28 +411,34 @@ export const useDeployModel = create<{
   createWorkerFlow: async (
     endpointId: string,
     additionalConcurrency: number,
-    projectId?: string
+    projectId?: string,
   ) => ({}),
-  completeCreateWorkerFlow: async (workflowId: string, projectId?: string) => ({}),
+  completeCreateWorkerFlow: async (
+    workflowId: string,
+    projectId?: string,
+  ) => ({}),
   getQuantizationMethods: async () => ({}),
   createQuantizationWorkflow: async (
     model_name: string,
     type: string,
-    hardware: string
+    hardware: string,
   ) => ({}),
   updateQuantizationMethod: async (method: string) => ({}),
   updateQuantizationAdvanced: async (
     weight: QuantizeConfig,
-    activation: QuantizeConfig
+    activation: QuantizeConfig,
   ) => ({}),
   updateQuantizationCluster: async (clusterId: string) => ({}),
   cancelQuantizationDeployment: async (id: string) => ({}),
   createAddAdapterWorkflow: async (
     endpointId: string,
     adapterModelId: string,
-    projectId?: string
+    projectId?: string,
   ) => ({}),
-  updateAdapterDetailWorkflow: async (adapterName: string, projectId?: string) => ({}),
+  updateAdapterDetailWorkflow: async (
+    adapterName: string,
+    projectId?: string,
+  ) => ({}),
   startRequest: () => {},
   endRequest: () => {},
 }));

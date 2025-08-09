@@ -2,9 +2,7 @@ import React, { useMemo, useState } from "react";
 import { Table, Tooltip } from "antd";
 import ProjectTags from "@/flows/components/ProjectTags";
 import { LeaderBoardItem } from "@/hooks/useModels";
-import {
-  Text_12_300_EEEEEE,
-} from "../../text";
+import { Text_12_300_EEEEEE } from "../../text";
 import NoDataFount from "../../noDataFount";
 
 function SortIcon({ sortOrder }: { sortOrder: string | null }) {
@@ -43,7 +41,13 @@ function SortIcon({ sortOrder }: { sortOrder: string | null }) {
   ) : null;
 }
 
-function LeaderboardsTable({ data, leaderboardClasses }: { data: LeaderBoardItem[], leaderboardClasses?: string }) {
+function LeaderboardsTable({
+  data,
+  leaderboardClasses,
+}: {
+  data: LeaderBoardItem[];
+  leaderboardClasses?: string;
+}) {
   const [orderBy, setOrderBy] = useState<string>("");
   const [order, setOrder] = useState<string>("");
 
@@ -77,7 +81,7 @@ function LeaderboardsTable({ data, leaderboardClasses }: { data: LeaderBoardItem
 
     horizontalRows.forEach((row) => {
       const existingRow = mergedRows.find(
-        (mergedRow) => mergedRow.label === row.label
+        (mergedRow) => mergedRow.label === row.label,
       );
       if (existingRow) {
         mergedRows[mergedRows.indexOf(existingRow)] = {
@@ -93,10 +97,11 @@ function LeaderboardsTable({ data, leaderboardClasses }: { data: LeaderBoardItem
   }, [data]);
 
   return (
-    <div className={`${leaderboardClasses}`}
+    <div
+      className={`${leaderboardClasses}`}
       style={{
-        paddingBottom: '60px',
-        paddingTop: '.4rem'
+        paddingBottom: "60px",
+        paddingTop: ".4rem",
       }}
     >
       <Table<LeaderBoardItem>
@@ -107,7 +112,9 @@ function LeaderboardsTable({ data, leaderboardClasses }: { data: LeaderBoardItem
             title: "Benchmark",
             dataIndex: "label",
             key: "label",
-            render: (text: any) => <Text_12_300_EEEEEE>{text}</Text_12_300_EEEEEE>,
+            render: (text: any) => (
+              <Text_12_300_EEEEEE>{text}</Text_12_300_EEEEEE>
+            ),
             sortIcon: SortIcon,
           },
           {
@@ -116,7 +123,9 @@ function LeaderboardsTable({ data, leaderboardClasses }: { data: LeaderBoardItem
             title: "Type",
             dataIndex: "dataset",
             key: "dataset",
-            render: (text: any) => <ProjectTags color="#D1B854" name={text || 'N/A'} />,
+            render: (text: any) => (
+              <ProjectTags color="#D1B854" name={text || "N/A"} />
+            ),
             sortIcon: SortIcon,
           },
           data
@@ -137,7 +146,9 @@ function LeaderboardsTable({ data, leaderboardClasses }: { data: LeaderBoardItem
             title: "Selected Model",
             dataIndex: "selected",
             key: "selected",
-            render: (text: any) => <Text_12_300_EEEEEE>{text}</Text_12_300_EEEEEE>,
+            render: (text: any) => (
+              <Text_12_300_EEEEEE>{text}</Text_12_300_EEEEEE>
+            ),
             sortIcon: SortIcon,
           },
           ...data
@@ -146,13 +157,15 @@ function LeaderboardsTable({ data, leaderboardClasses }: { data: LeaderBoardItem
               return {
                 width: 120,
                 ellipsis: true,
-                title: <Tooltip placement="topLeft" title={item.model?.uri}>{item.model?.uri}</Tooltip>,
+                title: (
+                  <Tooltip placement="topLeft" title={item.model?.uri}>
+                    {item.model?.uri}
+                  </Tooltip>
+                ),
                 dataIndex: item.model?.uri,
                 key: item.model?.uri,
                 render: (text: any) => (
-                  <Text_12_300_EEEEEE className="">
-                    {text}
-                  </Text_12_300_EEEEEE>
+                  <Text_12_300_EEEEEE className="">{text}</Text_12_300_EEEEEE>
                 ),
                 sortIcon: SortIcon,
               };
@@ -172,10 +185,7 @@ function LeaderboardsTable({ data, leaderboardClasses }: { data: LeaderBoardItem
         showSorterTooltip={true}
         locale={{
           emptyText: (
-            <NoDataFount
-              className="h-[20vh]"
-              message={`Data not available`}
-            />
+            <NoDataFount className="h-[20vh]" message={`Data not available`} />
           ),
         }}
       />

@@ -1,5 +1,5 @@
-import React from 'react';
-import { Popover } from 'antd';
+import React from "react";
+import { Popover } from "antd";
 
 interface CustomPopoverProps {
   title?: string;
@@ -12,7 +12,7 @@ export default function CustomPopover({
   title,
   children,
   contentClassNames,
-  customClassName
+  customClassName,
 }: CustomPopoverProps) {
   return (
     <Popover

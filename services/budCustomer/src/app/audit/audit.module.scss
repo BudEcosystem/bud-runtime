@@ -1,0 +1,152 @@
+// Using CSS variables for theme support
+$bg-main: var(--bud-bg-primary);
+$bg-card: var(--bud-bg-secondary);
+$bg-tertiary: var(--bud-bg-tertiary);
+$border-color: var(--bud-border);
+$border-secondary: var(--bud-border-secondary);
+$text-primary: var(--bud-text-primary);
+$text-muted: var(--bud-text-muted);
+$text-disabled: var(--bud-text-disabled);
+$primary-color: var(--bud-purple);
+
+.auditTable {
+  :global {
+    .ant-table {
+      background: $bg-card;
+
+      .ant-table-thead {
+        > tr > th {
+          background: $bg-tertiary;
+          border-bottom: 1px solid $border-color;
+          color: $text-muted;
+          font-weight: 600;
+          font-size: 12px;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+      }
+
+      .ant-table-tbody {
+        > tr {
+          > td {
+            border-bottom: 1px solid $border-color;
+            padding: 12px 16px;
+          }
+
+          &:hover > td {
+            background: var(--bud-bg-hover);
+          }
+
+          &.ant-table-row-selected > td {
+            background: var(--bud-purple-light);
+          }
+        }
+      }
+
+      .ant-table-cell {
+        color: $text-primary;
+      }
+
+      .ant-checkbox-wrapper {
+        .ant-checkbox {
+          border-color: $border-secondary;
+
+          &:hover {
+            border-color: $primary-color;
+          }
+        }
+
+        .ant-checkbox-checked {
+          .ant-checkbox-inner {
+            background-color: $primary-color;
+            border-color: $primary-color;
+          }
+        }
+      }
+    }
+
+    .ant-empty {
+      color: $text-disabled;
+    }
+
+    .ant-tag {
+      border: none;
+      font-size: 12px;
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+
+    .ant-badge {
+      .ant-badge-status-dot {
+        width: 8px;
+        height: 8px;
+      }
+    }
+
+    .ant-select,
+    .ant-input-affix-wrapper,
+    .ant-picker {
+      background: $bg-tertiary !important;
+      border-color: $border-secondary !important;
+
+      &:hover {
+        border-color: $primary-color !important;
+      }
+
+      &:focus,
+      &.ant-select-focused,
+      &.ant-input-affix-wrapper-focused,
+      &.ant-picker-focused {
+        border-color: $primary-color !important;
+        box-shadow: 0 0 0 2px rgba(150, 92, 222, 0.1);
+      }
+    }
+
+    .ant-select-selection-placeholder,
+    .ant-input::placeholder,
+    .ant-picker-input input::placeholder {
+      color: $text-disabled;
+    }
+
+    .ant-btn {
+      &.ant-btn-default {
+        background: transparent;
+        border-color: $border-color;
+        color: $text-muted;
+
+        &:hover {
+          background: $bg-tertiary;
+          border-color: $primary-color;
+          color: $text-primary;
+        }
+      }
+    }
+  }
+}
+
+.filterCard {
+  background: $bg-card;
+  border: 1px solid $border-color;
+  border-radius: 8px;
+  padding: 16px;
+
+  .filterGroup {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+}
+
+.statCard {
+  background: $bg-card;
+  border: 1px solid $border-color;
+  border-radius: 8px;
+  padding: 20px;
+  transition: all 0.3s ease;
+
+  &:hover {
+    border-color: $primary-color;
+    box-shadow: 0 4px 12px rgba(150, 92, 222, 0.1);
+  }
+}

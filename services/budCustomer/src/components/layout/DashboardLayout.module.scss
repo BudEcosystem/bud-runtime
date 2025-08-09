@@ -1,12 +1,12 @@
 // Color variables matching bud-dashboard
 $bg-main: #101010;
-$bg-sidebar: #0A0A0A;
+$bg-sidebar: #0a0a0a;
 $bg-card: #18191b;
-$border-color: #1F1F1F;
-$text-white: #EEEEEE;
-$text-gray: #B3B3B3;
+$border-color: #1f1f1f;
+$text-white: #eeeeee;
+$text-gray: #b3b3b3;
 $text-dark-gray: #757575;
-$primary-color: #965CDE;
+$primary-color: #965cde;
 $hover-bg: rgba(150, 92, 222, 0.1);
 
 .dashboardContainer {
@@ -73,7 +73,7 @@ $hover-bg: rgba(150, 92, 222, 0.1);
     background: $hover-bg;
 
     &::before {
-      content: '';
+      content: "";
       position: absolute;
       left: 0;
       top: 0;

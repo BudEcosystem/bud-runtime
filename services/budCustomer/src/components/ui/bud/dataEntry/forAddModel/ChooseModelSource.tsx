@@ -7,7 +7,6 @@ import { Text_12_400_757575, Text_14_400_EEEEEE } from "@/components/ui/text";
 import { useDeployModel } from "@/stores/useDeployModel";
 import ComingSoon from "@/components/ui/comingSoon";
 
-
 function ModelCard({
   selected,
   handleClick,
@@ -15,18 +14,14 @@ function ModelCard({
 }: {
   selected?: boolean;
   handleClick?: () => void;
-  data: any,
+  data: any;
 }) {
   const [hover, setHover] = React.useState(false);
 
-  const {
-    icon,
-    name,
-    description,
-  } = data;
+  const { icon, name, description } = data;
 
   // Determine if the tab should be inactive
-  const isInactive =  name === '';
+  const isInactive = name === "";
 
   return (
     <div
@@ -39,12 +34,12 @@ function ModelCard({
       onMouseLeave={() => !isInactive && setHover(false)}
       className={`addModelSelectCard relative pt-[.6rem] pb-[.95rem] px-[1.5rem] cursor-pointer border-t-[0.5px] border-b-[0.5px] border-b-[transparent] border-t-[#1F1F1F]
         flex-row flex items-center border-box
-        ${isInactive
-          ? "cursor-not-allowed  text-[#757575]"
-          : "hover:shadow-lg hover:border-y-[#757575] hover:bg-[#FFFFFF08]"
+        ${
+          isInactive
+            ? "cursor-not-allowed  text-[#757575]"
+            : "hover:shadow-lg hover:border-y-[#757575] hover:bg-[#FFFFFF08]"
         }
-        `
-      }
+        `}
       // className={`addModelSelectCard relative pt-[.6rem] pb-[.95rem] px-[1.5rem] cursor-pointer border-t-[0.5px] border-b-[0.5px] border-b-[transparent] border-t-[#1F1F1F]
       //     flex-row flex items-center border-box
       //     ${isInactive
