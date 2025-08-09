@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: devbox
-        image: docker.io/budstudio/devbox
+        image: docker.io/budstudio/status
         imagePullPolicy: "Always"
         ports:
         - containerPort: 80
