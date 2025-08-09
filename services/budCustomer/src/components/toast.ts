@@ -1,33 +1,33 @@
-import { notification } from 'antd';
+import { notification } from "antd";
 
 export const errorToast = (message: string) => {
   notification.error({
-    message: 'Error',
+    message: "Error",
     description: message,
-    placement: 'topRight',
+    placement: "topRight",
   });
 };
 
 export const successToast = (message: string) => {
   notification.success({
-    message: 'Success',
+    message: "Success",
     description: message,
-    placement: 'topRight',
+    placement: "topRight",
   });
 };
 
 export const warningToast = (message: string) => {
   notification.warning({
-    message: 'Warning',
+    message: "Warning",
     description: message,
-    placement: 'topRight',
+    placement: "topRight",
   });
 };
 
 export const infoToast = (message: string) => {
   notification.info({
-    message: 'Info',
+    message: "Info",
     description: message,
-    placement: 'topRight',
+    placement: "topRight",
   });
 };

@@ -20,7 +20,8 @@ interface RegisterData {
 }
 
 export default function Register() {
-  const { activePage, setActivePage, setAuthError, authError } = useAuthNavigation();
+  const { activePage, setActivePage, setAuthError, authError } =
+    useAuthNavigation();
   const { isLoading, showLoader, hideLoader } = useLoader();
   const { getUser } = useUser();
   const router = useRouter();
@@ -54,17 +55,17 @@ export default function Register() {
         permissions: [
           {
             name: "model:view",
-            has_permission: true
+            has_permission: true,
           },
           {
             name: "project:view",
-            has_permission: true
-          }
+            has_permission: true,
+          },
         ],
         role: "user", // Default role for new registrations
         company: formData.company,
         purpose: formData.purpose,
-        user_type: "client"
+        user_type: "client",
       };
 
       console.log("Payload:", payload);
@@ -76,17 +77,23 @@ export default function Register() {
         // Check if the response contains tokens
         if (response.data.token?.access_token) {
           // Store tokens
-          localStorage.setItem("access_token", response.data.token.access_token);
-          localStorage.setItem("refresh_token", response.data.token.refresh_token);
+          localStorage.setItem(
+            "access_token",
+            response.data.token.access_token,
+          );
+          localStorage.setItem(
+            "refresh_token",
+            response.data.token.refresh_token,
+          );
 
-          setAuthError('');
+          setAuthError("");
           successToast("Registration successful!");
 
-          // Redirect to dashboard or login based on response
-          router.push("/dashboard");
+          // Redirect to projects or login based on response
+          router.push("/projects");
         } else {
           // If no tokens, registration successful but needs to login
-          setAuthError('');
+          setAuthError("");
           successToast("Registration successful! Please login.");
           setActivePage(1); // Switch to login page
         }
@@ -95,16 +102,20 @@ export default function Register() {
       hideLoader();
     } catch (error: any) {
       console.error("Registration error:", error);
-      const errorMessage = error.response?.data?.detail ||
-                          error.response?.data?.message ||
-                          error.message ||
-                          "Registration failed. Please try again.";
+      const errorMessage =
+        error.response?.data?.detail ||
+        error.response?.data?.message ||
+        error.message ||
+        "Registration failed. Please try again.";
       setAuthError(errorMessage);
       hideLoader();
     }
   };
 
-  const handleLogin = async (payload: { email?: string; password?: string }) => {
+  const handleLogin = async (payload: {
+    email?: string;
+    password?: string;
+  }) => {
     console.log("=== LOGIN HANDLER CALLED ===");
     console.log("Login payload:", payload);
     showLoader();
@@ -114,9 +125,12 @@ export default function Register() {
       if (response.data?.token) {
         // Store tokens
         localStorage.setItem("access_token", response.data.token.access_token);
-        localStorage.setItem("refresh_token", response.data.token.refresh_token);
+        localStorage.setItem(
+          "refresh_token",
+          response.data.token.refresh_token,
+        );
 
-        setAuthError('');
+        setAuthError("");
 
         // Get user data
         await getUser();
@@ -125,17 +139,18 @@ export default function Register() {
         if (response.data.is_reset_password || response.data.first_login) {
           router.push("/auth/reset-password");
         } else {
-          router.push("/dashboard");
+          router.push("/projects");
         }
       }
 
       hideLoader();
     } catch (error: any) {
       console.error("Login error:", error);
-      const errorMessage = error.response?.data?.detail ||
-                          error.response?.data?.message ||
-                          error.message ||
-                          "Login failed. Please try again.";
+      const errorMessage =
+        error.response?.data?.detail ||
+        error.response?.data?.message ||
+        error.message ||
+        "Login failed. Please try again.";
       setAuthError(errorMessage);
       hideLoader();
     }

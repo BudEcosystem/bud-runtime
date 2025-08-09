@@ -1,9 +1,8 @@
-import React, { } from "react";
+import React from "react";
 
 import { getChromeColor } from "./TagsInputData";
 import { useProjects } from "@/hooks/useProjects";
 import TagsList from "@/flows/components/TagsList";
-
 
 function ProjectInfoCard() {
   const { selectedProject } = useProjects();
@@ -23,6 +22,6 @@ function ProjectInfoCard() {
       </div>
     </div>
   );
-};
+}
 
 export default ProjectInfoCard;

@@ -1,9 +1,15 @@
-import { Dropdown, Menu } from 'antd';
-import { ReactNode } from 'react';
+import { Dropdown, Menu } from "antd";
+import { ReactNode } from "react";
 
 interface CustomDropDownProps {
   items: { key: string; label: string; value?: any; onClick?: () => void }[];
-  Placement?: 'bottomLeft' | 'bottomCenter' | 'bottomRight' | 'topLeft' | 'topCenter' | 'topRight';
+  Placement?:
+    | "bottomLeft"
+    | "bottomCenter"
+    | "bottomRight"
+    | "topLeft"
+    | "topCenter"
+    | "topRight";
   menuItemColor?: string;
   parentClassNames?: string;
   buttonContent: ReactNode;
@@ -12,13 +18,13 @@ interface CustomDropDownProps {
 
 export default function CustomDropDown({
   items,
-  Placement = 'bottomLeft',
-  menuItemColor = '#EEEEEE',
-  parentClassNames = '',
+  Placement = "bottomLeft",
+  menuItemColor = "#EEEEEE",
+  parentClassNames = "",
   buttonContent,
-  onSelect
+  onSelect,
 }: CustomDropDownProps) {
-  const menuItems = items.map(item => ({
+  const menuItems = items.map((item) => ({
     key: item.key,
     label: (
       <div
@@ -37,11 +43,9 @@ export default function CustomDropDown({
     <Dropdown
       menu={{ items: menuItems }}
       placement={Placement}
-      trigger={['click']}
+      trigger={["click"]}
     >
-      <div className={parentClassNames}>
-        {buttonContent}
-      </div>
+      <div className={parentClassNames}>{buttonContent}</div>
     </Dropdown>
   );
 }

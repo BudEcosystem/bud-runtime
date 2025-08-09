@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState } from "react";
 
 export interface CloudCredential {
   id: string;
@@ -18,7 +18,7 @@ export const useCloudInfraProviders = () => {
       // TODO: Implement actual API call
       setCredentials([]);
     } catch (error) {
-      console.error('Error fetching cloud credentials:', error);
+      console.error("Error fetching cloud credentials:", error);
     } finally {
       setIsLoading(false);
     }

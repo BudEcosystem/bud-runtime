@@ -2,7 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap");
+@import "../styles/themes.css";
 
 /* Font definitions */
 @font-face {
@@ -24,9 +25,9 @@
   --background-start-rgb: #000000;
   --background-end-rgb: #000000;
   --color-background: #101010;
-  --color-primary: #965CDE;
-  --color-border: #1F1F1F;
-  --color-card-bg: #1A1A1A;
+  --color-primary: #965cde;
+  --color-border: #1f1f1f;
+  --color-card-bg: #1a1a1a;
   --color-hover: #252525;
 
   /* Tailwind CSS variables for shadcn/ui compatibility */
@@ -50,8 +51,8 @@
   --input: 0 0% 12.2%; /* #1F1F1F equivalent */
   --ring: 0 0% 70.2%; /* #B3B3B3 equivalent */
   --radius: 0.5rem;
-  --accent-9: #965CDE !important;
-  --primary-text: #FFFFFF;
+  --accent-9: #965cde !important;
+  --primary-text: #ffffff;
 }
 
 /* Base styles */
@@ -140,7 +141,7 @@ html.dark {
 
 /* Scrollbar styles */
 .custom-scrollbar::-webkit-scrollbar {
-  width: .25rem;
+  width: 0.25rem;
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
@@ -148,13 +149,13 @@ html.dark {
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #1F1F1F;
-  border-radius: .25rem;
+  background: #1f1f1f;
+  border-radius: 0.25rem;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #1F1F1F;
-  border-radius: .25rem;
+  background: #1f1f1f;
+  border-radius: 0.25rem;
 }
 
 /* Dashboard specific styles */
@@ -186,12 +187,12 @@ html.dark {
       background: transparent !important;
 
       &:hover {
-        color: #B3B3B3 !important;
+        color: #b3b3b3 !important;
       }
 
       &.ant-segmented-item-selected {
         background: rgba(150, 92, 222, 0.2) !important;
-        color: #EEEEEE !important;
+        color: #eeeeee !important;
       }
     }
   }
@@ -204,13 +205,51 @@ html.dark {
   }
 
   .no-scrollbar {
-    -ms-overflow-style: none;  /* IE and Edge */
-    scrollbar-width: none;  /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
   }
 
   .no-scrollbar::-webkit-scrollbar {
-    display: none;  /* Chrome, Safari and Opera */
+    display: none; /* Chrome, Safari and Opera */
   }
+}
+
+/* Theme Switcher Dropdown Styles */
+.theme-switcher-dropdown .ant-dropdown-menu {
+  background-color: var(--bg-primary) !important;
+  border: 1px solid var(--border-color) !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2) !important;
+}
+
+.theme-switcher-dropdown .ant-dropdown-menu-item {
+  background-color: transparent !important;
+  color: var(--text-primary) !important;
+  transition: background-color 0.2s ease !important;
+}
+
+.theme-switcher-dropdown .ant-dropdown-menu-item:hover {
+  background-color: var(--bg-hover) !important;
+}
+
+.theme-switcher-dropdown .ant-dropdown-menu-item-selected {
+  background-color: var(--bg-hover) !important;
+}
+
+.theme-switcher-dropdown .ant-dropdown-menu-item-divider {
+  background-color: var(--border-color) !important;
+}
+
+/* Ensure menu items don't have any Ant Design default backgrounds */
+.theme-switcher-menu .ant-dropdown-menu-item {
+  background: transparent !important;
+}
+
+.theme-switcher-menu .ant-dropdown-menu-item:hover {
+  background-color: var(--bg-hover) !important;
+}
+
+.theme-switcher-menu .ant-dropdown-menu-item-active {
+  background-color: var(--bg-hover) !important;
 }
 
 /* Chart card styles */
@@ -225,52 +264,52 @@ html.dark {
   }
 }
 
-/* BUD-specific background colors for direct Tailwind usage */
+/* BUD-specific colors using CSS variables for theme support */
 .bud-bg-primary {
-  background-color: #101010;
+  background-color: var(--bg-primary);
 }
 
 .bud-bg-secondary {
-  background-color: #1F1F1F;
+  background-color: var(--bg-secondary);
 }
 
 .bud-text-primary {
-  color: #FFFFFF;
+  color: var(--text-primary);
 }
 
 .bud-text-secondary {
-  color: #EEEEEE;
+  color: var(--text-secondary);
 }
 
 .bud-text-muted {
-  color: #B3B3B3;
+  color: var(--text-muted);
 }
 
 .bud-text-disabled {
-  color: #757575;
+  color: var(--text-disabled);
 }
 
 .bud-border {
-  border-color: #1F1F1F;
+  border-color: var(--border-color);
 }
 
 .bud-purple {
-  color: #965CDE;
+  color: var(--color-purple);
 }
 
 .bud-bg-purple {
-  background-color: #965CDE;
+  background-color: var(--color-purple);
 }
 
 /* Authentication Layout Styles */
 .logginBg:after {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   right: 0;
   width: 150px;
   height: 300px;
-  background: #3F344B;
+  background: #3f344b;
   filter: blur(40px);
   opacity: 0.2;
   transform: rotate(45deg);
@@ -278,7 +317,7 @@ html.dark {
 }
 
 .logginBg::before {
-  content: '';
+  content: "";
   position: absolute;
   bottom: -150px;
   right: -150px;
@@ -338,13 +377,13 @@ html.dark {
 }
 
 .gol-bg::before {
-  content: '';
+  content: "";
   position: absolute;
   bottom: -470px;
   right: -200px;
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, #2011CB 0%, #472A9B 100%);
+  background: linear-gradient(90deg, #2011cb 0%, #472a9b 100%);
   mix-blend-mode: screen;
   filter: blur(48.80000305175781px);
   transform: rotate(145deg);
@@ -386,12 +425,14 @@ html.dark {
 
 /* Logo text gradient effect */
 .logo-text {
-  background: linear-gradient(253deg,
-      #fff 19%,
-      #fff 31.88%,
-      #fff 70.09%,
-      rgba(255, 255, 255, 0.39) 95.34%,
-      #fff 111.89%);
+  background: linear-gradient(
+    253deg,
+    #fff 19%,
+    #fff 31.88%,
+    #fff 70.09%,
+    rgba(255, 255, 255, 0.39) 95.34%,
+    #fff 111.89%
+  );
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -404,7 +445,7 @@ html.dark {
 
 .logs-table .ant-table-thead > tr > th {
   background: transparent;
-  border-bottom: 1px solid #1F1F1F;
+  border-bottom: 1px solid #1f1f1f;
   padding: 1rem 1.5rem;
   color: #757575;
   font-weight: 400;
@@ -443,46 +484,46 @@ html.dark {
 .logs-table .ant-pagination-prev .ant-pagination-item-link,
 .logs-table .ant-pagination-next .ant-pagination-item-link {
   background: transparent;
-  border-color: #1F1F1F;
+  border-color: #1f1f1f;
 }
 
 .logs-table .ant-pagination-item a {
-  color: #B3B3B3;
+  color: #b3b3b3;
 }
 
 .logs-table .ant-pagination-item:hover,
 .logs-table .ant-pagination-prev:hover .ant-pagination-item-link,
 .logs-table .ant-pagination-next:hover .ant-pagination-item-link {
-  border-color: #965CDE;
+  border-color: #965cde;
 }
 
 .logs-table .ant-pagination-item:hover a {
-  color: #965CDE;
+  color: #965cde;
 }
 
 .logs-table .ant-pagination-item-active {
   background: rgba(150, 92, 222, 0.2);
-  border-color: #965CDE;
+  border-color: #965cde;
 }
 
 .logs-table .ant-pagination-item-active a {
-  color: #965CDE;
+  color: #965cde;
 }
 
 /* Logs Page Search Input */
 .ant-input-search .ant-input-affix-wrapper {
-  background: #1A1A1A !important;
-  border-color: #1F1F1F !important;
+  background: #1a1a1a !important;
+  border-color: #1f1f1f !important;
 }
 
 .ant-input-search .ant-input-affix-wrapper:hover,
 .ant-input-search .ant-input-affix-wrapper:focus-within {
-  border-color: #965CDE !important;
+  border-color: #965cde !important;
 }
 
 .ant-input-search .ant-input {
   background: transparent !important;
-  color: #EEEEEE;
+  color: #eeeeee;
 }
 
 .ant-input-search .ant-input::placeholder {
@@ -492,4 +533,151 @@ html.dark {
 .ant-input-search .ant-input-prefix,
 .ant-input-search .ant-input-suffix {
   color: #757575;
+}
+
+/* Custom Scrollbar Styles */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--bud-border) transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: var(--bud-border);
+  border-radius: 3px;
+  transition: background-color 0.2s ease;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background-color: var(--bud-border-secondary);
+}
+
+/* Sidebar scrolling area */
+.sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--bud-border) transparent;
+}
+
+.sidebar-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background-color: var(--bud-border);
+  border-radius: 2px;
+  transition: all 0.2s ease;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: var(--bud-purple);
+  width: 6px;
+}
+
+/* Project Selector Theme Fixes */
+.project-selector .ant-select-selector {
+  background-color: var(--bud-bg-tertiary) !important;
+  border: 1px solid var(--bud-border-secondary) !important;
+  color: var(--bud-text-primary) !important;
+  transition: all 0.2s ease;
+}
+
+.project-selector .ant-select-selector:hover {
+  border-color: var(--bud-purple) !important;
+}
+
+.project-selector .ant-select-focused .ant-select-selector,
+.project-selector .ant-select-open .ant-select-selector {
+  border-color: var(--bud-purple) !important;
+  box-shadow: 0 0 0 2px rgba(150, 92, 222, 0.1) !important;
+}
+
+.project-selector .ant-select-arrow {
+  color: var(--bud-text-disabled) !important;
+}
+
+.project-selector .ant-select-clear {
+  background: var(--bud-bg-tertiary) !important;
+  color: var(--bud-text-disabled) !important;
+}
+
+.project-selector .ant-select-selection-item {
+  color: var(--bud-text-primary) !important;
+}
+
+.project-selector .ant-select-selection-placeholder {
+  color: var(--bud-text-disabled) !important;
+}
+
+/* Project Selector Dropdown */
+.project-selector-dropdown {
+  background: transparent !important;
+}
+
+.project-selector-dropdown .ant-select-dropdown {
+  background: var(--bud-bg-secondary) !important;
+  border: 1px solid var(--bud-border) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+}
+
+.project-selector-dropdown .rc-virtual-list {
+  background: var(--bud-bg-secondary) !important;
+}
+
+.project-selector-dropdown .rc-virtual-list-holder {
+  background: var(--bud-bg-secondary) !important;
+}
+
+.project-selector-dropdown .ant-select-item {
+  color: var(--bud-text-primary) !important;
+  background: transparent !important;
+  transition: all 0.2s ease;
+}
+
+.project-selector-dropdown .ant-select-item:hover {
+  background: var(--bud-bg-hover) !important;
+}
+
+.project-selector-dropdown .ant-select-item-option-selected {
+  background: var(--bud-bg-tertiary) !important;
+  font-weight: 500;
+}
+
+.project-selector-dropdown .ant-select-item-option-active {
+  background: var(--bud-bg-hover) !important;
+}
+
+.project-selector-dropdown .ant-select-item-option-disabled {
+  color: var(--bud-text-disabled) !important;
+  cursor: not-allowed;
+}
+
+/* Project selector suffix and icons */
+.project-selector .ant-select-suffix {
+  color: var(--bud-text-disabled) !important;
+}
+
+.project-selector .ant-select-disabled .ant-select-selector {
+  background-color: var(--bud-bg-tertiary) !important;
+  color: var(--bud-text-disabled) !important;
+  cursor: not-allowed;
+}
+
+/* Ensure text colors are correct in both themes */
+.project-selector .ant-select-selection-item > div {
+  color: inherit !important;
+}
+
+.project-selector-dropdown .ant-select-item-option-content {
+  color: inherit !important;
 }

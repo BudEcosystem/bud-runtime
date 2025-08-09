@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState } from "react";
 
 export interface Provider {
   id: string;
@@ -16,7 +16,7 @@ export const useCloudProviders = () => {
       // TODO: Implement actual API call
       setProviders([]);
     } catch (error) {
-      console.error('Error fetching providers:', error);
+      console.error("Error fetching providers:", error);
     } finally {
       setIsLoading(false);
     }

@@ -1,13 +1,6 @@
 import React, { useContext } from "react";
-import {
-  Form,
-  FormRule,
-  Select,
-} from "antd";
-import {
-  GlobeIcon,
-  Link2Icon,
-} from "lucide-react";
+import { Form, FormRule, Select } from "antd";
+import { GlobeIcon, Link2Icon } from "lucide-react";
 import { SecondaryButton } from "../form/Buttons";
 import { BudFormContext } from "../context/BudFormContext";
 
@@ -20,8 +13,16 @@ const ShareLink: React.FC<{
     <div className="flex flex-row items-center justify-between pt-[0rem] pb-[.5rem]">
       <div className="flex items-center">
         <GlobeIcon size={16} className="text-[#B3B3B3] mr-2" />
-        <span className="text-[#B3B3B3] font-[400] text-[.75rem]">Anyone with the link can</span>
-        <Form.Item hasFeedback name="publicShareMode" initialValue="View" rules={props.rules} className="mb-[0]">
+        <span className="text-[#B3B3B3] font-[400] text-[.75rem]">
+          Anyone with the link can
+        </span>
+        <Form.Item
+          hasFeedback
+          name="publicShareMode"
+          initialValue="View"
+          rules={props.rules}
+          className="mb-[0]"
+        >
           <Select
             // open={true}
             variant="borderless"
@@ -40,8 +41,13 @@ const ShareLink: React.FC<{
       <div>
         <SecondaryButton classNames="!border-[transparent] px-[.6rem]">
           <div className="flex items-center gap-1">
-            <Link2Icon size={12} className="text-[#B3B3B3] rotate-[-45deg] mr-[.2rem]"/>
-            <div className="text-[.75rem] text-[#B3B3B3] font-[400]">Copy Link</div>
+            <Link2Icon
+              size={12}
+              className="text-[#B3B3B3] rotate-[-45deg] mr-[.2rem]"
+            />
+            <div className="text-[.75rem] text-[#B3B3B3] font-[400]">
+              Copy Link
+            </div>
           </div>
         </SecondaryButton>
       </div>
