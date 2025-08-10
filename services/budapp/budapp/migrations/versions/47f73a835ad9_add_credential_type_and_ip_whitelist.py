@@ -1,7 +1,7 @@
 """add_credential_type_and_ip_whitelist
 
 Revision ID: 47f73a835ad9
-Revises: 20250730155527
+Revises: c82d259d07ce
 Create Date: 2025-08-04 17:36:21.911783
 
 """
@@ -15,7 +15,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = "47f73a835ad9"
-down_revision: Union[str, None] = "20250730155527"
+down_revision: Union[str, None] = "c82d259d07ce"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
