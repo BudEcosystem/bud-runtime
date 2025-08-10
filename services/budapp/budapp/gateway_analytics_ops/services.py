@@ -181,20 +181,21 @@ class GatewayAnalyticsService(SessionMixin):
             endpoint_names = {}
 
             if project_ids:
+            if project_ids:
                 stmt = select(ProjectModel).where(ProjectModel.id.in_(list(project_ids)))
-                result = self.session.execute(stmt)
+                result = await self.session.execute(stmt)
                 projects = result.scalars().all()
                 project_names = {str(p.id): p.name for p in projects}
 
             if model_ids:
                 stmt = select(Model).where(Model.id.in_(list(model_ids)))
-                result = self.session.execute(stmt)
+                result = await self.session.execute(stmt)
                 models = result.scalars().all()
                 model_names = {str(m.id): m.name for m in models}
 
             if endpoint_ids:
                 stmt = select(EndpointModel).where(EndpointModel.id.in_(list(endpoint_ids)))
-                result = self.session.execute(stmt)
+                result = await self.session.execute(stmt)
                 endpoints = result.scalars().all()
                 endpoint_names = {str(e.id): e.name for e in endpoints}
 
