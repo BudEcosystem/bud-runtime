@@ -217,7 +217,7 @@ const InferenceListTable: React.FC<InferenceListTableProps> = ({ projectId: prop
         columns={columns}
         dataSource={inferences}
         rowKey="inference_id"
-        loading={isLoading}
+        loading={false}
         pagination={false}
         virtual
         bordered={false}
