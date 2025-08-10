@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState } from "react";
 
 export interface Credentials {
   id: string;
@@ -14,7 +14,8 @@ export interface Credentials {
 export const useProprietaryCredentials = () => {
   const [credentials, setCredentials] = useState<Credentials[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedCredential, setSelectedCredential] = useState<Credentials | null>(null);
+  const [selectedCredential, setSelectedCredential] =
+    useState<Credentials | null>(null);
   const [selectedProvider, setSelectedProvider] = useState<any>(null);
   const [totalCredentials, setTotalCredentials] = useState(0);
 
@@ -22,30 +23,30 @@ export const useProprietaryCredentials = () => {
     setIsLoading(true);
     try {
       // TODO: Implement actual API call with params
-      console.log('Fetching credentials with params:', params);
+      console.log("Fetching credentials with params:", params);
       setCredentials([]);
       setTotalCredentials(0);
     } catch (error) {
-      console.error('Error fetching credentials:', error);
+      console.error("Error fetching credentials:", error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const addCredential = async (credential: Omit<Credentials, 'id'>) => {
+  const addCredential = async (credential: Omit<Credentials, "id">) => {
     // TODO: Implement actual API call
     const newCredential = { ...credential, id: Date.now().toString() };
-    setCredentials(prev => [...prev, newCredential]);
+    setCredentials((prev) => [...prev, newCredential]);
   };
 
   const deleteCredential = async (id: string) => {
     // TODO: Implement actual API call
-    setCredentials(prev => prev.filter(cred => cred.id !== id));
+    setCredentials((prev) => prev.filter((cred) => cred.id !== id));
   };
 
   const getProprietaryCredentialDetails = async (id: string) => {
     // TODO: Implement actual API call
-    const credential = credentials.find(cred => cred.id === id);
+    const credential = credentials.find((cred) => cred.id === id);
     if (credential) {
       setSelectedCredential(credential);
     }

@@ -19,7 +19,7 @@ interface AuthNavigationContextType {
   activePage: number;
   setActivePage: Dispatch<React.SetStateAction<number>>;
   authError: string;
-  setAuthError: Dispatch<React.SetStateAction<string>>
+  setAuthError: Dispatch<React.SetStateAction<string>>;
 }
 
 const LoaderContext = createContext<LoaderContextType | undefined>(undefined);
@@ -39,7 +39,7 @@ export const useAuthNavigation = () => {
   const context = useContext(AuthNavigationContext);
   if (!context) {
     throw new Error(
-      "useAuthNavigation must be used within an AuthNavigationProvider"
+      "useAuthNavigation must be used within an AuthNavigationProvider",
     );
   }
   return context;
@@ -64,9 +64,11 @@ export const AuthNavigationProvider: React.FC<{
   children: React.ReactNode;
 }> = ({ children }) => {
   const [activePage, setActivePage] = useState(1);
-  const [authError, setAuthError] = useState('');
+  const [authError, setAuthError] = useState("");
   return (
-    <AuthNavigationContext.Provider value={{ activePage, setActivePage, authError, setAuthError }}>
+    <AuthNavigationContext.Provider
+      value={{ activePage, setActivePage, authError, setAuthError }}
+    >
       {children}
     </AuthNavigationContext.Provider>
   );

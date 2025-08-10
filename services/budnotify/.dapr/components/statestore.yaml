@@ -1,5 +1,4 @@
 # Reference: https://docs.dapr.io/reference/components-reference/supported-state-stores/setup-redis/
-
 apiVersion: dapr.io/v1alpha1
 kind: Component
 metadata:

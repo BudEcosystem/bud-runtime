@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef } from "react";
 
 const DESIRED_CELL_COUNT = 13; // Adjust this to control grid density
 interface BgProps {
@@ -19,27 +19,29 @@ const GameOfLifeBackground = (props: BgProps) => {
     const MAX_OPACITY = 0.2;
 
     // Use innerWidth/innerHeight for viewport dimensions
-    const CELL_SIZE = Math.min(window.innerWidth, window.innerHeight) / DESIRED_CELL_COUNT;
+    const CELL_SIZE =
+      Math.min(window.innerWidth, window.innerHeight) / DESIRED_CELL_COUNT;
     // const CELL_SIZE = 58;
     const GRID_WIDTH = Math.ceil(window.innerWidth / CELL_SIZE);
     const GRID_HEIGHT = Math.ceil(window.innerHeight / CELL_SIZE);
     const CANVAS_WIDTH = window.innerWidth;
     const CANVAS_HEIGHT = window.innerHeight;
-    const DEAD_COLOR = '#0d0d0d';
+    const DEAD_COLOR = "#0d0d0d";
     // const DEAD_COLOR = '#3b22a3';
 
     const canvas = canvasRef.current!;
-    const ctx = canvas.getContext('2d')!;
+    const ctx = canvas.getContext("2d")!;
     canvas.width = CANVAS_WIDTH;
     canvas.height = CANVAS_HEIGHT;
 
     // Initialize random grid with the correct dimensions
     gridRef.current = Array.from({ length: GRID_HEIGHT }, () =>
-      Array.from({ length: GRID_WIDTH }, () => Math.random() > 0.8 ? 1 : 0)
+      Array.from({ length: GRID_WIDTH }, () => (Math.random() > 0.8 ? 1 : 0)),
     );
 
-    const opacityGrid = Array.from({ length: GRID_HEIGHT }, () =>
-      Array.from({ length: GRID_WIDTH }, () => MAX_OPACITY)  // Initialize with max opacity 0.7
+    const opacityGrid = Array.from(
+      { length: GRID_HEIGHT },
+      () => Array.from({ length: GRID_WIDTH }, () => MAX_OPACITY), // Initialize with max opacity 0.7
     );
 
     let lastGenerationTime = Date.now();
@@ -53,8 +55,12 @@ const GameOfLifeBackground = (props: BgProps) => {
         for (let x = 0; x < GRID_WIDTH; x++) {
           // Update opacity with transition
           if (grid[y][x]) {
-            if (opacityGrid[y][x] < MAX_OPACITY) {  // Max opacity is 0.7
-              opacityGrid[y][x] = Math.min(MAX_OPACITY, opacityGrid[y][x] + 0.1);
+            if (opacityGrid[y][x] < MAX_OPACITY) {
+              // Max opacity is 0.7
+              opacityGrid[y][x] = Math.min(
+                MAX_OPACITY,
+                opacityGrid[y][x] + 0.1,
+              );
             }
           } else {
             if (opacityGrid[y][x] > 0) {
@@ -64,10 +70,15 @@ const GameOfLifeBackground = (props: BgProps) => {
 
           if (opacityGrid[y][x] > 0) {
             const gradient = ctx.createLinearGradient(
-              x * CELL_SIZE, y * CELL_SIZE,           // Start point (top)
-              x * CELL_SIZE, (y + 1) * CELL_SIZE      // End point (bottom)
+              x * CELL_SIZE,
+              y * CELL_SIZE, // Start point (top)
+              x * CELL_SIZE,
+              (y + 1) * CELL_SIZE, // End point (bottom)
             );
-            gradient.addColorStop(0, `rgba(255, 255, 255, ${opacityGrid[y][x]})`);
+            gradient.addColorStop(
+              0,
+              `rgba(255, 255, 255, ${opacityGrid[y][x]})`,
+            );
             gradient.addColorStop(1, `rgba(0, 0, 0, ${opacityGrid[y][x]})`);
             ctx.fillStyle = gradient;
             ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
@@ -79,7 +90,7 @@ const GameOfLifeBackground = (props: BgProps) => {
       }
 
       // Draw grid lines
-      ctx.strokeStyle = '#333333';
+      ctx.strokeStyle = "#333333";
       ctx.lineWidth = 1;
 
       // Vertical lines
@@ -100,7 +111,7 @@ const GameOfLifeBackground = (props: BgProps) => {
     };
 
     const nextGeneration = () => {
-      const newGrid = gridRef.current.map(arr => [...arr]);
+      const newGrid = gridRef.current.map((arr) => [...arr]);
       for (let y = 0; y < GRID_HEIGHT; y++) {
         for (let x = 0; x < GRID_WIDTH; x++) {
           const neighbors = countAliveNeighbors(x, y);
@@ -145,18 +156,20 @@ const GameOfLifeBackground = (props: BgProps) => {
   }, []);
 
   return (
-    <div className='absolute top-0 left-0 w-full h-full overflow-hidden'>
-      <div className={`absolute z-10 top-0 left-0 w-full h-full bg-[black] opacity-50 gol-bg`}></div>
+    <div className="absolute top-0 left-0 w-full h-full overflow-hidden">
+      <div
+        className={`absolute z-10 top-0 left-0 w-full h-full bg-[black] opacity-50 gol-bg`}
+      ></div>
       <canvas
         ref={canvasRef}
         style={{
-          position: 'absolute',
-          top: '0',
-          left: '0',
-          width: '100vw',
-          height: '100vh',
+          position: "absolute",
+          top: "0",
+          left: "0",
+          width: "100vw",
+          height: "100vh",
           zIndex: props.zIndex || 0,
-          backgroundColor: props.bg || '#202020',
+          backgroundColor: props.bg || "#202020",
           opacity: props.opacity || 0.5,
         }}
       />

@@ -5,7 +5,6 @@ import { tempApiBaseUrl } from "@/components/environment";
 import { Model } from "./useModels";
 import { Cluster } from "./useCluster";
 
-
 export interface IEndPoint {
   users_count?: number;
   endpoints_count?: number;
@@ -53,32 +52,32 @@ export interface IAdapter {
   model: Model;
 }
 export interface PromptListSample {
-  hit_ratio: number,
-  latency: number,
-  page: number,
-  limit: number,
-  total_record: number,
-  total_pages: number,
-  message: string,
-  most_reused_prompts: [],
-  object: string,
-  items: [],
-};
+  hit_ratio: number;
+  latency: number;
+  page: number;
+  limit: number;
+  total_record: number;
+  total_pages: number;
+  message: string;
+  most_reused_prompts: [];
+  object: string;
+  items: [];
+}
 
 export interface PromptDetail {
-  created_at: string,
-  prompt: string,
-  request_id: string,
-  response: string,
-  score: number,
-};
+  created_at: string;
+  prompt: string;
+  request_id: string;
+  response: string;
+  score: number;
+}
 export type GetAdapterParams = {
-  endpointId: string,
-  page: number,
-  limit: number,
-  name?: string,
-  order_by?: string,
-  projectId?: string
+  endpointId: string;
+  page: number;
+  limit: number;
+  name?: string;
+  order_by?: string;
+  projectId?: string;
 };
 export const useEndPoints = create<{
   endPoints: IEndPoint[];
@@ -104,13 +103,13 @@ export const useEndPoints = create<{
     name?: string;
     order_by?: string;
   }) => void;
-createEndPoint: (data: any) => Promise<any>;
+  createEndPoint: (data: any) => Promise<any>;
   setPageSource: (data: any) => Promise<any>;
   setPromptPage: (type: string, title: string) => Promise<any>;
   deleteEndPoint: (endpointId: string, id?: string) => Promise<any>;
   updateEndPoint: (endpointId: string, data: any) => void;
-  getReusedPrompts: (deploymentId: string,) => void;
-  getInferenceQualityAnalytics: (deploymentId: string,) => void;
+  getReusedPrompts: (deploymentId: string) => void;
+  getInferenceQualityAnalytics: (deploymentId: string) => void;
   getEndpointClusterDetails: (endpointId: string, projectId?: string) => void;
   getInferenceQualityPrompts: (params: any, id: string) => void;
   clusterDetails?: EndpointClusterData;
@@ -138,14 +137,13 @@ createEndPoint: (data: any) => Promise<any>;
     set({ scoreType: scoreType });
     set({ pageTitle: title });
   },
-getEndpointClusterDetails: async (endpointId: string, projectId?) => {
-    console.log("projectId projectId", projectId)
+  getEndpointClusterDetails: async (endpointId: string, projectId?) => {
+    console.log("projectId projectId", projectId);
     set({ loading: true });
     const url = `${tempApiBaseUrl}/endpoints/${endpointId}/model-cluster-detail`;
 
     try {
       const response: any = await AppRequest.Get(url, {
-
         headers: {
           "x-resource-type": "project",
           "x-entity-id": projectId,
@@ -215,7 +213,7 @@ getEndpointClusterDetails: async (endpointId: string, projectId?) => {
             "x-resource-type": "project",
             "x-entity-id": id,
           },
-        }
+        },
       );
       // successToast(response.data.message);
       return response;
@@ -227,14 +225,14 @@ getEndpointClusterDetails: async (endpointId: string, projectId?) => {
     try {
       const response: any = await AppRequest.Patch(
         `/endpoints/${endpointId}`,
-        data
+        data,
       );
       successToast(response.data.message);
     } catch (error) {
       console.error("Error creating model:", error);
     }
   },
-getAdapters: async (params: GetAdapterParams, projectId?) => {
+  getAdapters: async (params: GetAdapterParams, projectId?) => {
     const url = `${tempApiBaseUrl}/endpoints/${params.endpointId}/adapters`;
     set({ loading: true });
     try {
@@ -265,16 +263,12 @@ getAdapters: async (params: GetAdapterParams, projectId?) => {
   deleteAdapter: async (adapterId: string, projectId?) => {
     try {
       const url = `${tempApiBaseUrl}/endpoints/delete-adapter/${adapterId}`;
-      const response: any = await AppRequest.Post(
-        url,
-        undefined,
-        {
-          headers: {
-            "x-resource-type": "project",
-            "x-entity-id": projectId,
-          },
-        }
-      );
+      const response: any = await AppRequest.Post(url, undefined, {
+        headers: {
+          "x-resource-type": "project",
+          "x-entity-id": projectId,
+        },
+      });
       successToast(response.data.message);
     } catch (error) {
       console.error("Error creating model:", error);
@@ -303,17 +297,17 @@ getAdapters: async (params: GetAdapterParams, projectId?) => {
     }
   },
 
-
   getInferenceQualityPrompts: async (params: any, id: string): Promise<any> => {
-
-    console.log('params', params)
+    console.log("params", params);
 
     function convertToISOString(dateStr: string): string | null {
       if (!dateStr) return null;
-      const [month, day, year] = dateStr.split('/');
+      const [month, day, year] = dateStr.split("/");
       if (!month || !day || !year) return null;
 
-      const isoString = new Date(`${year}-${month}-${day}T00:00:00Z`).toISOString();
+      const isoString = new Date(
+        `${year}-${month}-${day}T00:00:00Z`,
+      ).toISOString();
       return isoString;
     }
 
@@ -326,10 +320,11 @@ getAdapters: async (params: GetAdapterParams, projectId?) => {
       created_at: convertToISOString(params.created_at),
     };
 
-
     // Filter out null or undefined values
     const payload = Object.fromEntries(
-      Object.entries(rawPayload).filter(([_, v]) => v !== null && v !== undefined && v !== "")
+      Object.entries(rawPayload).filter(
+        ([_, v]) => v !== null && v !== undefined && v !== "",
+      ),
     );
 
     const query = new URLSearchParams(payload as any).toString();
@@ -358,7 +353,7 @@ getAdapters: async (params: GetAdapterParams, projectId?) => {
           deployment_settings: {
             rate_limits: {
               enabled: false,
-              algorithm: 'token_bucket',
+              algorithm: "token_bucket",
               requests_per_minute: null,
               requests_per_second: null,
               requests_per_hour: null,
@@ -366,16 +361,19 @@ getAdapters: async (params: GetAdapterParams, projectId?) => {
             },
             retry_config: null,
             fallback_config: {
-              fallback_models: []
-            }
-          }
+              fallback_models: [],
+            },
+          },
         };
       }
       throw error;
     }
   },
 
-  updateEndpointSettings: async (endpointId: string, settings: any): Promise<any> => {
+  updateEndpointSettings: async (
+    endpointId: string,
+    settings: any,
+  ): Promise<any> => {
     try {
       const url = `${tempApiBaseUrl}/endpoints/${endpointId}/deployment-settings`;
       const response: any = await AppRequest.Put(url, settings);
@@ -383,13 +381,16 @@ getAdapters: async (params: GetAdapterParams, projectId?) => {
     } catch (error) {
       console.error("Error updating endpoint settings:", error);
       // Handle validation errors specifically
-      if ((error as any)?.response?.status === 422 && (error as any)?.response?.data?.detail) {
+      if (
+        (error as any)?.response?.status === 422 &&
+        (error as any)?.response?.data?.detail
+      ) {
         const validationErrors = (error as any).response.data.detail
-          .map((err: any) => `${err.loc.join('.')}: ${err.msg}`)
-          .join('\n');
+          .map((err: any) => `${err.loc.join(".")}: ${err.msg}`)
+          .join("\n");
         throw new Error(validationErrors);
       }
       throw error;
     }
-  }
+  },
 }));

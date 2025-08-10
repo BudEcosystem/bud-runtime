@@ -1,15 +1,13 @@
 name: "BudNotify: Build and Push Docker Image on Release"
 
 on:
+  workflow_dispatch:
   release:
     types: [created]
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./services/budnotify
 
     steps:
       - name: Checkout repository
@@ -34,7 +32,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ./services/budnotify
           push: true
-          file: ./deploy/Dockerfile
+          file: ./services/budnotify/deploy/Dockerfile
           tags: budstudio/budnotify:${{ env.RELEASE_TAG }}

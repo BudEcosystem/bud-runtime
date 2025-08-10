@@ -47,12 +47,16 @@ axiosInstance.interceptors.request.use(
 
     const isPublicEndpoint =
       config.url?.includes("auth/login") ||
+      config.url?.includes("auth/register") ||
       config.url?.includes("users/reset-password") ||
       config.url?.includes("auth/refresh-token");
 
     if (!Token && !isPublicEndpoint) {
       // Prevent redirect loop
-      if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+      if (
+        typeof window !== "undefined" &&
+        window.location.pathname !== "/login"
+      ) {
         if (!isRedirecting) {
           isRedirecting = true;
           localStorage.clear();
@@ -62,7 +66,6 @@ axiosInstance.interceptors.request.use(
       return Promise.reject(new Error("No access token found"));
     }
 
-
     if (Token && config.headers) {
       config.headers.Authorization = `Bearer ${Token}`;
     }
@@ -71,7 +74,7 @@ axiosInstance.interceptors.request.use(
   },
   (error) => {
     return Promise.reject(error);
-  }
+  },
 );
 
 function subscribeTokenRefresh(cb: (token: string) => void) {
@@ -127,11 +130,15 @@ axiosInstance.interceptors.response.use(
         });
       });
     } else if (status) {
-      const errorMsg = err.response?.data?.message || err.response?.data?.error || err.message || "An error occurred";
+      const errorMsg =
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        err.message ||
+        "An error occurred";
       errorToast(errorMsg);
     }
     return Promise.reject(err);
-  }
+  },
 );
 
 const refreshToken = async () => {
@@ -155,7 +162,7 @@ const refreshToken = async () => {
         headers: {
           "Content-Type": "application/json",
         },
-      }
+      },
     );
 
     const data = response.data;
@@ -178,13 +185,12 @@ const refreshToken = async () => {
   }
 };
 
-
 const Get = (
   endPoint: string,
   payload?: {
     params?: any;
     headers?: any;
-  }
+  },
 ) => {
   return axiosInstance.get(endPoint, payload);
 };
@@ -195,8 +201,12 @@ const Post = (
   config?: {
     params?: any;
     headers?: any;
-  }
+  },
 ) => {
+  console.log(`[API] POST request to: ${endPoint}`);
+  console.log(`[API] Full URL: ${baseUrl}${endPoint}`);
+  console.log(`[API] Payload:`, payload);
+
   const finalConfig: any = {
     ...config,
     headers: {
@@ -211,7 +221,6 @@ const Post = (
 
   return axiosInstance.post(endPoint, payload, finalConfig);
 };
-
 
 const Delete = (endPoint: string, _payload?: any, config?: any) => {
   return axiosInstance.delete(endPoint, config);

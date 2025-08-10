@@ -108,7 +108,7 @@ const RunsHistoryTable: React.FC<RunsHistoryTableProps> = ({ data }) => {
       `}</style>
       <Table
         columns={columns}
-        dataSource={data}
+        dataSource={Array.isArray(data) ? data : []}
         pagination={false}
         // pagination={{
         //   pageSize: 10,
@@ -118,7 +118,7 @@ const RunsHistoryTable: React.FC<RunsHistoryTableProps> = ({ data }) => {
         // }}
         rowKey="runId"
         size="small"
-        className=" eval-explorer-table"
+        className="eval-explorer-table"
       />
     </div>
   );

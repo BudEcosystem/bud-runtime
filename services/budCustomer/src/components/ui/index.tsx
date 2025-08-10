@@ -1,5 +1,9 @@
 import React from "react";
-import { Text_15_600_EEEEEE, Text_16_400_FFFFFF, Text_38_400_EEEEEE } from "./text";
+import {
+  Text_15_600_EEEEEE,
+  Text_16_400_FFFFFF,
+  Text_38_400_EEEEEE,
+} from "./text";
 import { Image } from "antd";
 import ProjectTags from "@/flows/components/ProjectTags";
 
@@ -11,9 +15,9 @@ export type GeneralCardsProps = {
     value: string;
     tagColor: string;
   };
-  ClassNames?: string
-  valueClassNames?: string
-}
+  ClassNames?: string;
+  valueClassNames?: string;
+};
 
 const CardWithBgAndTag: React.FC<GeneralCardsProps> = ({
   name,
@@ -21,15 +25,16 @@ const CardWithBgAndTag: React.FC<GeneralCardsProps> = ({
   value,
   tag,
   ClassNames,
-  valueClassNames
+  valueClassNames,
 }) => {
   return (
-    <div className={`relative rounded-[8px] px-[1.6rem] border-[1.5px] border-[#1c1c1c] bg-[#101010] ${ClassNames}`}
+    <div
+      className={`relative rounded-[8px] px-[1.6rem] border-[1.5px] border-[#1c1c1c] bg-[#101010] ${ClassNames}`}
       style={{
-        width: '24%',
-        minHeight: '172px',
-        paddingTop: '2rem',
-        paddingBottom: '1.5rem'
+        width: "24%",
+        minHeight: "172px",
+        paddingTop: "2rem",
+        paddingBottom: "1.5rem",
       }}
     >
       {/* Background Image */}
@@ -45,9 +50,10 @@ const CardWithBgAndTag: React.FC<GeneralCardsProps> = ({
       {/* Content */}
       <div className="relative z-10 w-full h-full flex flex-col justify-start">
         <Text_15_600_EEEEEE>{name}</Text_15_600_EEEEEE>
-        <div className={`${valueClassNames}`}
+        <div
+          className={`${valueClassNames}`}
           style={{
-            paddingTop: '3.2rem'
+            paddingTop: "3.2rem",
           }}
         >
           <Text_38_400_EEEEEE>{value}</Text_38_400_EEEEEE>

@@ -4,7 +4,11 @@ import debounce from "lodash/debounce";
 import FloatLabel from "./FloatLabel";
 import InfoLabel from "./InfoLabel";
 
-export function DebounceSelect({ fetchOptions, debounceTimeout = 800, ...props }: {
+export function DebounceSelect({
+  fetchOptions,
+  debounceTimeout = 800,
+  ...props
+}: {
   fetchOptions: (value: string) => Promise<any[]>;
   debounceTimeout?: number;
   [key: string]: any;
@@ -37,8 +41,7 @@ export function DebounceSelect({ fetchOptions, debounceTimeout = 800, ...props }
           filterOption={false}
           onSearch={debounceFetcher}
           notFoundContent={fetching ? <Spin size="small" /> : null}
-          onChange={(value) => {
-          }}
+          onChange={(value) => {}}
           mode="tags"
           {...props}
           options={options}

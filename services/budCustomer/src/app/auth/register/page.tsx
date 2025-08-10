@@ -6,6 +6,9 @@ import { useAuthNavigation, useLoader } from "@/context/authContext";
 import RegisterForm from "@/components/auth/RegisterForm";
 import LoginForm from "@/components/auth/LoginForm";
 import { motion, AnimatePresence } from "framer-motion";
+import { AppRequest } from "@/services/api/requests";
+import { useUser } from "@/stores/useUser";
+import { successToast } from "@/components/toast";
 
 interface RegisterData {
   name: string;
@@ -17,8 +20,10 @@ interface RegisterData {
 }
 
 export default function Register() {
-  const { activePage, setActivePage, setAuthError, authError } = useAuthNavigation();
+  const { activePage, setActivePage, setAuthError, authError } =
+    useAuthNavigation();
   const { isLoading, showLoader, hideLoader } = useLoader();
+  const { getUser } = useUser();
   const router = useRouter();
   const [isBackToLogin, setIsBackToLogin] = useState(false);
 
@@ -42,50 +47,111 @@ export default function Register() {
   const handleRegister = async (formData: { [key: string]: string }) => {
     showLoader();
     try {
-      // Mock registration logic - replace with your actual registration
-      console.log("Registration attempt:", formData);
+      // Prepare the payload according to the API schema
+      const payload = {
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        permissions: [
+          {
+            name: "model:view",
+            has_permission: true,
+          },
+          {
+            name: "project:view",
+            has_permission: true,
+          },
+        ],
+        role: "user", // Default role for new registrations
+        company: formData.company,
+        purpose: formData.purpose,
+        user_type: "client",
+      };
 
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      console.log("Payload:", payload);
 
-      // Mock success - replace with actual registration
-      if (formData.email && formData.password) {
-        // Store auth token or user data
-        localStorage.setItem("auth_token", "mock_token");
-        setAuthError('');
+      // Make the API call
+      const response = await AppRequest.Post("/auth/register", payload);
+      console.log("Registration response:", response);
+      if (response.data) {
+        // Check if the response contains tokens
+        if (response.data.token?.access_token) {
+          // Store tokens
+          localStorage.setItem(
+            "access_token",
+            response.data.token.access_token,
+          );
+          localStorage.setItem(
+            "refresh_token",
+            response.data.token.refresh_token,
+          );
 
-        // Redirect to dashboard
-        router.push("/dashboard");
+          setAuthError("");
+          successToast("Registration successful!");
+
+          // Redirect to projects or login based on response
+          router.push("/projects");
+        } else {
+          // If no tokens, registration successful but needs to login
+          setAuthError("");
+          successToast("Registration successful! Please login.");
+          setActivePage(1); // Switch to login page
+        }
       }
 
       hideLoader();
     } catch (error: any) {
       console.error("Registration error:", error);
-      setAuthError(error.message || "Registration failed. Please try again.");
+      const errorMessage =
+        error.response?.data?.detail ||
+        error.response?.data?.message ||
+        error.message ||
+        "Registration failed. Please try again.";
+      setAuthError(errorMessage);
       hideLoader();
     }
   };
 
-  const handleLogin = async (payload: { email?: string; password?: string }) => {
+  const handleLogin = async (payload: {
+    email?: string;
+    password?: string;
+  }) => {
+    console.log("=== LOGIN HANDLER CALLED ===");
+    console.log("Login payload:", payload);
     showLoader();
     try {
-      // Mock authentication logic
-      console.log("Login attempt:", payload);
+      const response = await AppRequest.Post("/auth/login", payload);
 
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      if (response.data?.token) {
+        // Store tokens
+        localStorage.setItem("access_token", response.data.token.access_token);
+        localStorage.setItem(
+          "refresh_token",
+          response.data.token.refresh_token,
+        );
 
-      // Mock success
-      if (payload.email && payload.password) {
-        localStorage.setItem("auth_token", "mock_token");
-        setAuthError('');
-        router.push("/dashboard");
+        setAuthError("");
+
+        // Get user data
+        await getUser();
+
+        // Handle different login scenarios
+        if (response.data.is_reset_password || response.data.first_login) {
+          router.push("/auth/reset-password");
+        } else {
+          router.push("/projects");
+        }
       }
 
       hideLoader();
     } catch (error: any) {
       console.error("Login error:", error);
-      setAuthError(error.message || "Login failed. Please try again.");
+      const errorMessage =
+        error.response?.data?.detail ||
+        error.response?.data?.message ||
+        error.message ||
+        "Login failed. Please try again.";
+      setAuthError(errorMessage);
       hideLoader();
     }
   };
@@ -103,8 +169,18 @@ export default function Register() {
             className="w-[70%] h-full open-sans mt-[-1rem] flex justify-center items-center flex-col"
           >
             <>
-              {activePage === 1 && <LoginForm onSubmit={handleLogin} />}
-              {activePage === 2 && <RegisterForm onSubmit={handleRegister} />}
+              {activePage === 1 && (
+                <>
+                  {console.log("Rendering LoginForm")}
+                  <LoginForm onSubmit={handleLogin} />
+                </>
+              )}
+              {activePage === 2 && (
+                <>
+                  {console.log("Rendering RegisterForm")}
+                  <RegisterForm onSubmit={handleRegister} />
+                </>
+              )}
             </>
           </motion.div>
         </AnimatePresence>

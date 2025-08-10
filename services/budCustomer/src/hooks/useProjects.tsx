@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { create } from "zustand";
 import { Tag } from "@/components/ui/bud/dataEntry/TagsInput";
 import { Cluster } from "./useCluster";
 
@@ -17,7 +17,7 @@ export type Project = {
   };
   created_at: string;
   endpoints_count: number;
-  project?: any
+  project?: any;
 };
 
 export interface IProject {
@@ -27,7 +27,11 @@ export interface IProject {
   profile_colors: string[];
 }
 
-export type Scopes = 'endpoint:view' | 'endpoint:manage' | 'project:view' | 'project:manage'
+export type Scopes =
+  | "endpoint:view"
+  | "endpoint:manage"
+  | "project:view"
+  | "project:manage";
 
 export type InviteUser = {
   user_id?: string;
@@ -67,7 +71,11 @@ export const useProjects = create<{
   createProject: (data: any) => Promise<any>;
   deleteProject: (projectId: string, router: any) => Promise<any>;
   updateProject: (projectId: string, data: any) => Promise<any>;
-  inviteMembers: (projectId: string, data: { users: InviteUser[] }, toast?: boolean) => Promise<any>;
+  inviteMembers: (
+    projectId: string,
+    data: { users: InviteUser[] },
+    toast?: boolean,
+  ) => Promise<any>;
   getProject: (projectId: string) => void;
   getProjectTags: () => void;
   setSelectedProjectId: (projectId: string) => void;
@@ -77,7 +85,11 @@ export const useProjects = create<{
   removeMembers: (projectId: string, userIds: string[]) => Promise<any>;
   getMembers: (projectId: string) => Promise<any>;
   projectMembers: ProjectMember[];
-  updatePermissions: (projectId: string, userId: string, scopes: Permission[]) => Promise<any>;
+  updatePermissions: (
+    projectId: string,
+    userId: string,
+    scopes: Permission[],
+  ) => Promise<any>;
   getClusters: (projectId: string) => Promise<any>;
   projectClusters: Cluster[];
   totalPages: number;
@@ -131,7 +143,11 @@ export const useProjects = create<{
     return Promise.resolve({});
   },
 
-  inviteMembers: async (projectId: string, data: any, toast: boolean = true) => {
+  inviteMembers: async (
+    projectId: string,
+    data: any,
+    toast: boolean = true,
+  ) => {
     // Stub implementation
     return Promise.resolve({});
   },
@@ -162,7 +178,11 @@ export const useProjects = create<{
     return Promise.resolve({});
   },
 
-  updatePermissions: async (projectId: string, userId: string, permissions: Permission[]) => {
+  updatePermissions: async (
+    projectId: string,
+    userId: string,
+    permissions: Permission[],
+  ) => {
     // Stub implementation
     return Promise.resolve({});
   },

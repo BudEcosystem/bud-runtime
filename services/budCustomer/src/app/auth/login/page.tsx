@@ -12,7 +12,8 @@ interface DataInterface {
 }
 
 export default function Login() {
-  const { activePage, setActivePage, setAuthError, authError } = useAuthNavigation();
+  const { activePage, setActivePage, setAuthError, authError } =
+    useAuthNavigation();
   const { isLoading, showLoader, hideLoader } = useLoader();
   const router = useRouter();
   const [isBackToLogin, setIsBackToLogin] = useState(false);
@@ -36,16 +37,16 @@ export default function Login() {
       console.log("Login attempt:", payload);
 
       // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
       // Mock success - replace with actual authentication
       if (payload.email && payload.password) {
         // Store auth token or user data
         localStorage.setItem("auth_token", "mock_token");
-        setAuthError('');
+        setAuthError("");
 
-        // Redirect to dashboard
-        router.push("/dashboard");
+        // Redirect to projects
+        router.push("/projects");
       }
 
       hideLoader();
@@ -68,9 +69,7 @@ export default function Login() {
             transition={{ duration: 0.4, ease: "linear" }}
             className="w-[70%] h-full open-sans mt-[-1rem] flex justify-center items-center flex-col"
           >
-            <>
-              {activePage === 1 && <LoginForm onSubmit={handleLogin} />}
-            </>
+            <>{activePage === 1 && <LoginForm onSubmit={handleLogin} />}</>
             {/* Other pages can be added here - reset password, contact admin, etc. */}
           </motion.div>
         </AnimatePresence>

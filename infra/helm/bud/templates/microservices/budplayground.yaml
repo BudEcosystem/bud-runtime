@@ -12,17 +12,19 @@ spec:
       labels:
         app: {{ .Release.Name }}-budplayground
       annotations:
-        dapr.io/enabled: "true"
-        dapr.io/app-id: "budplayground"
-        dapr.io/app-port: "3000"
+        date: "{{ now }}"
     spec:
       containers:
       - name: {{ .Release.Name }}-budplayground
         image: {{ .Values.microservices.budplayground.image }}
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         ports:
         - containerPort: 3000
         env:
+          - name: NEXT_PUBLIC_PASSWORD
+            value: {{ .Values.microservices.rsaKeys.privateKeyPassword }}
+          - name: NEXT_PUBLIC_PRIVATE_KEY
+            value: {{ .Values.microservices.rsaKeys.privateKey | b64enc }}
         {{ $root := . }}
         {{- range $key, $value := .Values.microservices.budplayground.env }}
           - name: {{ $key }}

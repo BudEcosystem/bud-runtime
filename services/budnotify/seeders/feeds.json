@@ -1,0 +1,10 @@
+[
+    {
+        "workflow_name": "bud-notification",
+        "feed_name": "inapp"
+    },
+    {
+        "workflow_name": "bud-internal",
+        "feed_name": "internal"
+    }
+]

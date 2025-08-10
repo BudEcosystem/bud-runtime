@@ -1,5 +1,8 @@
 import { errorToast } from "@/components/toast";
-import { FormProgressStatus, FormProgressType } from "@/components/ui/bud/progress/FormProgress";
+import {
+  FormProgressStatus,
+  FormProgressType,
+} from "@/components/ui/bud/progress/FormProgress";
 import { StepComponentsType } from "@/flows";
 import { create } from "zustand";
 import drawerFlows, { Flow } from "./drawerFlows";
@@ -62,10 +65,12 @@ export const useDrawer = create<{
     set(() => {
       return {
         // 1 item in the list
-        minmizedProcessList: [{
-          step: step,
-          flow: currentFlow,
-        }],
+        minmizedProcessList: [
+          {
+            step: step,
+            flow: currentFlow,
+          },
+        ],
         showMinimizedItem: true,
         cancelAlert: false,
         // Hide the minimized item after 5 seconds
@@ -77,14 +82,14 @@ export const useDrawer = create<{
           });
         }, 3000),
       };
-    }
-    );
-
+    });
   },
   maxmizedProcess: (step: DrawerStepParsedType) => {
     set((state) => {
       return {
-        minmizedProcessList: state.minmizedProcessList.filter((s) => s.step.id !== step.id),
+        minmizedProcessList: state.minmizedProcessList.filter(
+          (s) => s.step.id !== step.id,
+        ),
         showMinimizedItem: false,
       };
     });
@@ -186,7 +191,16 @@ export const useDrawer = create<{
     });
   },
   closeDrawer: () => {
-    set({ isDrawerOpen: false, currentFlow: null, step: null, previousStep: null, expandedStep: null, isFailed: false, drawerProps: null, expandedDrawerProps: null });
+    set({
+      isDrawerOpen: false,
+      currentFlow: null,
+      step: null,
+      previousStep: null,
+      expandedStep: null,
+      isFailed: false,
+      drawerProps: null,
+      expandedDrawerProps: null,
+    });
   },
   currentFlow: null,
   // currentFlow: "view-model",

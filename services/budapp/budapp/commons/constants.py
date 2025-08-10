@@ -504,6 +504,8 @@ class PermissionEnum(Enum):
         """Return client-specific permission values in a list."""
         return [
             cls.CLIENT_ACCESS.value,
+            cls.PROJECT_VIEW.value,
+            cls.PROJECT_MANAGE.value,
         ]
 
 
@@ -552,7 +554,7 @@ class WorkflowTypeEnum(StrEnum):
     MODEL_BENCHMARK = auto()
     ADD_ADAPTER = auto()
     DELETE_ADAPTER = auto()
-    EXPERIMENT_CREATION = auto()
+    EVALUATION_CREATION = auto()
 
 
 class NotificationType(Enum):
@@ -850,6 +852,20 @@ class ProjectStatusEnum(StrEnum):
 
     ACTIVE = auto()
     DELETED = auto()
+
+
+class ProjectTypeEnum(StrEnum):
+    """Enumeration of project types in the system.
+
+    This enum defines the different types of projects that can exist in the Bud ecosystem.
+
+    Attributes:
+        CLIENT_APP: Represents a client application project.
+        ADMIN_APP: Represents an admin application project.
+    """
+
+    CLIENT_APP = auto()
+    ADMIN_APP = auto()
 
 
 # Bud Notify Workflow

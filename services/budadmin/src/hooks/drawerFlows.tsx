@@ -3485,7 +3485,20 @@ const newExperiment: DrawerFlowType = {
           title: "New Experiment",
         },
       ],
-      confirmClose: true,
+      confirmClose: false,
+    },
+    {
+      navigation: () => ["Experiments", "New Experiment"],
+      id: "new-experiment-success",
+      step: 1,
+      component: StepComponents["new-experiment-success"],
+      progress: [
+        {
+          status: FormProgressStatus.inProgress,
+          title: "New Experiment",
+        },
+      ],
+      confirmClose: false,
     },
   ],
 };
