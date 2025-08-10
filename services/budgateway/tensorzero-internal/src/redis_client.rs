@@ -7,7 +7,7 @@ use redis::AsyncCommands;
 use secrecy::SecretString;
 use tracing::instrument;
 
-use crate::auth::{APIConfig, Auth};
+use crate::auth::{APIConfig, Auth, PublishedModelInfo};
 use crate::config_parser::ProviderTypesConfig;
 use crate::encryption::{decrypt_api_key, is_decryption_enabled, load_private_key};
 use crate::error::{Error, ErrorDetails};
@@ -16,6 +16,7 @@ use crate::model::{ModelTable, UninitializedModelConfig};
 
 const MODEL_TABLE_KEY_PREFIX: &str = "model_table:";
 const API_KEY_KEY_PREFIX: &str = "api_key:";
+const PUBLISHED_MODEL_INFO_KEY: &str = "published_model_info";
 
 pub struct RedisClient {
     pub(crate) client: redis::Client,
@@ -149,6 +150,14 @@ impl RedisClient {
         })
     }
 
+    async fn parse_published_model_info(json: &str) -> Result<PublishedModelInfo, Error> {
+        serde_json::from_str(json).map_err(|e| {
+            Error::new(ErrorDetails::Config {
+                message: format!("Failed to parse published model info from redis: {e}"),
+            })
+        })
+    }
+
     async fn handle_set_key_event(
         key: &str,
         conn: &mut MultiplexedConnection,
@@ -190,6 +199,23 @@ impl RedisClient {
                     }
                     Err(e) => {
                         tracing::error!("Failed to parse models from redis (key: {key}): {e}")
+                    }
+                }
+            }
+            k if k == PUBLISHED_MODEL_INFO_KEY => {
+                let value = conn.get::<_, String>(key).await.map_err(|e| {
+                    Error::new(ErrorDetails::Config {
+                        message: format!("Failed to get value for key {key} from Redis: {e}"),
+                    })
+                })?;
+
+                match Self::parse_published_model_info(&value).await {
+                    Ok(model_info) => {
+                        auth.update_published_model_info(model_info);
+                        tracing::debug!("Updated published model info");
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to parse published model info from redis: {e}")
                     }
                 }
             }
@@ -248,6 +274,10 @@ impl RedisClient {
                     tracing::error!("Invalid model table key format: {key}");
                 }
                 tracing::info!("Deleted model table: {key}");
+            }
+            k if k == PUBLISHED_MODEL_INFO_KEY => {
+                auth.clear_published_model_info();
+                tracing::debug!("Cleared published model info");
             }
             _ => {
                 tracing::info!("Received message from unknown key pattern: {key}");
@@ -341,6 +371,19 @@ impl RedisClient {
                         ),
                     }
                 }
+            }
+        }
+
+        // Fetch the published_model_info key
+        if let Ok(json) = self.conn.get::<_, String>(PUBLISHED_MODEL_INFO_KEY).await {
+            match Self::parse_published_model_info(&json).await {
+                Ok(model_info) => {
+                    self.auth.update_published_model_info(model_info);
+                    tracing::debug!("Loaded initial published model info");
+                }
+                Err(e) => tracing::error!(
+                    "Failed to parse initial published model info from redis: {e}"
+                ),
             }
         }
 

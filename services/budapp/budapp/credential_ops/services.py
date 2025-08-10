@@ -15,6 +15,7 @@ from budapp.commons.constants import (
     ModelProviderTypeEnum,
     PermissionEnum,
     ProjectStatusEnum,
+    ProjectTypeEnum,
     UserTypeEnum,
 )
 from budapp.commons.db_utils import SessionMixin
@@ -31,6 +32,7 @@ from budapp.project_ops.crud import ProjectDataManager
 from budapp.project_ops.services import ProjectService
 from budapp.shared.redis_service import RedisService, cache
 from budapp.user_ops.crud import UserDataManager
+from budapp.user_ops.models import User as UserModel
 
 from ..project_ops.models import Project as ProjectModel
 from .crud import CloudProviderDataManager, CredentialDataManager, ProprietaryCredentialDataManager
@@ -110,7 +112,12 @@ class CredentialService(SessionMixin):
 
     async def add_or_generate_credential(self, request: CredentialRequest, user_id: UUID) -> CredentialModel:
         # Get user information to determine credential type
-        db_user = await UserDataManager(self.session).retrieve_user_by_fields({"id": user_id})
+        db_user = await UserDataManager(self.session).retrieve_by_fields(UserModel, {"id": user_id})
+
+        # Get project information to validate credential type compatibility
+        db_project = await ProjectDataManager(self.session).retrieve_by_fields(
+            ProjectModel, {"id": request.project_id, "status": ProjectStatusEnum.ACTIVE}
+        )
 
         # Automatically set credential_type based on user_type if not explicitly provided
         credential_type = request.credential_type
@@ -123,6 +130,23 @@ class CredentialService(SessionMixin):
                 credential_type = ApiCredentialTypeEnum.ADMIN_APP
             else:
                 credential_type = request.credential_type
+
+        # Validate that credential type matches project type
+        if (
+            credential_type == ApiCredentialTypeEnum.CLIENT_APP
+            and db_project.project_type != ProjectTypeEnum.CLIENT_APP
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="CLIENT_APP credentials can only be created for CLIENT_APP projects",
+            )
+        elif (
+            credential_type == ApiCredentialTypeEnum.ADMIN_APP and db_project.project_type != ProjectTypeEnum.ADMIN_APP
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="ADMIN_APP credentials can only be created for ADMIN_APP projects",
+            )
 
         # Validate IP whitelist if provided
         if request.ip_whitelist:
@@ -214,20 +238,23 @@ class CredentialService(SessionMixin):
 
     async def get_credentials(
         self,
+        current_user: UserModel,
         offset: int = 0,
         limit: int = 10,
         filters: Optional[Dict] = None,
         order_by: Optional[List[str]] = None,
         search: bool = False,
     ) -> List[CredentialDetails]:
-        # Check user permissions for viewing credentials
-        # db_permission = await PermissionDataManager(self.session).retrieve_permission_by_fields({"user_id": user_id}, missing_ok=True)
-        # user_scopes = db_permission.scopes_list if db_permission else []
-        # if PermissionEnum.PROJECT_MANAGE.value not in user_scopes:
-        #     # Check user has access to project
-        #     await ProjectService(self.session).check_project_membership(project_id, user_id)
         filters = filters or {}
         order_by = order_by or []
+
+        # Set default credential_type filter based on logged-in user's type if not explicitly provided
+        if "credential_type" not in filters:
+            if current_user.user_type == UserTypeEnum.CLIENT:
+                filters["credential_type"] = ApiCredentialTypeEnum.CLIENT_APP.value
+            elif current_user.user_type == UserTypeEnum.ADMIN:
+                filters["credential_type"] = ApiCredentialTypeEnum.ADMIN_APP.value
+
         db_credentials, count = await CredentialDataManager(self.session).get_all_credentials(
             offset, limit, filters, order_by, search
         )

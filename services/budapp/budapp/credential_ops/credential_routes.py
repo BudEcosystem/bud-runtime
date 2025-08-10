@@ -168,7 +168,9 @@ async def retrieve_credentials(
     # Convert Filter to dictionary
     filters_dict = filters.model_dump(exclude_none=True)
     filters_dict["user_id"] = current_user.id
-    results, count = await CredentialService(session).get_credentials(offset, limit, filters_dict, order_by, search)
+    results, count = await CredentialService(session).get_credentials(
+        current_user, offset, limit, filters_dict, order_by, search
+    )
 
     return PaginatedCredentialResponse(
         message="Credentials listed successfully",

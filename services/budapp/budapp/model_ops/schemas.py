@@ -1298,6 +1298,5 @@ class ModelCatalogDetailResponse(SuccessResponse):
 class ModelCatalogFilter(BaseModel):
     """Filter options for model catalog."""
 
-    modality: Optional[List[ModalityEnum]] = None
     status: Optional[ModelStatusEnum] = None
     search: Optional[str] = None

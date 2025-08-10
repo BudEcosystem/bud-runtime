@@ -107,7 +107,7 @@ class CredentialRequest(BaseModel):
         default=None, gt=0, description="Max budget must be greater than 0 if specified"
     )
     model_budgets: Optional[model_budget_type] = None
-    credential_type: Optional[ApiCredentialTypeEnum] = ApiCredentialTypeEnum.CLIENT_APP
+    credential_type: Optional[ApiCredentialTypeEnum] = None
     ip_whitelist: Optional[List[str]] = Field(
         default=None, description="List of allowed IP addresses for this credential"
     )

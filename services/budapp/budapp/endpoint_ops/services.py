@@ -172,6 +172,7 @@ class EndpointService(SessionMixin):
             try:
                 await self.delete_model_from_proxy_cache(db_endpoint.id)
                 await CredentialService(self.session).update_proxy_cache(db_endpoint.project_id)
+                await self.update_published_model_cache()
                 logger.debug(f"Updated proxy cache for project {db_endpoint.project_id}")
             except (RedisException, Exception) as e:
                 logger.error(f"Failed to delete endpoint details from redis: {e}")
@@ -260,6 +261,7 @@ class EndpointService(SessionMixin):
         try:
             await self.delete_model_from_proxy_cache(db_endpoint.id)
             await CredentialService(self.session).update_proxy_cache(db_endpoint.project_id)
+            await self.update_published_model_cache()
             logger.debug(f"Updated proxy cache for project {db_endpoint.project_id}")
         except (RedisException, Exception) as e:
             logger.error(f"Failed to delete endpoint details from redis: {e}")
@@ -2091,6 +2093,7 @@ class EndpointService(SessionMixin):
                 EndpointModel, {"id": db_adapter.endpoint_id}
             )
             await CredentialService(self.session).update_proxy_cache(db_endpoint.project_id)
+            await self.update_published_model_cache()
             logger.debug(f"Updated proxy cache for project {db_endpoint.project_id} after adapter deletion")
         except (RedisException, Exception) as e:
             logger.error(f"Failed to update proxy cache after adapter deletion: {e}")
@@ -2738,7 +2741,49 @@ class EndpointService(SessionMixin):
         await redis_service.invalidate_catalog_cache(endpoint_id=str(endpoint_id))
 
         logger.info(f"Endpoint {endpoint_id} {action}ed successfully by user {current_user_id}")
+
+        # Update published model info cache
+        await self.update_published_model_cache()
+
         return endpoint
+
+    async def update_published_model_cache(self) -> None:
+        """Update the cache with all published model information.
+
+        This method collects all published endpoints across all projects and updates
+        the Redis cache with a mapping of model names to their endpoint metadata.
+
+        Cache format:
+        {
+            <model_name>: {
+                "endpoint_id": <endpoint_id>,
+                "model_id": <model_id>,
+                "project_id": <project_id>
+            }
+        }
+        """
+        try:
+            # Get all published endpoints
+            published_endpoints = await EndpointDataManager(self.session).get_all_published_endpoints()
+
+            # Build the cache data structure
+            published_models = {}
+            for endpoint in published_endpoints:
+                # Use endpoint name as the key (model name)
+                published_models[endpoint.name] = {
+                    "endpoint_id": str(endpoint.id),
+                    "model_id": str(endpoint.model_id),
+                    "project_id": str(endpoint.project_id),
+                }
+
+            # Update the cache
+            redis_service = RedisService()
+            await redis_service.set(name="published_model_info", value=json.dumps(published_models))
+
+            logger.info(f"Updated published model cache with {len(published_models)} endpoints")
+        except Exception as e:
+            logger.error(f"Failed to update published model cache: {e}")
+            # Don't raise exception - cache update failure shouldn't block the main operation
 
     async def get_current_pricing(self, endpoint_id: UUID) -> Optional["DeploymentPricing"]:
         """Get the current pricing for an endpoint.
