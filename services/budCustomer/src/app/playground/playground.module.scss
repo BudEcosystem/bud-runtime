@@ -1,0 +1,75 @@
+// Color variables
+$bg-main: #101010;
+$bg-card: #18191b;
+$border-color: #1f1f1f;
+$text-white: #eeeeee;
+$text-gray: #b3b3b3;
+$text-dark-gray: #757575;
+$primary-color: #965cde;
+
+.slider {
+  width: 100%;
+  height: 6px;
+  background: #2f2f2f;
+  border-radius: 3px;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+
+  &::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    background: $primary-color;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &:hover {
+      transform: scale(1.1);
+      box-shadow: 0 0 0 4px rgba($primary-color, 0.2);
+    }
+  }
+
+  &::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    background: $primary-color;
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s ease;
+
+    &:hover {
+      transform: scale(1.1);
+      box-shadow: 0 0 0 4px rgba($primary-color, 0.2);
+    }
+  }
+
+  &::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 6px;
+    background: #2f2f2f;
+    border-radius: 3px;
+  }
+
+  &::-moz-range-track {
+    width: 100%;
+    height: 6px;
+    background: #2f2f2f;
+    border-radius: 3px;
+  }
+
+  // Progress fill
+  &::-webkit-slider-runnable-track {
+    background: linear-gradient(
+      to right,
+      $primary-color 0%,
+      $primary-color var(--value),
+      #2f2f2f var(--value),
+      #2f2f2f 100%
+    );
+  }
+}

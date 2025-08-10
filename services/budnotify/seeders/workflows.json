@@ -1,0 +1,140 @@
+[
+    {
+        "active": true,
+        "name": "bud-notification",
+        "description": "In app notification system for Budserve",
+        "tags": ["inapp", "system"],
+        "steps": [
+            {
+                "active": true,
+                "template": {
+                    "content": "{{ content.message }}",
+                    "contentType": "editor",
+                    "subject": "",
+                    "type": "in_app",
+                    "variables": [
+                        {
+                            "type": "String",
+                            "name": "content.message",
+                            "defaultValue": "",
+                            "required": true
+                        }
+                    ],
+                    "feedId": null
+                }
+            }
+        ]
+    },
+    {
+        "active": true,
+        "name": "bud-internal",
+        "description": "Internal notification system for Budserve",
+        "tags": ["internal", "system"],
+        "steps": [
+            {
+                "active": true,
+                "template": {
+                    "content": "{{ content.message }}",
+                    "contentType": "editor",
+                    "subject": "",
+                    "type": "in_app",
+                    "variables": [
+                        {
+                            "type": "String",
+                            "name": "content.message",
+                            "defaultValue": "",
+                            "required": true
+                        }
+                    ],
+                    "feedId": null
+                }
+            }
+        ]
+    },
+    {
+        "active": true,
+        "name": "bud-reset-password",
+        "description": "Reset password workflow for budserve",
+        "tags": ["email", "user"],
+        "steps": [
+            {
+                "active": true,
+                "template": {
+                    "content": "bud_reset_password.html",
+                    "contentType": "customHtml",
+                    "subject": "Reset Your Bud Account Password",
+                    "senderName": "Bud Studio",
+                    "type": "email",
+                    "variables": [
+                        {
+                            "type": "String",
+                            "name": "content.password",
+                            "defaultValue": "",
+                            "required": true
+                        }
+                    ],
+                    "preheader": "",
+                    "layoutId": "bud-default-layout"
+                }
+            }
+        ]
+    },
+    {
+        "active": true,
+        "name": "bud-project-invite",
+        "description": "Project invite workflow for budserve",
+        "tags": ["email", "user"],
+        "steps": [
+            {
+                "active": true,
+                "template": {
+                    "content": "bud_project_invite.html",
+                    "contentType": "customHtml",
+                    "subject": "Budserve Project Invitation",
+                    "senderName": "Bud Studio",
+                    "type": "email",
+                    "variables": [
+                        {
+                            "type": "String",
+                            "name": "content.user.name",
+                            "defaultValue": "Bud User",
+                            "required": true
+                        },
+                        {
+                            "type": "String",
+                            "name": "content.user.password",
+                            "defaultValue": "",
+                            "required": false
+                        },
+                        {
+                            "type": "Boolean",
+                            "name": "content.user.is_budserve_user",
+                            "defaultValue": true,
+                            "required": true
+                        },
+                        {
+                            "type": "String",
+                            "name": "content.project.name",
+                            "defaultValue": "Budserve Project",
+                            "required": true
+                        },
+                        {
+                            "type": "String",
+                            "name": "content.project.description",
+                            "defaultValue": "Budserve Project Description",
+                            "required": true
+                        },
+                        {
+                            "type": "String",
+                            "name": "content.project.url",
+                            "defaultValue": "https://bud.studio",
+                            "required": true
+                        }
+                    ],
+                    "preheader": "",
+                    "layoutId": "bud-default-layout"
+                }
+            }
+        ]
+    }
+]

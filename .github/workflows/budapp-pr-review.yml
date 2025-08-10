@@ -1,4 +1,4 @@
-name: "PR Review - BudApp"
+name: "BudApp: PR Review"
 
 on:
   pull_request:
@@ -10,13 +10,12 @@ env:
   PYTHON_VERSION: "3.11"
 
 jobs:
-
   security:
     name: Security Scan
     runs-on: ubuntu-latest
     defaults:
-          run:
-            working-directory: ./services/budapp
+      run:
+        working-directory: ./services/budapp
 
     steps:
       - name: Checkout code
@@ -50,8 +49,8 @@ jobs:
     name: Run Tests
     runs-on: ubuntu-latest
     defaults:
-          run:
-            working-directory: ./services/budapp
+      run:
+        working-directory: ./services/budapp
 
     services:
       postgres:
@@ -123,8 +122,8 @@ jobs:
           sed -i 's|MINIO_ENDPOINT=.*|MINIO_ENDPOINT=localhost:9000|' .env
 
           # Set required secrets for testing
-          sed -i 's/SECRETS_PSQL_USER=.*/SECRETS_PSQL_USER=postgres/' .env
-          sed -i 's/SECRETS_PSQL_PASSWORD=.*/SECRETS_PSQL_PASSWORD=postgres/' .env
+          sed -i 's/PSQL_USER=.*/PSQL_USER=postgres/' .env
+          sed -i 's/PSQL_PASSWORD=.*/PSQL_PASSWORD=postgres/' .env
           sed -i 's/JWT_SECRET_KEY=.*/JWT_SECRET_KEY=test-secret-key-for-ci-testing-only/' .env
           sed -i 's/SUPER_USER_PASSWORD=.*/SUPER_USER_PASSWORD=test-password/' .env
 
@@ -179,8 +178,8 @@ jobs:
     name: Check Dependencies
     runs-on: ubuntu-latest
     defaults:
-          run:
-            working-directory: ./services/budapp
+      run:
+        working-directory: ./services/budapp
 
     steps:
       - name: Checkout code

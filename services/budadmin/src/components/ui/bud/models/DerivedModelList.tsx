@@ -112,7 +112,6 @@ export default function DerivedModelList() {
               }}
               search={search}
               setSearch={setSearch}
-              filterClick={() => { }}
               buttonPermission={hasPermission(PermissionEnum.ModelManage)}
               buttonLabel={props.selectedBranch.name == 'Quantizations' ? `Add ${props.selectedBranch.name}` : ''}
               onButtonClick={() => {

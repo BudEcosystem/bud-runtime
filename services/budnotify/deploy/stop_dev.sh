@@ -46,17 +46,9 @@ while [[ "$#" -gt 0 ]]; do
     shift
 done
 
-# Set dummy env to skip warnings & errors
-export APP_NAME=dummy
-export REDIS_PASSWORD=dummy
-export APP_PORT=9081
-export DAPR_HTTP_PORT=3510
-export DAPR_GRPC_PORT=50001
-export DAPR_API_TOKEN=
-export DEPLOYMENT_ENV=
-export LOG_LEVEL=
-export CONFIGSTORE_NAME=
-export SECRETSTORE_NAME=
+set -a
+source ./.env
+set +a
 
 # Stop Docker Compose services
 echo "Stopping services defined in: $DOCKER_COMPOSE_FILE"

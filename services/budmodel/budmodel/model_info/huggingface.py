@@ -799,7 +799,7 @@ class HuggingfaceUtils:
             # Add a small delay to avoid rate limiting
             time.sleep(1)
             # Send the HTTP request
-            response = requests.get(hf_url, headers=headers)
+            response = requests.get(hf_url, headers=headers, timeout=30)
             response.raise_for_status()  # Raise an exception for HTTP errors
             # Parse the HTML content
             tree = lxml_html.fromstring(response.content)
@@ -937,12 +937,12 @@ class ComputeModelParams:
         try:
             if file_path.startswith("https://"):
                 headers = {"Range": "bytes=0-7"}
-                response = requests.get(file_path, headers=headers)
+                response = requests.get(file_path, headers=headers, timeout=30)
                 response.raise_for_status()
 
                 header_size = struct.unpack("<Q", response.content)[0]
                 headers = {"Range": f"bytes=8-{7 + header_size}"}
-                response = requests.get(file_path, headers=headers)
+                response = requests.get(file_path, headers=headers, timeout=30)
                 response.raise_for_status()
 
                 return response.json()

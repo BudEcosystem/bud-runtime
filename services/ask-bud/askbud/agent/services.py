@@ -8,7 +8,7 @@ from fastapi.responses import StreamingResponse
 
 from ..tools.cluster import ClusterRegistry
 from .cluster import ClusterAgent
-from .schemas import ChatCompletionRequest, ChatCompletionResponse, SessionContext
+from .schemas import ChatCompletionRequest, ChatCompletionResponse, ChatMessage, Choice, SessionContext
 
 
 logger = logging.getLogger(__name__)
@@ -108,16 +108,16 @@ class AgentService:
             return StreamingResponse(self._stream_events(user_msg, ctx), media_type="text/event-stream")
         else:
             res = await Runner.run(self.agent, user_msg, context=ctx)
-            return {
-                "id": str(uuid.uuid4()),
-                "object": "chat.completion",
-                "model": "k8s-assistant",
-                "created": int(__import__("time").time()),
-                "choices": [
-                    {
-                        "index": 0,
-                        "message": {"role": "assistant", "content": res.final_output},
-                        "finish_reason": "stop",
-                    }
+            return ChatCompletionResponse(
+                id=str(uuid.uuid4()),
+                object="chat.completion",
+                model="k8s-assistant",
+                created=int(__import__("time").time()),
+                choices=[
+                    Choice(
+                        index=0,
+                        message=ChatMessage(role="assistant", content=res.final_output),
+                        finish_reason="stop",
+                    )
                 ],
-            }
+            )

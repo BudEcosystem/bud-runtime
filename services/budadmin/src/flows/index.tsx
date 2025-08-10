@@ -111,6 +111,7 @@ import SelectModelForNewEvaluation from "./Evaluations/RunEvaluation/SelectModel
 import SelectTrait from "./Evaluations/RunEvaluation/SelectTrait";
 import SelectEvaluation from "./Evaluations/RunEvaluation/SelectEvaluation";
 import EvaluationSummary from "./Evaluations/RunEvaluation/EvaluationSummary";
+import NewExperimentSuccess from "./Evaluations/NewExperiment/newExperimentSuccess";
 
 export const StepComponents = {
   "new-project": NewProject,
@@ -230,6 +231,7 @@ export const StepComponents = {
   "select-fallback-deployment": SelectFallbackDeployment,
   // experiments
   "new-experiment": NewExperimentDrawer,
+  "new-experiment-success": NewExperimentSuccess,
   // new evaluations
   "new-evaluation": NewEvaluation,
   "select-model-new-evaluation": SelectModelForNewEvaluation,

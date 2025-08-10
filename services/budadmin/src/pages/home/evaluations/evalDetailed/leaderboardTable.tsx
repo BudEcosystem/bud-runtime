@@ -80,7 +80,7 @@ function LeaderboardTable() {
             key: 'rank',
             width: '25%',
             render: (text) => <div className='flex justify-start'>
-              <Tags name={text.name} color={text.color} textClass="text-[#EEEEEE]" />
+              <Tags name={text.name} color={text.color} textClass="text-[#EEEEEE] text-[0.75rem]" classNames='w-[2rem] h-[1.5rem]' />
             </div>,
             sortOrder: orderBy === 'name' ? order === '-' ? 'descend' : 'ascend' : undefined,
             sorter: true,
@@ -99,11 +99,10 @@ function LeaderboardTable() {
                     src={text.icon}
                     style={{ width: "0.875em", height: "0.875em" }}
                     alt="Hovered Logo"
-                    className="1920px:w-[1.2em] 1920px:h-[1.2em]"
                   />
                 </div>
               )}
-              <Text_12_400_EEEEEE >{text.name}</Text_12_400_EEEEEE>
+              <Text_12_300_EEEEEE >{text.name}</Text_12_300_EEEEEE>
             </div>,
             sorter: true,
             sortIcon: SortIcon,
@@ -115,7 +114,7 @@ function LeaderboardTable() {
             width: '25%',
             sorter: true,
             sortOrder: orderBy === 'text' ? order === '-' ? 'descend' : 'ascend' : undefined,
-            render: (text) => <Text_12_400_EEEEEE >{text}</Text_12_400_EEEEEE>,
+            render: (text) => <Text_12_300_EEEEEE >{text}</Text_12_300_EEEEEE>,
             sortIcon: SortIcon,
           },
           {
@@ -125,7 +124,7 @@ function LeaderboardTable() {
             width: '25%',
             sorter: true,
             sortOrder: orderBy === 'text' ? order === '-' ? 'descend' : 'ascend' : undefined,
-            render: (text) => <Text_12_400_EEEEEE >{text}</Text_12_400_EEEEEE>,
+            render: (text) => <Text_12_300_EEEEEE >{text}</Text_12_300_EEEEEE>,
             sortIcon: SortIcon,
           }
         ]}

@@ -127,7 +127,7 @@ class KubeAI:
         yield b"data: [DONE]\n\n"
 
     @staticmethod
-    async def process_chat_completion(req: ChatCompletionRequest) -> Union[Dict[str, Any], StreamingResponse]:
+    async def process_chat_completion(req: ChatCompletionRequest) -> Union[ChatCompletionResponse, StreamingResponse]:
         """Process a chat completion request and return the appropriate response."""
         user_msg = next(m for m in reversed(req.messages) if m.role == "user")
         prompt = user_msg.content or ""

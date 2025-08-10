@@ -30,12 +30,15 @@ from budapp.user_ops.models import Tenant, TenantClient, TenantUserMapping
 from budapp.user_ops.models import User as UserModel
 from budapp.user_ops.schemas import TenantClientSchema, UserCreate
 
-from ..commons.constants import PermissionEnum
+from ..commons.constants import PermissionEnum, ProjectStatusEnum, ProjectTypeEnum
 from ..commons.exceptions import BudNotifyException
 from ..core.schemas import SubscriberCreate
 from ..permissions.schemas import PermissionList
+from ..permissions.service import PermissionService
+from ..project_ops.models import Project as ProjectModel
+from ..project_ops.schemas import ProjectUserAdd
 from ..shared.notification_service import BudNotifyHandler
-from .schemas import LogoutRequest, RefreshTokenRequest, RefreshTokenResponse, UserLogin, UserLoginData
+from .schemas import LogoutRequest, RefreshTokenRequest, RefreshTokenResponse, ResourceCreate, UserLogin, UserLoginData
 
 
 logger = logging.get_logger(__name__)
@@ -284,17 +287,26 @@ class AuthService(SessionMixin):
 
             # Set default permissions for CLIENT users
             if user.user_type == UserTypeEnum.CLIENT:
-                # Assign CLIENT_ACCESS permission to client users
-                client_permission = PermissionList(name=PermissionEnum.CLIENT_ACCESS, has_permission=True)
+                # Assign all client permissions
+                client_permissions = [
+                    PermissionList(name=PermissionEnum.CLIENT_ACCESS, has_permission=True),
+                    PermissionList(name=PermissionEnum.PROJECT_VIEW, has_permission=True),
+                    PermissionList(name=PermissionEnum.PROJECT_MANAGE, has_permission=True),
+                ]
+
                 if user.permissions:
                     # Add to existing permissions if not already present
-                    permission_names = {p.name for p in user.permissions}
-                    if PermissionEnum.CLIENT_ACCESS not in permission_names:
-                        user.permissions.append(client_permission)
+                    existing_permission_names = {p.name for p in user.permissions}
+                    for client_perm in client_permissions:
+                        if client_perm.name not in existing_permission_names:
+                            user.permissions.append(client_perm)
                 else:
-                    # Set as the only permission for client users
-                    user.permissions = [client_permission]
-                logger.debug("Assigned CLIENT_ACCESS permission to client user: %s", user.email)
+                    # Set client permissions for client users
+                    user.permissions = client_permissions
+                logger.debug(
+                    "Assigned client permissions (CLIENT_ACCESS, PROJECT_VIEW, PROJECT_MANAGE) to client user: %s",
+                    user.email,
+                )
 
             # Process permissions to add implicit view permissions for manage permissions
             if user.permissions:
@@ -350,16 +362,59 @@ class AuthService(SessionMixin):
             await UserDataManager(self.session).insert_one(tenant_user_mapping)
             logger.info(f"User {db_user.email} mapped to tenant {tenant.name}")
 
-            await BudNotifyHandler().create_subscriber(subscriber_data)
-            logger.info("User added to budnotify subscriber")
+            # Create a default project for CLIENT users
+            if user.user_type == UserTypeEnum.CLIENT:
+                try:
+                    # Create default project for the client user
+                    default_project = ProjectModel(
+                        name="My First Project",
+                        description="This is your default project.",
+                        created_by=db_user.id,
+                        status=ProjectStatusEnum.ACTIVE,
+                        benchmark=False,
+                        project_type=ProjectTypeEnum.CLIENT_APP.value,
+                    )
 
-            _ = await UserDataManager(self.session).update_subscriber_status(user_ids=[db_user.id], is_subscriber=True)
+                    # Insert the project into database
+                    await UserDataManager(self.session).insert_one(default_project)
+                    logger.info(f"Default project created for client user: {db_user.email}")
+
+                    # Associate the user with the project
+                    default_project.users.append(db_user)
+                    await self.session.commit()
+
+                    # Create permissions for the project in Keycloak
+                    permission_service = PermissionService(self.session)
+                    payload = ResourceCreate(
+                        resource_id=str(default_project.id),
+                        resource_type="project",
+                        scopes=["view", "manage"],
+                    )
+                    await permission_service.create_resource_permission_by_user(db_user, payload)
+
+                    logger.info(
+                        f"User {db_user.email} associated with default project: {default_project.name} with full permissions"
+                    )
+
+                except Exception as project_error:
+                    logger.error(f"Failed to create default project for user {db_user.email}: {project_error}")
+                    # Don't fail the registration if project creation fails
+                    # The user can create projects manually later
+
+            try:
+                await BudNotifyHandler().create_subscriber(subscriber_data)
+                logger.info("User added to budnotify subscriber")
+
+                _ = await UserDataManager(self.session).update_subscriber_status(
+                    user_ids=[db_user.id], is_subscriber=True
+                )
+            except BudNotifyException as e:
+                logger.error(
+                    f"Failed to add user to budnotify subscribers for {db_user.email}, but user registration is successful: {e}"
+                )
 
             return db_user
 
         except Exception as e:
             logger.error(f"Failed to register user: {e}")
-            raise ClientException(detail="Failed to register user")
-
-        except BudNotifyException as e:
-            logger.error(f"Failed to add user to budnotify subscribers: {e}")
+            raise e

@@ -427,7 +427,7 @@ class KubernetesHandler(BaseClusterHandler):
             headers["Authorization"] = f"Bearer {secrets_settings.litellm_master_key}"
 
         try:
-            response = requests.get(models_url, headers=headers)
+            response = requests.get(models_url, headers=headers, timeout=30)
             logger.debug(f"Ingress health check response: {response.content}")
             if response.status_code == 200:
                 models_data = response.json()

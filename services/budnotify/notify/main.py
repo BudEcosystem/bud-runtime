@@ -17,18 +17,35 @@
 """The main entry point for the application, initializing the FastAPI app and setting up the application's lifespan management, including configuration and secret syncs."""
 
 import asyncio
+import os
+import signal
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator
 
 from fastapi import APIRouter, FastAPI
 from fastapi.openapi.utils import get_openapi
 
+from notify.core import meta_routes
+
 from .commons import logging
 from .commons.config import app_settings
 from .commons.constants import Environment
+from .commons.exceptions import NovuApiClientException, NovuSeederException
+from .commons.helpers import retry
 from .core import sync_routes
 from .core.meta_routes import meta_router
 from .core.notify_routes import notify_router
+from .core.profiler_middleware import ProfilerMiddleware
+from .core.settings_routes import settings_router
+from .core.subscriber_routes import subscriber_router
+from .core.topic_routes import topic_router
+from .integrations.integration_routes import integration_router
+from .shared.novu_service import NovuService
+from .shared.seeder_service import (
+    NovuInitialSeeder,
+    NovuIntegrationSeeder,
+    NovuWorkflowSeeder,
+)
 
 
 logger = logging.get_logger(__name__)
@@ -54,6 +71,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         from random import randint
 
         await asyncio.sleep(3)
+        await meta_routes.register_service()
+        await asyncio.sleep(1.5)
+
         while True:
             await sync_routes.sync_configurations()
             await sync_routes.sync_secrets()
@@ -69,6 +89,49 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         task = asyncio.create_task(schedule_secrets_and_config_sync())
     else:
         task = None
+
+    async def shutdown_app(message: str) -> None:
+        """Shutdown the application by logging the provided message and sending a termination signal.
+
+        Args:
+        message (str): The error message to log before shutting down the application.
+
+        Returns:
+        None
+        """
+        logger.error(message)
+        logger.info("Shutting down application ...")
+        os.kill(os.getpid(), signal.SIGTERM)
+
+    @retry(max_attempts=36, delay=5, backoff_factor=1)
+    async def check_novu_backend_health() -> None:
+        """Retry checking the health of the Novu backend service with a maximum of 36 attempts with delay of 5 seconds (36*5=180sec).
+
+        This function calls the health check of the Novu service and retries if the service is unavailable.
+
+        Returns:
+        None
+
+        Raises:
+        NovuApiClientException: If the health check fails after all retry attempts.
+        """
+        await NovuService().health_check()
+
+    # Check Novu backend health and execute initial seeding.
+    # Shutdown the application if the health check or seeding fails.
+    try:
+        await check_novu_backend_health()
+        await NovuInitialSeeder().execute()
+        await NovuWorkflowSeeder().execute()
+        await NovuIntegrationSeeder().execute()
+    except (
+        NovuApiClientException,
+        NovuSeederException,
+    ) as err:
+        await shutdown_app(err.message)
+    except Exception as err:
+        logger.exception(f"Unexpected error during initial setup. {err}")
+        await shutdown_app("Unexpected error during initial setup.")
 
     yield
 
@@ -88,13 +151,19 @@ app = FastAPI(
     openapi_url=None if app_settings.env == Environment.PRODUCTION else "/openapi.json",
 )
 
+if app_settings.profiler_enabled:
+    app.add_middleware(ProfilerMiddleware)
+
 internal_router = APIRouter()
 internal_router.include_router(meta_router)
 internal_router.include_router(sync_routes.sync_router)
 
+app.include_router(integration_router)
 app.include_router(internal_router)
 app.include_router(notify_router)
-
+app.include_router(settings_router)
+app.include_router(subscriber_router)
+app.include_router(topic_router)
 
 # Override schemas for Swagger documentation
 app.openapi_schema = None  # Clear the cached schema

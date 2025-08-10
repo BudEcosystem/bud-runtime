@@ -20,7 +20,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
-from sqlalchemy import and_, delete, desc, func, or_, select, update
+from sqlalchemy import and_, asc, delete, desc, func, or_, select, update
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -28,7 +28,7 @@ from budapp.commons import logging
 from budapp.commons.constants import CloudModelStatusEnum, EndpointStatusEnum, ModelProviderTypeEnum, ModelStatusEnum
 from budapp.commons.db_utils import DataManagerUtils
 from budapp.commons.exceptions import DatabaseException
-from budapp.endpoint_ops.models import Endpoint
+from budapp.endpoint_ops.models import DeploymentPricing, Endpoint
 from budapp.model_ops.models import CloudModel, Model, PaperPublished
 from budapp.model_ops.models import Provider as ProviderModel
 from budapp.model_ops.models import QuantizationMethod as QuantizationMethodModel
@@ -512,6 +512,112 @@ class ModelDataManager(DataManagerUtils):
         except SQLAlchemyError as e:
             logger.exception(f"Failed to soft delete deprecated models: {e}")
             raise DatabaseException("Unable to soft delete deprecated models") from e
+
+    async def get_published_models_catalog(
+        self,
+        offset: int = 0,
+        limit: int = 10,
+        filters: Dict[str, Any] = {},
+        order_by: List[Tuple[str, str]] = [],
+        search_term: Optional[str] = None,
+    ) -> Tuple[List[Any], int]:
+        """Get published models for catalog with pricing information."""
+        # Base query joining Model, Endpoint, and DeploymentPricing
+        base_query = (
+            select(
+                Model,
+                Endpoint,
+                DeploymentPricing.input_cost,
+                DeploymentPricing.output_cost,
+                DeploymentPricing.currency,
+                DeploymentPricing.per_tokens,
+            )
+            .join(Endpoint, Endpoint.model_id == Model.id)
+            .outerjoin(
+                DeploymentPricing,
+                and_(DeploymentPricing.endpoint_id == Endpoint.id, DeploymentPricing.is_current),
+            )
+            .filter(
+                Endpoint.is_published,
+                Endpoint.status != EndpointStatusEnum.DELETED,
+                Model.status != ModelStatusEnum.DELETED,
+            )
+        )
+
+        # Apply filters
+        if "modality" in filters and filters["modality"]:
+            # Handle multiple modalities with OR condition
+            modality_conditions = []
+            for modality in filters["modality"]:
+                modality_conditions.append(Model.modality.contains([modality]))
+            base_query = base_query.filter(or_(*modality_conditions))
+
+        if "status" in filters and filters["status"]:
+            base_query = base_query.filter(Model.status == filters["status"])
+
+        # Apply search if provided
+        if search_term:
+            ts_query = func.plainto_tsquery("english", search_term)
+            search_conditions = or_(
+                func.to_tsvector("english", Model.name).op("@@")(ts_query),
+                func.to_tsvector("english", func.coalesce(Model.description, "")).op("@@")(ts_query),
+                func.array_to_string(Model.use_cases, " ").ilike(f"%{search_term}%"),
+            )
+            base_query = base_query.filter(search_conditions)
+
+        # Count query
+        count_query = select(func.count(func.distinct(Model.id))).select_from(base_query.subquery())
+        count = self.execute_scalar(count_query)
+
+        # Apply ordering
+        if order_by:
+            for field, direction in order_by:
+                if field == "published_date":
+                    order_func = desc if direction == "desc" else asc
+                    base_query = base_query.order_by(order_func(Endpoint.published_date))
+                elif field == "name":
+                    order_func = desc if direction == "desc" else asc
+                    base_query = base_query.order_by(order_func(Model.name))
+                elif field == "created_at":
+                    order_func = desc if direction == "desc" else asc
+                    base_query = base_query.order_by(order_func(Model.created_at))
+        else:
+            # Default ordering by published date desc
+            base_query = base_query.order_by(desc(Endpoint.published_date))
+
+        # Apply pagination
+        base_query = base_query.limit(limit).offset(offset)
+
+        # Execute query
+        result = self.session.execute(base_query)
+        return result.all(), count
+
+    async def get_published_model_detail(self, endpoint_id: UUID) -> Optional[Any]:
+        """Get detailed information for a published model by endpoint ID."""
+        query = (
+            select(
+                Model,
+                Endpoint,
+                DeploymentPricing.input_cost,
+                DeploymentPricing.output_cost,
+                DeploymentPricing.currency,
+                DeploymentPricing.per_tokens,
+            )
+            .join(Endpoint, Endpoint.model_id == Model.id)
+            .outerjoin(
+                DeploymentPricing,
+                and_(DeploymentPricing.endpoint_id == Endpoint.id, DeploymentPricing.is_current),
+            )
+            .filter(
+                Endpoint.id == endpoint_id,
+                Endpoint.is_published,
+                Endpoint.status != EndpointStatusEnum.DELETED,
+                Model.status != ModelStatusEnum.DELETED,
+            )
+        )
+
+        result = self.session.execute(query)
+        return result.first()
 
 
 class CloudModelDataManager(DataManagerUtils):

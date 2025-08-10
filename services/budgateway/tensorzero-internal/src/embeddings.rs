@@ -363,6 +363,8 @@ impl From<EmbeddingResponseWithMetadata> for ModelInferenceResponseWithMetadata 
             model_name: response.embedding_model_name,
             cached: false,
             finish_reason: None,
+            gateway_request: None,
+            gateway_response: None,
         }
     }
 }

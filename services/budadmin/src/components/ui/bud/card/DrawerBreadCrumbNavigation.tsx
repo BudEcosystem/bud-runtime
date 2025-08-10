@@ -51,19 +51,22 @@ export function CustomBreadcrumb({
           const hasUrl = urls?.[index];
 
           return {
-            href: !isLast && hasUrl ? hasUrl : undefined, // only set href if it's not the last
-            title: (
-              <Text_12_400_787B83
-                key={index}
-                className={
-                  isLast || !hasUrl
-                    ? 'cursor-default text-[#EEEEEE]'
-                    : 'hover:cursor-pointer hover:text-[#EEEEEE]'
-                }
-              >
-                {item}
-              </Text_12_400_787B83>
-            ),
+            title:
+              !isLast && hasUrl ? (
+                <Link href={hasUrl}>
+                  <Text_12_400_787B83
+                    className='hover:cursor-pointer hover:text-[#EEEEEE]'
+                  >
+                    {item}
+                  </Text_12_400_787B83>
+                </Link>
+              ) : (
+                <Text_12_400_787B83
+                  className='cursor-default text-[#EEEEEE]'
+                >
+                  {item}
+                </Text_12_400_787B83>
+              ),
           };
         }) || []
       }

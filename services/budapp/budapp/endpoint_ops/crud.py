@@ -16,11 +16,13 @@
 
 """The crud package, containing essential business logic, services, and routing configurations for the endpoint ops."""
 
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
 from sqlalchemy import and_, asc, case, cast, desc, distinct, func, literal, or_, select, update
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import joinedload
 
 from budapp.cluster_ops.models import Cluster as ClusterModel
 from budapp.commons import logging
@@ -34,6 +36,7 @@ from ..commons.helpers import get_param_range
 from ..project_ops.models import Project as ProjectModel
 from .models import Adapter as AdapterModel
 from .models import Endpoint as EndpointModel
+from .models import PublicationHistory as PublicationHistoryModel
 
 
 logger = logging.get_logger(__name__)
@@ -53,7 +56,7 @@ class EndpointDataManager(DataManagerUtils):
 
     async def get_all_active_endpoints(
         self,
-        project_id: UUID,
+        project_id: Optional[UUID],
         offset: int = 0,
         limit: int = 10,
         filters: Dict[str, Any] = {},
@@ -99,9 +102,7 @@ class EndpointDataManager(DataManagerUtils):
                 .join(Model)
                 .outerjoin(ClusterModel)
                 .filter(or_(*search_conditions))
-                .filter(
-                    and_(EndpointModel.status != EndpointStatusEnum.DELETED, EndpointModel.project_id == project_id)
-                )
+                .filter(EndpointModel.status != EndpointStatusEnum.DELETED)
             )
             count_stmt = (
                 select(func.count())
@@ -109,9 +110,7 @@ class EndpointDataManager(DataManagerUtils):
                 .join(Model)
                 .outerjoin(ClusterModel)
                 .filter(and_(*search_conditions))
-                .filter(
-                    and_(EndpointModel.status != EndpointStatusEnum.DELETED, EndpointModel.project_id == project_id)
-                )
+                .filter(EndpointModel.status != EndpointStatusEnum.DELETED)
             )
         else:
             stmt = select(EndpointModel).join(Model).outerjoin(ClusterModel)
@@ -119,12 +118,11 @@ class EndpointDataManager(DataManagerUtils):
             for key, value in filters.items():
                 stmt = stmt.filter(getattr(EndpointModel, key) == value)
                 count_stmt = count_stmt.filter(getattr(EndpointModel, key) == value)
-            stmt = stmt.filter(
-                and_(EndpointModel.status != EndpointStatusEnum.DELETED, EndpointModel.project_id == project_id)
-            )
-            count_stmt = count_stmt.filter(
-                and_(EndpointModel.status != EndpointStatusEnum.DELETED, EndpointModel.project_id == project_id)
-            )
+            stmt = stmt.filter(EndpointModel.status != EndpointStatusEnum.DELETED)
+            count_stmt = count_stmt.filter(EndpointModel.status != EndpointStatusEnum.DELETED)
+            if project_id:
+                stmt = stmt.filter(EndpointModel.project_id == project_id)
+                count_stmt = count_stmt.filter(EndpointModel.project_id == project_id)
 
         # Calculate count before applying limit and offset
         count = self.execute_scalar(count_stmt)
@@ -444,6 +442,230 @@ class EndpointDataManager(DataManagerUtils):
         stmt = update(EndpointModel).where(EndpointModel.model_id.in_(model_ids)).values(is_deprecated=True)
         self.session.execute(stmt)
         self.session.commit()
+
+    async def update_publication_status(
+        self, endpoint_id: UUID, is_published: bool, published_by: UUID, published_date: Optional[datetime] = None
+    ) -> EndpointModel:
+        """Update the publication status of an endpoint.
+
+        Args:
+            endpoint_id (UUID): The ID of the endpoint.
+            is_published (bool): Whether the endpoint is published.
+            published_by (UUID): The ID of the user who published/unpublished.
+            published_date (Optional[datetime]): The publication date (None for unpublish).
+
+        Returns:
+            EndpointModel: The updated endpoint.
+        """
+        stmt = (
+            update(EndpointModel)
+            .where(EndpointModel.id == endpoint_id)
+            .values(
+                is_published=is_published,
+                published_by=published_by,
+                published_date=published_date,
+            )
+            .returning(EndpointModel)
+        )
+        result = self.session.execute(stmt)
+        endpoint = result.scalar_one()
+        self.session.commit()
+        return endpoint
+
+    async def create_deployment_pricing(
+        self, endpoint_id: UUID, pricing_data: Dict[str, Any], created_by: UUID
+    ) -> "DeploymentPricing":
+        """Create a new deployment pricing record.
+
+        Args:
+            endpoint_id (UUID): The ID of the endpoint.
+            pricing_data (Dict[str, Any]): Pricing information containing input_cost, output_cost, currency, per_tokens.
+            created_by (UUID): The ID of the user creating the pricing.
+
+        Returns:
+            DeploymentPricing: The created pricing record.
+        """
+        from .models import DeploymentPricing
+
+        pricing = DeploymentPricing(
+            endpoint_id=endpoint_id,
+            input_cost=pricing_data["input_cost"],
+            output_cost=pricing_data["output_cost"],
+            currency=pricing_data.get("currency", "USD"),
+            per_tokens=pricing_data.get("per_tokens", 1000),
+            is_current=True,
+            created_by=created_by,
+        )
+        self.session.add(pricing)
+        self.session.commit()
+        return pricing
+
+    async def update_previous_pricing(self, endpoint_id: UUID) -> None:
+        """Set is_current=False for all previous pricing records of an endpoint.
+
+        Args:
+            endpoint_id (UUID): The ID of the endpoint.
+        """
+        from .models import DeploymentPricing
+
+        stmt = (
+            update(DeploymentPricing)
+            .where(and_(DeploymentPricing.endpoint_id == endpoint_id, DeploymentPricing.is_current))
+            .values(is_current=False)
+        )
+        self.session.execute(stmt)
+        # Don't commit here, let the caller handle transaction
+
+    async def get_current_pricing(self, endpoint_id: UUID) -> Optional["DeploymentPricing"]:
+        """Get the current pricing for an endpoint.
+
+        Args:
+            endpoint_id (UUID): The ID of the endpoint.
+
+        Returns:
+            Optional[DeploymentPricing]: The current pricing record, or None if not found.
+        """
+        from .models import DeploymentPricing
+
+        stmt = select(DeploymentPricing).where(
+            and_(DeploymentPricing.endpoint_id == endpoint_id, DeploymentPricing.is_current)
+        )
+        return self.scalar_one_or_none(stmt)
+
+    async def get_pricing_history(
+        self, endpoint_id: UUID, offset: int = 0, limit: int = 10
+    ) -> Tuple[List["DeploymentPricing"], int]:
+        """Get pricing history for an endpoint with pagination.
+
+        Args:
+            endpoint_id (UUID): The ID of the endpoint.
+            offset (int): Pagination offset.
+            limit (int): Pagination limit.
+
+        Returns:
+            Tuple[List[DeploymentPricing], int]: List of pricing records and total count.
+        """
+        from .models import DeploymentPricing
+
+        # Count query
+        count_stmt = (
+            select(func.count()).select_from(DeploymentPricing).where(DeploymentPricing.endpoint_id == endpoint_id)
+        )
+        count = self.execute_scalar(count_stmt)
+
+        # Data query
+        stmt = (
+            select(DeploymentPricing)
+            .where(DeploymentPricing.endpoint_id == endpoint_id)
+            .order_by(desc(DeploymentPricing.created_at))
+            .limit(limit)
+            .offset(offset)
+        )
+        result = self.scalars_all(stmt)
+
+        return result, count
+
+    async def get_published_endpoints_count(self, project_id: Optional[UUID] = None) -> int:
+        """Get count of published endpoints.
+
+        Args:
+            project_id (Optional[UUID]): Filter by project ID if provided.
+
+        Returns:
+            int: Count of published endpoints.
+        """
+        stmt = (
+            select(func.count())
+            .select_from(EndpointModel)
+            .filter(
+                and_(
+                    EndpointModel.is_published.is_(True),
+                    EndpointModel.status != EndpointStatusEnum.DELETED,
+                )
+            )
+        )
+        if project_id:
+            stmt = stmt.filter(EndpointModel.project_id == project_id)
+
+        return self.execute_scalar(stmt)
+
+
+class PublicationHistoryDataManager(DataManagerUtils):
+    """Data manager for the PublicationHistory model."""
+
+    async def create_publication_history(
+        self,
+        deployment_id: UUID,
+        action: str,
+        performed_by: UUID,
+        performed_at: datetime,
+        action_metadata: Optional[dict] = None,
+        previous_state: Optional[dict] = None,
+        new_state: Optional[dict] = None,
+    ) -> PublicationHistoryModel:
+        """Create a new publication history entry.
+
+        Args:
+            deployment_id (UUID): The ID of the endpoint/deployment.
+            action (str): The action performed ("publish" or "unpublish").
+            performed_by (UUID): The ID of the user who performed the action.
+            performed_at (datetime): When the action was performed.
+            action_metadata (Optional[dict]): Additional metadata about the action.
+            previous_state (Optional[dict]): The state before the action.
+            new_state (Optional[dict]): The state after the action.
+
+        Returns:
+            PublicationHistoryModel: The created history entry.
+        """
+        history_entry = PublicationHistoryModel(
+            deployment_id=deployment_id,
+            action=action,
+            performed_by=performed_by,
+            performed_at=performed_at,
+            action_metadata=action_metadata,
+            previous_state=previous_state,
+            new_state=new_state,
+        )
+        self.session.add(history_entry)
+        self.session.commit()
+        return history_entry
+
+    async def get_publication_history(
+        self,
+        deployment_id: UUID,
+        offset: int = 0,
+        limit: int = 20,
+    ) -> Tuple[List[PublicationHistoryModel], int]:
+        """Get publication history for a deployment.
+
+        Args:
+            deployment_id (UUID): The ID of the deployment.
+            offset (int): Pagination offset.
+            limit (int): Pagination limit.
+
+        Returns:
+            Tuple[List[PublicationHistoryModel], int]: List of history entries and total count.
+        """
+        # Count query
+        count_stmt = (
+            select(func.count())
+            .select_from(PublicationHistoryModel)
+            .filter(PublicationHistoryModel.deployment_id == deployment_id)
+        )
+        count = self.execute_scalar(count_stmt)
+
+        # Main query with user details
+        # Main query with user details
+        stmt = (
+            select(PublicationHistoryModel)
+            .options(joinedload(PublicationHistoryModel.performed_by_user))
+            .filter(PublicationHistoryModel.deployment_id == deployment_id)
+            .order_by(desc(PublicationHistoryModel.performed_at))
+            .limit(limit)
+            .offset(offset)
+        )
+        result = self.scalars_all(stmt)
+        return result, count
 
 
 class AdapterDataManager(DataManagerUtils):

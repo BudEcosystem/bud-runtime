@@ -2,57 +2,58 @@ import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
 import { Input } from 'antd';
 import { SearchOutlined } from "@ant-design/icons";
 import { Text_12_400_757575, Text_12_600_EEEEEE } from "@/components/ui/text";
-import EvaluationList, { Evaluation } from "src/flows/components/AvailableEvaluations";
 import BudStepAlert from "src/flows/components/BudStepAlert";
+import { useEvaluations } from "src/hooks/useEvaluations";
+import { successToast, errorToast } from "@/components/toast";
 export default function SelectEvaluation() {
-  // Mock evaluation data - replace with actual API call
-  const mockEvaluations: Evaluation[] = [
-    {
-      id: "eval-1",
-      name: "Truthfulness Evaluation",
-      description: "Evaluates the model's ability to provide accurate and truthful responses",
-      category: "accuracy",
-      tags: ["accuracy", "truthfulness", "hallucination"]
-    },
-    {
-      id: "eval-2",
-      name: "Code Generation Benchmark",
-      description: "Tests the model's ability to generate syntactically correct and functional code",
-      category: "code",
-      tags: ["code", "programming", "syntax"]
-    },
-    {
-      id: "eval-3",
-      name: "Language Understanding",
-      description: "Comprehensive evaluation of natural language understanding capabilities",
-      category: "language",
-      tags: ["NLU", "comprehension", "context"]
-    },
-    {
-      id: "eval-4",
-      name: "Mathematical Reasoning",
-      description: "Assesses mathematical problem-solving and logical reasoning abilities",
-      category: "math",
-      tags: ["math", "logic", "reasoning"]
-    },
-    {
-      id: "eval-5",
-      name: "Safety & Ethics",
-      description: "Evaluates adherence to safety guidelines and ethical considerations",
-      category: "safety",
-      tags: ["safety", "ethics", "harmful content"]
-    }
-  ];
   const [search, setSearch] = React.useState("");
-  const [selectedEvaluation, setSelectedEvaluation] = React.useState<Evaluation | null>(null);
-  const { openDrawerWithStep } = useDrawer();
+  const [selectedDatasets, setSelectedDatasets] = useState<string[]>([]);
+  const { openDrawerWithStep, drawerProps } = useDrawer();
+  const { createEvaluationWorkflow, currentWorkflow, getEvaluations, evaluationsList } = useEvaluations();
 
-  const filteredEvaluations = mockEvaluations.filter((evaluation) =>
+  useEffect(() => {
+    // Get trait IDs from the previous step stored in workflow
+    console.log('Current workflow:', currentWorkflow);
+    console.log('Workflow steps:', currentWorkflow?.workflow_steps);
+
+    const traitIds = currentWorkflow?.workflow_steps?.stage_data?.trait_ids ||
+                    currentWorkflow?.workflow_steps?.trait_ids || [];
+
+    console.log('Extracted trait IDs:', traitIds);
+
+    // Fetch evaluations/datasets filtered by selected traits
+    getEvaluations({
+      page: 1,
+      limit: 100,
+      trait_ids: traitIds
+    });
+  }, [currentWorkflow]);
+
+  const handleDatasetToggle = (datasetId: string) => {
+    setSelectedDatasets(prev => {
+      if (prev.includes(datasetId)) {
+        return prev.filter(id => id !== datasetId);
+      } else {
+        return [...prev, datasetId];
+      }
+    });
+  };
+
+  // Map evaluations to the expected format
+  const evaluationsAsDatasets = evaluationsList?.map(evaluation => ({
+    id: evaluation.id,
+    name: evaluation.name,
+    description: evaluation.description,
+    category: evaluation.task_type?.[0] || 'general',
+    tags: evaluation.domains || []
+  })) || [];
+
+  const filteredEvaluations = evaluationsAsDatasets.filter((evaluation) =>
     evaluation.name.toLowerCase().includes(search.toLowerCase()) ||
     evaluation.description?.toLowerCase().includes(search.toLowerCase()) ||
     evaluation.tags?.some(tag => tag.toLowerCase().includes(search.toLowerCase()))
@@ -63,17 +64,54 @@ export default function SelectEvaluation() {
   return (
     <BudForm
       data={{}}
-      // disableNext={!selectedModel?.id}
-      // onNext={async () => {
-      //   openDrawerWithStep("Benchmark-Configuration");
-      // }}
+      disableNext={selectedDatasets.length === 0}
       onBack={async () => {
         openDrawerWithStep("select-traits");
-      }
-      }
+      }}
       backText="Back"
-      onNext={() => {
-        openDrawerWithStep("evaluation-summary");
+      onNext={async () => {
+        try {
+          // Check if we have selected datasets
+          if (selectedDatasets.length === 0) {
+            errorToast("Please select at least one evaluation dataset");
+            return;
+          }
+
+          if (!currentWorkflow?.workflow_id) {
+            errorToast("Workflow not found. Please start over.");
+            return;
+          }
+
+          // Get experiment ID from workflow or drawer props
+          const experimentId = currentWorkflow.experiment_id || drawerProps?.experimentId;
+
+          if (!experimentId) {
+            errorToast("Experiment ID not found");
+            return;
+          }
+
+          // Prepare payload for step 4
+          const payload = {
+            workflow_id: currentWorkflow.workflow_id,
+            step_number: 4,
+            workflow_total_steps: 5,
+            trigger_workflow: false,
+            stage_data: {
+              dataset_ids: selectedDatasets
+            }
+          };
+
+          // Call the API
+          const response = await createEvaluationWorkflow(experimentId, payload);
+
+          successToast("Evaluation datasets selected successfully");
+
+          // Navigate to next step
+          openDrawerWithStep("evaluation-summary");
+        } catch (error) {
+          console.error("Failed to update evaluation workflow:", error);
+          errorToast("Failed to select evaluation datasets");
+        }
       }}
       nextText="Next"
     >
@@ -112,14 +150,43 @@ export default function SelectEvaluation() {
             </div>
             <div className="evaluationCardWrap w-full ">
               <div className="evaluationCard w-full mt-[0rem]">
-                {filteredEvaluations.length > 0 ?
-                  <EvaluationList
-                    evaluations={filteredEvaluations}
-                    handleEvaluationSelection={(evaluation) => {
-                      setSelectedEvaluation(evaluation);
-                    }}
-                    selectedEvaluation={selectedEvaluation} />
-                  : (
+                {filteredEvaluations.length > 0 ? (
+                  <div className="space-y-0">
+                    {filteredEvaluations.map((evaluation) => (
+                      <div
+                        key={evaluation.id}
+                        onClick={() => handleDatasetToggle(evaluation.id)}
+                        className={`p-4 border-b border-[#1F1F1F] cursor-pointer hover:bg-[#FFFFFF08] transition-colors ${
+                          selectedDatasets.includes(evaluation.id) ? 'bg-[#FFFFFF10]' : ''
+                        }`}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <Text_12_600_EEEEEE className="mb-1">{evaluation.name}</Text_12_600_EEEEEE>
+                            <Text_12_400_757575 className="line-clamp-2">{evaluation.description}</Text_12_400_757575>
+                            {evaluation.tags && evaluation.tags.length > 0 && (
+                              <div className="flex gap-2 mt-2">
+                                {evaluation.tags.slice(0, 3).map((tag, idx) => (
+                                  <span key={idx} className="text-[10px] px-2 py-1 bg-[#1F1F1F] rounded text-[#757575]">
+                                    {tag}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <div className="ml-4">
+                            <input
+                              type="checkbox"
+                              checked={selectedDatasets.includes(evaluation.id)}
+                              onChange={() => {}}
+                              className="w-4 h-4 text-purple-600 border-gray-600 rounded focus:ring-purple-500"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
                     <>
                       <div
                         className="mt-[1.5rem]"

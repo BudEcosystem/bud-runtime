@@ -905,6 +905,8 @@ pub async fn write_completed_batch_inference<'a>(
             model_provider_name: batch_request.model_provider_name.clone().into(),
             cached: false,
             finish_reason,
+            gateway_request: None,  // Not supported for batch inference
+            gateway_response: None, // Not supported for batch inference
         };
         let tool_config: Option<ToolCallConfig> = tool_params.map(|t| t.into());
         let output_schema = match output_schema
@@ -928,6 +930,7 @@ pub async fn write_completed_batch_inference<'a>(
             extra_body: Default::default(),
             extra_headers: Default::default(),
             extra_cache_key: None,
+            gateway_request: None, // Not supported for batch inference
         };
         let inference_result = function
             .prepare_response(

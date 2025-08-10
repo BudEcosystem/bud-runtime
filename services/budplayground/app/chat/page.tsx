@@ -21,6 +21,44 @@ export default function ChatPage() {
   const [isSingleChat, setIsSingleChat] = useState(false);
   const [selectedModel, setSelectedModel] = useState("");
 
+  const checkAccessKey = async (accessKey: string) => {
+    const isLoginSuccessful = await login("", accessKey);
+    if(isLoginSuccessful) {
+      console.log('Login successful');
+      // router.replace(`chat`);
+    } else {
+      // setIsInvalidApiKey(true);
+      router.replace(`login`);
+    }
+  }
+
+  const createNewChat = () => {
+    const newChatPayload = {
+      id: uuidv4(),
+      name: `New Chat`,
+      chat_setting_id: "default",
+      created_at: new Date().toISOString(),
+      modified_at: new Date().toISOString(),
+      total_tokens: 0,
+      active: true,
+    };
+    if (selectedModel) {
+      // Define the type for selectedDeployment
+      const selectedDeployment: Endpoint = {
+        name: selectedModel,
+        id: "default",
+        status: "running",
+        model: "default",
+        project: null,
+        created_at: new Date().toISOString()
+      };
+      // Add the property to newChatPayload
+      (newChatPayload as any).selectedDeployment = selectedDeployment;
+    }
+    createChat(newChatPayload);
+
+  }
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       // Access persisted store only on client
@@ -59,44 +97,6 @@ export default function ChatPage() {
     }
 
   }, [checkAccessKey, hideLoader]);
-
-  const checkAccessKey = async (accessKey: string) => {
-    const isLoginSuccessful = await login("", accessKey);
-    if(isLoginSuccessful) {
-      console.log('Login successful');
-      // router.replace(`chat`);
-    } else {
-      // setIsInvalidApiKey(true);
-      router.replace(`login`);
-    }
-  }
-
-  const createNewChat = () => {
-    const newChatPayload = {
-      id: uuidv4(),
-      name: `New Chat`,
-      chat_setting_id: "default",
-      created_at: new Date().toISOString(),
-      modified_at: new Date().toISOString(),
-      total_tokens: 0,
-      active: true,
-    };
-    if (selectedModel) {
-      // Define the type for selectedDeployment
-      const selectedDeployment: Endpoint = {
-        name: selectedModel,
-        id: "default",
-        status: "running",
-        model: "default",
-        project: null,
-        created_at: new Date().toISOString()
-      };
-      // Add the property to newChatPayload
-      (newChatPayload as any).selectedDeployment = selectedDeployment;
-    }
-    createChat(newChatPayload);
-
-  }
 
   return (
     <div

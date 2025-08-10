@@ -1,0 +1,114 @@
+// Using CSS variables for theme support
+$bg-main: var(--bud-bg-primary);
+$bg-card: var(--bud-bg-secondary);
+$border-color: var(--bud-border);
+$text-white: var(--bud-text-primary);
+$text-gray: var(--bud-text-muted);
+$text-dark-gray: var(--bud-text-disabled);
+$primary-color: var(--bud-purple);
+
+.batchesTable {
+  :global {
+    .ant-table {
+      background: transparent;
+      color: $text-white;
+    }
+
+    .ant-table-thead > tr > th {
+      background: var(--bud-bg-tertiary);
+      border-bottom: 1px solid $border-color;
+      color: $text-dark-gray;
+      font-weight: 400;
+      padding: 1rem 1.5rem;
+
+      &::before {
+        display: none;
+      }
+    }
+
+    .ant-table-tbody > tr > td {
+      border-bottom: 1px solid var(--bud-border-secondary);
+      padding: 1rem 1.5rem;
+    }
+
+    .ant-table-tbody > tr:last-child > td {
+      border-bottom: none;
+    }
+
+    .ant-table-tbody > tr:hover > td {
+      background: var(--bud-bg-hover);
+    }
+
+    .ant-progress-line {
+      margin-bottom: 0;
+    }
+
+    .ant-progress-bg {
+      height: 4px !important;
+    }
+
+    .ant-empty-normal {
+      color: $text-gray;
+    }
+  }
+}
+
+.modal {
+  :global {
+    .ant-modal-content {
+      background: $bg-card;
+      border: 1px solid $border-color;
+    }
+
+    .ant-modal-header {
+      background: $bg-card;
+      border-bottom: 1px solid $border-color;
+    }
+
+    .ant-modal-title {
+      color: $text-white;
+    }
+
+    .ant-modal-close {
+      color: $text-gray;
+
+      &:hover {
+        color: $text-white;
+      }
+    }
+
+    .ant-modal-footer {
+      border-top: 1px solid $border-color;
+    }
+
+    .ant-input {
+      background: var(--bud-bg-tertiary);
+      border-color: var(--bud-border-secondary);
+      color: $text-white;
+
+      &::placeholder {
+        color: $text-dark-gray;
+      }
+
+      &:hover,
+      &:focus {
+        border-color: $primary-color;
+        box-shadow: none;
+      }
+    }
+
+    .ant-btn {
+      &:not(.ant-btn-primary) {
+        background: transparent;
+        border-color: $border-color;
+        color: $text-gray;
+
+        &:hover {
+          background: var(--bud-bg-hover);
+          border-color: $primary-color;
+          color: $text-white;
+        }
+      }
+    }
+  }
+}
