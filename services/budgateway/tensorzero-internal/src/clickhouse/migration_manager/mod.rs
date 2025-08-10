@@ -3,7 +3,6 @@ pub mod migrations;
 
 use crate::clickhouse::ClickHouseConnectionInfo;
 use crate::error::{Error, ErrorDetails};
-use async_trait::async_trait;
 use migration_trait::Migration;
 use migrations::migration_0000::Migration0000;
 use migrations::migration_0002::Migration0002;

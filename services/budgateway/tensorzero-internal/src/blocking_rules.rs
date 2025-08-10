@@ -101,7 +101,7 @@ impl BlockingRulesManager {
         if let Some(json) = rules_json {
             let rules: Vec<BlockingRule> = serde_json::from_str(&json).map_err(|e| {
                 Error::new(ErrorDetails::InternalError {
-                    message: format!("Failed to parse blocking rules: {}", e),
+                    message: format!("Failed to parse blocking rules: {e}"),
                 })
             })?;
 
@@ -223,7 +223,7 @@ impl BlockingRulesManager {
                 if let Some(ip_str) = ip_value.as_str() {
                     if let Ok(ip) = ip_str.parse::<IpAddr>() {
                         if ip == client_addr {
-                            return (true, format!("IP {} is blocked", client_ip));
+                            return (true, format!("IP {client_ip} is blocked"));
                         }
                     }
                 }
@@ -238,7 +238,7 @@ impl BlockingRulesManager {
                         if network.contains(&client_addr) {
                             return (
                                 true,
-                                format!("IP {} is in blocked range {}", client_ip, cidr_str),
+                                format!("IP {client_ip} is in blocked range {cidr_str}"),
                             );
                         }
                     }
@@ -268,7 +268,7 @@ impl BlockingRulesManager {
             for country_value in countries {
                 if let Some(blocked_country) = country_value.as_str() {
                     if blocked_country.eq_ignore_ascii_case(country) {
-                        return (true, format!("Country {} is blocked", country));
+                        return (true, format!("Country {country} is blocked"));
                     }
                 }
             }
@@ -300,7 +300,7 @@ impl BlockingRulesManager {
                     if ua.to_lowercase().contains(&pattern.to_lowercase()) {
                         return (
                             true,
-                            format!("User agent matches blocked pattern: {}", pattern),
+                            format!("User agent matches blocked pattern: {pattern}"),
                         );
                     }
                 }
