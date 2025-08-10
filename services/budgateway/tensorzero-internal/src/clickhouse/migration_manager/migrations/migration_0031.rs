@@ -184,16 +184,11 @@ impl Migration for Migration0031<'_> {
     }
 
     fn rollback_instructions(&self) -> String {
-        r#"
-        -- Drop the new tables
-        DROP TABLE IF EXISTS EmbeddingInference;
-        DROP TABLE IF EXISTS AudioInference;
-        DROP TABLE IF EXISTS ImageInference;
-        DROP TABLE IF EXISTS ModerationInference;
-
-        -- Remove endpoint_type column from ModelInference
-        ALTER TABLE ModelInference DROP COLUMN IF EXISTS endpoint_type;
-        "#
+        r#"DROP TABLE IF EXISTS EmbeddingInference;
+DROP TABLE IF EXISTS AudioInference;
+DROP TABLE IF EXISTS ImageInference;
+DROP TABLE IF EXISTS ModerationInference;
+ALTER TABLE ModelInference DROP COLUMN IF EXISTS endpoint_type;"#
         .to_string()
     }
 
