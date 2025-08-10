@@ -112,6 +112,7 @@ import SelectTrait from "./Evaluations/RunEvaluation/SelectTrait";
 import SelectEvaluation from "./Evaluations/RunEvaluation/SelectEvaluation";
 import EvaluationSummary from "./Evaluations/RunEvaluation/EvaluationSummary";
 import NewExperimentSuccess from "./Evaluations/NewExperiment/newExperimentSuccess";
+import Publish from "./Project/Publish";
 
 export const StepComponents = {
   "new-project": NewProject,
@@ -165,6 +166,7 @@ export const StepComponents = {
   "add-members": AddMembers,
   "worker-details": WorkerDetails,
   "use-model": UseModel,
+  "publish": Publish,
   "delete-cluster": DeleteCluster,
   "deploy-model-success": DeployModelSuccess,
   "delete-cluster-status": ClusterDeleteStatus,

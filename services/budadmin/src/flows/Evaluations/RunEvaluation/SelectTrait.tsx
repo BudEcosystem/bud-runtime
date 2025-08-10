@@ -3,50 +3,50 @@ import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
 import { Checkbox } from "antd";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import CustomPopover from "src/flows/components/customPopover";
 import { useDrawer } from "src/hooks/useDrawer";
+import { useEvaluations } from "src/hooks/useEvaluations";
+import { successToast, errorToast } from "@/components/toast";
 
 
 export default function SelectTrait() {
   const [page, setPage] = React.useState(1);
   const [limit, setLimit] = React.useState(1000);
-  const { openDrawerWithStep } = useDrawer();
+  const { openDrawerWithStep, drawerProps } = useDrawer();
   const [hover, setHover] = React.useState(false);
+  const { createEvaluationWorkflow, currentWorkflow, getTraits, traitsList } = useEvaluations();
 
-  const [traits, setTraits] = React.useState([]);
-  const traitsList = [
-    {
-      name: "Trait 1",
-      description: "Description for Trait 1",
-      selected: false,
-      is_present_in_model: false
-    },
-    {
-      name: "Trait 2",
-      description: "Description for Trait 2",
-      selected: false,
-      is_present_in_model: false
-    },
-    // Add more traits as needed
-  ];
+  const [selectedTraits, setSelectedTraits] = useState<string[]>([]);
+
+  const handleTraitToggle = (traitId: string) => {
+    setSelectedTraits(prev => {
+      if (prev.includes(traitId)) {
+        return prev.filter(id => id !== traitId);
+      } else {
+        return [...prev, traitId];
+      }
+    });
+  };
 
   const triatCard = (data) => {
     const {
+      id,
       name,
       description,
-      selected = false,
       hideSelect = false
     } = data;
+    const selected = selectedTraits.includes(id);
+
     return (
       <div
         onMouseEnter={() => setHover(true)}
-        onClick={null}
+        onClick={() => !data.is_present_in_model && handleTraitToggle(id)}
         onMouseLeave={() => setHover(false)}
-        className={`pt-[1.05rem] pb-[.8rem] cursor-pointer hover:shadow-lg px-[1.5rem] border-y-[0.5px] border-y-[#1F1F1F] hover:border-[#757575] flex-row flex border-box hover:bg-[#FFFFFF08] ${data.is_present_in_model ? 'opacity-30 !cursor-not-allowed' : ''}`}
+        className={`w-full pt-[1.05rem] pb-[.8rem] cursor-pointer hover:shadow-lg px-[1.5rem] border-y-[0.5px] border-y-[#1F1F1F] hover:border-[#757575] flex-row flex border-box hover:bg-[#FFFFFF08] ${data.is_present_in_model ? 'opacity-30 !cursor-not-allowed' : ''}`}
       >
 
-        <div className="flex justify-between flex-col w-full max-w-[85%]">
+        <div className="flex justify-between flex-col w-full ">
           <div className="flex items-center justify-between ">
             <div className="flex flex-grow max-w-[90%]"
 
@@ -87,25 +87,62 @@ export default function SelectTrait() {
   };
 
   useEffect(() => {
-
+    // Fetch traits when component mounts
+    getTraits({ page, limit });
   }, [page]);
 
 
   return (
     <BudForm
       data={{}}
-      // disableNext={!selectedModel?.id}
-      // onNext={async () => {
-      //   openDrawerWithStep("Benchmark-Configuration");
-      // }}
+      disableNext={selectedTraits.length === 0}
       onBack={async () => {
         openDrawerWithStep("select-model-new-evaluation");
-      }
-      }
+      }}
       backText="Back"
-      onNext={() => {
+      onNext={async () => {
+        try {
+          // Check if we have selected traits
+          if (selectedTraits.length === 0) {
+            errorToast("Please select at least one trait");
+            return;
+          }
 
-        openDrawerWithStep("select-evaluation");
+          if (!currentWorkflow?.workflow_id) {
+            errorToast("Workflow not found. Please start over.");
+            return;
+          }
+
+          // Get experiment ID from workflow or drawer props
+          const experimentId = currentWorkflow.experiment_id || drawerProps?.experimentId;
+
+          if (!experimentId) {
+            errorToast("Experiment ID not found");
+            return;
+          }
+
+          // Prepare payload for step 3
+          const payload = {
+            workflow_id: currentWorkflow.workflow_id,
+            step_number: 3,
+            workflow_total_steps: 5,
+            trigger_workflow: false,
+            stage_data: {
+              trait_ids: selectedTraits
+            }
+          };
+
+          // Call the API
+          const response = await createEvaluationWorkflow(experimentId, payload);
+
+          successToast("Traits selected successfully");
+
+          // Navigate to next step
+          openDrawerWithStep("select-evaluation");
+        } catch (error) {
+          console.error("Failed to update evaluation workflow:", error);
+          errorToast("Failed to select traits");
+        }
       }}
       nextText="Next"
     >
@@ -120,15 +157,21 @@ export default function SelectTrait() {
           />
           <div className="px-[1.4rem] pb-[.875rem] pt-[1.25rem] flex justify-between items-center">
             <div className="text-[#757575] text-[.75rem] font-[400]">
-              Traits Available <span className="text-[#EEEEEE]">{traitsList?.length}</span>
+              Traits Available <span className="text-[#EEEEEE]">{traitsList?.length || 0}</span>
             </div>
           </div>
 
-          {traitsList.map((trait, index) => (
-            <div key={index}>
-              {triatCard(trait)}
+          {traitsList && traitsList.length > 0 ? (
+            traitsList.map((trait) => (
+              <div key={trait.id}>
+                {triatCard(trait)}
+              </div>
+            ))
+          ) : (
+            <div className="px-[1.4rem] py-[2rem] text-center text-[#757575]">
+              Loading traits...
             </div>
-          ))}
+          )}
         </BudDrawerLayout>
       </BudWraperBox>
     </BudForm>

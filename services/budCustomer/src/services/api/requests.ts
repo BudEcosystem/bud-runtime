@@ -197,6 +197,10 @@ const Post = (
     headers?: any;
   }
 ) => {
+  console.log(`[API] POST request to: ${endPoint}`);
+  console.log(`[API] Full URL: ${baseUrl}${endPoint}`);
+  console.log(`[API] Payload:`, payload);
+
   const finalConfig: any = {
     ...config,
     headers: {

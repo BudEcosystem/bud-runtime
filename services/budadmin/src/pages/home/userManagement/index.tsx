@@ -409,14 +409,14 @@ export default function UserManagement() {
           />
         </div>
         {hasPermission(PermissionEnum.UserManage) ?
-          <div className="pt-4">
+          <div className="pt-4 px-[3.5rem]">
             {/* Tab Navigation */}
             <div className="flex mb-4 border-b border-[#1F1F1F]">
               <button
                 onClick={() => setActiveTab('client')}
                 className={`px-4 py-2 text-sm font-medium transition-colors ${
                   activeTab === 'client'
-                    ? 'text-[#EEEEEE] border-b-2 border-[#D1B854]'
+                    ? 'text-[#EEEEEE] border-b-2 border-[#EEEEEE]'
                     : 'text-[#757575] hover:text-[#EEEEEE]'
                 }`}
               >
@@ -426,7 +426,7 @@ export default function UserManagement() {
                 onClick={() => setActiveTab('admin')}
                 className={`px-4 py-2 text-sm font-medium transition-colors ${
                   activeTab === 'admin'
-                    ? 'text-[#EEEEEE] border-b-2 border-[#D1B854]'
+                    ? 'text-[#EEEEEE] border-b-2 border-[#EEEEEE]'
                     : 'text-[#757575] hover:text-[#EEEEEE]'
                 }`}
               >
@@ -435,14 +435,14 @@ export default function UserManagement() {
             </div>
 
             {/* User Count Display */}
-            <div className="mb-4 px-4">
+            <div className="mb-4 ">
               <Text_12_400_757575>
                 Showing {totalUsers} {activeTab === 'admin' ? 'Admin' : 'Client'} Users
               </Text_12_400_757575>
             </div>
 
             {/* Users Table */}
-            <div className="tablePadding userTable relative CommonCustomPagination">
+            <div className=" userTable relative CommonCustomPagination">
               <Table<User>
                 columns={columns}
                 pagination={{

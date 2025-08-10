@@ -94,9 +94,14 @@ const RegisterForm = ({ onSubmit }: RegisterFormProps) => {
     return !error;
   };
 
-  const handleRegister = (e: { preventDefault: () => void }) => {
+  const handleRegister = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!submittable) return;
+    e.stopPropagation();
+
+    if (!submittable) {
+      console.log("Form not submittable, returning");
+      return;
+    }
 
     const { confirmPassword, ...submitData } = formData;
     onSubmit(submitData);
@@ -122,6 +127,8 @@ const RegisterForm = ({ onSubmit }: RegisterFormProps) => {
       <form
         onSubmit={handleRegister}
         className="w-[76.6%] mt-[1.6em]"
+        action="#"
+        method="POST"
       >
         {/* Name Field */}
         <div className="mb-[1.8rem]">

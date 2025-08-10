@@ -1869,6 +1869,27 @@ const useModel: DrawerFlowType = {
   ],
 };
 
+const publish: DrawerFlowType = {
+  title: "Publish",
+  description: "Publish deployment",
+  totalSteps: 1,
+  steps: [
+    {
+      navigation: () => ["Projects", "Publish"],
+      id: "publish",
+      confirmClose: false,
+      step: 1,
+      component: StepComponents["publish"],
+      progress: [
+        {
+          status: FormProgressStatus.inProgress,
+          title: "publish",
+        },
+      ],
+    },
+  ],
+};
+
 const deleteCluster: DrawerFlowType = {
   title: "Delete Cluster",
   description: "Delete a cluster",
@@ -3485,7 +3506,7 @@ const newExperiment: DrawerFlowType = {
           title: "New Experiment",
         },
       ],
-      confirmClose: true,
+      confirmClose: false,
     },
     {
       navigation: () => ["Experiments", "New Experiment"],
@@ -3498,7 +3519,7 @@ const newExperiment: DrawerFlowType = {
           title: "New Experiment",
         },
       ],
-      confirmClose: true,
+      confirmClose: false,
     },
   ],
 };
@@ -3611,6 +3632,7 @@ const flows = {
   "add-worker": addWorker,
   "worker-details": workerDetails,
   "use-model": useModel,
+  "publish": publish,
   "delete-cluster": deleteCluster,
   "delete-project": deleteProject,
   "deleting-endpoint": deletingEndpoint,
