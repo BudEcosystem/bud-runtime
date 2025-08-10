@@ -1026,9 +1026,18 @@ pub async fn write_inference(
                     .await;
             }
             InferenceResult::TextToSpeech(result) => {
+                // Extract the text input from the input
+                let text_input = input.messages.first()
+                    .and_then(|msg| msg.content.first())
+                    .and_then(|content| match content {
+                        ResolvedInputMessageContent::Text { value } => value.as_str().map(|s| s.to_string()),
+                        _ => None,
+                    })
+                    .unwrap_or_else(|| "text input".to_string());
+
                 let audio_inference = AudioInferenceDatabaseInsert::new_text_to_speech(
                     result,
-                    "text input".to_string(), // Will be overridden with actual input
+                    text_input,
                     metadata,
                 );
                 let _ = clickhouse_connection_info
@@ -1036,9 +1045,18 @@ pub async fn write_inference(
                     .await;
             }
             InferenceResult::ImageGeneration(result) => {
+                // Extract the prompt from the input
+                let prompt = input.messages.first()
+                    .and_then(|msg| msg.content.first())
+                    .and_then(|content| match content {
+                        ResolvedInputMessageContent::Text { value } => value.as_str().map(|s| s.to_string()),
+                        _ => None,
+                    })
+                    .unwrap_or_else(|| "image prompt".to_string());
+
                 let image_inference = ImageInferenceDatabaseInsert::new(
                     result,
-                    "image prompt".to_string(), // Will be overridden with actual prompt
+                    prompt,
                     metadata,
                 );
                 let _ = clickhouse_connection_info
@@ -1046,9 +1064,18 @@ pub async fn write_inference(
                     .await;
             }
             InferenceResult::Moderation(result) => {
+                // Extract the input text from the input
+                let input_text = input.messages.first()
+                    .and_then(|msg| msg.content.first())
+                    .and_then(|content| match content {
+                        ResolvedInputMessageContent::Text { value } => value.as_str().map(|s| s.to_string()),
+                        _ => None,
+                    })
+                    .unwrap_or_else(|| "moderation input".to_string());
+
                 let moderation_inference = ModerationInferenceDatabaseInsert::new(
                     result,
-                    "moderation input".to_string(), // Will be overridden with actual input
+                    input_text,
                     metadata,
                 );
                 let _ = clickhouse_connection_info

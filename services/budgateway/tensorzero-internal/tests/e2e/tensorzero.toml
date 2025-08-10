@@ -12,6 +12,10 @@ debug = true
 enable_template_filesystem_access = true
 export.otlp.traces.enabled = true
 
+[gateway.observability]
+enabled = true
+async_writes = false
+
 [gateway.authentication]
 enabled = false
 
