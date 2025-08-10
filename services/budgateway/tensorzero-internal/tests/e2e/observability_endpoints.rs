@@ -86,7 +86,8 @@ async fn select_model_inference_by_endpoint_type(
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_embedding_observability_clickhouse_write() {
+#[cfg_attr(not(feature = "e2e_tests"), ignore = "test_dummy_only")]
+async fn test_dummy_only_embedding_observability_clickhouse_write() {
     // Start the gateway in the background
     let _gateway_handle = make_embedded_gateway().await;
 
@@ -94,7 +95,7 @@ async fn test_embedding_observability_clickhouse_write() {
 
     // Make embedding request
     let payload = json!({
-        "model": "text-embedding-3-small",
+        "model": "text-embedding-test",
         "input": "Test embedding for observability"
     });
 
@@ -106,8 +107,12 @@ async fn test_embedding_observability_clickhouse_write() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), 200);
-    let response_body: Value = response.json().await.unwrap();
+    if response.status() != 200 {
+        let status = response.status();
+        let error_text = response.text().await.unwrap();
+        panic!("Request failed with status {}: {}", status, error_text);
+    }
+    let _response_body: Value = response.json().await.unwrap();
 
     // Wait a bit for async writes to complete
     sleep(Duration::from_millis(500)).await;
@@ -119,7 +124,7 @@ async fn test_embedding_observability_clickhouse_write() {
     assert!(model_inference.is_some(), "No ModelInference record found for embedding");
     let model_record = model_inference.unwrap();
     assert_eq!(model_record["endpoint_type"], "embedding");
-    assert_eq!(model_record["model_name"], "text-embedding-3-small");
+    assert_eq!(model_record["model_name"], "text-embedding-test");
 
     // Extract inference_id to check EmbeddingInference table
     let inference_id_str = model_record["inference_id"].as_str().unwrap();
@@ -132,7 +137,7 @@ async fn test_embedding_observability_clickhouse_write() {
     assert!(embedding_inference.is_some(), "No EmbeddingInference record found");
     let embedding_record = embedding_inference.unwrap();
     assert_eq!(embedding_record["id"], inference_id_str);
-    assert_eq!(embedding_record["function_name"], "text-embedding-3-small");
+    assert_eq!(embedding_record["function_name"], "text-embedding-test");
     assert!(embedding_record["embeddings"].as_str().unwrap().len() > 0);
     assert_eq!(embedding_record["input_count"], 1);
 
@@ -140,14 +145,15 @@ async fn test_embedding_observability_clickhouse_write() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_moderation_observability_clickhouse_write() {
+#[cfg_attr(not(feature = "e2e_tests"), ignore = "test_dummy_only")]
+async fn test_dummy_only_moderation_observability_clickhouse_write() {
     let _gateway_handle = make_embedded_gateway().await;
 
     let client = Client::new();
 
     // Make moderation request
     let payload = json!({
-        "model": "moderation_model",
+        "model": "moderation-test",
         "input": "This is a test message for moderation observability"
     });
 
@@ -160,7 +166,7 @@ async fn test_moderation_observability_clickhouse_write() {
         .unwrap();
 
     assert_eq!(response.status(), 200);
-    let response_body: Value = response.json().await.unwrap();
+    let _response_body: Value = response.json().await.unwrap();
 
     // Wait for async writes
     sleep(Duration::from_millis(500)).await;
@@ -184,7 +190,7 @@ async fn test_moderation_observability_clickhouse_write() {
     assert!(moderation_inference.is_some(), "No ModerationInference record found");
     let moderation_record = moderation_inference.unwrap();
     assert_eq!(moderation_record["id"], inference_id_str);
-    assert_eq!(moderation_record["function_name"], "moderation_model");
+    assert_eq!(moderation_record["function_name"], "moderation-test");
     assert!(moderation_record["input"]
         .as_str()
         .unwrap()
@@ -195,7 +201,8 @@ async fn test_moderation_observability_clickhouse_write() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_image_generation_observability_clickhouse_write() {
+#[cfg_attr(not(feature = "e2e_tests"), ignore = "test_dummy_only")]
+async fn test_dummy_only_image_generation_observability_clickhouse_write() {
     let _gateway_handle = make_embedded_gateway().await;
 
     let client = Client::new();
@@ -217,7 +224,7 @@ async fn test_image_generation_observability_clickhouse_write() {
         .unwrap();
 
     assert_eq!(response.status(), 200);
-    let response_body: Value = response.json().await.unwrap();
+    let _response_body: Value = response.json().await.unwrap();
 
     // Wait for async writes
     sleep(Duration::from_millis(500)).await;
@@ -241,7 +248,7 @@ async fn test_image_generation_observability_clickhouse_write() {
     assert!(image_inference.is_some(), "No ImageInference record found");
     let image_record = image_inference.unwrap();
     assert_eq!(image_record["id"], inference_id_str);
-    assert_eq!(image_record["function_name"], "dall-e-3");
+    assert_eq!(image_record["function_name"], "image-generation-test");
     assert!(image_record["prompt"].as_str().unwrap().contains("sunset"));
     assert_eq!(image_record["size"], "1024x1024");
     assert_eq!(image_record["image_count"], 1);
@@ -249,20 +256,21 @@ async fn test_image_generation_observability_clickhouse_write() {
     println!("✅ Image generation observability test passed - data written to ClickHouse");
 }
 
-#[tokio::test]
-async fn test_endpoint_type_differentiation_in_model_inference() {
+#[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(not(feature = "e2e_tests"), ignore = "test_dummy_only")]
+async fn test_dummy_only_endpoint_type_differentiation_in_model_inference() {
     let _gateway_handle = make_embedded_gateway().await;
 
     let client = Client::new();
 
     // Make requests to different endpoints
     let embedding_payload = json!({
-        "model": "text-embedding-3-small",
+        "model": "text-embedding-test",
         "input": "Test for endpoint type differentiation"
     });
 
     let moderation_payload = json!({
-        "model": "moderation_model",
+        "model": "moderation-test",
         "input": "Test moderation content"
     });
 
@@ -331,14 +339,15 @@ async fn test_endpoint_type_differentiation_in_model_inference() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_embedding_batch_observability() {
+#[cfg_attr(not(feature = "e2e_tests"), ignore = "test_dummy_only")]
+async fn test_dummy_only_embedding_batch_observability() {
     let _gateway_handle = make_embedded_gateway().await;
 
     let client = Client::new();
 
     // Make batch embedding request
     let payload = json!({
-        "model": "text-embedding-3-small",
+        "model": "text-embedding-test",
         "input": ["First text", "Second text", "Third text"]
     });
 
@@ -351,7 +360,7 @@ async fn test_embedding_batch_observability() {
         .unwrap();
 
     assert_eq!(response.status(), 200);
-    let response_body: Value = response.json().await.unwrap();
+    let _response_body: Value = response.json().await.unwrap();
 
     // Wait for async writes
     sleep(Duration::from_millis(500)).await;
@@ -377,7 +386,8 @@ async fn test_embedding_batch_observability() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_observability_tables_creation() {
+#[cfg_attr(not(feature = "e2e_tests"), ignore = "test_dummy_only")]
+async fn test_dummy_only_observability_tables_creation() {
     // Test that all new observability tables exist
     let clickhouse = get_clickhouse().await;
 
@@ -422,14 +432,15 @@ async fn test_observability_tables_creation() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_observability_data_consistency() {
+#[cfg_attr(not(feature = "e2e_tests"), ignore = "test_dummy_only")]
+async fn test_dummy_only_observability_data_consistency() {
     let _gateway_handle = make_embedded_gateway().await;
 
     let client = Client::new();
 
     // Make an embedding request
     let payload = json!({
-        "model": "text-embedding-3-small",
+        "model": "text-embedding-test",
         "input": "Consistency test"
     });
 
