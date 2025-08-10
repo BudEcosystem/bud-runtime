@@ -61,13 +61,35 @@ const config = {
           foreground: "hsl(var(--card-foreground))",
         },
         // BUD-specific color palette
-        'bud-purple': '#965CDE',
-        'bud-bg-primary': '#101010',
-        'bud-bg-secondary': '#1F1F1F',
-        'bud-text-primary': '#FFFFFF',
-        'bud-text-secondary': '#EEEEEE',
-        'bud-text-muted': '#B3B3B3',
-        'bud-text-disabled': '#757575',
+        'bud-bg-primary': 'var(--bg-primary)',
+        'bud-bg-secondary': 'var(--bg-secondary)',
+        'bud-bg-tertiary': 'var(--bg-tertiary)',
+        'bud-text-primary': 'var(--text-primary)',
+        'bud-text-secondary': 'var(--text-secondary)',
+        'bud-text-muted': 'var(--text-muted)',
+        'bud-text-disabled': 'var(--text-disabled)',
+        'bud-border': 'var(--border-color)',
+        'bud-border-secondary': 'var(--border-secondary)',
+        'bud-border-transparent': 'var(--border-transparent)',
+
+        // Accent colors
+        'bud-purple': 'var(--color-purple)',
+        'bud-purple-hover': 'var(--color-purple-hover)',
+        'bud-purple-active': 'var(--color-purple-active)',
+        'bud-yellow': 'var(--color-yellow)',
+        'bud-yellow-hover': 'var(--color-yellow-hover)',
+        'bud-yellow-active': 'var(--color-yellow-active)',
+
+        // Themed text colors
+        'bud-primary-text': 'var(--color-primary-text)',
+        'bud-secondary-text': 'var(--color-secondary-text)',
+        'bud-accent-text': 'var(--color-accent-text)',
+        'bud-yellow-text': 'var(--color-yellow-text)',
+
+        // Status colors
+        'bud-success': 'var(--color-success)',
+        'bud-warning': 'var(--color-warning)',
+        'bud-error': 'var(--color-error)',
       },
       borderRadius: {
         lg: "var(--radius)",

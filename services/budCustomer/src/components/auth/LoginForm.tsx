@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   Text_12_300_EEEEEE,
   Text_12_400_808080,
@@ -43,30 +44,30 @@ const LoginForm = ({ onSubmit }: LoginPageModalProps) => {
 
   const validateEmail = (value: string) => {
     if (!value) {
-      setEmailError('Please input your email!');
+      setEmailError("Please input your email!");
       return false;
     }
     if (value.length < 3) {
       return true; // Don't show error for short input
     }
     if (!emailRegex.test(value)) {
-      setEmailError('Please enter a valid email');
+      setEmailError("Please enter a valid email");
       return false;
     }
-    setEmailError('');
+    setEmailError("");
     return true;
   };
 
   const validatePassword = (value: string) => {
     if (!value) {
-      setPasswordError('Please input your password!');
+      setPasswordError("Please input your password!");
       return false;
     }
     if (value.length < 8) {
-      setPasswordError('Password must be at least 8 characters long!');
+      setPasswordError("Password must be at least 8 characters long!");
       return false;
     }
-    setPasswordError('');
+    setPasswordError("");
     return true;
   };
 
@@ -82,10 +83,10 @@ const LoginForm = ({ onSubmit }: LoginPageModalProps) => {
     if (value.length >= 3) {
       validateEmail(value);
     } else {
-      setEmailError('');
+      setEmailError("");
     }
     if (!value) {
-      setAuthError('');
+      setAuthError("");
     }
   };
 
@@ -95,12 +96,12 @@ const LoginForm = ({ onSubmit }: LoginPageModalProps) => {
     if (value.length >= 8) {
       validatePassword(value);
     } else if (value.length > 0) {
-      setPasswordError('Password must be at least 8 characters long!');
+      setPasswordError("Password must be at least 8 characters long!");
     } else {
-      setPasswordError('');
+      setPasswordError("");
     }
     if (!value) {
-      setAuthError('');
+      setAuthError("");
     }
   };
 
@@ -135,15 +136,12 @@ const LoginForm = ({ onSubmit }: LoginPageModalProps) => {
         </Text_12_400_B3B3B3>
       </div>
 
-      <form
-        onSubmit={handleLogin}
-        className="w-[76.6%] mt-[1.6em]"
-      >
+      <form onSubmit={handleLogin} className="w-[76.6%] mt-[1.6em]">
         <div className="mb-[1.8rem]">
           <div className="relative">
-            <Text_12_300_EEEEEE className="absolute px-1 bg-black -top-1 left-2 inline-block tracking-[.035rem] z-10">
+            <span className="absolute px-1 bg-bud-bg-primary top-[-.4rem] left-2 inline-block tracking-[.035rem] z-10 text-xs font-light text-bud-text-muted">
               Email
-            </Text_12_300_EEEEEE>
+            </span>
           </div>
           <input
             type="email"
@@ -151,23 +149,27 @@ const LoginForm = ({ onSubmit }: LoginPageModalProps) => {
             value={email}
             onChange={handleEmailChange}
             onBlur={() => validateEmail(email)}
-            className={`h-auto leading-[100%] w-full placeholder:text-xs text-xs text-[#EEEEEE] placeholder:text-[#808080] font-light outline-none border rounded-[6px] pt-[.8rem] pb-[.53rem] px-3 bg-transparent
-              ${emailError ? 'border-red-500' : 'border-gray-600 focus:border-gray-400'}`}
+            className={`h-auto leading-[100%] w-full placeholder:text-xs text-xs text-bud-text-primary placeholder:text-bud-text-disabled font-light outline-none border rounded-[6px] pt-[.8rem] pb-[.53rem] px-3 bg-transparent
+              ${emailError ? "border-red-500" : "border-bud-border focus:border-bud-text-muted"}`}
           />
           {emailError && (
             <div className="text-red-500 text-xs mt-1 flex items-center">
-              <img src="/icons/warning.svg" alt="error" className="w-4 h-4 mr-1" />
+              <img
+                src="/icons/warning.svg"
+                alt="error"
+                className="w-4 h-4 mr-1"
+              />
               {emailError}
             </div>
           )}
         </div>
 
         <div className="mb-[1rem]">
-          <div className="flex items-center border rounded-[6px] relative !bg-[transparent]">
+          <div className="flex items-center border border-bud-border rounded-[6px] relative !bg-[transparent]">
             <div className="">
-              <Text_12_300_EEEEEE className="absolute px-1.5 bg-black -top-1.5 left-1.5 inline-block tracking-[.035rem] z-10">
+              <span className="absolute px-1.5 bg-bud-bg-primary top-[-0.4rem] left-1.5 inline-block tracking-[.035rem] z-10 text-xs font-light text-bud-text-muted">
                 Password
-              </Text_12_300_EEEEEE>
+              </span>
             </div>
             <input
               type={isShow ? "text" : "password"}
@@ -176,19 +178,23 @@ const LoginForm = ({ onSubmit }: LoginPageModalProps) => {
               onChange={handlePasswordChange}
               onKeyDown={handleKeyDown}
               autoComplete="current-password"
-              className={`h-auto leading-[100%] w-full placeholder:text-xs text-xs text-[#EEEEEE] placeholder:text-[#808080] font-light outline-none !bg-[transparent] border-none rounded-[6px] pt-[.8rem] pb-[.53rem] px-3`}
+              className={`h-auto leading-[100%] w-full placeholder:text-xs text-xs text-bud-text-primary placeholder:text-bud-text-disabled font-light outline-none !bg-[transparent] border-none rounded-[6px] pt-[.8rem] pb-[.53rem] px-3`}
             />
             <button
               type="button"
               onClick={() => setIsShow(!isShow)}
-              className="text-[#808080] cursor-pointer pr-3"
+              className="text-bud-text-muted cursor-pointer pr-3"
             >
               {isShow ? "👁️" : "🙈"}
             </button>
           </div>
           {passwordError && (
             <div className="text-red-500 text-xs mt-1 flex items-center">
-              <img src="/icons/warning.svg" alt="error" className="w-4 h-4 mr-1" />
+              <img
+                src="/icons/warning.svg"
+                alt="error"
+                className="w-4 h-4 mr-1"
+              />
               {passwordError}
             </div>
           )}
@@ -232,6 +238,15 @@ const LoginForm = ({ onSubmit }: LoginPageModalProps) => {
         </Text_12_400_EEEEEE>
       </div>
 
+      <div className="mt-[1rem] flex justify-center items-center gap-1">
+        <Text_12_400_808080>Don&apos;t have an account?</Text_12_400_808080>
+        <Link href="/register">
+          <Text_12_400_EEEEEE className="cursor-pointer hover:underline">
+            Sign up
+          </Text_12_400_EEEEEE>
+        </Link>
+      </div>
+
       {authError && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
@@ -243,7 +258,9 @@ const LoginForm = ({ onSubmit }: LoginPageModalProps) => {
           }}
         >
           <Text_12_400_EEEEEE className="text-[#EC7575]">
-            {authError.includes('Cannot read properties') ? 'Something went wrong, please try again later.' : authError}
+            {authError.includes("Cannot read properties")
+              ? "Something went wrong, please try again later."
+              : authError}
           </Text_12_400_EEEEEE>
         </motion.div>
       )}

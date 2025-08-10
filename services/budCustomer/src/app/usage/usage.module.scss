@@ -1,11 +1,11 @@
-// Color variables
-$bg-main: #101010;
-$bg-card: #18191b;
-$border-color: #1F1F1F;
-$text-white: #EEEEEE;
-$text-gray: #B3B3B3;
-$text-dark-gray: #757575;
-$primary-color: #965CDE;
+// Using CSS variables for theme support
+$bg-main: var(--bud-bg-primary);
+$bg-card: var(--bud-bg-secondary);
+$border-color: var(--bud-border);
+$text-white: var(--bud-text-primary);
+$text-gray: var(--bud-text-muted);
+$text-dark-gray: var(--bud-text-disabled);
+$primary-color: var(--bud-purple);
 
 .selectFilter {
   :global {
@@ -33,7 +33,7 @@ $primary-color: #965CDE;
     }
 
     .ant-table-thead > tr > th {
-      background: rgba(#252525, 0.5);
+      background: var(--bud-bg-tertiary);
       border-bottom: 1px solid $border-color;
       color: $text-dark-gray;
       font-weight: 400;
@@ -45,7 +45,7 @@ $primary-color: #965CDE;
     }
 
     .ant-table-tbody > tr > td {
-      border-bottom: 1px solid rgba($border-color, 0.5);
+      border-bottom: 1px solid var(--bud-border-secondary);
       padding: 1rem 1.5rem;
     }
 
@@ -54,7 +54,7 @@ $primary-color: #965CDE;
     }
 
     .ant-table-tbody > tr:hover > td {
-      background: rgba(#252525, 0.3);
+      background: var(--bud-bg-hover);
     }
 
     .ant-empty-normal {
@@ -92,8 +92,8 @@ $primary-color: #965CDE;
     }
 
     .ant-input {
-      background: #1F1F1F;
-      border-color: #2F2F2F;
+      background: var(--bud-bg-tertiary);
+      border-color: var(--bud-border-secondary);
       color: $text-white;
 
       &::placeholder {
@@ -114,7 +114,7 @@ $primary-color: #965CDE;
         color: $text-gray;
 
         &:hover {
-          background: rgba(#252525, 0.5);
+          background: var(--bud-bg-hover);
           border-color: $primary-color;
           color: $text-white;
         }
@@ -123,8 +123,8 @@ $primary-color: #965CDE;
 
     .ant-select {
       .ant-select-selector {
-        background: #1F1F1F;
-        border-color: #2F2F2F;
+        background: var(--bud-bg-tertiary);
+        border-color: var(--bud-border-secondary);
         color: $text-white;
 
         &:hover,

@@ -287,17 +287,26 @@ class AuthService(SessionMixin):
 
             # Set default permissions for CLIENT users
             if user.user_type == UserTypeEnum.CLIENT:
-                # Assign CLIENT_ACCESS permission to client users
-                client_permission = PermissionList(name=PermissionEnum.CLIENT_ACCESS, has_permission=True)
+                # Assign all client permissions
+                client_permissions = [
+                    PermissionList(name=PermissionEnum.CLIENT_ACCESS, has_permission=True),
+                    PermissionList(name=PermissionEnum.PROJECT_VIEW, has_permission=True),
+                    PermissionList(name=PermissionEnum.PROJECT_MANAGE, has_permission=True),
+                ]
+
                 if user.permissions:
                     # Add to existing permissions if not already present
-                    permission_names = {p.name for p in user.permissions}
-                    if PermissionEnum.CLIENT_ACCESS not in permission_names:
-                        user.permissions.append(client_permission)
+                    existing_permission_names = {p.name for p in user.permissions}
+                    for client_perm in client_permissions:
+                        if client_perm.name not in existing_permission_names:
+                            user.permissions.append(client_perm)
                 else:
-                    # Set as the only permission for client users
-                    user.permissions = [client_permission]
-                logger.debug("Assigned CLIENT_ACCESS permission to client user: %s", user.email)
+                    # Set client permissions for client users
+                    user.permissions = client_permissions
+                logger.debug(
+                    "Assigned client permissions (CLIENT_ACCESS, PROJECT_VIEW, PROJECT_MANAGE) to client user: %s",
+                    user.email,
+                )
 
             # Process permissions to add implicit view permissions for manage permissions
             if user.permissions:
@@ -353,11 +362,6 @@ class AuthService(SessionMixin):
             await UserDataManager(self.session).insert_one(tenant_user_mapping)
             logger.info(f"User {db_user.email} mapped to tenant {tenant.name}")
 
-            await BudNotifyHandler().create_subscriber(subscriber_data)
-            logger.info("User added to budnotify subscriber")
-
-            _ = await UserDataManager(self.session).update_subscriber_status(user_ids=[db_user.id], is_subscriber=True)
-
             # Create a default project for CLIENT users
             if user.user_type == UserTypeEnum.CLIENT:
                 try:
@@ -397,10 +401,20 @@ class AuthService(SessionMixin):
                     # Don't fail the registration if project creation fails
                     # The user can create projects manually later
 
+            try:
+                await BudNotifyHandler().create_subscriber(subscriber_data)
+                logger.info("User added to budnotify subscriber")
+
+                _ = await UserDataManager(self.session).update_subscriber_status(
+                    user_ids=[db_user.id], is_subscriber=True
+                )
+            except BudNotifyException as e:
+                logger.error(
+                    f"Failed to add user to budnotify subscribers for {db_user.email}, but user registration is successful: {e}"
+                )
+
             return db_user
 
-        except BudNotifyException as e:
-            logger.error(f"Failed to add user to budnotify subscribers: {e}")
         except Exception as e:
             logger.error(f"Failed to register user: {e}")
             raise e

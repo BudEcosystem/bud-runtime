@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   Text_12_300_EEEEEE,
   Text_12_400_B3B3B3,
@@ -11,6 +12,7 @@ import { useAuthNavigation } from "@/context/authContext";
 import { PrimaryButton } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { getChromeColor } from "@/utils/getChromeColor";
+import CustomDropdownMenu from "@/components/ui/dropDown";
 
 type RegisterFormProps = {
   onSubmit: (formData: { [key: string]: string }) => void;
@@ -27,7 +29,7 @@ const RegisterForm = ({ onSubmit }: RegisterFormProps) => {
     purpose: "",
     role: "",
   });
-  const [errors, setErrors] = useState<{[key: string]: string}>({});
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [submittable, setSubmittable] = useState(false);
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -39,58 +41,71 @@ const RegisterForm = ({ onSubmit }: RegisterFormProps) => {
 
   useEffect(() => {
     // Check if form is submittable
-    const requiredFields = ['name', 'email', 'password', 'confirmPassword', 'company', 'purpose', 'role'];
-    const isFormValid = requiredFields.every(field => {
-      const value = formData[field as keyof typeof formData];
-      if (field === 'email') return value.length >= 3 && emailRegex.test(value);
-      if (field === 'password' || field === 'confirmPassword') return value.length >= 8;
-      return value.length > 0;
-    }) && formData.password === formData.confirmPassword;
+    const requiredFields = [
+      "name",
+      "email",
+      "password",
+      "confirmPassword",
+      "company",
+      "purpose",
+      "role",
+    ];
+    const isFormValid =
+      requiredFields.every((field) => {
+        const value = formData[field as keyof typeof formData];
+        if (field === "email")
+          return value.length >= 3 && emailRegex.test(value);
+        if (field === "password" || field === "confirmPassword")
+          return value.length >= 8;
+        return value.length > 0;
+      }) && formData.password === formData.confirmPassword;
 
     setSubmittable(isFormValid);
   }, [formData, emailRegex]);
 
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData((prev) => ({ ...prev, [field]: value }));
 
     // Clear errors when user starts typing
     if (value) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
-      setAuthError('');
+      setErrors((prev) => ({ ...prev, [field]: "" }));
+      setAuthError("");
     }
   };
 
   const validateField = (field: string, value: string) => {
-    let error = '';
+    let error = "";
 
     switch (field) {
-      case 'email':
-        if (!value) error = 'Please input your email!';
-        else if (value.length >= 3 && !emailRegex.test(value)) error = 'Please enter a valid email';
+      case "email":
+        if (!value) error = "Please input your email!";
+        else if (value.length >= 3 && !emailRegex.test(value))
+          error = "Please enter a valid email";
         break;
-      case 'password':
-        if (!value) error = 'Please input your password!';
-        else if (value.length < 8) error = 'Password must be at least 8 characters long';
+      case "password":
+        if (!value) error = "Please input your password!";
+        else if (value.length < 8)
+          error = "Password must be at least 8 characters long";
         break;
-      case 'confirmPassword':
-        if (!value) error = 'Please confirm your password!';
-        else if (value !== formData.password) error = 'Passwords do not match';
+      case "confirmPassword":
+        if (!value) error = "Please confirm your password!";
+        else if (value !== formData.password) error = "Passwords do not match";
         break;
-      case 'name':
-        if (!value) error = 'Please input your name!';
+      case "name":
+        if (!value) error = "Please input your name!";
         break;
-      case 'company':
-        if (!value) error = 'Please input your company!';
+      case "company":
+        if (!value) error = "Please input your company!";
         break;
-      case 'purpose':
-        if (!value) error = 'Please specify your purpose!';
+      case "purpose":
+        if (!value) error = "Please specify your purpose!";
         break;
-      case 'role':
-        if (!value) error = 'Please input your role!';
+      case "role":
+        if (!value) error = "Please input your role!";
         break;
     }
 
-    setErrors(prev => ({ ...prev, [field]: error }));
+    setErrors((prev) => ({ ...prev, [field]: error }));
     return !error;
   };
 
@@ -133,18 +148,18 @@ const RegisterForm = ({ onSubmit }: RegisterFormProps) => {
         {/* Name Field */}
         <div className="mb-[1.8rem]">
           <div className="relative">
-            <Text_12_300_EEEEEE className="absolute px-1 bg-black -top-1 left-2 inline-block tracking-[.035rem] z-10">
+            <span className="absolute px-1 bg-bud-bg-primary -top-1 left-2 inline-block tracking-[.035rem] z-10 text-xs font-light text-bud-text-muted">
               Name
-            </Text_12_300_EEEEEE>
+            </span>
           </div>
           <input
             type="text"
             placeholder="Enter your full name"
             value={formData.name}
-            onChange={(e) => handleInputChange('name', e.target.value)}
-            onBlur={() => validateField('name', formData.name)}
-            className={`h-auto leading-[100%] w-full placeholder:text-xs text-xs text-[#EEEEEE] placeholder:text-[#808080] font-light outline-none border rounded-[6px] pt-[.8rem] pb-[.53rem] px-3 bg-transparent
-              ${errors.name ? 'border-red-500' : 'border-gray-600 focus:border-gray-400'}`}
+            onChange={(e) => handleInputChange("name", e.target.value)}
+            onBlur={() => validateField("name", formData.name)}
+            className={`h-auto leading-[100%] w-full placeholder:text-xs text-xs text-bud-text-primary placeholder:text-bud-text-disabled font-light outline-none border rounded-[6px] pt-[.8rem] pb-[.53rem] px-3 bg-transparent
+              ${errors.name ? "border-red-500" : "border-bud-border focus:border-bud-text-muted"}`}
           />
           {errors.name && (
             <div className="text-red-500 text-xs mt-1">{errors.name}</div>
@@ -154,18 +169,18 @@ const RegisterForm = ({ onSubmit }: RegisterFormProps) => {
         {/* Email Field */}
         <div className="mb-[1.8rem]">
           <div className="relative">
-            <Text_12_300_EEEEEE className="absolute px-1 bg-black -top-1 left-2 inline-block tracking-[.035rem] z-10">
+            <span className="absolute px-1 bg-bud-bg-primary -top-1 left-2 inline-block tracking-[.035rem] z-10 text-xs font-light text-bud-text-muted">
               Email
-            </Text_12_300_EEEEEE>
+            </span>
           </div>
           <input
             type="email"
             placeholder="Enter email"
             value={formData.email}
-            onChange={(e) => handleInputChange('email', e.target.value)}
-            onBlur={() => validateField('email', formData.email)}
-            className={`h-auto leading-[100%] w-full placeholder:text-xs text-xs text-[#EEEEEE] placeholder:text-[#808080] font-light outline-none border rounded-[6px] pt-[.8rem] pb-[.53rem] px-3 bg-transparent
-              ${errors.email ? 'border-red-500' : 'border-gray-600 focus:border-gray-400'}`}
+            onChange={(e) => handleInputChange("email", e.target.value)}
+            onBlur={() => validateField("email", formData.email)}
+            className={`h-auto leading-[100%] w-full placeholder:text-xs text-xs text-bud-text-primary placeholder:text-bud-text-disabled font-light outline-none border rounded-[6px] pt-[.8rem] pb-[.53rem] px-3 bg-transparent
+              ${errors.email ? "border-red-500" : "border-bud-border focus:border-bud-text-muted"}`}
           />
           {errors.email && (
             <div className="text-red-500 text-xs mt-1">{errors.email}</div>
@@ -176,18 +191,18 @@ const RegisterForm = ({ onSubmit }: RegisterFormProps) => {
         <div className="flex gap-4 mb-[1.8rem]">
           <div className="flex-1">
             <div className="relative">
-              <Text_12_300_EEEEEE className="absolute px-1 bg-black -top-1 left-2 inline-block tracking-[.035rem] z-10">
+              <span className="absolute px-1 bg-bud-bg-primary -top-1 left-2 inline-block tracking-[.035rem] z-10 text-xs font-light text-bud-text-muted">
                 Password
-              </Text_12_300_EEEEEE>
+              </span>
             </div>
             <input
               type="password"
               placeholder="Enter password"
               value={formData.password}
-              onChange={(e) => handleInputChange('password', e.target.value)}
-              onBlur={() => validateField('password', formData.password)}
-              className={`h-auto leading-[100%] w-full placeholder:text-xs text-xs text-[#EEEEEE] placeholder:text-[#808080] font-light outline-none border rounded-[6px] pt-[.8rem] pb-[.53rem] px-3 bg-transparent
-                ${errors.password ? 'border-red-500' : 'border-gray-600 focus:border-gray-400'}`}
+              onChange={(e) => handleInputChange("password", e.target.value)}
+              onBlur={() => validateField("password", formData.password)}
+              className={`h-auto leading-[100%] w-full placeholder:text-xs text-xs text-bud-text-primary placeholder:text-bud-text-disabled font-light outline-none border rounded-[6px] pt-[.8rem] pb-[.53rem] px-3 bg-transparent
+                ${errors.password ? "border-red-500" : "border-bud-border focus:border-bud-text-muted"}`}
             />
             {errors.password && (
               <div className="text-red-500 text-xs mt-1">{errors.password}</div>
@@ -196,21 +211,27 @@ const RegisterForm = ({ onSubmit }: RegisterFormProps) => {
 
           <div className="flex-1">
             <div className="relative">
-              <Text_12_300_EEEEEE className="absolute px-1 bg-black -top-1 left-2 inline-block tracking-[.035rem] z-10">
+              <span className="absolute px-1 bg-bud-bg-primary -top-1 left-2 inline-block tracking-[.035rem] z-10 text-xs font-light text-bud-text-muted">
                 Confirm Password
-              </Text_12_300_EEEEEE>
+              </span>
             </div>
             <input
               type="password"
               placeholder="Confirm password"
               value={formData.confirmPassword}
-              onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
-              onBlur={() => validateField('confirmPassword', formData.confirmPassword)}
-              className={`h-auto leading-[100%] w-full placeholder:text-xs text-xs text-[#EEEEEE] placeholder:text-[#808080] font-light outline-none border rounded-[6px] pt-[.8rem] pb-[.53rem] px-3 bg-transparent
-                ${errors.confirmPassword ? 'border-red-500' : 'border-gray-600 focus:border-gray-400'}`}
+              onChange={(e) =>
+                handleInputChange("confirmPassword", e.target.value)
+              }
+              onBlur={() =>
+                validateField("confirmPassword", formData.confirmPassword)
+              }
+              className={`h-auto leading-[100%] w-full placeholder:text-xs text-xs text-bud-text-primary placeholder:text-bud-text-disabled font-light outline-none border rounded-[6px] pt-[.8rem] pb-[.53rem] px-3 bg-transparent
+                ${errors.confirmPassword ? "border-red-500" : "border-bud-border focus:border-bud-text-muted"}`}
             />
             {errors.confirmPassword && (
-              <div className="text-red-500 text-xs mt-1">{errors.confirmPassword}</div>
+              <div className="text-red-500 text-xs mt-1">
+                {errors.confirmPassword}
+              </div>
             )}
           </div>
         </div>
@@ -218,18 +239,18 @@ const RegisterForm = ({ onSubmit }: RegisterFormProps) => {
         {/* Company Field */}
         <div className="mb-[1.8rem]">
           <div className="relative">
-            <Text_12_300_EEEEEE className="absolute px-1 bg-black -top-1 left-2 inline-block tracking-[.035rem] z-10">
+            <span className="absolute px-1 bg-bud-bg-primary -top-1 left-2 inline-block tracking-[.035rem] z-10 text-xs font-light text-bud-text-muted">
               Company
-            </Text_12_300_EEEEEE>
+            </span>
           </div>
           <input
             type="text"
             placeholder="Enter company name"
             value={formData.company}
-            onChange={(e) => handleInputChange('company', e.target.value)}
-            onBlur={() => validateField('company', formData.company)}
-            className={`h-auto leading-[100%] w-full placeholder:text-xs text-xs text-[#EEEEEE] placeholder:text-[#808080] font-light outline-none border rounded-[6px] pt-[.8rem] pb-[.53rem] px-3 bg-transparent
-              ${errors.company ? 'border-red-500' : 'border-gray-600 focus:border-gray-400'}`}
+            onChange={(e) => handleInputChange("company", e.target.value)}
+            onBlur={() => validateField("company", formData.company)}
+            className={`h-auto leading-[100%] w-full placeholder:text-xs text-xs text-bud-text-primary placeholder:text-bud-text-disabled font-light outline-none border rounded-[6px] pt-[.8rem] pb-[.53rem] px-3 bg-transparent
+              ${errors.company ? "border-red-500" : "border-bud-border focus:border-bud-text-muted"}`}
           />
           {errors.company && (
             <div className="text-red-500 text-xs mt-1">{errors.company}</div>
@@ -239,18 +260,18 @@ const RegisterForm = ({ onSubmit }: RegisterFormProps) => {
         {/* Purpose Field */}
         <div className="mb-[1.8rem]">
           <div className="relative">
-            <Text_12_300_EEEEEE className="absolute px-1 bg-black -top-1 left-2 inline-block tracking-[.035rem] z-10">
+            <span className="absolute px-1 bg-bud-bg-primary -top-1 left-2 inline-block tracking-[.035rem] z-10 text-xs font-light text-bud-text-muted">
               Purpose
-            </Text_12_300_EEEEEE>
+            </span>
           </div>
           <input
             type="text"
             placeholder="What will you use BUD for?"
             value={formData.purpose}
-            onChange={(e) => handleInputChange('purpose', e.target.value)}
-            onBlur={() => validateField('purpose', formData.purpose)}
-            className={`h-auto leading-[100%] w-full placeholder:text-xs text-xs text-[#EEEEEE] placeholder:text-[#808080] font-light outline-none border rounded-[6px] pt-[.8rem] pb-[.53rem] px-3 bg-transparent
-              ${errors.purpose ? 'border-red-500' : 'border-gray-600 focus:border-gray-400'}`}
+            onChange={(e) => handleInputChange("purpose", e.target.value)}
+            onBlur={() => validateField("purpose", formData.purpose)}
+            className={`h-auto leading-[100%] w-full placeholder:text-xs text-xs text-bud-text-primary placeholder:text-bud-text-disabled font-light outline-none border rounded-[6px] pt-[.8rem] pb-[.53rem] px-3 bg-transparent
+              ${errors.purpose ? "border-red-500" : "border-bud-border focus:border-bud-text-muted"}`}
           />
           {errors.purpose && (
             <div className="text-red-500 text-xs mt-1">{errors.purpose}</div>
@@ -260,19 +281,36 @@ const RegisterForm = ({ onSubmit }: RegisterFormProps) => {
         {/* Role Field */}
         <div className="mb-[1.8rem]">
           <div className="relative">
-            <Text_12_300_EEEEEE className="absolute px-1 bg-black -top-1 left-2 inline-block tracking-[.035rem] z-10">
+            <span className="absolute px-1 bg-bud-bg-primary -top-1 left-2 inline-block tracking-[.035rem] z-10 text-xs font-light text-bud-text-muted">
               Role
-            </Text_12_300_EEEEEE>
+            </span>
           </div>
-          <input
-            type="text"
-            placeholder="Enter your role"
-            value={formData.role}
-            onChange={(e) => handleInputChange('role', e.target.value)}
-            onBlur={() => validateField('role', formData.role)}
-            className={`h-auto leading-[100%] w-full placeholder:text-xs text-xs text-[#EEEEEE] placeholder:text-[#808080] font-light outline-none border rounded-[6px] pt-[.8rem] pb-[.53rem] px-3 bg-transparent
-              ${errors.role ? 'border-red-500' : 'border-gray-600 focus:border-gray-400'}`}
-          />
+          <div
+            className={`border rounded-[6px] ${errors.role ? "border-red-500" : "border-bud-border"}`}
+          >
+            <CustomDropdownMenu
+              items={["Developer", "Tester", "DevOps"]}
+              onSelect={(value: string) => {
+                handleInputChange("role", value.toLowerCase());
+                validateField("role", value.toLowerCase());
+              }}
+              triggerClassNames="w-full"
+              contentClassNames="w-full"
+              triggerRenderItem={
+                <div className="flex items-center justify-between w-full h-auto leading-[100%] text-xs text-bud-text-primary font-light pt-[.8rem] pb-[.53rem] px-3">
+                  <span
+                    className={formData.role ? "" : "text-bud-text-disabled"}
+                  >
+                    {formData.role
+                      ? formData.role.charAt(0).toUpperCase() +
+                        formData.role.slice(1)
+                      : "Select your role"}
+                  </span>
+                  <span className="text-bud-text-disabled">▼</span>
+                </div>
+              }
+            />
+          </div>
           {errors.role && (
             <div className="text-red-500 text-xs mt-1">{errors.role}</div>
           )}
@@ -290,12 +328,12 @@ const RegisterForm = ({ onSubmit }: RegisterFormProps) => {
       <div className="mt-[2.2rem] flex justify-center">
         <Text_12_400_EEEEEE className="cursor-pointer">
           Already have an account?{" "}
-          <span
-            className="text-[#965CDE] cursor-pointer"
-            onClick={() => setActivePage(1)}
+          <Link
+            href="/login"
+            className="text-bud-purple cursor-pointer hover:underline"
           >
             Sign in
-          </span>
+          </Link>
         </Text_12_400_EEEEEE>
       </div>
 
@@ -310,7 +348,9 @@ const RegisterForm = ({ onSubmit }: RegisterFormProps) => {
           }}
         >
           <Text_12_400_EEEEEE className="text-[#EC7575]">
-            {authError.includes('Cannot read properties') ? 'Something went wrong, please try again later.' : authError}
+            {authError.includes("Cannot read properties")
+              ? "Something went wrong, please try again later."
+              : authError}
           </Text_12_400_EEEEEE>
         </motion.div>
       )}

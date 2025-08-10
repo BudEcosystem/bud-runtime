@@ -1,4 +1,4 @@
-import React, { } from "react";
+import React from "react";
 
 import { Image } from "antd";
 import {
@@ -10,9 +10,7 @@ import { PrimaryButton } from "../form/Buttons";
 import { useDrawer } from "@/hooks/useDrawer";
 import { useDeployModel } from "@/stores/useDeployModel";
 
-const ProjectSuccessCard = (props: {
-  text?: string;
-}) => {
+const ProjectSuccessCard = (props: { text?: string }) => {
   const { openDrawerWithStep } = useDrawer();
   const { reset } = useDeployModel();
 

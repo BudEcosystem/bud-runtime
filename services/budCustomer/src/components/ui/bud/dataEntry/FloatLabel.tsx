@@ -1,6 +1,11 @@
 import React, { useState } from "react";
 
-const FloatLabel = (props: { children: React.ReactNode; label: React.ReactNode; value: any; classNames?: string }) => {
+const FloatLabel = (props: {
+  children: React.ReactNode;
+  label: React.ReactNode;
+  value: any;
+  classNames?: string;
+}) => {
   const [focus, setFocus] = useState(false);
   const { children, label, value, classNames } = props;
 
@@ -13,7 +18,9 @@ const FloatLabel = (props: { children: React.ReactNode; label: React.ReactNode; 
       onFocus={() => setFocus(true)}
     >
       {children}
-      <label className={`text-nowrap ${labelClass} ${classNames}`}>{label}</label>
+      <label className={`text-nowrap ${labelClass} ${classNames}`}>
+        {label}
+      </label>
     </div>
   );
 };

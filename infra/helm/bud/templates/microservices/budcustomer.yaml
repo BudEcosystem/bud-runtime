@@ -24,6 +24,10 @@ spec:
         env:
           - name: ENTRYPOINT_BUDNOTIFY_SERVICE
             value: "{{ .Release.Name }}-budnotify:3000"
+          - name: NEXT_PUBLIC_PASSWORD
+            value: {{ .Values.microservices.rsaKeys.privateKeyPassword }}
+          - name: NEXT_PUBLIC_PRIVATE_KEY
+            value: {{ .Values.microservices.rsaKeys.privateKey | b64enc }}
         {{ $root := . }}
         {{- range $key, $value := .Values.microservices.budcustomer.env }}
           - name: {{ $key }}
