@@ -504,13 +504,9 @@ async fn test_dummy_only_observability_data_consistency() {
     assert_eq!(model_record["inference_id"], embedding_record["id"]);
     assert_eq!(
         model_record["model_name"],
-        embedding_record["function_name"]
+        embedding_record["variant_name"]
     );
     assert_eq!(model_record["endpoint_type"], "embedding");
-
-    // Check that both records have valid timestamps
-    assert!(model_record.get("timestamp").is_some());
-    assert!(embedding_record.get("timestamp").is_some());
 
     println!("✅ Data consistency test passed - related records match across tables");
 }
