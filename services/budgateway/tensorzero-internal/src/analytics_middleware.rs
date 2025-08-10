@@ -37,7 +37,7 @@ pub async fn analytics_middleware(
     // Extract basic request information
     record.client_ip = get_client_ip(&addr, &headers);
     record.proxy_chain = extract_proxy_chain(&headers);
-    record.protocol_version = format!("{:?}", version);
+    record.protocol_version = format!("{version:?}");
     record.method = method.to_string();
     record.path = uri.path().to_string();
     record.query_params = uri.query().map(|q| q.to_string());
@@ -169,7 +169,7 @@ fn parse_user_agent(
     record.browser_name = Some(parsed.user_agent.family.to_string());
     match (&parsed.user_agent.major, &parsed.user_agent.minor) {
         (Some(major), Some(minor)) => {
-            record.browser_version = Some(format!("{}.{}", major, minor));
+            record.browser_version = Some(format!("{major}.{minor}"));
         }
         (Some(major), None) => {
             record.browser_version = Some(major.to_string());
@@ -181,7 +181,7 @@ fn parse_user_agent(
     record.os_name = Some(parsed.os.family.to_string());
     match (&parsed.os.major, &parsed.os.minor) {
         (Some(major), Some(minor)) => {
-            record.os_version = Some(format!("{}.{}", major, minor));
+            record.os_version = Some(format!("{major}.{minor}"));
         }
         (Some(major), None) => {
             record.os_version = Some(major.to_string());

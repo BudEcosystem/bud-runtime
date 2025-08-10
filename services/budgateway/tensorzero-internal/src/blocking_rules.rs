@@ -84,17 +84,17 @@ impl BlockingRulesManager {
             return Ok(());
         };
 
-        let key = format!("gateway:blocking_rules:{}", project_id);
+        let key = format!("gateway:blocking_rules:{project_id}");
 
         let mut conn = redis_client.get_connection().await.map_err(|e| {
             Error::new(ErrorDetails::InternalError {
-                message: format!("Failed to get Redis connection: {}", e),
+                message: format!("Failed to get Redis connection: {e}"),
             })
         })?;
 
         let rules_json: Option<String> = conn.get(&key).await.map_err(|e| {
             Error::new(ErrorDetails::InternalError {
-                message: format!("Failed to get blocking rules from Redis: {}", e),
+                message: format!("Failed to get blocking rules from Redis: {e}"),
             })
         })?;
 
@@ -330,9 +330,9 @@ impl BlockingRulesManager {
         let window_minutes = config
             .get("window_minutes")
             .and_then(|v| v.as_u64())
-            .unwrap_or(1) as u64;
+            .unwrap_or(1);
 
-        let key = format!("{}:{}:{}", project_id, rule.id, client_ip);
+        let key = format!("{project_id}:{}:{client_ip}", rule.id);
         let window_duration = Duration::from_secs(window_minutes * 60);
 
         let mut rate_limits = self.rate_limits.write().await;
@@ -357,8 +357,8 @@ impl BlockingRulesManager {
             return (
                 true,
                 format!(
-                    "Rate limit exceeded: {} requests in {} minutes (limit: {})",
-                    state.requests, window_minutes, requests_per_minute
+                    "Rate limit exceeded: {} requests in {window_minutes} minutes (limit: {requests_per_minute})",
+                    state.requests
                 ),
             );
         }
@@ -381,11 +381,11 @@ impl BlockingRulesManager {
 async fn update_rule_stats(redis_client: &RedisClient, rule_id: &Uuid) -> Result<(), Error> {
     let mut conn = redis_client.get_connection().await.map_err(|e| {
         Error::new(ErrorDetails::InternalError {
-            message: format!("Failed to get Redis connection: {}", e),
+            message: format!("Failed to get Redis connection: {e}"),
         })
     })?;
 
-    let stats_key = format!("gateway:rule_stats:{}", rule_id);
+    let stats_key = format!("gateway:rule_stats:{rule_id}");
     let now = chrono::Utc::now().timestamp();
 
     // Increment match count
@@ -394,7 +394,7 @@ async fn update_rule_stats(redis_client: &RedisClient, rule_id: &Uuid) -> Result
         .await
         .map_err(|e| {
             Error::new(ErrorDetails::InternalError {
-                message: format!("Failed to update rule stats: {}", e),
+                message: format!("Failed to update rule stats: {e}"),
             })
         })?;
 
@@ -404,14 +404,14 @@ async fn update_rule_stats(redis_client: &RedisClient, rule_id: &Uuid) -> Result
         .await
         .map_err(|e| {
             Error::new(ErrorDetails::InternalError {
-                message: format!("Failed to update rule stats: {}", e),
+                message: format!("Failed to update rule stats: {e}"),
             })
         })?;
 
     // Set expiry to 7 days
     let _: () = conn.expire(&stats_key, 604800).await.map_err(|e| {
         Error::new(ErrorDetails::InternalError {
-            message: format!("Failed to set expiry on rule stats: {}", e),
+            message: format!("Failed to set expiry on rule stats: {e}"),
         })
     })?;
 

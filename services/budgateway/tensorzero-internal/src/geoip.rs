@@ -80,7 +80,7 @@ impl GeoIpService {
                                 subdivision
                                     .names
                                     .as_ref()
-                                    .and_then(|n| n.get("en").map(|s| *s))
+                                    .and_then(|n| n.get("en").copied())
                             })
                             .map(|s| s.to_string());
                     }
