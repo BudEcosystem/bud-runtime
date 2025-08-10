@@ -90,7 +90,7 @@ class GatewayBlockingRule(Base, TimestampMixin):
 
     # Relationships
     project: Mapped["Project"] = relationship(back_populates="blocking_rules")
-    endpoint: Mapped["Endpoint"] = relationship(back_populates="blocking_rules", optional=True)
+    endpoint: Mapped[Optional["Endpoint"]] = relationship(back_populates="blocking_rules")
     created_user: Mapped["User"] = relationship(foreign_keys=[created_by])
 
     # Indexes for performance
