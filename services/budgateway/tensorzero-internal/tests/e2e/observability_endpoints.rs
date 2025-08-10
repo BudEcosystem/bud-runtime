@@ -85,7 +85,7 @@ async fn select_model_inference_by_endpoint_type(
     Ok(Some(json))
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_embedding_observability_clickhouse_write() {
     // Start the gateway in the background
     let _gateway_handle = make_embedded_gateway().await;
@@ -139,7 +139,7 @@ async fn test_embedding_observability_clickhouse_write() {
     println!("✅ Embedding observability test passed - data written to ClickHouse");
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_moderation_observability_clickhouse_write() {
     let _gateway_handle = make_embedded_gateway().await;
 
@@ -194,7 +194,7 @@ async fn test_moderation_observability_clickhouse_write() {
     println!("✅ Moderation observability test passed - data written to ClickHouse");
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_image_generation_observability_clickhouse_write() {
     let _gateway_handle = make_embedded_gateway().await;
 
