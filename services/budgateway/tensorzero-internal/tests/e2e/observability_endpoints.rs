@@ -202,7 +202,7 @@ async fn test_image_generation_observability_clickhouse_write() {
 
     // Make image generation request
     let payload = json!({
-        "model": "dall-e-3",
+        "model": "image-generation-test",
         "prompt": "A beautiful sunset over mountains for observability testing",
         "n": 1,
         "size": "1024x1024"
@@ -330,7 +330,7 @@ async fn test_endpoint_type_differentiation_in_model_inference() {
     println!("✅ Endpoint type differentiation test passed - ModelInference correctly tracks endpoint types: {:?}", endpoint_types);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_embedding_batch_observability() {
     let _gateway_handle = make_embedded_gateway().await;
 
@@ -376,7 +376,7 @@ async fn test_embedding_batch_observability() {
     println!("✅ Batch embedding observability test passed - batch size correctly tracked");
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_observability_tables_creation() {
     // Test that all new observability tables exist
     let clickhouse = get_clickhouse().await;
@@ -421,7 +421,7 @@ async fn test_observability_tables_creation() {
     println!("✅ All observability tables and columns are properly created");
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_observability_data_consistency() {
     let _gateway_handle = make_embedded_gateway().await;
 
