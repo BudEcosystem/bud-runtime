@@ -72,3 +72,4 @@ class Project(Base, TimestampMixin):
         back_populates="project", cascade="all, delete"
     )
     created_user: Mapped["User"] = relationship(back_populates="created_projects", foreign_keys=[created_by])
+    blocking_rules: Mapped[list["GatewayBlockingRule"]] = relationship(back_populates="project", cascade="all, delete")

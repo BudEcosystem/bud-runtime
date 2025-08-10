@@ -99,6 +99,9 @@ class Endpoint(Base, TimestampMixin):
         "RouterEndpoint",
         back_populates="endpoint",
     )
+    blocking_rules: Mapped[list["GatewayBlockingRule"]] = relationship(
+        back_populates="endpoint", cascade="all, delete"
+    )
 
     @hybrid_property
     def cache_config_dict(self):

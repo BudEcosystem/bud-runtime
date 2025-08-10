@@ -24,6 +24,7 @@ from starlette_compress import CompressMiddleware
 
 from .commons.config import app_settings, secrets_settings
 from .commons.profiling_utils import performance_logger
+from .gateway_analytics.routes import gateway_analytics_router
 from .observability.routes import observability_router
 
 
@@ -49,3 +50,4 @@ app = configure_app(app_settings, secrets_settings, lifespan=lifespan)
 app.add_middleware(CompressMiddleware, minimum_size=1000, zstd_level=4, brotli_quality=4, gzip_level=4)
 
 app.include_router(observability_router)
+app.include_router(gateway_analytics_router)

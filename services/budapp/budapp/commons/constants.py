@@ -892,6 +892,36 @@ class FeedbackEnum(Enum):
     DOWNVOTE = "downvote"
 
 
+class BlockingRuleType(StrEnum):
+    """Enumeration of blocking rule types for gateway protection.
+
+    Attributes:
+        IP_BLOCKING: Block specific IP addresses or ranges
+        COUNTRY_BLOCKING: Block traffic from specific countries
+        USER_AGENT_BLOCKING: Block based on user agent patterns
+        RATE_BASED_BLOCKING: Block based on request rate thresholds
+    """
+
+    IP_BLOCKING = auto()
+    COUNTRY_BLOCKING = auto()
+    USER_AGENT_BLOCKING = auto()
+    RATE_BASED_BLOCKING = auto()
+
+
+class BlockingRuleStatus(StrEnum):
+    """Enumeration of blocking rule statuses.
+
+    Attributes:
+        ACTIVE: Rule is active and will be enforced
+        INACTIVE: Rule is inactive and will not be enforced
+        EXPIRED: Rule has expired (for temporary rules)
+    """
+
+    ACTIVE = auto()
+    INACTIVE = auto()
+    EXPIRED = auto()
+
+
 APP_ICONS = {
     "general": {
         "model_mono": "icons/general/model_mono.png",

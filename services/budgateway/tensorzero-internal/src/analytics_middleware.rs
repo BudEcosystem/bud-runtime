@@ -1,0 +1,270 @@
+use axum::{
+    extract::{ConnectInfo, Request},
+    http::{HeaderMap, Method, StatusCode, Uri, Version},
+    middleware::Next,
+    response::Response,
+};
+use chrono::Utc;
+use std::collections::HashMap;
+use std::net::SocketAddr;
+use std::sync::Arc;
+use tracing::error;
+use uaparser::{Parser, UserAgentParser};
+
+use crate::analytics::{GatewayAnalyticsDatabaseInsert, RequestAnalytics};
+use crate::clickhouse::ClickHouseConnectionInfo;
+use crate::error::Error;
+use crate::geoip::GeoIpService;
+
+/// Middleware for collecting analytics data about gateway requests
+pub async fn analytics_middleware(
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+    method: Method,
+    uri: Uri,
+    version: Version,
+    mut request: Request,
+    next: Next,
+) -> Result<Response, Error> {
+    // Get services from request extensions
+    let geoip_service = request.extensions().get::<Arc<GeoIpService>>().cloned();
+    let ua_parser = request.extensions().get::<Arc<UserAgentParser>>().cloned();
+
+    // Create analytics record
+    let mut analytics = RequestAnalytics::new();
+    let record = &mut analytics.record;
+
+    // Extract basic request information
+    record.client_ip = get_client_ip(&addr, &headers);
+    record.proxy_chain = extract_proxy_chain(&headers);
+    record.protocol_version = format!("{:?}", version);
+    record.method = method.to_string();
+    record.path = uri.path().to_string();
+    record.query_params = uri.query().map(|q| q.to_string());
+
+    // Extract user agent
+    record.user_agent = headers
+        .get("user-agent")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+
+    // Parse user agent for device/browser info
+    if let (Some(ua), Some(parser)) = (record.user_agent.clone(), ua_parser.as_ref()) {
+        parse_user_agent(&ua, record, parser);
+    }
+
+    // Perform GeoIP lookup
+    if let Some(geoip) = &geoip_service {
+        let client_ip = record.client_ip.clone();
+        geoip.enrich_analytics(&client_ip, record);
+    }
+
+    // Extract selected request headers
+    record.request_headers = extract_important_headers(&headers);
+
+    // Store analytics in request extensions
+    let analytics_arc = Arc::new(tokio::sync::Mutex::new(analytics));
+    request.extensions_mut().insert(analytics_arc.clone());
+
+    // Get ClickHouse connection before processing request
+    let clickhouse_opt = request
+        .extensions()
+        .get::<Arc<ClickHouseConnectionInfo>>()
+        .cloned();
+
+    // Process the request
+    let response = next.run(request).await;
+
+    // Update analytics with response data
+    {
+        let mut analytics = analytics_arc.lock().await;
+
+        // Calculate durations
+        let elapsed = analytics.start_time.elapsed();
+        analytics.record.total_duration_ms = elapsed.as_millis() as u32;
+        analytics.record.response_timestamp = Utc::now();
+
+        // Extract response information
+        analytics.record.status_code = response.status().as_u16();
+
+        // Extract selected response headers
+        analytics.record.response_headers = extract_important_headers(response.headers());
+
+        // Check if request was blocked
+        if response.status() == StatusCode::FORBIDDEN
+            || response.status() == StatusCode::TOO_MANY_REQUESTS
+        {
+            analytics.record.is_blocked = true;
+            // Block reason might be in a custom header or response body
+            if let Some(reason) = response.headers().get("x-block-reason") {
+                analytics.record.block_reason = reason.to_str().ok().map(|s| s.to_string());
+            }
+        }
+    }
+
+    // Get final analytics record
+    let final_record = analytics_arc.lock().await.record.clone();
+
+    // Spawn task to write analytics (non-blocking)
+    if let Some(clickhouse) = clickhouse_opt {
+        tokio::spawn(async move {
+            if let Err(e) = write_analytics_to_clickhouse(&clickhouse, final_record).await {
+                error!("Failed to write analytics to ClickHouse: {}", e);
+            }
+        });
+    }
+
+    Ok(response)
+}
+
+/// Extract the real client IP considering proxy headers
+fn get_client_ip(addr: &SocketAddr, headers: &HeaderMap) -> String {
+    // Check X-Forwarded-For first
+    if let Some(forwarded_for) = headers.get("x-forwarded-for") {
+        if let Ok(forwarded_str) = forwarded_for.to_str() {
+            // X-Forwarded-For can contain multiple IPs, take the first one
+            if let Some(first_ip) = forwarded_str.split(',').next() {
+                return first_ip.trim().to_string();
+            }
+        }
+    }
+
+    // Check X-Real-IP
+    if let Some(real_ip) = headers.get("x-real-ip") {
+        if let Ok(ip_str) = real_ip.to_str() {
+            return ip_str.to_string();
+        }
+    }
+
+    // Fallback to socket address
+    addr.ip().to_string()
+}
+
+/// Extract proxy chain information
+fn extract_proxy_chain(headers: &HeaderMap) -> Option<String> {
+    headers
+        .get("x-forwarded-for")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string())
+}
+
+/// Parse user agent string to extract device and browser information
+fn parse_user_agent(
+    ua: &str,
+    record: &mut GatewayAnalyticsDatabaseInsert,
+    parser: &UserAgentParser,
+) {
+    let ua_lower = ua.to_lowercase();
+
+    // Detect bots
+    record.is_bot = ua_lower.contains("bot")
+        || ua_lower.contains("crawler")
+        || ua_lower.contains("spider")
+        || ua_lower.contains("scraper");
+
+    // Parse user agent
+    let parsed = parser.parse(ua);
+
+    // Browser info
+    record.browser_name = Some(parsed.user_agent.family.to_string());
+    match (&parsed.user_agent.major, &parsed.user_agent.minor) {
+        (Some(major), Some(minor)) => {
+            record.browser_version = Some(format!("{}.{}", major, minor));
+        }
+        (Some(major), None) => {
+            record.browser_version = Some(major.to_string());
+        }
+        _ => {}
+    }
+
+    // OS info
+    record.os_name = Some(parsed.os.family.to_string());
+    match (&parsed.os.major, &parsed.os.minor) {
+        (Some(major), Some(minor)) => {
+            record.os_version = Some(format!("{}.{}", major, minor));
+        }
+        (Some(major), None) => {
+            record.os_version = Some(major.to_string());
+        }
+        _ => {}
+    }
+
+    // Device type
+    let device_family = parsed.device.family.to_lowercase();
+    record.device_type = Some(if record.is_bot {
+        "bot".to_string()
+    } else if device_family.contains("mobile") || device_family.contains("phone") {
+        "mobile".to_string()
+    } else if device_family.contains("tablet") || device_family.contains("ipad") {
+        "tablet".to_string()
+    } else {
+        "desktop".to_string()
+    });
+}
+
+/// Extract important headers for analytics
+fn extract_important_headers(headers: &HeaderMap) -> HashMap<String, String> {
+    let mut result = HashMap::new();
+
+    // List of headers to capture
+    let important_headers = [
+        "accept",
+        "accept-language",
+        "content-type",
+        "referer",
+        "origin",
+        "x-request-id",
+        "x-correlation-id",
+        "x-model-name",
+    ];
+
+    for header_name in &important_headers {
+        if let Some(value) = headers.get(*header_name) {
+            if let Ok(value_str) = value.to_str() {
+                result.insert(header_name.to_string(), value_str.to_string());
+            }
+        }
+    }
+
+    result
+}
+
+/// Write analytics record to ClickHouse
+async fn write_analytics_to_clickhouse(
+    clickhouse: &ClickHouseConnectionInfo,
+    record: GatewayAnalyticsDatabaseInsert,
+) -> Result<(), Error> {
+    clickhouse.write(&[record], "GatewayAnalytics").await
+}
+
+use axum::extract::State;
+
+/// Middleware to attach ClickHouse connection to request extensions
+pub async fn attach_clickhouse_middleware(
+    State(clickhouse): State<Arc<ClickHouseConnectionInfo>>,
+    mut request: Request,
+    next: Next,
+) -> Result<Response, Error> {
+    request.extensions_mut().insert(clickhouse);
+    Ok(next.run(request).await)
+}
+
+/// Middleware to attach GeoIP service to request extensions
+pub async fn attach_geoip_middleware(
+    State(geoip): State<Arc<GeoIpService>>,
+    mut request: Request,
+    next: Next,
+) -> Result<Response, Error> {
+    request.extensions_mut().insert(geoip);
+    Ok(next.run(request).await)
+}
+
+/// Middleware to attach UA parser to request extensions
+pub async fn attach_ua_parser_middleware(
+    State(parser): State<Arc<UserAgentParser>>,
+    mut request: Request,
+    next: Next,
+) -> Result<Response, Error> {
+    request.extensions_mut().insert(parser);
+    Ok(next.run(request).await)
+}

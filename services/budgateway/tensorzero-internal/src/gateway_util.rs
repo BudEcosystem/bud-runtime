@@ -2,7 +2,8 @@ use std::collections::HashMap;
 use std::future::IntoFuture;
 use std::net::SocketAddr;
 use std::path::Path;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
+use uaparser::UserAgentParser;
 
 use axum::extract::{rejection::JsonRejection, FromRequest, Json, Request};
 use axum::routing::post;
@@ -14,11 +15,13 @@ use tokio::sync::oneshot::Sender;
 use tracing::instrument;
 
 use crate::auth::Auth;
+use crate::blocking_rules::BlockingRulesManager;
 use crate::clickhouse::migration_manager;
 use crate::clickhouse::ClickHouseConnectionInfo;
 use crate::config_parser::Config;
 use crate::endpoints;
 use crate::error::{Error, ErrorDetails};
+use crate::geoip::GeoIpService;
 use crate::kafka::KafkaConnectionInfo;
 use crate::model::ModelTable;
 use crate::rate_limit::DistributedRateLimiter;
@@ -39,8 +42,11 @@ pub struct AppStateData {
     pub clickhouse_connection_info: ClickHouseConnectionInfo,
     pub kafka_connection_info: KafkaConnectionInfo,
     pub authentication_info: AuthenticationInfo,
-    pub model_credential_store: Arc<RwLock<HashMap<String, SecretString>>>,
+    pub model_credential_store: Arc<std::sync::RwLock<HashMap<String, SecretString>>>,
     pub rate_limiter: Option<Arc<DistributedRateLimiter>>,
+    pub geoip_service: Option<Arc<GeoIpService>>,
+    pub ua_parser: Option<Arc<UserAgentParser>>,
+    pub blocking_manager: Option<Arc<BlockingRulesManager>>,
 }
 pub type AppState = axum::extract::State<AppStateData>;
 
@@ -66,14 +72,39 @@ impl AppStateData {
         let http_client = setup_http_client()?;
         let authentication_info = setup_authentication(&config);
 
+        // Initialize analytics services if enabled
+        let (geoip_service, ua_parser) = if config.gateway.analytics.enabled {
+            let geoip = config
+                .gateway
+                .analytics
+                .geoip_db_path
+                .as_ref()
+                .map(|path| Arc::new(GeoIpService::new(Some(path))));
+
+            let parser = match UserAgentParser::from_bytes(include_bytes!("../regexes.yaml")) {
+                Ok(p) => Some(Arc::new(p)),
+                Err(e) => {
+                    tracing::warn!("Failed to initialize user agent parser: {}", e);
+                    None
+                }
+            };
+
+            (geoip, parser)
+        } else {
+            (None, None)
+        };
+
         Ok(Self {
             config,
             http_client,
             clickhouse_connection_info,
             kafka_connection_info,
             authentication_info,
-            model_credential_store: Arc::new(RwLock::new(HashMap::new())),
+            model_credential_store: Arc::new(std::sync::RwLock::new(HashMap::new())),
             rate_limiter: None, // Will be initialized later with Redis client
+            geoip_service,
+            ua_parser,
+            blocking_manager: None, // Will be initialized later with Redis client
         })
     }
     pub async fn update_model_table(&self, mut new_models: ModelTable) {
@@ -298,6 +329,51 @@ pub async fn setup_redis_and_rate_limiter(
         }
     } else {
         tracing::info!("No rate limiting configuration found");
+        app_state
+    };
+
+    // Setup blocking manager if configured and Redis is available
+    let app_state = if config.gateway.blocking.enabled {
+        if let Some(ref url) = redis_url {
+            if !url.is_empty() {
+                // Create Redis client for blocking rules
+                let auth = match &app_state.authentication_info {
+                    AuthenticationInfo::Enabled(auth) => auth.clone(),
+                    AuthenticationInfo::Disabled => Auth::new(config.api_keys.clone()),
+                };
+
+                match RedisClient::new(url, app_state.clone(), auth).await {
+                    Ok(redis_client) => {
+                        let blocking_manager =
+                            Arc::new(BlockingRulesManager::new(Some(Arc::new(redis_client))));
+
+                        // Start background sync task
+                        let sync_manager = blocking_manager.clone();
+                        tokio::spawn(crate::blocking_middleware::blocking_rules_sync_task(
+                            sync_manager,
+                        ));
+
+                        tracing::info!("Blocking rules manager initialized successfully");
+
+                        let mut app_state = app_state;
+                        app_state.blocking_manager = Some(blocking_manager);
+                        app_state
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to initialize blocking manager: {}", e);
+                        app_state
+                    }
+                }
+            } else {
+                tracing::warn!("Blocking is enabled but TENSORZERO_REDIS_URL is empty");
+                app_state
+            }
+        } else {
+            tracing::warn!("Blocking is enabled but TENSORZERO_REDIS_URL is not set");
+            app_state
+        }
+    } else {
+        tracing::info!("Blocking is disabled in configuration");
         app_state
     };
 
