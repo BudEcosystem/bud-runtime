@@ -2046,7 +2046,7 @@ pub async fn moderation_handler(
     let openai_response = OpenAICompatibleModerationResponse {
         id: format!("modr-{}", Uuid::now_v7()),
         model: model_resolution.original_model_name.to_string(),
-        results: response.results,
+        results: response.results.clone(),
     };
 
     // Capture the gateway response (without null values)
@@ -3051,7 +3051,7 @@ pub async fn image_generation_handler(
         config,
         http_client,
         clickhouse_connection_info,
-        kafka_connection_info: _,
+        kafka_connection_info,
         authentication_info: _,
         model_credential_store,
         ..
@@ -3142,8 +3142,8 @@ pub async fn image_generation_handler(
         }
     }
 
-    // Capture the gateway request (without null values)
-    let _gateway_request = serialize_without_nulls(&params).ok();
+    // Capture the gateway request (without null values) before params are consumed
+    let gateway_request_json = serialize_without_nulls(&params).ok();
 
     // Create image generation request
     let image_request = ImageGenerationRequest {
@@ -3191,11 +3191,12 @@ pub async fn image_generation_handler(
         created: response.created,
         data: response
             .data
+            .clone()
             .into_iter()
             .map(|d| OpenAICompatibleImageData {
-                url: d.url,
-                b64_json: d.b64_json,
-                revised_prompt: d.revised_prompt,
+                url: d.url.clone(),
+                b64_json: d.b64_json.clone(),
+                revised_prompt: d.revised_prompt.clone(),
             })
             .collect(),
     };
@@ -3203,17 +3204,129 @@ pub async fn image_generation_handler(
     // Capture the gateway response (without null values)
     let gateway_response_json = serialize_without_nulls(&openai_response).ok();
 
-    // Store the gateway response if we have it
-    if let Some(gateway_response) = &gateway_response_json {
-        // Log for debugging
-        tracing::debug!(
-            "Gateway response captured: {} bytes",
-            gateway_response.len()
+    // Write observability data
+    if config.gateway.observability.enabled.unwrap_or(false) {
+        let inference_id = image_request.id;
+
+        // Create ModelInferenceResponseWithMetadata
+        let model_inference = crate::inference::types::ModelInferenceResponseWithMetadata {
+            id: Uuid::now_v7(),
+            created: response.created,
+            output: vec![],
+            model_name: Arc::from(model_name.as_str()),
+            model_provider_name: model.providers.values().next().map(|p| p.name.clone()).unwrap_or_default(),
+            input_messages: vec![],
+            raw_request: response.raw_request.clone(),
+            raw_response: response.raw_response.clone(),
+            usage: response.usage.clone(),
+            system: None,
+            cached: false,
+            latency: response.latency.clone(),
+            finish_reason: Some(crate::inference::types::FinishReason::Stop),
+            gateway_request: None,
+            gateway_response: None,
+        };
+
+        // Create the InferenceResult
+        let result = crate::inference::types::InferenceResult::ImageGeneration(
+            crate::inference::types::ImageGenerationInferenceResult {
+                inference_id,
+                created: response.created,
+                images: response.data.iter().map(|d| crate::inference::types::ImageData {
+                    url: d.url.clone(),
+                    base64: d.b64_json.clone(),
+                    revised_prompt: d.revised_prompt.clone(),
+                }).collect(),
+                image_count: response.data.len() as u8,
+                size: image_request.size.map(|s| format!("{:?}", s)).unwrap_or_else(|| "1024x1024".to_string()),
+                quality: image_request.quality.map(|q| format!("{:?}", q).to_lowercase()).unwrap_or_else(|| "standard".to_string()),
+                style: image_request.style.map(|s| format!("{:?}", s).to_lowercase()),
+                usage: response.usage.clone(),
+                model_inference_results: vec![model_inference],
+                inference_params: crate::endpoints::inference::InferenceParams::default(),
+                original_response: Some(response.raw_response.clone()),
+            },
         );
 
-        // Store the gateway response in the database
-        // This requires updating the storage layer to include the gateway_response
-        // For now, we'll need to update the storage layer separately
+        // Extract observability metadata from headers (set by auth middleware)
+        let observability_metadata = if let (Some(project_id), Some(endpoint_id), Some(model_id)) = (
+            headers
+                .get("x-tensorzero-project-id")
+                .and_then(|v| v.to_str().ok()),
+            headers
+                .get("x-tensorzero-endpoint-id")
+                .and_then(|v| v.to_str().ok()),
+            headers
+                .get("x-tensorzero-model-id")
+                .and_then(|v| v.to_str().ok()),
+        ) {
+            Some(super::inference::ObservabilityMetadata {
+                project_id: project_id.to_string(),
+                endpoint_id: endpoint_id.to_string(),
+                model_id: model_id.to_string(),
+            })
+        } else {
+            None
+        };
+
+        // Use defaults for image generation requests
+        let episode_id = Uuid::now_v7();
+        let metadata = crate::endpoints::inference::InferenceDatabaseInsertMetadata {
+            function_name: "tensorzero::image_generation".to_string(),  // Default function name for images
+            variant_name: model_name.to_string(),           // Use model name as variant
+            episode_id,
+            tool_config: None,
+            processing_time: Some(match response.latency {
+                crate::inference::types::Latency::NonStreaming { response_time } => response_time,
+                _ => std::time::Duration::from_millis(0),
+            }),
+            tags: HashMap::new(),
+            extra_body: UnfilteredInferenceExtraBody::default(),
+            extra_headers: crate::inference::types::extra_headers::UnfilteredInferenceExtraHeaders::default(),
+        };
+
+        // Convert prompt to ResolvedInput for write_inference
+        let resolved_input = ResolvedInput {
+            messages: vec![ResolvedInputMessage {
+                role: Role::User,
+                content: vec![ResolvedInputMessageContent::Text {
+                    value: serde_json::Value::String(image_request.prompt.clone()),
+                }],
+            }],
+            system: None,
+        };
+
+        // Gateway request already captured before params were consumed
+
+        // Write to observability database asynchronously
+        let config_clone = config.clone();
+        let clickhouse_info = clickhouse_connection_info.clone();
+        let kafka_info = kafka_connection_info.clone();
+        let gateway_response_json = gateway_response_json.clone();
+        let async_writes = config.gateway.observability.async_writes;
+
+        let write_future = tokio::spawn(async move {
+            write_inference(
+                &clickhouse_info,
+                &kafka_info,
+                &config_clone,
+                resolved_input,
+                result,
+                metadata,
+                observability_metadata,
+                gateway_request_json,
+                gateway_response_json,
+            )
+            .await;
+        });
+
+        if !async_writes {
+            write_future.await.map_err(|e| {
+                Error::new(ErrorDetails::InternalError {
+                    message: format!("Failed to join write task: {e}"),
+                })
+            })?;
+        }
     }
 
     Ok(Json(openai_response).into_response())

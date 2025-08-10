@@ -67,11 +67,6 @@ const InferenceListTable: React.FC<InferenceListTableProps> = ({ projectId: prop
     message.success('Copied to clipboard');
   };
 
-  // Format tokens display
-  const formatTokens = (input: number, output: number) => {
-    const total = input + output;
-    return `${total.toLocaleString()} (${input.toLocaleString()} / ${output.toLocaleString()})`;
-  };
 
   // Format cost display
   const formatCost = (cost?: number) => {
@@ -119,12 +114,13 @@ const InferenceListTable: React.FC<InferenceListTableProps> = ({ projectId: prop
       ),
     },
     {
-      title: 'Tokens',
-      key: 'tokens',
+      title: 'Response Time',
+      dataIndex: 'response_time_ms',
+      key: 'response_time_ms',
       width: 120,
-      render: (_, record) => (
+      render: (response_time_ms: number) => (
         <Text_12_400_EEEEEE>
-          {record.total_tokens.toLocaleString()}
+          {response_time_ms ? `${response_time_ms.toLocaleString()} ms` : '-'}
         </Text_12_400_EEEEEE>
       ),
       sorter: true,
@@ -177,7 +173,6 @@ const InferenceListTable: React.FC<InferenceListTableProps> = ({ projectId: prop
     if (sorter.field) {
       const sortMap: Record<string, string> = {
         timestamp: 'timestamp',
-        tokens: 'tokens',
         response_time_ms: 'latency',
         cost: 'cost',
       };

@@ -64,6 +64,7 @@ export interface InferenceDetail {
   cached: boolean;
   finish_reason?: string;
   cost?: number;
+  endpoint_type?: string;
 
   // Gateway data (optional)
   gateway_request?: any;
