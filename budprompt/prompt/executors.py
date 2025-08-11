@@ -74,6 +74,8 @@ class SimplePromptExecutor:
         output_validation_prompt: Optional[str] = None,
         input_validation_prompt: Optional[str] = None,
         llm_retry_limit: Optional[int] = 3,
+        enable_tools: bool = False,
+        allow_multiple_calls: bool = True,
     ) -> Union[Dict[str, Any], str, AsyncGenerator[str, None]]:
         """Execute a prompt with structured or unstructured input and output.
 
@@ -89,6 +91,8 @@ class SimplePromptExecutor:
             output_validation_prompt: Natural language validation rules for output
             input_validation_prompt: Natural language validation rules for input
             llm_retry_limit: Number of LLM retries when validation fails
+            enable_tools: Enable tool calling capability (requires allow_multiple_calls=true)
+            allow_multiple_calls: Allow multiple LLM calls for retries and tools
 
         Returns:
             Output data (Dict for structured, str for unstructured) or AsyncGenerator for streaming
@@ -132,6 +136,7 @@ class SimplePromptExecutor:
                 output_type,
                 rendered_system_prompt,
                 llm_retry_limit if output_validation_prompt and not stream else None,
+                allow_multiple_calls,
             )
 
             # Build message history from all messages
@@ -281,6 +286,7 @@ class SimplePromptExecutor:
         output_type: Union[Type[BaseModel], Type[str], NativeOutput],
         system_prompt: str,
         llm_retry_limit: Optional[int] = None,
+        allow_multiple_calls: bool = True,
     ) -> Agent:
         """Create Pydantic AI agent with automatic parameter routing.
 
@@ -289,6 +295,8 @@ class SimplePromptExecutor:
             model_settings: Model configuration with all parameters
             output_type: Output type (Pydantic model for structured, str for unstructured)
             system_prompt: System prompt
+            llm_retry_limit: Number of retries for validation failures
+            allow_multiple_calls: Whether to allow multiple LLM calls
 
         Returns:
             Configured AI agent
@@ -311,6 +319,10 @@ class SimplePromptExecutor:
         if llm_retry_limit is not None:
             agent_kwargs["retries"] = llm_retry_limit
             logger.debug(f"Agent configured with {llm_retry_limit} retries for validation")
+        # Override to force no retries if multiple calls are not allowed
+        if not allow_multiple_calls:
+            agent_kwargs["retries"] = 0
+            logger.debug("Agent configured with 0 retries (allow_multiple_calls=False, overriding any retry settings)")
 
         agent = Agent(**agent_kwargs)
 

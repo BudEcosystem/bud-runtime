@@ -74,6 +74,13 @@ class PromptExecutorService:
             ):
                 raise ClientException(status_code=400, message="Input schema must contain a 'content' field")
 
+            # Validate tool and multiple calls configuration
+            if request.enable_tools and not request.allow_multiple_calls:
+                raise ClientException(
+                    status_code=400,
+                    message="Enabling tools requires multiple LLM calls.",
+                )
+
             # Execute the prompt with input_data from request and stream parameter
             result = await self.executor.execute(
                 deployment_name=request.deployment_name,
@@ -87,6 +94,8 @@ class PromptExecutorService:
                 output_validation_prompt=request.output_validation_prompt,
                 input_validation_prompt=request.input_validation_prompt,
                 llm_retry_limit=request.llm_retry_limit,
+                enable_tools=request.enable_tools,
+                allow_multiple_calls=request.allow_multiple_calls,
             )
 
             return result

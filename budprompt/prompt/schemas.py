@@ -155,6 +155,13 @@ class PromptExecuteRequest(BaseModel):
     llm_retry_limit: Optional[int] = Field(
         default=3, ge=0, description="Number of LLM retries when validation fails (non-streaming only)"
     )
+    enable_tools: bool = Field(
+        default=False, description="Enable tool calling capability (requires allow_multiple_calls=true)"
+    )
+    allow_multiple_calls: bool = Field(
+        default=True,
+        description="Allow multiple LLM calls for retries and tool usage. When false, only a single LLM call is made",
+    )
 
 
 class PromptExecuteResponse(SuccessResponse):
