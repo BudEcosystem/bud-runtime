@@ -1,0 +1,35 @@
+ingress:
+    hosts:
+        keycloak: cloak.stage.bud.studio
+        budadmin: admin.stage.bud.studio
+        budcustomer: customer.stage.bud.studio
+        budplayground: playground.stage.bud.studio
+        budapp: app.stage.bud.studio
+        budgateway: gateway.stage.bud.studio
+        budask: ask.stage.bud.studio
+        novuapi: api.novu.stage.bud.studio
+        novuws: ws.novu.stage.bud.studio
+
+microservices:
+    budproxy:
+        image: budstudio/budproxy:nightly
+    askbud:
+        image: budstudio/askbud:nightly
+    budapp:
+        image: budstudio/budapp:nightly
+    budcluster:
+        image: budstudio/budcluster:nightly
+    budmetrics:
+        image: budstudio/budmetrics:nightly
+    budmodel:
+        image: budstudio/budmodel:nightly
+    budplayground:
+        image: budstudio/budplayground:nightly
+    budsim:
+        image: budstudio/budsim:nightly
+    budadmin:
+        image: budstudio/budadmin:nightly
+    budcustomer:
+        image: budstudio/budcustomer:nightly
+    budnotify:
+        image: budstudio/budnotify:nightly
