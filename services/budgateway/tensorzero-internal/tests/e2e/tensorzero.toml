@@ -19,11 +19,6 @@ async_writes = false
 [gateway.authentication]
 enabled = false
 
-[gateway.analytics]
-enabled = true
-# GeoIP database for location data enrichment
-geoip_db_path = "/app/tensorzero-internal/fixtures/geo/GeoLite2-City.mmdb"
-
 [object_storage]
 type = "disabled"
 
