@@ -41,7 +41,7 @@ microservices:
     budcluster:
         image: budstudio/budcluster:nightly
         env:
-            BUD_SERVE_URL: https://app.dev.bud.studio
+            BUD_SERVE_URL: 'https://{{ .Values.ingress.hosts.budapp }}'
             APP_CONFIG: '{}'
             NOTIFY_SERVICE_NAME: '{{ .Release.Name }}-budnotify'
             NOTIFY_SERVICE_TOPIC: notificationMessages
@@ -91,8 +91,8 @@ microservices:
     budplayground:
         image: budstudio/budplayground:nightly
         env:
-            NEXT_PUBLIC_TEMP_API_BASE_URL: https://app.dev.bud.studio
-            NEXT_PUBLIC_COPY_CODE_API_BASE_URL: https://gateway.dev.bud.studio/
+            NEXT_PUBLIC_TEMP_API_BASE_URL: 'https://{{ .Values.ingress.hosts.budapp }}'
+            NEXT_PUBLIC_COPY_CODE_API_BASE_URL: 'https://{{ .Values.ingress.hosts.budgateway }}'
             # deadlink (502 Bad Gateway)
             NEXT_PUBLIC_BASE_URL: https://api-dev.bud.studio/
             NEXT_PUBLIC_VERCEL_ENV: preview
@@ -108,14 +108,14 @@ microservices:
     budadmin:
         image: budstudio/budadmin:nightly
         env:
-            BASE_URL: https://app.dev.bud.studio
-            NEXT_PUBLIC_BASE_URL: https://app.dev.bud.studio
-            NEXT_PUBLIC_TEMP_API_BASE_URL: https://app.dev.bud.studio
-            NEXT_PUBLIC_NOVU_SOCKET_URL: https://ws.novu.dev.bud.studio
-            NEXT_PUBLIC_NOVU_BASE_URL: https://api.novu.dev.bud.studio
-            NEXT_PUBLIC_COPY_CODE_API_BASE_URL: https://gateway.dev.bud.studio/
-            NEXT_PUBLIC_PLAYGROUND_URL: https://playground.dev.bud.studio
-            NEXT_PUBLIC_ASK_BUD_URL: https://ask.dev.bud.studio/v1
+            BASE_URL: 'https://{{ .Values.ingress.hosts.budapp }}'
+            NEXT_PUBLIC_BASE_URL: 'https://{{ .Values.ingress.hosts.budapp }}'
+            NEXT_PUBLIC_TEMP_API_BASE_URL: 'https://{{ .Values.ingress.hosts.budapp }}'
+            NEXT_PUBLIC_NOVU_SOCKET_URL: 'https://{{ .Values.ingress.hosts.novuws }}'
+            NEXT_PUBLIC_NOVU_BASE_URL: 'https://{{ .Values.ingress.hosts.novuapi }}'
+            NEXT_PUBLIC_COPY_CODE_API_BASE_URL: 'https://{{ .Values.ingress.hosts.budgateway }}'
+            NEXT_PUBLIC_PLAYGROUND_URL: 'https://{{ .Values.ingress.hosts.budplayground }}'
+            NEXT_PUBLIC_ASK_BUD_URL: 'https://{{ .Values.ingress.hosts.askbud }}/v1'
             NEXT_PUBLIC_ASK_BUD_MODEL: qwen3-32b
             NEXT_PUBLIC_VERCEL_ENV: preview
     budcustomer:
@@ -132,8 +132,8 @@ microservices:
     global:
         env:
             PROMETHEUS_URL: https://metric.bud.studio
-            BUD_SERVE_URL: https://app.dev.bud.studio
-            CORS_ORIGINS: http://localhost:3000,https://admin.dev.bud.studio,https://playground.dev.bud.studio,https://customer.dev.bud.studio
+            BUD_SERVE_URL: 'https://{{ .Values.ingress.hosts.budapp }}'
+            CORS_ORIGINS: http://localhost:3000,https://{{ .Values.ingress.hosts.budadmin }},https://{{ .Values.ingress.hosts.budplayground }},https://{{ .Values.ingress.hosts.budcustomer }}
             # deadlink
             BUD_LLM_BASE_URL: http://20.66.97.208/v1/
             #deadlink
