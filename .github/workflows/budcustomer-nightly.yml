@@ -1,4 +1,4 @@
-name: "BudCustomer: Nightly Image Update"
+name: "BudCustomer: Nightly Image Release"
 on:
   push:
     branches:
@@ -17,3 +17,5 @@ jobs:
     uses: ./.github/workflows/nix-workflow.yaml
     with:
       workflow: dockerhub_budcustomer
+    secrets:
+      SOPS_AGE_KEY: "${{ secrets.SOPS_AGE_KEY }}"

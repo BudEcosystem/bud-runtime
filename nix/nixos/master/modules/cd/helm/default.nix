@@ -1,7 +1,7 @@
 { pkgs, lib, ... }:
 let
   script = pkgs.callPackage ./package.nix { };
-  sops_key_path = "/var/secrets/devbox.sops";
+  sops_key_path = "/var/secrets/master.sops";
 in
 {
   systemd =
