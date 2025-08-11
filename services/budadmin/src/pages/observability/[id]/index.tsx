@@ -26,6 +26,7 @@ interface InferenceDetail {
   project_name?: string;
   endpoint_id: string;
   endpoint_name?: string;
+  endpoint_type?: string;
   system_prompt?: string;
   messages: Array<{ role: string; content: any }>;
   output: string;
@@ -77,6 +78,12 @@ const ObservabilityDetailPage: React.FC = () => {
       setError(null);
       const response = await AppRequest.Get(`/metrics/inferences/${inferenceId}`);
       if (response.data) {
+        console.log('Inference data:', response.data);
+        console.log('Endpoint type:', response.data.endpoint_type);
+        console.log('Type of endpoint_type:', typeof response.data.endpoint_type);
+        console.log('Is chat?', response.data.endpoint_type === 'chat');
+        console.log('Is undefined?', response.data.endpoint_type === undefined);
+        console.log('Is null?', response.data.endpoint_type === null);
         setInferenceData(response.data);
       }
     } catch (error: any) {
@@ -236,6 +243,26 @@ const ObservabilityDetailPage: React.FC = () => {
                 </div>
 
                 <div>
+                  <Text_12_400_B3B3B3 className="mb-1">Endpoint URL</Text_12_400_B3B3B3>
+                  <Text_12_600_EEEEEE>
+                    {inferenceData.endpoint_type === 'embedding' ? '/v1/embeddings' :
+                     inferenceData.endpoint_type === 'audio_transcription' ? '/v1/audio/transcriptions' :
+                     inferenceData.endpoint_type === 'audio_translation' ? '/v1/audio/translations' :
+                     inferenceData.endpoint_type === 'text_to_speech' ? '/v1/audio/speech' :
+                     inferenceData.endpoint_type === 'image_generation' ? '/v1/images/generations' :
+                     inferenceData.endpoint_type === 'moderation' ? '/v1/moderations' :
+                     '/v1/chat/completions'}
+                  </Text_12_600_EEEEEE>
+                </div>
+
+                <div>
+                  <Text_12_400_B3B3B3 className="mb-1">Type</Text_12_400_B3B3B3>
+                  <Tag color={inferenceData.endpoint_type === 'embedding' ? 'purple' : 'blue'}>
+                    {inferenceData.endpoint_type || 'chat'}
+                  </Tag>
+                </div>
+
+                <div>
                   <Text_12_400_B3B3B3 className="mb-1">Project</Text_12_400_B3B3B3>
                   <Text_12_600_EEEEEE>{inferenceData.project_name || 'Unknown Project'}</Text_12_600_EEEEEE>
                 </div>
@@ -283,26 +310,30 @@ const ObservabilityDetailPage: React.FC = () => {
 
               <div className="flex justify-between items-center">
 
-                <div className="text-center">
-                  <div className="text-[1.25rem] font-[600] text-[#3b82f6] mb-1">
-                    {inferenceData.input_tokens.toLocaleString()}
-                  </div>
-                  <Text_12_400_B3B3B3>Input Tokens</Text_12_400_B3B3B3>
-                </div>
+                {inferenceData.endpoint_type !== 'embedding' && inferenceData.endpoint_type !== 'audio_transcription' && inferenceData.endpoint_type !== 'audio_translation' && inferenceData.endpoint_type !== 'text_to_speech' && inferenceData.endpoint_type !== 'image_generation' && inferenceData.endpoint_type !== 'moderation' && (
+                  <>
+                    <div className="text-center">
+                      <div className="text-[1.25rem] font-[600] text-[#3b82f6] mb-1">
+                        {inferenceData.input_tokens.toLocaleString()}
+                      </div>
+                      <Text_12_400_B3B3B3>Input Tokens</Text_12_400_B3B3B3>
+                    </div>
 
-                <div className="text-center">
-                  <div className="text-[1.25rem] font-[600] text-[#3b82f6] mb-1">
-                    {inferenceData.output_tokens.toLocaleString()}
-                  </div>
-                  <Text_12_400_B3B3B3>Output Tokens</Text_12_400_B3B3B3>
-                </div>
+                    <div className="text-center">
+                      <div className="text-[1.25rem] font-[600] text-[#3b82f6] mb-1">
+                        {inferenceData.output_tokens.toLocaleString()}
+                      </div>
+                      <Text_12_400_B3B3B3>Output Tokens</Text_12_400_B3B3B3>
+                    </div>
 
-                <div className="text-center">
-                  <div className="text-[1.25rem] font-[600] text-[#8b5cf6] mb-1">
-                    {(inferenceData.input_tokens + inferenceData.output_tokens).toLocaleString()}
-                  </div>
-                  <Text_12_400_B3B3B3>Total Tokens</Text_12_400_B3B3B3>
-                </div>
+                    <div className="text-center">
+                      <div className="text-[1.25rem] font-[600] text-[#8b5cf6] mb-1">
+                        {(inferenceData.input_tokens + inferenceData.output_tokens).toLocaleString()}
+                      </div>
+                      <Text_12_400_B3B3B3>Total Tokens</Text_12_400_B3B3B3>
+                    </div>
+                  </>
+                )}
 
                 {inferenceData.ttft_ms && (
                   <div className="text-center">
@@ -322,23 +353,24 @@ const ObservabilityDetailPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Conversation */}
-          <div className="flex items-center flex-col border border-[#1F1F1F] rounded-[.4rem] px-[1.4rem] py-[1.3rem] pb-[1.1rem] w-full bg-[#101010] mb-[1.6rem]">
-            <div className="w-full">
-              <div className="flex justify-between items-center mb-4">
-                <Text_14_600_EEEEEE className="text-[#EEEEEE]">Conversation</Text_14_600_EEEEEE>
-                <Button
-                  size="small"
-                  icon={<DownloadOutlined />}
-                  onClick={() => downloadJson(inferenceData.messages, 'conversation')}
-                  className="bg-[#1F1F1F] border-[#1F1F1F] text-[#EEEEEE] hover:bg-[#2F2F2F]"
-                >
-                  Download
-                </Button>
-              </div>
+          {/* Conversation - Only show for chat endpoint type */}
+          {(!inferenceData.endpoint_type || inferenceData.endpoint_type === 'chat') && (
+            <div className="flex items-center flex-col border border-[#1F1F1F] rounded-[.4rem] px-[1.4rem] py-[1.3rem] pb-[1.1rem] w-full bg-[#101010] mb-[1.6rem]">
+              <div className="w-full">
+                <div className="flex justify-between items-center mb-4">
+                  <Text_14_600_EEEEEE className="text-[#EEEEEE]">Conversation</Text_14_600_EEEEEE>
+                  <Button
+                    size="small"
+                    icon={<DownloadOutlined />}
+                    onClick={() => downloadJson(inferenceData.messages, 'conversation')}
+                    className="bg-[#1F1F1F] border-[#1F1F1F] text-[#EEEEEE] hover:bg-[#2F2F2F]"
+                  >
+                    Download
+                  </Button>
+                </div>
 
-              <div className="space-y-3">
-                {inferenceData.messages.map((message, index) => (
+                <div className="space-y-3">
+                  {inferenceData.messages.map((message, index) => (
                   <div
                     key={index}
                     className={`border rounded-md p-3 ${
@@ -423,6 +455,7 @@ const ObservabilityDetailPage: React.FC = () => {
               </div>
             </div>
           </div>
+          )}
 
 
           {/* Gateway Request */}
