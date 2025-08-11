@@ -12,7 +12,9 @@ else
 	git pull origin master
 	hash_new="$(git log -n1 master --pretty=format:"%H")"
 
-	if [ "$hash_cur" = "$hash_new" ]; then
+	# force redeployment every 15 minutes because we don't currently have
+	# image tag tracking
+	if [ $(($(date +%M) % 15)) = 1 ] && [ "$hash_cur" = "$hash_new" ]; then
 		exit 0
 	fi
 fi
