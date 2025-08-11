@@ -144,6 +144,13 @@ class PromptExecuteRequest(BaseModel):
     input_data: Optional[Union[Dict[str, Any], str]] = Field(
         None, description="Input data (Dict for structured, str for unstructured)"
     )
+    output_validation_prompt: Optional[str] = Field(
+        None,
+        description="Natural language validation rules for output (only for Pydantic models in non-streaming mode)",
+    )
+    llm_retry_limit: Optional[int] = Field(
+        default=3, ge=0, description="Number of LLM retries when validation fails (non-streaming only)"
+    )
 
 
 class PromptExecuteResponse(SuccessResponse):

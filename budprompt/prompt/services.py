@@ -83,6 +83,8 @@ class PromptExecutorService:
                 messages=request.messages,
                 input_data=request.input_data,
                 stream=request.stream,
+                output_validation_prompt=request.output_validation_prompt,
+                llm_retry_limit=request.llm_retry_limit,
             )
 
             return result

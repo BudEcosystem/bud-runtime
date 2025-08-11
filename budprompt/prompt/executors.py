@@ -24,6 +24,7 @@ from typing import Any, AsyncGenerator, Dict, List, Optional, Type, Union
 
 from pydantic import BaseModel, ValidationError
 from pydantic_ai import Agent
+from pydantic_ai.exceptions import UnexpectedModelBehavior
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
@@ -42,6 +43,7 @@ from .schema_builder import PydanticModelGenerator
 from .schemas import Message, ModelSettings
 from .template_renderer import render_template
 from .utils import contains_pydantic_model, validate_input_data_type
+from .validation import add_validator_to_model_async
 
 
 logger = logging.getLogger(__name__)
@@ -69,6 +71,8 @@ class SimplePromptExecutor:
         messages: List[Message],
         input_data: Optional[Union[Dict[str, Any], str]] = None,
         stream: bool = False,
+        output_validation_prompt: Optional[str] = None,
+        llm_retry_limit: Optional[int] = 3,
     ) -> Union[Dict[str, Any], str, AsyncGenerator[str, None]]:
         """Execute a prompt with structured or unstructured input and output.
 
@@ -81,6 +85,8 @@ class SimplePromptExecutor:
             messages: List of messages for context
             input_data: Input data to process (Dict for structured, str for unstructured)
             stream: Whether to stream the response
+            output_validation_prompt: Natural language validation rules for output
+            llm_retry_limit: Number of LLM retries when validation fails
 
         Returns:
             Output data (Dict for structured, str for unstructured) or AsyncGenerator for streaming
@@ -114,11 +120,17 @@ class SimplePromptExecutor:
             # Render system prompt with Jinja2
             rendered_system_prompt = render_template(system_prompt, context)
 
-            # Handle output type
-            output_type = await self._get_output_type(output_schema)
+            # Handle output type and validation (only for non-streaming with Pydantic models)
+            output_type = await self._get_output_type(output_schema, output_validation_prompt, stream)
 
-            # Create AI agent with appropriate output type
-            agent = await self._create_agent(deployment_name, model_settings, output_type, rendered_system_prompt)
+            # Create AI agent with appropriate output type and retry configuration
+            agent = await self._create_agent(
+                deployment_name,
+                model_settings,
+                output_type,
+                rendered_system_prompt,
+                llm_retry_limit if output_validation_prompt and not stream else None,
+            )
 
             # Build message history from all messages
             message_history = self._build_message_history(messages, context)
@@ -140,14 +152,22 @@ class SimplePromptExecutor:
             logger.error(f"Prompt execution failed: {str(e)}")
             raise PromptExecutionException("Failed to execute prompt") from e
 
-    async def _get_output_type(self, output_schema: Optional[Dict[str, Any]]) -> Any:
-        """Extract output type from schema's content field.
+    async def _get_output_type(
+        self,
+        output_schema: Optional[Dict[str, Any]],
+        output_validation_prompt: Optional[str] = None,
+        stream: bool = False,
+    ) -> Any:
+        """Extract output type from schema's content field and apply validation if needed.
 
         Args:
             output_schema: JSON schema with content field
+            output_validation_prompt: Natural language validation rules
+            stream: Whether streaming is enabled
 
         Returns:
-            The type of the content field, wrapped in NativeOutput if it contains BaseModel
+            The type of the content field, potentially enhanced with validation,
+            wrapped in NativeOutput if it contains BaseModel
         """
         if output_schema is None:
             return str
@@ -157,6 +177,15 @@ class SimplePromptExecutor:
 
         # Extract type from content field using Pydantic v2 field access
         output_type = output_model.__pydantic_fields__["content"].annotation
+
+        # Check if we should add validation (only for non-streaming Pydantic models)
+        if output_validation_prompt and not stream and contains_pydantic_model(output_type):
+            logger.debug(f"Adding validation to output model: {output_validation_prompt}")
+
+            # If output_type is a Pydantic model, enhance it with validation
+            if isinstance(output_type, type) and issubclass(output_type, BaseModel):
+                output_type = await add_validator_to_model_async(output_type, output_validation_prompt)
+                logger.debug(f"Enhanced model with validation: {output_type.__name__}")
 
         # Return NativeOutput if type contains BaseModel, otherwise return raw type
         if contains_pydantic_model(output_type):
@@ -223,6 +252,7 @@ class SimplePromptExecutor:
         model_settings: ModelSettings,
         output_type: Union[Type[BaseModel], Type[str], NativeOutput],
         system_prompt: str,
+        llm_retry_limit: Optional[int] = None,
     ) -> Agent:
         """Create Pydantic AI agent with automatic parameter routing.
 
@@ -242,12 +272,19 @@ class SimplePromptExecutor:
         # Create model using BudServeProvider
         model = self.provider.get_model(model_name=deployment_name, settings=openai_settings)
 
-        # Create agent with output type
-        agent = Agent(
-            model=model,
-            output_type=output_type,
-            system_prompt=system_prompt,
-        )
+        # Create agent with output type and optional retry configuration
+        agent_kwargs = {
+            "model": model,
+            "output_type": output_type,
+            "system_prompt": system_prompt,
+        }
+
+        # Add retries if validation is enabled
+        if llm_retry_limit is not None:
+            agent_kwargs["retries"] = llm_retry_limit
+            logger.debug(f"Agent configured with {llm_retry_limit} retries for validation")
+
+        agent = Agent(**agent_kwargs)
 
         return agent
 
@@ -354,6 +391,9 @@ class SimplePromptExecutor:
                 user_prompt=user_prompt,
                 message_history=message_history,
             )
+            logger.debug("================================================")
+            logger.debug("Pydantic AI execution result: %s", result.all_messages())
+            logger.debug("================================================")
 
             # Process and return result based on output schema
             if output_schema is not None:
@@ -362,6 +402,16 @@ class SimplePromptExecutor:
             else:
                 # Unstructured output: return as string
                 return result.output
+        except UnexpectedModelBehavior as e:
+            # Handle validation retry exhaustion with specific message
+            error_msg = str(e)
+            if "Exceeded maximum retries" in error_msg:
+                # Extract retry count from error message if possible
+                logger.error(f"Output validation failed after maximum retries: {error_msg}")
+                raise PromptExecutionException(f"Output validation failed: {error_msg}") from e
+            else:
+                logger.error(f"Unexpected model behavior: {error_msg}")
+                raise PromptExecutionException(f"Unexpected model behavior: {error_msg}") from e
         except Exception as e:
             logger.error(f"Agent execution failed: {str(e)}")
             raise PromptExecutionException("Agent execution failed") from e
@@ -387,7 +437,7 @@ class SimplePromptExecutor:
         try:
             # Use async context manager for run_stream
             async with agent.run_stream(user_prompt=user_prompt, message_history=message_history) as stream_result:
-                logger.info("Starting streaming with stream_structured()...")
+                logger.debug("Starting streaming with stream_structured()...")
 
                 # Use stream_structured() for getting structured messages
                 # This works for both structured and unstructured outputs

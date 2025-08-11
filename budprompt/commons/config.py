@@ -35,6 +35,7 @@ class AppConfig(BaseAppConfig):
 
     # BudServe Gateway Configuration
     bud_gateway_base_url: str = Field(..., alias="BUD_GATEWAY_BASE_URL")
+    bud_default_model_name: str = Field(..., alias="BUD_DEFAULT_MODEL_NAME")
 
 
 class SecretsConfig(BaseSecretsConfig):
