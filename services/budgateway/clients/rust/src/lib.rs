@@ -467,30 +467,35 @@ impl Client {
                         self.http_inference_stream(event_source).await?,
                     ))
                 } else {
-                    let response: InferenceResponse = self.parse_http_response(builder.send().await).await?;
+                    let response: InferenceResponse =
+                        self.parse_http_response(builder.send().await).await?;
                     // For HTTP gateway, we need to create a compatible InferenceOutput
                     // but we don't have access to internal result or write_info
                     // This is a limitation of the current design
                     match &response {
                         InferenceResponse::Chat(chat_response) => {
-                            let dummy_result = tensorzero_internal::inference::types::InferenceResult::Chat(
-                                tensorzero_internal::inference::types::ChatInferenceResult {
-                                    inference_id: chat_response.inference_id,
-                                    created: tensorzero_internal::inference::types::current_timestamp(),
-                                    content: chat_response.content.clone(),
-                                    usage: tensorzero_internal::inference::types::Usage::default(),
-                                    model_inference_results: vec![],
-                                    inference_params: Default::default(),
-                                    original_response: None,
-                                    finish_reason: None,
-                                }
-                            );
+                            let dummy_result =
+                                tensorzero_internal::inference::types::InferenceResult::Chat(
+                                    tensorzero_internal::inference::types::ChatInferenceResult {
+                                        inference_id: chat_response.inference_id,
+                                        created:
+                                            tensorzero_internal::inference::types::current_timestamp(
+                                            ),
+                                        content: chat_response.content.clone(),
+                                        usage:
+                                            tensorzero_internal::inference::types::Usage::default(),
+                                        model_inference_results: vec![],
+                                        inference_params: Default::default(),
+                                        original_response: None,
+                                        finish_reason: None,
+                                    },
+                                );
                             Ok(InferenceOutput::NonStreaming {
                                 response,
                                 result: dummy_result,
                                 write_info: None,
                             })
-                        },
+                        }
                         InferenceResponse::Json(json_response) => {
                             let dummy_result = tensorzero_internal::inference::types::InferenceResult::Json(
                                 tensorzero_internal::inference::types::JsonInferenceResult {

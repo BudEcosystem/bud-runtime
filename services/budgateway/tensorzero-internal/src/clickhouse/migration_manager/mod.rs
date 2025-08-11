@@ -161,6 +161,7 @@ pub async fn run_migration(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use async_trait::async_trait;
 
     struct MockMigration {
         can_apply_result: bool,

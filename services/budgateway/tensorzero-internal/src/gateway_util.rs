@@ -573,9 +573,12 @@ mod tests {
     use tracing_test::traced_test;
 
     use super::*;
-    use crate::config_parser::{AuthenticationConfig, GatewayConfig, ObservabilityConfig};
+    use crate::config_parser::{
+        AnalyticsConfig, AuthenticationConfig, BlockingConfig, GatewayConfig, ObservabilityConfig,
+    };
     use secrecy::SecretString;
     use std::collections::HashMap;
+    use std::sync::RwLock;
 
     #[tokio::test]
     #[traced_test]
@@ -593,6 +596,11 @@ mod tests {
             enable_template_filesystem_access: false,
             export: Default::default(),
             rate_limits: None,
+            analytics: AnalyticsConfig {
+                enabled: false,
+                geoip_db_path: None,
+            },
+            blocking: BlockingConfig { enabled: false },
         };
 
         let config = Box::leak(Box::new(Config {
@@ -649,6 +657,11 @@ mod tests {
             enable_template_filesystem_access: false,
             export: Default::default(),
             rate_limits: None,
+            analytics: AnalyticsConfig {
+                enabled: false,
+                geoip_db_path: None,
+            },
+            blocking: BlockingConfig { enabled: false },
         };
 
         let config = Box::leak(Box::new(Config {
@@ -674,6 +687,11 @@ mod tests {
             enable_template_filesystem_access: false,
             export: Default::default(),
             rate_limits: None,
+            analytics: AnalyticsConfig {
+                enabled: false,
+                geoip_db_path: None,
+            },
+            blocking: BlockingConfig { enabled: false },
         };
         let config = Box::leak(Box::new(Config {
             gateway: gateway_config,
@@ -867,6 +885,11 @@ mod tests {
             enable_template_filesystem_access: false,
             export: Default::default(),
             rate_limits: None,
+            analytics: AnalyticsConfig {
+                enabled: false,
+                geoip_db_path: None,
+            },
+            blocking: BlockingConfig { enabled: false },
         };
         let config = Config {
             gateway: gateway_config,
