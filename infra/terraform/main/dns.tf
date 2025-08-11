@@ -5,6 +5,8 @@ locals {
 
     # personal dev environment
     "sinan",
+    "ditto",
+    "varun",
   ]
 
   # a service can be only removed if it's not required by all the environments
