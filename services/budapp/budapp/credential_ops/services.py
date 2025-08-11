@@ -999,7 +999,7 @@ class ProprietaryCredentialService(SessionMixin):
                                 "id": str(endpoint.model.id),
                                 "name": endpoint.model.name,
                                 "icon": endpoint.model.provider.icon,
-                                "modality": endpoint.model.modality.value,
+                                "modality": endpoint.model.modality,  # This is already a list of strings
                             },
                             "created_at": endpoint.created_at,
                         }
