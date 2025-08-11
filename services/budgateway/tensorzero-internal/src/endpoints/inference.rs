@@ -1068,7 +1068,13 @@ pub async fn write_inference(
                 let input_text = input.messages.first()
                     .and_then(|msg| msg.content.first())
                     .and_then(|content| match content {
-                        ResolvedInputMessageContent::Text { value } => value.as_str().map(|s| s.to_string()),
+                        ResolvedInputMessageContent::Text { value } => {
+                            // Handle both direct string values and JSON string values
+                            match value {
+                                serde_json::Value::String(s) => Some(s.clone()),
+                                _ => value.as_str().map(|s| s.to_string()),
+                            }
+                        },
                         _ => None,
                     })
                     .unwrap_or_else(|| "moderation input".to_string());
