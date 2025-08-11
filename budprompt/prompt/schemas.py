@@ -148,6 +148,10 @@ class PromptExecuteRequest(BaseModel):
         None,
         description="Natural language validation rules for output (only for Pydantic models in non-streaming mode)",
     )
+    input_validation_prompt: Optional[str] = Field(
+        None,
+        description="Natural language validation rules for input (only for structured input with Pydantic models)",
+    )
     llm_retry_limit: Optional[int] = Field(
         default=3, ge=0, description="Number of LLM retries when validation fails (non-streaming only)"
     )

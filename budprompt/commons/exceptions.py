@@ -16,6 +16,10 @@
 
 """The exceptions used in the budprompt module."""
 
+from typing import Any, Dict, Optional
+
+from budmicroframe.commons.exceptions import ClientException as BudMicroframeClientException
+
 
 class BaseException(Exception):
     """Base exception class for BudPrompt."""
@@ -48,3 +52,12 @@ class PromptExecutionException(BaseException):
     """Exception raised when prompt execution fails."""
 
     pass
+
+
+class ClientException(BudMicroframeClientException):
+    def __init__(self, message: str, status_code: int = 400, params: Optional[Dict[str, Any]] = None):
+        """Initialize the ClientException with a message."""
+        self.message = message
+        self.status_code = status_code
+        self.params = params
+        super().__init__(self.message, self.status_code)

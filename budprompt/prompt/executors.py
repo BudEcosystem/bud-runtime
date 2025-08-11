@@ -72,6 +72,7 @@ class SimplePromptExecutor:
         input_data: Optional[Union[Dict[str, Any], str]] = None,
         stream: bool = False,
         output_validation_prompt: Optional[str] = None,
+        input_validation_prompt: Optional[str] = None,
         llm_retry_limit: Optional[int] = 3,
     ) -> Union[Dict[str, Any], str, AsyncGenerator[str, None]]:
         """Execute a prompt with structured or unstructured input and output.
@@ -86,6 +87,7 @@ class SimplePromptExecutor:
             input_data: Input data to process (Dict for structured, str for unstructured)
             stream: Whether to stream the response
             output_validation_prompt: Natural language validation rules for output
+            input_validation_prompt: Natural language validation rules for input
             llm_retry_limit: Number of LLM retries when validation fails
 
         Returns:
@@ -103,8 +105,8 @@ class SimplePromptExecutor:
             # Handle input validation
             validated_input = None
             if input_schema is not None and input_data is not None:
-                # Structured input: create model and validate
-                input_model = await self._get_pydantic_model(input_schema, "InputModel")
+                # Structured input: create model with validation and validate
+                input_model = await self._get_input_model_with_validation(input_schema, input_validation_prompt)
                 try:
                     validated_input = input_model.model_validate(input_data)
                 except ValidationError:
@@ -192,6 +194,32 @@ class SimplePromptExecutor:
             return NativeOutput(output_type)
         else:
             return output_type
+
+    async def _get_input_model_with_validation(
+        self,
+        input_schema: Dict[str, Any],
+        input_validation_prompt: Optional[str] = None,
+    ) -> Type[BaseModel]:
+        """Get input model with optional validation enhancement.
+
+        Args:
+            input_schema: JSON schema for input validation
+            input_validation_prompt: Natural language validation rules
+
+        Returns:
+            Input model class, potentially enhanced with validation
+        """
+        # Generate base model from schema
+        input_model = await self._get_pydantic_model(input_schema, "InputModel")
+
+        # Check if we should add validation
+        if input_validation_prompt:
+            logger.debug(f"Adding validation to input model: {input_validation_prompt}")
+            # Enhance with validation using existing function
+            input_model = await add_validator_to_model_async(input_model, input_validation_prompt)
+            logger.debug(f"Enhanced input model with validation: {input_model.__name__}")
+
+        return input_model
 
     async def _get_pydantic_model(self, schema: Dict[str, Any], model_name: str) -> Type[BaseModel]:
         """Convert JSON schema to Pydantic model.

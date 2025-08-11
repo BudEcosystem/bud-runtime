@@ -19,11 +19,11 @@
 import logging
 from typing import Union
 
-from budmicroframe.commons.exceptions import ClientException
 from budmicroframe.commons.schemas import ErrorResponse
 from fastapi import APIRouter, status
 from fastapi.responses import StreamingResponse
 
+from ..commons.exceptions import ClientException
 from .schemas import PromptExecuteRequest, PromptExecuteResponse
 from .services import PromptExecutorService
 
@@ -99,6 +99,7 @@ async def execute_prompt(
         return ErrorResponse(
             code=e.status_code,
             message=e.message,
+            param=e.params,
         ).to_http_response()
     except Exception as e:
         logger.error(f"Unexpected error during prompt execution: {str(e)}")

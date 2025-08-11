@@ -16,14 +16,15 @@
 
 """Services for the prompt module."""
 
+import json
 import logging
 from typing import Any, AsyncGenerator, Dict, Union
 
-from budmicroframe.commons.exceptions import ClientException
 from pydantic import ValidationError
 
 from budprompt.commons.exceptions import PromptExecutionException, SchemaGenerationException
 
+from ..commons.exceptions import ClientException
 from .executors import SimplePromptExecutor
 from .schemas import PromptExecuteRequest
 from .utils import clean_model_cache
@@ -84,15 +85,18 @@ class PromptExecutorService:
                 input_data=request.input_data,
                 stream=request.stream,
                 output_validation_prompt=request.output_validation_prompt,
+                input_validation_prompt=request.input_validation_prompt,
                 llm_retry_limit=request.llm_retry_limit,
             )
 
             return result
 
         except ValidationError as e:
-            # Input validation errors -> 400 Bad Request
+            # Input validation errors -> 422 Unprocessable Entity
             logger.error(f"Input validation failed: {str(e)}")
-            raise ClientException(status_code=400, message="Invalid input data") from e
+            raise ClientException(
+                status_code=422, message="Invalid input data", params={"errors": json.loads(e.json())}
+            ) from e
 
         except SchemaGenerationException as e:
             # Schema generation errors -> 400 Bad Request
