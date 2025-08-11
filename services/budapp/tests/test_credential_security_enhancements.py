@@ -1,14 +1,16 @@
 """Tests for enhanced API key security features."""
 
 import pytest
-from datetime import datetime, timedelta, UTC
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, patch, MagicMock
 from uuid import uuid4
+
+UTC = timezone.utc
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from budapp.commons.constants import ApiCredentialTypeEnum, UserTypeEnum
+from budapp.commons.constants import ApiCredentialTypeEnum, ProjectTypeEnum, UserTypeEnum
 from budapp.credential_ops.helpers import generate_secure_api_key
 from budapp.credential_ops.models import Credential
 from budapp.credential_ops.schemas import CredentialRequest
@@ -90,9 +92,11 @@ class TestCredentialValidation:
         with patch("budapp.credential_ops.services.RedisService") as mock_redis:
             mock_redis_instance = mock_redis.return_value
             mock_redis_instance.get = AsyncMock(return_value=None)
+            mock_redis_instance.set = AsyncMock(return_value=None)
 
             with patch("budapp.credential_ops.services.CredentialDataManager") as mock_dm:
                 mock_dm.return_value.retrieve_by_fields = AsyncMock(return_value=mock_credential)
+                mock_dm.return_value.update_credential_by_fields = AsyncMock(return_value=None)
 
                 # Test with allowed IP
                 result = await service.is_credential_valid("test_hashed_key", "192.168.1.1")
@@ -117,25 +121,38 @@ class TestCredentialTypeMapping:
         mock_user.id = uuid4()
         mock_user.user_type = UserTypeEnum.CLIENT
 
+        # Mock project
+        mock_project = MagicMock()
+        mock_project.id = uuid4()
+        mock_project.project_type = ProjectTypeEnum.CLIENT_APP
+
         # Mock credential request
         request = CredentialRequest(
             name="Test Key",
-            project_id=uuid4(),
+            project_id=mock_project.id,
             credential_type=ApiCredentialTypeEnum.ADMIN_APP  # Try to request admin type
         )
 
+        # Mock created credential
+        mock_credential = MagicMock(spec=Credential)
+        mock_credential.id = uuid4()
+        mock_credential.credential_type = ApiCredentialTypeEnum.CLIENT_APP
+
         with patch("budapp.credential_ops.services.UserDataManager") as mock_user_dm:
-            mock_user_dm.return_value.retrieve_user_by_fields = AsyncMock(return_value=mock_user)
+            mock_user_dm.return_value.retrieve_by_fields = AsyncMock(return_value=mock_user)
 
-            with patch("budapp.credential_ops.services.CredentialDataManager") as mock_cred_dm:
-                mock_cred_dm.return_value.create_credential = AsyncMock()
+            with patch("budapp.credential_ops.services.ProjectDataManager") as mock_project_dm:
+                mock_project_dm.return_value.retrieve_by_fields = AsyncMock(return_value=mock_project)
 
-                # Call add_or_generate_credential
-                result = await service.add_or_generate_credential(request, mock_user.id)
+                with patch("budapp.credential_ops.services.CredentialDataManager") as mock_cred_dm:
+                    mock_cred_dm.return_value.create_credential = AsyncMock(return_value=mock_credential)
 
-                # Verify credential was created with client_app type
-                create_call = mock_cred_dm.return_value.create_credential.call_args[0][0]
-                assert create_call.credential_type == ApiCredentialTypeEnum.CLIENT_APP
+                    # Call add_or_generate_credential
+                    result = await service.add_or_generate_credential(request, mock_user.id)
+
+                    # Verify credential was created with client_app type
+                    create_call = mock_cred_dm.return_value.create_credential.call_args[0][0]
+                    assert create_call.credential_type == ApiCredentialTypeEnum.CLIENT_APP
 
     @pytest.mark.asyncio
     async def test_admin_user_can_create_any_credential(self):
@@ -148,22 +165,35 @@ class TestCredentialTypeMapping:
         mock_user.id = uuid4()
         mock_user.user_type = UserTypeEnum.ADMIN
 
+        # Mock project
+        mock_project = MagicMock()
+        mock_project.id = uuid4()
+        mock_project.project_type = ProjectTypeEnum.ADMIN_APP
+
         # Test admin can create admin_app credential
         request = CredentialRequest(
             name="Test Admin Key",
-            project_id=uuid4(),
+            project_id=mock_project.id,
             credential_type=ApiCredentialTypeEnum.ADMIN_APP
         )
 
+        # Mock created credential
+        mock_credential = MagicMock(spec=Credential)
+        mock_credential.id = uuid4()
+        mock_credential.credential_type = ApiCredentialTypeEnum.ADMIN_APP
+
         with patch("budapp.credential_ops.services.UserDataManager") as mock_user_dm:
-            mock_user_dm.return_value.retrieve_user_by_fields = AsyncMock(return_value=mock_user)
+            mock_user_dm.return_value.retrieve_by_fields = AsyncMock(return_value=mock_user)
 
-            with patch("budapp.credential_ops.services.CredentialDataManager") as mock_cred_dm:
-                mock_cred_dm.return_value.create_credential = AsyncMock()
+            with patch("budapp.credential_ops.services.ProjectDataManager") as mock_project_dm:
+                mock_project_dm.return_value.retrieve_by_fields = AsyncMock(return_value=mock_project)
 
-                # Call add_or_generate_credential
-                result = await service.add_or_generate_credential(request, mock_user.id)
+                with patch("budapp.credential_ops.services.CredentialDataManager") as mock_cred_dm:
+                    mock_cred_dm.return_value.create_credential = AsyncMock(return_value=mock_credential)
 
-                # Verify credential was created with requested type
-                create_call = mock_cred_dm.return_value.create_credential.call_args[0][0]
-                assert create_call.credential_type == ApiCredentialTypeEnum.ADMIN_APP
+                    # Call add_or_generate_credential
+                    result = await service.add_or_generate_credential(request, mock_user.id)
+
+                    # Verify credential was created with requested type
+                    create_call = mock_cred_dm.return_value.create_credential.call_args[0][0]
+                    assert create_call.credential_type == ApiCredentialTypeEnum.ADMIN_APP
