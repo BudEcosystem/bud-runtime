@@ -3906,11 +3906,11 @@ class ModelCatalogService(SessionMixin):
             # Convert supported_endpoints enums to strings
             supported_endpoints_values = []
             if model.supported_endpoints:
-                for endpoint in model.supported_endpoints:
-                    if hasattr(endpoint, "value"):
-                        supported_endpoints_values.append(endpoint.value)
+                for endpoint_enum in model.supported_endpoints:
+                    if hasattr(endpoint_enum, "value"):
+                        supported_endpoints_values.append(endpoint_enum.value)
                     else:
-                        supported_endpoints_values.append(endpoint)
+                        supported_endpoints_values.append(endpoint_enum)
 
             catalog_item = {
                 "id": str(model.id),
