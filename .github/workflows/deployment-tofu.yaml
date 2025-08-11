@@ -17,3 +17,5 @@ jobs:
     uses: ./.github/workflows/nix-workflow.yaml
     with:
       workflow: tofu_apply
+    secrets:
+      SOPS_AGE_KEY: "${{ secrets.SOPS_AGE_KEY }}"
