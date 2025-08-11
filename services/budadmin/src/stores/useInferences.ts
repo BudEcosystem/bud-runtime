@@ -18,6 +18,7 @@ export interface InferenceListItem {
   cost?: number;
   is_success: boolean;
   cached: boolean;
+  endpoint_type?: string;
 }
 
 export interface InferenceDetail {
@@ -63,6 +64,7 @@ export interface InferenceDetail {
   cached: boolean;
   finish_reason?: string;
   cost?: number;
+  endpoint_type?: string;
 
   // Gateway data (optional)
   gateway_request?: any;
@@ -91,6 +93,7 @@ export interface InferenceFilters {
   min_tokens?: number;
   max_tokens?: number;
   max_latency_ms?: number;
+  endpoint_type?: 'chat' | 'embedding' | 'audio_transcription' | 'audio_translation' | 'text_to_speech' | 'image_generation' | 'moderation';
   sort_by: 'timestamp' | 'tokens' | 'latency' | 'cost';
   sort_order: 'asc' | 'desc';
 }

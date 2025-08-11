@@ -8,7 +8,7 @@ from pydantic import ValidationError
 
 from budmetrics.commons.schemas import BulkCloudEventBase
 from budmetrics.observability.schemas import (
-    InferenceDetailResponse,
+    EnhancedInferenceDetailResponse,
     InferenceDetailsMetrics,
     InferenceFeedbackResponse,
     InferenceListRequest,
@@ -251,7 +251,7 @@ async def get_inference_details(inference_id: str) -> Response:
     Returns:
         HTTP response containing detailed inference information.
     """
-    response: Union[InferenceDetailResponse, ErrorResponse]
+    response: Union[EnhancedInferenceDetailResponse, ErrorResponse]
 
     try:
         response = await service.get_inference_details(inference_id)

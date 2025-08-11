@@ -32,11 +32,13 @@ use crate::inference::types::extra_headers::UnfilteredInferenceExtraHeaders;
 use crate::inference::types::resolved_input::FileWithPath;
 use crate::inference::types::storage::StoragePath;
 use crate::inference::types::{
-    collect_chunks, Base64File, ChatInferenceDatabaseInsert, CollectChunksArgs,
-    ContentBlockChatOutput, ContentBlockChunk, FetchContext, FinishReason, InferenceResult,
+    collect_chunks, AudioInferenceDatabaseInsert, Base64File, ChatInferenceDatabaseInsert,
+    CollectChunksArgs, ContentBlockChatOutput, ContentBlockChunk, EmbeddingInferenceDatabaseInsert,
+    FetchContext, FinishReason, ImageInferenceDatabaseInsert, InferenceResult,
     InferenceResultChunk, InferenceResultStream, Input, InternalJsonInferenceOutput,
     JsonInferenceDatabaseInsert, JsonInferenceOutput, ModelInferenceResponseWithMetadata,
-    RequestMessage, ResolvedInput, ResolvedInputMessageContent, Usage,
+    ModerationInferenceDatabaseInsert, RequestMessage, ResolvedInput, ResolvedInputMessageContent,
+    Usage,
 };
 use crate::jsonschema_util::DynamicJSONSchema;
 use crate::kafka::KafkaConnectionInfo;
@@ -996,6 +998,96 @@ pub async fn write_inference(
                     .write(&[json_inference], "JsonInference")
                     .await;
             }
+            InferenceResult::Embedding(result) => {
+                let embedding_inference =
+                    EmbeddingInferenceDatabaseInsert::new(result, input.clone(), metadata);
+                let _ = clickhouse_connection_info
+                    .write(&[embedding_inference], "EmbeddingInference")
+                    .await;
+            }
+            InferenceResult::AudioTranscription(result) => {
+                let audio_inference = AudioInferenceDatabaseInsert::new_transcription(
+                    result,
+                    "audio file".to_string(), // Will be overridden with actual input
+                    metadata,
+                );
+                let _ = clickhouse_connection_info
+                    .write(&[audio_inference], "AudioInference")
+                    .await;
+            }
+            InferenceResult::AudioTranslation(result) => {
+                let audio_inference = AudioInferenceDatabaseInsert::new_translation(
+                    result,
+                    "audio file".to_string(), // Will be overridden with actual input
+                    metadata,
+                );
+                let _ = clickhouse_connection_info
+                    .write(&[audio_inference], "AudioInference")
+                    .await;
+            }
+            InferenceResult::TextToSpeech(result) => {
+                // Extract the text input from the input
+                let text_input = input.messages.first()
+                    .and_then(|msg| msg.content.first())
+                    .and_then(|content| match content {
+                        ResolvedInputMessageContent::Text { value } => value.as_str().map(|s| s.to_string()),
+                        _ => None,
+                    })
+                    .unwrap_or_else(|| "text input".to_string());
+
+                let audio_inference = AudioInferenceDatabaseInsert::new_text_to_speech(
+                    result,
+                    text_input,
+                    metadata,
+                );
+                let _ = clickhouse_connection_info
+                    .write(&[audio_inference], "AudioInference")
+                    .await;
+            }
+            InferenceResult::ImageGeneration(result) => {
+                // Extract the prompt from the input
+                let prompt = input.messages.first()
+                    .and_then(|msg| msg.content.first())
+                    .and_then(|content| match content {
+                        ResolvedInputMessageContent::Text { value } => value.as_str().map(|s| s.to_string()),
+                        _ => None,
+                    })
+                    .unwrap_or_else(|| "image prompt".to_string());
+
+                let image_inference = ImageInferenceDatabaseInsert::new(
+                    result,
+                    prompt,
+                    metadata,
+                );
+                let _ = clickhouse_connection_info
+                    .write(&[image_inference], "ImageInference")
+                    .await;
+            }
+            InferenceResult::Moderation(result) => {
+                // Extract the input text from the input
+                let input_text = input.messages.first()
+                    .and_then(|msg| msg.content.first())
+                    .and_then(|content| match content {
+                        ResolvedInputMessageContent::Text { value } => {
+                            // Handle both direct string values and JSON string values
+                            match value {
+                                serde_json::Value::String(s) => Some(s.clone()),
+                                _ => value.as_str().map(|s| s.to_string()),
+                            }
+                        },
+                        _ => None,
+                    })
+                    .unwrap_or_else(|| "moderation input".to_string());
+
+                let moderation_inference = ModerationInferenceDatabaseInsert::new(
+                    result,
+                    input_text,
+                    metadata,
+                );
+                let _ = clickhouse_connection_info
+                    .write(&[moderation_inference], "ModerationInference")
+                    .await;
+            }
         }
     }));
 
@@ -1006,6 +1098,12 @@ pub async fn write_inference(
         let inference_id = match &result_clone {
             InferenceResult::Chat(result) => result.inference_id,
             InferenceResult::Json(result) => result.inference_id,
+            InferenceResult::Embedding(result) => result.inference_id,
+            InferenceResult::AudioTranscription(result) => result.inference_id,
+            InferenceResult::AudioTranslation(result) => result.inference_id,
+            InferenceResult::TextToSpeech(result) => result.inference_id,
+            InferenceResult::ImageGeneration(result) => result.inference_id,
+            InferenceResult::Moderation(result) => result.inference_id,
         };
 
         let request_arrival_time = chrono::Utc::now()
@@ -1029,12 +1127,48 @@ pub async fn write_inference(
                 .first()
                 .map(|m| m.model_name.clone())
                 .unwrap_or_else(|| Arc::from("unknown")),
+            InferenceResult::Embedding(result) => result
+                .model_inference_results
+                .first()
+                .map(|m| m.model_name.clone())
+                .unwrap_or_else(|| Arc::from("unknown")),
+            InferenceResult::AudioTranscription(result) => result
+                .model_inference_results
+                .first()
+                .map(|m| m.model_name.clone())
+                .unwrap_or_else(|| Arc::from("unknown")),
+            InferenceResult::AudioTranslation(result) => result
+                .model_inference_results
+                .first()
+                .map(|m| m.model_name.clone())
+                .unwrap_or_else(|| Arc::from("unknown")),
+            InferenceResult::TextToSpeech(result) => result
+                .model_inference_results
+                .first()
+                .map(|m| m.model_name.clone())
+                .unwrap_or_else(|| Arc::from("unknown")),
+            InferenceResult::ImageGeneration(result) => result
+                .model_inference_results
+                .first()
+                .map(|m| m.model_name.clone())
+                .unwrap_or_else(|| Arc::from("unknown")),
+            InferenceResult::Moderation(result) => result
+                .model_inference_results
+                .first()
+                .map(|m| m.model_name.clone())
+                .unwrap_or_else(|| Arc::from("unknown")),
         };
 
         // Calculate cost (simplified - you may want to enhance this)
         let usage = match &result_clone {
             InferenceResult::Chat(result) => &result.usage,
             InferenceResult::Json(result) => &result.usage,
+            InferenceResult::Embedding(result) => &result.usage,
+            InferenceResult::AudioTranscription(result) => &result.usage,
+            InferenceResult::AudioTranslation(result) => &result.usage,
+            InferenceResult::TextToSpeech(result) => &result.usage,
+            InferenceResult::ImageGeneration(result) => &result.usage,
+            InferenceResult::Moderation(result) => &result.usage,
         };
         let cost = if usage.input_tokens > 0 || usage.output_tokens > 0 {
             Some((usage.input_tokens as f64 * 0.00001) + (usage.output_tokens as f64 * 0.00003))
@@ -1138,6 +1272,11 @@ impl InferenceResponse {
                     original_response: result.original_response,
                     finish_reason: result.finish_reason,
                 })
+            }
+            _ => {
+                // Other inference types don't use the generic inference endpoint
+                // They have their own OpenAI-compatible endpoints
+                panic!("Unsupported inference type for InferenceResponse")
             }
         }
     }
