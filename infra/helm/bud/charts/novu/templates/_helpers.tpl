@@ -116,7 +116,7 @@ Create a default fully qualified Redis(TM) name.
 {{- if .Values.redis.enabled -}}
     {{- printf "%s-master" (include "novu.redis.fullname" .) | trunc 63 | trimSuffix "-" -}}
 {{- else -}}
-    {{- print .Values.externalRedis.host -}}
+    {{- tpl .Values.externalRedis.host $. -}}
 {{- end -}}
 {{- end -}}
 
@@ -152,7 +152,7 @@ Return the Redis(TM) Secret Name
 {{- if .Values.redis.enabled -}}
     {{- print (include "novu.redis.fullname" .) "-password" -}}
 {{- else if .Values.externalRedis.existingSecret -}}
-    {{- print .Values.externalRedis.existingSecret -}}
+    {{- tpl .Values.externalRedis.existingSecret $. -}}
 {{- else -}}
     {{- printf "%s-externalredis" (include "common.names.fullname" .) | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
@@ -191,7 +191,7 @@ Return mongodb host
 {{- if .Values.mongodb.enabled -}}
     {{- include "novu.mongodb.fullname" . -}}
 {{- else -}}
-    {{- print .Values.externalDatabase.host -}}
+    {{- tpl .Values.externalDatabase.host $. -}}
 {{- end -}}
 {{- end -}}
 
@@ -303,7 +303,7 @@ Return the MongoDB Secret Name
 {{- if .Values.localstack.enabled }}
     {{- printf "%s" (include "novu.s3.fullname" .) -}}
 {{- else if .Values.externalS3.existingSecret -}}
-    {{- printf "%s" .Values.externalS3.existingSecret -}}
+    {{- tpl .Values.externalS3.existingSecret $. -}}
 {{- else -}}
     {{- printf "%s-externals3" (include "common.names.fullname" .) | trunc 63 | trimSuffix "-" -}}
 {{- end -}}

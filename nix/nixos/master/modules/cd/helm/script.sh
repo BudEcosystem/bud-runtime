@@ -19,7 +19,7 @@ fi
 
 helm_path="$(git rev-parse --show-toplevel)/infra/helm"
 for chart in "$helm_path"/*; do
-	namespace="nixos-cd-$(basename "$chart")"
+	namespace="nixcd-dev-$(basename "$chart")"
 	release_name="panda"
 
 	helm dependency update "$chart"

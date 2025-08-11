@@ -339,15 +339,15 @@ novu:
     store:
         encryption-key: bud-Kf9yLjGPLOz939Y1GM0nJckVoVyF
     externalDatabase:
-        host: panda-mongodb
+        host: '{{ $.Release.Name }}-mongodb'
         username: novu_user
         password: novu_password
         database: novu_db
     externalRedis:
-        host: panda-valkey-primary
-        existingSecret: panda-novu-externalredis
+        host: '{{ $.Release.Name }}-valkey-primary'
+        existingSecret: '{{ $.Release.Name }}-novu-externalredis'
     externalS3:
-        existingSecret: panda-novu-externals3
+        existingSecret: '{{ $.Release.Name }}-novu-externals3'
 dapr:
     enabled: false
 minio:
