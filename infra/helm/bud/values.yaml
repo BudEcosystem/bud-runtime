@@ -349,7 +349,7 @@ novu:
     externalS3:
         existingSecret: panda-novu-externals3
 dapr:
-    enabled: true
+    enabled: false
 minio:
     enabled: true
     provisioning:

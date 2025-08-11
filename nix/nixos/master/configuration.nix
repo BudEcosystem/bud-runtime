@@ -6,7 +6,7 @@
     ./hardware-configuration.nix
     ./disko.nix
 
-    ./modules/k3s.nix
+    ./modules/k8s
     ./modules/cd
     ./modules/wireguard.nix
   ];
