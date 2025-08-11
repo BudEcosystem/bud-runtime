@@ -422,11 +422,13 @@ const InferenceDetailModal: React.FC<InferenceDetailModalProps> = ({
             </div>
           </TabPane>
 
-          <TabPane tab="Messages" key="messages">
-            <div style={{ padding: 24 }}>
-              {renderMessages()}
-            </div>
-          </TabPane>
+          {selectedInference?.endpoint_type === 'chat' && (
+            <TabPane tab="Messages" key="messages">
+              <div style={{ padding: 24 }}>
+                {renderMessages()}
+              </div>
+            </TabPane>
+          )}
 
           <TabPane tab="Performance" key="performance">
             <div style={{ padding: 24 }}>

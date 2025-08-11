@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 
 // Placeholder component factory
 const createPlaceholderComponent = (name: string) => {
@@ -129,9 +129,12 @@ const stepComponentNames = [
 ];
 
 // Create StepComponents object with placeholder components
-export const StepComponents = stepComponentNames.reduce((acc, name) => {
-  acc[name] = createPlaceholderComponent(name);
-  return acc;
-}, {} as Record<string, React.FC>);
+export const StepComponents = stepComponentNames.reduce(
+  (acc, name) => {
+    acc[name] = createPlaceholderComponent(name);
+    return acc;
+  },
+  {} as Record<string, React.FC>,
+);
 
 export type StepComponentsType = keyof typeof StepComponents;

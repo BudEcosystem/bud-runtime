@@ -15,7 +15,7 @@ microservices:
     budproxy:
         image: budstudio/budproxy:nightly
     askbud:
-        image: budstudio/askbud:0.1.0
+        image: budstudio/askbud:nightly
         env:
             INFERENCE_MODEL: qwen3-32b
     budapp:
@@ -80,7 +80,7 @@ microservices:
             SECRETS_CLICKHOUSE_USER: '{{ .Values.clickhouse.auth.username }}'
             SECRETS_CLICKHOUSE_PASSWORD: '{{ .Values.clickhouse.auth.password }}'
     budmodel:
-        image: budstudio/budmodel:0.1.0
+        image: budstudio/budmodel:nightly
         env:
             SECRETS_PSQL_USER: budmodel
             SECRETS_PSQL_PASSWORD: budmodel
@@ -89,7 +89,7 @@ microservices:
             PSQL_DB_NAME: budmodel
             LOG_LEVEL: DEBUG
     budplayground:
-        image: budstudio/budplayground:latest
+        image: budstudio/budplayground:nightly
         env:
             NEXT_PUBLIC_TEMP_API_BASE_URL: https://app.dev.bud.studio
             NEXT_PUBLIC_COPY_CODE_API_BASE_URL: https://gateway.dev.bud.studio/
@@ -106,7 +106,7 @@ microservices:
             PSQL_DB_NAME: budsim
             DAPR_HOST_IP: 127.0.0.1
     budadmin:
-        image: budstudio/budadmin:latest
+        image: budstudio/budadmin:nightly
         env:
             BASE_URL: https://app.dev.bud.studio
             NEXT_PUBLIC_BASE_URL: https://app.dev.bud.studio
@@ -128,7 +128,7 @@ microservices:
             NEXT_PUBLIC_TEMP_API_BASE_URL: “https://{{ .Values.ingress.hosts.budapp }}”
             NEXT_PUBLIC_COPY_CODE_API_BASE_URL: “https://{{ .Values.ingress.hosts.budgateway }}”
     budnotify:
-        image: budstudio/budnotify:latest
+        image: budstudio/budnotify:nightly
     global:
         env:
             PROMETHEUS_URL: https://metric.bud.studio
@@ -339,17 +339,17 @@ novu:
     store:
         encryption-key: bud-Kf9yLjGPLOz939Y1GM0nJckVoVyF
     externalDatabase:
-        host: panda-mongodb
+        host: '{{ $.Release.Name }}-mongodb'
         username: novu_user
         password: novu_password
         database: novu_db
     externalRedis:
-        host: panda-valkey-primary
-        existingSecret: panda-novu-externalredis
+        host: '{{ $.Release.Name }}-valkey-primary'
+        existingSecret: '{{ $.Release.Name }}-novu-externalredis'
     externalS3:
-        existingSecret: panda-novu-externals3
+        existingSecret: '{{ $.Release.Name }}-novu-externals3'
 dapr:
-    enabled: true
+    enabled: false
 minio:
     enabled: true
     provisioning:

@@ -1,11 +1,11 @@
 // Color variables
 $bg-main: #101010;
 $bg-card: #18191b;
-$border-color: #1F1F1F;
-$text-white: #EEEEEE;
-$text-gray: #B3B3B3;
+$border-color: #1f1f1f;
+$text-white: #eeeeee;
+$text-gray: #b3b3b3;
 $text-dark-gray: #757575;
-$primary-color: #965CDE;
+$primary-color: #965cde;
 
 .apiKeysTable {
   width: 100%;
@@ -55,7 +55,7 @@ $primary-color: #965CDE;
       background: transparent;
 
       &:hover > td {
-        background: rgba(#1A1A1A, 0.5);
+        background: rgba(#1a1a1a, 0.5);
       }
     }
 
@@ -138,8 +138,8 @@ $primary-color: #965CDE;
     }
 
     .ant-input {
-      background: #1F1F1F;
-      border-color: #2F2F2F;
+      background: #1f1f1f;
+      border-color: #2f2f2f;
       color: $text-white;
 
       &::placeholder {

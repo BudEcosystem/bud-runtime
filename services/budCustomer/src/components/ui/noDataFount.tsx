@@ -1,5 +1,5 @@
-import React from 'react';
-import { Image } from 'antd';
+import React from "react";
+import { Image } from "antd";
 
 interface NoDataFountProps {
   message?: string;
@@ -13,7 +13,9 @@ const NoDataFount: React.FC<NoDataFountProps> = ({
   className = "",
 }) => {
   return (
-    <div className={`flex flex-col items-center justify-center py-8 ${className}`}>
+    <div
+      className={`flex flex-col items-center justify-center py-8 ${className}`}
+    >
       <Image
         src={imageUrl}
         alt="No data"

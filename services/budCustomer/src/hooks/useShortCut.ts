@@ -1,10 +1,16 @@
 import { useEffect, useState } from "react";
 
-export function useShortCut({ key, action }: { key: string; action: () => void }) {
+export function useShortCut({
+  key,
+  action,
+}: {
+  key: string;
+  action: () => void;
+}) {
   const [metaKeyPressed, setMetaKeyPressed] = useState(false);
 
   const handleKeyDown = (e: KeyboardEvent) => {
-    if(e.target !== document.body){
+    if (e.target !== document.body) {
       return;
     }
     const isMetaKey = e.metaKey;

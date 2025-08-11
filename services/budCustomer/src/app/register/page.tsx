@@ -24,10 +24,10 @@ export default function Register() {
         name: formData.name,
         email: formData.email,
         password: formData.password,
-        role: "user", // Default role for new registrations
+        role: formData.role, // Default role for new registrations
         company: formData.company,
         purpose: formData.purpose,
-        user_type: "client"
+        user_type: "client",
       };
 
       console.log("Calling API endpoint: /auth/register");
@@ -37,7 +37,7 @@ export default function Register() {
       const response = await AppRequest.Post("/auth/register", payload);
       console.log("Registration response-1:", response);
       if (response.data) {
-        setAuthError('');
+        setAuthError("");
         successToast("Registration successful! Please login.");
         router.push("/login");
       }
@@ -45,10 +45,11 @@ export default function Register() {
       hideLoader();
     } catch (error: any) {
       console.error("Registration error:", error);
-      const errorMessage = error.response?.data?.detail ||
-                          error.response?.data?.message ||
-                          error.message ||
-                          "Registration failed. Please try again.";
+      const errorMessage =
+        error.response?.data?.detail ||
+        error.response?.data?.message ||
+        error.message ||
+        "Registration failed. Please try again.";
       setAuthError(errorMessage);
       hideLoader();
     }

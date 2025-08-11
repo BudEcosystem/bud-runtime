@@ -1,14 +1,8 @@
-import {
-  Flex,
-} from "@radix-ui/themes";
+import { Flex } from "@radix-ui/themes";
 import React, { ComponentType } from "react";
-import {
-  Heading_30_600_FFFFFF,
-  Text_12_400_B3B3B3,
-} from "../text";
+import { Heading_30_600_FFFFFF, Text_12_400_B3B3B3 } from "../text";
 
 import { PrimaryButton } from "../bud/form/Buttons";
-
 
 interface pageHeaderProps {
   headding: string;
@@ -30,24 +24,27 @@ const PageHeader: React.FC<pageHeaderProps> = ({
   ButtonIcon,
   rightComponent,
   hClass,
-  buttonPermission
+  buttonPermission,
 }) => {
   return (
     <>
-      <div  className={`pageHeader flex justify-between items-start ${classNames}`}>
+      <div
+        className={`pageHeader flex justify-between items-start ${classNames}`}
+      >
         <div className="flex flex-col justify-start gap-[3] items-start">
           <Heading_30_600_FFFFFF className={`mb-0 pt-[.2rem] ${hClass}`}>
             {headding}
           </Heading_30_600_FFFFFF>
           {text && (
-            <Text_12_400_B3B3B3 className="pt-[.8rem] pl-[.15rem]">{text}</Text_12_400_B3B3B3>
+            <Text_12_400_B3B3B3 className="pt-[.8rem] pl-[.15rem]">
+              {text}
+            </Text_12_400_B3B3B3>
           )}
         </div>
         <Flex align="center">
-
           {rightComponent}
           {buttonLabel && (
-            <Flex align={'center'} justify={'end'} className="">
+            <Flex align={"center"} justify={"end"} className="">
               <PrimaryButton
                 permission={buttonPermission}
                 type="submit"
@@ -55,7 +52,13 @@ const PageHeader: React.FC<pageHeaderProps> = ({
                 classNames="!pr-[.8rem] tracking-[.02rem]"
               >
                 <div className="flex items-center justify-center gap-[.2rem]">
-                  {ButtonIcon && <ButtonIcon className="text-[#FFFFFF]" width="14px" height="14px" />}
+                  {ButtonIcon && (
+                    <ButtonIcon
+                      className="text-[#FFFFFF]"
+                      width="14px"
+                      height="14px"
+                    />
+                  )}
                   {buttonLabel}
                 </div>
               </PrimaryButton>
