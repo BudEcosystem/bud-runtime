@@ -35,7 +35,7 @@ use crate::inference::types::extra_body::UnfilteredInferenceExtraBody;
 use crate::inference::types::extra_headers::UnfilteredInferenceExtraHeaders;
 use crate::inference::types::{
     current_timestamp, ContentBlockChatOutput, ContentBlockChunk, File, FileKind, FinishReason,
-    Input, InputMessage, InputMessageContent, ResolvedInput, ResolvedInputMessage,
+    InferenceResult, Input, InputMessage, InputMessageContent, ResolvedInput, ResolvedInputMessage,
     ResolvedInputMessageContent, Role, TextKind, Usage,
 };
 use crate::tool::{
@@ -226,6 +226,30 @@ pub async fn inference_handler(
             result,
             write_info,
         } => {
+            // Extract model latency from the result (using the first model inference result) before moving result
+            let model_latency_ms = match &result {
+                InferenceResult::Chat(chat_result) => {
+                    chat_result.model_inference_results.first()
+                        .and_then(|r| match &r.latency {
+                            crate::inference::types::Latency::NonStreaming { response_time } => Some(response_time.as_millis() as u32),
+                            crate::inference::types::Latency::Streaming { response_time, .. } => Some(response_time.as_millis() as u32),
+                            crate::inference::types::Latency::Batch => None,
+                        })
+                        .unwrap_or(0)
+                },
+                InferenceResult::Json(json_result) => {
+                    json_result.model_inference_results.first()
+                        .and_then(|r| match &r.latency {
+                            crate::inference::types::Latency::NonStreaming { response_time } => Some(response_time.as_millis() as u32),
+                            crate::inference::types::Latency::Streaming { response_time, .. } => Some(response_time.as_millis() as u32),
+                            crate::inference::types::Latency::Batch => None,
+                        })
+                        .unwrap_or(0)
+                },
+                // For other result types, we don't have model_inference_results, so default to 0
+                _ => 0,
+            };
+
             let mut openai_compatible_response =
                 OpenAICompatibleResponse::from((response.clone(), original_model_name.clone()));
 
@@ -297,7 +321,28 @@ pub async fn inference_handler(
                 }
             }
 
-            Ok(Json(openai_compatible_response).into_response())
+            // Extract inference_id from the original response for analytics
+            let inference_id = match &response {
+                InferenceResponse::Chat(chat_response) => chat_response.inference_id,
+                InferenceResponse::Json(json_response) => json_response.inference_id,
+            };
+
+            let json_response = Json(openai_compatible_response);
+            let mut http_response = json_response.into_response();
+
+            // Add inference_id to response headers for analytics middleware
+            http_response.headers_mut().insert(
+                "x-tensorzero-inference-id",
+                inference_id.to_string().parse().unwrap(),
+            );
+
+            // Add model latency to response headers for analytics middleware
+            http_response.headers_mut().insert(
+                "x-tensorzero-model-latency-ms",
+                model_latency_ms.to_string().parse().unwrap(),
+            );
+
+            Ok(http_response)
         }
         InferenceOutput::Streaming(stream) => {
             let openai_compatible_stream = prepare_serialized_openai_compatible_events(

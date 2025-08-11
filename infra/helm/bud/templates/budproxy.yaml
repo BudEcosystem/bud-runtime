@@ -7,6 +7,12 @@ data:
     [gateway]
     bind_address = "0.0.0.0:3000"
 
+    [gateway.rate_limits]
+    enabled = true
+
+    [gateway.analytics]
+    enabled = true
+
     [gateway.observability.kafka]
     enabled = true
     brokers = "{{ .Release.Name }}-kafka:9092"

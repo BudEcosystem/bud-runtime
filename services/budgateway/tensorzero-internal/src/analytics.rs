@@ -1,7 +1,16 @@
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
 use std::collections::HashMap;
 use uuid::Uuid;
+
+/// Custom serializer for DateTime<Utc> to format compatible with ClickHouse DateTime64(3)
+fn serialize_datetime<S>(dt: &DateTime<Utc>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let formatted = dt.format("%Y-%m-%d %H:%M:%S%.3f").to_string();
+    serializer.serialize_str(&formatted)
+}
 
 /// Represents analytics data collected for each gateway request
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -51,7 +60,9 @@ pub struct GatewayAnalyticsDatabaseInsert {
     pub endpoint_id: Option<Uuid>,
 
     /// Performance metrics
+    #[serde(serialize_with = "serialize_datetime")]
     pub request_timestamp: DateTime<Utc>,
+    #[serde(serialize_with = "serialize_datetime")]
     pub response_timestamp: DateTime<Utc>,
     pub gateway_processing_ms: u32,
     pub total_duration_ms: u32,

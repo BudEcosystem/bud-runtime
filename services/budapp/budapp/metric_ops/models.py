@@ -14,12 +14,13 @@
 #  limitations under the License.
 #  -----------------------------------------------------------------------------
 
-"""Database models for gateway blocking rules."""
+"""Database models for metrics and gateway analytics."""
 
+from typing import Optional
 from uuid import UUID, uuid4
 
-from sqlalchemy import Boolean, Column, Enum, ForeignKey, Index, String, Uuid
-from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMPTZ
+from sqlalchemy import Column, Enum, ForeignKey, Index, String, Uuid
+from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from budapp.commons.database import Base, TimestampMixin
@@ -86,7 +87,7 @@ class GatewayBlockingRule(Base, TimestampMixin):
 
     # Statistics tracking
     match_count: Mapped[int] = mapped_column(default=0)
-    last_matched_at = Column(TIMESTAMPTZ, nullable=True)
+    last_matched_at = Column(TIMESTAMP(timezone=True), nullable=True)
 
     # Relationships
     project: Mapped["Project"] = relationship(back_populates="blocking_rules")

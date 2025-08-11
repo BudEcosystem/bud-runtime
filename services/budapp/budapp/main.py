@@ -39,7 +39,6 @@ from .dataset_ops import dataset_routes
 from .endpoint_ops import endpoint_routes
 from .eval_ops import eval_routes
 from .eval_ops.workflows import EvalDataSyncWorkflows
-from .gateway_analytics_ops import gateway_analytics_routes
 from .initializers.seeder import seeders
 from .metric_ops import metric_routes
 from .model_ops import model_routes
@@ -209,7 +208,6 @@ internal_router.include_router(credential_routes.credential_router)
 internal_router.include_router(credential_routes.proprietary_credential_router)
 internal_router.include_router(dataset_routes.dataset_router)
 internal_router.include_router(endpoint_routes.endpoint_router)
-internal_router.include_router(gateway_analytics_routes.gateway_analytics_router)
 internal_router.include_router(meta_routes.meta_router)
 internal_router.include_router(metric_routes.metric_router)
 internal_router.include_router(model_routes.model_router)

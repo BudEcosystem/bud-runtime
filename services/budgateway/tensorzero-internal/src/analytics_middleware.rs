@@ -1,5 +1,5 @@
 use axum::{
-    extract::{ConnectInfo, Request},
+    extract::Request,
     http::{HeaderMap, Method, StatusCode, Uri, Version},
     middleware::Next,
     response::Response,
@@ -10,6 +10,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tracing::error;
 use uaparser::{Parser, UserAgentParser};
+use uuid::Uuid;
 
 use crate::analytics::{GatewayAnalyticsDatabaseInsert, RequestAnalytics};
 use crate::clickhouse::ClickHouseConnectionInfo;
@@ -18,7 +19,6 @@ use crate::geoip::GeoIpService;
 
 /// Middleware for collecting analytics data about gateway requests
 pub async fn analytics_middleware(
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
     method: Method,
     uri: Uri,
@@ -26,6 +26,8 @@ pub async fn analytics_middleware(
     mut request: Request,
     next: Next,
 ) -> Result<Response, Error> {
+    tracing::debug!("Analytics middleware called for {} {}", method, uri.path());
+
     // Get services from request extensions
     let geoip_service = request.extensions().get::<Arc<GeoIpService>>().cloned();
     let ua_parser = request.extensions().get::<Arc<UserAgentParser>>().cloned();
@@ -34,8 +36,8 @@ pub async fn analytics_middleware(
     let mut analytics = RequestAnalytics::new();
     let record = &mut analytics.record;
 
-    // Extract basic request information
-    record.client_ip = get_client_ip(&addr, &headers);
+    // Extract basic request information - use headers-only approach for client IP
+    record.client_ip = get_client_ip_fallback(&headers);
     record.proxy_chain = extract_proxy_chain(&headers);
     record.protocol_version = format!("{version:?}");
     record.method = method.to_string();
@@ -72,6 +74,9 @@ pub async fn analytics_middleware(
         .get::<Arc<ClickHouseConnectionInfo>>()
         .cloned();
 
+    tracing::debug!("ClickHouse connection in analytics middleware: {}",
+        if clickhouse_opt.is_some() { "available" } else { "not available" });
+
     // Process the request
     let response = next.run(request).await;
 
@@ -86,6 +91,28 @@ pub async fn analytics_middleware(
 
         // Extract response information
         analytics.record.status_code = response.status().as_u16();
+
+        // Extract inference_id from response headers if present
+        if let Some(inference_id_header) = response.headers().get("x-tensorzero-inference-id") {
+            if let Ok(inference_id_str) = inference_id_header.to_str() {
+                if let Ok(inference_id) = Uuid::parse_str(inference_id_str) {
+                    analytics.record.inference_id = Some(inference_id);
+                    tracing::debug!("Captured inference_id {} for analytics", inference_id);
+                }
+            }
+        }
+
+        // Extract model latency from response headers if present and calculate gateway processing time
+        if let Some(model_latency_header) = response.headers().get("x-tensorzero-model-latency-ms") {
+            if let Ok(model_latency_str) = model_latency_header.to_str() {
+                if let Ok(model_latency_ms) = model_latency_str.parse::<u32>() {
+                    // Gateway processing time = Total duration - Model latency
+                    analytics.record.gateway_processing_ms = analytics.record.total_duration_ms.saturating_sub(model_latency_ms);
+                    tracing::debug!("Calculated gateway processing time: {} ms (total: {} ms, model: {} ms)",
+                        analytics.record.gateway_processing_ms, analytics.record.total_duration_ms, model_latency_ms);
+                }
+            }
+        }
 
         // Extract selected response headers
         analytics.record.response_headers = extract_important_headers(response.headers());
@@ -107,14 +134,43 @@ pub async fn analytics_middleware(
 
     // Spawn task to write analytics (non-blocking)
     if let Some(clickhouse) = clickhouse_opt {
+        tracing::debug!("Spawning task to write analytics to ClickHouse for {} {}", method, uri.path());
         tokio::spawn(async move {
+            tracing::debug!("Writing analytics record to ClickHouse: {:?}", final_record);
             if let Err(e) = write_analytics_to_clickhouse(&clickhouse, final_record).await {
                 error!("Failed to write analytics to ClickHouse: {}", e);
+            } else {
+                tracing::debug!("Successfully wrote analytics record to ClickHouse");
             }
         });
+    } else {
+        tracing::warn!("No ClickHouse connection available for analytics");
     }
 
     Ok(response)
+}
+
+/// Extract client IP from headers only (when ConnectInfo is not available)
+fn get_client_ip_fallback(headers: &HeaderMap) -> String {
+    // Check X-Forwarded-For first
+    if let Some(forwarded_for) = headers.get("x-forwarded-for") {
+        if let Ok(forwarded_str) = forwarded_for.to_str() {
+            // X-Forwarded-For can contain multiple IPs, take the first one
+            if let Some(first_ip) = forwarded_str.split(',').next() {
+                return first_ip.trim().to_string();
+            }
+        }
+    }
+
+    // Check X-Real-IP
+    if let Some(real_ip) = headers.get("x-real-ip") {
+        if let Ok(ip_str) = real_ip.to_str() {
+            return ip_str.to_string();
+        }
+    }
+
+    // Fallback to unknown
+    "unknown".to_string()
 }
 
 /// Extract the real client IP considering proxy headers
@@ -245,6 +301,7 @@ pub async fn attach_clickhouse_middleware(
     mut request: Request,
     next: Next,
 ) -> Result<Response, Error> {
+    tracing::debug!("Attaching ClickHouse connection to request extensions: {:?}", clickhouse.database());
     request.extensions_mut().insert(clickhouse);
     Ok(next.run(request).await)
 }

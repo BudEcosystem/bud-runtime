@@ -416,11 +416,16 @@ async fn main() {
     if app_state.config.gateway.analytics.enabled {
         tracing::info!("Gateway analytics enabled");
 
-        // Attach required services to request extensions
-        router = router.layer(axum::middleware::from_fn_with_state(
-            Arc::new(app_state.clickhouse_connection_info.clone()),
-            attach_clickhouse_middleware,
-        ));
+        // Apply analytics collection middleware FIRST (so it runs LAST)
+        router = router.layer(axum::middleware::from_fn(analytics_middleware));
+
+        // Attach required services to request extensions LAST (so they run FIRST)
+        if let Some(parser) = app_state.ua_parser.clone() {
+            router = router.layer(axum::middleware::from_fn_with_state(
+                parser,
+                attach_ua_parser_middleware,
+            ));
+        }
 
         if let Some(geoip) = app_state.geoip_service.clone() {
             router = router.layer(axum::middleware::from_fn_with_state(
@@ -429,15 +434,10 @@ async fn main() {
             ));
         }
 
-        if let Some(parser) = app_state.ua_parser.clone() {
-            router = router.layer(axum::middleware::from_fn_with_state(
-                parser,
-                attach_ua_parser_middleware,
-            ));
-        }
-
-        // Apply analytics collection middleware
-        router = router.layer(axum::middleware::from_fn(analytics_middleware));
+        router = router.layer(axum::middleware::from_fn_with_state(
+            Arc::new(app_state.clickhouse_connection_info.clone()),
+            attach_clickhouse_middleware,
+        ));
     }
 
     // Apply blocking middleware if enabled

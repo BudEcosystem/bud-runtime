@@ -14,21 +14,18 @@
 #  limitations under the License.
 #  -----------------------------------------------------------------------------
 
-"""CRUD operations for gateway blocking rules."""
+"""CRUD operations for metrics and gateway blocking rules."""
 
 from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session, joinedload
 
 from ..commons import logging
 from ..commons.constants import BlockingRuleStatus, BlockingRuleType
 from ..commons.db_utils import SessionMixin
-from ..endpoint_ops.models import Endpoint
-from ..project_ops.models import Project
-from ..user_ops.models import User
 from .models import GatewayBlockingRule
 from .schemas import BlockingRuleCreate, BlockingRuleUpdate
 

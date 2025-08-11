@@ -52,10 +52,10 @@ impl Migration for Migration0032<'_> {
 
                 -- Client metadata
                 user_agent Nullable(String),
-                device_type Nullable(LowCardinality(String)),
-                browser_name Nullable(LowCardinality(String)),
+                device_type LowCardinality(Nullable(String)),
+                browser_name LowCardinality(Nullable(String)),
                 browser_version Nullable(String),
-                os_name Nullable(LowCardinality(String)),
+                os_name LowCardinality(Nullable(String)),
                 os_version Nullable(String),
                 is_bot Bool DEFAULT false,
 
@@ -68,7 +68,7 @@ impl Migration for Migration0032<'_> {
 
                 -- Authentication context
                 api_key_id Nullable(String),       -- Hashed/masked API key
-                auth_method Nullable(LowCardinality(String)),
+                auth_method LowCardinality(Nullable(String)),
                 user_id Nullable(String),
                 project_id Nullable(UUID),
                 endpoint_id Nullable(UUID),
@@ -80,16 +80,16 @@ impl Migration for Migration0032<'_> {
                 total_duration_ms UInt32,
 
                 -- Model routing information
-                model_name Nullable(LowCardinality(String)),
-                model_provider Nullable(LowCardinality(String)),
+                model_name LowCardinality(Nullable(String)),
+                model_provider LowCardinality(Nullable(String)),
                 model_version Nullable(String),
-                routing_decision Nullable(LowCardinality(String)),
+                routing_decision LowCardinality(Nullable(String)),
 
                 -- Response metadata
                 status_code UInt16,
                 response_size Nullable(UInt32),
                 response_headers Map(String, String),
-                error_type Nullable(LowCardinality(String)),
+                error_type LowCardinality(Nullable(String)),
                 error_message Nullable(String),
 
                 -- Blocking information
@@ -107,8 +107,8 @@ impl Migration for Migration0032<'_> {
             )
             ENGINE = MergeTree()
             PARTITION BY toYYYYMM(request_timestamp)
-            ORDER BY (project_id, timestamp, id)
-            TTL request_timestamp + INTERVAL 90 DAY
+            ORDER BY (timestamp, id)
+            TTL toDateTime(request_timestamp) + INTERVAL 90 DAY
             SETTINGS index_granularity = 8192;
         "#;
 
