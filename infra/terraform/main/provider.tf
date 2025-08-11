@@ -1,7 +1,7 @@
 terraform {
   backend "s3" {
     bucket = "tfstate"
-    key    = "devbox.tfstate"
+    key    = "budk8s.tfstate"
     endpoints = {
       s3 = "https://s3.sinanmohd.com"
     }

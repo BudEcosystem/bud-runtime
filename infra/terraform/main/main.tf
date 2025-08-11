@@ -9,13 +9,13 @@ resource "tls_private_key" "ssh" {
 module "azure" {
   source = "../azure"
 
-  prefix      = "devbox"
+  prefix      = "budk8s"
   admin_user  = local.install_user
   ssh_pub_key = tls_private_key.ssh.public_key_openssh
 
   workers = {}
   master = {
-    hostname = "devbox"
+    hostname = "master"
     disksize = 512
     sku      = "Standard_D32als_v6"
   }
@@ -37,8 +37,8 @@ module "install" {
   nixos_partitioner = module.disko.result.out
   instance_id       = module.azure.master_ip.v4
 
-  target_host        = module.azure.master_ip.v6
+  target_host        = module.azure.master_ip.v4
   target_user        = local.install_user
   ssh_private_key    = tls_private_key.ssh.private_key_openssh
-  extra_files_script = "${path.module}/decrypt-sops-root.sh"
+  extra_files_script = "${path.module}/decrypt-sops-age.sh"
 }

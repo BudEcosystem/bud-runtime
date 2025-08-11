@@ -1,15 +1,8 @@
-resource "azurerm_subnet" "worker_ipv4" {
+resource "azurerm_subnet" "worker" {
   name                 = "${var.prefix}-worker"
   resource_group_name  = azurerm_resource_group.common.name
   virtual_network_name = azurerm_virtual_network.common.name
-  address_prefixes     = ["10.177.3.0/24"]
-}
-
-resource "azurerm_subnet" "worker_ipv6" {
-  name                 = "${var.prefix}-worker"
-  resource_group_name  = azurerm_resource_group.common.name
-  virtual_network_name = azurerm_virtual_network.common.name
-  address_prefixes     = ["fd12:3456:789a:b00b::/64"]
+  address_prefixes     = ["10.177.3.0/24", "fd12:3456:789a:b00b::/64"]
 }
 
 resource "azurerm_public_ip" "worker_ipv4" {
@@ -49,7 +42,7 @@ resource "azurerm_network_security_group" "worker" {
 
   security_rule {
     name                       = "${var.prefix}-worker_inbound_local_ipv4"
-    priority                   = 200
+    priority                   = 150
     direction                  = "Inbound"
     access                     = "Allow"
     protocol                   = "*"
@@ -93,15 +86,17 @@ resource "azurerm_network_interface" "worker" {
   ip_configuration {
     primary                       = true
     name                          = "IPv4"
-    subnet_id                     = azurerm_subnet.worker_ipv4.id
+    private_ip_address_version    = "IPv4"
+    subnet_id                     = azurerm_subnet.worker.id
     private_ip_address_allocation = "Dynamic"
     public_ip_address_id          = azurerm_public_ip.worker_ipv4[each.key].id
   }
 
   ip_configuration {
-    private_ip_address_version    = "IPv6"
+    primary                       = false
     name                          = "IPv6"
-    subnet_id                     = azurerm_subnet.worker_ipv6.id
+    private_ip_address_version    = "IPv6"
+    subnet_id                     = azurerm_subnet.worker.id
     private_ip_address_allocation = "Dynamic"
     public_ip_address_id          = azurerm_public_ip.worker_ipv6[each.key].id
   }

@@ -1,20 +1,13 @@
-resource "azurerm_subnet" "master_ipv4" {
+resource "azurerm_subnet" "master" {
   name                 = "${var.prefix}-master"
   resource_group_name  = azurerm_resource_group.common.name
   virtual_network_name = azurerm_virtual_network.common.name
-  address_prefixes     = ["10.177.2.0/24"]
-}
-
-resource "azurerm_subnet" "master_ipv6" {
-  name                 = "${var.prefix}-master"
-  resource_group_name  = azurerm_resource_group.common.name
-  virtual_network_name = azurerm_virtual_network.common.name
-  address_prefixes     = ["fd12:3456:789a:beef::/64"]
+  address_prefixes     = ["10.177.2.0/24", "fd12:3456:789a:beef::/64"]
 }
 
 resource "azurerm_public_ip" "master" {
   for_each            = toset(["IPv4", "IPv6"])
-  name                = "${var.prefix}-master"
+  name                = "${var.prefix}-master-${lower(each.key)}"
   ip_version          = each.key
   location            = azurerm_resource_group.common.location
   resource_group_name = azurerm_resource_group.common.name
@@ -60,15 +53,17 @@ resource "azurerm_network_interface" "master" {
   ip_configuration {
     primary                       = true
     name                          = "IPv4"
-    subnet_id                     = azurerm_subnet.master_ipv4.id
+    private_ip_address_version    = "IPv4"
+    subnet_id                     = azurerm_subnet.master.id
     private_ip_address_allocation = "Dynamic"
     public_ip_address_id          = azurerm_public_ip.master["IPv4"].id
   }
 
   ip_configuration {
-    private_ip_address_version    = "IPv6"
+    primary                       = false
     name                          = "IPv6"
-    subnet_id                     = azurerm_subnet.master_ipv6.id
+    private_ip_address_version    = "IPv6"
+    subnet_id                     = azurerm_subnet.master.id
     private_ip_address_allocation = "Dynamic"
     public_ip_address_id          = azurerm_public_ip.master["IPv6"].id
   }
