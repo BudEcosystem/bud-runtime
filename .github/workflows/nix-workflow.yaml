@@ -14,7 +14,7 @@ on:
         type: string
 
 jobs:
-  apply:
+  nix-workflow:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repository
@@ -26,4 +26,4 @@ jobs:
     - name: Run Nix Workflow
       env:
         SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
-      run: nix run .#workflow_${{ github.event.inputs.targetEnv || inputs.targetEnv }}
+      run: nix run .#workflow_${{ github.event.inputs.workflow || inputs.workflow }}
