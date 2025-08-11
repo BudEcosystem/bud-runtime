@@ -1,6 +1,13 @@
 { ... }:
 {
   users.users = {
+    "varunsr" = {
+      isNormalUser = true;
+      extraGroups = [ "wheel" ];
+      openssh.authorizedKeys.keys = [
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFqcB/R4H0qhr4ftadM03weJVfY0HqNt5GCRkRExNNlj varun.sr@accubits.com"
+      ];
+    };
     "ditto" = {
       isNormalUser = true;
       extraGroups = [ "wheel" ];
