@@ -1,23 +1,23 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ .Release.Name }}-devbox
+  name: {{ .Release.Name }}-dev
   annotations:
     kubernetes.io/tls-acme: "true"
 spec:
   ingressClassName: traefik
   rules:
-    - host: {{ .Values.host.devbox }}
+    - host: {{ .Values.host.dev }}
       http:
         paths:
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: {{ .Release.Name }}-devbox
+                name: {{ .Release.Name }}-dev
                 port:
                   number: 80
   tls:
     - hosts:
-        - {{ .Values.host.devbox }}
-      secretName: {{ .Release.Name }}-devbox-acme-cert
+        - {{ .Values.host.dev }}
+      secretName: {{ .Release.Name }}-dev-acme-cert

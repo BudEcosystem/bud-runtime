@@ -1,21 +1,21 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Release.Name }}-devbox
+  name: {{ .Release.Name }}-dev
 spec:
   selector:
     matchLabels:
-      app: {{ .Release.Name }}-devbox
+      app: {{ .Release.Name }}-dev
   replicas: 1
   template:
     metadata:
       labels:
-        app: {{ .Release.Name }}-devbox
+        app: {{ .Release.Name }}-dev
       annotations:
         date: "{{ now }}"
     spec:
       containers:
-      - name: devbox
+      - name: dev
         image: docker.io/budstudio/status
         imagePullPolicy: "Always"
         ports:
@@ -24,10 +24,10 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ .Release.Name }}-devbox
+  name: {{ .Release.Name }}-dev
 spec:
   selector:
-    app: {{ .Release.Name }}-devbox
+    app: {{ .Release.Name }}-dev
   ports:
     - protocol: TCP
       port: 80
