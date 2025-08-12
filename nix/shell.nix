@@ -112,7 +112,7 @@ mkShell {
         k2="$2"
         var_name="$3"
 
-        if var_value="$(sops --decrypt --extract "[\""$k1"\"][\""$k2"\"]" "${self}/infra/terraform/main/secrets.yaml" )"
+        if var_value="$(sops --decrypt --extract "[\""$k1"\"][\""$k2"\"]" "${self}/infra/terraform/main/secrets.yaml" 2> /dev/null)"
         then
             export "$var_name"="$var_value"
         fi
