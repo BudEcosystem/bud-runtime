@@ -5,6 +5,8 @@
 
   sops,
   age,
+  gnugrep,
+  git,
 
   k3d,
   kubectl,
@@ -54,10 +56,13 @@ mkShell {
     mypy
     typescript-language-server
     prefetch-npm-deps
+    gnugrep
+    git
   ];
 
   shellHook = ''
-    pde() {
+    # deploy development environment
+    bud_pde() {
         if [ "$#" -lt 1 ]; then
             echo "Usage: pde <dev_name>"
             return 1
@@ -73,6 +78,33 @@ mkShell {
             --values "$chart/secrets.yaml" \
             --values "$chart/values.$dev_name.yaml" \
             "$dev_name" "$chart"
+    }
+
+    # setup sops, generate age key pair if not exists, return pubic key
+    bud_sops() {
+        if [ -n "$XDG_CONFIG_HOME" ]; then
+                key_path="$XDG_CONFIG_HOME/sops/age/keys.txt"
+        else
+                case "$(uname -s)" in
+                Linux)
+                        key_path="$HOME/.config/sops/age/keys.txt"
+                        ;;
+                Darwin)
+                        key_path="$HOME/Library/Application Support/sops/age/keys.txt"
+                        ;;
+                *)
+                        echo "Unsupported System"
+                        return 1
+                        ;;
+                esac
+        fi
+
+        mkdir -p "$(dirname "$key_path")" || return 1
+        if [ ! -f "$key_path" ]; then
+                age-keygen -o "$key_path" || return 1
+        fi
+
+        grep -Eom1 "age1.*$" "$key_path" || return 1
     }
 
     export_sops_secret_silent() {
