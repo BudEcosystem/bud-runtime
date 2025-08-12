@@ -48,7 +48,9 @@ class TestMultipleCallsControl:
 
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Say hello",
+            "messages": [
+                {"role": "system", "content": "Say hello"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             # Not specifying allow_multiple_calls - should default to true
         }
@@ -64,7 +66,9 @@ class TestMultipleCallsControl:
 
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Say hello",
+            "messages": [
+                {"role": "system", "content": "Say hello"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "allow_multiple_calls": False,
         }
@@ -88,7 +92,9 @@ class TestMultipleCallsControl:
 
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Generate a person with name 'John' and age 25",
+            "messages": [
+                {"role": "system", "content": "Generate a person with name 'John' and age 25"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "output_validation_prompt": "The person's name must be exactly 'Alice'",  # Will fail
             "allow_multiple_calls": False,  # No retries allowed
@@ -110,7 +116,9 @@ class TestMultipleCallsControl:
 
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Generate a person with name 'Alice' and age 30",
+            "messages": [
+                {"role": "system", "content": "Generate a person with name 'Alice' and age 30"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "output_validation_prompt": "The person's age must be exactly 30",
             "allow_multiple_calls": True,  # Retries allowed
@@ -129,7 +137,9 @@ class TestMultipleCallsControl:
 
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Say hello",
+            "messages": [
+                {"role": "system", "content": "Say hello"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "enable_tools": True,
             "allow_multiple_calls": False,  # Invalid combination
@@ -150,7 +160,9 @@ class TestMultipleCallsControl:
 
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Say hello",
+            "messages": [
+                {"role": "system", "content": "Say hello"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "enable_tools": True,
             "allow_multiple_calls": True,  # Valid combination
@@ -168,7 +180,9 @@ class TestMultipleCallsControl:
         # Test with allow_multiple_calls=false
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Say hello",
+            "messages": [
+                {"role": "system", "content": "Say hello"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "enable_tools": False,
             "allow_multiple_calls": False,
@@ -198,7 +212,9 @@ class TestMultipleCallsControl:
 
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Describe this person",
+            "messages": [
+                {"role": "system", "content": "Describe this person"},
+            ],
             "input_schema": InputSchema.model_json_schema(),
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": {"content": {"name": "John", "age": 16}},
@@ -231,7 +247,9 @@ class TestMultipleCallsControl:
 
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Create a description for this person and return their details",
+            "messages": [
+                {"role": "system", "content": "Create a description for this person and return their details"},
+            ],
             "input_schema": InputSchema.model_json_schema(),
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": {"content": {"name": "Alice", "age": 30, "city": "New York"}},

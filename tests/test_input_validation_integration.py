@@ -56,7 +56,9 @@ class TestInputValidationIntegration:
         
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Describe the person briefly",
+            "messages": [
+                {"role": "system", "content": "Describe the person briefly"},
+            ],
             "input_schema": InputSchema.model_json_schema(),
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": {"content": {"name": "John", "age": 25}},
@@ -87,7 +89,9 @@ class TestInputValidationIntegration:
         
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Describe this person",
+            "messages": [
+                {"role": "system", "content": "Describe this person"},
+            ],
             "input_schema": InputSchema.model_json_schema(),
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": {"content": {"name": "John", "age": 30, "email": "john@example.com"}},
@@ -119,7 +123,9 @@ class TestInputValidationIntegration:
         
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Describe this person",
+            "messages": [
+                {"role": "system", "content": "Describe this person"},
+            ],
             "input_schema": InputSchema.model_json_schema(),
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": {"content": {"name": "Jane", "age": 16, "email": "jane@example.com"}},
@@ -153,7 +159,9 @@ class TestInputValidationIntegration:
         
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Describe this person",
+            "messages": [
+                {"role": "system", "content": "Describe this person"},
+            ],
             "input_schema": InputSchema.model_json_schema(),
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": {"content": {"name": "John", "age": 30, "city": "New York"}},
@@ -192,7 +200,9 @@ class TestInputValidationIntegration:
         # Valid input that should pass validation
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Describe this person and their location",
+            "messages": [
+                {"role": "system", "content": "Describe this person and their location"},
+            ],
             "input_schema": InputSchema.model_json_schema(),
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": {
@@ -239,7 +249,9 @@ class TestInputValidationIntegration:
         # Invalid input that should fail validation
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Describe this person and their location",
+            "messages": [
+                {"role": "system", "content": "Describe this person and their location"},
+            ],
             "input_schema": InputSchema.model_json_schema(),
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": {
@@ -287,7 +299,9 @@ class TestInputValidationIntegration:
         # Valid input that should pass validation
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Describe this team",
+            "messages": [
+                {"role": "system", "content": "Describe this team"},
+            ],
             "input_schema": InputSchema.model_json_schema(),
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": {
@@ -331,7 +345,9 @@ class TestInputValidationIntegration:
         # Invalid input - one member is too young
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Describe this team",
+            "messages": [
+                {"role": "system", "content": "Describe this team"},
+            ],
             "input_schema": InputSchema.model_json_schema(),
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": {
@@ -374,7 +390,9 @@ class TestInputValidationIntegration:
         # Valid input that should pass all constraints
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Describe this person",
+            "messages": [
+                {"role": "system", "content": "Describe this person"},
+            ],
             "input_schema": InputSchema.model_json_schema(),
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": {
@@ -403,7 +421,9 @@ class TestInputValidationIntegration:
         
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Respond to the user's input",
+            "messages": [
+                {"role": "system", "content": "Respond to the user's input"},
+            ],
             # No input_schema - unstructured input
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "Hello, my name is John and I am 16 years old",
@@ -436,7 +456,9 @@ class TestInputValidationIntegration:
         # Valid input within ranges
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Describe this product",
+            "messages": [
+                {"role": "system", "content": "Describe this product"},
+            ],
             "input_schema": InputSchema.model_json_schema(),
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": {
@@ -475,7 +497,9 @@ class TestInputValidationIntegration:
         # Valid input with edge case values
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Describe this measurement",
+            "messages": [
+                {"role": "system", "content": "Describe this measurement"},
+            ],
             "input_schema": InputSchema.model_json_schema(),
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": {

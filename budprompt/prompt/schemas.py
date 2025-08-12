@@ -102,11 +102,11 @@ class Message(BaseModel):
     """Message structure for prompt execution.
 
     Attributes:
-        role: The role of the message sender (user, assistant, developer)
+        role: The role of the message sender (system, developer, user, or assistant)
         content: The content of the message
     """
 
-    role: Literal["user", "assistant", "developer"] = Field(default="user")
+    role: Literal["system", "developer", "user", "assistant"] = Field(default="user")
     content: str = Field(..., min_length=1)
 
 
@@ -125,8 +125,7 @@ class PromptExecuteRequest(BaseModel):
         stream: Whether to stream the response
         input_schema: Optional JSON schema for structured input (None for unstructured)
         output_schema: Optional JSON schema for structured output (None for unstructured)
-        system_prompt: System prompt to guide the model's behavior
-        messages: List of messages to provide context
+        messages: List of messages to provide context (can include system/developer roles)
         input_data: Input data (Dict for structured, str for unstructured)
     """
 
@@ -139,8 +138,9 @@ class PromptExecuteRequest(BaseModel):
     output_schema: Optional[Dict[str, Any]] = Field(
         None, description="JSON schema for structured output (None for unstructured)"
     )
-    system_prompt: str = Field(..., min_length=1, description="System prompt for the model")
-    messages: List[Message] = Field(default_factory=list, description="Conversation messages")
+    messages: List[Message] = Field(
+        default_factory=list, description="Conversation messages (can include system/developer messages)"
+    )
     input_data: Optional[Union[Dict[str, Any], str]] = Field(
         None, description="Input data (Dict for structured, str for unstructured)"
     )
@@ -161,6 +161,10 @@ class PromptExecuteRequest(BaseModel):
     allow_multiple_calls: bool = Field(
         default=True,
         description="Allow multiple LLM calls for retries and tool usage. When false, only a single LLM call is made",
+    )
+    system_prompt_role: Optional[Literal["system", "developer", "user"]] = Field(
+        None,
+        description="Role for system prompts in OpenAI models. 'developer' only works with compatible models (not o1-mini)",
     )
 
 

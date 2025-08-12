@@ -21,7 +21,7 @@ from typing import Any, Dict, Optional
 
 from jinja2 import Environment, TemplateSyntaxError, UndefinedError, meta
 
-from budprompt.commons.exceptions import PromptExecutionException
+from budprompt.commons.exceptions import TemplateRenderingException
 
 
 logger = logging.getLogger(__name__)
@@ -74,13 +74,13 @@ class TemplateRenderer:
 
         except TemplateSyntaxError as e:
             logger.error(f"Template syntax error: {str(e)}")
-            raise PromptExecutionException("Invalid template syntax") from e
+            raise TemplateRenderingException("Invalid template syntax") from e
         except UndefinedError as e:
             logger.error(f"Undefined variable in template: {str(e)}")
-            raise PromptExecutionException("Undefined variable in template") from e
+            raise TemplateRenderingException("Undefined variable in template") from e
         except Exception as e:
             logger.error(f"Template rendering failed: {str(e)}")
-            raise PromptExecutionException("Template rendering failed") from e
+            raise TemplateRenderingException("Template rendering failed") from e
 
 
 # Global instance for convenience

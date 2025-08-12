@@ -61,7 +61,7 @@ class BudServeProvider:
 
         Args:
             model_name: Name of the model deployment
-            **kwargs: Additional arguments passed to OpenAIModel
+            **kwargs: Additional arguments passed to OpenAIModel (including system_prompt_role)
 
         Returns:
             OpenAIModel configured with BudServe provider

@@ -52,7 +52,9 @@ class TestModelParameters:
 
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "You are a helpful assistant. Respond briefly.",
+            "messages": [
+                {"role": "system", "content": "You are a helpful assistant. Respond briefly."},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": input_data,
             "model_settings": model_settings,
@@ -160,7 +162,9 @@ class TestModelParameters:
         # Use httpx.stream for streaming response
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "You are a helpful assistant. Respond briefly.",
+            "messages": [
+                {"role": "system", "content": "You are a helpful assistant. Respond briefly."},
+            ],
             "output_schema": {"type": "object", "properties": {"content": {"type": "string"}}},
             "input_data": "Hello",
             "model_settings": model_settings,
@@ -370,7 +374,9 @@ class TestModelParameters:
 
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "You are a helpful assistant.",
+            "messages": [
+                {"role": "system", "content": "You are a helpful assistant."},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "Count from 1 to 5",
             "stream": True,

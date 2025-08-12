@@ -22,7 +22,11 @@ from typing import Any, AsyncGenerator, Dict, Union
 
 from pydantic import ValidationError
 
-from budprompt.commons.exceptions import PromptExecutionException, SchemaGenerationException
+from budprompt.commons.exceptions import (
+    PromptExecutionException,
+    SchemaGenerationException,
+    TemplateRenderingException,
+)
 
 from ..commons.exceptions import ClientException
 from .executors import SimplePromptExecutor
@@ -87,7 +91,6 @@ class PromptExecutorService:
                 model_settings=request.model_settings,
                 input_schema=request.input_schema,
                 output_schema=request.output_schema,
-                system_prompt=request.system_prompt,
                 messages=request.messages,
                 input_data=request.input_data,
                 stream=request.stream,
@@ -96,6 +99,7 @@ class PromptExecutorService:
                 llm_retry_limit=request.llm_retry_limit,
                 enable_tools=request.enable_tools,
                 allow_multiple_calls=request.allow_multiple_calls,
+                system_prompt_role=request.system_prompt_role,
             )
 
             return result
@@ -110,6 +114,14 @@ class PromptExecutorService:
         except SchemaGenerationException as e:
             # Schema generation errors -> 400 Bad Request
             logger.error(f"Schema generation failed: {str(e)}")
+            raise ClientException(
+                status_code=400,
+                message=e.message,  # Use the custom exception's message
+            ) from e
+
+        except TemplateRenderingException as e:
+            # Prompt execution errors -> 500 Internal Server Error
+            logger.error(f"Template rendering failed: {str(e)}")
             raise ClientException(
                 status_code=400,
                 message=e.message,  # Use the custom exception's message

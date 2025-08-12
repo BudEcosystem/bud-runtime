@@ -36,7 +36,11 @@ from pydantic_ai.messages import (
 from pydantic_ai.models.openai import ModelSettings as OpenAIModelSettings
 from pydantic_ai.output import NativeOutput
 
-from budprompt.commons.exceptions import PromptExecutionException, SchemaGenerationException
+from budprompt.commons.exceptions import (
+    PromptExecutionException,
+    SchemaGenerationException,
+    TemplateRenderingException,
+)
 from budprompt.shared.providers import BudServeProvider
 
 from .schema_builder import PydanticModelGenerator
@@ -67,7 +71,6 @@ class SimplePromptExecutor:
         model_settings: ModelSettings,
         input_schema: Optional[Dict[str, Any]],
         output_schema: Optional[Dict[str, Any]],
-        system_prompt: str,
         messages: List[Message],
         input_data: Optional[Union[Dict[str, Any], str]] = None,
         stream: bool = False,
@@ -76,6 +79,7 @@ class SimplePromptExecutor:
         llm_retry_limit: Optional[int] = 3,
         enable_tools: bool = False,
         allow_multiple_calls: bool = True,
+        system_prompt_role: Optional[str] = None,
     ) -> Union[Dict[str, Any], str, AsyncGenerator[str, None]]:
         """Execute a prompt with structured or unstructured input and output.
 
@@ -84,8 +88,7 @@ class SimplePromptExecutor:
             model_settings: Model configuration settings
             input_schema: JSON schema for input validation (None for unstructured)
             output_schema: JSON schema for output structure (None for unstructured)
-            system_prompt: System prompt to guide the model
-            messages: List of messages for context
+            messages: List of messages for context (can include system/developer messages)
             input_data: Input data to process (Dict for structured, str for unstructured)
             stream: Whether to stream the response
             output_validation_prompt: Natural language validation rules for output
@@ -93,6 +96,7 @@ class SimplePromptExecutor:
             llm_retry_limit: Number of LLM retries when validation fails
             enable_tools: Enable tool calling capability (requires allow_multiple_calls=true)
             allow_multiple_calls: Allow multiple LLM calls for retries and tools
+            system_prompt_role: Role for system prompts (system/developer/user)
 
         Returns:
             Output data (Dict for structured, str for unstructured) or AsyncGenerator for streaming
@@ -123,9 +127,6 @@ class SimplePromptExecutor:
             # Prepare context for template rendering
             context = self._prepare_template_context(validated_input, input_schema is not None)
 
-            # Render system prompt with Jinja2
-            rendered_system_prompt = render_template(system_prompt, context)
-
             # Handle output type and validation (only for non-streaming with Pydantic models)
             output_type = await self._get_output_type(output_schema, output_validation_prompt, stream)
 
@@ -134,9 +135,9 @@ class SimplePromptExecutor:
                 deployment_name,
                 model_settings,
                 output_type,
-                rendered_system_prompt,
                 llm_retry_limit if output_validation_prompt and not stream else None,
                 allow_multiple_calls,
+                system_prompt_role,
             )
 
             # Build message history from all messages
@@ -153,7 +154,7 @@ class SimplePromptExecutor:
                 # Execute the agent with both history and current prompt
                 return await self._run_agent(agent, user_prompt, message_history, output_schema)
 
-        except (SchemaGenerationException, ValidationError, PromptExecutionException):
+        except (SchemaGenerationException, ValidationError, PromptExecutionException, TemplateRenderingException):
             raise
         except Exception as e:
             logger.error(f"Prompt execution failed: {str(e)}")
@@ -284,9 +285,9 @@ class SimplePromptExecutor:
         deployment_name: str,
         model_settings: ModelSettings,
         output_type: Union[Type[BaseModel], Type[str], NativeOutput],
-        system_prompt: str,
         llm_retry_limit: Optional[int] = None,
         allow_multiple_calls: bool = True,
+        system_prompt_role: Optional[str] = None,
     ) -> Agent:
         """Create Pydantic AI agent with automatic parameter routing.
 
@@ -294,9 +295,9 @@ class SimplePromptExecutor:
             deployment_name: Model deployment name
             model_settings: Model configuration with all parameters
             output_type: Output type (Pydantic model for structured, str for unstructured)
-            system_prompt: System prompt
             llm_retry_limit: Number of retries for validation failures
             allow_multiple_calls: Whether to allow multiple LLM calls
+            system_prompt_role: Role for system prompts (system/developer/user)
 
         Returns:
             Configured AI agent
@@ -305,14 +306,17 @@ class SimplePromptExecutor:
         # This automatically routes BudEcosystem parameters to extra_body
         openai_settings = self._convert_to_openai_settings(model_settings)
 
-        # Create model using BudServeProvider
-        model = self.provider.get_model(model_name=deployment_name, settings=openai_settings)
+        # Create model using BudServeProvider with system_prompt_role
+        model = self.provider.get_model(
+            model_name=deployment_name, system_prompt_role=system_prompt_role, settings=openai_settings
+        )
 
         # Create agent with output type and optional retry configuration
+        # Note: system_prompt is not passed here - it will be added to message_history instead
+        # This is because pydantic-ai ignores system_prompt when message_history is provided
         agent_kwargs = {
             "model": model,
             "output_type": output_type,
-            "system_prompt": system_prompt,
         }
 
         # Add retries if validation is enabled
@@ -365,11 +369,16 @@ class SimplePromptExecutor:
         """
         message_history = []
 
+        # Process all messages
         for msg in messages:
             # Render message content with Jinja2
             rendered_content = render_template(msg.content, context)
 
-            if msg.role == "user":
+            if msg.role in ["system", "developer"]:
+                # System and developer messages both use SystemPromptPart
+                # The actual OpenAI role (system/developer) is controlled by system_prompt_role
+                message_history.append(ModelRequest(parts=[SystemPromptPart(content=rendered_content)]))
+            elif msg.role == "user":
                 # Create user message
                 message_history.append(ModelRequest(parts=[UserPromptPart(content=rendered_content)]))
             elif msg.role == "assistant":
@@ -380,9 +389,6 @@ class SimplePromptExecutor:
                         timestamp=datetime.now(timezone.utc),
                     )
                 )
-            elif msg.role == "developer":
-                # Developer messages are system-level instructions
-                message_history.append(ModelRequest(parts=[SystemPromptPart(content=rendered_content)]))
 
         return message_history
 

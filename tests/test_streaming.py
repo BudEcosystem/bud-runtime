@@ -47,8 +47,9 @@ def test_simple_text_streaming(http_client: httpx.Client) -> None:
             "max_tokens": 100,
         },
         "stream": True,
-        "system_prompt": "You are a helpful assistant. Generate a story about a cat.",
-        "messages": [],
+        "messages": [
+                {"role": "system", "content": "You are a helpful assistant. Generate a story about a cat."},
+        ],
         "input_data": "Write a short story",
     }
 
@@ -125,8 +126,9 @@ def test_structured_output_streaming(http_client: httpx.Client) -> None:
         },
         "stream": True,
         "output_schema": output_schema,
-        "system_prompt": "Extract person information from the text.",
-        "messages": [],
+        "messages": [
+                {"role": "system", "content": "Extract person information from the text."},
+        ],
         "input_data": "John is 30 years old and lives in New York.",
     }
 
@@ -192,8 +194,8 @@ def test_streaming_with_message_history(http_client: httpx.Client) -> None:
             "max_tokens": 50,
         },
         "stream": True,
-        "system_prompt": "You are a helpful math tutor.",
         "messages": [
+            {"role": "system", "content": "You are a helpful math tutor."},
             {"role": "user", "content": "What is 2 + 2?"},
             {"role": "assistant", "content": "2 + 2 equals 4."},
             {"role": "user", "content": "What about 3 + 3?"},
@@ -256,8 +258,9 @@ def test_streaming_with_jinja2_template(http_client: httpx.Client) -> None:
         },
         "stream": True,
         "input_schema": input_schema,
-        "system_prompt": "You are reviewing a {{ category }} product called {{ product }}. Be brief.",
-        "messages": [],
+        "messages": [
+                {"role": "system", "content": "You are reviewing a {{ category }} product called {{ product }}. Be brief."},
+        ],
         "input_data": {
             "content": {
                 "product": "iPhone 15",
@@ -317,8 +320,9 @@ def test_streaming_error_handling(http_client: httpx.Client) -> None:
         "model_settings": {},
         "stream": True,
         "output_schema": output_schema,
-        "system_prompt": "Extract name",
-        "messages": [],
+        "messages": [
+                {"role": "system", "content": "Extract name"},
+        ],
         "input_data": "John",
     }
 
@@ -357,8 +361,9 @@ def test_non_streaming_still_works(http_client: httpx.Client) -> None:
             "temperature": 0.1,
         },
         "stream": False,  # Explicitly set to False
-        "system_prompt": "You are a helpful assistant. Answer in one word.",
-        "messages": [],
+        "messages": [
+                {"role": "system", "content": "You are a helpful assistant. Answer in one word."},
+        ],
         "input_data": "What is 2 + 2?",
     }
 
@@ -378,8 +383,9 @@ def test_model_response_structure_validation(http_client: httpx.Client) -> None:
         "deployment_name": "qwen3-4b",
         "model_settings": {"temperature": 0.1, "max_tokens": 50},
         "stream": True,
-        "system_prompt": "You are a helpful assistant.",
-        "messages": [],
+        "messages": [
+                {"role": "system", "content": "You are a helpful assistant."},
+        ],
         "input_data": "Say hello",
     }
 
@@ -420,8 +426,9 @@ def test_streaming_last_message_flag(http_client: httpx.Client) -> None:
         "deployment_name": "qwen3-4b",
         "model_settings": {"temperature": 0.1, "max_tokens": 50},
         "stream": True,
-        "system_prompt": "You are a helpful assistant. Be very brief.",
-        "messages": [],
+        "messages": [
+                {"role": "system", "content": "You are a helpful assistant. Be very brief."},
+        ],
         "input_data": "Count from 1 to 3",
     }
 
@@ -450,8 +457,9 @@ def test_streaming_empty_response(http_client: httpx.Client) -> None:
         "deployment_name": "qwen3-4b",
         "model_settings": {"temperature": 0, "max_tokens": 1},
         "stream": True,
-        "system_prompt": "You must only respond with a single character.",
-        "messages": [],
+        "messages": [
+                {"role": "system", "content": "You must only respond with a single character."},
+        ],
         "input_data": "Respond with just the letter 'A'",
     }
 
@@ -474,8 +482,9 @@ def test_streaming_sse_format_compliance(http_client: httpx.Client) -> None:
         "deployment_name": "qwen3-4b",
         "model_settings": {"temperature": 0.1, "max_tokens": 30},
         "stream": True,
-        "system_prompt": "You are a helpful assistant.",
-        "messages": [],
+        "messages": [
+                {"role": "system", "content": "You are a helpful assistant."},
+        ],
         "input_data": "Hello",
     }
 
@@ -507,8 +516,9 @@ def test_concurrent_streaming_requests(http_client: httpx.Client) -> None:
             "deployment_name": "qwen3-4b",
             "model_settings": {"temperature": 0.1, "max_tokens": 30},
             "stream": True,
-            "system_prompt": "You are a helpful assistant.",
-            "messages": [],
+            "messages": [
+                {"role": "system", "content": "You are a helpful assistant."},
+            ],
             "input_data": f"Say 'Response {request_id}'",
         }
         
@@ -578,8 +588,9 @@ def test_streaming_with_complex_structured_output(http_client: httpx.Client) -> 
         "model_settings": {"temperature": 0.1},
         "stream": True,
         "output_schema": output_schema,
-        "system_prompt": "Generate user data based on the request.",
-        "messages": [],
+        "messages": [
+                {"role": "system", "content": "Generate user data based on the request."},
+        ],
         "input_data": "Create 2 users with hobbies",
     }
 
@@ -609,8 +620,9 @@ def test_streaming_timeout_handling(http_client: httpx.Client) -> None:
             "max_tokens": 500  # Large token count
         },
         "stream": True,
-        "system_prompt": "You are a helpful assistant.",
-        "messages": [],
+        "messages": [
+                {"role": "system", "content": "You are a helpful assistant."},
+        ],
         "input_data": "Write a detailed explanation of streaming in web applications",
     }
 
@@ -638,8 +650,9 @@ def test_streaming_with_special_characters(http_client: httpx.Client) -> None:
         "deployment_name": "qwen3-4b",
         "model_settings": {"temperature": 0.1, "max_tokens": 50},
         "stream": True,
-        "system_prompt": "You are a helpful assistant. Include the exact special characters from the input in your response.",
-        "messages": [],
+        "messages": [
+                {"role": "system", "content": "You are a helpful assistant. Include the exact special characters from the input in your response."},
+        ],
         "input_data": "Repeat these characters: émojis 🎉, symbols €$¥, and quotes \"'`",
     }
 

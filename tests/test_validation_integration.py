@@ -48,7 +48,9 @@ class TestValidationIntegration:
         
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "You are a helpful assistant",
+            "messages": [
+                {"role": "system", "content": "You are a helpful assistant"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "Say hello",
             # No output_validation_prompt - validation should be disabled
@@ -75,7 +77,9 @@ class TestValidationIntegration:
         
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Generate a person who is over 25 years old",
+            "messages": [
+                {"role": "system", "content": "Generate a person who is over 25 years old"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "Generate a person over 25 years old",
             "output_validation_prompt": "Age must be greater than 25",
@@ -106,7 +110,9 @@ class TestValidationIntegration:
         
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Generate a person named John",
+            "messages": [
+                {"role": "system", "content": "Generate a person named John"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "Generate a person named John with age and email",
             "output_validation_prompt": "The name must be exactly 'John'",
@@ -137,7 +143,9 @@ class TestValidationIntegration:
         
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Generate a person living in Bangalore, India",
+            "messages": [
+                {"role": "system", "content": "Generate a person living in Bangalore, India"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "Generate a person who lives in Bangalore, India",
             "output_validation_prompt": "The person must live in Bangalore city",
@@ -166,7 +174,9 @@ class TestValidationIntegration:
         
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Generate a person with name and age",
+            "messages": [
+                {"role": "system", "content": "Generate a person with name and age"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "Generate a person",
             # Multiple impossible constraints to ensure failure
@@ -201,7 +211,9 @@ class TestValidationIntegration:
         
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Generate a person",
+            "messages": [
+                {"role": "system", "content": "Generate a person"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "Generate a person",
             "stream": True,  # Streaming enabled - validation should be ignored
@@ -235,7 +247,9 @@ class TestValidationIntegration:
         
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Generate a batch of 3 people, all adults over 18",
+            "messages": [
+                {"role": "system", "content": "Generate a batch of 3 people, all adults over 18"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "Generate a batch with 3 adult people",
             "output_validation_prompt": "All people must be over 18 years old",
@@ -266,7 +280,9 @@ class TestValidationIntegration:
         
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Generate a random person with any name and age",
+            "messages": [
+                {"role": "system", "content": "Generate a random person with any name and age"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "Generate any person",
             "output_validation_prompt": "Name must be exactly 'XyZabc123ImpossibleName' AND age must be negative",
@@ -301,7 +317,9 @@ class TestValidationIntegration:
         
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Generate a person from Bangalore",
+            "messages": [
+                {"role": "system", "content": "Generate a person from Bangalore"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "Generate a person who lives in Bangalore",
             "output_validation_prompt": "The person must be from Bangalore city and age must be exactly 30",
@@ -329,7 +347,9 @@ class TestValidationIntegration:
         
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Generate a person with all required details",
+            "messages": [
+                {"role": "system", "content": "Generate a person with all required details"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "Generate a person",
             "output_validation_prompt": "Name must start with 'A', age must be between 25 and 35, city must be 'Mumbai', and email must contain '@gmail.com'",
@@ -360,7 +380,9 @@ class TestValidationIntegration:
         
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Generate a product with name, price, rating, and quantity",
+            "messages": [
+                {"role": "system", "content": "Generate a product with name, price, rating, and quantity"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "Generate a product",
             "output_validation_prompt": "Price must be between 10.0 and 100.0, rating must be between 4.0 and 5.0, quantity must be greater than 0",
@@ -390,7 +412,9 @@ class TestValidationIntegration:
         
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Generate contact information",
+            "messages": [
+                {"role": "system", "content": "Generate contact information"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "Generate contact details",
             "output_validation_prompt": "Phone must start with '+91', email must end with '.com', website must start with 'https://'",
@@ -423,7 +447,9 @@ class TestValidationIntegration:
         
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Generate a team with members",
+            "messages": [
+                {"role": "system", "content": "Generate a team with members"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "Generate a team with multiple members",
             "output_validation_prompt": "Team must have exactly 3 members, all members must be over 20 years old, and project_count must be greater than 0",
@@ -454,7 +480,9 @@ class TestValidationIntegration:
         
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Generate an employee with position, salary, and experience",
+            "messages": [
+                {"role": "system", "content": "Generate an employee with position, salary, and experience"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "Generate an employee",
             "output_validation_prompt": "If position is 'Manager' then salary must be above 80000, if experience_years > 5 then salary must be above 60000",
@@ -487,7 +515,9 @@ class TestValidationIntegration:
         
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Generate a measurement",
+            "messages": [
+                {"role": "system", "content": "Generate a measurement"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "Generate a measurement",
             "output_validation_prompt": "Value must be exactly 0.0, unit must be 'meters', is_positive must be false",
@@ -517,7 +547,9 @@ class TestValidationIntegration:
         # Test with specific constraints that may require retries
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Generate a person",
+            "messages": [
+                {"role": "system", "content": "Generate a person"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "Generate a person",
             "output_validation_prompt": "Name must be exactly 'Alexander', age must be exactly 28, city must be exactly 'Stockholm'",
@@ -549,7 +581,9 @@ class TestValidationIntegration:
         
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Generate an order with business rules",
+            "messages": [
+                {"role": "system", "content": "Generate an order with business rules"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "Generate an order",
             "output_validation_prompt": "If customer_type is 'Premium' then discount_percent must be at least 10, final_amount must equal total_amount minus discount, and order_id must start with 'ORD-'",
@@ -605,7 +639,9 @@ class TestValidationAdvancedScenarios:
         for retry_limit in [1, 3, 5]:
             request_data = {
                 "deployment_name": self.deployment_name,
-                "system_prompt": "Generate a person with specific requirements",
+                "messages": [
+                {"role": "system", "content": "Generate a person with specific requirements"},
+            ],
                 "output_schema": OutputSchema.model_json_schema(),
                 "input_data": "Generate a person",
                 "output_validation_prompt": constraint,
@@ -640,7 +676,9 @@ class TestValidationAdvancedScenarios:
         
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Generate a person",
+            "messages": [
+                {"role": "system", "content": "Generate a person"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "Generate a person",
             "output_validation_prompt": "Age must be greater than 100 AND age must be less than 50 AND name must be both 'John' and 'Mary' at the same time",
@@ -668,7 +706,9 @@ class TestValidationAdvancedScenarios:
         
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Generate a person with international details",
+            "messages": [
+                {"role": "system", "content": "Generate a person with international details"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "Generate a person with unicode characters",
             "output_validation_prompt": "Name must contain emoji 🌟, city must be 'München', description must include the word 'café'",
@@ -712,7 +752,9 @@ class TestValidationAdvancedScenarios:
         
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Generate a person with detailed requirements",
+            "messages": [
+                {"role": "system", "content": "Generate a person with detailed requirements"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "Generate a person",
             "output_validation_prompt": long_prompt,
@@ -762,7 +804,9 @@ class TestValidationErrorHandling:
         
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Generate something",
+            "messages": [
+                {"role": "system", "content": "Generate something"},
+            ],
             "output_schema": invalid_schema,
             "input_data": "Generate data",
             "output_validation_prompt": "Some validation",
@@ -778,7 +822,9 @@ class TestValidationErrorHandling:
         
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Just say hello",
+            "messages": [
+                {"role": "system", "content": "Just say hello"},
+            ],
             "input_data": "Say hello",
             # No output_schema - unstructured output
             "output_validation_prompt": "Must contain 'hello'",  # Should be ignored
@@ -803,7 +849,9 @@ class TestValidationErrorHandling:
         
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Generate a person",
+            "messages": [
+                {"role": "system", "content": "Generate a person"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "Generate a person",
             "output_validation_prompt": "Name must contain 'test' and description must have quotes \"like this\"",
@@ -826,7 +874,9 @@ class TestValidationErrorHandling:
         
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Generate a person",
+            "messages": [
+                {"role": "system", "content": "Generate a person"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "Generate a person",
             "output_validation_prompt": "@@@ invalid syntax { } [ ] python code error $$$ nonsense validation !!!",
@@ -849,7 +899,9 @@ class TestValidationErrorHandling:
         
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Generate a person",
+            "messages": [
+                {"role": "system", "content": "Generate a person"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "Generate a person",
             "output_validation_prompt": "",  # Empty validation prompt
@@ -872,7 +924,9 @@ class TestValidationErrorHandling:
         
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Generate a person",
+            "messages": [
+                {"role": "system", "content": "Generate a person"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "Generate a person",
             "output_validation_prompt": '{"malicious": "injection", "code": "exec(\\"harmful_code\\")", "name": "should_be_ignored"}',

@@ -45,8 +45,10 @@ class TestJinja2Templates:
         """Test that non-templated prompts still work (backward compatibility)."""
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "You are a helpful assistant.",
-            "messages": [{"role": "user", "content": "What is 2 + 2?"}],
+            "messages": [
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": "What is 2 + 2?"}
+            ],
             "input_data": None,
         }
 
@@ -63,8 +65,10 @@ class TestJinja2Templates:
         """Test simple system prompt without templates."""
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "You are a helpful assistant specialized in programming.",
-            "messages": [{"role": "user", "content": "Say hello"}],
+            "messages": [
+                {"role": "system", "content": "You are a helpful assistant specialized in programming."},
+                {"role": "user", "content": "Say hello"}
+            ],
             "input_data": None,
         }
 
@@ -84,8 +88,9 @@ class TestJinja2Templates:
         """Test system prompt template with unstructured string input."""
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Summarize the following text: {{ input }}",
-            "messages": [],
+            "messages": [
+                {"role": "system", "content": "Summarize the following text: {{ input }}"}
+            ],
             "input_data": "The quick brown fox jumps over the lazy dog. This is a pangram containing all letters of the alphabet."
         }
 
@@ -103,8 +108,10 @@ class TestJinja2Templates:
         """Test message template with unstructured input."""
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "You are a helpful assistant.",
-            "messages": [{"role": "user", "content": "Analyze this: {{ input }}"}],
+            "messages": [
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": "Analyze this: {{ input }}"}
+            ],
             "input_data": "Python is a high-level programming language."
         }
 
@@ -131,8 +138,10 @@ class TestJinja2Templates:
         
         request_data = {
             "deployment_name": "qwen3-32b",  # Use larger model for better system prompt following
-            "system_prompt": "You are a {{ content.personality }} assistant specialized in {{ content.domain }}.",
-            "messages": [{"role": "user", "content": "What can you help me with?"}],
+            "messages": [
+                {"role": "system", "content": "You are a {{ content.personality }} assistant specialized in {{ content.domain }}."},
+                {"role": "user", "content": "What can you help me with?"}
+            ],
             "input_schema": InputSchema.model_json_schema(),
             "input_data": {
                 "content": {
@@ -164,8 +173,8 @@ class TestJinja2Templates:
         
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "You are a helpful assistant.",
             "messages": [
+                {"role": "system", "content": "You are a helpful assistant."},
                 {
                     "role": "user",
                     "content": "My name is {{ content.name }} and I need help with {{ content.topic }}."
@@ -201,8 +210,8 @@ class TestJinja2Templates:
         
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "You are a helpful assistant.",
             "messages": [
+                {"role": "system", "content": "You are a helpful assistant."},
                 {
                     "role": "user",
                     "content": "Please analyze these items: {% for item in content.fruits %}{{ item }}{% if not loop.last %}, {% endif %}{% endfor %}"
@@ -239,8 +248,8 @@ class TestJinja2Templates:
         
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "You are a helpful assistant.",
             "messages": [
+                {"role": "system", "content": "You are a helpful assistant."},
                 {
                     "role": "user",
                     "content": "{% if content.is_urgent %}URGENT: {% endif %}Please help me with {{ content.task }}{% if content.deadline %} by {{ content.deadline }}{% endif %}."
@@ -279,8 +288,8 @@ class TestJinja2Templates:
         
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "You are a helpful assistant.",
             "messages": [
+                {"role": "system", "content": "You are a helpful assistant."},
                 {
                     "role": "user",
                     "content": "Convert this to {{ content.case_type }}: {{ content.text|upper }}"
@@ -317,8 +326,8 @@ class TestJinja2Templates:
         
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "You are a helpful math tutor.",
             "messages": [
+                {"role": "system", "content": "You are a helpful math tutor."},
                 {
                     "role": "developer",
                     "content": "Always show your work step by step."
@@ -358,8 +367,8 @@ class TestJinja2Templates:
         """Test that developer role messages are treated as system-level instructions."""
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "You are a Python expert.",
             "messages": [
+                {"role": "system", "content": "You are a Python expert."},
                 {
                     "role": "developer",
                     "content": "Always use type hints in Python code examples."
@@ -395,8 +404,8 @@ class TestJinja2Templates:
         
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "You are a travel assistant.",
             "messages": [
+                {"role": "system", "content": "You are a travel assistant."},
                 {
                     "role": "user",
                     "content": "I want to travel from {{ content.origin }}."
@@ -445,8 +454,9 @@ class TestJinja2Templates:
         
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Process this data and provide insights.",
-            "messages": [],
+            "messages": [
+                {"role": "system", "content": "Process this data and provide insights."}
+            ],
             "input_schema": InputSchema.model_json_schema(),
             "input_data": {
                 "content": {
@@ -471,8 +481,10 @@ class TestJinja2Templates:
         """Test behavior when template variable is missing (should use empty string)."""
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "You are a {{ personality }} assistant.",
-            "messages": [{"role": "user", "content": "Hello"}],
+            "messages": [
+                {"role": "system", "content": "You are a {{ personality }} assistant."},
+                {"role": "user", "content": "Hello"}
+            ],
             "input_data": "test",  # String input, but template expects 'personality'
         }
 
@@ -488,14 +500,16 @@ class TestJinja2Templates:
         """Test error handling for invalid Jinja2 syntax."""
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "You are a {{ personality assistant.",  # Missing closing }}
-            "messages": [{"role": "user", "content": "Hello"}],
+            "messages": [
+                {"role": "system", "content": "You are a {{ personality assistant.}"},  # Missing closing }}
+                {"role": "user", "content": "Hello"}
+            ],
             "input_data": "test",
         }
 
         response = self._execute_prompt(http_client, request_data)
-        assert response.status_code == 500  # Should fail with template syntax error
-        if response.status_code == 500:
+        assert response.status_code == 400  # Should fail with template syntax error
+        if response.status_code == 400:
             error_response = response.json()
             assert "template" in str(error_response).lower() or "syntax" in str(error_response).lower()
 

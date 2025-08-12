@@ -48,7 +48,9 @@ class TestOutputTypes:
 
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Answer in one word only",
+            "messages": [
+                {"role": "system", "content": "Answer in one word only"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "What is the capital of France?",
         }
@@ -70,7 +72,9 @@ class TestOutputTypes:
 
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Return only the number as an integer",
+            "messages": [
+                {"role": "system", "content": "Return only the number as an integer"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "What is 10 + 15?",
         }
@@ -91,7 +95,9 @@ class TestOutputTypes:
 
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Return only the decimal number",
+            "messages": [
+                {"role": "system", "content": "Return only the decimal number"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "What is 10 divided by 4?",
         }
@@ -112,7 +118,9 @@ class TestOutputTypes:
 
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Answer with true or false only",
+            "messages": [
+                {"role": "system", "content": "Answer with true or false only"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "Is Paris the capital of France?",
         }
@@ -138,7 +146,9 @@ class TestOutputTypes:
 
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Choose one color from: red, green, or blue. Answer with just the color name.",
+            "messages": [
+                {"role": "system", "content": "Choose one color from: red, green, or blue. Answer with just the color name."},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "What color is the sky on a clear day?",
         }
@@ -162,7 +172,9 @@ class TestOutputTypes:
 
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "List exactly three items as an array of strings",
+            "messages": [
+                {"role": "system", "content": "List exactly three items as an array of strings"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "List the three primary colors",
         }
@@ -184,7 +196,9 @@ class TestOutputTypes:
 
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Return exactly five integers as an array",
+            "messages": [
+                {"role": "system", "content": "Return exactly five integers as an array"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "List the first five prime numbers",
         }
@@ -207,7 +221,9 @@ class TestOutputTypes:
 
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Return an array of decimal numbers",
+            "messages": [
+                {"role": "system", "content": "Return an array of decimal numbers"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "List these numbers as decimals: 1.5, 2.5, 3.5",
         }
@@ -230,7 +246,9 @@ class TestOutputTypes:
 
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Return an array of boolean values (true/false)",
+            "messages": [
+                {"role": "system", "content": "Return an array of boolean values (true/false)"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "Answer these with true or false: Is 2+2=4? Is 3+3=7? Is 5+5=10?",
         }
@@ -254,7 +272,9 @@ class TestOutputTypes:
 
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Return an array containing both strings and integers",
+            "messages": [
+                {"role": "system", "content": "Return an array containing both strings and integers"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "Create a list with: the word 'hello', the number 42, the word 'world', and the number 123",
         }
@@ -286,7 +306,9 @@ class TestOutputTypes:
 
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Extract the person's information from the text",
+            "messages": [
+                {"role": "system", "content": "Extract the person's information from the text"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "John Doe is 30 years old and his email is john.doe@example.com",
         }
@@ -315,7 +337,9 @@ class TestOutputTypes:
 
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Extract the person's information. If email or phone are not mentioned, leave them as null",
+            "messages": [
+                {"role": "system", "content": "Extract the person's information. If email or phone are not mentioned, leave them as null"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "Jane Smith is 25 years old",
         }
@@ -352,7 +376,9 @@ class TestOutputTypes:
 
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Extract the person and address information from the text",
+            "messages": [
+                {"role": "system", "content": "Extract the person and address information from the text"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "John Doe is 30 years old and lives at 123 Main St, New York, USA",
         }
@@ -385,7 +411,9 @@ class TestOutputTypes:
 
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Extract information about each person mentioned",
+            "messages": [
+                {"role": "system", "content": "Extract information about each person mentioned"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "John is 25 years old, Jane is 30 years old, and Bob is 35 years old",
         }
@@ -417,7 +445,9 @@ class TestOutputTypes:
 
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Extract the team information including all members and scores",
+            "messages": [
+                {"role": "system", "content": "Extract the team information including all members and scores"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "Team Alpha has members: Alice, Bob, Charlie. Their scores are: 95, 87, 92",
         }
@@ -451,7 +481,9 @@ class TestOutputTypes:
 
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Parse this as a success response with data='Operation completed' and status='ok'",
+            "messages": [
+                {"role": "system", "content": "Parse this as a success response with data='Operation completed' and status='ok'"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "The operation was successful",
         }
@@ -470,7 +502,9 @@ class TestOutputTypes:
         """Test with no output schema - should default to string output."""
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Answer the question briefly",
+            "messages": [
+                {"role": "system", "content": "Answer the question briefly"},
+            ],
             # No output_schema provided
             "input_data": "What is 2 + 2?",
         }
@@ -488,7 +522,9 @@ class TestOutputTypes:
         """Test with explicit None output schema - should default to string output."""
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Answer the question briefly",
+            "messages": [
+                {"role": "system", "content": "Answer the question briefly"},
+            ],
             "output_schema": None,
             "input_data": "What is the capital of France?",
         }
@@ -515,7 +551,9 @@ class TestOutputTypes:
         # Test Case 1: Should return string
         request_data_string = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "You must analyze the input. If it contains a person's name, age, and occupation, extract as PersonInfo. Otherwise, respond with a simple string answer. Weather questions should get string responses.",
+            "messages": [
+                {"role": "system", "content": "You must analyze the input. If it contains a person's name, age, and occupation, extract as PersonInfo. Otherwise, respond with a simple string answer. Weather questions should get string responses."},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "What is the weather like today?",
         }
@@ -531,7 +569,9 @@ class TestOutputTypes:
         # Test Case 2: Should return PersonInfo
         request_data_person = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "You must analyze the input. If it contains a person's name, age, and occupation, extract as PersonInfo. Otherwise, respond with a simple string answer.",
+            "messages": [
+                {"role": "system", "content": "You must analyze the input. If it contains a person's name, age, and occupation, extract as PersonInfo. Otherwise, respond with a simple string answer."},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "Tell me about John Smith who is 28 years old and works as a software engineer",
         }
@@ -568,7 +608,9 @@ class TestOutputTypes:
         # Test UserProfile case
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Parse as UserProfile with username='john_doe', email='john@example.com', premium=true",
+            "messages": [
+                {"role": "system", "content": "Parse as UserProfile with username='john_doe', email='john@example.com', premium=true"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "Create a user profile for John",
         }
@@ -594,7 +636,9 @@ class TestOutputTypes:
         # Test with product info
         request_data_with_product = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Extract product information if available, otherwise return null",
+            "messages": [
+                {"role": "system", "content": "Extract product information if available, otherwise return null"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "The iPhone 15 costs $999 and is currently in stock",
         }
@@ -613,7 +657,9 @@ class TestOutputTypes:
         # Test without product info (should return None)
         request_data_no_product = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "You are a product information extractor. Return null if the input does not contain a commercial product with name, price, and stock status. The input is about weather, which is NOT a product. You must return null.",
+            "messages": [
+                {"role": "system", "content": "You are a product information extractor. Return null if the input does not contain a commercial product with name, price, and stock status. The input is about weather, which is NOT a product. You must return null."},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "Today is a beautiful sunny day with clear skies",
         }
@@ -648,7 +694,9 @@ class TestOutputTypes:
 
         request_data = {
             "deployment_name": self.deployment_name,
-            "system_prompt": "Return exactly 3 items in this order: 1) The string 'Header: Todo List', 2) A Task object with id=1, description='Buy groceries', completed=false, 3) The string 'End of list'",
+            "messages": [
+                {"role": "system", "content": "Return exactly 3 items in this order: 1) The string 'Header: Todo List', 2) A Task object with id=1, description='Buy groceries', completed=false, 3) The string 'End of list'"},
+            ],
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": "Create the list exactly as specified",
         }
@@ -686,3 +734,6 @@ class TestOutputTypes:
         # Third item should be the string "End of list"
         assert isinstance(result["data"][2], str)
         assert result["data"][2] == "End of list"
+
+
+# docker exec budserve-development-budprompt pytest tests/test_output_types.py -v

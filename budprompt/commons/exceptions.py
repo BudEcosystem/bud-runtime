@@ -54,6 +54,12 @@ class PromptExecutionException(BaseException):
     pass
 
 
+class TemplateRenderingException(BaseException):
+    """Exception raised when template rendering fails."""
+
+    pass
+
+
 class ClientException(BudMicroframeClientException):
     def __init__(self, message: str, status_code: int = 400, params: Optional[Dict[str, Any]] = None):
         """Initialize the ClientException with a message."""
