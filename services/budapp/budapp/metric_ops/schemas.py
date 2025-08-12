@@ -507,3 +507,292 @@ class BlockingRuleSyncRequest(BaseModel):
 
     project_ids: Optional[List[UUID]] = Field(None, description="Specific projects to sync")
     force_sync: bool = Field(default=False, description="Force sync even if no changes")
+
+
+# New Aggregated Metrics Schemas
+
+
+class AggregatedMetricsRequest(BaseModel):
+    """Request schema for aggregated metrics with server-side calculations."""
+
+    from_date: datetime = Field(..., description="Start date for the analysis")
+    to_date: Optional[datetime] = Field(None, description="End date for the analysis")
+    group_by: Optional[List[Literal["model", "project", "endpoint", "user"]]] = Field(
+        None, description="Dimensions to group by"
+    )
+    filters: Optional[Dict[str, Any]] = Field(None, description="Filters to apply")
+    metrics: List[
+        Literal[
+            "total_requests",
+            "success_rate",
+            "avg_latency",
+            "p95_latency",
+            "p99_latency",
+            "total_tokens",
+            "avg_tokens",
+            "total_cost",
+            "avg_cost",
+            "ttft_avg",
+            "ttft_p95",
+            "ttft_p99",
+            "cache_hit_rate",
+            "throughput_avg",
+            "error_rate",
+            "unique_users",
+        ]
+    ] = Field(..., description="Metrics to calculate")
+
+    @field_validator("to_date")
+    @classmethod
+    def validate_to_date(cls, v: Optional[datetime], info) -> Optional[datetime]:
+        """Validate that to_date is after from_date."""
+        if v is None:
+            return v
+        from_date = info.data.get("from_date")
+        if from_date and v < from_date:
+            raise ValueError("to_date must be after from_date")
+        return v
+
+
+class AggregatedMetricValue(BaseModel):
+    """Single aggregated metric value."""
+
+    value: Union[int, float] = Field(..., description="The metric value")
+    formatted_value: Optional[str] = Field(None, description="Human readable format (e.g., '1.2K', '95.5%')")
+    unit: Optional[str] = Field(None, description="Unit of measurement (e.g., 'ms', '%', 'requests')")
+
+
+class AggregatedMetricsGroup(BaseModel):
+    """Grouped aggregated metrics."""
+
+    # Grouping dimensions
+    model_id: Optional[UUID] = Field(None, description="Model ID")
+    model_name: Optional[str] = Field(None, description="Model name")
+    project_id: Optional[UUID] = Field(None, description="Project ID")
+    project_name: Optional[str] = Field(None, description="Project name")
+    endpoint_id: Optional[UUID] = Field(None, description="Endpoint ID")
+    endpoint_name: Optional[str] = Field(None, description="Endpoint name")
+    user_id: Optional[str] = Field(None, description="User ID")
+
+    # Aggregated metrics
+    metrics: Dict[str, AggregatedMetricValue] = Field(..., description="Calculated metrics")
+
+
+class AggregatedMetricsResponse(SuccessResponse):
+    """Response schema for aggregated metrics."""
+
+    object: str = Field(default="aggregated_metrics", description="Response object type")
+    groups: List[AggregatedMetricsGroup] = Field(..., description="Grouped metrics")
+    summary: Dict[str, AggregatedMetricValue] = Field(..., description="Overall aggregated values")
+    total_groups: int = Field(..., description="Total number of groups")
+    date_range: Dict[str, datetime] = Field(..., description="Date range used for analysis")
+
+
+class TimeSeriesRequest(BaseModel):
+    """Request schema for time-series data."""
+
+    from_date: datetime = Field(..., description="Start date for the time series")
+    to_date: Optional[datetime] = Field(None, description="End date for the time series")
+    interval: Literal["1m", "5m", "15m", "30m", "1h", "6h", "12h", "1d", "1w"] = Field(
+        default="1h", description="Time interval for data points"
+    )
+    metrics: List[
+        Literal[
+            "requests",
+            "success_rate",
+            "avg_latency",
+            "p95_latency",
+            "p99_latency",
+            "tokens",
+            "cost",
+            "ttft_avg",
+            "cache_hit_rate",
+            "throughput",
+            "error_rate",
+        ]
+    ] = Field(..., description="Metrics to include in time series")
+    filters: Optional[Dict[str, Any]] = Field(None, description="Filters to apply")
+    group_by: Optional[List[Literal["model", "project", "endpoint"]]] = Field(
+        None, description="Dimensions to group by"
+    )
+    fill_gaps: bool = Field(default=True, description="Fill gaps in time series data")
+
+    @field_validator("to_date")
+    @classmethod
+    def validate_to_date(cls, v: Optional[datetime], info) -> Optional[datetime]:
+        """Validate that to_date is after from_date."""
+        if v is None:
+            return v
+        from_date = info.data.get("from_date")
+        if from_date and v < from_date:
+            raise ValueError("to_date must be after from_date")
+        return v
+
+
+class TimeSeriesPoint(BaseModel):
+    """Single time series data point."""
+
+    timestamp: datetime = Field(..., description="Timestamp for this data point")
+    values: Dict[str, Optional[float]] = Field(..., description="Metric values at this timestamp")
+
+
+class TimeSeriesGroup(BaseModel):
+    """Time series data for a specific group."""
+
+    # Grouping dimensions
+    model_id: Optional[UUID] = Field(None, description="Model ID")
+    model_name: Optional[str] = Field(None, description="Model name")
+    project_id: Optional[UUID] = Field(None, description="Project ID")
+    project_name: Optional[str] = Field(None, description="Project name")
+    endpoint_id: Optional[UUID] = Field(None, description="Endpoint ID")
+    endpoint_name: Optional[str] = Field(None, description="Endpoint name")
+
+    # Time series data
+    data_points: List[TimeSeriesPoint] = Field(..., description="Time series data points")
+
+
+class TimeSeriesResponse(SuccessResponse):
+    """Response schema for time-series data."""
+
+    object: str = Field(default="time_series", description="Response object type")
+    groups: List[TimeSeriesGroup] = Field(..., description="Time series groups")
+    interval: str = Field(..., description="Time interval used")
+    date_range: Dict[str, datetime] = Field(..., description="Date range for the time series")
+
+
+class GeographicDataRequest(BaseModel):
+    """Request schema for geographic distribution data."""
+
+    from_date: datetime = Field(..., description="Start date for the analysis")
+    to_date: Optional[datetime] = Field(None, description="End date for the analysis")
+    filters: Optional[Dict[str, Any]] = Field(None, description="Filters to apply")
+    group_by: Literal["country", "region", "city"] = Field(default="country", description="Geographic grouping level")
+    limit: int = Field(default=50, description="Maximum number of locations to return")
+
+    @field_validator("to_date")
+    @classmethod
+    def validate_to_date(cls, v: Optional[datetime], info) -> Optional[datetime]:
+        """Validate that to_date is after from_date."""
+        if v is None:
+            return v
+        from_date = info.data.get("from_date")
+        if from_date and v < from_date:
+            raise ValueError("to_date must be after from_date")
+        return v
+
+    @field_validator("limit")
+    @classmethod
+    def validate_limit(cls, v: int) -> int:
+        """Validate that limit is between 1 and 1000."""
+        if v < 1 or v > 1000:
+            raise ValueError("limit must be between 1 and 1000")
+        return v
+
+
+class GeographicDataPoint(BaseModel):
+    """Geographic data point."""
+
+    # Geographic info
+    country_code: Optional[str] = Field(None, description="Country ISO code")
+    country_name: Optional[str] = Field(None, description="Country name")
+    region: Optional[str] = Field(None, description="Region/state name")
+    city: Optional[str] = Field(None, description="City name")
+    latitude: Optional[float] = Field(None, description="Latitude coordinate")
+    longitude: Optional[float] = Field(None, description="Longitude coordinate")
+
+    # Metrics
+    request_count: int = Field(..., description="Number of requests from this location")
+    success_rate: float = Field(..., description="Success rate percentage")
+    avg_latency_ms: Optional[float] = Field(None, description="Average latency in milliseconds")
+    unique_users: Optional[int] = Field(None, description="Number of unique users")
+    percentage: float = Field(..., description="Percentage of total requests")
+
+
+class GeographicDataResponse(SuccessResponse):
+    """Response schema for geographic distribution data."""
+
+    object: str = Field(default="geographic_data", description="Response object type")
+    locations: List[GeographicDataPoint] = Field(..., description="Geographic data points")
+    total_requests: int = Field(..., description="Total number of requests")
+    total_locations: int = Field(..., description="Total number of unique locations")
+    date_range: Dict[str, datetime] = Field(..., description="Date range for the analysis")
+    group_by: str = Field(..., description="Geographic grouping level used")
+
+
+class LatencyDistributionRequest(BaseModel):
+    """Request schema for latency distribution data."""
+
+    from_date: datetime = Field(..., description="Start date for the analysis")
+    to_date: Optional[datetime] = Field(None, description="End date for the analysis")
+    filters: Optional[Dict[str, Any]] = Field(None, description="Additional filters to apply")
+    group_by: Optional[list[Literal["model", "project", "endpoint", "user"]]] = Field(
+        None, description="Dimensions to group the results by"
+    )
+    buckets: Optional[List[Dict[str, Union[int, str]]]] = Field(
+        None, description="Custom latency buckets (min, max, label)"
+    )
+
+    @field_validator("to_date")
+    @classmethod
+    def validate_to_date(cls, v: Optional[datetime], info) -> Optional[datetime]:
+        """Validate that to_date is after from_date."""
+        if v is None:
+            return v
+        from_date = info.data.get("from_date")
+        if from_date and v < from_date:
+            raise ValueError("to_date must be after from_date")
+        return v
+
+    @field_validator("buckets")
+    @classmethod
+    def validate_buckets(
+        cls, v: Optional[List[Dict[str, Union[int, str]]]]
+    ) -> Optional[List[Dict[str, Union[int, str]]]]:
+        """Validate bucket format."""
+        if v is None:
+            return v
+        for bucket in v:
+            if not isinstance(bucket, dict) or "min" not in bucket or "max" not in bucket or "label" not in bucket:
+                raise ValueError("Each bucket must have 'min', 'max', and 'label' fields")
+        return v
+
+
+class LatencyDistributionBucket(BaseModel):
+    """Single latency distribution bucket."""
+
+    range: str = Field(..., description="Latency range (e.g., '0-100ms')")
+    count: int = Field(..., description="Number of requests in this bucket")
+    percentage: float = Field(..., description="Percentage of total requests")
+    avg_latency: Optional[float] = Field(None, description="Average latency within this bucket")
+
+
+class LatencyDistributionGroup(BaseModel):
+    """Latency distribution for a specific group."""
+
+    # Grouping dimensions
+    model_id: Optional[UUID] = Field(None, description="Model ID")
+    model_name: Optional[str] = Field(None, description="Model display name")
+    project_id: Optional[UUID] = Field(None, description="Project ID")
+    project_name: Optional[str] = Field(None, description="Project name")
+    endpoint_id: Optional[UUID] = Field(None, description="Endpoint ID")
+    endpoint_name: Optional[str] = Field(None, description="Endpoint name")
+    user_id: Optional[str] = Field(None, description="User ID")
+
+    # Distribution data
+    buckets: List[LatencyDistributionBucket] = Field(..., description="Distribution buckets")
+    total_requests: int = Field(..., description="Total requests for this group")
+
+
+class LatencyDistributionResponse(SuccessResponse):
+    """Response schema for latency distribution data."""
+
+    object: str = Field(default="latency_distribution", description="Response object type")
+    groups: List[LatencyDistributionGroup] = Field(..., description="Grouped distribution data")
+    overall_distribution: List[LatencyDistributionBucket] = Field(
+        ..., description="Overall distribution aggregated across all groups"
+    )
+    total_requests: int = Field(..., description="Total number of requests")
+    date_range: Dict[str, datetime] = Field(..., description="Date range for the analysis")
+    bucket_definitions: List[Dict[str, Union[int, str]]] = Field(
+        ..., description="The bucket ranges used for the distribution"
+    )

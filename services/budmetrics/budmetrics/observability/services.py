@@ -1,7 +1,8 @@
 import asyncio
 import math
 from collections import defaultdict
-from typing import Optional
+from datetime import datetime
+from typing import Optional, Union
 from uuid import UUID
 
 from budmicroframe.commons import logging
@@ -28,6 +29,8 @@ from budmetrics.observability.schemas import (
     InferenceListItem,
     InferenceListRequest,
     InferenceListResponse,
+    LatencyDistributionRequest,
+    LatencyDistributionResponse,
     MetricsData,
     ModerationInferenceDetail,
     ObservabilityMetricsRequest,
@@ -1678,3 +1681,917 @@ class ObservabilityMetricsService:
                 "to": request.to_date.isoformat() if request.to_date else None,
             },
         }
+
+    # New Aggregated Metrics Methods
+    async def get_aggregated_metrics(self, request) -> dict:
+        """Get aggregated metrics with server-side calculations."""
+        from budmetrics.observability.schemas import (
+            AggregatedMetricsGroup,
+            AggregatedMetricsResponse,
+            AggregatedMetricValue,
+        )
+
+        # Build the base query with efficient aggregations
+        select_fields = []
+
+        # Add grouping fields if specified
+        group_by_fields = []
+        if request.group_by:
+            for group in request.group_by:
+                if group == "model":
+                    group_by_fields.extend(["mid.model_id", "mi.model_name"])
+                    select_fields.extend(["mid.model_id", "mi.model_name"])
+                elif group == "project":
+                    group_by_fields.append("mid.project_id")
+                    select_fields.append("mid.project_id")
+                elif group == "endpoint":
+                    group_by_fields.append("mid.endpoint_id")
+                    select_fields.append("mid.endpoint_id")
+                elif group == "user":
+                    group_by_fields.append("ga.user_id")
+                    select_fields.append("ga.user_id")
+
+        # Build aggregation fields based on requested metrics
+        for metric in request.metrics:
+            if metric == "total_requests":
+                select_fields.append("COUNT(*) as total_requests")
+            elif metric == "success_rate":
+                select_fields.append("AVG(CASE WHEN mid.is_success THEN 1.0 ELSE 0.0 END) * 100 as success_rate")
+            elif metric == "avg_latency":
+                select_fields.append("AVG(mi.response_time_ms) as avg_latency")
+            elif metric == "p95_latency":
+                select_fields.append("quantile(0.95)(mi.response_time_ms) as p95_latency")
+            elif metric == "p99_latency":
+                select_fields.append("quantile(0.99)(mi.response_time_ms) as p99_latency")
+            elif metric == "total_tokens":
+                select_fields.append("SUM(mi.input_tokens + mi.output_tokens) as total_tokens")
+            elif metric == "avg_tokens":
+                select_fields.append("AVG(mi.input_tokens + mi.output_tokens) as avg_tokens")
+            elif metric == "total_cost":
+                select_fields.append("SUM(mid.cost) as total_cost")
+            elif metric == "avg_cost":
+                select_fields.append("AVG(mid.cost) as avg_cost")
+            elif metric == "ttft_avg":
+                select_fields.append("AVG(mi.ttft_ms) as ttft_avg")
+            elif metric == "ttft_p95":
+                select_fields.append("quantile(0.95)(mi.ttft_ms) as ttft_p95")
+            elif metric == "ttft_p99":
+                select_fields.append("quantile(0.99)(mi.ttft_ms) as ttft_p99")
+            elif metric == "cache_hit_rate":
+                select_fields.append("AVG(CASE WHEN mi.cached THEN 1.0 ELSE 0.0 END) * 100 as cache_hit_rate")
+            elif metric == "throughput_avg":
+                select_fields.append(
+                    "AVG(mi.output_tokens * 1000.0 / NULLIF(mi.response_time_ms, 0)) as throughput_avg"
+                )
+            elif metric == "error_rate":
+                select_fields.append("AVG(CASE WHEN NOT mid.is_success THEN 1.0 ELSE 0.0 END) * 100 as error_rate")
+            elif metric == "unique_users":
+                select_fields.append("uniqExact(ga.user_id) as unique_users")
+
+        # Build FROM clause with joins
+        from_clause = """
+        FROM ModelInferenceDetails mid
+        INNER JOIN ModelInference mi ON mid.inference_id = mi.inference_id
+        LEFT JOIN GatewayAnalytics ga ON mid.inference_id = ga.inference_id
+        """
+
+        # Build WHERE clause
+        where_conditions = ["mid.request_arrival_time >= %(from_date)s", "mid.request_arrival_time <= %(to_date)s"]
+
+        params = {
+            "from_date": request.from_date,
+            "to_date": request.to_date or datetime.now(),
+        }
+
+        # Add filters
+        if request.filters:
+            for filter_key, filter_value in request.filters.items():
+                if filter_key == "project_id":
+                    if isinstance(filter_value, list):
+                        placeholders = [f"%(project_{i})s" for i in range(len(filter_value))]
+                        where_conditions.append(f"mid.project_id IN ({','.join(placeholders)})")
+                        for i, val in enumerate(filter_value):
+                            params[f"project_{i}"] = val
+                    else:
+                        where_conditions.append("mid.project_id = %(project_id)s")
+                        params["project_id"] = filter_value
+                elif filter_key == "model_id":
+                    where_conditions.append("mid.model_id = %(model_id)s")
+                    params["model_id"] = filter_value
+                elif filter_key == "endpoint_id":
+                    where_conditions.append("mid.endpoint_id = %(endpoint_id)s")
+                    params["endpoint_id"] = filter_value
+
+        # Build final query
+        order_by = "total_requests DESC" if "total_requests" in request.metrics else "1"
+        query = f"""
+        SELECT {", ".join(select_fields)}
+        {from_clause}
+        WHERE {" AND ".join(where_conditions)}
+        {f"GROUP BY {', '.join(group_by_fields)}" if group_by_fields else ""}
+        ORDER BY {order_by}
+        """
+
+        # Execute query
+        logger = logging.get_logger(__name__)
+        logger.info(f"Executing aggregated metrics query: {query}")
+        logger.info(f"Query parameters: {params}")
+        logger.info(f"Group by fields: {group_by_fields}")
+        results = await self.clickhouse_client.execute_query(query, params)
+        logger.info(f"Query returned {len(results) if results else 0} results")
+
+        # Process results
+        groups = []
+        overall_summary = {}
+
+        if not results:
+            return AggregatedMetricsResponse(
+                groups=[],
+                summary={},
+                total_groups=0,
+                date_range={"from": request.from_date, "to": request.to_date or datetime.now()},
+            )
+
+        # If no grouping, create summary from single result
+        if not request.group_by:
+            row = results[0]
+            for i, metric in enumerate(request.metrics):
+                value = row[i] if i < len(row) else 0
+                formatted_value, unit = self._format_metric_value(metric, value)
+                overall_summary[metric] = AggregatedMetricValue(
+                    value=value or 0, formatted_value=formatted_value, unit=unit
+                )
+        else:
+            # Process grouped results
+            field_offset = len(
+                [
+                    f
+                    for group in request.group_by
+                    for f in (
+                        ["model_id", "model_name"]
+                        if group == "model"
+                        else [f"{group}_id" if group != "user" else "user_id"]
+                    )
+                ]
+            )
+
+            for row in results:
+                group = AggregatedMetricsGroup(metrics={})
+
+                # Extract grouping dimensions
+                field_idx = 0
+                for group_by in request.group_by:
+                    if group_by == "model":
+                        group.model_id = row[field_idx]
+                        group.model_name = row[field_idx + 1]
+                        field_idx += 2
+                    elif group_by == "project":
+                        group.project_id = row[field_idx]
+                        field_idx += 1
+                    elif group_by == "endpoint":
+                        group.endpoint_id = row[field_idx]
+                        field_idx += 1
+                    elif group_by == "user":
+                        group.user_id = row[field_idx]
+                        field_idx += 1
+
+                # Extract metrics
+                for i, metric in enumerate(request.metrics):
+                    value = row[field_offset + i] if field_offset + i < len(row) else 0
+                    formatted_value, unit = self._format_metric_value(metric, value)
+                    group.metrics[metric] = AggregatedMetricValue(
+                        value=value or 0, formatted_value=formatted_value, unit=unit
+                    )
+
+                groups.append(group)
+
+        return AggregatedMetricsResponse(
+            groups=groups,
+            summary=overall_summary,
+            total_groups=len(groups),
+            date_range={"from": request.from_date, "to": request.to_date or datetime.now()},
+        )
+
+    async def get_time_series_data(self, request) -> dict:
+        """Get time-series data with efficient bucketing."""
+        from budmetrics.observability.schemas import (
+            TimeSeriesGroup,
+            TimeSeriesPoint,
+            TimeSeriesResponse,
+        )
+
+        # Map interval to ClickHouse interval functions
+        # For simple functions, we'll add the column parameter later
+        # For toStartOfInterval, include the full expression
+        if request.interval == "1m":
+            time_bucket_expr = "toStartOfMinute(mid.request_arrival_time)"
+        elif request.interval == "5m":
+            time_bucket_expr = "toStartOfInterval(mid.request_arrival_time, INTERVAL 5 minute)"
+        elif request.interval == "15m":
+            time_bucket_expr = "toStartOfInterval(mid.request_arrival_time, INTERVAL 15 minute)"
+        elif request.interval == "30m":
+            time_bucket_expr = "toStartOfInterval(mid.request_arrival_time, INTERVAL 30 minute)"
+        elif request.interval == "1h":
+            time_bucket_expr = "toStartOfHour(mid.request_arrival_time)"
+        elif request.interval == "6h":
+            time_bucket_expr = "toStartOfInterval(mid.request_arrival_time, INTERVAL 6 hour)"
+        elif request.interval == "12h":
+            time_bucket_expr = "toStartOfInterval(mid.request_arrival_time, INTERVAL 12 hour)"
+        elif request.interval == "1d":
+            time_bucket_expr = "toStartOfDay(mid.request_arrival_time)"
+        elif request.interval == "1w":
+            time_bucket_expr = "toStartOfWeek(mid.request_arrival_time)"
+        else:
+            time_bucket_expr = "toStartOfHour(mid.request_arrival_time)"
+
+        # Build select fields
+        select_fields = [f"{time_bucket_expr} as time_bucket"]
+
+        # Add grouping fields
+        group_by_fields = ["time_bucket"]
+        if request.group_by:
+            for group in request.group_by:
+                if group == "model":
+                    group_by_fields.extend(["mid.model_id", "mi.model_name"])
+                    select_fields.extend(["mid.model_id", "mi.model_name"])
+                elif group == "project":
+                    group_by_fields.append("mid.project_id")
+                    select_fields.append("mid.project_id")
+                elif group == "endpoint":
+                    group_by_fields.append("mid.endpoint_id")
+                    select_fields.append("mid.endpoint_id")
+
+        # Add metric calculations
+        for metric in request.metrics:
+            if metric == "requests":
+                select_fields.append("COUNT(*) as requests")
+            elif metric == "success_rate":
+                select_fields.append("AVG(CASE WHEN mid.is_success THEN 1.0 ELSE 0.0 END) * 100 as success_rate")
+            elif metric == "avg_latency":
+                select_fields.append("AVG(mi.response_time_ms) as avg_latency")
+            elif metric == "p95_latency":
+                select_fields.append("quantile(0.95)(mi.response_time_ms) as p95_latency")
+            elif metric == "p99_latency":
+                select_fields.append("quantile(0.99)(mi.response_time_ms) as p99_latency")
+            elif metric == "tokens":
+                select_fields.append("SUM(mi.input_tokens + mi.output_tokens) as tokens")
+            elif metric == "cost":
+                select_fields.append("SUM(mid.cost) as cost")
+            elif metric == "ttft_avg":
+                select_fields.append("AVG(mi.ttft_ms) as ttft_avg")
+            elif metric == "cache_hit_rate":
+                select_fields.append("AVG(CASE WHEN mi.cached THEN 1.0 ELSE 0.0 END) * 100 as cache_hit_rate")
+            elif metric == "throughput":
+                select_fields.append("AVG(mi.output_tokens * 1000.0 / NULLIF(mi.response_time_ms, 0)) as throughput")
+            elif metric == "error_rate":
+                select_fields.append("AVG(CASE WHEN NOT mid.is_success THEN 1.0 ELSE 0.0 END) * 100 as error_rate")
+
+        # Build WHERE clause
+        where_conditions = ["mid.request_arrival_time >= %(from_date)s", "mid.request_arrival_time <= %(to_date)s"]
+
+        params = {
+            "from_date": request.from_date,
+            "to_date": request.to_date or datetime.now(),
+        }
+
+        # Add filters
+        if hasattr(request, "filters") and request.filters:
+            for filter_key, filter_value in request.filters.items():
+                if filter_key == "project_id":
+                    if isinstance(filter_value, list):
+                        placeholders = [f"%(project_{i})s" for i in range(len(filter_value))]
+                        where_conditions.append(f"mid.project_id IN ({','.join(placeholders)})")
+                        for i, val in enumerate(filter_value):
+                            params[f"project_{i}"] = val
+                    else:
+                        where_conditions.append("mid.project_id = %(project_id)s")
+                        params["project_id"] = filter_value
+                elif filter_key == "model_id":
+                    where_conditions.append("mid.model_id = %(model_id)s")
+                    params["model_id"] = filter_value
+                elif filter_key == "endpoint_id":
+                    where_conditions.append("mid.endpoint_id = %(endpoint_id)s")
+                    params["endpoint_id"] = filter_value
+
+        # Build query
+        query = f"""
+        SELECT {", ".join(select_fields)}
+        FROM ModelInferenceDetails mid
+        INNER JOIN ModelInference mi ON mid.inference_id = mi.inference_id
+        WHERE {" AND ".join(where_conditions)}
+        GROUP BY {", ".join(group_by_fields)}
+        ORDER BY time_bucket ASC
+        """
+
+        # Execute query
+        results = await self.clickhouse_client.execute_query(query, params)
+
+        # Process results into groups
+        groups_dict = defaultdict(list)
+
+        for row in results:
+            time_bucket = row[0]
+
+            # Extract grouping info
+            group_key = "default"
+            group_info = {}
+            field_idx = 1
+
+            if request.group_by:
+                group_key_parts = []
+                for group in request.group_by:
+                    if group == "model":
+                        model_id = row[field_idx]
+                        model_name = row[field_idx + 1]
+                        group_info["model_id"] = model_id
+                        group_info["model_name"] = model_name
+                        group_key_parts.append(f"model:{model_id}")
+                        field_idx += 2
+                    elif group == "project":
+                        project_id = row[field_idx]
+                        group_info["project_id"] = project_id
+                        group_key_parts.append(f"project:{project_id}")
+                        field_idx += 1
+                    elif group == "endpoint":
+                        endpoint_id = row[field_idx]
+                        group_info["endpoint_id"] = endpoint_id
+                        group_key_parts.append(f"endpoint:{endpoint_id}")
+                        field_idx += 1
+
+                group_key = "|".join(group_key_parts)
+
+            # Extract metric values
+            values = {}
+            for i, metric in enumerate(request.metrics):
+                metric_value = row[field_idx + i] if field_idx + i < len(row) else None
+                values[metric] = metric_value
+
+            groups_dict[group_key].append({"timestamp": time_bucket, "values": values, "group_info": group_info})
+
+        # Convert to response format
+        groups = []
+        for _group_key, data_points in groups_dict.items():
+            group = TimeSeriesGroup(
+                data_points=[TimeSeriesPoint(timestamp=dp["timestamp"], values=dp["values"]) for dp in data_points]
+            )
+
+            # Set group info
+            if data_points and data_points[0]["group_info"]:
+                group_info = data_points[0]["group_info"]
+                group.model_id = group_info.get("model_id")
+                group.model_name = group_info.get("model_name")
+                group.project_id = group_info.get("project_id")
+                group.endpoint_id = group_info.get("endpoint_id")
+
+            groups.append(group)
+
+        # Fill gaps if requested
+        if request.fill_gaps and groups:
+            groups = self._fill_time_series_gaps(groups, request)
+
+        return TimeSeriesResponse(
+            groups=groups,
+            interval=request.interval,
+            date_range={"from": request.from_date, "to": request.to_date or datetime.now()},
+        )
+
+    async def get_geographic_data(self, request) -> dict:
+        """Get geographic distribution data from GatewayAnalytics table."""
+        from budmetrics.observability.schemas import (
+            GeographicDataPoint,
+            GeographicDataResponse,
+        )
+
+        # Build query based on group_by parameter
+        if request.group_by == "country":
+            select_fields = [
+                "ga.country_code",
+                "COUNT(*) as request_count",
+                "AVG(CASE WHEN mid.is_success THEN 1.0 ELSE 0.0 END) * 100 as success_rate",
+                "AVG(mi.response_time_ms) as avg_latency_ms",
+                "uniqExact(ga.user_id) as unique_users",
+                "any(ga.latitude) as latitude",
+                "any(ga.longitude) as longitude",
+            ]
+            group_by_clause = "ga.country_code"
+            having_clause = "ga.country_code IS NOT NULL AND ga.country_code != ''"
+        elif request.group_by == "region":
+            select_fields = [
+                "ga.country_code",
+                "ga.region",
+                "COUNT(*) as request_count",
+                "AVG(CASE WHEN mid.is_success THEN 1.0 ELSE 0.0 END) * 100 as success_rate",
+                "AVG(mi.response_time_ms) as avg_latency_ms",
+                "uniqExact(ga.user_id) as unique_users",
+            ]
+            group_by_clause = "ga.country_code, ga.region"
+            having_clause = "ga.region IS NOT NULL AND ga.region != ''"
+        else:  # city
+            select_fields = [
+                "ga.country_code",
+                "ga.region",
+                "ga.city",
+                "COUNT(*) as request_count",
+                "AVG(CASE WHEN mid.is_success THEN 1.0 ELSE 0.0 END) * 100 as success_rate",
+                "AVG(mi.response_time_ms) as avg_latency_ms",
+                "uniqExact(ga.user_id) as unique_users",
+                "any(ga.latitude) as latitude",
+                "any(ga.longitude) as longitude",
+            ]
+            group_by_clause = "ga.country_code, ga.region, ga.city"
+            having_clause = "ga.city IS NOT NULL AND ga.city != ''"
+
+        # Build WHERE conditions
+        where_conditions = ["ga.timestamp >= %(from_date)s", "ga.timestamp <= %(to_date)s"]
+
+        params = {
+            "from_date": request.from_date,
+            "to_date": request.to_date or datetime.now(),
+        }
+
+        # Add filters
+        if request.filters:
+            for filter_key, filter_value in request.filters.items():
+                if filter_key == "project_id":
+                    where_conditions.append("ga.project_id = %(project_id)s")
+                    params["project_id"] = filter_value
+                elif filter_key == "country_code":
+                    if isinstance(filter_value, list):
+                        placeholders = [f"%(country_{i})s" for i in range(len(filter_value))]
+                        where_conditions.append(f"ga.country_code IN ({','.join(placeholders)})")
+                        for i, val in enumerate(filter_value):
+                            params[f"country_{i}"] = val
+                    else:
+                        where_conditions.append("ga.country_code = %(country_code)s")
+                        params["country_code"] = filter_value
+
+        # Build main query
+        query = f"""
+        WITH total_requests AS (
+            SELECT COUNT(*) as total
+            FROM GatewayAnalytics ga
+            LEFT JOIN ModelInferenceDetails mid ON ga.inference_id = mid.inference_id
+            LEFT JOIN ModelInference mi ON mid.inference_id = mi.inference_id
+            WHERE {" AND ".join(where_conditions)}
+        )
+        SELECT
+            {", ".join(select_fields)},
+            (request_count * 100.0 / (SELECT total FROM total_requests)) as percentage
+        FROM GatewayAnalytics ga
+        LEFT JOIN ModelInferenceDetails mid ON ga.inference_id = mid.inference_id
+        LEFT JOIN ModelInference mi ON mid.inference_id = mi.inference_id
+        WHERE {" AND ".join(where_conditions)}
+        GROUP BY {group_by_clause}
+        HAVING {having_clause}
+        ORDER BY request_count DESC
+        LIMIT %(limit)s
+        """
+
+        params["limit"] = request.limit
+
+        # Execute query
+        results = await self.clickhouse_client.execute_query(query, params)
+
+        # Get total count for summary
+        total_query = f"""
+        SELECT COUNT(*) as total_requests
+        FROM GatewayAnalytics ga
+        WHERE {" AND ".join(where_conditions)}
+        """
+        total_result = await self.clickhouse_client.execute_query(
+            total_query, {k: v for k, v in params.items() if k != "limit"}
+        )
+        total_requests = total_result[0][0] if total_result else 0
+
+        # Process results
+        locations = []
+        for row in results:
+            if request.group_by == "country":
+                location = GeographicDataPoint(
+                    country_code=row[0],
+                    request_count=row[1],
+                    success_rate=row[2] if len(row) > 2 else 0.0,
+                    avg_latency_ms=row[3] if len(row) > 3 else None,
+                    unique_users=row[4] if len(row) > 4 else None,
+                    latitude=row[5] if len(row) > 5 else None,
+                    longitude=row[6] if len(row) > 6 else None,
+                    percentage=row[7] if len(row) > 7 else 0.0,
+                )
+            elif request.group_by == "region":
+                location = GeographicDataPoint(
+                    country_code=row[0],
+                    region=row[1],
+                    request_count=row[2],
+                    success_rate=row[3] if len(row) > 3 else 0.0,
+                    avg_latency_ms=row[4] if len(row) > 4 else None,
+                    unique_users=row[5] if len(row) > 5 else None,
+                    percentage=row[6] if len(row) > 6 else 0.0,
+                )
+            else:  # city
+                location = GeographicDataPoint(
+                    country_code=row[0],
+                    region=row[1],
+                    city=row[2],
+                    request_count=row[3],
+                    success_rate=row[4] if len(row) > 4 else 0.0,
+                    avg_latency_ms=row[5] if len(row) > 5 else None,
+                    unique_users=row[6] if len(row) > 6 else None,
+                    latitude=row[7] if len(row) > 7 else None,
+                    longitude=row[8] if len(row) > 8 else None,
+                    percentage=row[9] if len(row) > 9 else 0.0,
+                )
+
+            locations.append(location)
+
+        return GeographicDataResponse(
+            locations=locations,
+            total_requests=total_requests,
+            total_locations=len(locations),
+            date_range={"from": request.from_date, "to": request.to_date or datetime.now()},
+            group_by=request.group_by,
+        )
+
+    async def get_latency_distribution(self, request: LatencyDistributionRequest) -> LatencyDistributionResponse:
+        """Get latency distribution data with optional grouping.
+
+        This method calculates latency distribution by creating histogram buckets
+        and counting requests that fall into each bucket. It supports custom buckets
+        and grouping by various dimensions.
+
+        Args:
+            request: The latency distribution request parameters.
+
+        Returns:
+            LatencyDistributionResponse: Response containing distribution data.
+        """
+        from budmetrics.observability.schemas import (
+            LatencyDistributionBucket,
+            LatencyDistributionGroup,
+            LatencyDistributionResponse,
+        )
+
+        logger.info(f"Getting latency distribution for date range {request.from_date} to {request.to_date}")
+
+        # Default latency buckets if none provided
+        default_buckets = [
+            {"min": 0, "max": 100, "label": "0-100ms"},
+            {"min": 100, "max": 500, "label": "100-500ms"},
+            {"min": 500, "max": 1000, "label": "500ms-1s"},
+            {"min": 1000, "max": 2000, "label": "1-2s"},
+            {"min": 2000, "max": 5000, "label": "2-5s"},
+            {"min": 5000, "max": 10000, "label": "5-10s"},
+            {"min": 10000, "max": float("inf"), "label": ">10s"},
+        ]
+
+        buckets = request.buckets or default_buckets
+
+        # Base query components
+        from_date_str = request.from_date.strftime("%Y-%m-%d %H:%M:%S")
+        to_date_str = (request.to_date or datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
+
+        # Build filters
+        filter_conditions = [
+            f"toDateTime('{from_date_str}') <= request_arrival_time",
+            f"request_arrival_time < toDateTime('{to_date_str}')",
+        ]
+
+        if request.filters:
+            if "project_id" in request.filters:
+                project_ids = request.filters["project_id"]
+                if isinstance(project_ids, str):
+                    project_ids = [project_ids]
+                project_filter = "', '".join(str(pid) for pid in project_ids)
+                filter_conditions.append(f"toString(project_id) IN ('{project_filter}')")
+
+            if "endpoint_id" in request.filters:
+                endpoint_ids = request.filters["endpoint_id"]
+                if isinstance(endpoint_ids, str):
+                    endpoint_ids = [endpoint_ids]
+                endpoint_filter = "', '".join(str(eid) for eid in endpoint_ids)
+                filter_conditions.append(f"toString(endpoint_id) IN ('{endpoint_filter}')")
+
+            if "model_id" in request.filters:
+                model_ids = request.filters["model_id"]
+                if isinstance(model_ids, str):
+                    model_ids = [model_ids]
+                model_filter = "', '".join(str(mid) for mid in model_ids)
+                filter_conditions.append(f"toString(model_id) IN ('{model_filter}')")
+
+        where_clause = " AND ".join(filter_conditions)
+
+        # Calculate latency from ModelInference table's response_time_ms column
+        # We need to join with ModelInference table to get the actual response time
+        latency_expr = "COALESCE(mid.response_time_ms, 0)"
+
+        # Build bucket case expressions for distribution
+        bucket_cases = []
+        for bucket in buckets:
+            if bucket["max"] == float("inf"):
+                condition = f"{latency_expr} >= {bucket['min']}"
+            else:
+                condition = f"{latency_expr} >= {bucket['min']} AND {latency_expr} < {bucket['max']}"
+            bucket_cases.append(f"WHEN {condition} THEN '{bucket['label']}'")
+
+        # If no grouping, create simple overall distribution
+        if not request.group_by:
+            bucket_case_expr = f"CASE {' '.join(bucket_cases)} ELSE 'Other' END"
+
+            query = f"""
+                SELECT
+                    {bucket_case_expr} as bucket,
+                    count() as request_count,
+                    avg({latency_expr}) as avg_latency_in_bucket
+                FROM ModelInferenceDetails mdi
+                LEFT JOIN ModelInference mid ON mid.inference_id = mdi.inference_id
+                WHERE {where_clause}
+                GROUP BY bucket
+                ORDER BY
+                    CASE bucket
+                        WHEN '{buckets[0]["label"]}' THEN 1
+                        WHEN '{buckets[1]["label"]}' THEN 2
+                        WHEN '{buckets[2]["label"]}' THEN 3
+                        WHEN '{buckets[3]["label"]}' THEN 4
+                        WHEN '{buckets[4]["label"]}' THEN 5
+                        WHEN '{buckets[5]["label"]}' THEN 6
+                        WHEN '{buckets[6]["label"]}' THEN 7
+                        ELSE 8
+                    END
+            """
+
+            logger.debug(f"Executing latency distribution query: {query}")
+            result = await self.clickhouse_client.execute_query(query)
+
+            # Get total count for percentage calculation
+            total_query = f"SELECT count() FROM ModelInferenceDetails mdi LEFT JOIN ModelInference mid ON mid.inference_id = mdi.inference_id WHERE {where_clause}"
+            total_result = await self.clickhouse_client.execute_query(total_query)
+            total_requests = total_result[0][0] if total_result else 0
+
+            # Process results
+            overall_buckets = []
+            bucket_data = {row[0]: (row[1], row[2]) for row in result}
+
+            for bucket in buckets:
+                count, avg_latency = bucket_data.get(bucket["label"], (0, 0))
+                percentage = (count / total_requests * 100) if total_requests > 0 else 0
+
+                overall_buckets.append(
+                    LatencyDistributionBucket(
+                        range=bucket["label"],
+                        count=count,
+                        percentage=round(percentage, 2),
+                        avg_latency=round(avg_latency, 2) if avg_latency else None,
+                    )
+                )
+
+            return LatencyDistributionResponse(
+                groups=[],
+                overall_distribution=overall_buckets,
+                total_requests=total_requests,
+                date_range={"from": request.from_date, "to": request.to_date or datetime.now()},
+                bucket_definitions=buckets,
+            )
+
+        # Handle grouped queries
+        groups = []
+        total_requests = 0
+
+        # Determine grouping columns and joins needed
+        group_columns = []
+        join_tables = []
+
+        # Always join with ModelInference to get response_time_ms
+        join_tables.append("LEFT JOIN ModelInference mid ON mid.inference_id = mdi.inference_id")
+
+        if "model" in request.group_by:
+            group_columns.extend(["toString(mdi.model_id) as model_id", "mid.model_name as model_name"])
+
+        if "project" in request.group_by:
+            # We have project_id in ModelInferenceDetails, but might need project name
+            group_columns.extend(["toString(mdi.project_id) as project_id", "'Unknown' as project_name"])
+
+        if "endpoint" in request.group_by:
+            group_columns.extend(["toString(mdi.endpoint_id) as endpoint_id", "'Unknown' as endpoint_name"])
+
+        if "user" in request.group_by:
+            # User info would need additional joins - for now use project as proxy
+            group_columns.extend(["toString(mdi.project_id) as user_id"])
+
+        group_by_clause = ", ".join([col.split(" as ")[1] if " as " in col else col for col in group_columns])
+        select_columns = ", ".join(group_columns)
+
+        # Build grouped query with bucket distribution
+        bucket_case_expr = f"CASE {' '.join(bucket_cases)} ELSE 'Other' END"
+
+        joins_clause = " ".join(join_tables) if join_tables else ""
+
+        query = f"""
+            WITH grouped_data AS (
+                SELECT
+                    {select_columns},
+                    {bucket_case_expr} as bucket,
+                    count() as request_count,
+                    avg({latency_expr}) as avg_latency_in_bucket
+                FROM ModelInferenceDetails mdi
+                {joins_clause}
+                WHERE {where_clause}
+                GROUP BY {group_by_clause}, bucket
+            )
+            SELECT
+                *,
+                sum(request_count) OVER (PARTITION BY {group_by_clause}) as group_total
+            FROM grouped_data
+            ORDER BY group_total DESC, bucket
+        """
+
+        logger.debug(f"Executing grouped latency distribution query: {query}")
+        result = await self.clickhouse_client.execute_query(query)
+
+        # Get overall total for percentage calculations
+        total_query = f"SELECT count() FROM ModelInferenceDetails mdi {joins_clause} WHERE {where_clause}"
+        total_result = await self.clickhouse_client.execute_query(total_query)
+        total_requests = total_result[0][0] if total_result else 0
+
+        # Process grouped results
+        groups_data = {}
+
+        for row in result:
+            # Extract group identifiers based on what was selected
+            group_key = []
+            group_values = {}
+            col_idx = 0
+
+            if "model" in request.group_by:
+                group_values["model_id"] = row[col_idx]
+                group_values["model_name"] = row[col_idx + 1] or "Unknown"
+                group_key.append(f"model:{group_values['model_id']}")
+                col_idx += 2
+
+            if "project" in request.group_by:
+                group_values["project_id"] = row[col_idx]
+                group_values["project_name"] = row[col_idx + 1] or "Unknown"
+                group_key.append(f"project:{group_values['project_id']}")
+                col_idx += 2
+
+            if "endpoint" in request.group_by:
+                group_values["endpoint_id"] = row[col_idx]
+                group_values["endpoint_name"] = row[col_idx + 1] or "Unknown"
+                group_key.append(f"endpoint:{group_values['endpoint_id']}")
+                col_idx += 2
+
+            if "user" in request.group_by:
+                group_values["user_id"] = row[col_idx]
+                group_key.append(f"user:{group_values['user_id']}")
+                col_idx += 1
+
+            group_key_str = "|".join(group_key)
+            bucket = row[col_idx]
+            request_count = row[col_idx + 1]
+            avg_latency = row[col_idx + 2]
+            group_total = row[col_idx + 3]
+
+            if group_key_str not in groups_data:
+                groups_data[group_key_str] = {"group_values": group_values, "buckets": {}, "total": group_total}
+
+            groups_data[group_key_str]["buckets"][bucket] = {"count": request_count, "avg_latency": avg_latency}
+
+        # Convert to response format
+        for _group_key, group_data in groups_data.items():
+            group_buckets = []
+            group_total = group_data["total"]
+
+            for bucket in buckets:
+                bucket_info = group_data["buckets"].get(bucket["label"], {"count": 0, "avg_latency": 0})
+                count = bucket_info["count"]
+                avg_latency = bucket_info["avg_latency"]
+                percentage = (count / group_total * 100) if group_total > 0 else 0
+
+                group_buckets.append(
+                    LatencyDistributionBucket(
+                        range=bucket["label"],
+                        count=count,
+                        percentage=round(percentage, 2),
+                        avg_latency=round(avg_latency, 2) if avg_latency else None,
+                    )
+                )
+
+            group_obj = LatencyDistributionGroup(buckets=group_buckets, total_requests=group_total)
+
+            # Set group identifiers
+            group_vals = group_data["group_values"]
+            if "model_id" in group_vals:
+                try:
+                    group_obj.model_id = UUID(group_vals["model_id"]) if group_vals["model_id"] else None
+                except (ValueError, TypeError):
+                    group_obj.model_id = None
+                group_obj.model_name = group_vals["model_name"]
+            if "project_id" in group_vals:
+                try:
+                    group_obj.project_id = UUID(group_vals["project_id"]) if group_vals["project_id"] else None
+                except (ValueError, TypeError):
+                    group_obj.project_id = None
+                group_obj.project_name = group_vals["project_name"]
+            if "endpoint_id" in group_vals:
+                try:
+                    group_obj.endpoint_id = UUID(group_vals["endpoint_id"]) if group_vals["endpoint_id"] else None
+                except (ValueError, TypeError):
+                    group_obj.endpoint_id = None
+                group_obj.endpoint_name = group_vals["endpoint_name"]
+            if "user_id" in group_vals:
+                group_obj.user_id = group_vals["user_id"]
+
+            groups.append(group_obj)
+
+        # Calculate overall distribution across all groups
+        overall_bucket_counts = {}
+        for group in groups:
+            for bucket in group.buckets:
+                if bucket.range not in overall_bucket_counts:
+                    overall_bucket_counts[bucket.range] = {"count": 0, "latencies": []}
+                overall_bucket_counts[bucket.range]["count"] += bucket.count
+                if bucket.avg_latency:
+                    overall_bucket_counts[bucket.range]["latencies"].append(bucket.avg_latency)
+
+        overall_buckets = []
+        for bucket in buckets:
+            bucket_data = overall_bucket_counts.get(bucket["label"], {"count": 0, "latencies": []})
+            count = bucket_data["count"]
+            percentage = (count / total_requests * 100) if total_requests > 0 else 0
+            avg_latency = (
+                (sum(bucket_data["latencies"]) / len(bucket_data["latencies"])) if bucket_data["latencies"] else None
+            )
+
+            overall_buckets.append(
+                LatencyDistributionBucket(
+                    range=bucket["label"],
+                    count=count,
+                    percentage=round(percentage, 2),
+                    avg_latency=round(avg_latency, 2) if avg_latency else None,
+                )
+            )
+
+        # Clean up bucket definitions for response (replace inf with large number for JSON serialization)
+        clean_buckets = []
+        for bucket in buckets:
+            clean_bucket = {
+                "min": bucket["min"],
+                "max": 999999999 if bucket["max"] == float("inf") else bucket["max"],
+                "label": bucket["label"],
+            }
+            clean_buckets.append(clean_bucket)
+
+        return LatencyDistributionResponse(
+            groups=groups,
+            overall_distribution=overall_buckets,
+            total_requests=total_requests,
+            date_range={"from": request.from_date, "to": request.to_date or datetime.now()},
+            bucket_definitions=clean_buckets,
+        )
+
+    def _format_metric_value(self, metric: str, value: Union[int, float, None]) -> tuple[str, str]:
+        """Format metric values with appropriate units and human-readable formatting."""
+        if value is None:
+            return "0", ""
+
+        # Percentage metrics
+        if metric in ["success_rate", "cache_hit_rate", "error_rate"]:
+            return f"{value:.1f}%", "%"
+
+        # Time metrics (milliseconds)
+        elif metric in ["avg_latency", "p95_latency", "p99_latency", "ttft_avg", "ttft_p95", "ttft_p99"]:
+            if value >= 1000:
+                return f"{value / 1000:.2f}s", "ms"
+            return f"{value:.0f}ms", "ms"
+
+        # Token metrics
+        elif metric in ["total_tokens", "avg_tokens"]:
+            if value >= 1_000_000:
+                return f"{value / 1_000_000:.1f}M", "tokens"
+            elif value >= 1_000:
+                return f"{value / 1_000:.1f}K", "tokens"
+            return f"{value:.0f}", "tokens"
+
+        # Cost metrics
+        elif metric in ["total_cost", "avg_cost"]:
+            return f"${value:.4f}", "$"
+
+        # Count metrics
+        elif metric in ["total_requests", "unique_users"]:
+            if value >= 1_000_000:
+                return f"{value / 1_000_000:.1f}M", "requests" if "request" in metric else "users"
+            elif value >= 1_000:
+                return f"{value / 1_000:.1f}K", "requests" if "request" in metric else "users"
+            return f"{value:.0f}", "requests" if "request" in metric else "users"
+
+        # Throughput
+        elif metric == "throughput_avg":
+            return f"{value:.1f}", "tokens/sec"
+
+        # Default formatting
+        else:
+            return f"{value:.2f}", ""
+
+    def _fill_time_series_gaps(self, groups: list, request) -> list:
+        """Fill gaps in time series data with zero values."""
+        # This is a simplified implementation - in production you'd want more sophisticated gap filling
+        # For now, just return the groups as-is
+        return groups

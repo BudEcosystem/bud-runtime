@@ -34,6 +34,9 @@ from budapp.user_ops.models import User as UserModel
 from budapp.user_ops.schemas import User
 
 from .schemas import (
+    # New aggregated metrics schemas
+    AggregatedMetricsRequest,
+    AggregatedMetricsResponse,
     # Gateway Analytics schemas
     BlockingRule,
     BlockingRuleCreate,
@@ -48,10 +51,16 @@ from .schemas import (
     GatewayAnalyticsRequest,
     GatewayAnalyticsResponse,
     GeographicalStatsResponse,
+    GeographicDataRequest,
+    GeographicDataResponse,
     InferenceDetailResponse,
     InferenceFeedbackResponse,
     InferenceListRequest,
     InferenceListResponse,
+    LatencyDistributionRequest,
+    LatencyDistributionResponse,
+    TimeSeriesRequest,
+    TimeSeriesResponse,
     TopRoutesResponse,
 )
 from .services import (
@@ -636,3 +645,454 @@ async def sync_blocking_rules(
         success=True,
         message=f"Successfully synced {result['synced_rules']} rules to Redis",
     )
+
+
+# New Aggregated Metrics Proxy Endpoints
+
+
+@metric_router.post(
+    "/aggregated",
+    response_model=AggregatedMetricsResponse,
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_403_FORBIDDEN: {
+            "model": ErrorResponse,
+            "description": "Access denied to requested projects",
+        },
+        status.HTTP_200_OK: {
+            "model": AggregatedMetricsResponse,
+            "description": "Successfully retrieved aggregated metrics",
+        },
+    },
+    description="Get aggregated metrics with server-side calculations and user access control",
+)
+async def get_aggregated_metrics(
+    request: AggregatedMetricsRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> AggregatedMetricsResponse:
+    """Get aggregated metrics with server-side calculations and access control.
+
+    This endpoint provides pre-aggregated metrics calculated directly in ClickHouse for
+    high performance. The request is automatically filtered to only include data from
+    projects the user has access to.
+
+    Supported metrics include:
+    - total_requests: Total number of requests
+    - success_rate: Success rate percentage
+    - avg_latency, p95_latency, p99_latency: Latency percentiles
+    - total_tokens, avg_tokens: Token usage metrics
+    - total_cost, avg_cost: Cost metrics
+    - ttft_avg, ttft_p95, ttft_p99: Time to first token metrics
+    - cache_hit_rate: Cache performance
+    - throughput_avg: Request throughput
+    - error_rate: Error rate percentage
+    - unique_users: Number of unique users
+
+    Args:
+        request: Aggregated metrics request parameters
+        current_user: The current authenticated user making the request
+        session: The database session used for querying data
+
+    Returns:
+        AggregatedMetricsResponse: Aggregated metrics with enriched entity names
+    """
+    try:
+        response_data = await BudMetricService(session).proxy_aggregated_metrics(
+            request.model_dump(mode="json"), current_user
+        )
+        return AggregatedMetricsResponse(**response_data)
+    except ClientException as e:
+        logger.exception(f"Failed to get aggregated metrics: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to get aggregated metrics: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get aggregated metrics"
+        ).to_http_response()
+
+
+@metric_router.post(
+    "/time-series",
+    response_model=TimeSeriesResponse,
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_403_FORBIDDEN: {
+            "model": ErrorResponse,
+            "description": "Access denied to requested projects",
+        },
+        status.HTTP_200_OK: {
+            "model": TimeSeriesResponse,
+            "description": "Successfully retrieved time-series data",
+        },
+    },
+    description="Get time-series metrics data for chart visualization with user access control",
+)
+async def get_time_series_metrics(
+    request: TimeSeriesRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> TimeSeriesResponse:
+    """Get time-series metrics data for chart visualization with access control.
+
+    This endpoint provides time-bucketed metrics data optimized for charts and graphs.
+    Uses efficient ClickHouse time bucketing functions and supports gap filling for
+    smooth visualizations. The request is automatically filtered to only include data
+    from projects the user has access to.
+
+    Supported intervals:
+    - 1m, 5m, 15m, 30m: Minute-based intervals
+    - 1h, 6h, 12h: Hour-based intervals
+    - 1d: Daily intervals
+    - 1w: Weekly intervals
+
+    Supported metrics:
+    - requests: Number of requests per interval
+    - success_rate: Success rate percentage
+    - avg_latency, p95_latency, p99_latency: Latency metrics
+    - tokens: Token usage per interval
+    - cost: Cost per interval
+    - ttft_avg: Average time to first token
+    - cache_hit_rate: Cache hit rate percentage
+    - throughput: Request throughput
+    - error_rate: Error rate percentage
+
+    Args:
+        request: Time-series request parameters
+        current_user: The current authenticated user making the request
+        session: The database session used for querying data
+
+    Returns:
+        TimeSeriesResponse: Time-series data with enriched entity names
+    """
+    try:
+        response_data = await BudMetricService(session).proxy_time_series_metrics(
+            request.model_dump(mode="json"), current_user
+        )
+        return TimeSeriesResponse(**response_data)
+    except ClientException as e:
+        logger.exception(f"Failed to get time-series metrics: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to get time-series metrics: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get time-series metrics"
+        ).to_http_response()
+
+
+@metric_router.get(
+    "/geography",
+    response_model=GeographicDataResponse,
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_403_FORBIDDEN: {
+            "model": ErrorResponse,
+            "description": "Access denied to requested projects",
+        },
+        status.HTTP_200_OK: {
+            "model": GeographicDataResponse,
+            "description": "Successfully retrieved geographic distribution data",
+        },
+    },
+    description="Get geographic distribution of API requests with user access control",
+)
+async def get_geographic_distribution(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    from_date: datetime = Query(..., description="Start date for the analysis"),
+    to_date: Optional[datetime] = Query(None, description="End date for the analysis"),
+    group_by: str = Query("country", description="Group by: country, region, city"),
+    limit: int = Query(50, ge=1, le=1000, description="Maximum number of locations to return"),
+    project_ids: Optional[str] = Query(
+        None, description="Comma-separated list of project IDs to filter by (optional - defaults to user's projects)"
+    ),
+) -> GeographicDataResponse:
+    """Get geographic distribution of API requests with access control.
+
+    Returns statistics grouped by country, region, or city including:
+    - Request counts per location
+    - Success rates per location
+    - Average response times by geography
+    - Number of unique users per location
+    - Percentage breakdown of total requests
+
+    The request is automatically filtered to only include data from projects
+    the user has access to. If specific project IDs are provided, they are
+    validated against the user's accessible projects.
+
+    Args:
+        current_user: The current authenticated user making the request
+        session: The database session used for querying data
+        from_date: Start date for the analysis
+        to_date: End date for the analysis (defaults to current time)
+        group_by: Geographic grouping level (country, region, city)
+        limit: Maximum number of locations to return (1-1000)
+        project_ids: Optional comma-separated project IDs to filter by
+
+    Returns:
+        GeographicDataResponse: Geographic distribution data with enriched information
+    """
+    try:
+        # Prepare request parameters
+        request_params = {
+            "from_date": from_date.isoformat(),
+            "group_by": group_by,
+            "limit": limit,
+        }
+
+        if to_date:
+            request_params["to_date"] = to_date.isoformat()
+
+        if project_ids:
+            request_params["project_ids"] = project_ids
+
+        response_data = await BudMetricService(session).proxy_geographic_metrics(request_params, current_user)
+        return GeographicDataResponse(**response_data)
+    except ClientException as e:
+        logger.exception(f"Failed to get geographic distribution: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to get geographic distribution: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get geographic distribution"
+        ).to_http_response()
+
+
+@metric_router.post(
+    "/observability/metrics/aggregated",
+    response_model=AggregatedMetricsResponse,
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_403_FORBIDDEN: {
+            "model": ErrorResponse,
+            "description": "Access denied to requested projects",
+        },
+        status.HTTP_200_OK: {
+            "model": AggregatedMetricsResponse,
+            "description": "Successfully retrieved aggregated metrics data",
+        },
+    },
+    description="Get aggregated metrics with user access control",
+)
+async def get_aggregated_metrics(
+    request: AggregatedMetricsRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> AggregatedMetricsResponse:
+    """Get aggregated metrics with user access control.
+
+    This endpoint proxies to the budmetrics service and automatically filters
+    results based on the user's project access permissions.
+    """
+    try:
+        response_data = await BudMetricService(session).proxy_aggregated_metrics(
+            request.model_dump(mode="json"), current_user
+        )
+        return AggregatedMetricsResponse(**response_data)
+    except ClientException as e:
+        logger.exception(f"Failed to get aggregated metrics: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to get aggregated metrics: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get aggregated metrics"
+        ).to_http_response()
+
+
+@metric_router.post(
+    "/observability/metrics/time-series",
+    response_model=TimeSeriesResponse,
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_403_FORBIDDEN: {
+            "model": ErrorResponse,
+            "description": "Access denied to requested projects",
+        },
+        status.HTTP_200_OK: {
+            "model": TimeSeriesResponse,
+            "description": "Successfully retrieved time series data",
+        },
+    },
+    description="Get time series metrics with user access control",
+)
+async def get_time_series_metrics(
+    request: TimeSeriesRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> TimeSeriesResponse:
+    """Get time series metrics with user access control.
+
+    This endpoint proxies to the budmetrics service and automatically filters
+    results based on the user's project access permissions.
+    """
+    try:
+        response_data = await BudMetricService(session).proxy_time_series_metrics(
+            request.model_dump(mode="json"), current_user
+        )
+        return TimeSeriesResponse(**response_data)
+    except ClientException as e:
+        logger.exception(f"Failed to get time series metrics: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to get time series metrics: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get time series metrics"
+        ).to_http_response()
+
+
+@metric_router.get(
+    "/observability/metrics/geography",
+    response_model=GeographicDataResponse,
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_403_FORBIDDEN: {
+            "model": ErrorResponse,
+            "description": "Access denied to requested projects",
+        },
+        status.HTTP_200_OK: {
+            "model": GeographicDataResponse,
+            "description": "Successfully retrieved geographic data",
+        },
+    },
+    description="Get geographic distribution metrics with user access control",
+)
+async def get_geographic_metrics(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    from_date: datetime = Query(..., description="Start date for the query range"),
+    to_date: Optional[datetime] = Query(None, description="End date for the query range"),
+) -> GeographicDataResponse:
+    """Get geographic distribution metrics with user access control.
+
+    This endpoint proxies to the budmetrics service and automatically filters
+    results based on the user's project access permissions.
+    """
+    try:
+        # Prepare request parameters
+        params = {"from_date": from_date.isoformat(), "to_date": to_date.isoformat() if to_date else None}
+
+        response_data = await BudMetricService(session).proxy_geographic_metrics(params, current_user)
+        return GeographicDataResponse(**response_data)
+    except ClientException as e:
+        logger.exception(f"Failed to get geographic metrics: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to get geographic metrics: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get geographic metrics"
+        ).to_http_response()
+
+
+@metric_router.post(
+    "/latency-distribution",
+    response_model=LatencyDistributionResponse,
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_403_FORBIDDEN: {
+            "model": ErrorResponse,
+            "description": "Access denied to requested projects",
+        },
+        status.HTTP_200_OK: {
+            "model": LatencyDistributionResponse,
+            "description": "Successfully retrieved latency distribution data",
+        },
+    },
+    description="Get latency distribution analysis with server-side calculations and user access control",
+)
+async def get_latency_distribution(
+    request: LatencyDistributionRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> LatencyDistributionResponse:
+    """Get latency distribution analysis with server-side calculations and access control.
+
+    This endpoint provides latency distribution analysis calculated directly in ClickHouse for
+    high performance. The request is automatically filtered to only include data from
+    projects the user has access to.
+
+    Default latency buckets:
+    - 0-100ms: Very fast responses
+    - 100-500ms: Fast responses
+    - 500ms-1s: Moderate responses
+    - 1-2s: Slow responses
+    - 2-5s: Very slow responses
+    - 5-10s: Extremely slow responses
+    - >10s: Timeout-prone responses
+
+    Features:
+    - Custom latency bucket definitions
+    - Grouping by model, project, endpoint, or user
+    - Automatic access control filtering
+    - Percentage and count statistics
+    - Average latency within each bucket
+
+    Args:
+        request: Latency distribution request parameters
+        current_user: The current authenticated user making the request
+        session: The database session used for querying data
+
+    Returns:
+        LatencyDistributionResponse: Latency distribution data with enriched information
+    """
+    try:
+        response_data = await BudMetricService(session).proxy_latency_distribution_metrics(
+            request.model_dump(mode="json"), current_user
+        )
+        return LatencyDistributionResponse(**response_data)
+    except ClientException as e:
+        logger.exception(f"Failed to get latency distribution: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to get latency distribution: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get latency distribution"
+        ).to_http_response()

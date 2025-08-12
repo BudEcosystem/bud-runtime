@@ -30,9 +30,10 @@ RUN useradd -m -s /bin/bash gateway
 # Copy gateway binary and GeoIP database before switching to gateway user
 COPY --from=builder /release/gateway /usr/local/bin/gateway
 
-# Create directory structure and copy GeoIP database for location data enrichment
-RUN mkdir -p /app/geo
-COPY --from=builder /src/tensorzero-internal/fixtures/geo/GeoLite2-City.mmdb /app/geo/GeoLite2-City.mmdb
+# Create directory structure and download GeoIP database for location data enrichment
+RUN mkdir -p /app/geo && \
+    wget -O /app/geo/GeoLite2-City.mmdb https://git.io/GeoLite2-City.mmdb && \
+    chmod 644 /app/geo/GeoLite2-City.mmdb
 
 # Set proper ownership for the gateway user
 RUN chown -R gateway:gateway /app

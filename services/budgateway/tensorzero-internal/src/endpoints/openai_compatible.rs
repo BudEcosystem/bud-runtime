@@ -17,10 +17,9 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::response::sse::{Event, Sse};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
-use futures::Stream;
+use futures::{Stream, StreamExt as FuturesStreamExt};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
-use tokio_stream::StreamExt;
 use url::Url;
 use uuid::Uuid;
 
@@ -344,15 +343,50 @@ pub async fn inference_handler(
 
             Ok(http_response)
         }
-        InferenceOutput::Streaming(stream) => {
+        InferenceOutput::Streaming(mut stream) => {
+            // We need to peek at the first chunk to get the inference_id for analytics
+            let mut inference_id_for_header = None;
+            let mut first_chunk = None;
+
+            // Try to get the first chunk to extract inference_id
+            if let Some(chunk_result) = FuturesStreamExt::next(&mut stream).await {
+                if let Ok(chunk) = &chunk_result {
+                    inference_id_for_header = Some(chunk.inference_id());
+                    first_chunk = Some(chunk_result);
+                }
+            }
+
+            // Create a new stream that includes the first chunk if we have one
+            let combined_stream = async_stream::stream! {
+                // Yield the first chunk if we have it
+                if let Some(chunk) = first_chunk {
+                    yield chunk;
+                }
+                // Then yield the rest of the stream
+                while let Some(chunk) = FuturesStreamExt::next(&mut stream).await {
+                    yield chunk;
+                }
+            };
+
             let openai_compatible_stream = prepare_serialized_openai_compatible_events(
-                stream,
+                Box::pin(combined_stream),
                 original_model_name,
                 stream_options,
             );
-            Ok(Sse::new(openai_compatible_stream)
+
+            let mut response = Sse::new(openai_compatible_stream)
                 .keep_alive(axum::response::sse::KeepAlive::new())
-                .into_response())
+                .into_response();
+
+            // Add inference_id header if we captured it
+            if let Some(inference_id) = inference_id_for_header {
+                response.headers_mut().insert(
+                    "x-tensorzero-inference-id",
+                    inference_id.to_string().parse().unwrap(),
+                );
+            }
+
+            Ok(response)
         }
     }
 }
@@ -1461,7 +1495,7 @@ fn prepare_serialized_openai_compatible_events(
         };
         let mut inference_id = None;
         let mut episode_id = None;
-        while let Some(chunk) = stream.next().await {
+        while let Some(chunk) = tokio_stream::StreamExt::next(&mut stream).await {
             // NOTE - in the future, we may want to end the stream early if we get an error
             // For now, we just ignore the error and try to get more chunks
             let Ok(chunk) = chunk else {
@@ -4220,7 +4254,7 @@ pub async fn response_create_handler(
             .await?;
 
         // Convert to SSE stream
-        let sse_stream = stream.map(|result| match result {
+        let sse_stream = tokio_stream::StreamExt::map(stream, |result| match result {
             Ok(event) => Event::default().json_data(event).map_err(|e| {
                 Error::new(ErrorDetails::Inference {
                     message: format!("Failed to serialize SSE event: {e}"),
@@ -6610,7 +6644,7 @@ async fn convert_openai_response_to_anthropic(
     {
         // Handle streaming response
         let stream = body.into_data_stream();
-        let anthropic_stream = stream.map(|chunk| {
+        let anthropic_stream = tokio_stream::StreamExt::map(stream, |chunk| {
             chunk.map(|bytes| {
                 // Parse the SSE data
                 let data = String::from_utf8_lossy(&bytes);
@@ -6635,11 +6669,11 @@ async fn convert_openai_response_to_anthropic(
                                     event_data
                                 ))
                             }
-                            Err(_) => bytes,
+                            Err(_) => axum::body::Bytes::from(bytes.to_vec()),
                         }
                     }
                 } else {
-                    bytes
+                    axum::body::Bytes::from(bytes.to_vec())
                 }
             })
         });

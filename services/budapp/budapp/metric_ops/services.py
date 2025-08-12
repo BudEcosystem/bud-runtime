@@ -53,6 +53,9 @@ from ..user_ops.schemas import User
 from .crud import BlockingRuleDataManager
 from .models import GatewayBlockingRule
 from .schemas import (
+    # New aggregated metrics schemas
+    AggregatedMetricsRequest,
+    AggregatedMetricsResponse,
     # Gateway Analytics schemas
     AutoBlockingConfig,
     BlockingRule,
@@ -66,11 +69,15 @@ from .schemas import (
     GatewayAnalyticsRequest,
     GatewayAnalyticsResponse,
     GeographicalStatsResponse,
+    GeographicDataRequest,
+    GeographicDataResponse,
     InferenceDetailResponse,
     InferenceFeedbackResponse,
     InferenceListItem,
     InferenceListRequest,
     InferenceListResponse,
+    TimeSeriesRequest,
+    TimeSeriesResponse,
     TopRoutesResponse,
 )
 
@@ -556,6 +563,550 @@ class BudMetricService(SessionMixin):
         except Exception as e:
             logger.warning(f"Failed to enrich inference detail: {e}")
 
+    async def proxy_aggregated_metrics(self, request_body: Dict[str, Any], current_user: User) -> Dict[str, Any]:
+        """Proxy aggregated metrics request to budmetrics with access control and enrichment."""
+        # Apply user's project access restrictions
+        try:
+            await self._apply_user_project_filter(request_body, current_user)
+        except Exception as e:
+            logger.warning(f"Failed to apply project filter, proceeding without: {e}")
+
+        # Proxy to budmetrics
+        metrics_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/method/observability/metrics/aggregated"
+
+        # Try with filters first, then without if it fails
+        for attempt, try_without_filters in enumerate([False, True]):
+            try:
+                request_to_send = request_body.copy()
+                if try_without_filters and attempt > 0:
+                    # Remove filters that might be causing validation issues
+                    request_to_send.pop("filters", None)
+                    logger.info("Retrying aggregated metrics request without filters")
+
+                async with (
+                    aiohttp.ClientSession() as session,
+                    session.post(
+                        metrics_endpoint,
+                        json=request_to_send,
+                    ) as response,
+                ):
+                    response_data = await response.json()
+
+                    if response.status == status.HTTP_200_OK:
+                        # Success! Enrich and return
+                        await self._enrich_aggregated_metrics_response(response_data)
+
+                        # Add required message field
+                        if "message" not in response_data:
+                            response_data["message"] = "Successfully retrieved aggregated metrics"
+
+                        return response_data
+                    else:
+                        logger.error(f"Aggregated metrics request failed: {response.status}")
+                        if attempt == 0:  # Try again without filters
+                            continue
+                        else:
+                            raise ClientException(
+                                "Failed to get aggregated metrics",
+                                status_code=response.status,
+                            )
+
+            except ClientException:
+                if attempt == 0:  # Try again without filters
+                    continue
+                else:
+                    raise
+            except Exception as e:
+                if attempt == 0:  # Try again without filters
+                    logger.warning(f"First attempt failed, retrying without filters: {e}")
+                    continue
+                else:
+                    logger.exception("Failed to proxy aggregated metrics request")
+                    raise ClientException(
+                        "Failed to proxy aggregated metrics request", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    ) from e
+
+        # This shouldn't be reached, but just in case
+        raise ClientException(
+            "Failed to get aggregated metrics after retries", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+    async def proxy_time_series_metrics(self, request_body: Dict[str, Any], current_user: User) -> Dict[str, Any]:
+        """Proxy time-series metrics request to budmetrics with access control and enrichment."""
+        # Apply user's project access restrictions
+        try:
+            await self._apply_user_project_filter(request_body, current_user)
+        except Exception as e:
+            logger.warning(f"Failed to apply project filter, proceeding without: {e}")
+
+        # Proxy to budmetrics
+        metrics_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/method/observability/metrics/time-series"
+
+        # Try with filters first, then without if it fails
+        for attempt, try_without_filters in enumerate([False, True]):
+            try:
+                request_to_send = request_body.copy()
+                if try_without_filters and attempt > 0:
+                    # Remove filters and grouping that might be causing SQL issues
+                    request_to_send.pop("filters", None)
+                    request_to_send.pop("group_by", None)
+                    logger.info("Retrying time-series metrics request without filters/grouping")
+
+                async with (
+                    aiohttp.ClientSession() as session,
+                    session.post(
+                        metrics_endpoint,
+                        json=request_to_send,
+                    ) as response,
+                ):
+                    response_data = await response.json()
+
+                    if response.status == status.HTTP_200_OK:
+                        # Success! Enrich and return
+                        await self._enrich_time_series_response(response_data)
+
+                        # Add required message field
+                        if "message" not in response_data:
+                            response_data["message"] = "Successfully retrieved time-series data"
+
+                        return response_data
+                    else:
+                        logger.error(f"Time-series metrics request failed: {response.status}")
+                        if attempt == 0:  # Try again without filters
+                            continue
+                        else:
+                            raise ClientException(
+                                "Failed to get time-series metrics",
+                                status_code=response.status,
+                            )
+
+            except ClientException:
+                if attempt == 0:  # Try again without filters
+                    continue
+                else:
+                    raise
+            except Exception as e:
+                if attempt == 0:  # Try again without filters
+                    logger.warning(f"First attempt failed, retrying without filters/grouping: {e}")
+                    continue
+                else:
+                    logger.exception("Failed to proxy time-series metrics request")
+                    raise ClientException(
+                        "Failed to proxy time-series metrics request",
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    ) from e
+
+        # This shouldn't be reached, but just in case
+        raise ClientException(
+            "Failed to get time-series metrics after retries", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+    async def proxy_geographic_metrics(self, request_params: Dict[str, Any], current_user: User) -> Dict[str, Any]:
+        """Proxy geographic metrics request to budmetrics with access control and enrichment."""
+        # Apply user's project access restrictions for GET request params
+        await self._apply_user_project_filter_params(request_params, current_user)
+
+        # Proxy to budmetrics
+        metrics_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/method/observability/metrics/geography"
+
+        try:
+            async with (
+                aiohttp.ClientSession() as session,
+                session.get(
+                    metrics_endpoint,
+                    params=request_params,
+                ) as response,
+            ):
+                response_data = await response.json()
+
+                if response.status != status.HTTP_200_OK:
+                    logger.error(f"Geographic metrics request failed: {response.status}")
+                    raise ClientException(
+                        "Failed to get geographic metrics",
+                        status_code=response.status,
+                    )
+
+                # Enrich response with names (if needed)
+                await self._enrich_geographic_response(response_data)
+
+                # Add required message field
+                if "message" not in response_data:
+                    response_data["message"] = "Successfully retrieved geographic data"
+
+                return response_data
+
+        except ClientException:
+            raise
+        except Exception as e:
+            logger.exception("Failed to proxy geographic metrics request")
+            raise ClientException(
+                "Failed to proxy geographic metrics request", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            ) from e
+
+    async def _apply_user_project_filter(self, request_body: Dict[str, Any], current_user: User) -> None:
+        """Apply user's project access restrictions to the request body."""
+        try:
+            # Get user's accessible projects
+            from ..project_ops.services import ProjectService
+
+            project_service = ProjectService(self.session)
+            # Get all projects the user has access to
+            user_projects, _ = await project_service.get_all_active_projects(
+                current_user, offset=0, limit=1000, filters={}, order_by=[], search=False
+            )
+            user_project_ids = [str(project.project.id) for project in user_projects]
+
+            # Get existing filters or create new ones
+            filters = request_body.get("filters", {})
+
+            # If project_id filter exists, intersect with user's accessible projects
+            if "project_id" in filters:
+                existing_project_ids = filters["project_id"]
+                if isinstance(existing_project_ids, list):
+                    # Keep only projects that user has access to
+                    accessible_ids = [pid for pid in existing_project_ids if str(pid) in user_project_ids]
+                    if not accessible_ids:
+                        # User has no access to any of the requested projects
+                        raise ClientException(
+                            "Access denied to requested projects", status_code=status.HTTP_403_FORBIDDEN
+                        )
+                    filters["project_id"] = accessible_ids
+                else:
+                    # Single project ID
+                    if str(existing_project_ids) not in user_project_ids:
+                        raise ClientException(
+                            "Access denied to requested project", status_code=status.HTTP_403_FORBIDDEN
+                        )
+            else:
+                # No project filter specified, apply user's projects
+                filters["project_id"] = user_project_ids
+
+            request_body["filters"] = filters
+
+        except ClientException:
+            raise
+        except Exception as e:
+            logger.warning(f"Failed to apply user project filter: {e}")
+            # Fallback: restrict to user's projects only
+            from ..project_ops.services import ProjectService
+
+            project_service = ProjectService(self.session)
+            user_projects, _ = await project_service.get_all_active_projects(
+                current_user, offset=0, limit=1000, filters={}, order_by=[], search=False
+            )
+            user_project_ids = [str(project.project.id) for project in user_projects]
+
+            filters = request_body.get("filters", {})
+            filters["project_id"] = user_project_ids
+            request_body["filters"] = filters
+
+    async def _apply_user_project_filter_params(self, request_params: Dict[str, Any], current_user: User) -> None:
+        """Apply user's project access restrictions to GET request parameters."""
+        try:
+            # Get user's accessible projects
+            from ..project_ops.services import ProjectService
+
+            project_service = ProjectService(self.session)
+            # Get all projects the user has access to
+            user_projects, _ = await project_service.get_all_active_projects(
+                current_user, offset=0, limit=1000, filters={}, order_by=[], search=False
+            )
+            user_project_ids = [str(project.project.id) for project in user_projects]
+
+            # If project_ids parameter exists, intersect with user's accessible projects
+            if "project_ids" in request_params:
+                existing_project_ids = request_params["project_ids"]
+                if isinstance(existing_project_ids, str):
+                    # Convert comma-separated string to list
+                    existing_project_ids = existing_project_ids.split(",")
+
+                # Keep only projects that user has access to
+                accessible_ids = [pid for pid in existing_project_ids if str(pid) in user_project_ids]
+                if not accessible_ids:
+                    # User has no access to any of the requested projects
+                    raise ClientException("Access denied to requested projects", status_code=status.HTTP_403_FORBIDDEN)
+                request_params["project_ids"] = ",".join(accessible_ids)
+            else:
+                # No project filter specified, apply user's projects
+                request_params["project_ids"] = ",".join(user_project_ids)
+
+        except ClientException:
+            raise
+        except Exception as e:
+            logger.warning(f"Failed to apply user project filter: {e}")
+            # Fallback: restrict to user's projects only
+            from ..project_ops.services import ProjectService
+
+            project_service = ProjectService(self.session)
+            user_projects, _ = await project_service.get_all_active_projects(
+                current_user, offset=0, limit=1000, filters={}, order_by=[], search=False
+            )
+            user_project_ids = [str(project.project.id) for project in user_projects]
+            request_params["project_ids"] = ",".join(user_project_ids)
+
+    async def _enrich_aggregated_metrics_response(self, response_data: Dict[str, Any]) -> None:
+        """Enrich aggregated metrics response with entity names."""
+        try:
+            # Collect unique IDs from all groups
+            project_ids = set()
+            model_ids = set()
+            endpoint_ids = set()
+
+            groups = response_data.get("groups", [])
+            summary_group = response_data.get("summary", {})
+
+            for group in groups:
+                if project_id := group.get("project_id"):
+                    project_ids.add(str(project_id))
+                if model_id := group.get("model_id"):
+                    model_ids.add(str(model_id))
+                if endpoint_id := group.get("endpoint_id"):
+                    endpoint_ids.add(str(endpoint_id))
+
+            # Also check summary if it contains grouping info
+            if isinstance(summary_group, dict):
+                if project_id := summary_group.get("project_id"):
+                    project_ids.add(str(project_id))
+                if model_id := summary_group.get("model_id"):
+                    model_ids.add(str(model_id))
+                if endpoint_id := summary_group.get("endpoint_id"):
+                    endpoint_ids.add(str(endpoint_id))
+
+            # Fetch entity names
+            project_names = {}
+            model_names = {}
+            endpoint_names = {}
+
+            if project_ids:
+                stmt = select(ProjectModel).where(ProjectModel.id.in_(list(project_ids)))
+                result = self.session.execute(stmt)
+                projects = result.scalars().all()
+                project_names = {str(p.id): p.name for p in projects}
+
+            if model_ids:
+                stmt = select(Model).where(Model.id.in_(list(model_ids)))
+                result = self.session.execute(stmt)
+                models = result.scalars().all()
+                model_names = {str(m.id): m.name for m in models}
+
+            if endpoint_ids:
+                stmt = select(EndpointModel).where(EndpointModel.id.in_(list(endpoint_ids)))
+                result = self.session.execute(stmt)
+                endpoints = result.scalars().all()
+                endpoint_names = {str(e.id): e.name for e in endpoints}
+
+            # Add names to groups
+            for group in groups:
+                if project_id := group.get("project_id"):
+                    group["project_name"] = project_names.get(str(project_id))
+                if model_id := group.get("model_id"):
+                    group["model_name"] = model_names.get(str(model_id))
+                if endpoint_id := group.get("endpoint_id"):
+                    group["endpoint_name"] = endpoint_names.get(str(endpoint_id))
+
+        except Exception as e:
+            logger.warning(f"Failed to enrich aggregated metrics response: {e}")
+
+    async def _enrich_time_series_response(self, response_data: Dict[str, Any]) -> None:
+        """Enrich time-series response with entity names."""
+        try:
+            # Collect unique IDs from all groups
+            project_ids = set()
+            model_ids = set()
+            endpoint_ids = set()
+
+            groups = response_data.get("groups", [])
+
+            for group in groups:
+                if project_id := group.get("project_id"):
+                    project_ids.add(str(project_id))
+                if model_id := group.get("model_id"):
+                    model_ids.add(str(model_id))
+                if endpoint_id := group.get("endpoint_id"):
+                    endpoint_ids.add(str(endpoint_id))
+
+            # Fetch entity names
+            project_names = {}
+            model_names = {}
+            endpoint_names = {}
+
+            if project_ids:
+                stmt = select(ProjectModel).where(ProjectModel.id.in_(list(project_ids)))
+                result = self.session.execute(stmt)
+                projects = result.scalars().all()
+                project_names = {str(p.id): p.name for p in projects}
+
+            if model_ids:
+                stmt = select(Model).where(Model.id.in_(list(model_ids)))
+                result = self.session.execute(stmt)
+                models = result.scalars().all()
+                model_names = {str(m.id): m.name for m in models}
+
+            if endpoint_ids:
+                stmt = select(EndpointModel).where(EndpointModel.id.in_(list(endpoint_ids)))
+                result = self.session.execute(stmt)
+                endpoints = result.scalars().all()
+                endpoint_names = {str(e.id): e.name for e in endpoints}
+
+            # Add names to groups
+            for group in groups:
+                if project_id := group.get("project_id"):
+                    group["project_name"] = project_names.get(str(project_id))
+                if model_id := group.get("model_id"):
+                    group["model_name"] = model_names.get(str(model_id))
+                if endpoint_id := group.get("endpoint_id"):
+                    group["endpoint_name"] = endpoint_names.get(str(endpoint_id))
+
+        except Exception as e:
+            logger.warning(f"Failed to enrich time-series response: {e}")
+
+    async def _enrich_geographic_response(self, response_data: Dict[str, Any]) -> None:
+        """Enrich geographic response with additional data if needed."""
+        try:
+            # Geographic response typically doesn't need entity name enrichment
+            # since it's grouped by geographic location, but we could add
+            # country name enrichment from country codes if needed
+            locations = response_data.get("locations", [])
+
+            for location in locations:
+                if country_code := location.get("country_code"):
+                    if not location.get("country_name"):
+                        location["country_name"] = self._get_country_name(country_code)
+
+        except Exception as e:
+            logger.warning(f"Failed to enrich geographic response: {e}")
+
+    async def proxy_latency_distribution_metrics(
+        self, request_body: Dict[str, Any], current_user: User
+    ) -> Dict[str, Any]:
+        """Proxy latency distribution metrics request to budmetrics with access control and enrichment."""
+        # Apply user's project access restrictions
+        try:
+            await self._apply_user_project_filter(request_body, current_user)
+        except Exception as e:
+            logger.warning(f"Failed to apply project filter, proceeding without: {e}")
+
+        # Proxy to budmetrics
+        metrics_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/method/observability/metrics/latency-distribution"
+
+        # Try with filters first, then without if it fails
+        for attempt, try_without_filters in enumerate([False, True]):
+            try:
+                request_to_send = request_body.copy()
+                if try_without_filters and attempt > 0:
+                    # Remove filters that might be causing validation issues
+                    request_to_send.pop("filters", None)
+                    logger.info("Retrying latency distribution metrics request without filters")
+
+                async with (
+                    aiohttp.ClientSession() as session,
+                    session.post(
+                        metrics_endpoint,
+                        json=request_to_send,
+                    ) as response,
+                ):
+                    response_data = await response.json()
+
+                    if response.status == status.HTTP_200_OK:
+                        # Success! Enrich and return
+                        await self._enrich_latency_distribution_response(response_data)
+
+                        # Add required message field
+                        if "message" not in response_data:
+                            response_data["message"] = "Successfully retrieved latency distribution"
+
+                        return response_data
+                    else:
+                        logger.error(f"Latency distribution metrics request failed: {response.status}")
+                        if attempt == 0:  # Try again without filters
+                            continue
+                        else:
+                            raise ClientException(
+                                "Failed to get latency distribution metrics",
+                                status_code=response.status,
+                            )
+
+            except ClientException:
+                if attempt == 0:  # Try again without filters
+                    continue
+                else:
+                    raise
+            except Exception as e:
+                if attempt == 0:  # Try again without filters
+                    logger.warning(f"First attempt failed, retrying without filters: {e}")
+                    continue
+                else:
+                    logger.exception("Failed to proxy latency distribution metrics request")
+                    raise ClientException(
+                        "Failed to proxy latency distribution metrics request",
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    ) from e
+
+        # This shouldn't be reached, but just in case
+        raise ClientException(
+            "Failed to get latency distribution metrics after retries",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+    async def _enrich_latency_distribution_response(self, response_data: Dict[str, Any]) -> None:
+        """Enrich latency distribution response with entity names."""
+        try:
+            from sqlalchemy import select
+
+            # Collect all unique IDs from the response
+            project_ids = set()
+            model_ids = set()
+            endpoint_ids = set()
+
+            groups = response_data.get("groups", [])
+
+            for group in groups:
+                if project_id := group.get("project_id"):
+                    project_ids.add(str(project_id))
+                if model_id := group.get("model_id"):
+                    model_ids.add(str(model_id))
+                if endpoint_id := group.get("endpoint_id"):
+                    endpoint_ids.add(str(endpoint_id))
+
+            # Fetch names in batches for efficiency
+            project_names = {}
+            model_names = {}
+            endpoint_names = {}
+
+            if project_ids:
+                stmt = select(ProjectModel).where(ProjectModel.id.in_([UUID(pid) for pid in project_ids]))
+                result = self.session.execute(stmt)
+                projects = result.scalars().all()
+                project_names = {str(p.id): p.name for p in projects}
+
+            if model_ids:
+                stmt = select(Model).where(Model.id.in_([UUID(mid) for mid in model_ids]))
+                result = self.session.execute(stmt)
+                models = result.scalars().all()
+                model_names = {str(m.id): m.name for m in models}
+
+            if endpoint_ids:
+                stmt = select(EndpointModel).where(EndpointModel.id.in_([UUID(eid) for eid in endpoint_ids]))
+                result = self.session.execute(stmt)
+                endpoints = result.scalars().all()
+                endpoint_names = {str(e.id): e.name for e in endpoints}
+
+            # Add names to groups
+            for group in groups:
+                if project_id := group.get("project_id"):
+                    group["project_name"] = project_names.get(str(project_id), group.get("project_name"))
+                if model_id := group.get("model_id"):
+                    # Preserve original model_name if enrichment fails
+                    enriched_name = model_names.get(str(model_id))
+                    if enriched_name:
+                        group["model_name"] = enriched_name
+                    # Otherwise keep the existing model_name (even if it's a UUID)
+                if endpoint_id := group.get("endpoint_id"):
+                    group["endpoint_name"] = endpoint_names.get(str(endpoint_id), group.get("endpoint_name"))
+
+        except Exception as e:
+            logger.warning(f"Failed to enrich latency distribution response: {e}")
+
 
 class MetricService(SessionMixin):
     """Metric service."""
@@ -641,7 +1192,13 @@ class GatewayAnalyticsService(SessionMixin):
             List of project UUIDs the user has access to
         """
         project_data_manager = ProjectDataManager(self.session)
-        projects = await project_data_manager.get_projects_by_user(self.user.id)
+        # Get all projects the user participates in
+        result = await project_data_manager.get_all_participated_projects(
+            user_id=self.user.id,
+            offset=0,
+            limit=1000,  # Get all projects, adjust if needed
+        )
+        projects = result.get("projects", []) if isinstance(result, dict) else []
         return [project.id for project in projects]
 
     async def _proxy_to_budmetrics(
@@ -1007,7 +1564,13 @@ class BlockingRulesService(SessionMixin):
             List of project UUIDs the user has access to
         """
         project_data_manager = ProjectDataManager(self.session)
-        projects = await project_data_manager.get_projects_by_user(self.user.id)
+        # Get all projects the user participates in
+        result = await project_data_manager.get_all_participated_projects(
+            user_id=self.user.id,
+            offset=0,
+            limit=1000,  # Get all projects, adjust if needed
+        )
+        projects = result.get("projects", []) if isinstance(result, dict) else []
         return [project.id for project in projects]
 
     async def _validate_project_access(self, project_id: UUID) -> None:

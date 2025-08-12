@@ -726,3 +726,276 @@ class GatewayBlockingRuleStats(BaseModel):
     def to_http_response(self) -> ORJSONResponse:
         """Convert to HTTP response."""
         return ORJSONResponse(content=self.model_dump(mode="json", exclude_none=True), status_code=200)
+
+
+# New Aggregated Metrics Schemas
+class AggregatedMetricsRequest(BaseModel):
+    """Request schema for aggregated metrics with server-side calculations."""
+
+    from_date: datetime
+    to_date: Optional[datetime] = None
+    group_by: Optional[list[Literal["model", "project", "endpoint", "user"]]] = None
+    filters: Optional[Dict[str, Any]] = None  # e.g., {"project_id": ["uuid1", "uuid2"], "model_id": "uuid"}
+    metrics: list[
+        Literal[
+            "total_requests",
+            "success_rate",
+            "avg_latency",
+            "p95_latency",
+            "p99_latency",
+            "total_tokens",
+            "avg_tokens",
+            "total_cost",
+            "avg_cost",
+            "ttft_avg",
+            "ttft_p95",
+            "ttft_p99",
+            "cache_hit_rate",
+            "throughput_avg",
+            "error_rate",
+            "unique_users",
+        ]
+    ]
+
+    @field_validator("to_date")
+    @classmethod
+    def validate_to_date(cls, v: Optional[datetime], info) -> Optional[datetime]:
+        """Validate that to_date is after from_date."""
+        if v is None:
+            return v
+        from_date = info.data.get("from_date")
+        if from_date and v < from_date:
+            raise ValueError("to_date must be after from_date")
+        return v
+
+
+class AggregatedMetricValue(BaseModel):
+    """Single aggregated metric value."""
+
+    value: Union[int, float]
+    formatted_value: Optional[str] = None  # Human readable format (e.g., "1.2K", "95.5%")
+    unit: Optional[str] = None  # Unit of measurement (e.g., "ms", "%", "requests")
+
+
+class AggregatedMetricsGroup(BaseModel):
+    """Grouped aggregated metrics."""
+
+    # Grouping dimensions
+    model_id: Optional[UUID] = None
+    model_name: Optional[str] = None
+    project_id: Optional[UUID] = None
+    project_name: Optional[str] = None
+    endpoint_id: Optional[UUID] = None
+    endpoint_name: Optional[str] = None
+    user_id: Optional[str] = None
+
+    # Aggregated metrics
+    metrics: Dict[str, AggregatedMetricValue]
+
+
+class AggregatedMetricsResponse(ResponseBase):
+    """Response schema for aggregated metrics."""
+
+    object: str = "aggregated_metrics"
+    groups: List[AggregatedMetricsGroup]
+    summary: Dict[str, AggregatedMetricValue]  # Overall aggregated values
+    total_groups: int
+    date_range: Dict[str, datetime]  # {"from": datetime, "to": datetime}
+
+
+class TimeSeriesRequest(BaseModel):
+    """Request schema for time-series data."""
+
+    from_date: datetime
+    to_date: Optional[datetime] = None
+    interval: Literal["1m", "5m", "15m", "30m", "1h", "6h", "12h", "1d", "1w"] = "1h"
+    metrics: list[
+        Literal[
+            "requests",
+            "success_rate",
+            "avg_latency",
+            "p95_latency",
+            "p99_latency",
+            "tokens",
+            "cost",
+            "ttft_avg",
+            "cache_hit_rate",
+            "throughput",
+            "error_rate",
+        ]
+    ]
+    filters: Optional[Dict[str, Any]] = None
+    group_by: Optional[list[Literal["model", "project", "endpoint"]]] = None
+    fill_gaps: bool = True
+
+    @field_validator("to_date")
+    @classmethod
+    def validate_to_date(cls, v: Optional[datetime], info) -> Optional[datetime]:
+        """Validate that to_date is after from_date."""
+        if v is None:
+            return v
+        from_date = info.data.get("from_date")
+        if from_date and v < from_date:
+            raise ValueError("to_date must be after from_date")
+        return v
+
+
+class TimeSeriesPoint(BaseModel):
+    """Single time series data point."""
+
+    timestamp: datetime
+    values: Dict[str, Optional[float]]  # metric_name -> value
+
+
+class TimeSeriesGroup(BaseModel):
+    """Time series data for a specific group."""
+
+    # Grouping dimensions
+    model_id: Optional[UUID] = None
+    model_name: Optional[str] = None
+    project_id: Optional[UUID] = None
+    project_name: Optional[str] = None
+    endpoint_id: Optional[UUID] = None
+    endpoint_name: Optional[str] = None
+
+    # Time series data
+    data_points: List[TimeSeriesPoint]
+
+
+class TimeSeriesResponse(ResponseBase):
+    """Response schema for time-series data."""
+
+    object: str = "time_series"
+    groups: List[TimeSeriesGroup]
+    interval: str
+    date_range: Dict[str, datetime]
+
+
+class GeographicDataRequest(BaseModel):
+    """Request schema for geographic distribution data."""
+
+    from_date: datetime
+    to_date: Optional[datetime] = None
+    filters: Optional[Dict[str, Any]] = None
+    group_by: Literal["country", "region", "city"] = "country"
+    limit: int = 50
+
+    @field_validator("to_date")
+    @classmethod
+    def validate_to_date(cls, v: Optional[datetime], info) -> Optional[datetime]:
+        """Validate that to_date is after from_date."""
+        if v is None:
+            return v
+        from_date = info.data.get("from_date")
+        if from_date and v < from_date:
+            raise ValueError("to_date must be after from_date")
+        return v
+
+    @field_validator("limit")
+    @classmethod
+    def validate_limit(cls, v: int) -> int:
+        """Validate that limit is between 1 and 1000."""
+        if v < 1 or v > 1000:
+            raise ValueError("limit must be between 1 and 1000")
+        return v
+
+
+class GeographicDataPoint(BaseModel):
+    """Geographic data point."""
+
+    # Geographic info
+    country_code: Optional[str] = None
+    country_name: Optional[str] = None
+    region: Optional[str] = None
+    city: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+
+    # Metrics
+    request_count: int
+    success_rate: float
+    avg_latency_ms: Optional[float] = None
+    unique_users: Optional[int] = None
+    percentage: float  # Percentage of total requests
+
+
+class GeographicDataResponse(ResponseBase):
+    """Response schema for geographic distribution data."""
+
+    object: str = "geographic_data"
+    locations: List[GeographicDataPoint]
+    total_requests: int
+    total_locations: int
+    date_range: Dict[str, datetime]
+    group_by: str
+
+
+class LatencyDistributionRequest(BaseModel):
+    """Request schema for latency distribution data."""
+
+    from_date: datetime
+    to_date: Optional[datetime] = None
+    filters: Optional[Dict[str, Any]] = None
+    group_by: Optional[list[Literal["model", "project", "endpoint", "user"]]] = None
+    buckets: Optional[List[Dict[str, Union[int, str]]]] = None
+
+    @field_validator("to_date")
+    @classmethod
+    def validate_to_date(cls, v: Optional[datetime], info) -> Optional[datetime]:
+        """Validate that to_date is after from_date."""
+        if v is None:
+            return v
+        from_date = info.data.get("from_date")
+        if from_date and v < from_date:
+            raise ValueError("to_date must be after from_date")
+        return v
+
+    @field_validator("buckets")
+    @classmethod
+    def validate_buckets(
+        cls, v: Optional[List[Dict[str, Union[int, str]]]]
+    ) -> Optional[List[Dict[str, Union[int, str]]]]:
+        """Validate bucket format."""
+        if v is None:
+            return v
+        for bucket in v:
+            if not isinstance(bucket, dict) or "min" not in bucket or "max" not in bucket or "label" not in bucket:
+                raise ValueError("Each bucket must have 'min', 'max', and 'label' fields")
+        return v
+
+
+class LatencyDistributionBucket(BaseModel):
+    """Single latency distribution bucket."""
+
+    range: str  # e.g., "0-100ms"
+    count: int
+    percentage: float
+    avg_latency: Optional[float] = None  # Average latency within this bucket
+
+
+class LatencyDistributionGroup(BaseModel):
+    """Latency distribution for a specific group."""
+
+    # Grouping dimensions
+    model_id: Optional[UUID] = None
+    model_name: Optional[str] = None
+    project_id: Optional[UUID] = None
+    project_name: Optional[str] = None
+    endpoint_id: Optional[UUID] = None
+    endpoint_name: Optional[str] = None
+    user_id: Optional[str] = None
+
+    # Distribution data
+    buckets: List[LatencyDistributionBucket]
+    total_requests: int
+
+
+class LatencyDistributionResponse(ResponseBase):
+    """Response schema for latency distribution data."""
+
+    object: str = "latency_distribution"
+    groups: List[LatencyDistributionGroup]
+    overall_distribution: List[LatencyDistributionBucket]  # Aggregated across all groups
+    total_requests: int
+    date_range: Dict[str, datetime]
+    bucket_definitions: List[Dict[str, Union[int, str]]]  # The bucket ranges used
