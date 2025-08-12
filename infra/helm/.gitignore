@@ -1,2 +1,5 @@
 */charts/*.tgz
 */secrets.yaml
+
+# personal dev environment
+*/values.sinan.yaml

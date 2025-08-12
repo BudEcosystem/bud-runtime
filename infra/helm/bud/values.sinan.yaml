@@ -1,0 +1,3 @@
+ingress:
+    hosts:
+        root: sinan.bud.studio
