@@ -57,7 +57,7 @@
       devShells = forAllSystems (
         { system, pkgs }:
         {
-          bud = pkgs.callPackage ./nix/shell.nix {
+          bud = pkgs.callPackage ./nix/shell {
             self = self;
           };
 

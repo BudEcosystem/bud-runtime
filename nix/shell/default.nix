@@ -7,6 +7,7 @@
   age,
   gnugrep,
   git,
+  callPackage,
 
   k3d,
   kubectl,
@@ -58,6 +59,7 @@ mkShell {
     prefetch-npm-deps
     gnugrep
     git
+    (callPackage ./bud_wg { })
   ];
 
   shellHook = ''
