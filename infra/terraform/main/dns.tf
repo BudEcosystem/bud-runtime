@@ -30,7 +30,7 @@ locals {
   services_with_envs = toset(flatten([
     for env in local.environments : [
       for srv in local.services :
-      srv == "" ? env : "${srv}.${env}.${var.zone_domain}"
+      srv == "" ? "${env}.${var.zone_domain}" : "${srv}.${env}.${var.zone_domain}"
     ]
   ]))
 }
