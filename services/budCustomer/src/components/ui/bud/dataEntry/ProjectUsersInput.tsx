@@ -31,7 +31,9 @@ export default function ProjectUsersInput(props: SelectProps) {
   const { users, getUsers } = useUsers();
   const { name: fieldName } = props;
   const { form } = useContext(BudFormContext);
-  const [options, setOptions] = useState<(User & { label: string; value: string })[]>([]);
+  const [options, setOptions] = useState<
+    (User & { label: string; value: string })[]
+  >([]);
   const [scopes, setScopes] = useState("endpoint:view");
   const ref = React.useRef<any>(null);
 
@@ -66,7 +68,6 @@ export default function ProjectUsersInput(props: SelectProps) {
   };
 
   const [search, setSearch] = useState("");
-
 
   const load = useCallback(async () => {
     await getUsers({
@@ -267,7 +268,7 @@ export default function ProjectUsersInput(props: SelectProps) {
                         e.stopPropagation();
                         form.setFieldsValue({
                           [fieldName]: selected.filter(
-                            (item: any) => item.label !== props.data.label
+                            (item: any) => item.label !== props.data.label,
                           ),
                         });
                       }}
@@ -300,7 +301,7 @@ export default function ProjectUsersInput(props: SelectProps) {
               colourOptions.find((option) => option.value === props.data.value)
                 ?.value || "#FFF";
             const selectedTag = selected?.find(
-              (tag: any) => tag.label === props.data.label
+              (tag: any) => tag.label === props.data.label,
             );
             return (
               <div
@@ -322,7 +323,7 @@ export default function ProjectUsersInput(props: SelectProps) {
                       e.stopPropagation();
                       form.setFieldsValue({
                         [fieldName]: selected.filter(
-                          (item: any) => item.label !== props.data.label
+                          (item: any) => item.label !== props.data.label,
                         ),
                       });
                     }

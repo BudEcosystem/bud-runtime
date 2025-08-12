@@ -473,6 +473,10 @@ impl FuserConfig {
                         included_indices.push(i);
                     }
                 }
+                _ => {
+                    // Other inference types are not supported for mixture-of-n
+                    // Simply skip them
+                }
             }
         }
         let template_context = json!({

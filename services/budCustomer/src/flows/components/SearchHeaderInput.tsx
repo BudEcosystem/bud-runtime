@@ -1,6 +1,6 @@
-import React from 'react';
-import { Input } from 'antd';
-import { Icon } from '@iconify/react/dist/iconify.js';
+import React from "react";
+import { Input } from "antd";
+import { Icon } from "@iconify/react/dist/iconify.js";
 
 interface SearchHeaderInputProps {
   placeholder?: string;
@@ -26,9 +26,9 @@ const SearchHeaderInput: React.FC<SearchHeaderInputProps> = ({
       prefix={<Icon icon="material-symbols:search" className="text-gray-400" />}
       className={`bg-[#1A1A1A] border-[#2A2A2A] text-white ${className}`}
       style={{
-        backgroundColor: '#1A1A1A',
-        borderColor: '#2A2A2A',
-        color: 'white',
+        backgroundColor: "#1A1A1A",
+        borderColor: "#2A2A2A",
+        color: "white",
       }}
     />
   );

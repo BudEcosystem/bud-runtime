@@ -23,8 +23,5 @@ dependencies:
 - name: mongodb
   repository: https://charts.bitnami.com/bitnami
   version: 16.5.31
-- name: lgtm-distributed
-  repository: https://grafana.github.io/helm-charts
-  version: 2.1.0
-digest: sha256:55107d5b63595ac37bb787a94bc93be4cea30ff463006da3028c5f21bb66a4da
-generated: "2025-07-24T15:44:46.905114455+05:30"
+digest: sha256:a235bc8eb83d8f392c55a76d06e339cb474872f7924f58972183f47716000bbb
+generated: "2025-08-07T11:54:29.877843373+05:30"

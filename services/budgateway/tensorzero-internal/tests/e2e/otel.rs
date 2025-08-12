@@ -123,7 +123,10 @@ pub async fn test_capture_simple_inference_spans() {
         })
         .await
         .unwrap();
-    let InferenceOutput::NonStreaming { response: output, .. } = res else {
+    let InferenceOutput::NonStreaming {
+        response: output, ..
+    } = res
+    else {
         panic!("Expected non-streaming output, got: {res:#?}");
     };
 

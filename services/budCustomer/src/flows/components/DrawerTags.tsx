@@ -1,5 +1,5 @@
-import React from 'react';
-import { Tag } from 'antd';
+import React from "react";
+import { Tag } from "antd";
 
 interface TagsProps {
   tags?: string[];
@@ -9,8 +9,8 @@ interface TagsProps {
 
 const Tags: React.FC<TagsProps> = ({
   tags = [],
-  color = 'blue',
-  className = ''
+  color = "blue",
+  className = "",
 }) => {
   if (!tags || tags.length === 0) {
     return null;

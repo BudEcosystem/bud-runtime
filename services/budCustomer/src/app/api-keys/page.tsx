@@ -10,7 +10,7 @@ import {
   Text_14_500_EEEEEE,
   Text_15_600_EEEEEE,
   Text_19_600_EEEEEE,
-  Text_24_500_EEEEEE
+  Text_24_500_EEEEEE,
 } from "@/components/ui/text";
 import { Icon } from "@iconify/react/dist/iconify.js";
 import styles from "./api-keys.module.scss";
@@ -41,7 +41,7 @@ export default function ApiKeysPage() {
       createdAt: "2024-01-15",
       lastUsedAt: "2024-01-20",
       usage: 15420,
-      status: "active"
+      status: "active",
     },
     {
       id: "2",
@@ -50,7 +50,7 @@ export default function ApiKeysPage() {
       createdAt: "2024-01-10",
       lastUsedAt: "2024-01-19",
       usage: 8350,
-      status: "active"
+      status: "active",
     },
     {
       id: "3",
@@ -59,8 +59,8 @@ export default function ApiKeysPage() {
       createdAt: "2023-12-20",
       lastUsedAt: "2024-01-05",
       usage: 2100,
-      status: "revoked"
-    }
+      status: "revoked",
+    },
   ]);
 
   const handleCreateKey = () => {
@@ -72,10 +72,10 @@ export default function ApiKeysPage() {
       id: Date.now().toString(),
       label: newKeyLabel,
       key: mockKey,
-      createdAt: new Date().toISOString().split('T')[0],
+      createdAt: new Date().toISOString().split("T")[0],
       lastUsedAt: "-",
       usage: 0,
-      status: "active"
+      status: "active",
     };
 
     setApiKeys([newApiKey, ...apiKeys]);
@@ -86,9 +86,11 @@ export default function ApiKeysPage() {
   };
 
   const handleRevokeKey = (id: string) => {
-    setApiKeys(apiKeys.map(key =>
-      key.id === id ? { ...key, status: "revoked" as const } : key
-    ));
+    setApiKeys(
+      apiKeys.map((key) =>
+        key.id === id ? { ...key, status: "revoked" as const } : key,
+      ),
+    );
   };
 
   const handleCopyKey = (key: string, id: string) => {
@@ -104,14 +106,14 @@ export default function ApiKeysPage() {
   const columns = [
     {
       title: <Text_12_400_757575>NAME</Text_12_400_757575>,
-      dataIndex: 'label',
-      key: 'label',
-      render: (text: string) => <Text_14_500_EEEEEE>{text}</Text_14_500_EEEEEE>
+      dataIndex: "label",
+      key: "label",
+      render: (text: string) => <Text_14_500_EEEEEE>{text}</Text_14_500_EEEEEE>,
     },
     {
       title: <Text_12_400_757575>KEY</Text_12_400_757575>,
-      dataIndex: 'key',
-      key: 'key',
+      dataIndex: "key",
+      key: "key",
       render: (text: string, record: ApiKey) => (
         <Flex align="center" gap={12}>
           <code className="bg-[#1F1F1F] px-[0.75rem] py-[0.25rem] rounded text-[#B3B3B3] text-[0.813rem]">
@@ -119,65 +121,70 @@ export default function ApiKeysPage() {
           </code>
           <Button
             type="text"
-            icon={<Icon icon={copiedKeyId === record.id ? "ph:check" : "ph:copy"} />}
+            icon={
+              <Icon icon={copiedKeyId === record.id ? "ph:check" : "ph:copy"} />
+            }
             onClick={() => handleCopyKey(text, record.id)}
             className="text-[#757575] hover:text-[#EEEEEE]"
-            style={{ background: 'transparent', border: 'none' }}
+            style={{ background: "transparent", border: "none" }}
           />
         </Flex>
-      )
+      ),
     },
     {
       title: <Text_12_400_757575>CREATED</Text_12_400_757575>,
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      render: (text: string) => <Text_13_400_EEEEEE>{text}</Text_13_400_EEEEEE>
+      dataIndex: "createdAt",
+      key: "createdAt",
+      render: (text: string) => <Text_13_400_EEEEEE>{text}</Text_13_400_EEEEEE>,
     },
     {
       title: <Text_12_400_757575>LAST USED</Text_12_400_757575>,
-      dataIndex: 'lastUsedAt',
-      key: 'lastUsedAt',
-      render: (text: string) => <Text_13_400_EEEEEE>{text}</Text_13_400_EEEEEE>
+      dataIndex: "lastUsedAt",
+      key: "lastUsedAt",
+      render: (text: string) => <Text_13_400_EEEEEE>{text}</Text_13_400_EEEEEE>,
     },
     {
       title: <Text_12_400_757575>USAGE</Text_12_400_757575>,
-      dataIndex: 'usage',
-      key: 'usage',
-      render: (text: number) => <Text_13_400_EEEEEE>{text.toLocaleString()} requests</Text_13_400_EEEEEE>
+      dataIndex: "usage",
+      key: "usage",
+      render: (text: number) => (
+        <Text_13_400_EEEEEE>
+          {text.toLocaleString()} requests
+        </Text_13_400_EEEEEE>
+      ),
     },
     {
       title: <Text_12_400_757575>STATUS</Text_12_400_757575>,
-      dataIndex: 'status',
-      key: 'status',
+      dataIndex: "status",
+      key: "status",
       render: (status: string) => (
         <Text_13_400_EEEEEE
           style={{
-            color: status === 'active' ? '#479D5F' : '#EC7575'
+            color: status === "active" ? "#479D5F" : "#EC7575",
           }}
         >
           {status.charAt(0).toUpperCase() + status.slice(1)}
         </Text_13_400_EEEEEE>
-      )
+      ),
     },
     {
-      title: '',
-      key: 'actions',
+      title: "",
+      key: "actions",
       width: 100,
-      render: (_: any, record: ApiKey) => (
-        record.status === 'active' ? (
+      render: (_: any, record: ApiKey) =>
+        record.status === "active" ? (
           <Button
             type="text"
             onClick={() => handleRevokeKey(record.id)}
             className="text-[#EC7575] hover:text-[#FF6B6B] hover:bg-[#EC757510]"
-            style={{ background: 'transparent', border: 'none' }}
+            style={{ background: "transparent", border: "none" }}
           >
             Revoke
           </Button>
         ) : (
           <Text_12_400_757575>Revoked</Text_12_400_757575>
-        )
-      )
-    }
+        ),
+    },
   ];
 
   return (
@@ -204,11 +211,17 @@ export default function ApiKeysPage() {
 
           {/* Security Notice */}
           <div className="bg-[#5C9CDE1A] border border-[#5C9CDE33] rounded-[8px] p-[1rem] mb-[2rem] flex gap-[1rem]">
-            <Icon icon="ph:info" className="text-[#5C9CDE] text-[1.25rem] flex-shrink-0" />
+            <Icon
+              icon="ph:info"
+              className="text-[#5C9CDE] text-[1.25rem] flex-shrink-0"
+            />
             <div>
-              <Text_14_500_EEEEEE className="mb-[0.25rem]">Keep your API keys secure</Text_14_500_EEEEEE>
+              <Text_14_500_EEEEEE className="mb-[0.25rem]">
+                Keep your API keys secure
+              </Text_14_500_EEEEEE>
               <Text_12_400_B3B3B3>
-                Do not share your secret API keys in publicly accessible areas such as GitHub, client-side code, etc.
+                Do not share your secret API keys in publicly accessible areas
+                such as GitHub, client-side code, etc.
               </Text_12_400_B3B3B3>
             </div>
           </div>
@@ -221,7 +234,7 @@ export default function ApiKeysPage() {
               rowKey="id"
               pagination={false}
               className={styles.apiKeysTable}
-              style={{ background: 'transparent' }}
+              style={{ background: "transparent" }}
             />
           </div>
           {/* Create Key Modal */}
@@ -233,10 +246,13 @@ export default function ApiKeysPage() {
               setNewKeyLabel("");
             }}
             footer={[
-              <Button key="cancel" onClick={() => {
-                setShowCreateModal(false);
-                setNewKeyLabel("");
-              }}>
+              <Button
+                key="cancel"
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setNewKeyLabel("");
+                }}
+              >
                 Cancel
               </Button>,
               <Button
@@ -247,7 +263,7 @@ export default function ApiKeysPage() {
                 className="bg-[#965CDE] border-[#965CDE]"
               >
                 Create Key
-              </Button>
+              </Button>,
             ]}
             className={styles.modal}
           >
@@ -280,20 +296,25 @@ export default function ApiKeysPage() {
                 }}
                 className="bg-[#965CDE] border-[#965CDE]"
               >
-                I've saved this key
-              </Button>
+                I&apos;ve saved this key
+              </Button>,
             ]}
             className={styles.modal}
           >
             <div className="bg-[#DE9C5C1A] border border-[#DE9C5C33] rounded-[8px] p-[1rem] mb-[1.5rem] flex gap-[0.75rem]">
-              <Icon icon="ph:warning" className="text-[#DE9C5C] text-[1.25rem]" />
+              <Icon
+                icon="ph:warning"
+                className="text-[#DE9C5C] text-[1.25rem]"
+              />
               <Text_13_400_EEEEEE>
-                Save this key now. You won't be able to see it again!
+                Save this key now. You won&apos;t be able to see it again!
               </Text_13_400_EEEEEE>
             </div>
 
             <div className="bg-[#1F1F1F] border border-[#2F2F2F] rounded-[8px] p-[1rem] flex items-center justify-between">
-              <code className="text-[#EEEEEE] text-[0.875rem] break-all">{newKey}</code>
+              <code className="text-[#EEEEEE] text-[0.875rem] break-all">
+                {newKey}
+              </code>
               <Button
                 type="text"
                 icon={<Icon icon="ph:copy" />}

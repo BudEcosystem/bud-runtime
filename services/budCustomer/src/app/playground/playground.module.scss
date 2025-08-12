@@ -1,16 +1,16 @@
 // Color variables
 $bg-main: #101010;
 $bg-card: #18191b;
-$border-color: #1F1F1F;
-$text-white: #EEEEEE;
-$text-gray: #B3B3B3;
+$border-color: #1f1f1f;
+$text-white: #eeeeee;
+$text-gray: #b3b3b3;
 $text-dark-gray: #757575;
-$primary-color: #965CDE;
+$primary-color: #965cde;
 
 .slider {
   width: 100%;
   height: 6px;
-  background: #2F2F2F;
+  background: #2f2f2f;
   border-radius: 3px;
   outline: none;
   -webkit-appearance: none;
@@ -51,19 +51,25 @@ $primary-color: #965CDE;
   &::-webkit-slider-runnable-track {
     width: 100%;
     height: 6px;
-    background: #2F2F2F;
+    background: #2f2f2f;
     border-radius: 3px;
   }
 
   &::-moz-range-track {
     width: 100%;
     height: 6px;
-    background: #2F2F2F;
+    background: #2f2f2f;
     border-radius: 3px;
   }
 
   // Progress fill
   &::-webkit-slider-runnable-track {
-    background: linear-gradient(to right, $primary-color 0%, $primary-color var(--value), #2F2F2F var(--value), #2F2F2F 100%);
+    background: linear-gradient(
+      to right,
+      $primary-color 0%,
+      $primary-color var(--value),
+      #2f2f2f var(--value),
+      #2f2f2f 100%
+    );
   }
 }

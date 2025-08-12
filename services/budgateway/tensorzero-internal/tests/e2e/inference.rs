@@ -1857,7 +1857,10 @@ model_name = "json"
 
     // First request to the flaky judge should succeed
     let good_response = gateway.inference(params.clone()).await.unwrap();
-    let InferenceOutput::NonStreaming { response: InferenceResponse::Chat(good_response), .. } = good_response
+    let InferenceOutput::NonStreaming {
+        response: InferenceResponse::Chat(good_response),
+        ..
+    } = good_response
     else {
         panic!("Expected non-streaming response, got {good_response:?}");
     };
@@ -1869,7 +1872,11 @@ model_name = "json"
 
     // Second request to the flaky judge should fail
     let bad_response = gateway.inference(params).await.unwrap();
-    let InferenceOutput::NonStreaming { response: InferenceResponse::Chat(bad_response), .. } = bad_response else {
+    let InferenceOutput::NonStreaming {
+        response: InferenceResponse::Chat(bad_response),
+        ..
+    } = bad_response
+    else {
         panic!("Expected non-streaming response, got {bad_response:?}");
     };
 
@@ -1924,7 +1931,10 @@ model = "dummy::flaky_model"
 
     // First request to the flaky judge should succeed
     let good_response = gateway.inference(params.clone()).await.unwrap();
-    let InferenceOutput::NonStreaming { response: InferenceResponse::Chat(good_response), .. } = good_response
+    let InferenceOutput::NonStreaming {
+        response: InferenceResponse::Chat(good_response),
+        ..
+    } = good_response
     else {
         panic!("Expected non-streaming response, got {good_response:?}");
     };
@@ -1938,7 +1948,11 @@ model = "dummy::flaky_model"
 
     // Second request to the flaky judge should fail
     let bad_response = gateway.inference(params).await.unwrap();
-    let InferenceOutput::NonStreaming { response: InferenceResponse::Chat(bad_response), .. } = bad_response else {
+    let InferenceOutput::NonStreaming {
+        response: InferenceResponse::Chat(bad_response),
+        ..
+    } = bad_response
+    else {
         panic!("Expected non-streaming response, got {bad_response:?}");
     };
 
@@ -2614,7 +2628,6 @@ async fn test_inference_invalid_params() {
     // Should succeed with 200 OK
     assert_eq!(response.status(), StatusCode::OK);
 }
-
 
 #[tokio::test]
 async fn test_dummy_only_inference_invalid_default_function_arg() {

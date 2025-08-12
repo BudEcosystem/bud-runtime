@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useTheme } from "@/context/themeContext";
 import styles from "./MainLayout.module.scss";
 
 interface MainLayoutProps {
@@ -11,22 +12,22 @@ interface MainLayoutProps {
 const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const pathname = usePathname();
   const router = useRouter();
+  const { effectiveTheme } = useTheme();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   const menuItems = [
-    { path: "/dashboard", label: "Dashboard", icon: "/icons/dashboard.png" },
     { path: "/models", label: "Model Brochure", icon: "/icons/modelBig.png" },
-    { path: "/logs", label: "Logs", icon: "/icons/process.png" },
+    { path: "/playground", label: "Playground", icon: "/icons/playIcn.png" },
     { path: "/batches", label: "Batches", icon: "/icons/double.png" },
-    { path: "/api-keys", label: "API Keys", icon: "/icons/key.png" },
+    { path: "/logs", label: "Logs", icon: "/icons/process.png" },
     { path: "/usage", label: "Usage", icon: "/icons/throughput.png" },
     { path: "/billing", label: "Billing", icon: "/icons/dollar.png" },
+    { path: "/api-keys", label: "API Keys", icon: "/icons/key.png" },
     { path: "/projects", label: "Projects", icon: "/icons/project.png" },
-    { path: "/playground", label: "Playground", icon: "/icons/playIcn.png" },
   ];
 
   const handleLogout = () => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       localStorage.removeItem("access_token");
     }
     router.push("/login");
@@ -35,9 +36,18 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   return (
     <div className={styles.container}>
       {/* Sidebar */}
-      <aside className={`${styles.sidebar} ${isSidebarCollapsed ? styles.collapsed : ""}`}>
+      <aside
+        className={`${styles.sidebar} ${isSidebarCollapsed ? styles.collapsed : ""}`}
+      >
         <div className={styles.logo}>
-          <img src="/images/BudLogo.png" alt="Bud Logo" />
+          <img
+            src={
+              effectiveTheme === "light"
+                ? "/BudLogo-white.png"
+                : "/images/BudLogo.png"
+            }
+            alt="Bud Logo"
+          />
         </div>
 
         <nav className={styles.navigation}>
@@ -84,9 +94,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           </div>
         </header>
 
-        <div className={styles.content}>
-          {children}
-        </div>
+        <div className={styles.content}>{children}</div>
       </main>
     </div>
   );

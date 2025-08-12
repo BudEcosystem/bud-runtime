@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState } from "react";
 
 export interface Cluster {
   id: string;
@@ -17,7 +17,7 @@ export const useCluster = () => {
       // TODO: Implement actual API call
       return null;
     } catch (error) {
-      console.error('Error fetching cluster:', error);
+      console.error("Error fetching cluster:", error);
       return null;
     } finally {
       setIsLoading(false);
@@ -30,7 +30,7 @@ export const useCluster = () => {
       // TODO: Implement actual API call
       setClusters([]);
     } catch (error) {
-      console.error('Error fetching clusters:', error);
+      console.error("Error fetching clusters:", error);
     } finally {
       setIsLoading(false);
     }

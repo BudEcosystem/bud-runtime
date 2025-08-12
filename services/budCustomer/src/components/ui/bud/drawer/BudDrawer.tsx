@@ -7,7 +7,14 @@ import BudStepAlert from "@/flows/components/BudStepAlert";
 import { BudForm } from "../dataEntry/BudForm";
 
 const BudDrawer: React.FC = () => {
-  const { step, expandedStep, isDrawerOpen, setCancelAlert, closeDrawer, isFailed } = useDrawer();
+  const {
+    step,
+    expandedStep,
+    isDrawerOpen,
+    setCancelAlert,
+    closeDrawer,
+    isFailed,
+  } = useDrawer();
   const { form, submittable, loading, setLoading, values } = useForm({
     initialData: {},
   });
@@ -22,11 +29,9 @@ const BudDrawer: React.FC = () => {
 
   if (screenWidth > 2560) {
     width = screenWidth * 0.35;
-  }
-  else if (screenWidth > 1920) {
+  } else if (screenWidth > 1920) {
     width = screenWidth * 0.4322;
-  }
-  else if (screenWidth > 1280) {
+  } else if (screenWidth > 1280) {
     width = screenWidth * 0.433;
   } else if (screenWidth > 1024) {
     width = 450;
@@ -41,9 +46,10 @@ const BudDrawer: React.FC = () => {
       className="drawerRoot bg-transparent flex  flex-col shadow-none w-full border relative visible-drawer pr-[.6rem]"
       closeIcon={null}
       classNames={{
-        wrapper: "bg-transparent my-[.75rem] mr-[0.6875rem]rounded-[17px] shadow-none",
+        wrapper:
+          "bg-transparent my-[.75rem] mr-[0.6875rem]rounded-[17px] shadow-none",
         mask: "bg-transparent bud-drawer-mask",
-        body: 'flex flex-row bg-transparent',
+        body: "flex flex-row bg-transparent",
       }}
       styles={{
         wrapper: {
@@ -60,31 +66,56 @@ const BudDrawer: React.FC = () => {
       }}
       closable={false}
     >
-      {step?.component && <div
-        className="drawerBackground"
-        style={{
-          width,
-          // paddingRight: ".7rem",
-          height: "100%",
-        }}
-      >
-        <BudFormContext.Provider
-          value={{
-            form,
-            submittable,
-            loading,
-            setLoading,
-            values,
-            isExpandedView: false,
-            isExpandedViewOpen: Boolean(expandedStep),
+      {step?.component && (
+        <div
+          className="drawerBackground"
+          style={{
+            width,
+            // paddingRight: ".7rem",
+            height: "100%",
           }}
         >
-          <step.component
-            {...step?.properties}
-          />
-        </BudFormContext.Provider>
-      </div>}
-      {expandedStep?.component && <>
+          <BudFormContext.Provider
+            value={{
+              form,
+              submittable,
+              loading,
+              setLoading,
+              values,
+              isExpandedView: false,
+              isExpandedViewOpen: Boolean(expandedStep),
+            }}
+          >
+            <step.component {...step?.properties} />
+          </BudFormContext.Provider>
+        </div>
+      )}
+      {expandedStep?.component && (
+        <>
+          <div
+            className="border-gradient border-gradient-purple drawerBackground"
+            style={{
+              width,
+              height: "100%",
+            }}
+          >
+            <BudFormContext.Provider
+              value={{
+                form,
+                submittable,
+                loading,
+                setLoading,
+                values,
+                isExpandedView: true,
+                isExpandedViewOpen: true,
+              }}
+            >
+              <expandedStep.component {...step?.properties} />
+            </BudFormContext.Provider>
+          </div>
+        </>
+      )}
+      {!step?.component && !expandedStep?.component && (
         <div
           className="border-gradient border-gradient-purple drawerBackground"
           style={{
@@ -103,41 +134,15 @@ const BudDrawer: React.FC = () => {
               isExpandedViewOpen: true,
             }}
           >
-            <expandedStep.component
-              {...step?.properties}
-            />
+            <BudForm data={{}}>
+              <BudStepAlert
+                description={`The step you are trying to access is not available. ${step?.id}`}
+                title="Error"
+              />
+            </BudForm>
           </BudFormContext.Provider>
         </div>
-      </>}
-      {!step?.component && !expandedStep?.component && <div
-        className="border-gradient border-gradient-purple drawerBackground"
-        style={{
-          width,
-          height: "100%",
-        }}
-      >
-        <BudFormContext.Provider
-          value={{
-            form,
-            submittable,
-            loading,
-            setLoading,
-            values,
-            isExpandedView: true,
-            isExpandedViewOpen: true,
-          }}
-        >
-          <BudForm
-            data={{}}
-          >
-            <BudStepAlert
-              description={`The step you are trying to access is not available. ${step?.id}`}
-              title="Error"
-            />
-          </BudForm>
-        </BudFormContext.Provider>
-      </div>
-      }
+      )}
     </Drawer>
   );
 };

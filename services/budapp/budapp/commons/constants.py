@@ -504,6 +504,8 @@ class PermissionEnum(Enum):
         """Return client-specific permission values in a list."""
         return [
             cls.CLIENT_ACCESS.value,
+            cls.PROJECT_VIEW.value,
+            cls.PROJECT_MANAGE.value,
         ]
 
 
