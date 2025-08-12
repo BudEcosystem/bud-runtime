@@ -71,7 +71,7 @@ mkShell {
             --namespace "pde-$dev_name" \
             --create-namespace \
             --values "$chart/secrets.yaml" \
-            --values "values.$dev_name.yaml" \
+            --values "$chart/values.$dev_name.yaml" \
             "$dev_name" "$chart"
     }
 
