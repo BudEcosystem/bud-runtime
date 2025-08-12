@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Tabs, Button, Table, Tag, Tooltip, Typography, message, Card, Row, Col, Statistic, Select, DatePicker, Space, Segmented, Image } from 'antd';
+import { Tabs, Button, Table, Tag, Tooltip, Typography, message, Card, Row, Col, Statistic, Select, DatePicker, Space, Segmented, Image, ConfigProvider } from 'antd';
 import { DownloadOutlined, ReloadOutlined, ArrowUpOutlined, ArrowDownOutlined, BarChartOutlined, LineChartOutlined, PieChartOutlined, GlobalOutlined, FilterOutlined, UserOutlined, AppstoreOutlined, RocketOutlined, CodeOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { format } from 'date-fns';
@@ -19,6 +19,7 @@ import DashBoardLayout from '../layout';
 import PageHeader from '@/components/ui/pageHeader';
 import { ClientTimestamp } from '@/components/ui/ClientTimestamp';
 import MetricsTab from './MetricsTab';
+import RulesTab from './RulesTab';
 import type { RangePickerProps } from 'antd/es/date-picker';
 import dayjs from 'dayjs';
 
@@ -29,9 +30,10 @@ const ObservabilityPage: React.FC = () => {
   const router = useRouter();
   const [searchValue, setSearchValue] = useState('');
   const [activeTab, setActiveTab] = useState('metrics');
+  // Initialize with consistent rounded times
   const [timeRange, setTimeRange] = useState<[dayjs.Dayjs, dayjs.Dayjs]>([
-    dayjs().subtract(7, 'days'),
-    dayjs()
+    dayjs().startOf('day').subtract(7, 'days'),
+    dayjs().startOf('hour')
   ]);
   const [viewBy, setViewBy] = useState<'model' | 'deployment' | 'project' | 'user'>('model');
   const [selectedPreset, setSelectedPreset] = useState<string>('Last 7 days');
@@ -47,12 +49,23 @@ const ObservabilityPage: React.FC = () => {
     filters,
   } = useInferences();
 
+  // Show global loader for both tabs
   useLoaderOnLoding(isLoading);
 
-  // Fetch all inferences on mount (without project filter)
+  // Sync filters with timeRange on mount and fetch inferences
   useEffect(() => {
-    fetchInferences(); // No project ID means fetch all
-  }, []);
+    // Create initial filters based on timeRange
+    const initialFilters = {
+      from_date: timeRange[0].toISOString(),
+      to_date: timeRange[1].toISOString(),
+      sort_by: 'timestamp' as const,
+      sort_order: 'desc' as const
+    };
+    // Set filters in store
+    setFilters(initialFilters);
+    // Fetch with the same filters to ensure consistency
+    fetchInferences(undefined, initialFilters);
+  }, []); // Run only on mount
 
   // Handle search with debounce
   useEffect(() => {
@@ -73,23 +86,65 @@ const ObservabilityPage: React.FC = () => {
     if (dates && dates[0] && dates[1]) {
       setTimeRange([dates[0], dates[1]]);
       setSelectedPreset(''); // Clear preset selection when using date picker
-      // Fetch new data based on time range
-      setFilters({
+      // Create the new filters
+      const newFilters = {
         from_date: dates[0].toISOString(),
         to_date: dates[1].toISOString(),
-      });
-      fetchInferences();
+        sort_by: 'timestamp' as const,
+        sort_order: 'desc' as const
+      };
+      // Update filters in store
+      setFilters(newFilters);
+      // Fetch with the same filters to ensure consistency
+      fetchInferences(undefined, newFilters);
     }
   };
 
   // Predefined time ranges - using function to return value for TypeScript compatibility
+  // Round times to consistent boundaries to prevent data shifting
   const timeRangePresets = [
-    { label: 'Last 1 hour', value: () => [dayjs().subtract(1, 'hours'), dayjs()] as [dayjs.Dayjs, dayjs.Dayjs] },
-    { label: 'Last 6 hours', value: () => [dayjs().subtract(6, 'hours'), dayjs()] as [dayjs.Dayjs, dayjs.Dayjs] },
-    { label: 'Last 24 hours', value: () => [dayjs().subtract(24, 'hours'), dayjs()] as [dayjs.Dayjs, dayjs.Dayjs] },
-    { label: 'Last 7 days', value: () => [dayjs().subtract(7, 'days'), dayjs()] as [dayjs.Dayjs, dayjs.Dayjs] },
-    { label: 'Last 30 days', value: () => [dayjs().subtract(30, 'days'), dayjs()] as [dayjs.Dayjs, dayjs.Dayjs] },
-    { label: 'Last 3 months', value: () => [dayjs().subtract(3, 'months'), dayjs()] as [dayjs.Dayjs, dayjs.Dayjs] },
+    {
+      label: 'Last 1 hour',
+      value: () => {
+        const now = dayjs(); // Use exact current time
+        return [now.subtract(1, 'hours'), now] as [dayjs.Dayjs, dayjs.Dayjs];
+      }
+    },
+    {
+      label: 'Last 6 hours',
+      value: () => {
+        const now = dayjs(); // Use exact current time
+        return [now.subtract(6, 'hours'), now] as [dayjs.Dayjs, dayjs.Dayjs];
+      }
+    },
+    {
+      label: 'Last 24 hours',
+      value: () => {
+        const now = dayjs(); // Use exact current time
+        return [now.subtract(24, 'hours'), now] as [dayjs.Dayjs, dayjs.Dayjs];
+      }
+    },
+    {
+      label: 'Last 7 days',
+      value: () => {
+        const now = dayjs().startOf('day'); // Round to start of current day
+        return [now.subtract(7, 'days'), now] as [dayjs.Dayjs, dayjs.Dayjs];
+      }
+    },
+    {
+      label: 'Last 30 days',
+      value: () => {
+        const now = dayjs().startOf('day'); // Round to start of current day
+        return [now.subtract(30, 'days'), now] as [dayjs.Dayjs, dayjs.Dayjs];
+      }
+    },
+    {
+      label: 'Last 3 months',
+      value: () => {
+        const now = dayjs().startOf('day'); // Round to start of current day
+        return [now.subtract(3, 'months'), now] as [dayjs.Dayjs, dayjs.Dayjs];
+      }
+    },
   ];
 
   // View by options with appropriate icons
@@ -322,15 +377,42 @@ const ObservabilityPage: React.FC = () => {
                 <div className="flex flex-col gap-2 flex-1">
                   <Text_12_400_808080>Time Range</Text_12_400_808080>
                   <div className="flex items-center gap-3">
-                    <RangePicker
-                      value={timeRange}
-                      onChange={handleTimeRangeChange}
-                      presets={timeRangePresets}
-                      showTime
-                      format="YYYY-MM-DD HH:mm"
-                      className="bg-[#1a1a1a] border-gray-700 flex-1 h-7"
-                      placeholder={['Start Date', 'End Date']}
-                    />
+                    <ConfigProvider
+                      theme={{
+                        token: {
+                          colorPrimary: '#965CDE',
+                          colorPrimaryHover: '#a873e5',
+                          colorPrimaryActive: '#8348c7',
+                        },
+                        components: {
+                          DatePicker: {
+                            colorBgContainer: '#1A1A1A',
+                            colorBorder: '#1F1F1F',
+                            colorText: '#EEEEEE',
+                            colorTextPlaceholder: '#666666',
+                            colorBgElevated: '#1A1A1A',
+                            colorPrimary: '#965CDE',
+                            colorPrimaryBg: '#2A1F3D',
+                            colorPrimaryBgHover: '#3A2F4D',
+                            colorTextLightSolid: '#FFFFFF',
+                            controlItemBgActive: '#965CDE',
+                            colorLink: '#965CDE',
+                            colorLinkHover: '#a873e5',
+                            colorLinkActive: '#8348c7',
+                          },
+                        },
+                      }}
+                    >
+                      <RangePicker
+                        value={timeRange}
+                        onChange={handleTimeRangeChange}
+                        presets={timeRangePresets}
+                        showTime
+                        format="YYYY-MM-DD HH:mm"
+                        className="bg-[#1A1A1A] border-[#1F1F1F] hover:border-[#3F3F3F] flex-1 h-7"
+                        placeholder={['Start Date', 'End Date']}
+                      />
+                    </ConfigProvider>
                     <div className="flex gap-2">
                       {timeRangePresets.slice(0, 3).map((preset) => {
                         const isSelected = selectedPreset === preset.label;
@@ -345,15 +427,25 @@ const ObservabilityPage: React.FC = () => {
                               color: isSelected ? '#FFFFFF' : '#9CA3AF'
                             }}
                             onClick={() => {
+                              // Skip if already selected and using the same preset
+                              if (selectedPreset === preset.label) {
+                                return;
+                              }
+
                               const timeValue = preset.value();
                               setTimeRange(timeValue);
                               setSelectedPreset(preset.label);
-                              // Update filters with the new time range
-                              setFilters({
+                              // Create the new filters
+                              const newFilters = {
                                 from_date: timeValue[0].toISOString(),
                                 to_date: timeValue[1].toISOString(),
-                              });
-                              fetchInferences();
+                                sort_by: 'timestamp' as const,
+                                sort_order: 'desc' as const
+                              };
+                              // Update filters in store
+                              setFilters(newFilters);
+                              // Fetch with the same filters to ensure consistency
+                              fetchInferences(undefined, newFilters);
                             }}
                             className="text-xs hover:text-white hover:border-gray-500"
                           >
@@ -378,6 +470,7 @@ const ObservabilityPage: React.FC = () => {
                       isLoading={isLoading}
                       viewBy={viewBy}
                       isActive={activeTab === 'metrics'}
+                      filters={filters}
                     />
                   </>
                 )
@@ -460,6 +553,27 @@ const ObservabilityPage: React.FC = () => {
                   }}
                 />
               </div>
+                )
+              },
+              {
+                label: (
+                  <div className="flex items-center gap-[0.375rem] px-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width=".875rem" height=".875rem" viewBox="0 0 14 14" fill="none">
+                      <path d="M7 1.75C7 1.33579 6.66421 1 6.25 1C5.83579 1 5.5 1.33579 5.5 1.75V2.5H3.75C3.33579 2.5 3 2.83579 3 3.25V4H11V3.25C11 2.83579 10.6642 2.5 10.25 2.5H8.5V1.75C8.5 1.33579 8.16421 1 7.75 1C7.33579 1 7 1.33579 7 1.75ZM3 5.5V11.75C3 12.1642 3.33579 12.5 3.75 12.5H10.25C10.6642 12.5 11 12.1642 11 11.75V5.5H3ZM5.5 7C5.5 6.72386 5.72386 6.5 6 6.5C6.27614 6.5 6.5 6.72386 6.5 7V10C6.5 10.2761 6.27614 10.5 6 10.5C5.72386 10.5 5.5 10.2761 5.5 10V7ZM7.5 7C7.5 6.72386 7.72386 6.5 8 6.5C8.27614 6.5 8.5 6.72386 8.5 7V10C8.5 10.2761 8.27614 10.5 8 10.5C7.72386 10.5 7.5 10.2761 7.5 10V7Z" fill={activeTab === "rules" ? "#EEEEEE" : "#B3B3B3"}/>
+                    </svg>
+                    {activeTab === "rules" ? (
+                      <Text_14_600_EEEEEE>Rules</Text_14_600_EEEEEE>
+                    ) : (
+                      <Text_14_600_B3B3B3>Rules</Text_14_600_B3B3B3>
+                    )}
+                  </div>
+                ),
+                key: 'rules',
+                children: (
+                  <RulesTab
+                    timeRange={timeRange}
+                    isActive={activeTab === 'rules'}
+                  />
                 )
               }
             ]}

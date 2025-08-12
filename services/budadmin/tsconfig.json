@@ -32,6 +32,9 @@
       ],
       "@/stores/*": [
         "src/stores/*"
+      ],
+      "@/hooks/*": [
+        "src/hooks/*"
       ]
     }
   },

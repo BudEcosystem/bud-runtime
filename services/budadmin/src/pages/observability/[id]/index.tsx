@@ -208,13 +208,7 @@ const ObservabilityDetailPage: React.FC = () => {
   };
 
   if (loading) {
-    return (
-      <DashBoardLayout>
-        <div className="flex justify-center items-center h-96">
-          <Spin size="large" />
-        </div>
-      </DashBoardLayout>
-    );
+    return <DashBoardLayout />;
   }
 
   if (error || !inferenceData) {
@@ -391,12 +385,6 @@ const ObservabilityDetailPage: React.FC = () => {
                       <Tag color={inferenceData.gateway_metadata.status_code >= 200 && inferenceData.gateway_metadata.status_code < 300 ? 'success' : 'error'}>
                         {inferenceData.gateway_metadata.status_code}
                       </Tag>
-                    </div>
-                  )}
-                  {inferenceData.gateway_metadata.gateway_processing_ms !== undefined && (
-                    <div>
-                      <Text_12_400_B3B3B3 className="mb-1">Gateway Processing</Text_12_400_B3B3B3>
-                      <Text_12_600_EEEEEE>{inferenceData.gateway_metadata.gateway_processing_ms} ms</Text_12_600_EEEEEE>
                     </div>
                   )}
 

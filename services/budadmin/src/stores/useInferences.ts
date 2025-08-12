@@ -168,6 +168,10 @@ export interface InferenceDetail {
   cost?: number;
   endpoint_type?: string;
 
+  // Raw data
+  raw_request?: string;
+  raw_response?: string;
+
   // Gateway data (optional)
   gateway_request?: any;
   gateway_response?: any;
@@ -226,7 +230,7 @@ interface InferenceStore {
   resetFilters: () => void;
 
   // API calls
-  fetchInferences: (projectId?: string) => Promise<void>;
+  fetchInferences: (projectId?: string, overrideFilters?: Partial<InferenceFilters>) => Promise<void>;
   fetchInferenceDetail: (inferenceId: string) => Promise<void>;
   fetchInferenceFeedback: (inferenceId: string) => Promise<void>;
   exportInferences: (format: 'csv' | 'json') => Promise<void>;
@@ -284,28 +288,26 @@ export const useInferences = create<InferenceStore>((set, get) => ({
   },
 
   // Fetch inferences list
-  fetchInferences: async (projectId?: string) => {
+  fetchInferences: async (projectId?: string, overrideFilters?: Partial<InferenceFilters>) => {
     const { filters, pagination } = get();
     set({ isLoading: true, error: null });
 
     try {
+      // Use override filters if provided, otherwise use store filters
+      const finalFilters = overrideFilters ? { ...filters, ...overrideFilters } : filters;
+
       const requestBody = {
-        ...filters,
-        project_id: projectId || filters.project_id,
+        ...finalFilters,
+        project_id: projectId || finalFilters.project_id,
         offset: pagination.offset,
         limit: pagination.limit,
       };
 
       const response = await AppRequest.Post('/metrics/inferences/list', requestBody);
 
-      console.log('Inference API Response:', response.data); // Debug log
-
       // Check if response is successful (could be 200 or undefined)
       if (response.data && response.data.items) {
         const data = response.data;
-
-        console.log('Parsed items:', data.items); // Debug log
-        console.log('Setting state with items count:', data.items.length); // Debug log
 
         set({
           inferences: data.items,

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Row, Col, Spin, Empty, Progress, List, Typography, Tooltip } from 'antd';
+import { Row, Col, Empty, Progress, List, Typography, Tooltip } from 'antd';
 import {
   ArrowUpOutlined,
   ArrowDownOutlined,
@@ -27,12 +27,19 @@ import {
   Text_13_400_757575
 } from '@/components/ui/text';
 import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
+
+// Extend dayjs with UTC and timezone support
+dayjs.extend(utc);
+dayjs.extend(timezone);
 import BarChart from '@/components/charts/barChart';
 import LineChartCustom from '@/components/charts/lineChart/LineChartCustom';
 import MultiSeriesLineChart from '@/components/charts/MultiSeriesLineChart';
 import GroupedBarChart from '@/components/charts/GroupedBarChart';
 import GeoMapChart from '@/components/charts/GeoMapChart';
 import { Flex } from '@radix-ui/themes';
+import { useAggregatedMetrics } from '@/hooks/useAggregatedMetrics';
 
 const { Text } = Typography;
 
@@ -92,6 +99,7 @@ interface MetricsTabProps {
   isLoading: boolean;
   viewBy: 'model' | 'deployment' | 'project' | 'user';
   isActive?: boolean;
+  filters?: Record<string, any>;
 }
 
 interface MetricStats {
@@ -126,21 +134,67 @@ interface MetricStats {
   groupedLatencyOverTime: { [key: string]: { time: string; avg: number; p95: number; p99: number }[] };
   groupedTokensOverTime: { [key: string]: { time: string; input: number; output: number }[] };
   groupedRequestsPerSecond: { [key: string]: { time: string; rps: number }[] };
+  groupedTTFTOverTime: { [key: string]: { time: string; value: number }[] };
 }
 
 
-const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoading, viewBy, isActive }) => {
+const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoading, viewBy, isActive, filters }) => {
+  const { fetchMetricsTabData, isLoading: metricsLoading, error: metricsError } = useAggregatedMetrics();
+  const [serverMetrics, setServerMetrics] = useState<any>(null);
+  const [geographicData, setGeographicData] = useState<any>(null);
 
   // Trigger ECharts resize when tab becomes active
   useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+
     if (isActive) {
       // Small delay to ensure the tab content is fully visible
-      setTimeout(() => {
+      timeoutId = setTimeout(() => {
         // Trigger resize event to force all ECharts instances to recalculate
         window.dispatchEvent(new Event('resize'));
       }, 100);
     }
+
+    // Cleanup timeout on unmount or when isActive changes
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
   }, [isActive]);
+
+  // Fetch server-side aggregated metrics with cleanup
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchMetrics = async () => {
+      if (timeRange && viewBy) {
+        try {
+          // Only pass non-date filters to avoid conflicts
+          const { from_date, to_date, sort_by, sort_order, ...relevantFilters } = filters || {};
+          const data = await fetchMetricsTabData(timeRange, viewBy, relevantFilters);
+          // Only update state if component is still mounted
+          if (isMounted && data) {
+            setServerMetrics(data);
+            setGeographicData(data.geographicData || null);
+          }
+        } catch (error) {
+          // Only log error if component is still mounted
+          if (isMounted) {
+            console.error('Error fetching metrics:', error);
+            // Don't clear data on error to prevent UI flashing
+          }
+        }
+      }
+    };
+
+    fetchMetrics();
+
+    // Cleanup function to prevent state updates on unmounted component
+    return () => {
+      isMounted = false;
+    };
+  }, [timeRange, viewBy, filters]);
 
   // Color palette for consistent colors across charts
   const colorPalette = [
@@ -163,8 +217,578 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
     };
   }, []);
 
-  // Calculate metrics from inferences data
+  // Function to process server metrics into the format expected by charts
+  const processServerMetrics = (data: any, viewBy: string, inferenceData?: InferenceListItem[]): MetricStats => {
+    const {
+      summaryMetrics,
+      requestsTimeSeries,
+      latencyTimeSeries,
+      tokensTimeSeries,
+      throughputTimeSeries,
+      ttftTimeSeries,
+      topEntities,
+      latencyDistribution,
+      geographicData
+    } = data;
+
+    // Extract summary values
+    const totalRequests = summaryMetrics?.summary?.total_requests?.value || 0;
+    const successRate = summaryMetrics?.summary?.success_rate?.value || 0;
+    const failureRate = 100 - successRate;
+    const avgLatency = summaryMetrics?.summary?.avg_latency?.value || 0;
+    const p95Latency = summaryMetrics?.summary?.p95_latency?.value || 0;
+    const p99Latency = summaryMetrics?.summary?.p99_latency?.value || 0;
+    const totalCost = summaryMetrics?.summary?.total_cost?.value || 0;
+    const totalTokens = summaryMetrics?.summary?.total_tokens?.value || 0;
+    const avgTTFT = summaryMetrics?.summary?.ttft_avg?.value || 0;
+    const p95TTFT = summaryMetrics?.summary?.ttft_p95?.value || 0;
+    const throughputAvg = summaryMetrics?.summary?.throughput_avg?.value || 0;
+
+    // Calculate requests per hour from time range
+    const hoursInRange = timeRange[1].diff(timeRange[0], 'hours') || 1;
+    const requestsPerHour = totalRequests / hoursInRange;
+
+    // Process time series data for charts
+    const processTimeSeries = (tsData: any, metricName: string) => {
+      // Check if we have grouped data
+      if (tsData?.groups && tsData.groups.length > 0) {
+        // Aggregate all groups' data points
+        const allPoints: any[] = [];
+        const pointsMap = new Map<string, { sum: number; count: number }>();
+
+        // Determine the format based on interval
+        const interval = tsData.interval || '1h';
+        let timeFormat: string;
+        if (interval === '1w') {
+          timeFormat = 'MMM DD';  // Week: "Jan 15"
+        } else if (interval === '1d') {
+          timeFormat = 'MM/DD';   // Day: "01/15"
+        } else if (interval === '6h' || interval === '12h') {
+          timeFormat = 'MM/DD HH:mm';  // 6h/12h: "01/15 18:00"
+        } else if (interval === '1h' || interval === '30m' || interval === '15m' || interval === '5m' || interval === '1m') {
+          timeFormat = 'HH:mm';   // Hour or less: "18:30"
+        } else {
+          timeFormat = 'HH:mm';   // Default format
+        }
+
+        tsData.groups.forEach((group: any) => {
+          group.data_points?.forEach((point: any) => {
+            // Parse as UTC and convert to local time for display
+            const time = dayjs.utc(point.timestamp).local().format(timeFormat);
+            const value = point.values?.[metricName];
+
+            // Only process non-null values
+            if (value !== null && value !== undefined) {
+              if (pointsMap.has(time)) {
+                const existing = pointsMap.get(time)!;
+                pointsMap.set(time, {
+                  sum: existing.sum + value,
+                  count: existing.count + 1
+                });
+              } else {
+                pointsMap.set(time, { sum: value, count: 1 });
+              }
+            }
+          });
+        });
+
+        // Convert map to array, calculating averages
+        return Array.from(pointsMap.entries()).map(([time, data]) => ({
+          time,
+          value: data.count > 0 ? data.sum / data.count : 0
+        })).sort((a, b) => a.time.localeCompare(b.time));
+      }
+
+      // Fallback to old structure if it exists
+      if (tsData?.series && tsData.series.length > 0) {
+        // Determine the format based on interval
+        const interval = tsData.interval || '1h';
+        let timeFormat: string;
+        if (interval === '1w') {
+          timeFormat = 'MMM DD';
+        } else if (interval === '1d') {
+          timeFormat = 'MM/DD';
+        } else if (interval === '6h' || interval === '12h') {
+          timeFormat = 'MM/DD HH:mm';
+        } else {
+          timeFormat = 'HH:mm';
+        }
+
+        return tsData.series.map((point: any) => ({
+          time: dayjs.utc(point.timestamp).local().format(timeFormat),
+          value: point.values?.[metricName] || 0
+        }));
+      }
+
+      return [];
+    };
+
+    // Helper function to generate all time points in a range
+    const generateTimePoints = (startTime: dayjs.Dayjs, endTime: dayjs.Dayjs, interval: string) => {
+      const timePoints: string[] = [];
+
+      // Determine the format based on interval
+      let timeFormat: string;
+      let unitToAdd: any;
+      let amountToAdd: number;
+      let startUnit: any;
+
+      if (interval === '1w') {
+        timeFormat = 'MMM DD';
+        unitToAdd = 'week';
+        amountToAdd = 1;
+        startUnit = 'week';
+      } else if (interval === '1d') {
+        timeFormat = 'MM/DD';
+        unitToAdd = 'day';
+        amountToAdd = 1;
+        startUnit = 'day';
+      } else if (interval === '6h') {
+        timeFormat = 'MM/DD HH:mm';
+        unitToAdd = 'hour';
+        amountToAdd = 6;
+        startUnit = 'hour';
+      } else if (interval === '12h') {
+        timeFormat = 'MM/DD HH:mm';
+        unitToAdd = 'hour';
+        amountToAdd = 12;
+        startUnit = 'hour';
+      } else {
+        timeFormat = 'HH:mm';
+        unitToAdd = 'hour';
+        amountToAdd = 1;
+        startUnit = 'hour';
+      }
+
+      let current = startTime.startOf(startUnit);
+
+      while (current.isBefore(endTime) || current.isSame(endTime)) {
+        timePoints.push(current.format(timeFormat));
+        current = current.add(amountToAdd, unitToAdd);
+      }
+
+      return timePoints;
+    };
+
+    // Process grouped time series for multi-series charts
+    const processGroupedTimeSeries = (tsData: any, metricName: string) => {
+      const grouped: { [key: string]: any[] } = {};
+
+      // Check if we have groups in the new structure
+      if (tsData?.groups && tsData.groups.length > 0) {
+        // Determine the format based on interval
+        const interval = tsData.interval || '1h';
+        let timeFormat: string;
+        if (interval === '1w') {
+          timeFormat = 'MMM DD';  // Week: "Jan 15"
+        } else if (interval === '1d') {
+          timeFormat = 'MM/DD';   // Day: "01/15"
+        } else if (interval === '6h' || interval === '12h') {
+          timeFormat = 'MM/DD HH:mm';  // 6h/12h: "01/15 18:00"
+        } else if (interval === '1h' || interval === '30m' || interval === '15m' || interval === '5m' || interval === '1m') {
+          timeFormat = 'HH:mm';   // Hour or less: "18:30"
+        } else {
+          timeFormat = 'HH:mm';   // Default format
+        }
+
+        // Collect all actual time points from the data
+        // This ensures we use the exact times that exist in the data
+        const uniqueTimes = new Set<string>();
+        tsData.groups.forEach((group: any) => {
+          group.data_points?.forEach((point: any) => {
+            uniqueTimes.add(dayjs.utc(point.timestamp).local().format(timeFormat));
+          });
+        });
+        const allTimePoints = Array.from(uniqueTimes).sort();
+
+        tsData.groups.forEach((group: any) => {
+          // Create a key for the group based on available identifiers
+          const groupKey = group.model_name || group.project_name || group.endpoint_name || 'Unknown';
+
+          // Create a map of existing data points
+          const dataMap = new Map<string, number>();
+          group.data_points?.forEach((point: any) => {
+            const time = dayjs.utc(point.timestamp).local().format(timeFormat);
+            const value = point.values?.[metricName];
+            // Only set if value is not null
+            if (value !== null && value !== undefined) {
+              dataMap.set(time, value);
+            }
+          });
+
+          // Fill in all time points with data or 0
+          grouped[groupKey] = allTimePoints.map(time => ({
+            time,
+            value: dataMap.get(time) || 0
+          }));
+        });
+
+        return grouped;
+      }
+
+      // Fallback to old structure if it exists
+      if (tsData?.grouped_series) {
+        // Determine the format based on interval
+        const interval = tsData.interval || '1h';
+        let timeFormat: string;
+        if (interval === '1w') {
+          timeFormat = 'MMM DD';
+        } else if (interval === '1d') {
+          timeFormat = 'MM/DD';
+        } else if (interval === '6h' || interval === '12h') {
+          timeFormat = 'MM/DD HH:mm';
+        } else {
+          timeFormat = 'HH:mm';
+        }
+
+        Object.entries(tsData.grouped_series).forEach(([groupKey, series]: [string, any]) => {
+          grouped[groupKey] = series.map((point: any) => ({
+            time: dayjs(point.timestamp).format(timeFormat),
+            value: point.values[metricName] || 0
+          }));
+        });
+      }
+
+      return grouped;
+    };
+
+    // Process top entities
+    const processTopEntities = (entitiesData: any) => {
+      if (!entitiesData?.groups || entitiesData.groups.length === 0) return [];
+
+      return entitiesData.groups
+        .map((group: any) => {
+          // Get the name based on what's available in the group
+          const name = group.model_name || group.project_name || group.endpoint_name || 'Unknown';
+          const count = group.metrics?.total_requests?.value || 0;
+
+          return {
+            name,
+            count,
+            percentage: totalRequests > 0 ? (count / totalRequests * 100) : 0
+          };
+        })
+        .sort((a: any, b: any) => b.count - a.count)
+        .slice(0, 5);
+    };
+
+    // Build top lists based on viewBy
+    let topModels: any[] = [];
+    let topProjects: any[] = [];
+    let topEndpoints: any[] = [];
+
+    const topList = processTopEntities(topEntities);
+
+    if (viewBy === 'model') {
+      topModels = topList.map(item => ({ model: item.name, ...item }));
+    } else if (viewBy === 'project') {
+      topProjects = topList.map(item => ({ project: item.name, ...item }));
+    } else if (viewBy === 'deployment') {
+      topEndpoints = topList.map(item => ({ endpoint: item.name, ...item }));
+    }
+
+    // Process hourly distribution - always show 24-hour view for Request Volume Over Time
+    // This chart should always show hourly distribution regardless of the time range
+    let hourlyDistribution: { hour: string; count: number }[] = [];
+
+    if (requestsTimeSeries?.groups && requestsTimeSeries.groups.length > 0) {
+      // Aggregate by hour of day (0-23) across all days in the range
+      const hourlyMap = new Map<number, number>();
+
+      requestsTimeSeries.groups.forEach((group: any) => {
+        group.data_points?.forEach((point: any) => {
+          const hour = dayjs.utc(point.timestamp).local().hour();
+          const count = point.values?.requests || 0;
+          hourlyMap.set(hour, (hourlyMap.get(hour) || 0) + count);
+        });
+      });
+
+      // Create array for all 24 hours
+      hourlyDistribution = Array.from({ length: 24 }, (_, hour) => ({
+        hour: `${hour.toString().padStart(2, '0')}:00`,
+        count: hourlyMap.get(hour) || 0
+      }));
+    } else if (requestsTimeSeries?.series) {
+      // Fallback to old structure
+      const hourlyMap = new Map<number, number>();
+
+      requestsTimeSeries.series.forEach((point: any) => {
+        const hour = dayjs(point.timestamp).hour();
+        const count = point.values?.requests || 0;
+        hourlyMap.set(hour, (hourlyMap.get(hour) || 0) + count);
+      });
+
+      hourlyDistribution = Array.from({ length: 24 }, (_, hour) => ({
+        hour: `${hour.toString().padStart(2, '0')}:00`,
+        count: hourlyMap.get(hour) || 0
+      }));
+    }
+
+    // Ensure we always have 24 hours
+    const allHours = hourlyDistribution.length > 0 ? hourlyDistribution :
+      Array.from({ length: 24 }, (_, i) => ({
+        hour: `${i.toString().padStart(2, '0')}:00`,
+        count: 0
+      }));
+
+    // Process latency distribution from new API response
+    let simpleLatencyDistribution;
+    if (latencyDistribution?.overall_distribution && latencyDistribution.overall_distribution.length > 0) {
+      // Use data from the new latency distribution endpoint
+      simpleLatencyDistribution = latencyDistribution.overall_distribution.map((bucket: any) => ({
+        range: bucket.range,
+        count: bucket.count
+      }));
+    } else if (inferenceData && inferenceData.length > 0) {
+      // Fallback to client-side calculation if API data not available
+      const latencyRanges = [
+        { min: 0, max: 100, label: '0-100ms' },
+        { min: 100, max: 500, label: '100-500ms' },
+        { min: 500, max: 1000, label: '500ms-1s' },
+        { min: 1000, max: 2000, label: '1-2s' },
+        { min: 2000, max: 5000, label: '2-5s' },
+        { min: 5000, max: 10000, label: '5-10s' },
+        { min: 10000, max: Infinity, label: '>10s' },
+      ];
+
+      const latencies = inferenceData
+        .map(i => i.response_time_ms)
+        .filter(l => l != null);
+
+      simpleLatencyDistribution = latencyRanges.map(range => ({
+        range: range.label,
+        count: latencies.filter(l => l >= range.min && l < range.max).length
+      }));
+    } else {
+      // Default empty distribution with new bucket structure
+      simpleLatencyDistribution = [
+        { range: '0-100ms', count: 0 },
+        { range: '100-500ms', count: 0 },
+        { range: '500ms-1s', count: 0 },
+        { range: '1-2s', count: 0 },
+        { range: '2-5s', count: 0 },
+        { range: '5-10s', count: 0 },
+        { range: '>10s', count: 0 },
+      ];
+    }
+
+    // Process grouped hourly data - always aggregate by hour of day for Request Volume Over Time
+    const groupedHourlyData: { [key: string]: any[] } = {};
+
+    if (requestsTimeSeries?.groups && requestsTimeSeries.groups.length > 0) {
+      requestsTimeSeries.groups.forEach((group: any) => {
+        const groupKey = group.model_name || group.project_name || group.endpoint_name || 'Unknown';
+        const hourlyMap = new Map<number, number>();
+
+        group.data_points?.forEach((point: any) => {
+          const hour = dayjs.utc(point.timestamp).local().hour();
+          const count = point.values?.requests || 0;
+          hourlyMap.set(hour, (hourlyMap.get(hour) || 0) + count);
+        });
+
+        // Create array for all 24 hours for this group
+        groupedHourlyData[groupKey] = Array.from({ length: 24 }, (_, hour) => ({
+          hour: `${hour.toString().padStart(2, '0')}:00`,
+          count: hourlyMap.get(hour) || 0
+        }));
+      });
+    }
+
+    // Process grouped latency distribution from new API response
+    const groupedLatencyData: { [key: string]: { range: string; count: number }[] } = {};
+
+    if (latencyDistribution?.groups && latencyDistribution.groups.length > 0) {
+      // Use data from the new latency distribution endpoint
+      latencyDistribution.groups.forEach((group: any) => {
+        // Determine group key based on available identifiers
+        let groupKey = 'Unknown';
+        if (group.model_name) {
+          groupKey = group.model_name;
+        } else if (group.project_name) {
+          groupKey = group.project_name;
+        } else if (group.endpoint_name) {
+          groupKey = group.endpoint_name;
+        } else if (group.user_id) {
+          groupKey = group.user_id;
+        }
+
+        groupedLatencyData[groupKey] = group.buckets.map((bucket: any) => ({
+          range: bucket.range,
+          count: bucket.count
+        }));
+      });
+    } else if (inferenceData && inferenceData.length > 0 && viewBy) {
+      // Fallback to client-side calculation if API data not available
+      const latencyRanges = [
+        { min: 0, max: 100, label: '0-100ms' },
+        { min: 100, max: 500, label: '100-500ms' },
+        { min: 500, max: 1000, label: '500ms-1s' },
+        { min: 1000, max: 2000, label: '1-2s' },
+        { min: 2000, max: 5000, label: '2-5s' },
+        { min: 5000, max: 10000, label: '5-10s' },
+        { min: 10000, max: Infinity, label: '>10s' },
+      ];
+
+      // Group inferences by the selected viewBy dimension
+      const groupedInferences: { [key: string]: InferenceListItem[] } = {};
+
+      inferenceData.forEach(inference => {
+        let groupKey = 'Unknown';
+        switch (viewBy) {
+          case 'model':
+            groupKey = inference.model_display_name || inference.model_name || 'Unknown';
+            break;
+          case 'deployment':
+            groupKey = inference.endpoint_name || 'Unknown';
+            break;
+          case 'project':
+            groupKey = inference.project_name || 'Unknown';
+            break;
+          case 'user':
+            groupKey = inference.project_name || 'Unknown'; // Using project as proxy for user
+            break;
+        }
+
+        if (!groupedInferences[groupKey]) {
+          groupedInferences[groupKey] = [];
+        }
+        groupedInferences[groupKey].push(inference);
+      });
+
+      // Calculate distribution for each group
+      Object.entries(groupedInferences).forEach(([groupKey, inferences]) => {
+        const latencies = inferences
+          .map(i => i.response_time_ms)
+          .filter(l => l != null);
+
+        groupedLatencyData[groupKey] = latencyRanges.map(range => ({
+          range: range.label,
+          count: latencies.filter(l => l >= range.min && l < range.max).length
+        }));
+      });
+    }
+
+    // Process time series for new charts
+    // For latency, we need to handle the multi-metric response
+    let latencyOverTime: any[] = [];
+    if (latencyTimeSeries?.groups && latencyTimeSeries.groups.length > 0) {
+      // Aggregate latency data across all groups
+      const timeMap = new Map<string, { avg: number[], p95: number[], p99: number[] }>();
+
+      // Determine the format based on interval
+      const interval = latencyTimeSeries.interval || '1h';
+      let timeFormat: string;
+      if (interval === '1w') {
+        timeFormat = 'MMM DD';
+      } else if (interval === '1d') {
+        timeFormat = 'MM/DD';
+      } else if (interval === '6h' || interval === '12h') {
+        timeFormat = 'MM/DD HH:mm';
+      } else {
+        timeFormat = 'HH:mm';
+      }
+
+      latencyTimeSeries.groups.forEach((group: any) => {
+        group.data_points?.forEach((point: any) => {
+          const time = dayjs.utc(point.timestamp).local().format(timeFormat);
+          if (!timeMap.has(time)) {
+            timeMap.set(time, { avg: [], p95: [], p99: [] });
+          }
+          const data = timeMap.get(time)!;
+          if (point.values?.avg_latency != null) data.avg.push(point.values.avg_latency);
+          if (point.values?.p95_latency != null) data.p95.push(point.values.p95_latency);
+          if (point.values?.p99_latency != null) data.p99.push(point.values.p99_latency);
+        });
+      });
+
+      latencyOverTime = Array.from(timeMap.entries()).map(([time, data]) => ({
+        time,
+        avg: data.avg.length > 0 ? data.avg.reduce((a, b) => a + b, 0) / data.avg.length : 0,
+        p95: data.p95.length > 0 ? Math.max(...data.p95) : 0,
+        p99: data.p99.length > 0 ? Math.max(...data.p99) : 0
+      })).sort((a, b) => a.time.localeCompare(b.time));
+    }
+
+    // Process tokens data - might be empty if metric not available
+    const tokensOverTime = processTimeSeries(tokensTimeSeries, 'tokens')
+      .map(item => ({
+        time: item.time,
+        input: item.value / 2, // Approximate split
+        output: item.value / 2
+      }));
+
+    // Process requests per second - might be empty if metric not available
+    const requestsPerSecond = processTimeSeries(throughputTimeSeries, 'throughput')
+      .map(item => ({
+        time: item.time,
+        rps: item.value || 0
+      }));
+
+    // Process TTFT data - might be empty if metric not available
+    const ttftOverTime = processTimeSeries(ttftTimeSeries, 'ttft_avg')
+      .map((item, idx) => ({
+        time: item.time,
+        avg: item.value || 0,
+        p95: ttftTimeSeries?.series?.[idx]?.values?.ttft_p95 || 0
+      }));
+
+    // Process grouped time series
+    const groupedLatencyOverTime = processGroupedTimeSeries(latencyTimeSeries, 'avg_latency');
+    const groupedTokensOverTime = processGroupedTimeSeries(tokensTimeSeries, 'tokens');
+    const groupedRequestsPerSecondRaw = processGroupedTimeSeries(throughputTimeSeries, 'throughput');
+    const groupedTTFTOverTime = processGroupedTimeSeries(ttftTimeSeries, 'ttft_avg');
+
+    // Transform grouped RPS data to have 'rps' property instead of 'value'
+    const groupedRequestsPerSecond: { [key: string]: any[] } = {};
+    Object.entries(groupedRequestsPerSecondRaw).forEach(([key, data]) => {
+      groupedRequestsPerSecond[key] = data.map((item: any) => ({
+        time: item.time,
+        rps: item.value || 0
+      }));
+    });
+
+    return {
+      totalRequests,
+      successRate,
+      failureRate,
+      avgLatency,
+      p95Latency,
+      p99Latency,
+      totalCost,
+      totalTokens,
+      totalInputTokens: totalTokens / 2, // Approximate
+      totalOutputTokens: totalTokens / 2,
+      requestsPerHour,
+      avgTTFT,
+      p95TTFT,
+      topModels,
+      topProjects,
+      topEndpoints,
+      hourlyDistribution: allHours,
+      latencyDistribution: simpleLatencyDistribution,
+      errorTypes: [],
+      groupedHourlyData,
+      groupedLatencyData,
+      latencyOverTime,
+      tokensOverTime,
+      requestsPerSecond,
+      ttftOverTime,
+      groupedLatencyOverTime,
+      groupedTokensOverTime,
+      groupedRequestsPerSecond,
+      groupedTTFTOverTime,
+    };
+  };
+
+  // Calculate metrics from server data or fallback to client-side calculation
   const metrics = useMemo<MetricStats>(() => {
+    // If we have server-side metrics, use those
+    if (serverMetrics) {
+      const processed = processServerMetrics(serverMetrics, viewBy);
+      return processed;
+    }
+
+    // Fallback to client-side calculation from inferences
     if (!inferences || inferences.length === 0) {
       return {
         totalRequests: 0,
@@ -195,6 +819,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
         groupedLatencyOverTime: {},
         groupedTokensOverTime: {},
         groupedRequestsPerSecond: {},
+        groupedTTFTOverTime: {},
       };
     }
 
@@ -313,7 +938,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
           percentage: (count / totalRequests) * 100
         }))
         .sort((a, b) => b.count - a.count)
-        .slice(0, 3);
+        .slice(0, 5);
     }
 
     if (topProjects.length === 0 && viewBy !== 'project' && viewBy !== 'user') {
@@ -329,7 +954,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
           percentage: (count / totalRequests) * 100
         }))
         .sort((a, b) => b.count - a.count)
-        .slice(0, 3);
+        .slice(0, 5);
     }
 
     if (topEndpoints.length === 0 && viewBy !== 'deployment') {
@@ -345,7 +970,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
           percentage: (count / totalRequests) * 100
         }))
         .sort((a, b) => b.count - a.count)
-        .slice(0, 3);
+        .slice(0, 5);
     }
 
     // Hourly distribution
@@ -601,12 +1226,13 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
       groupedLatencyOverTime,
       groupedTokensOverTime,
       groupedRequestsPerSecond,
+      groupedTTFTOverTime: {},
     };
-  }, [inferences, timeRange, viewBy]);
+  }, [serverMetrics, inferences, timeRange, viewBy]);
 
 
-  // Remove the loader here since parent component already handles it with useLoaderOnLoding
-  if (!isLoading && (!inferences || inferences.length === 0)) {
+  // Show empty state if no data
+  if (!serverMetrics && (!inferences || inferences.length === 0)) {
     return (
       <div className="flex justify-center items-center h-96">
         <Empty description="No data available for the selected time range" />
@@ -614,8 +1240,11 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
     );
   }
 
+  // Create a stable key based on time range to help React track component updates
+  const metricsKey = `${timeRange[0].unix()}-${timeRange[1].unix()}-${viewBy}`;
+
   return (
-    <div className="metrics-container">
+    <div className="metrics-container" key={metricsKey}>
       {/* Key Metrics Cards */}
       <Row gutter={[16, 16]} className="mb-6">
         <Col xs={24} sm={12} md={6}>
@@ -644,7 +1273,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
             icon={<ClockCircleOutlined style={{ color: '#3F8EF7', fontSize: '1.25rem' }} />}
             title="Avg Latency"
             value={`${metrics.avgLatency.toFixed(0)}ms`}
-            subtitle={`P95: ${metrics.p95Latency}ms | P99: ${metrics.p99Latency}ms`}
+            subtitle={`P95: ${Math.round(metrics.p95Latency)}ms | P99: ${Math.round(metrics.p99Latency)}ms`}
           />
         </Col>
 
@@ -667,6 +1296,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
           >
             {Object.keys(metrics.groupedHourlyData).length > 0 ? (
               <MultiSeriesLineChart
+                key={`hourly-multi-${metricsKey}`}
                 data={{
                   categories: Array.from({ length: 24 }, (_, i) =>
                     `${i.toString().padStart(2, '0')}:00`
@@ -682,11 +1312,12 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
               />
             ) : (
               <LineChartCustom
+                key={`hourly-single-${metricsKey}`}
                 data={{
                   categories: metrics.hourlyDistribution.map(d => d.hour),
                   data: metrics.hourlyDistribution.map(d => d.count),
                   label1: 'Requests',
-                  label2: 'Time',
+                  label2: 'Hour of Day',
                   color: '#3F8EF7',
                   smooth: true
                 }}
@@ -703,7 +1334,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
             {Object.keys(metrics.groupedLatencyData).length > 0 ? (
               <GroupedBarChart
                 data={{
-                  categories: ['0-100ms', '100-500ms', '500ms-1s', '1-5s', '>5s'],
+                  categories: ['0-100ms', '100-500ms', '500ms-1s', '1-2s', '2-5s', '5-10s', '>10s'],
                   series: Object.entries(metrics.groupedLatencyData)
                     .slice(0, 10) // Limit to top 10 series for readability
                     .map(([name, data]) => ({
@@ -729,9 +1360,17 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
       {/* Geographic Distribution Row */}
       <Row gutter={[16, 16]} className="mb-6">
         <Col xs={24}>
-          <ChartCard title="Geographic Distribution" subtitle="Request origins by country">
-            <GeoMapChart />
-          </ChartCard>
+          <div className="bg-[#101010] p-[2.55rem] py-[2rem] rounded-[6.403px] border-[1.067px] border-[#1F1F1F] w-full">
+            <div className="flex items-center w-full flex-col mb-4">
+              <Text_19_600_EEEEEE className="w-full">
+                Geographic Distribution
+              </Text_19_600_EEEEEE>
+              <Text_13_400_757575 className='w-full mt-2'>
+                Request origins by country
+              </Text_13_400_757575>
+            </div>
+            <GeoMapChart key={`geo-${metricsKey}`} data={geographicData} />
+          </div>
         </Col>
       </Row>
 
@@ -744,19 +1383,27 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
           >
             {Object.keys(metrics.groupedLatencyOverTime).length > 0 ? (
               <MultiSeriesLineChart
+                key={`latency-grouped-${metricsKey}`}
                 data={{
-                  categories: metrics.latencyOverTime.map(d => d.time),
+                  categories: [...new Set(Object.values(metrics.groupedLatencyOverTime).flat().map((d: any) => d.time))].sort(),
                   series: Object.entries(metrics.groupedLatencyOverTime)
                     .slice(0, 10) // Limit to top 10 for readability
-                    .map(([name, data]) => ({
-                      name,
-                      data: data.map(d => d.avg),
-                      color: getEntityColor(name)
-                    }))
+                    .map(([name, data]) => {
+                      // Create a map for quick lookup
+                      const dataMap = new Map(data.map((d: any) => [d.time, d.value || 0]));
+                      // Ensure all categories have a value (0 if missing)
+                      const categories = [...new Set(Object.values(metrics.groupedLatencyOverTime).flat().map((d: any) => d.time))].sort();
+                      return {
+                        name,
+                        data: categories.map(cat => dataMap.get(cat) || 0),
+                        color: getEntityColor(name)
+                      };
+                    })
                 }}
               />
             ) : (
               <MultiSeriesLineChart
+                key={`latency-single-${metricsKey}`}
                 data={{
                   categories: metrics.latencyOverTime.map(d => d.time),
                   series: [
@@ -790,14 +1437,20 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
             {Object.keys(metrics.groupedTokensOverTime).length > 0 ? (
               <MultiSeriesLineChart
                 data={{
-                  categories: metrics.tokensOverTime.map(d => d.time),
+                  categories: [...new Set(Object.values(metrics.groupedTokensOverTime).flat().map((d: any) => d.time))].sort(),
                   series: Object.entries(metrics.groupedTokensOverTime)
                     .slice(0, 10) // Limit to top 10 for readability
-                    .map(([name, data]) => ({
-                      name,
-                      data: data.map(d => d.input + d.output),
-                      color: getEntityColor(name)
-                    }))
+                    .map(([name, data]) => {
+                      // Create a map for quick lookup
+                      const dataMap = new Map(data.map((d: any) => [d.time, d.value || 0]));
+                      // Ensure all categories have a value (0 if missing)
+                      const categories = [...new Set(Object.values(metrics.groupedTokensOverTime).flat().map((d: any) => d.time))].sort();
+                      return {
+                        name,
+                        data: categories.map(cat => dataMap.get(cat) || 0),
+                        color: getEntityColor(name)
+                      };
+                    })
                 }}
               />
             ) : (
@@ -833,21 +1486,27 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
             {Object.keys(metrics.groupedRequestsPerSecond).length > 0 ? (
               <MultiSeriesLineChart
                 data={{
-                  categories: metrics.requestsPerSecond.map(d => d.time),
+                  categories: [...new Set(Object.values(metrics.groupedRequestsPerSecond).flat().map((d: any) => d.time))].sort(),
                   series: Object.entries(metrics.groupedRequestsPerSecond)
                     .slice(0, 10) // Limit to top 10 for readability
-                    .map(([name, data]) => ({
-                      name,
-                      data: data.map(d => parseFloat(d.rps.toFixed(3))),
-                      color: getEntityColor(name)
-                    }))
+                    .map(([name, data]) => {
+                      // Create a map for quick lookup
+                      const dataMap = new Map(data.map((d: any) => [d.time, d.rps || 0]));
+                      // Ensure all categories have a value (0 if missing)
+                      const categories = [...new Set(Object.values(metrics.groupedRequestsPerSecond).flat().map((d: any) => d.time))].sort();
+                      return {
+                        name,
+                        data: categories.map(cat => dataMap.get(cat) != null ? parseFloat(dataMap.get(cat).toFixed(3)) : 0),
+                        color: getEntityColor(name)
+                      };
+                    })
                 }}
               />
             ) : (
               <LineChartCustom
                 data={{
                   categories: metrics.requestsPerSecond.map(d => d.time),
-                  data: metrics.requestsPerSecond.map(d => parseFloat(d.rps.toFixed(2))),
+                  data: metrics.requestsPerSecond.map(d => d.rps != null ? parseFloat(d.rps.toFixed(2)) : 0),
                   label1: 'RPS',
                   label2: 'Time',
                   color: '#4ECDC4',
@@ -859,29 +1518,68 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
         </Col>
 
         <Col xs={24} md={12}>
-          <ChartCard title="Time to First Token (TTFT)" subtitle="Stream response metrics">
-            <div className="flex flex-col items-center justify-center h-full gap-2">
-              <ThunderboltOutlined style={{ fontSize: '32px', color: '#757575' }} />
-              <Text_12_400_B3B3B3 className="text-center">
-                TTFT metrics are available for streaming responses only
-              </Text_12_400_B3B3B3>
-              <Text_12_400_B3B3B3 className="text-center text-xs opacity-60">
-                This data will appear when streaming endpoints are used
-              </Text_12_400_B3B3B3>
-            </div>
+          <ChartCard title="Time to First Token (TTFT)" subtitle={`Stream response metrics by ${viewBy}`}>
+            {Object.keys(metrics.groupedTTFTOverTime).length > 0 ? (
+              <MultiSeriesLineChart
+                data={{
+                  categories: [...new Set(Object.values(metrics.groupedTTFTOverTime).flat().map((d: any) => d.time))].sort(),
+                  series: Object.entries(metrics.groupedTTFTOverTime)
+                    .slice(0, 10) // Limit to top 10 for readability
+                    .map(([name, data]) => {
+                      // Create a map for quick lookup
+                      const dataMap = new Map(data.map((d: any) => [d.time, d.value || 0]));
+                      // Ensure all categories have a value (0 if missing)
+                      const categories = [...new Set(Object.values(metrics.groupedTTFTOverTime).flat().map((d: any) => d.time))].sort();
+                      return {
+                        name,
+                        data: categories.map(cat => dataMap.get(cat) != null ? parseFloat(dataMap.get(cat).toFixed(2)) : 0),
+                        color: getEntityColor(name)
+                      };
+                    })
+                }}
+              />
+            ) : metrics.ttftOverTime && metrics.ttftOverTime.length > 0 ? (
+              <MultiSeriesLineChart
+                data={{
+                  categories: metrics.ttftOverTime.map(d => d.time),
+                  series: [
+                    {
+                      name: 'Average TTFT',
+                      data: metrics.ttftOverTime.map(d => d.avg || 0),
+                      color: '#52C41A'
+                    },
+                    {
+                      name: 'P95 TTFT',
+                      data: metrics.ttftOverTime.map(d => d.p95 || 0),
+                      color: '#FFC442'
+                    }
+                  ]
+                }}
+              />
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full gap-2">
+                <ThunderboltOutlined style={{ fontSize: '32px', color: '#757575' }} />
+                <Text_12_400_B3B3B3 className="text-center">
+                  No TTFT data available
+                </Text_12_400_B3B3B3>
+                <Text_12_400_B3B3B3 className="text-center text-xs opacity-60">
+                  TTFT metrics will appear when streaming endpoints are used
+                </Text_12_400_B3B3B3>
+              </div>
+            )}
           </ChartCard>
         </Col>
       </Row>
 
       {/* Top Statistics Row - Dynamic based on viewBy */}
-      <Row gutter={[16, 16]}>
+      <Row gutter={[16, 16]} className="mb-6">
         {viewBy === 'model' && (
-          <Col xs={24} md={8}>
-            <div className="bg-[#101010] p-[1.55rem] py-[2rem] rounded-[6.403px] border-[1.067px] border-[#1F1F1F] h-[20rem]">
+          <Col xs={24} md={12}>
+            <div className="bg-[#101010] p-[1.55rem] py-[2rem] rounded-[6.403px] border-[1.067px] border-[#1F1F1F] h-[22rem]">
               <Text_19_600_EEEEEE className="mb-4">Top Models</Text_19_600_EEEEEE>
               <List
                 dataSource={metrics.topModels}
-                renderItem={item => (
+                renderItem={(item, index) => (
                   <List.Item className="border-[#212225] py-2">
                     <div className="w-full">
                       <div className="flex justify-between mb-1">
@@ -891,7 +1589,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
                       <Progress
                         percent={item.percentage}
                         showInfo={false}
-                        strokeColor="#3F8EF7"
+                        strokeColor={getEntityColor(item.model)}
                         trailColor="#212225"
                         size="small"
                       />
@@ -904,12 +1602,12 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
         )}
 
         {viewBy === 'deployment' && (
-          <Col xs={24} md={8}>
-            <div className="bg-[#101010] p-[1.55rem] py-[2rem] rounded-[6.403px] border-[1.067px] border-[#1F1F1F] h-[20rem]">
+          <Col xs={24} md={12}>
+            <div className="bg-[#101010] p-[1.55rem] py-[2rem] rounded-[6.403px] border-[1.067px] border-[#1F1F1F] h-[22rem]">
               <Text_19_600_EEEEEE className="mb-4">Top Deployments</Text_19_600_EEEEEE>
               <List
                 dataSource={metrics.topEndpoints}
-                renderItem={item => (
+                renderItem={(item, index) => (
                   <List.Item className="border-[#212225] py-2">
                     <div className="w-full">
                       <div className="flex justify-between mb-1">
@@ -919,7 +1617,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
                       <Progress
                         percent={item.percentage}
                         showInfo={false}
-                        strokeColor="#965CDE"
+                        strokeColor={getEntityColor(item.endpoint)}
                         trailColor="#212225"
                         size="small"
                       />
@@ -932,14 +1630,14 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
         )}
 
         {(viewBy === 'project' || viewBy === 'user') && (
-          <Col xs={24} md={8}>
-            <div className="bg-[#101010] p-[1.55rem] py-[2rem] rounded-[6.403px] border-[1.067px] border-[#1F1F1F] h-[20rem]">
+          <Col xs={24} md={12}>
+            <div className="bg-[#101010] p-[1.55rem] py-[2rem] rounded-[6.403px] border-[1.067px] border-[#1F1F1F] h-[22rem]">
               <Text_19_600_EEEEEE className="mb-4">
                 {viewBy === 'user' ? 'Top Users' : 'Top Projects'}
               </Text_19_600_EEEEEE>
               <List
                 dataSource={metrics.topProjects}
-                renderItem={item => (
+                renderItem={(item, index) => (
                   <List.Item className="border-[#212225] py-2">
                     <div className="w-full">
                       <div className="flex justify-between mb-1">
@@ -949,7 +1647,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
                       <Progress
                         percent={item.percentage}
                         showInfo={false}
-                        strokeColor="#FFC442"
+                        strokeColor={getEntityColor(item.project)}
                         trailColor="#212225"
                         size="small"
                       />
@@ -963,12 +1661,12 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
 
         {/* Secondary stats - show complementary data */}
         {viewBy !== 'model' && metrics.topModels.length > 0 && (
-          <Col xs={24} md={8}>
-            <div className="bg-[#101010] p-[1.55rem] py-[2rem] rounded-[6.403px] border-[1.067px] border-[#1F1F1F] h-[20rem]">
+          <Col xs={24} md={12}>
+            <div className="bg-[#101010] p-[1.55rem] py-[2rem] rounded-[6.403px] border-[1.067px] border-[#1F1F1F] h-[22rem]">
               <Text_19_600_EEEEEE className="mb-4">Models Used</Text_19_600_EEEEEE>
               <List
                 dataSource={metrics.topModels}
-                renderItem={item => (
+                renderItem={(item, index) => (
                   <List.Item className="border-[#212225] py-2">
                     <div className="w-full">
                       <div className="flex justify-between mb-1">
@@ -978,7 +1676,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
                       <Progress
                         percent={item.percentage}
                         showInfo={false}
-                        strokeColor="#3F8EF7"
+                        strokeColor={getEntityColor(item.model)}
                         trailColor="#212225"
                         size="small"
                       />
@@ -991,12 +1689,12 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
         )}
 
         {viewBy !== 'deployment' && metrics.topEndpoints.length > 0 && (
-          <Col xs={24} md={8}>
-            <div className="bg-[#101010] p-[1.55rem] py-[2rem] rounded-[6.403px] border-[1.067px] border-[#1F1F1F] h-[20rem]">
+          <Col xs={24} md={12}>
+            <div className="bg-[#101010] p-[1.55rem] py-[2rem] rounded-[6.403px] border-[1.067px] border-[#1F1F1F] h-[22rem]">
               <Text_19_600_EEEEEE className="mb-4">Active Deployments</Text_19_600_EEEEEE>
               <List
                 dataSource={metrics.topEndpoints}
-                renderItem={item => (
+                renderItem={(item, index) => (
                   <List.Item className="border-[#212225] py-2">
                     <div className="w-full">
                       <div className="flex justify-between mb-1">
@@ -1006,7 +1704,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
                       <Progress
                         percent={item.percentage}
                         showInfo={false}
-                        strokeColor="#965CDE"
+                        strokeColor={getEntityColor(item.endpoint)}
                         trailColor="#212225"
                         size="small"
                       />
@@ -1018,8 +1716,8 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
           </Col>
         )}
 
-        <Col xs={24} md={8}>
-          <ChartCard title="Success/Failure Ratio" height="20rem">
+        <Col xs={24} md={12}>
+          <ChartCard title="Success/Failure Ratio" height="22rem">
             <div className="flex justify-around items-center h-full">
               <div className="text-center">
                 <CheckCircleOutlined style={{ color: '#22c55e', fontSize: '48px' }} />

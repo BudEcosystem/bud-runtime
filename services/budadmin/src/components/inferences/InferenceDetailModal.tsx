@@ -225,7 +225,7 @@ const InferenceDetailModal: React.FC<InferenceDetailModalProps> = ({
         )}
 
         {selectedInference.gateway_response && (
-          <div>
+          <div style={{ marginBottom: 24 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
               <Title level={5}>Gateway Response</Title>
               <Space>
@@ -255,6 +255,42 @@ const InferenceDetailModal: React.FC<InferenceDetailModalProps> = ({
                 customStyle={{ borderRadius: 8 }}
               >
                 {JSON.stringify(selectedInference.gateway_response, null, 2)}
+              </SyntaxHighlighter>
+            </div>
+          </div>
+        )}
+
+        {selectedInference.raw_response && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <Title level={5}>Raw Response (Streaming Data)</Title>
+              <Space>
+                <Button
+                  size="small"
+                  icon={<CopyOutlined />}
+                  onClick={() => copyToClipboard(selectedInference.raw_response, 'Raw response')}
+                >
+                  Copy
+                </Button>
+                <Button
+                  size="small"
+                  icon={<DownloadOutlined />}
+                  onClick={() => downloadAsFile(
+                    selectedInference.raw_response,
+                    `raw_response_${selectedInference.inference_id}.txt`
+                  )}
+                >
+                  Download
+                </Button>
+              </Space>
+            </div>
+            <div style={{ maxHeight: '40vh', overflowY: 'auto' }}>
+              <SyntaxHighlighter
+                language="text"
+                style={monokai}
+                customStyle={{ borderRadius: 8, fontSize: 12 }}
+              >
+                {selectedInference.raw_response}
               </SyntaxHighlighter>
             </div>
           </div>
@@ -352,10 +388,6 @@ const InferenceDetailModal: React.FC<InferenceDetailModalProps> = ({
   };
 
   const renderFeedback = () => {
-    if (isLoadingFeedback) {
-      return <Spin />;
-    }
-
     if (!inferenceFeedback || inferenceFeedback.length === 0) {
       return <Empty description="No feedback available for this inference" />;
     }
@@ -456,7 +488,7 @@ const InferenceDetailModal: React.FC<InferenceDetailModalProps> = ({
       footer={null}
       bodyStyle={{ padding: 0 }}
     >
-      {isLoadingDetail ? (
+      {isLoadingDetail || (activeTab === 'feedback' && isLoadingFeedback) ? (
         <div style={{ textAlign: 'center', padding: 50 }}>
           <Spin size="large" />
         </div>
