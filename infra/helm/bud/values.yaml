@@ -170,7 +170,7 @@ microservices:
             MINIO_ENDPOINT: '{{ .Release.Name }}-minio:{{ .Values.minio.service.ports.api }}'
             MINIO_MODEL_BUCKET: model-info
             MINIO_SECRET_KEY: '{{ .Values.minio.auth.rootPassword }}'
-            MINIO_SECURE: "true"
+            MINIO_SECURE: "false"
             MODEL_DOWNLOAD_DIR: /data/models-registry
             MODEL_DOWNLOAD_DIR_MAX_SIZE: "500"
             MODEL_REGISTRY_DIR: /data/models-registry
