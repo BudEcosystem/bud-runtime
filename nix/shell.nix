@@ -69,8 +69,8 @@ mkShell {
         fi
         dev_name="$1"
 
-        chart="$(git rev-parse --show-toplevel)/infra/helm/bud" || exit 1
-        sops -d "$chart/values.enc.yaml" > "$chart/secrets.yaml" || exit 1
+        chart="$(git rev-parse --show-toplevel)/infra/helm/bud" || return 1
+        sops -d "$chart/values.enc.yaml" > "$chart/secrets.yaml" || return 1
         helm upgrade \
             --install \
             --namespace "pde-$dev_name" \
