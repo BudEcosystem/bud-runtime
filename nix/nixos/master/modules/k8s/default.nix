@@ -13,6 +13,7 @@
     tokenFile = config.sops.secrets."misc/k3s_token".path;
     clusterInit = true;
 
+    extraKubeletConfig.maxPods = 512;
     extraFlags = [
       "--write-kubeconfig-group users"
       "--write-kubeconfig-mode 0640"
