@@ -81,7 +81,7 @@ microservices:
             LITELLM_PROXY_SERVER_IMAGE: ghcr.io/berriai/litellm:main-latest
             RSA_KEY_NAME: rsa-private-key.pem
             MINIO_BUCKET: models-registry
-            MINIO_ENDPOINT: '{{ .Release.Name }}-minio'
+            MINIO_ENDPOINT: '{{ .Release.Name }}-minio:{{ .Values.minio.service.ports.api }}'
             MINIO_SECURE: "false"
             VOLUME_TYPE: nfs
             QUANTIZATION_JOB_IMAGE: budimages.azurecr.io/budecosystem/bud-quantization-cpu:0.02
@@ -167,7 +167,7 @@ microservices:
             LOG_LEVEL: DEBUG
             MINIO_ACCESS_KEY: '{{ .Values.minio.auth.rootUser }}'
             MINIO_BUCKET: models-registry
-            MINIO_ENDPOINT: '{{ .Release.Name }}-minio'
+            MINIO_ENDPOINT: '{{ .Release.Name }}-minio:{{ .Values.minio.service.ports.api }}'
             MINIO_MODEL_BUCKET: model-info
             MINIO_SECRET_KEY: '{{ .Values.minio.auth.rootPassword }}'
             MINIO_SECURE: "true"
