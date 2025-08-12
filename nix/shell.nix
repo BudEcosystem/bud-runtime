@@ -57,6 +57,24 @@ mkShell {
   ];
 
   shellHook = ''
+    pde() {
+        if [ "$#" -lt 1 ]; then
+            echo "Usage: pde <dev_name>"
+            return 1
+        fi
+        dev_name="$1"
+
+        chart="$(git rev-parse --show-toplevel)/infra/helm/bud" || exit 1
+        sops -d "$chart/values.enc.yaml" > "$chart/secrets.yaml" || exit 1
+        helm upgrade \
+            --install \
+            --namespace "pde-$dev_name" \
+            --create-namespace \
+            --values "$chart/secrets.yaml" \
+            --values "values.$dev_name.yaml" \
+            "$dev_name" "$chart"
+    }
+
     export_sops_secret_silent() {
         k1="$1"
         k2="$2"
