@@ -103,7 +103,7 @@ mkShell {
         if [ ! -f "$key_path" ]; then
                 age-keygen -o "$key_path" || return 1
         else
-            printf "Public key: %s\n" "$(grep -Eom1 "age1.*$" "$key_path")"
+                printf "Public key: %s\n" "$(grep -Eom1 "age1.*$" "$key_path")"
         fi
     }
 
