@@ -3,6 +3,8 @@ kind: ConfigMap
 metadata:
   name: {{ .Release.Name}}-bud-global
 data:
+  BUD_SERVE_URL: {{ include "bud.ingress.url.budapp" $ }}
+  CORS_ORIGINS: http://localhost:3000,{{ include "bud.ingress.url.budadmin" $ }},{{ include "bud.ingress.url.budplayground" $ }},{{ include "bud.ingress.url.budcustomer" $ }}
 {{ $root := . }}
 {{- range $key, $value := .Values.microservices.global.env }}
   {{ $key }}: {{ tpl $value $root | quote }}

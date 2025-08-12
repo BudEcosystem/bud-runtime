@@ -26,6 +26,8 @@ spec:
         ports:
         - containerPort: 3003
         env:
+          - name: BUD_SERVE_URL
+            value: {{ include "bud.ingress.url.budapp" $ }}
         {{ $root := . }}
         {{- range $key, $value := .Values.microservices.budcluster.env }}
           - name: {{ $key }}

@@ -1,15 +1,8 @@
 ingress:
     hosts:
-        keycloak: cloak.stage.bud.studio
-        budadmin: admin.stage.bud.studio
-        budcustomer: customer.stage.bud.studio
-        budplayground: playground.stage.bud.studio
-        budapp: app.stage.bud.studio
-        budgateway: gateway.stage.bud.studio
-        budask: ask.stage.bud.studio
-        novuapi: api.novu.stage.bud.studio
-        novuws: ws.novu.stage.bud.studio
+        root: stage.bud.studio
 
+# when we make a first release the tags should be changed to :staging
 microservices:
     budproxy:
         image: budstudio/budproxy:nightly
