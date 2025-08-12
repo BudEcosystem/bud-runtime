@@ -1,17 +1,34 @@
 ingress:
     enabled: true
+    # used to derive public urls for frontend services
+    httpsEnabled: true
     hosts:
-        keycloak: cloak.dev.bud.studio
-        budadmin: admin.dev.bud.studio
-        budcustomer: customer.dev.bud.studio
-        budplayground: playground.dev.bud.studio
-        budapp: app.dev.bud.studio
-        budgateway: gateway.dev.bud.studio
-        budask: ask.dev.bud.studio
-        novuapi: api.novu.dev.bud.studio
-        novuws: ws.novu.dev.bud.studio
+        root: "dev.bud.studio"
+        # rest is derived from root by ./templates/_helpers.tpl
+        budadmin: ""
+        budcustomer: ""
+        budplayground: ""
+        budapp: ""
+        budgateway: ""
+        budask: ""
+        novuapi: ""
+        novuws: ""
 
 microservices:
+    budadmin:
+        image: budstudio/budadmin:nightly
+        env:
+            NEXT_PUBLIC_ASK_BUD_MODEL: qwen3-32b
+    budcustomer:
+        enabled: true
+        image: budstudio/budcustomer:nightly
+        env: {}
+    budplayground:
+        image: budstudio/budplayground:nightly
+        env:
+            # deadlink (502 Bad Gateway)
+            NEXT_PUBLIC_BASE_URL: https://api-dev.bud.studio/
+            NODE_TLS_REJECT_UNAUTHORIZED: "0"
     budproxy:
         image: budstudio/budproxy:nightly
     askbud:
@@ -41,7 +58,6 @@ microservices:
     budcluster:
         image: budstudio/budcluster:nightly
         env:
-            BUD_SERVE_URL: 'https://{{ .Values.ingress.hosts.budapp }}'
             APP_CONFIG: '{}'
             NOTIFY_SERVICE_NAME: '{{ .Release.Name }}-budnotify'
             NOTIFY_SERVICE_TOPIC: notificationMessages
@@ -88,15 +104,6 @@ microservices:
             PSQL_PORT: "5432"
             PSQL_DB_NAME: budmodel
             LOG_LEVEL: DEBUG
-    budplayground:
-        image: budstudio/budplayground:nightly
-        env:
-            NEXT_PUBLIC_TEMP_API_BASE_URL: 'https://{{ .Values.ingress.hosts.budapp }}'
-            NEXT_PUBLIC_COPY_CODE_API_BASE_URL: 'https://{{ .Values.ingress.hosts.budgateway }}'
-            # deadlink (502 Bad Gateway)
-            NEXT_PUBLIC_BASE_URL: https://api-dev.bud.studio/
-            NEXT_PUBLIC_VERCEL_ENV: preview
-            NODE_TLS_REJECT_UNAUTHORIZED: "0"
     budsim:
         image: budstudio/budsim:nightly
         env:
@@ -105,35 +112,11 @@ microservices:
             SECRETS_PSQL_PASSWORD: budsim
             PSQL_DB_NAME: budsim
             DAPR_HOST_IP: 127.0.0.1
-    budadmin:
-        image: budstudio/budadmin:nightly
-        env:
-            BASE_URL: 'https://{{ .Values.ingress.hosts.budapp }}'
-            NEXT_PUBLIC_BASE_URL: 'https://{{ .Values.ingress.hosts.budapp }}'
-            NEXT_PUBLIC_TEMP_API_BASE_URL: 'https://{{ .Values.ingress.hosts.budapp }}'
-            NEXT_PUBLIC_NOVU_SOCKET_URL: 'https://{{ .Values.ingress.hosts.novuws }}'
-            NEXT_PUBLIC_NOVU_BASE_URL: 'https://{{ .Values.ingress.hosts.novuapi }}'
-            NEXT_PUBLIC_COPY_CODE_API_BASE_URL: 'https://{{ .Values.ingress.hosts.budgateway }}'
-            NEXT_PUBLIC_PLAYGROUND_URL: 'https://{{ .Values.ingress.hosts.budplayground }}'
-            NEXT_PUBLIC_ASK_BUD_URL: 'https://{{ .Values.ingress.hosts.askbud }}/v1'
-            NEXT_PUBLIC_ASK_BUD_MODEL: qwen3-32b
-            NEXT_PUBLIC_VERCEL_ENV: preview
-    budcustomer:
-        enabled: true
-        image: budstudio/budcustomer:nightly
-        env:
-            NEXT_PUBLIC_NOVU_SOCKET_URL: “https://{{ .Values.ingress.hosts.novuws }}”
-            NEXT_PUBLIC_NOVU_BASE_URL: “https://{{ .Values.ingress.hosts.novuapi }}”
-            NEXT_PUBLIC_BASE_URL: “https://{{ .Values.ingress.hosts.budapp }}”
-            NEXT_PUBLIC_TEMP_API_BASE_URL: “https://{{ .Values.ingress.hosts.budapp }}”
-            NEXT_PUBLIC_COPY_CODE_API_BASE_URL: “https://{{ .Values.ingress.hosts.budgateway }}”
     budnotify:
         image: budstudio/budnotify:nightly
     global:
         env:
             PROMETHEUS_URL: https://metric.bud.studio
-            BUD_SERVE_URL: 'https://{{ .Values.ingress.hosts.budapp }}'
-            CORS_ORIGINS: http://localhost:3000,https://{{ .Values.ingress.hosts.budadmin }},https://{{ .Values.ingress.hosts.budplayground }},https://{{ .Values.ingress.hosts.budcustomer }}
             # deadlink
             BUD_LLM_BASE_URL: http://20.66.97.208/v1/
             #deadlink
