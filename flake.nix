@@ -72,6 +72,46 @@
               check-merge-conflicts.enable = true;
               check-symlinks.enable = true;
               check-toml.enable = true;
+              check-vcs-permalinks = {
+                enable = true;
+                excludes = [
+                  "services/budadmin/public/login_files/.*"
+                  "node_modules/.*"
+                ];
+              };
+
+              check-xml.enable = true;
+
+              check-yaml = {
+                enable = true;
+                excludes = [
+                  "infra/helm/.*\.yaml"
+                  "services/.*/charts/.*/templates/.*\.yaml"
+                  "services/.*/examples/.*/templates/.*\.yaml"
+                  "services/budnotify/deploy/kubernetes/.*\.yaml"
+                  ".*\.minijinja$"
+                ];
+              };
+              detect-private-keys = {
+                enable = true;
+                excludes = [
+                  "services/budcluster/crypto-keys/.*\.pem"
+                  "services/budgateway/docs/.*\.md"
+                  "services/budgateway/CLAUDE\.md"
+                  "services/budgateway/ci/dummy-gcp-credentials\.json"
+                  "infra/helm/bud/charts/novu/values\.yaml"
+                  "services/budgateway/tensorzero-internal/src/inference/providers/gcp_vertex_gemini\.rs"
+                  "\.env\.sample"
+                ];
+              };
+
+              trim-trailing-whitespace.enable = true;
+              end-of-file-fixer.enable = true;
+
+              shellcheck = {
+                enable = true;
+                excludes = [ "services/.*" ];
+              };
             };
           };
         }
