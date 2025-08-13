@@ -9,6 +9,7 @@
     ./modules/k8s
     ./modules/cd
     ./modules/wireguard.nix
+    ./modules/docker.nix
   ];
 
   boot.loader.systemd-boot.enable = true;
