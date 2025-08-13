@@ -2,6 +2,7 @@
   inputs = {
     nixpkgs.url = "github:NixOs/nixpkgs/nixos-unstable";
     nixos-facter-modules.url = "github:nix-community/nixos-facter-modules";
+    pre-commit-hooks.url = "github:cachix/git-hooks.nix";
 
     sinan = {
       url = "github:sinanmohd/nixos/master";
@@ -21,6 +22,7 @@
       sinan,
       disko,
       nixos-facter-modules,
+      pre-commit-hooks,
     }:
     let
       lib = nixpkgs.lib;
@@ -54,6 +56,27 @@
         };
     in
     {
+      checks = forAllSystems (
+        { system, pkgs }:
+        {
+          pre-commit-check = pre-commit-hooks.lib.${system}.run {
+            src = ./.;
+            # https://devenv.sh/reference/options/#git-hooks
+            hooks = {
+              actionlint.enable = true;
+              nixfmt-rfc-style.enable = true;
+              check-added-large-files.enable = true;
+              check-case-conflicts.enable = true;
+              check-executables-have-shebangs.enable = true;
+              check-json.enable = true;
+              check-merge-conflicts.enable = true;
+              check-symlinks.enable = true;
+              check-toml.enable = true;
+            };
+          };
+        }
+      );
+
       devShells = forAllSystems (
         { system, pkgs }:
         {
@@ -89,7 +112,6 @@
           );
 
       nixosConfigurations = lib.genAttrs [
-        "common"
         "master"
       ] (host: makeNixos host "x86_64-linux");
     };
