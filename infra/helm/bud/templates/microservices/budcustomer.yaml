@@ -38,6 +38,10 @@ spec:
             value: {{ include "bud.ingress.url.budapp" $ }}
           - name: NEXT_PUBLIC_COPY_CODE_API_BASE_URL
             value: {{ include "bud.ingress.url.budgateway" $ }}
+          - name: NEXT_PUBLIC_PLAYGROUND_URL
+            value: {{ include "bud.ingress.url.budplayground" $ }}
+          - name: NEXT_PUBLIC_ASK_BUD_URL
+            value: {{ include "bud.ingress.url.budask" $ }}
         {{ $root := . }}
         {{- range $key, $value := .Values.microservices.budcustomer.env }}
           - name: {{ $key }}
