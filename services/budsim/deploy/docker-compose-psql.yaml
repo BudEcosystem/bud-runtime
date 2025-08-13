@@ -5,8 +5,8 @@ services:
     ports:
       - "$PSQL_PORT:$PSQL_PORT"
     environment:
-      POSTGRES_USER: "${SECRETS_PSQL_USER:?SECRETS_PSQL_USER variable is not set}"
-      POSTGRES_PASSWORD: "${SECRETS_PSQL_PASSWORD:?SECRETS_PSQL_PASSWORD variable is not set}"
+      POSTGRES_USER: "${PSQL_USER:?PSQL_USER variable is not set}"
+      POSTGRES_PASSWORD: "${PSQL_PASSWORD:?PSQL_PASSWORD variable is not set}"
       POSTGRES_DB: "${PSQL_DB_NAME:?PSQL_DB_NAME variable is not set}"
     volumes:
       - budsim_postgres_data:/var/lib/postgresql/data

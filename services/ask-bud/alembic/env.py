@@ -43,8 +43,8 @@ def get_psql_url() -> str:
 
     return PostgresDsn.build(
         scheme="postgresql+psycopg",
-        username=os.getenv("SECRETS_PSQL_USER"),
-        password=os.getenv("SECRETS_PSQL_PASSWORD"),
+        username=os.getenv("PSQL_USER"),
+        password=os.getenv("PSQL_PASSWORD"),
         host=os.getenv("PSQL_HOST"),
         port=int(port_str),
         path=os.getenv("PSQL_DB_NAME"),
