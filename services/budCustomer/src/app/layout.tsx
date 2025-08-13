@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { AntdRegistry } from "@ant-design/nextjs-registry";
+import { App } from "antd";
 import "./globals.css";
 import { AuthNavigationProvider, LoaderProvider } from "@/context/authContext";
 import { ThemeProvider } from "@/context/themeContext";
 import { ProjectProvider } from "@/context/projectContext";
+import { NotificationProvider } from "@/components/NotificationProvider";
+import { AppInitializer } from "@/components/AppInitializer";
 
 const geistSans = localFont({
   src: "../../public/fonts/Geist-VariableFont_wght.ttf",
@@ -34,13 +37,18 @@ export default function RootLayout({
         suppressHydrationWarning={true}
       >
         <ThemeProvider>
-          <ProjectProvider>
-            <AuthNavigationProvider>
-              <LoaderProvider>
-                <AntdRegistry>{children}</AntdRegistry>
-              </LoaderProvider>
-            </AuthNavigationProvider>
-          </ProjectProvider>
+          <AntdRegistry>
+            <App>
+              <NotificationProvider>
+                <AppInitializer />
+                <ProjectProvider>
+                  <AuthNavigationProvider>
+                    <LoaderProvider>{children}</LoaderProvider>
+                  </AuthNavigationProvider>
+                </ProjectProvider>
+              </NotificationProvider>
+            </App>
+          </AntdRegistry>
         </ThemeProvider>
       </body>
     </html>
