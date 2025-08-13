@@ -14,5 +14,5 @@ in
     autoPrune.enable = true;
   };
 
-  users.extraGroups.docker.members = [ wheelUsers ];
+  users.extraGroups.docker.members = wheelUsers;
 }
