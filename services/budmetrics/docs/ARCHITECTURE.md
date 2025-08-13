@@ -301,8 +301,8 @@ The API returns a nested structure optimized for time series data:
 PSQL_HOST=localhost
 PSQL_PORT=9000
 PSQL_DB_NAME=tensorzero
-SECRETS_PSQL_USER=default
-SECRETS_PSQL_PASSWORD=password
+PSQL_USER=default
+PSQL_PASSWORD=password
 
 # Application Settings
 APP_PORT=8000

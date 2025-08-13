@@ -139,7 +139,8 @@ class ClickHouseMigration:
             input_messages String,
             output String,
             cached Bool DEFAULT false,
-            finish_reason Nullable(Enum8('stop' = 1, 'length' = 2, 'tool_call' = 3, 'content_filter' = 4, 'unknown' = 5))
+            finish_reason Nullable(Enum8('stop' = 1, 'length' = 2, 'tool_call' = 3, 'content_filter' = 4, 'unknown' = 5)),
+            endpoint_type LowCardinality(String) DEFAULT 'chat'
         )
         ENGINE = MergeTree()
         PARTITION BY toYYYYMM(timestamp)
@@ -216,9 +217,147 @@ class ClickHouseMigration:
             logger.error(f"Error creating ModelInferenceDetails table: {e}")
             raise
 
+    async def create_embedding_inference_table(self):
+        """Create EmbeddingInference table."""
+        query = """
+        CREATE TABLE IF NOT EXISTS EmbeddingInference
+        (
+            id UUID,
+            function_name LowCardinality(String),
+            variant_name LowCardinality(String),
+            episode_id Nullable(UUID),
+            embeddings Array(Array(Float32)),
+            embedding_dimensions UInt32,
+            input_count UInt32,
+            input String,
+            processing_time_ms Nullable(UInt32),
+            tags Map(String, String),
+            extra_body String,
+            timestamp DateTime DEFAULT now()
+        )
+        ENGINE = MergeTree()
+        PARTITION BY toYYYYMM(timestamp)
+        ORDER BY (function_name, timestamp, id)
+        SETTINGS index_granularity = 8192
+        """
+
+        try:
+            await self.client.execute_query(query)
+            logger.info("EmbeddingInference table created successfully")
+        except Exception as e:
+            logger.error(f"Error creating EmbeddingInference table: {e}")
+            raise
+
+    async def create_audio_inference_table(self):
+        """Create AudioInference table."""
+        query = """
+        CREATE TABLE IF NOT EXISTS AudioInference
+        (
+            id UUID,
+            function_name LowCardinality(String),
+            variant_name LowCardinality(String),
+            episode_id Nullable(UUID),
+            audio_type Enum8('transcription' = 1, 'translation' = 2, 'text_to_speech' = 3),
+            input String,
+            output String,
+            language Nullable(String),
+            duration_seconds Nullable(Float32),
+            file_size_bytes Nullable(UInt64),
+            response_format Nullable(String),
+            inference_params String,
+            processing_time_ms Nullable(UInt32),
+            tags Map(String, String),
+            extra_body String,
+            timestamp DateTime DEFAULT now()
+        )
+        ENGINE = MergeTree()
+        PARTITION BY toYYYYMM(timestamp)
+        ORDER BY (function_name, audio_type, timestamp, id)
+        SETTINGS index_granularity = 8192
+        """
+
+        try:
+            await self.client.execute_query(query)
+            logger.info("AudioInference table created successfully")
+        except Exception as e:
+            logger.error(f"Error creating AudioInference table: {e}")
+            raise
+
+    async def create_image_inference_table(self):
+        """Create ImageInference table."""
+        query = """
+        CREATE TABLE IF NOT EXISTS ImageInference
+        (
+            id UUID,
+            function_name LowCardinality(String),
+            variant_name LowCardinality(String),
+            episode_id Nullable(UUID),
+            prompt String,
+            image_count UInt8,
+            size LowCardinality(String),
+            quality LowCardinality(String),
+            style LowCardinality(Nullable(String)),
+            images String,
+            inference_params String,
+            processing_time_ms Nullable(UInt32),
+            tags Map(String, String),
+            extra_body String,
+            timestamp DateTime DEFAULT now()
+        )
+        ENGINE = MergeTree()
+        PARTITION BY toYYYYMM(timestamp)
+        ORDER BY (function_name, timestamp, id)
+        SETTINGS index_granularity = 8192
+        """
+
+        try:
+            await self.client.execute_query(query)
+            logger.info("ImageInference table created successfully")
+        except Exception as e:
+            logger.error(f"Error creating ImageInference table: {e}")
+            raise
+
+    async def create_moderation_inference_table(self):
+        """Create ModerationInference table."""
+        query = """
+        CREATE TABLE IF NOT EXISTS ModerationInference
+        (
+            id UUID,
+            function_name LowCardinality(String),
+            variant_name LowCardinality(String),
+            episode_id Nullable(UUID),
+            input String,
+            results String,
+            flagged Bool,
+            categories Map(String, Bool),
+            category_scores Map(String, Float32),
+            processing_time_ms Nullable(UInt32),
+            tags Map(String, String),
+            extra_body String,
+            timestamp DateTime DEFAULT now()
+        )
+        ENGINE = MergeTree()
+        PARTITION BY toYYYYMM(timestamp)
+        ORDER BY (function_name, flagged, timestamp, id)
+        SETTINGS index_granularity = 8192
+        """
+
+        try:
+            await self.client.execute_query(query)
+            logger.info("ModerationInference table created successfully")
+        except Exception as e:
+            logger.error(f"Error creating ModerationInference table: {e}")
+            raise
+
     async def verify_tables(self):
         """Verify that tables were created successfully."""
-        tables_to_check = ["ModelInferenceDetails"]
+        tables_to_check = [
+            "ModelInferenceDetails",
+            "EmbeddingInference",
+            "AudioInference",
+            "ImageInference",
+            "ModerationInference",
+        ]
         if self.include_model_inference:
             tables_to_check.append("ModelInference")
 
@@ -245,6 +384,10 @@ class ClickHouseMigration:
             await self.create_database()
             await self.create_model_inference_details_table()
             await self.create_model_inference_table()
+            await self.create_embedding_inference_table()
+            await self.create_audio_inference_table()
+            await self.create_image_inference_table()
+            await self.create_moderation_inference_table()
             await self.verify_tables()
             logger.info("Migration completed successfully!")
 

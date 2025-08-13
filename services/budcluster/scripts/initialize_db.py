@@ -33,8 +33,8 @@ def get_psql_url() -> PostgresDsn:
         raise ValueError("PSQL_HOST, PSQL_PORT, and PSQL_DB_NAME must be set")
     return PostgresDsn.build(
         scheme="postgresql+psycopg",
-        username=os.getenv("SECRETS_PSQL_USER"),
-        password=os.getenv("SECRETS_PSQL_PASSWORD"),
+        username=os.getenv("PSQL_USER"),
+        password=os.getenv("PSQL_PASSWORD"),
         host=os.getenv("PSQL_HOST"),
         port=int(os.getenv("PSQL_PORT")),
         path=os.getenv("PSQL_DB_NAME", "budcluster"),
