@@ -19,6 +19,7 @@ import ThemeSwitcher from "@/components/ui/ThemeSwitcher";
 import { useTheme } from "@/context/themeContext";
 import ProjectSelector from "@/components/project/ProjectSelector";
 import { useProject } from "@/context/projectContext";
+import { useUser } from "@/stores/useUser";
 
 const { Text } = Typography;
 
@@ -80,6 +81,9 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
 
   // Project context
   const { currentProject } = useProject();
+
+  // User context
+  const { user, logout } = useUser();
 
   const tabs: TabItem[] = [
     {
@@ -143,10 +147,7 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
   const isActive = (route: string) => pathname === route;
 
   const handleLogout = () => {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("auth_token");
-    }
-    router.push("/login");
+    logout();
   };
 
   return (
@@ -363,10 +364,10 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
                   </Avatar>
                   <div>
                     <div className="text-bud-text-primary text-sm font-medium">
-                      Admin
+                      {user?.name || "User"}
                     </div>
                     <Text className="text-bud-text-disabled text-xs">
-                      admin@bud.studio
+                      {user?.email || "user@bud.studio"}
                     </Text>
                   </div>
                 </div>

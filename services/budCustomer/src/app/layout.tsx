@@ -8,6 +8,7 @@ import { ThemeProvider } from "@/context/themeContext";
 import { ProjectProvider } from "@/context/projectContext";
 import { NotificationProvider } from "@/components/NotificationProvider";
 import { AppInitializer } from "@/components/AppInitializer";
+import AuthGuard from "@/components/auth/AuthGuard";
 
 const geistSans = localFont({
   src: "../../public/fonts/Geist-VariableFont_wght.ttf",
@@ -41,11 +42,13 @@ export default function RootLayout({
             <App>
               <NotificationProvider>
                 <AppInitializer />
-                <ProjectProvider>
-                  <AuthNavigationProvider>
-                    <LoaderProvider>{children}</LoaderProvider>
-                  </AuthNavigationProvider>
-                </ProjectProvider>
+                <AuthNavigationProvider>
+                  <LoaderProvider>
+                    <ProjectProvider>
+                      <AuthGuard>{children}</AuthGuard>
+                    </ProjectProvider>
+                  </LoaderProvider>
+                </AuthNavigationProvider>
               </NotificationProvider>
             </App>
           </AntdRegistry>
