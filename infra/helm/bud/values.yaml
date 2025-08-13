@@ -341,3 +341,5 @@ minio:
             - name: novu-local
             - name: models-registry
             - name: model-info
+keel:
+    enabled: true

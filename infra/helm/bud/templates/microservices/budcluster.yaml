@@ -12,7 +12,7 @@ spec:
       labels:
         app: {{ .Release.Name }}-budcluster
       annotations:
-        date: "{{ now }}"
+        {{- include "bud.podAnnotations" $ | nindent 8 }}
         dapr.io/enabled: "true"
         dapr.io/app-id: "budcluster"
         dapr.io/app-port: "3003"

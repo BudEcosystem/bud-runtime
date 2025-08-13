@@ -12,15 +12,17 @@ else
 	git pull origin master
 	hash_new="$(git log -n1 master --pretty=format:"%H")"
 
-	# force redeployment every 15 minutes because we don't currently have
-	# image tag tracking
-	if [ $(($(date +%M) % 15)) != 0 ] && [ "$hash_cur" = "$hash_new" ]; then
+	if [ "$hash_cur" = "$hash_new" ]; then
 		exit 0
 	fi
 fi
 
 helm_path="$(git rev-parse --show-toplevel)/infra/helm"
 for chart in "$helm_path"/*; do
+	if ! git diff "$hash_cur" "$hash_new" --name-only "$chart" | grep -q '.*'; then
+		continue
+	fi
+
 	namespace="nixcd-dev-$(basename "$chart")"
 	release_name="panda"
 
