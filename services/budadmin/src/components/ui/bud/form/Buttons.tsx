@@ -107,3 +107,17 @@ export function SecondaryButton({ classNames = '', ...props }: any) {
     </Button>
   );
 }
+export function BorderlessButton({ classNames = '', ...props }: any) {
+  return (
+    <Button {...props} className={`text-[0.75rem] h-[1.75rem] border-[.5px] border-[transparent] min-w-[4rem] font-normal bg-[#1F1F1F]
+    hover:bg-[#1F1F1F] hover:border-[#B3B3B3] ${classNames}
+    ${props.text == 'Skip' && 'hover:bg-[#38260B] hover:border-[#896814]'}
+    ${props.text == 'Close' && 'hover:bg-[#290E0E] hover:border-[#6F0E0E]'}
+    ${props.disabled ? 'bg-[#1F1F1F]  text-[#757575]! cursor-not-allowed' : 'bg-[#1F1F1F] '}
+    `}>
+      <Text_12_400_EEEEEE
+        className={`${props.disabled ? '!text-[#757575] font-600' : 'text-[#EEEEEE]'}`}
+      >{props.children || props.text || "Back"} </Text_12_400_EEEEEE>
+    </Button>
+  );
+}

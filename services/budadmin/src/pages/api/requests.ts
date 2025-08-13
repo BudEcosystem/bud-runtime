@@ -258,8 +258,27 @@ const Patch = (endPoint, payload?) => {
   return axiosInstance.patch(endPoint, payload);
 };
 
-const Put = (endPoint, payload) => {
-  return axiosInstance.put(endPoint, payload);
+const Put = (
+  endPoint,
+  payload?: any,
+  config?: {
+    params?: any;
+    headers?: any;
+  }
+) => {
+  const finalConfig: any = {
+    ...config,
+    headers: {
+      ...(config?.headers || {}),
+    },
+  };
+
+  // Check if payload is an instance of FormData
+  if (payload instanceof FormData) {
+    finalConfig.headers["Accept"] = "multipart/form-data";
+  }
+
+  return axiosInstance.put(endPoint, payload, finalConfig);
 };
 
 export const AppRequest = {
