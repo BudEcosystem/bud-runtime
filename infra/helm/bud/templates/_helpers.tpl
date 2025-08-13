@@ -11,6 +11,14 @@
 {{- end }}
 {{- end }}
 
+{{- define "bud.podAnnotations" -}}
+{{- if .Values.keel.enabled -}}
+keel.sh/policy: force
+keel.sh/trigger: poll
+keel.sh/match-tag: true
+keel.sh/pollSchedule: "@every 1m"
+{{- end -}}
+{{- end -}}
 
 {{- define "bud.ingress.hosts.budadmin" -}}
 {{- if .Values.ingress.hosts.budadmin }}

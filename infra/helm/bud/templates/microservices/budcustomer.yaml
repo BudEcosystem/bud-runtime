@@ -13,7 +13,7 @@ spec:
       labels:
         app: {{ .Release.Name }}-budcustomer
       annotations:
-        date: "{{ now }}"
+        {{- include "bud.podAnnotations" $ | nindent 8 }}
     spec:
       containers:
       - name: {{ .Release.Name }}-budcustomer

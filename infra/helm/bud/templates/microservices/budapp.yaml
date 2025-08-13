@@ -12,7 +12,7 @@ spec:
       labels:
         app: {{ .Release.Name}}-budapp
       annotations:
-        date: "{{ now }}"
+        {{- include "bud.podAnnotations" $ | nindent 8 }}
         dapr.io/enabled: "true"
         dapr.io/app-id: "budapp"
         dapr.io/app-port: "9082"
