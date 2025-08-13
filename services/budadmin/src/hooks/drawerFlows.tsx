@@ -3615,6 +3615,27 @@ const runEvaluation: DrawerFlowType = {
   ],
 };
 
+const viewEvalDetails: DrawerFlowType = {
+  title: "Evaluation Details",
+  description: "View Evaluation Details",
+  totalSteps: 1,
+  steps: [
+    {
+      navigation: () => ["Experiments", "Evaluation Details"],
+      id: "eval-details",
+      step: 1,
+      component: StepComponents["view-eval-details"],
+      progress: [
+        {
+          status: FormProgressStatus.inProgress,
+          title: "New evaluation",
+        },
+      ],
+      confirmClose: false,
+    },
+  ],
+};
+
 const flows = {
   "new-project": newProject,
   "deploy-model": deployModel,
@@ -3669,6 +3690,7 @@ const flows = {
   // experiments
   "new-experiment": newExperiment,
   "run-evaluation": runEvaluation,
+  "eval-details": viewEvalDetails,
 };
 
 export const flowMapping: {

@@ -113,6 +113,7 @@ import SelectEvaluation from "./Evaluations/RunEvaluation/SelectEvaluation";
 import EvaluationSummary from "./Evaluations/RunEvaluation/EvaluationSummary";
 import NewExperimentSuccess from "./Evaluations/NewExperiment/newExperimentSuccess";
 import Publish from "./Project/Publish";
+import ViewEvalDetailscopy from "./Evaluations/RunEvaluation/ViewEvalDetail";
 
 export const StepComponents = {
   "new-project": NewProject,
@@ -239,6 +240,8 @@ export const StepComponents = {
   "select-model-new-evaluation": SelectModelForNewEvaluation,
   "select-traits": SelectTrait,
   "select-evaluation": SelectEvaluation,
+  // "view-eval-details": ViewEvalDetails,
+  "view-eval-details": ViewEvalDetailscopy,
   "evaluation-summary": EvaluationSummary,
 
 };
