@@ -21,6 +21,8 @@ export default function Login() {
   const [isBackToLogin, setIsBackToLogin] = useState(false);
 
   useEffect(() => {
+    console.log('From client NEXT_PUBLIC_TEMP_API_BASE_URL:', process.env.NEXT_PUBLIC_TEMP_API_BASE_URL);
+    console.log('From client NEXT_PUBLIC_BASE_URL:', process.env.NEXT_PUBLIC_BASE_URL);
     if (activePage === 4) {
       setTimeout(() => {
         setIsBackToLogin(true);
