@@ -331,8 +331,6 @@ novu:
         existingSecret: '{{ $.Release.Name }}-novu-externalredis'
     externalS3:
         existingSecret: '{{ $.Release.Name }}-novu-externals3'
-dapr:
-    enabled: false
 minio:
     enabled: true
     provisioning:
@@ -341,5 +339,9 @@ minio:
             - name: novu-local
             - name: models-registry
             - name: model-info
+
+# best to be installed cluster wide, not as part of this chart
+dapr:
+    enabled: false
 keel:
-    enabled: true
+    enabled: false
