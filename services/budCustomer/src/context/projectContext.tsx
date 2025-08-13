@@ -52,6 +52,8 @@ export const ProjectProvider: React.FC<ProjectProviderProps> = ({
 
   // Load projects and current project from localStorage on mount
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
     const savedProjects = localStorage.getItem("bud_projects");
     if (savedProjects) {
       const parsedProjects = JSON.parse(savedProjects);
@@ -79,11 +81,13 @@ export const ProjectProvider: React.FC<ProjectProviderProps> = ({
 
   // Save to localStorage when projects change
   useEffect(() => {
+    if (typeof window === "undefined") return;
     localStorage.setItem("bud_projects", JSON.stringify(projects));
   }, [projects]);
 
   // Save current project to localStorage when it changes
   useEffect(() => {
+    if (typeof window === "undefined") return;
     if (currentProject) {
       localStorage.setItem(
         "bud_current_project",

@@ -49,6 +49,7 @@ export const useUser = create<{
   setUser: (user: any) => void;
   updateCurrentUser: (params: UserParams, id: string) => Promise<any>;
   getUser: () => Promise<any>;
+  logout: () => Promise<void>;
   permissions: ModulePermission[];
   hasPermission: (permission: PermissionEnum) => boolean;
   hasProjectPermission: (
@@ -67,6 +68,36 @@ export const useUser = create<{
     set(() => ({ permissions: permissions.data?.permissions }));
     set(() => ({ loadingUser: false }));
     return response;
+  },
+  logout: async () => {
+    try {
+      // Get the refresh token before clearing
+      const refreshToken = localStorage.getItem("refresh_token");
+
+      // Call logout API if refresh token exists
+      if (refreshToken) {
+        await AppRequest.Post("/auth/logout", {
+          refresh_token: refreshToken,
+        });
+      }
+    } catch (error) {
+      console.error("Logout API error:", error);
+      // Continue with local cleanup even if API call fails
+    } finally {
+      // Clear all auth data
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
+      localStorage.removeItem("bud_current_project");
+      localStorage.removeItem("bud_projects");
+
+      // Reset user state
+      set(() => ({ user: null, permissions: [], loadingUser: false }));
+
+      // Redirect to login
+      if (typeof window !== "undefined") {
+        window.location.replace("/login");
+      }
+    }
   },
   permissions: [],
   hasPermission: (permission: PermissionEnum) => {
