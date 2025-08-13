@@ -15,6 +15,7 @@ ingress:
         novuws: ""
 
 microservices:
+    # frontend services
     budadmin:
         image: budstudio/budadmin:nightly
         env:
@@ -29,6 +30,8 @@ microservices:
             # deadlink (502 Bad Gateway)
             NEXT_PUBLIC_BASE_URL: https://api-dev.bud.studio/
             NODE_TLS_REJECT_UNAUTHORIZED: "0"
+
+    # backend exposed services
     budproxy:
         image: budstudio/budproxy:nightly
     askbud:
@@ -39,57 +42,73 @@ microservices:
         image: budstudio/budapp:nightly
         env:
             APP_CONFIG: '{}'
+            STATIC_DIR: /data/static-dir
+
             PSQL_HOST: '{{ $.Release.Name }}-postgresql'
             PSQL_PORT: "5432"
             PSQL_USER: budapp
             PSQL_PASSWORD: budapp
             PSQL_DB_NAME: budapp
-            STATIC_DIR: /data/static-dir
+
             GRAFANA_SCHEME: http
             GRAFANA_URL: '{{ $.Release.Name }}-grafana'
+
             KEYCLOAK_SERVER_URL: http://{{ $.Release.Name }}-keycloak/
             KEYCLOAK_REALM_NAME: '{{ .Values.keycloak.adminRealm }}'
             KEYCLOAK_ADMIN_USERNAME: '{{ .Values.keycloak.auth.adminUser }}'
             KEYCLOAK_ADMIN_PASSWORD: '{{ .Values.keycloak.auth.adminPassword }}'
             KEYCLOAK_VERIFY_SSL: "false"
             DEFAULT_REALM_NAME: bud-keycloak
+
             CLOUD_MODEL_SEEDER_ENGINE: tensorzero
             BUD_CONNECT_BASE_URL: https://budconnect.bud.studio
+
+    # backend internal services
     budcluster:
         image: budstudio/budcluster:nightly
         env:
             APP_CONFIG: '{}'
+            LOG_LEVEL: DEBUG
+            RSA_KEY_NAME: rsa-private-key.pem
+            VOLUME_TYPE: nfs
+
             NOTIFY_SERVICE_NAME: '{{ .Release.Name }}-budnotify'
             NOTIFY_SERVICE_TOPIC: notificationMessages
+
             CONFIGSTORE_NAME: '{{ .Release.Name }}-configstore'
             SECRETSTORE_SECRET_NAME: '{{ .Release.Name }}-secretstore'
-            LOG_LEVEL: DEBUG
+
             PSQL_HOST: '{{ $.Release.Name }}-postgresql'
-            SECRETS_PSQL_USER: budcluster
-            SECRETS_PSQL_PASSWORD: budcluster
+            PSQL_PORT: "5432"
             PSQL_USER: budcluster
             PSQL_PASSWORD: budcluster
-            PSQL_PORT: "5432"
             PSQL_DB_NAME: budcluster
+
             VALIDATE_CERTS: "false"
             NODE_INFO_COLLECTOR_IMAGE_CPU: budstudio/node-info-collector-cpu:0.1.0
             NODE_INFO_COLLECTOR_IMAGE_CUDA: budimages.azurecr.io/budecosystem/node-info-collector-cuda:latest
             NODE_INFO_COLLECTOR_IMAGE_HPU: budimages.azurecr.io/budecosystem/node-info-collector-hpu:latest
             NODE_INFO_LABELER_IMAGE: budimages.azurecr.io/budecosystem/node-device-labeler:latest
+            QUANTIZATION_JOB_IMAGE: budimages.azurecr.io/budecosystem/bud-quantization-cpu:0.02
             ENGINE_CONTAINER_PORT: "8000"
             REGISTRY_SERVER: https://budimages.azurecr.io
             LITELLM_PROXY_SERVER_IMAGE: ghcr.io/berriai/litellm:main-latest
-            RSA_KEY_NAME: rsa-private-key.pem
+
             MINIO_BUCKET: models-registry
             MINIO_ENDPOINT: '{{ .Release.Name }}-minio:{{ .Values.minio.service.ports.api }}'
             MINIO_SECURE: "false"
-            VOLUME_TYPE: nfs
-            QUANTIZATION_JOB_IMAGE: budimages.azurecr.io/budecosystem/bud-quantization-cpu:0.02
     budmetrics:
         image: budstudio/budmetrics:nightly
         env:
             #deadlink
             INFERENCE_URL: http://172.184.137.177:8502/classify
+
+            PSQL_HOST: '{{ $.Release.Name }}-postgresql'
+            PSQL_PORT: "5432"
+            PSQL_USER: budmetrics
+            PSQL_PASSWORD: budmetrics
+            PSQL_DB_NAME: budmetrics
+
             CLICKHOUSE_HOST: '{{ .Release.Name }}-clickhouse'
             CLICKHOUSE_PORT: "9000"
             CLICKHOUSE_DB_NAME: budproxy
@@ -98,20 +117,23 @@ microservices:
     budmodel:
         image: budstudio/budmodel:nightly
         env:
-            SECRETS_PSQL_USER: budmodel
-            SECRETS_PSQL_PASSWORD: budmodel
+            LOG_LEVEL: DEBUG
+
             PSQL_HOST: '{{ $.Release.Name }}-postgresql'
             PSQL_PORT: "5432"
+            PSQL_USER: budmodel
+            PSQL_PASSWORD: budmodel
             PSQL_DB_NAME: budmodel
-            LOG_LEVEL: DEBUG
     budsim:
         image: budstudio/budsim:nightly
         env:
             LOG_LEVEL: INFO
-            SECRETS_PSQL_USER: budsim
-            SECRETS_PSQL_PASSWORD: budsim
+
+            PSQL_HOST: '{{ $.Release.Name }}-postgresql'
+            PSQL_PORT: "5432"
+            PSQL_USER: budsim
+            PSQL_PASSWORD: budsim
             PSQL_DB_NAME: budsim
-            DAPR_HOST_IP: 127.0.0.1
     budnotify:
         image: budstudio/budnotify:nightly
     global:
@@ -192,22 +214,6 @@ microservices:
             PGADMIN_PORT: "8888"
             POPULATION_SIZE: "50"
             PORT: "3000"
-            POSTGRES_DB: budapp_v2
-            POSTGRES_DB_NAME_BUDAPP: budapp_v2
-            POSTGRES_HOST: '{{ $.Release.Name }}-postgresql'
-            POSTGRES_PASSWORD: mypassword
-            POSTGRES_PORT_BUDAPP: "5432"
-            POSTGRES_USER: myuser
-            PSQL_DB_NAME_BUDCLUSTER: budcluster
-            PSQL_DB_NAME_BUDMETRICS: budmetrics
-            PSQL_DB_NAME_BUDMODEL: budmodel
-            PSQL_DB_NAME_BUDSIM: budsim
-            PSQL_HOST: '{{ $.Release.Name }}-postgresql'
-            PSQL_PASSWORD: myuser
-            PSQL_POOL_SIZE: "100"
-            PSQL_PORT: "5432"
-            PSQL_PORT_BUDMETRICS: "5431"
-            PSQL_USER: myuser
             REDIS_CACHE_SERVICE_HOST: ""
             REDIS_CACHE_SERVICE_PORT: "6379"
             REDIS_DB_INDEX: "5"
@@ -223,12 +229,6 @@ microservices:
             SECRETSTORE_NAME: secretstore
             SECRETSTORE_SECRET_NAME: '{{ .Release.Name }}-secretstore'
             # TODO
-            SECRETS_POSTGRES_PASSWORD: myuser
-            SECRETS_POSTGRES_USER: myuser
-            SECRETS_PSQL_PASSWORD: myuser
-            SECRETS_PSQL_PASSWORD_BUDAPP: myuser
-            SECRETS_PSQL_USER: myuser
-            SECRETS_PSQL_USER_BUDAPP: myuser
             SENTRY_DSN: ""
             TENSORZERO_REDIS_URL: redis://default:{{ .Values.valkey.auth.password}}@{{ .Release.Name }}-valkey-primary:6379/2
             VALIDATE_CERTS: "false"
@@ -266,14 +266,15 @@ postgresql:
         password: bud
 postgresqlExtra:
     autoCreateDB:
-        - budapp
-        - budproxy
-        - budcluster
-        - budsim
         - keycloak
+        - budask
+        - budapp
+        - budcluster
+        - budeval
+        - budmetrics
         - budmodel
-        # migrated from old chart
-        - myuser
+        - budsim
+
 keycloak:
     proxy: edge
     resources:

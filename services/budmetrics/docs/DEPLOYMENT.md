@@ -49,8 +49,8 @@ docker run -d \
   -e PSQL_HOST=clickhouse.example.com \
   -e PSQL_PORT=9000 \
   -e PSQL_DB_NAME=tensorzero \
-  -e SECRETS_PSQL_USER=default \
-  -e SECRETS_PSQL_PASSWORD=secure_password \
+  -e PSQL_USER=default \
+  -e PSQL_PASSWORD=secure_password \
   bud-serve-metrics:latest
 
 # With all configurations
@@ -63,8 +63,8 @@ docker run -d \
   -e PSQL_HOST=clickhouse.example.com \
   -e PSQL_PORT=9000 \
   -e PSQL_DB_NAME=tensorzero \
-  -e SECRETS_PSQL_USER=default \
-  -e SECRETS_PSQL_PASSWORD=secure_password \
+  -e PSQL_USER=default \
+  -e PSQL_PASSWORD=secure_password \
   -e APP_PORT=8000 \
   -e LOG_LEVEL=INFO \
   -e DEBUG=false \
@@ -106,8 +106,8 @@ services:
       PSQL_HOST: clickhouse
       PSQL_PORT: 9000
       PSQL_DB_NAME: ${PSQL_DB_NAME}
-      SECRETS_PSQL_USER: ${SECRETS_PSQL_USER}
-      SECRETS_PSQL_PASSWORD: ${SECRETS_PSQL_PASSWORD}
+      PSQL_USER: ${PSQL_USER}
+      PSQL_PASSWORD: ${PSQL_PASSWORD}
       # Application
       APP_PORT: 8000
       LOG_LEVEL: INFO
@@ -133,8 +133,8 @@ services:
       - "9000:9000"  # Native protocol
     environment:
       CLICKHOUSE_DB: ${PSQL_DB_NAME}
-      CLICKHOUSE_USER: ${SECRETS_PSQL_USER}
-      CLICKHOUSE_PASSWORD: ${SECRETS_PSQL_PASSWORD}
+      CLICKHOUSE_USER: ${PSQL_USER}
+      CLICKHOUSE_PASSWORD: ${PSQL_PASSWORD}
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
     volumes:
       - clickhouse_data:/var/lib/clickhouse
@@ -180,8 +180,8 @@ metadata:
   name: bud-serve-metrics-secrets
 type: Opaque
 stringData:
-  SECRETS_PSQL_USER: "default"
-  SECRETS_PSQL_PASSWORD: "secure_password"
+  PSQL_USER: "default"
+  PSQL_PASSWORD: "secure_password"
 ```
 
 ### Deployment
@@ -297,8 +297,8 @@ spec:
 | `PSQL_HOST` | ClickHouse host | `clickhouse.example.com` |
 | `PSQL_PORT` | ClickHouse native port | `9000` |
 | `PSQL_DB_NAME` | Database name | `tensorzero` |
-| `SECRETS_PSQL_USER` | Database user | `default` |
-| `SECRETS_PSQL_PASSWORD` | Database password | `secure_password` |
+| `PSQL_USER` | Database user | `default` |
+| `PSQL_PASSWORD` | Database password | `secure_password` |
 
 ### Optional Variables
 

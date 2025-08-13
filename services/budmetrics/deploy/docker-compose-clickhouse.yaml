@@ -7,8 +7,8 @@ services:
       - "${PSQL_PORT:-9111}:9000"  # Native protocol port (default 9111 like run.sh)
     environment:
       CLICKHOUSE_DB: "${PSQL_DB_NAME:?PSQL_DB_NAME variable is not set}"
-      CLICKHOUSE_USER: "${SECRETS_PSQL_USER:?SECRETS_PSQL_USER variable is not set}"
-      CLICKHOUSE_PASSWORD: "${SECRETS_PSQL_PASSWORD:?SECRETS_PSQL_PASSWORD variable is not set}"
+      CLICKHOUSE_USER: "${PSQL_USER:?PSQL_USER variable is not set}"
+      CLICKHOUSE_PASSWORD: "${PSQL_PASSWORD:?PSQL_PASSWORD variable is not set}"
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
     cap_add:
       - SYS_NICE
