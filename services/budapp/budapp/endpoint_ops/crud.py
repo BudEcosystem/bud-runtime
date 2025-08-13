@@ -152,6 +152,24 @@ class EndpointDataManager(DataManagerUtils):
         )
         return self.scalars_all(stmt)
 
+    async def get_all_published_endpoints(self) -> List[EndpointModel]:
+        """Get all published endpoints across all projects.
+
+        Returns:
+            List[EndpointModel]: List of all published endpoints with their model and project information.
+        """
+        stmt = (
+            select(EndpointModel)
+            .filter(
+                and_(
+                    EndpointModel.is_published.is_(True),
+                    EndpointModel.status != EndpointStatusEnum.DELETED,
+                )
+            )
+            .options(joinedload(EndpointModel.model), joinedload(EndpointModel.project))
+        )
+        return self.scalars_all(stmt)
+
     async def get_all_endpoints_in_cluster(
         self,
         cluster_id: Optional[UUID],

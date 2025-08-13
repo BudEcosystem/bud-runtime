@@ -3889,11 +3889,34 @@ class ModelCatalogService(SessionMixin):
             if hasattr(provider_type_value, "value"):
                 provider_type_value = provider_type_value.value
 
+            # Convert modality enums to strings
+            modality_values = []
+            if model.modality:
+                for mod in model.modality:
+                    if hasattr(mod, "value"):
+                        modality_values.append(mod.value)
+                    else:
+                        modality_values.append(mod)
+
+            # Convert status enum to string if needed
+            status_value = model.status
+            if hasattr(status_value, "value"):
+                status_value = status_value.value
+
+            # Convert supported_endpoints enums to strings
+            supported_endpoints_values = []
+            if model.supported_endpoints:
+                for endpoint_enum in model.supported_endpoints:
+                    if hasattr(endpoint_enum, "value"):
+                        supported_endpoints_values.append(endpoint_enum.value)
+                    else:
+                        supported_endpoints_values.append(endpoint_enum)
+
             catalog_item = {
                 "id": str(model.id),
                 "name": model.name,
-                "modality": model.modality,
-                "status": model.status,
+                "modality": modality_values,
+                "status": status_value,
                 "description": model.description,
                 "capabilities": list(set(capabilities)),  # Remove duplicates
                 "token_limit": model.token_limit,
@@ -3904,7 +3927,7 @@ class ModelCatalogService(SessionMixin):
                 "provider_type": provider_type_value,
                 "published_date": endpoint.published_date.isoformat() if endpoint.published_date else None,
                 "endpoint_id": str(endpoint.id),
-                "supported_endpoints": model.supported_endpoints,
+                "supported_endpoints": supported_endpoints_values,
             }
 
             # Add pricing if available
@@ -3974,11 +3997,34 @@ class ModelCatalogService(SessionMixin):
         if hasattr(provider_type_value, "value"):
             provider_type_value = provider_type_value.value
 
+        # Convert modality enums to strings
+        modality_values = []
+        if model.modality:
+            for mod in model.modality:
+                if hasattr(mod, "value"):
+                    modality_values.append(mod.value)
+                else:
+                    modality_values.append(mod)
+
+        # Convert status enum to string if needed
+        status_value = model.status
+        if hasattr(status_value, "value"):
+            status_value = status_value.value
+
+        # Convert supported_endpoints enums to strings
+        supported_endpoints_values = []
+        if model.supported_endpoints:
+            for endpoint_enum in model.supported_endpoints:
+                if hasattr(endpoint_enum, "value"):
+                    supported_endpoints_values.append(endpoint_enum.value)
+                else:
+                    supported_endpoints_values.append(endpoint_enum)
+
         catalog_item = {
             "id": str(model.id),
             "name": model.name,
-            "modality": model.modality,
-            "status": model.status,
+            "modality": modality_values,
+            "status": status_value,
             "description": model.description,
             "capabilities": list(set(capabilities)),
             "token_limit": model.token_limit,
@@ -3989,7 +4035,7 @@ class ModelCatalogService(SessionMixin):
             "provider_type": provider_type_value,
             "published_date": endpoint.published_date.isoformat() if endpoint.published_date else None,
             "endpoint_id": str(endpoint.id),
-            "supported_endpoints": model.supported_endpoints,
+            "supported_endpoints": supported_endpoints_values,
         }
 
         # Add pricing if available

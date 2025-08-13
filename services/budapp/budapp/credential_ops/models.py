@@ -23,7 +23,7 @@ from sqlalchemy import Boolean, DateTime, Enum, Float, ForeignKey, String, Uuid
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from budapp.commons.constants import CredentialTypeEnum
+from budapp.commons.constants import ApiCredentialTypeEnum, CredentialTypeEnum
 from budapp.commons.database import Base, TimestampMixin
 from budapp.commons.security import hash_token
 
@@ -70,6 +70,18 @@ class Credential(Base, TimestampMixin):
 
     name: Mapped[str] = mapped_column(String, nullable=False)
     hashed_key: Mapped[str] = mapped_column(String, nullable=True)
+
+    # New fields for enhanced security
+    credential_type: Mapped[str] = mapped_column(
+        Enum(
+            ApiCredentialTypeEnum,
+            name="api_credential_type_enum",
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        nullable=False,
+        default=ApiCredentialTypeEnum.CLIENT_APP.value,
+    )
+    ip_whitelist: Mapped[dict] = mapped_column(JSONB, nullable=True)  # List of allowed IPs
 
     project: Mapped["Project"] = relationship("Project", foreign_keys=[project_id])
 
