@@ -2,6 +2,10 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ .Release.Name}}-budapp
+  annotations:
+    {{- range $key, $value := .Values.deploymentAnnotations }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
 spec:
   replicas: 1
   selector:
@@ -12,9 +16,6 @@ spec:
       labels:
         app: {{ .Release.Name}}-budapp
       annotations:
-        {{- range $key, $value := .Values.podAnnotations }}
-        {{ $key }}: {{ $value | quote }}
-        {{- end }}
         dapr.io/enabled: "true"
         dapr.io/app-id: "budapp"
         dapr.io/app-port: "9082"

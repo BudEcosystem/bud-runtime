@@ -340,7 +340,7 @@ minio:
             - name: models-registry
             - name: model-info
 
-podAnnotations:
+deploymentAnnotations:
     keel.sh/policy: force
     keel.sh/trigger: poll
     keel.sh/match-tag: true
