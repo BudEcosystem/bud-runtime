@@ -340,6 +340,12 @@ minio:
             - name: models-registry
             - name: model-info
 
+podAnnotations:
+    keel.sh/policy: force
+    keel.sh/trigger: poll
+    keel.sh/match-tag: true
+    keel.sh/pollSchedule: "@every 1m"
+
 # best to be installed cluster wide, not as part of this chart
 dapr:
     enabled: false
