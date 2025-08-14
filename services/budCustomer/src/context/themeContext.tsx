@@ -114,7 +114,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
       };
       return defaultValues[varName] || "";
     },
-    [effectiveTheme, mounted]
+    [effectiveTheme, mounted],
   );
 
   // Use useMemo to stabilize theme config and prevent unnecessary re-renders
@@ -164,7 +164,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
       },
       components: {
         Button: {
-          colorPrimaryHover: getCSSVarValue("--color-purple-hover") || "#A76FE8",
+          colorPrimaryHover:
+            getCSSVarValue("--color-purple-hover") || "#A76FE8",
           colorPrimaryActive:
             getCSSVarValue("--color-purple-active") || "#8549D2",
         },
@@ -201,7 +202,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
         },
       },
     }),
-    [effectiveTheme, mounted, getCSSVarValue]
+    [effectiveTheme, mounted, getCSSVarValue],
   );
 
   // Prevent rendering children until client is mounted to avoid hydration issues

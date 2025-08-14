@@ -1,7 +1,6 @@
 import { successToast } from "../components/toast";
 import { AppRequest } from "../services/api/requests";
 import { create } from "zustand";
-import { tempApiBaseUrl } from "@/components/environment";
 import { Model } from "./useModels";
 import { Cluster } from "./useCluster";
 
@@ -140,7 +139,7 @@ export const useEndPoints = create<{
   getEndpointClusterDetails: async (endpointId: string, projectId?) => {
     console.log("projectId projectId", projectId);
     set({ loading: true });
-    const url = `${tempApiBaseUrl}/endpoints/${endpointId}/model-cluster-detail`;
+    const url = `/endpoints/${endpointId}/model-cluster-detail`;
 
     try {
       const response: any = await AppRequest.Get(url, {
@@ -161,7 +160,7 @@ export const useEndPoints = create<{
   },
 
   getEndPoints: async ({ id, page, limit, name, order_by = "-created_at" }) => {
-    const url = `${tempApiBaseUrl}/endpoints/`;
+    const url = `/endpoints/`;
     set({ loading: true });
     try {
       const response: any = await AppRequest.Get(url, {
@@ -206,7 +205,7 @@ export const useEndPoints = create<{
   deleteEndPoint: async (endpointId: string, id?: string): Promise<any> => {
     try {
       const response: any = await AppRequest.Post(
-        `${tempApiBaseUrl}/endpoints/${endpointId}/delete-workflow`,
+        `/endpoints/${endpointId}/delete-workflow`,
         null,
         {
           headers: {
@@ -233,7 +232,7 @@ export const useEndPoints = create<{
     }
   },
   getAdapters: async (params: GetAdapterParams, projectId?) => {
-    const url = `${tempApiBaseUrl}/endpoints/${params.endpointId}/adapters`;
+    const url = `/endpoints/${params.endpointId}/adapters`;
     set({ loading: true });
     try {
       const response: any = await AppRequest.Get(url, {
@@ -262,7 +261,7 @@ export const useEndPoints = create<{
 
   deleteAdapter: async (adapterId: string, projectId?) => {
     try {
-      const url = `${tempApiBaseUrl}/endpoints/delete-adapter/${adapterId}`;
+      const url = `/endpoints/delete-adapter/${adapterId}`;
       const response: any = await AppRequest.Post(url, undefined, {
         headers: {
           "x-resource-type": "project",
@@ -277,7 +276,7 @@ export const useEndPoints = create<{
 
   getReusedPrompts: async (deploymentId: string): Promise<any> => {
     try {
-      const url = `${tempApiBaseUrl}/metrics/analytics/cache-metrics/${deploymentId}?page=1&limit=1000`;
+      const url = `/metrics/analytics/cache-metrics/${deploymentId}?page=1&limit=1000`;
       const response: any = await AppRequest.Post(url);
       set({ reusedPromptList: response.data });
     } catch (error) {
@@ -287,7 +286,7 @@ export const useEndPoints = create<{
   getInferenceQualityAnalytics: async (deploymentId: string): Promise<any> => {
     set({ loading: true });
     try {
-      const url = `${tempApiBaseUrl}/metrics/analytics/inference-quality/${deploymentId}`;
+      const url = `/metrics/analytics/inference-quality/${deploymentId}`;
       const response: any = await AppRequest.Post(url);
       set({ inferenceQualityAnalytics: response.data });
       set({ loading: false });
@@ -328,7 +327,7 @@ export const useEndPoints = create<{
     );
 
     const query = new URLSearchParams(payload as any).toString();
-    const url = `${tempApiBaseUrl}/metrics/analytics/inference-quality-prompts/${id}/${get().scoreType}?${query}`;
+    const url = `/metrics/analytics/inference-quality-prompts/${id}/${get().scoreType}?${query}`;
 
     try {
       const response: any = await AppRequest.Post(url); // Assuming you're actually fetching data
@@ -341,7 +340,7 @@ export const useEndPoints = create<{
 
   getEndpointSettings: async (endpointId: string): Promise<any> => {
     try {
-      const url = `${tempApiBaseUrl}/endpoints/${endpointId}/deployment-settings`;
+      const url = `/endpoints/${endpointId}/deployment-settings`;
       const response: any = await AppRequest.Get(url);
       return response.data;
     } catch (error) {
@@ -375,7 +374,7 @@ export const useEndPoints = create<{
     settings: any,
   ): Promise<any> => {
     try {
-      const url = `${tempApiBaseUrl}/endpoints/${endpointId}/deployment-settings`;
+      const url = `/endpoints/${endpointId}/deployment-settings`;
       const response: any = await AppRequest.Put(url, settings);
       return response.data;
     } catch (error) {
