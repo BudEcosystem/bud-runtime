@@ -17,7 +17,9 @@ export const errorToast = (message: string) => {
       placement: "topRight",
     });
   } else {
-    console.error("Notification API not initialized. Use useNotification hook instead.");
+    console.error(
+      "Notification API not initialized. Use useNotification hook instead.",
+    );
   }
 };
 
@@ -29,7 +31,9 @@ export const successToast = (message: string) => {
       placement: "topRight",
     });
   } else {
-    console.error("Notification API not initialized. Use useNotification hook instead.");
+    console.error(
+      "Notification API not initialized. Use useNotification hook instead.",
+    );
   }
 };
 
@@ -41,7 +45,9 @@ export const warningToast = (message: string) => {
       placement: "topRight",
     });
   } else {
-    console.error("Notification API not initialized. Use useNotification hook instead.");
+    console.error(
+      "Notification API not initialized. Use useNotification hook instead.",
+    );
   }
 };
 
@@ -53,7 +59,9 @@ export const infoToast = (message: string) => {
       placement: "topRight",
     });
   } else {
-    console.error("Notification API not initialized. Use useNotification hook instead.");
+    console.error(
+      "Notification API not initialized. Use useNotification hook instead.",
+    );
   }
 };
 
