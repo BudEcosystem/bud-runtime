@@ -12,7 +12,6 @@ from budapp.eval_ops.models import ExpDataset as DatasetModel
 from budapp.eval_ops.models import (
     ExpDatasetVersion,
     ExperimentStatusEnum,
-    ExpTrait,
     RunStatusEnum,
 )
 from budapp.eval_ops.models import Experiment as ExperimentModel
@@ -57,6 +56,7 @@ from budapp.eval_ops.schemas import (
 from budapp.eval_ops.schemas import (
     Trait as TraitSchema,
 )
+from budapp.model_ops.models import Model as ModelTable
 from budapp.workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
 from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStatusEnum
@@ -652,7 +652,7 @@ class ExperimentService:
                         q = q.filter(DatasetModel.domains.contains([domain]))
                 if filters.trait_ids:
                     # Filter by trait UUIDs through the many-to-many relationship
-                    q = q.join(DatasetModel.traits).filter(ExpTrait.id.in_(filters.trait_ids))
+                    q = q.join(DatasetModel.traits).filter(TraitModel.id.in_(filters.trait_ids))
 
             # Get total count before applying pagination
             total_count = q.count()
@@ -1564,12 +1564,24 @@ class EvaluationWorkflowService:
                 if model_id:
                     try:
                         model_uuid = uuid.UUID(str(model_id))
-                        # Since we don't have direct model details, at least format it nicely
-                        step_data["model_details"] = {
-                            "id": str(model_uuid),
-                            "name": f"Model {str(model_uuid)[:8]}",
-                            # You could fetch more details from a model service/table if available
-                        }
+                        model_row = self.session.query(ModelTable).filter(ModelTable.id == model_uuid).first()
+                        if model_row:
+                            step_data["model_details"] = {
+                                "id": str(model_row.id),
+                                "name": model_row.name,
+                                "description": model_row.description,
+                                "modality": list(model_row.modality) if model_row.modality is not None else None,
+                                "provider_type": model_row.provider_type,
+                                "source": model_row.source,
+                                "uri": model_row.uri,
+                                "icon": model_row.icon,
+                            }
+                        else:
+                            # Fallback to minimal info if model row is not found
+                            step_data["model_details"] = {
+                                "id": str(model_uuid),
+                                "name": f"Model {str(model_uuid)[:8]}",
+                            }
                     except (ValueError, TypeError):
                         pass
 
@@ -1767,13 +1779,30 @@ class EvaluationWorkflowService:
 
             unique_model_ids = list({run.model_id for run in existing_runs})
 
-            # Get model details (assuming you have a model service/table)
-            return {
-                "available_models": [
-                    {"id": str(model_id), "name": f"Model {str(model_id)[:8]}"} for model_id in unique_model_ids
-                ],
-                "message": "Select a model for evaluation",
-            }
+            # Fetch model details for these IDs
+            models = self.session.query(ModelTable).filter(ModelTable.id.in_(unique_model_ids)).all()
+            model_id_to_row = {row.id: row for row in models}
+
+            available_models = []
+            for model_id in unique_model_ids:
+                row = model_id_to_row.get(model_id)
+                if row:
+                    available_models.append(
+                        {
+                            "id": str(row.id),
+                            "name": row.name,
+                            "description": row.description,
+                            "modality": list(row.modality) if row.modality is not None else None,
+                            "provider_type": row.provider_type,
+                            "source": row.source,
+                            "uri": row.uri,
+                            "icon": row.icon,
+                        }
+                    )
+                else:
+                    available_models.append({"id": str(model_id), "name": f"Model {str(model_id)[:8]}"})
+
+            return {"available_models": available_models, "message": "Select a model for evaluation"}
 
         elif next_step == 3:
             # Return available traits
@@ -1811,12 +1840,87 @@ class EvaluationWorkflowService:
             trait_ids = accumulated_data.get("step_3", {}).get("trait_ids", [])
             dataset_ids = accumulated_data.get("step_4", {}).get("dataset_ids", [])
 
+            # Prepare model details
+            model_details = accumulated_data.get("step_2", {}).get("model_details")
+            if not model_details and model_id:
+                try:
+                    model_uuid = uuid.UUID(str(model_id))
+                    model_row = self.session.query(ModelTable).filter(ModelTable.id == model_uuid).first()
+                    if model_row:
+                        model_details = {
+                            "id": str(model_row.id),
+                            "name": model_row.name,
+                            "description": model_row.description,
+                            "modality": list(model_row.modality) if model_row.modality is not None else None,
+                            "provider_type": model_row.provider_type,
+                            "source": model_row.source,
+                            "uri": model_row.uri,
+                            "icon": model_row.icon,
+                        }
+                except (ValueError, TypeError):
+                    model_details = None
+
+            # Inject static fields into model details as requested
+            if model_details is None:
+                model_details = {}
+            # Always include static tags
+            model_details["tags"] = ["LLM", "SLM"]
+            # Ensure icon has some value
+            if not model_details.get("icon"):
+                model_details["icon"] = "https://example.com/icon.png"
+
+            # Prepare traits details
+            traits_details = accumulated_data.get("step_3", {}).get("traits_details") or []
+            if not traits_details and trait_ids:
+                traits_details = []
+                for t_id in trait_ids:
+                    try:
+                        t_uuid = uuid.UUID(str(t_id))
+                        trait = self.session.query(TraitModel).filter(TraitModel.id == t_uuid).first()
+                        if trait:
+                            traits_details.append(
+                                {"id": str(trait.id), "name": trait.name, "description": trait.description}
+                            )
+                    except (ValueError, TypeError):
+                        continue
+
+            # Prepare datasets details
+            datasets_details = accumulated_data.get("step_4", {}).get("datasets_details") or []
+            if not datasets_details and dataset_ids:
+                datasets_details = []
+                for d_id in dataset_ids:
+                    try:
+                        d_uuid = uuid.UUID(str(d_id))
+                        dataset = self.session.query(DatasetModel).filter(DatasetModel.id == d_uuid).first()
+                        if dataset:
+                            datasets_details.append(
+                                {
+                                    "id": str(dataset.id),
+                                    "name": dataset.name,
+                                    "description": dataset.description,
+                                }
+                            )
+                    except (ValueError, TypeError):
+                        continue
+
             return {
                 "summary": {
+                    # Keep existing fields for backward compatibility
                     "model_selected": str(model_id) if model_id else "None",
                     "traits_selected": len(trait_ids),
                     "datasets_selected": len(dataset_ids),
-                    "runs_to_create": len(dataset_ids),
+                    # New detailed fields
+                    "model": model_details,
+                    "traits": traits_details,
+                    "datasets": datasets_details,
+                    "runs_to_create": len(datasets_details) if datasets_details else len(dataset_ids),
+                    # New evaluation info (static values)
+                    "eva_info": {
+                        "ETA": "2hr",
+                        "Cost": "100$",
+                        "Max QPS": "652 req/sec",
+                        "Total Tokens": "5321",
+                    },
                 },
                 "message": "Review and confirm to create evaluation runs",
             }
