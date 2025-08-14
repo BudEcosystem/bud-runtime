@@ -123,7 +123,7 @@ class PlaygroundService(SessionMixin):
             # For CLIENT users, only show published models
             filter_published_only = user.user_type == UserTypeEnum.CLIENT
 
-            if user.user_type == UserTypeEnum.CLIENT:
+            if filter_published_only:
                 # For CLIENT users, show ALL published models (not restricted by project)
                 logger.debug(f"Getting all published deployments for CLIENT user {current_user_id}")
                 project_ids = None  # None means no project filtering - show all published
