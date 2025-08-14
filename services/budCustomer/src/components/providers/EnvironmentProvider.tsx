@@ -1,20 +1,25 @@
 "use client";
 
-import React, { createContext, useContext, ReactNode } from 'react';
-import { EnvironmentConfig } from '@/lib/environment';
+import React, { createContext, useContext, ReactNode } from "react";
+import { EnvironmentConfig } from "@/lib/environment";
 
 interface EnvironmentContextType {
   environment: EnvironmentConfig;
 }
 
-const EnvironmentContext = createContext<EnvironmentContextType | undefined>(undefined);
+const EnvironmentContext = createContext<EnvironmentContextType | undefined>(
+  undefined,
+);
 
 interface EnvironmentProviderProps {
   children: ReactNode;
   environment: EnvironmentConfig;
 }
 
-export function EnvironmentProvider({ children, environment }: EnvironmentProviderProps) {
+export function EnvironmentProvider({
+  children,
+  environment,
+}: EnvironmentProviderProps) {
   return (
     <EnvironmentContext.Provider value={{ environment }}>
       {children}
@@ -25,7 +30,9 @@ export function EnvironmentProvider({ children, environment }: EnvironmentProvid
 export function useEnvironment() {
   const context = useContext(EnvironmentContext);
   if (context === undefined) {
-    throw new Error('useEnvironment must be used within an EnvironmentProvider');
+    throw new Error(
+      "useEnvironment must be used within an EnvironmentProvider",
+    );
   }
   return context.environment;
 }
@@ -35,8 +42,6 @@ export function useApiConfig() {
   const environment = useEnvironment();
   return {
     baseUrl: environment.baseUrl,
-    apiBaseUrl: environment.apiBaseUrl,
-    tempApiBaseUrl: environment.tempApiBaseUrl,
   };
 }
 

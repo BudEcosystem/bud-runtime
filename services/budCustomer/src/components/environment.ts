@@ -6,4 +6,4 @@ import { getClientEnvironment } from "@/lib/environment";
 const clientEnv = getClientEnvironment();
 
 export const assetBaseUrl = clientEnv.assetBaseUrl || "";
-export const tempApiBaseUrl = clientEnv.apiBaseUrl || "http://localhost:3000/api";
+export const tempApiBaseUrl = clientEnv.baseUrl || "http://localhost:3000";

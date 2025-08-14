@@ -6,9 +6,7 @@ export interface EnvironmentConfig {
   askBudUrl: string;
   askBudModel: string;
   assetBaseUrl: string;
-  apiBaseUrl: string;
   baseUrl: string;
-  tempApiBaseUrl: string;
   novuBaseUrl: string;
   novuSocketUrl: string;
   copyCodeApiBaseUrl: string;
@@ -20,13 +18,12 @@ export interface EnvironmentConfig {
 // This will pick up both .env file variables and runtime environment variables
 export function getServerEnvironment(): EnvironmentConfig {
   return {
-    playgroundUrl: process.env.NEXT_PUBLIC_PLAYGROUND_URL || "http://localhost:3001",
+    playgroundUrl:
+      process.env.NEXT_PUBLIC_PLAYGROUND_URL || "http://localhost:3001",
     askBudUrl: process.env.NEXT_PUBLIC_ASK_BUD_URL || "",
     askBudModel: process.env.NEXT_PUBLIC_ASK_BUD_MODEL || "gpt-4",
     assetBaseUrl: process.env.NEXT_PUBLIC_ASSET_BASE_URL || "",
-    apiBaseUrl: process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000/api",
     baseUrl: process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000",
-    tempApiBaseUrl: process.env.NEXT_PUBLIC_TEMP_API_BASE_URL || process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000",
     novuBaseUrl: process.env.NEXT_PUBLIC_NOVU_BASE_URL || "",
     novuSocketUrl: process.env.NEXT_PUBLIC_NOVU_SOCKET_URL || "",
     copyCodeApiBaseUrl: process.env.NEXT_PUBLIC_COPY_CODE_API_BASE_URL || "",
@@ -38,19 +35,18 @@ export function getServerEnvironment(): EnvironmentConfig {
 // Client-side fallback function (for client components that still need env vars)
 // This should be used as a fallback when server-side injection is not available
 export function getClientEnvironment(): Partial<EnvironmentConfig> {
-  if (typeof window === 'undefined') {
+  if (typeof window === "undefined") {
     // If running on server, return empty object to prevent hydration issues
     return {};
   }
 
   return {
-    playgroundUrl: process.env.NEXT_PUBLIC_PLAYGROUND_URL || "http://localhost:3001",
+    playgroundUrl:
+      process.env.NEXT_PUBLIC_PLAYGROUND_URL || "http://localhost:3001",
     askBudUrl: process.env.NEXT_PUBLIC_ASK_BUD_URL || "",
     askBudModel: process.env.NEXT_PUBLIC_ASK_BUD_MODEL || "gpt-4",
     assetBaseUrl: process.env.NEXT_PUBLIC_ASSET_BASE_URL || "",
-    apiBaseUrl: process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000/api",
     baseUrl: process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000",
-    tempApiBaseUrl: process.env.NEXT_PUBLIC_TEMP_API_BASE_URL || process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000",
     novuBaseUrl: process.env.NEXT_PUBLIC_NOVU_BASE_URL || "",
     novuSocketUrl: process.env.NEXT_PUBLIC_NOVU_SOCKET_URL || "",
     copyCodeApiBaseUrl: process.env.NEXT_PUBLIC_COPY_CODE_API_BASE_URL || "",
@@ -58,6 +54,8 @@ export function getClientEnvironment(): Partial<EnvironmentConfig> {
 }
 
 // Type guard to check if environment config is complete
-export function isCompleteEnvironment(env: Partial<EnvironmentConfig>): env is EnvironmentConfig {
-  return !!(env.baseUrl && env.apiBaseUrl);
+export function isCompleteEnvironment(
+  env: Partial<EnvironmentConfig>,
+): env is EnvironmentConfig {
+  return !!env.baseUrl;
 }

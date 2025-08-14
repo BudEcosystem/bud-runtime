@@ -1,13 +1,13 @@
 "use client";
 
-import { useMemo } from 'react';
-import { useApiConfig } from '@/components/providers/EnvironmentProvider';
-import { createApiRequest } from '@/services/api/requests-new';
+import { useMemo } from "react";
+import { useApiConfig } from "@/components/providers/EnvironmentProvider";
+import { createApiRequest } from "@/services/api/requests-new";
 
 // Hook to create API request instance with environment configuration
 export function useApiRequest() {
   const { baseUrl } = useApiConfig();
-  
+
   const apiRequest = useMemo(() => {
     return createApiRequest(baseUrl);
   }, [baseUrl]);

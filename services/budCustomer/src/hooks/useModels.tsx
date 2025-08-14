@@ -1,4 +1,3 @@
-import { tempApiBaseUrl } from "@/components/environment";
 import { AppRequest } from "@/services/api/requests";
 import { create } from "zustand";
 import { Provider } from "./useCloudProviders";
@@ -252,7 +251,7 @@ export const useModels = create<{
   getLeaderBoard: async (modelId: string) => {
     try {
       const response: any = await AppRequest.Get(
-        `${tempApiBaseUrl}/models/${modelId}/leaderboards`,
+        `/models/${modelId}/leaderboards`,
         {
           params: {
             table_source: "model",
@@ -379,7 +378,7 @@ export const useModels = create<{
 
     set({ loading: true });
     try {
-      const response: any = await AppRequest.Get(`${tempApiBaseUrl}/models`, {
+      const response: any = await AppRequest.Get(`/models`, {
         params: {
           ...params,
           search: Boolean(params.name),
@@ -415,9 +414,7 @@ export const useModels = create<{
     set({ loading: true });
     try {
       set({ selectedModel: null });
-      const response: any = await AppRequest.Get(
-        `${tempApiBaseUrl}/models/${modelId}`,
-      );
+      const response: any = await AppRequest.Get(`/models/${modelId}`);
       set({
         selectedModel: {
           ...response.data.model,
@@ -436,10 +433,7 @@ export const useModels = create<{
   },
   updateModel: async (modelId: string, data: any) => {
     try {
-      const response: any = await AppRequest.Patch(
-        `${tempApiBaseUrl}/models/${modelId}`,
-        data,
-      );
+      const response: any = await AppRequest.Patch(`/models/${modelId}`, data);
       return response.data;
     } catch (error) {
       console.error("Error creating model:", error);
@@ -451,9 +445,7 @@ export const useModels = create<{
   },
   getTasks: async () => {
     try {
-      const response: any = await AppRequest.Get(
-        `${tempApiBaseUrl}/models/tasks`,
-      );
+      const response: any = await AppRequest.Get(`/models/tasks`);
       set({ tasks: response.data?.tasks });
     } catch (error) {
       console.error("Error creating model:", error);
@@ -461,15 +453,12 @@ export const useModels = create<{
   },
   getAuthors: async () => {
     try {
-      const response: any = await AppRequest.Get(
-        `${tempApiBaseUrl}/models/authors`,
-        {
-          params: {
-            page: 1,
-            limit: 1000,
-          },
+      const response: any = await AppRequest.Get(`/models/authors`, {
+        params: {
+          page: 1,
+          limit: 1000,
         },
-      );
+      });
       set({ authors: response.data?.authors });
     } catch (error) {
       console.error("Error creating model:", error);
@@ -481,9 +470,7 @@ export const useModels = create<{
   },
   deleteModel: async (modelId: string) => {
     try {
-      const response: any = await AppRequest.Delete(
-        `${tempApiBaseUrl}/models/${modelId}`,
-      );
+      const response: any = await AppRequest.Delete(`/models/${modelId}`);
       return response.data;
     } catch (error) {
       console.error("Error creating model:", error);

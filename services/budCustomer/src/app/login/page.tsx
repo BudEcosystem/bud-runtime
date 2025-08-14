@@ -20,17 +20,16 @@ export default function Login() {
   const { showLoader, hideLoader } = useLoader();
   const router = useRouter();
   const [isBackToLogin, setIsBackToLogin] = useState(false);
-  
+
   // Use the new environment system
   const environment = useEnvironment();
   const apiRequest = useApiRequest();
 
   useEffect(() => {
-    console.log('Environment variables from provider:');
-    console.log('tempApiBaseUrl:', environment.tempApiBaseUrl);
-    console.log('baseUrl:', environment.baseUrl);
-    console.log('novuBaseUrl:', environment.novuBaseUrl);
-    
+    console.log("Environment variables from provider:");
+    console.log("baseUrl:", environment.baseUrl);
+    console.log("novuBaseUrl:", environment.novuBaseUrl);
+
     if (activePage === 4) {
       setTimeout(() => {
         setIsBackToLogin(true);
