@@ -387,10 +387,6 @@ class EndpointDataManager(DataManagerUtils):
                 .filter(or_(*search_conditions, *explicit_conditions))
                 .filter(EndpointModel.status == EndpointStatusEnum.RUNNING)
             )
-            # Only filter by project_ids if provided
-            if project_ids is not None:
-                stmt = stmt.filter(EndpointModel.project_id.in_(project_ids))
-                count_stmt = count_stmt.filter(EndpointModel.project_id.in_(project_ids))
         else:
             if explicit_filters["model_name"]:
                 model_name_condition = Model.name == explicit_filters["model_name"]
@@ -435,10 +431,11 @@ class EndpointDataManager(DataManagerUtils):
                 .where(and_(*explicit_conditions))
                 .filter(EndpointModel.status == EndpointStatusEnum.RUNNING)
             )
-            # Only filter by project_ids if provided
-            if project_ids is not None:
-                stmt = stmt.filter(EndpointModel.project_id.in_(project_ids))
-                count_stmt = count_stmt.filter(EndpointModel.project_id.in_(project_ids))
+
+        # Only filter by project_ids if provided
+        if project_ids is not None:
+            stmt = stmt.filter(EndpointModel.project_id.in_(project_ids))
+            count_stmt = count_stmt.filter(EndpointModel.project_id.in_(project_ids))
 
         # Calculate count before applying limit and offset
         count = self.execute_scalar(count_stmt)
