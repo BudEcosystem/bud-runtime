@@ -114,6 +114,8 @@ import EvaluationSummary from "./Evaluations/RunEvaluation/EvaluationSummary";
 import NewExperimentSuccess from "./Evaluations/NewExperiment/newExperimentSuccess";
 import Publish from "./Project/Publish";
 import ViewEvalDetailscopy from "./Evaluations/RunEvaluation/ViewEvalDetail";
+import SelectProvider from "./GuardRails/SelectProvider";
+import PolitenessDetection from "./GuardRails/PolitenessDetection";
 
 export const StepComponents = {
   "new-project": NewProject,
@@ -243,6 +245,10 @@ export const StepComponents = {
   // "view-eval-details": ViewEvalDetails,
   "view-eval-details": ViewEvalDetailscopy,
   "evaluation-summary": EvaluationSummary,
+
+  // GuardRails
+  "select-provider": SelectProvider,
+  "politeness-detection": PolitenessDetection,
 
 };
 

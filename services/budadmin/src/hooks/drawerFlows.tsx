@@ -3636,6 +3636,48 @@ const viewEvalDetails: DrawerFlowType = {
   ],
 };
 
+const addGuardrail: DrawerFlowType = {
+  title: "Add Guardrail",
+  description: "Configure guardrails for your models",
+  totalSteps: 2,
+  steps: [
+    {
+      navigation: () => ["Guardrails", "Select Provider"],
+      id: "select-provider",
+      step: 1,
+      component: StepComponents["select-provider"],
+      progress: [
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Select Provider",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Configure",
+        },
+      ],
+      confirmClose: true,
+    },
+    {
+      navigation: () => ["Guardrails", "Configure"],
+      id: "politeness-detection",
+      step: 2,
+      component: StepComponents["politeness-detection"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Provider",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Configure",
+        },
+      ],
+      confirmClose: true,
+    },
+  ],
+};
+
 const flows = {
   "new-project": newProject,
   "deploy-model": deployModel,
@@ -3691,6 +3733,8 @@ const flows = {
   "new-experiment": newExperiment,
   "run-evaluation": runEvaluation,
   "eval-details": viewEvalDetails,
+  // guardrails
+  "add-guardrail": addGuardrail,
 };
 
 export const flowMapping: {
