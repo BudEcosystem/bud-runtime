@@ -22,7 +22,7 @@ from uuid import UUID
 from fastapi import status
 
 from ..commons import logging
-from ..commons.constants import EndpointStatusEnum
+from ..commons.constants import EndpointStatusEnum, ProjectTypeEnum, UserTypeEnum
 from ..commons.db_utils import SessionMixin
 from ..commons.exceptions import ClientException
 from ..credential_ops.crud import CredentialDataManager
@@ -31,6 +31,9 @@ from ..endpoint_ops.crud import EndpointDataManager
 from ..endpoint_ops.models import Endpoint as EndpointModel
 from ..model_ops.services import ModelService
 from ..project_ops.crud import ProjectDataManager
+from ..project_ops.models import Project as ProjectModel
+from ..user_ops.crud import UserDataManager
+from ..user_ops.models import User as UserModel
 from .crud import ChatSessionDataManager, ChatSettingDataManager, MessageDataManager, NoteDataManager
 from .models import ChatSession, ChatSetting, Message, Note
 from .schemas import (
@@ -63,8 +66,12 @@ class PlaygroundService(SessionMixin):
         filters = filters or {}
         order_by = order_by or []
 
-        project_ids = await self._get_authorized_project_ids(current_user_id, api_key)
-        logger.debug("authorized project_ids: %s", project_ids)
+        project_ids, filter_published_only = await self._get_authorized_project_ids(current_user_id, api_key)
+        logger.debug("authorized project_ids: %s, filter_published_only: %s", project_ids, filter_published_only)
+
+        # Add published filter if needed for CLIENT users
+        if filter_published_only:
+            filters["is_published"] = True
 
         db_endpoints, count = await EndpointDataManager(self.session).get_all_playground_deployments(
             project_ids,
@@ -101,15 +108,34 @@ class PlaygroundService(SessionMixin):
 
     async def _get_authorized_project_ids(
         self, current_user_id: Optional[UUID] = None, api_key: Optional[str] = None
-    ) -> List[UUID]:
-        """Get all authorized project ids."""
+    ) -> Tuple[Optional[List[UUID]], bool]:
+        """Get all authorized project ids and whether to filter published only.
+
+        Returns:
+            Tuple[Optional[List[UUID]], bool]: List of project IDs (None for all projects) and whether to filter for published models only.
+                - When filter_published_only is True and project_ids is None, show ALL published models across all projects
+                - When filter_published_only is False, project_ids contains specific projects to filter
+        """
         if current_user_id:
-            # NOTE: As per user permissions list the playground deployments (accessible project ids)
-            # TODO: Query all accessible project ids for the user (Currently all active project ids since permissions are not implemented)
-            logger.debug(f"Getting all playground deployments for user {current_user_id}")
-            return await ProjectDataManager(self.session).get_all_active_project_ids()
+            # Get the user to check their type
+            user = await UserDataManager(self.session).retrieve_by_fields(UserModel, fields={"id": current_user_id})
+
+            # For CLIENT users, only show published models
+            filter_published_only = user.user_type == UserTypeEnum.CLIENT
+
+            if user.user_type == UserTypeEnum.CLIENT:
+                # For CLIENT users, show ALL published models (not restricted by project)
+                logger.debug(f"Getting all published deployments for CLIENT user {current_user_id}")
+                project_ids = None  # None means no project filtering - show all published
+            else:
+                # For ADMIN users, get all active project ids
+                logger.debug(f"Getting all playground deployments for ADMIN user {current_user_id}")
+                project_ids = await ProjectDataManager(self.session).get_all_active_project_ids()
+
+            return project_ids, filter_published_only
         elif api_key:
-            # if api_key is present identify the project id
+            # if api_key is present identify the project id and type
+
             db_credential = await CredentialDataManager(self.session).retrieve_by_fields(
                 CredentialModel, fields={"key": api_key}, missing_ok=True
             )
@@ -121,7 +147,28 @@ class PlaygroundService(SessionMixin):
                     message="Invalid API key",
                 )
             else:
-                return [db_credential.project.id]
+                # Get the project to check its type
+                project = await ProjectDataManager(self.session).retrieve_by_fields(
+                    ProjectModel, fields={"id": db_credential.project_id}
+                )
+
+                # Check if the API key belongs to a CLIENT project
+                # CLIENT projects should only see published models
+                filter_published_only = project.project_type == ProjectTypeEnum.CLIENT_APP
+
+                if filter_published_only:
+                    # CLIENT API keys see ALL published models (not restricted to their project)
+                    logger.debug(f"CLIENT API key for project {project.id}, showing all published models")
+                    project_ids = None  # None means no project filtering - show all published
+                else:
+                    # Non-CLIENT API keys see all models from their specific project
+                    logger.debug(
+                        f"Non-CLIENT API key for project {project.id} (type: {project.project_type}), "
+                        f"showing all models from this project"
+                    )
+                    project_ids = [project.id]
+
+                return project_ids, filter_published_only
         else:
             raise ClientException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
