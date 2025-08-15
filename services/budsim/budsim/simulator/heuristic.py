@@ -394,4 +394,4 @@ class HeuristicCalculator:
         }
         # Create deterministic hash
         key_str = json.dumps(key_data, sort_keys=True)
-        return hashlib.md5(key_str.encode()).hexdigest()
+        return hashlib.md5(key_str.encode(), usedforsecurity=False).hexdigest()

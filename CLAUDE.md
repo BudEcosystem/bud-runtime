@@ -330,6 +330,60 @@ Note: Make sure to update CLAUDE.md if you come across anything new related to a
 - Use sub agents when ever required
 - Use proactively stack-keeper agent to plan the development task and distribute to respective agents.
 
+## Service-Specific Development Notes
+
+### BudSim (Performance Simulation Service)
+
+The budsim service has two distinct optimization methods:
+- **Evolution Algorithm (ML-based)**: Uses genetic algorithms with XGBoost regressors to optimize all engine parameters
+- **DirectSearch/Heuristic**: Uses memory-based calculations to optimize only parallelism (TP/PP) parameters
+
+Key architecture patterns:
+- Optimization methods are selected via `simulation_method` parameter (REGRESSOR vs HEURISTIC)
+- Engine configurations use minimal args for heuristic mode (only essential parameters)
+- Evolution mode includes all optimized parameters in deployment configs
+- Use `_is_heuristic_config()` to detect which method generated a configuration
+
+Important: When working with deployment configurations, ensure heuristic-based configs only include optimized parameters, not engine defaults.
+
+### Service Communication Patterns
+
+- **Dapr Workflows**: Long-running processes use Dapr workflows (budsim simulations, cluster provisioning)
+- **Pub/Sub**: Real-time notifications via Kafka with budnotify service
+- **State Management**: Redis/Valkey for cross-service state sharing
+- **Service Invocation**: Dapr service-to-service calls with automatic retry/circuit breaking
+
+### Database Patterns
+
+- **PostgreSQL**: Primary storage for most services with Alembic migrations
+- **ClickHouse**: Time-series analytics in budmetrics with custom query optimizations
+- **Redis**: Pub/sub, caching, and Dapr state store
+- **Row-level Security**: Implemented in budapp for multi-tenant data isolation
+
+### Common Development Patterns
+
+#### Error Handling and Validation
+- Use Pydantic schemas for request/response validation across all services
+- Implement proper exception handling with structured error responses
+- Log errors with context (workflow_id, user_id, cluster_id) for debugging
+
+#### Configuration Management
+- Environment variables via `.env` files with `.env.sample` templates
+- Dapr configuration for runtime settings with periodic sync
+- Use `app_settings` from budmicroframe for centralized config access
+
+#### Testing Approaches
+- Unit tests with pytest and asyncio support
+- Mock Dapr components for isolated testing
+- Integration tests require Dapr sidecar with API tokens
+- Use `--dapr-http-port` and `--dapr-api-token` for pytest
+
+#### Performance Considerations
+- ClickHouse queries use composite indexes for time-series data
+- Implement pagination for large result sets
+- Use background tasks for long-running operations (workflows)
+- Cache frequently accessed data in Redis
+
 ## Recent Feature Additions
 
 ### Inference Request/Prompt Listing (January 2025)

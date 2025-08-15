@@ -6,11 +6,7 @@ from llm_benchmark.model import analysis
 
 # Try to import llm-memory-calculator for accurate calculations
 try:
-    from llm_memory_calculator import (
-        calculate_memory,
-        estimate_end_to_end_performance,
-        get_hardware_config,
-    )
+    from llm_memory_calculator import calculate_memory
 
     LLM_CALC_AVAILABLE = True
 except ImportError:

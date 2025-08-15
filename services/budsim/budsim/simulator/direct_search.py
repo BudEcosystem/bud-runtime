@@ -5,7 +5,6 @@ concurrency and explores configurations systematically, stopping when performanc
 targets are met to ensure minimum cost.
 """
 
-import logging
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 

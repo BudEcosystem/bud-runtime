@@ -168,7 +168,6 @@ class DeploymentHandler:
         }
 
         full_node_list = copy.deepcopy(node_list)
-        max_loras = 5 if not adapters else max(5, len(adapters))
 
         for node in node_list:
             node_values = {"name": node["name"], "devices": []}
