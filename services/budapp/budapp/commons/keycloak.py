@@ -6,13 +6,15 @@ import sys
 from typing import Dict, List, Optional, Tuple, Union
 
 import requests
-from jose import ExpiredSignatureError, JWTError
+from jwt.exceptions import ExpiredSignatureError
+from jwt.exceptions import PyJWTError as JWTError
 from keycloak import (
     KeycloakAdmin,
     KeycloakAuthenticationError,
     KeycloakGetError,
     KeycloakInvalidTokenError,
     KeycloakOpenID,
+    KeycloakPostError,
 )
 
 from budapp.auth.schemas import ResourceCreate, UserCreate
@@ -356,8 +358,13 @@ class KeycloakManager:
             if user.permissions:
                 for permission in user.permissions:
                     if permission.has_permission:
-                        key = permission.name.split(":")[0]
-                        scope_name = permission.name.split(":")[1]
+                        parts = permission.name.split(":", 1)
+                        if len(parts) == 2:
+                            key, scope_name = parts
+                        else:
+                            # Handle permissions without colon separator
+                            key = permission.name
+                            scope_name = "default"
                         if key not in user_permission_map:
                             user_permission_map[key] = []
                         user_permission_map[key].append(scope_name)
@@ -497,6 +504,15 @@ class KeycloakManager:
                     )
 
             return user_id
+        except KeycloakPostError as e:
+            # A 409 Conflict status code typically indicates that the user already exists.
+            if e.response_code == 409:
+                logger.error(f"User with email {user.email} already exists in Keycloak realm {realm_name}")
+                from budapp.commons.exceptions import ClientException
+
+                raise ClientException(message="Email already registered")
+            logger.error(f"Keycloak error creating user {user.email} in realm {realm_name}: {error_msg}")
+            raise
         except Exception as e:
             logger.error(f"Error creating realm admin {(user.email,)} in realm {realm_name}: {str(e)}", exc_info=True)
             raise

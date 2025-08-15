@@ -84,7 +84,7 @@ async fn test_dynamic_evaluation() {
             ]),
             ..Default::default()
         };
-        let response = if let InferenceOutput::NonStreaming(response) =
+        let response = if let InferenceOutput::NonStreaming { response, .. } =
             client.inference(inference_params).await.unwrap()
         {
             response
@@ -253,7 +253,7 @@ async fn test_dynamic_evaluation_other_function() {
         },
         ..Default::default()
     };
-    let response = if let InferenceOutput::NonStreaming(response) =
+    let response = if let InferenceOutput::NonStreaming { response, .. } =
         client.inference(inference_params).await.unwrap()
     {
         response
@@ -378,7 +378,7 @@ async fn test_dynamic_evaluation_override_variant_tags() {
         tags: HashMap::from([("foo".to_string(), "baz".to_string())]),
         ..Default::default()
     };
-    let response = if let InferenceOutput::NonStreaming(response) =
+    let response = if let InferenceOutput::NonStreaming { response, .. } =
         client.inference(inference_params).await.unwrap()
     {
         response

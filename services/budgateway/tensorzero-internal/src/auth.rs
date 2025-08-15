@@ -16,6 +16,7 @@ pub struct ApiKeyMetadata {
 }
 
 pub type APIConfig = HashMap<String, ApiKeyMetadata>;
+pub type PublishedModelInfo = HashMap<String, ApiKeyMetadata>;
 
 // Common error response helper
 fn auth_error_response(status: StatusCode, message: &str) -> Response {
@@ -32,12 +33,14 @@ fn auth_error_response(status: StatusCode, message: &str) -> Response {
 #[derive(Clone)]
 pub struct Auth {
     api_keys: Arc<RwLock<HashMap<String, APIConfig>>>,
+    published_model_info: Arc<RwLock<PublishedModelInfo>>,
 }
 
 impl Auth {
     pub fn new(api_keys: HashMap<String, APIConfig>) -> Self {
         Self {
             api_keys: Arc::new(RwLock::new(api_keys)),
+            published_model_info: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -62,6 +65,24 @@ impl Auth {
             return Ok(api_config.clone());
         }
         Err(StatusCode::UNAUTHORIZED)
+    }
+
+    pub fn update_published_model_info(&self, model_info: PublishedModelInfo) {
+        #[expect(clippy::expect_used)]
+        let mut published_model_info = self.published_model_info.write().expect("RwLock poisoned");
+        *published_model_info = model_info;
+    }
+
+    pub fn clear_published_model_info(&self) {
+        #[expect(clippy::expect_used)]
+        let mut published_model_info = self.published_model_info.write().expect("RwLock poisoned");
+        published_model_info.clear();
+    }
+
+    pub fn get_published_model_info(&self) -> PublishedModelInfo {
+        #[expect(clippy::expect_used)]
+        let published_model_info = self.published_model_info.read().expect("RwLock poisoned");
+        published_model_info.clone()
     }
 }
 
@@ -92,12 +113,22 @@ pub async fn require_api_key(
         }
     };
 
-    let api_config = auth.validate_api_key(key);
+    let mut api_config = auth.validate_api_key(key);
     if api_config.is_err() {
         return Err(auth_error_response(
             StatusCode::UNAUTHORIZED,
             "Invalid API key",
         ));
+    }
+
+    // If the key starts with 'bud_client', extend api_config with published_model_info
+    if key.starts_with("bud_client") {
+        #[expect(clippy::unwrap_used)]
+        let mut config = api_config.unwrap();
+        let published_models = auth.get_published_model_info();
+        // Extend the config with published model info
+        config.extend(published_models);
+        api_config = Ok(config);
     }
 
     // Check if this is a batch or file endpoint (which don't require model validation)

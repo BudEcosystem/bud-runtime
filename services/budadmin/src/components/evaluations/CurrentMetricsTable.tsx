@@ -69,9 +69,9 @@ const CurrentMetricsTable: React.FC<CurrentMetricsTableProps> = ({ data }) => {
       `}</style>
       <Table
         columns={columns}
-        dataSource={data}
+        dataSource={Array.isArray(data) ? data : []}
         pagination={false}
-        rowKey="evaluation eval-explorer-table"
+        rowKey="evaluation"
         size="small"
       />
     </div>

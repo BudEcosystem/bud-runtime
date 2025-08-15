@@ -119,6 +119,8 @@ createEndPoint: (data: any) => Promise<any>;
   deleteAdapter: (adapterId: string, projectId?: string) => void;
   getEndpointSettings: (endpointId: string) => Promise<any>;
   updateEndpointSettings: (endpointId: string, settings: any) => Promise<any>;
+  getPricingHistory: (endpointId: string) => Promise<any>;
+  updateTokenPricing: (endpointId: string, pricing: any, projectId?: string) => Promise<any>;
 }>((set, get) => ({
   pageSource: "",
   clusterDetails: undefined,
@@ -140,7 +142,6 @@ createEndPoint: (data: any) => Promise<any>;
     set({ pageTitle: title });
   },
 getEndpointClusterDetails: async (endpointId: string, projectId?) => {
-    console.log("projectId projectId", projectId)
     set({ loading: true });
     const url = `${tempApiBaseUrl}/endpoints/${endpointId}/model-cluster-detail`;
 
@@ -167,19 +168,29 @@ getEndpointClusterDetails: async (endpointId: string, projectId?) => {
     const url = `${tempApiBaseUrl}/endpoints/`;
     set({ loading: true });
     try {
+      const params: any = {
+        page: page,
+        limit: limit,
+        search: name ? true : false,
+        name: name ? name : undefined,
+        order_by: order_by,
+      };
+
+      // Only add project_id if it's provided (not null)
+      if (id) {
+        params.project_id = id;
+      }
+
+      const headers: any = {};
+      // Only add headers if id is provided
+      if (id) {
+        headers["x-resource-type"] = "project";
+        headers["x-entity-id"] = id;
+      }
+
       const response: any = await AppRequest.Get(url, {
-        params: {
-          project_id: id,
-          page: page,
-          limit: limit,
-          search: name ? true : false,
-          name: name ? name : undefined,
-          order_by: order_by,
-        },
-        headers: {
-          "x-resource-type": "project",
-          "x-entity-id": id,
-        },
+        params,
+        headers,
       });
       const listData = response.data;
       // const updatedListData =
@@ -390,6 +401,46 @@ getAdapters: async (params: GetAdapterParams, projectId?) => {
           .join('\n');
         throw new Error(validationErrors);
       }
+      throw error;
+    }
+  },
+
+  getPricingHistory: async (endpointId: string): Promise<any> => {
+    try {
+      const url = `${tempApiBaseUrl}/endpoints/${endpointId}/pricing/history`;
+      const response: any = await AppRequest.Get(url);
+      console.log('Pricing history data:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching pricing history:", error);
+      throw error;
+    }
+  },
+
+  updateTokenPricing: async (endpointId: string, pricing: any, projectId?: string): Promise<any> => {
+    try {
+      const url = `${tempApiBaseUrl}/endpoints/${endpointId}/pricing`;
+      const payload = {
+        input_cost: parseFloat(pricing.input_cost),
+        output_cost: parseFloat(pricing.output_cost),
+        currency: "USD",
+        per_tokens: parseInt(pricing.per_tokens)
+      };
+
+      const response: any = await AppRequest.Put(
+        url,
+        payload,
+        {
+          headers: {
+            "x-resource-type": "project",
+            "x-entity-id": projectId,
+          },
+        }
+      );
+      successToast(response.message || "Token pricing updated successfully");
+      return response.data;
+    } catch (error) {
+      console.error("Error updating token pricing:", error);
       throw error;
     }
   }

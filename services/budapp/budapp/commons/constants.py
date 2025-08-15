@@ -276,14 +276,32 @@ ModelSourceEnum = create_dynamic_enum(
     ],
 )
 
-CredentialTypeEnum = Enum(
-    "CredentialTypeEnum",
+# Keep the old CredentialTypeEnum for ProprietaryCredential compatibility
+ProprietaryCredentialTypeEnum = Enum(
+    "ProprietaryCredentialTypeEnum",
     {
         name: member.value
         for name, member in ModelSourceEnum.__members__.items()
         if member not in [ModelSourceEnum.LOCAL]
     },
 )
+
+# Alias for backward compatibility
+CredentialTypeEnum = ProprietaryCredentialTypeEnum
+
+
+class ApiCredentialTypeEnum(str, Enum):
+    """Enumeration of API credential types.
+
+    This enum defines the types of API credentials that can be created.
+
+    Attributes:
+        CLIENT_APP (str): Client application credentials for external API access.
+        ADMIN_APP (str): Administrative application credentials with elevated permissions.
+    """
+
+    CLIENT_APP = "client_app"
+    ADMIN_APP = "admin_app"
 
 
 class ModelProviderTypeEnum(Enum):
@@ -504,6 +522,8 @@ class PermissionEnum(Enum):
         """Return client-specific permission values in a list."""
         return [
             cls.CLIENT_ACCESS.value,
+            cls.PROJECT_VIEW.value,
+            cls.PROJECT_MANAGE.value,
         ]
 
 
@@ -552,7 +572,7 @@ class WorkflowTypeEnum(StrEnum):
     MODEL_BENCHMARK = auto()
     ADD_ADAPTER = auto()
     DELETE_ADAPTER = auto()
-    EXPERIMENT_CREATION = auto()
+    EVALUATION_CREATION = auto()
 
 
 class NotificationType(Enum):
@@ -850,6 +870,20 @@ class ProjectStatusEnum(StrEnum):
 
     ACTIVE = auto()
     DELETED = auto()
+
+
+class ProjectTypeEnum(StrEnum):
+    """Enumeration of project types in the system.
+
+    This enum defines the different types of projects that can exist in the Bud ecosystem.
+
+    Attributes:
+        CLIENT_APP: Represents a client application project.
+        ADMIN_APP: Represents an admin application project.
+    """
+
+    CLIENT_APP = auto()
+    ADMIN_APP = auto()
 
 
 # Bud Notify Workflow

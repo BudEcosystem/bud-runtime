@@ -115,10 +115,11 @@ pub async fn run_llm_judge_evaluator(
         extra_body: Default::default(),
         extra_headers: Default::default(),
         observability_metadata: None,
+        gateway_request: None,
     };
     let result = clients.tensorzero_client.inference(params).await?;
     let response = match result {
-        InferenceOutput::NonStreaming(response) => response,
+        InferenceOutput::NonStreaming { response, .. } => response,
         InferenceOutput::Streaming(..) => {
             bail!("Streaming not supported for LLM judge evaluations. This is a bug, please file a bug report at https://github.com/tensorzero/tensorzero/discussions/new?category=bug-reports.")
         }

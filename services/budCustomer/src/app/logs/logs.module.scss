@@ -1,0 +1,173 @@
+// Using CSS variables for theme support
+$bg-main: var(--bud-bg-primary);
+$bg-card: var(--bud-bg-secondary);
+$border-color: var(--bud-border);
+$text-white: var(--bud-text-primary);
+$text-gray: var(--bud-text-muted);
+$text-dark-gray: var(--bud-text-disabled);
+$primary-color: var(--bud-purple);
+
+.searchInput {
+  :global {
+    .ant-input-affix-wrapper {
+      background: $bg-card !important;
+      border-color: $border-color !important;
+
+      &:hover,
+      &:focus-within {
+        border-color: $primary-color !important;
+      }
+    }
+
+    .ant-input {
+      background: transparent !important;
+      color: $text-white;
+
+      &::placeholder {
+        color: $text-dark-gray;
+      }
+    }
+
+    .ant-input-prefix {
+      color: $text-dark-gray;
+    }
+  }
+}
+
+.selectFilter {
+  :global {
+    .ant-select-selector {
+      background: $bg-card !important;
+      border-color: $border-color !important;
+      color: $text-white !important;
+
+      &:hover {
+        border-color: $primary-color !important;
+      }
+    }
+
+    .ant-select-arrow {
+      color: $text-dark-gray;
+    }
+  }
+}
+
+.rangePicker {
+  :global {
+    .ant-picker {
+      background: $bg-card !important;
+      border-color: $border-color !important;
+
+      &:hover,
+      &.ant-picker-focused {
+        border-color: $primary-color !important;
+      }
+    }
+
+    .ant-picker-input > input {
+      color: $text-white !important;
+
+      &::placeholder {
+        color: $text-dark-gray;
+      }
+    }
+
+    .ant-picker-suffix,
+    .ant-picker-separator {
+      color: $text-dark-gray;
+    }
+  }
+}
+
+.logsTable {
+  :global {
+    .ant-table {
+      background: transparent;
+      color: $text-white;
+    }
+
+    .ant-table-thead > tr > th {
+      background: var(--bud-bg-tertiary);
+      border-bottom: 1px solid $border-color;
+      color: $text-dark-gray;
+      font-weight: 400;
+      padding: 1rem 1.5rem;
+
+      &::before {
+        display: none;
+      }
+    }
+
+    .ant-table-tbody > tr > td {
+      border-bottom: 1px solid var(--bud-border-secondary);
+      padding: 1rem 1.5rem;
+    }
+
+    .ant-table-tbody > tr:last-child > td {
+      border-bottom: none;
+    }
+
+    .ant-table-tbody > tr:hover > td {
+      background: var(--bud-bg-hover);
+    }
+
+    .ant-table-expanded-row > td {
+      background: transparent;
+      padding: 0 1.5rem 1.5rem !important;
+    }
+
+    .ant-pagination {
+      .ant-pagination-item {
+        background: transparent;
+        border-color: $border-color;
+
+        a {
+          color: $text-gray;
+        }
+
+        &:hover {
+          border-color: $primary-color;
+
+          a {
+            color: $primary-color;
+          }
+        }
+
+        &.ant-pagination-item-active {
+          background: color-mix(in srgb, var(--bud-purple) 20%, transparent);
+          border-color: $primary-color;
+
+          a {
+            color: $primary-color;
+          }
+        }
+      }
+
+      .ant-pagination-prev,
+      .ant-pagination-next {
+        .ant-pagination-item-link {
+          background: transparent;
+          border-color: $border-color;
+          color: $text-gray;
+
+          &:hover {
+            border-color: $primary-color;
+            color: $primary-color;
+          }
+        }
+      }
+
+      .ant-select {
+        .ant-select-selector {
+          background: $bg-card;
+          border-color: $border-color;
+          color: $text-white;
+        }
+      }
+    }
+
+    .ant-empty-normal {
+      color: $text-gray;
+    }
+  }
+}

@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-budmetrics
+  annotations:
+    {{- range $key, $value := .Values.deploymentAnnotations }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-budmetrics
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-budmetrics
+      annotations:
+        dapr.io/enabled: "true"
+        dapr.io/app-id: "budmetrics"
+        dapr.io/app-port: "3005"
+    spec:
+      containers:
+      - name: {{ .Release.Name }}-budmetrics
+        image: {{ .Values.microservices.budmetrics.image }}
+        imagePullPolicy: Always
+        command: ["sh", "-c", "python3 scripts/migrate_clickhouse.py && uvicorn budmetrics.main:app --host 0.0.0.0 --port 3005"]
+        ports:
+        - containerPort: 3005
+        env:
+        {{ $root := . }}
+        {{- range $key, $value := .Values.microservices.budmetrics.env }}
+          - name: {{ $key }}
+            value: {{ tpl $value $root | quote }}
+        {{- end }}
+        envFrom:
+          - configMapRef:
+              name: {{ .Release.Name}}-bud-global
+        resources:
+          limits:
+            memory: 32768Mi
+            cpu: 2
+          requests:
+            memory: 256Mi
+            cpu: 250m
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-budmetrics
+spec:
+  ports:
+  - port: 3005
+    targetPort: 3005
+  selector:
+    app: {{ .Release.Name }}-budmetrics
+  type: ClusterIP

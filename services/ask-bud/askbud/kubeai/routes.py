@@ -43,9 +43,4 @@ async def get_kubeai(request: ChatCompletionRequest) -> Union[ChatCompletionResp
         Either a ChatCompletionResponse or a StreamingResponse depending on the request
     """
     response = await KubeAI.process_chat_completion(request)
-    if isinstance(response, dict):
-        return response
-    elif isinstance(response, StreamingResponse):
-        return response  # StreamingResponse is returned as is
-    else:
-        return response
+    return response

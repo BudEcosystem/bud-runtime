@@ -3,7 +3,7 @@ kind: Secret
 metadata:
   name: {{ .Release.Name }}-novu-externals3
 data:
-  endpoint: {{ printf "http://%s-minio" .Release.Name | b64enc }}
+  endpoint: {{ printf "http://%s-minio:%s" .Release.Name .Values.minio.service.ports.api | b64enc }}
   bucketName: {{ "novu-local" | b64enc }}
   region: {{ "us-east-1" | b64enc }}
   accessKey: {{ .Values.minio.auth.rootUser | b64enc }}

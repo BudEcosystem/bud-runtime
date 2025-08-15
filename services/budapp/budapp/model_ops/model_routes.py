@@ -52,6 +52,9 @@ from .schemas import (
     LocalModelScanRequest,
     ModelAuthorFilter,
     ModelAuthorResponse,
+    ModelCatalogFilter,
+    ModelCatalogItem,
+    ModelCatalogResponse,
     ModelDeployStepRequest,
     ModelDetailSuccessResponse,
     ModelFilter,
@@ -71,6 +74,7 @@ from .services import (
     CloudModelService,
     CloudModelWorkflowService,
     LocalModelWorkflowService,
+    ModelCatalogService,
     ModelService,
     ProviderService,
 )
@@ -773,6 +777,111 @@ async def list_quantization_methods(
         object="quantization_methods.list",
         code=status.HTTP_200_OK,
     ).to_http_response()
+
+
+@model_router.get(
+    "/catalog",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": ModelCatalogResponse,
+            "description": "Successfully listed published models",
+        },
+    },
+    description="List published models available in the catalog with optional search and filtering",
+)
+@require_permissions(permissions=[PermissionEnum.CLIENT_ACCESS])
+async def list_catalog_models(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    filters: Annotated[ModelCatalogFilter, Depends()],
+    modality: Optional[List[ModalityEnum]] = Query(None, description="Filter by modality"),
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=100),
+    order_by: Optional[List[str]] = Depends(parse_ordering_fields),
+    search: Optional[str] = Query(None, description="Search term for full-text search", min_length=2),
+) -> Union[ModelCatalogResponse, ErrorResponse]:
+    """List published models available for CLIENT users with optional filtering and search."""
+    try:
+        # Calculate offset
+        offset = (page - 1) * limit
+
+        # Convert filter to dictionary and add modality
+        filters_dict = filters.model_dump(exclude_none=True)
+        if modality:
+            filters_dict["modality"] = modality
+
+        # Get models from catalog service
+        db_models, count = await ModelCatalogService(session).get_published_models(
+            offset=offset,
+            limit=limit,
+            filters=filters_dict,
+            order_by=order_by or [("published_date", "desc")],
+            search_term=search,
+        )
+
+        return ModelCatalogResponse(
+            models=db_models,
+            total_record=count,
+            page=page,
+            limit=limit,
+            object="catalog.models.list",
+            code=status.HTTP_200_OK,
+        ).to_http_response()
+    except ClientException as e:
+        logger.exception(f"Failed to list catalog models: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to list catalog models: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Failed to list catalog models",
+        ).to_http_response()
+
+
+@model_router.get(
+    "/catalog/{endpoint_id}",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Model not found",
+        },
+        status.HTTP_200_OK: {
+            "model": ModelDetailSuccessResponse,
+            "description": "Successfully retrieved model details",
+        },
+    },
+    description="Get detailed information about a published model",
+)
+@require_permissions(permissions=[PermissionEnum.CLIENT_ACCESS])
+async def get_catalog_model_details(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    endpoint_id: UUID,
+) -> Union[ModelDetailSuccessResponse, ErrorResponse]:
+    """Get detailed information about a specific published model."""
+    try:
+        return await ModelCatalogService(session).get_catalog_model_details(endpoint_id)
+    except ClientException as e:
+        logger.exception(f"Failed to get catalog model details: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to get catalog model details: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Failed to get catalog model details",
+        ).to_http_response()
 
 
 @model_router.get(

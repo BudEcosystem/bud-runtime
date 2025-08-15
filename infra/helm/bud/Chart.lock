@@ -1,4 +1,7 @@
 dependencies:
+- name: keel
+  repository: https://charts.keel.sh
+  version: 1.0.5
 - name: postgresql
   repository: https://charts.bitnami.com/bitnami
   version: 16.7.18
@@ -23,8 +26,5 @@ dependencies:
 - name: mongodb
   repository: https://charts.bitnami.com/bitnami
   version: 16.5.31
-- name: lgtm-distributed
-  repository: https://grafana.github.io/helm-charts
-  version: 2.1.0
-digest: sha256:55107d5b63595ac37bb787a94bc93be4cea30ff463006da3028c5f21bb66a4da
-generated: "2025-07-24T15:44:46.905114455+05:30"
+digest: sha256:a6340b361f5acec8a99ca4124be53b22577c87a1c1e30b5a48127d60c27aa151
+generated: "2025-08-13T11:26:21.367260593+05:30"

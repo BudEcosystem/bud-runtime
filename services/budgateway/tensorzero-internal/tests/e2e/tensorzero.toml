@@ -12,6 +12,10 @@ debug = true
 enable_template_filesystem_access = true
 export.otlp.traces.enabled = true
 
+[gateway.observability]
+enabled = true
+async_writes = false
+
 [gateway.authentication]
 enabled = false
 
@@ -678,6 +682,24 @@ endpoints = ["image_generation"]
 [models."image-generation-test".providers.dummy]
 type = "dummy"
 model_name = "image-generation-test"
+
+# Dummy embedding model for testing
+[models."text-embedding-test"]
+routing = ["dummy"]
+endpoints = ["embedding"]
+
+[models."text-embedding-test".providers.dummy]
+type = "dummy"
+model_name = "text-embedding-test"
+
+# Dummy moderation model for testing
+[models."moderation-test"]
+routing = ["dummy"]
+endpoints = ["moderation"]
+
+[models."moderation-test".providers.dummy]
+type = "dummy"
+model_name = "moderation-test"
 
 # xAI image generation model for testing
 [models."grok-2-image"]

@@ -33,9 +33,12 @@ from budapp.commons.exceptions import ClientException
 from budapp.commons.schemas import ErrorResponse, SuccessResponse
 from budapp.user_ops.schemas import User
 
-from ..commons.constants import PermissionEnum
+from ..commons.constants import PermissionEnum, ProjectTypeEnum, UserTypeEnum
 from ..commons.permission_handler import require_permissions
 from ..user_ops.schemas import UserFilter
+from .access_control import validate_client_project_access
+from .crud import ProjectDataManager
+from .models import Project as ProjectModel
 from .schemas import (
     EditProjectRequest,
     PagenatedProjectUserResponse,
@@ -215,9 +218,27 @@ async def create_project(
 ) -> Union[ProjectSuccessResopnse, ErrorResponse]:
     """Create a new project."""
     try:
-        db_project = await ProjectService(session).create_project(
-            project_data.model_dump(exclude_unset=True, exclude_none=True), current_user.id
-        )
+        # Handle project_type based on user type
+        project_dict = project_data.model_dump(exclude_unset=True, exclude_none=True)
+
+        # CLIENT users can only create CLIENT_APP projects
+        if current_user.user_type == UserTypeEnum.CLIENT:
+            project_dict["project_type"] = ProjectTypeEnum.CLIENT_APP.value
+        # ADMIN users can create both types, default to ADMIN_APP if not specified
+        elif current_user.user_type == UserTypeEnum.ADMIN:
+            if "project_type" not in project_dict:
+                project_dict["project_type"] = ProjectTypeEnum.ADMIN_APP.value
+            # Validate the provided project_type for ADMIN users
+            elif project_dict["project_type"] not in [
+                ProjectTypeEnum.CLIENT_APP.value,
+                ProjectTypeEnum.ADMIN_APP.value,
+            ]:
+                raise ClientException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    message=f"Invalid project type: {project_dict['project_type']}",
+                )
+
+        db_project = await ProjectService(session).create_project(project_dict, current_user.id)
     except ClientException as e:
         logger.exception(f"Failed to create project: {e}")
         return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
@@ -253,6 +274,7 @@ async def create_project(
     },
     description="Get all active projects from the database",
 )
+@require_permissions(permissions=[PermissionEnum.PROJECT_VIEW])
 async def get_all_projects(
     current_user: Annotated[
         User,
@@ -276,6 +298,7 @@ async def get_all_projects(
     offset = (page - 1) * limit
     filters_dict = filters.model_dump(exclude_none=True)
 
+    # All access control logic is now handled in the service layer
     try:
         db_projects, count = await ProjectService(session).get_all_active_projects(
             current_user, offset, limit, filters_dict, order_by, search
@@ -376,6 +399,9 @@ async def list_all_clusters(
     search: bool = False,
 ) -> Union[ProjectClusterPaginatedResponse, ErrorResponse]:
     """List all clusters in a project."""
+    # Validate CLIENT user access to this project
+    await validate_client_project_access(current_user, project_id, session, "list clusters in")
+
     # Calculate offset
     offset = (page - 1) * limit
 
@@ -443,6 +469,20 @@ async def retrieve_project(
     """Retrieve a single active project."""
     try:
         db_project, endpoints_count = await ProjectService(session).retrieve_active_project_details(project_id)
+
+        # Check if client user is trying to access non-CLIENT_APP project
+        if (
+            current_user.user_type == UserTypeEnum.CLIENT
+            and db_project.project_type != ProjectTypeEnum.CLIENT_APP.value
+        ):
+            raise ClientException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                message="Access denied: Client users can only access client application projects",
+            )
+
+        # Validate CLIENT user access (includes project type and association checks)
+        await validate_client_project_access(current_user, project_id, session, "retrieve")
+
         logger.info(f"Project retrieved: {project_id}")
     except ClientException as e:
         logger.exception(f"Failed to retrieve project: {e}")
@@ -659,6 +699,9 @@ async def list_project_users(
     search: bool = False,
 ) -> Union[PagenatedProjectUserResponse, ErrorResponse]:
     """Get all active users in a project."""
+    # Validate CLIENT user access to this project
+    await validate_client_project_access(current_user, project_id, session, "list users in")
+
     offset = (page - 1) * limit
     filters_dict = filters.model_dump(exclude_none=True)
 

@@ -25,6 +25,10 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ .Release.Name }}-budproxy
+  annotations:
+    {{- range $key, $value := .Values.deploymentAnnotations }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
 spec:
   replicas: 1
   selector:
@@ -34,6 +38,8 @@ spec:
     metadata:
       labels:
         app: {{ .Release.Name }}-budproxy
+      annotations:
+        date: "{{ now }}"
     spec:
       containers:
         - name: budproxy
@@ -49,9 +55,18 @@ spec:
               value: "redis://default:{{ .Values.valkey.auth.password}}@{{ .Release.Name }}-valkey-primary:6379/2"
             - name: TENSORZERO_CLICKHOUSE_URL
               value: "http://{{ .Values.clickhouse.auth.username }}:{{ .Values.clickhouse.auth.password }}@{{ .Release.Name }}-clickhouse:8123/budproxy"
+            - name: TENSORZERO_RSA_PRIVATE_KEY_PATH
+              value: /app/keys/private-key.pem
+            - name: TENSORZERO_RSA_PRIVATE_KEY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-rsa-keys
+                  key: private-key-password
           volumeMounts:
             - name: {{ .Release.Name }}-budproxy-config
               mountPath: /app/config
+            - name: rsa-keys
+              mountPath: /app/keys
           resources:
             limits:
               cpu: 2000m
@@ -63,6 +78,10 @@ spec:
         - name: {{ .Release.Name }}-budproxy-config
           configMap:
             name: {{ .Release.Name }}-budproxy-config
+        - name: rsa-keys
+          secret:
+            secretName: {{ .Release.Name }}-rsa-keys
+            defaultMode: 0444
 ---
 apiVersion: v1
 kind: Service

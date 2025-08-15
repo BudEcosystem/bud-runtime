@@ -43,11 +43,8 @@ function Footer(props: FooterProps) {
       }
       {props.onNext
         ? <PrimaryButton
-          type="submit"
+          htmlType="submit"
           disabled={props.disableNext}
-          onClick={() => {
-            props.onNext(form.getFieldsValue());
-          }}
           id="next-button"
         >
           {props.nextText || "Next"}
@@ -98,7 +95,6 @@ export function BudForm(props: BudFormProps) {
     // Blur logic
     className={`flex flex-col h-full  relative` }
     scrollToFirstError
-    autoFocus
     feedbackIcons={() => {
       // return <FeedbackIcons status={status} errors={errors} warnings={warnings} />
       return {
@@ -106,6 +102,13 @@ export function BudForm(props: BudFormProps) {
         success: <div />,
         warning: <div />,
         "": <div />,
+      }
+    }}
+    onFinish={(values) => {
+      if (isExpandedView) {
+        closeExpandedStep();
+      } else if (props.onNext) {
+        props.onNext(values);
       }
     }}
   >

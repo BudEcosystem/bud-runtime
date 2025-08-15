@@ -60,3 +60,6 @@ Debug/
 
 # Screts
 secrets.json
+
+# pyenv
+.python-version

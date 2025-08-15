@@ -32,7 +32,7 @@ jobs:
 
       - name: Test gateway container starts
         run: |
-          docker run -d --name test-gateway -p 3000:3000 budgateway:${{ github.sha }} --default-config
+          docker run -d --name test-gateway -p 3000:3000 "budgateway:${{ github.sha }}" --default-config
           sleep 5
           curl -f http://localhost:3000/health || (docker logs test-gateway && exit 1)
           docker stop test-gateway

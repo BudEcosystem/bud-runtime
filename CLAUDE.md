@@ -11,7 +11,7 @@ Bud-stack is a comprehensive multi-service platform for AI/ML model deployment a
 - **budcluster**: Cluster lifecycle management service that provisions and manages Kubernetes/OpenShift clusters across multiple clouds (AWS EKS, Azure AKS, on-premises) using Terraform and Ansible
 - **budsim**: Performance simulation service that uses ML models and genetic algorithms to optimize LLM deployment configurations across CPU/CUDA/HPU hardware
 - **budmodel**: Model registry and leaderboard service managing model metadata, licensing, and performance metrics from various AI benchmarks
-- **budmetrics**: Observability service built on ClickHouse for analytics and time-series metrics collection
+- **budmetrics**: Observability service built on ClickHouse for analytics and time-series metrics collection, including AI inference request/response tracking
 - **budnotify**: Notification service for pub/sub messaging across the platform
 - **ask-bud**: AI assistant service providing cluster and performance analysis capabilities
 - **budgateway**: Rust-based high-performance API gateway service for model inference routing and load balancing
@@ -329,3 +329,58 @@ Note: Make sure to update CLAUDE.md if you come across anything new related to a
 
 - Use sub agents when ever required
 - Use proactively stack-keeper agent to plan the development task and distribute to respective agents.
+
+## Recent Feature Additions
+
+### Inference Request/Prompt Listing (January 2025)
+
+A comprehensive feature for viewing and analyzing AI model inference requests has been added across three services:
+
+#### BudMetrics Changes
+- Added new API endpoints for inference data retrieval:
+  - `POST /observability/inferences/list` - List inferences with pagination and filtering
+  - `GET /observability/inferences/{inference_id}` - Get complete inference details
+  - `GET /observability/inferences/{inference_id}/feedback` - Get all feedback for an inference
+- Implemented efficient ClickHouse queries joining ModelInference, ChatInference, and ModelInferenceDetails tables
+- Added comprehensive schemas for request/response handling
+
+#### BudApp Changes
+- Added proxy endpoints with access control:
+  - `POST /metrics/inferences/list` - Proxy to budmetrics with project access validation
+  - `GET /metrics/inferences/{inference_id}` - Proxy with access control
+  - `GET /metrics/inferences/{inference_id}/feedback` - Proxy with access control
+- Implemented response enrichment to add entity names (project, endpoint, model display names)
+- Added row-level security to ensure users can only see their project's data
+
+#### BudAdmin Changes
+- Added new "Inferences" tab to project details page
+- Created comprehensive UI components:
+  - `InferenceListView` - Main list view with data table, pagination, and sorting
+  - `InferenceDetailModal` - Detailed view with tabs for overview, messages, performance, raw data, and feedback
+  - `InferenceFilters` - Advanced filtering with date ranges, token counts, and latency filters
+- Added Zustand store (`useInferences`) for state management
+- Implemented CSV and JSON export functionality
+- Added interactive features like copy-to-clipboard and file downloads
+
+#### Key Features
+- View individual AI inference requests with full prompt/response details
+- Filter by date range, success status, token counts, and latency
+- Sort by timestamp, tokens, latency, or cost
+- View performance metrics including response time, token usage, and costs
+- Access user feedback including ratings, boolean metrics, and comments
+- Export data for external analysis
+- Row-level access control ensuring data privacy
+
+#### Testing
+- Unit tests added for budmetrics endpoints (`tests/test_inference_endpoints.py`)
+- Unit tests added for budapp proxy routes (`tests/test_metric_proxy_endpoints.py`)
+- End-to-end test script created (`test_inference_feature.py`)
+- Manual testing guide provided (`manual_test_inferences.md`)
+
+#### API Documentation
+Complete API documentation available in `docs/api/inference-endpoints.md` covering:
+- Authentication requirements
+- Request/response formats
+- Error handling
+- Rate limiting
+- Best practices

@@ -473,6 +473,10 @@ impl FuserConfig {
                         included_indices.push(i);
                     }
                 }
+                _ => {
+                    // Other inference types are not supported for mixture-of-n
+                    // Simply skip them
+                }
             }
         }
         let template_context = json!({
@@ -768,6 +772,8 @@ mod tests {
             model_name: "ExampleModel".into(),
             finish_reason: Some(FinishReason::Stop),
             cached: false,
+            gateway_request: None,
+            gateway_response: None,
         };
 
         let candidate1 = InferenceResult::Chat(
@@ -805,6 +811,8 @@ mod tests {
             model_name: "ExampleModel2".into(),
             finish_reason: Some(FinishReason::Stop),
             cached: false,
+            gateway_request: None,
+            gateway_response: None,
         };
 
         let candidate2 = InferenceResult::Chat(
@@ -870,6 +878,8 @@ mod tests {
             model_name: "ExampleModel".into(),
             finish_reason: Some(FinishReason::Stop),
             cached: false,
+            gateway_request: None,
+            gateway_response: None,
         };
 
         let candidate1 = InferenceResult::Json(JsonInferenceResult::new(
@@ -909,6 +919,8 @@ mod tests {
             model_name: "ExampleModel2".into(),
             finish_reason: Some(FinishReason::Stop),
             cached: false,
+            gateway_request: None,
+            gateway_response: None,
         };
 
         let candidate2 = InferenceResult::Json(JsonInferenceResult::new(
@@ -990,6 +1002,8 @@ mod tests {
             model_name: "ExampleModel".into(),
             finish_reason: Some(FinishReason::Stop),
             cached: false,
+            gateway_request: None,
+            gateway_response: None,
         };
         let inference_id0 = Uuid::now_v7();
         let candidate0 = InferenceResult::Chat(
@@ -1027,6 +1041,8 @@ mod tests {
             model_name: "ExampleModel1".into(),
             finish_reason: Some(FinishReason::Stop),
             cached: false,
+            gateway_request: None,
+            gateway_response: None,
         };
         let inference_id1 = Uuid::now_v7();
         let candidate1 = InferenceResult::Chat(
@@ -1097,6 +1113,7 @@ mod tests {
             extra_body: Default::default(),
             extra_headers: Default::default(),
             extra_cache_key: None,
+            gateway_request: None,
         };
 
         let fused = mixture_of_n_variant

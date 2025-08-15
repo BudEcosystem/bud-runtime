@@ -1,0 +1,28 @@
+ingress:
+    hosts:
+        root: stage.bud.studio
+
+# when we make a first release the tags should be changed to :staging
+microservices:
+    budproxy:
+        image: budstudio/budproxy:nightly
+    askbud:
+        image: budstudio/askbud:nightly
+    budapp:
+        image: budstudio/budapp:nightly
+    budcluster:
+        image: budstudio/budcluster:nightly
+    budmetrics:
+        image: budstudio/budmetrics:nightly
+    budmodel:
+        image: budstudio/budmodel:nightly
+    budplayground:
+        image: budstudio/budplayground:nightly
+    budsim:
+        image: budstudio/budsim:nightly
+    budadmin:
+        image: budstudio/budadmin:nightly
+    budcustomer:
+        image: budstudio/budcustomer:nightly
+    budnotify:
+        image: budstudio/budnotify:nightly

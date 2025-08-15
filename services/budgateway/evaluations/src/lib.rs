@@ -16,7 +16,10 @@ use tensorzero_internal::endpoints::inference::{
     InferenceOutput, InferenceParams, InferenceResponse, Params as InferenceRequestParams,
 };
 use tensorzero_internal::evaluations::{EvaluationConfig, EvaluatorConfig};
-use tensorzero_internal::inference::types::Input;
+use tensorzero_internal::inference::types::{
+    current_timestamp, ChatInferenceResult, InferenceResult, Input, InternalJsonInferenceOutput,
+    JsonInferenceResult, Usage,
+};
 use tensorzero_internal::tool::DynamicToolParams;
 use tensorzero_internal::{
     clickhouse::ClickHouseConnectionInfo, config_parser::Config, endpoints::datasets::Datapoint,
@@ -433,10 +436,11 @@ async fn infer_datapoint(params: InferDatapointParams<'_>) -> Result<InferenceRe
         extra_body: Default::default(),
         extra_headers: Default::default(),
         observability_metadata: None,
+        gateway_request: None,
     };
     let inference_result = clients.tensorzero_client.inference(params).await?;
     match inference_result {
-        InferenceOutput::NonStreaming(inference_response) => Ok(inference_response),
+        InferenceOutput::NonStreaming { response, .. } => Ok(response),
         InferenceOutput::Streaming(_inference_stream) => {
             bail!("Streaming inference should never happen in evaluations")
         }
@@ -525,7 +529,42 @@ impl ThrottledTensorZeroClient {
         }
 
         let inference_response: InferenceResponse = response.json().await?;
-        Ok(InferenceOutput::NonStreaming(inference_response))
+        // Create a dummy result to match the new InferenceOutput structure
+        let dummy_result = match &inference_response {
+            InferenceResponse::Chat(chat_response) => InferenceResult::Chat(ChatInferenceResult {
+                inference_id: chat_response.inference_id,
+                created: current_timestamp(),
+                content: chat_response.content.clone(),
+                usage: Usage::default(),
+                model_inference_results: vec![],
+                inference_params: InferenceParams::default(),
+                original_response: None,
+                finish_reason: None,
+            }),
+            InferenceResponse::Json(json_response) => {
+                InferenceResult::Json(JsonInferenceResult {
+                    inference_id: json_response.inference_id,
+                    created: current_timestamp(),
+                    output: InternalJsonInferenceOutput {
+                        raw: json_response.output.raw.clone(),
+                        parsed: json_response.output.parsed.clone(),
+                        auxiliary_content: vec![], // Not available in response
+                        json_block_index: None,
+                    },
+                    usage: Usage::default(),
+                    model_inference_results: vec![],
+                    output_schema: serde_json::Value::Null,
+                    inference_params: InferenceParams::default(),
+                    original_response: None,
+                    finish_reason: None,
+                })
+            }
+        };
+        Ok(InferenceOutput::NonStreaming {
+            response: inference_response,
+            result: dummy_result,
+            write_info: None,
+        })
     }
 
     async fn feedback(

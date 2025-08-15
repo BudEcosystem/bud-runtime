@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-budadmin
+  annotations:
+    {{- range $key, $value := .Values.deploymentAnnotations }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-budadmin
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-budadmin
+    spec:
+      containers:
+      - name: {{ .Release.Name }}-budadmin
+        image: {{ .Values.microservices.budadmin.image }}
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3000
+        env:
+          - name: ENTRYPOINT_BUDNOTIFY_SERVICE
+            value: "{{ .Release.Name }}-budnotify:3000"
+          - name: NEXT_PUBLIC_PASSWORD
+            value: {{ .Values.microservices.rsaKeys.privateKeyPassword }}
+          - name: NEXT_PUBLIC_PRIVATE_KEY
+            value: {{ .Values.microservices.rsaKeys.privateKey | b64enc }}
+          - name: BASE_URL
+            value: {{ include "bud.ingress.url.budapp" $ }}
+          - name: NEXT_PUBLIC_BASE_URL
+            value: {{ include "bud.ingress.url.budapp" $ }}
+          - name: NEXT_PUBLIC_TEMP_API_BASE_URL
+            value: {{ include "bud.ingress.url.budapp" $ }}
+          - name: NEXT_PUBLIC_NOVU_SOCKET_URL
+            value: {{ include "bud.ingress.url.novuws" $ }}
+          - name: NEXT_PUBLIC_NOVU_BASE_URL
+            value: {{ include "bud.ingress.url.novuapi" $ }}
+          - name: NEXT_PUBLIC_COPY_CODE_API_BASE_URL
+            value: {{ include "bud.ingress.url.budgateway" $ }}
+          - name: NEXT_PUBLIC_PLAYGROUND_URL
+            value: {{ include "bud.ingress.url.budplayground" $ }}
+          - name: NEXT_PUBLIC_ASK_BUD_URL
+            value: '{{ include "bud.ingress.url.budask" $ }}/v1'
+        {{ $root := . }}
+        {{- range $key, $value := .Values.microservices.budadmin.env }}
+          - name: {{ $key }}
+            value: {{ tpl $value $root | quote }}
+        {{- end }}
+        envFrom:
+          - configMapRef:
+              name: {{ .Release.Name}}-bud-global
+        resources:
+          limits:
+            memory: 512Mi
+            cpu: 1
+          requests:
+            memory: 256Mi
+            cpu: 250m
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-budadmin
+spec:
+  ports:
+  - port: 3000
+    targetPort: 3000
+  selector:
+    app: {{ .Release.Name }}-budadmin
+  type: ClusterIP

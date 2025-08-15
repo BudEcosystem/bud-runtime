@@ -1869,6 +1869,27 @@ const useModel: DrawerFlowType = {
   ],
 };
 
+const publish: DrawerFlowType = {
+  title: "Publish",
+  description: "Publish deployment",
+  totalSteps: 1,
+  steps: [
+    {
+      navigation: () => ["Projects", "Publish"],
+      id: "publish",
+      confirmClose: false,
+      step: 1,
+      component: StepComponents["publish"],
+      progress: [
+        {
+          status: FormProgressStatus.inProgress,
+          title: "publish",
+        },
+      ],
+    },
+  ],
+};
+
 const deleteCluster: DrawerFlowType = {
   title: "Delete Cluster",
   description: "Delete a cluster",
@@ -3485,7 +3506,20 @@ const newExperiment: DrawerFlowType = {
           title: "New Experiment",
         },
       ],
-      confirmClose: true,
+      confirmClose: false,
+    },
+    {
+      navigation: () => ["Experiments", "New Experiment"],
+      id: "new-experiment-success",
+      step: 1,
+      component: StepComponents["new-experiment-success"],
+      progress: [
+        {
+          status: FormProgressStatus.inProgress,
+          title: "New Experiment",
+        },
+      ],
+      confirmClose: false,
     },
   ],
 };
@@ -3581,6 +3615,27 @@ const runEvaluation: DrawerFlowType = {
   ],
 };
 
+const viewEvalDetails: DrawerFlowType = {
+  title: "Evaluation Details",
+  description: "View Evaluation Details",
+  totalSteps: 1,
+  steps: [
+    {
+      navigation: () => ["Experiments", "Evaluation Details"],
+      id: "eval-details",
+      step: 1,
+      component: StepComponents["view-eval-details"],
+      progress: [
+        {
+          status: FormProgressStatus.inProgress,
+          title: "New evaluation",
+        },
+      ],
+      confirmClose: false,
+    },
+  ],
+};
+
 const flows = {
   "new-project": newProject,
   "deploy-model": deployModel,
@@ -3598,6 +3653,7 @@ const flows = {
   "add-worker": addWorker,
   "worker-details": workerDetails,
   "use-model": useModel,
+  "publish": publish,
   "delete-cluster": deleteCluster,
   "delete-project": deleteProject,
   "deleting-endpoint": deletingEndpoint,
@@ -3634,6 +3690,7 @@ const flows = {
   // experiments
   "new-experiment": newExperiment,
   "run-evaluation": runEvaluation,
+  "eval-details": viewEvalDetails,
 };
 
 export const flowMapping: {

@@ -26,8 +26,8 @@ use uuid::Uuid;
 
 use crate::cache::CacheParamsOptions;
 use crate::endpoints::inference::{
-    inference, ChatCompletionInferenceParams, InferenceClients, InferenceCredentials,
-    InferenceParams, Params,
+    inference, write_inference, ChatCompletionInferenceParams, InferenceClients,
+    InferenceCredentials, InferenceParams, Params,
 };
 use crate::error::{Error, ErrorDetails};
 use crate::gateway_util::{AppState, AppStateData, StructuredJson};
@@ -35,7 +35,8 @@ use crate::inference::types::extra_body::UnfilteredInferenceExtraBody;
 use crate::inference::types::extra_headers::UnfilteredInferenceExtraHeaders;
 use crate::inference::types::{
     current_timestamp, ContentBlockChatOutput, ContentBlockChunk, File, FileKind, FinishReason,
-    Input, InputMessage, InputMessageContent, Role, TextKind, Usage,
+    Input, InputMessage, InputMessageContent, ResolvedInput, ResolvedInputMessage,
+    ResolvedInputMessageContent, Role, TextKind, Usage,
 };
 use crate::tool::{
     DynamicToolParams, Tool, ToolCall, ToolCallChunk, ToolCallOutput, ToolChoice, ToolResult,
@@ -86,6 +87,55 @@ fn merge_credentials_from_store(
     credentials
 }
 
+/// Helper function to serialize JSON without null values
+pub(crate) fn serialize_without_nulls<T: Serialize>(
+    value: &T,
+) -> Result<String, serde_json::Error> {
+    let value = serde_json::to_value(value)?;
+
+    fn remove_nulls(value: Value) -> Value {
+        match value {
+            Value::Object(map) => {
+                let mut cleaned = Map::new();
+                for (k, v) in map {
+                    match v {
+                        Value::Null => continue,
+                        Value::Object(_) => {
+                            cleaned.insert(k, remove_nulls(v));
+                        }
+                        Value::Array(arr) => {
+                            let cleaned_arr: Vec<Value> = arr
+                                .into_iter()
+                                .map(remove_nulls)
+                                .filter(|v| !matches!(v, Value::Null))
+                                .collect();
+                            if !cleaned_arr.is_empty() {
+                                cleaned.insert(k, Value::Array(cleaned_arr));
+                            }
+                        }
+                        other => {
+                            cleaned.insert(k, other);
+                        }
+                    }
+                }
+                Value::Object(cleaned)
+            }
+            Value::Array(arr) => {
+                let cleaned: Vec<Value> = arr
+                    .into_iter()
+                    .map(remove_nulls)
+                    .filter(|v| !matches!(v, Value::Null))
+                    .collect();
+                Value::Array(cleaned)
+            }
+            other => other,
+        }
+    }
+
+    let cleaned = remove_nulls(value);
+    serde_json::to_string(&cleaned)
+}
+
 /// A handler for the OpenAI-compatible inference endpoint
 #[debug_handler(state = AppStateData)]
 pub async fn inference_handler(
@@ -122,6 +172,9 @@ pub async fn inference_handler(
 
     let original_model_name = model_resolution.original_model_name.to_string();
 
+    // Capture the gateway request (without null values)
+    let gateway_request = serialize_without_nulls(&openai_compatible_params).ok();
+
     // Create params with resolved model/function names
     let mut params = Params::try_from_openai_with_resolution(
         headers.clone(),
@@ -154,18 +207,25 @@ pub async fn inference_handler(
         });
     }
 
+    // Set the gateway request on params
+    params.gateway_request = gateway_request;
+
     let response = inference(
-        config,
+        config.clone(),
         &http_client,
-        clickhouse_connection_info,
-        kafka_connection_info,
+        clickhouse_connection_info.clone(),
+        kafka_connection_info.clone(),
         model_credential_store,
         params,
     )
     .await?;
 
     match response {
-        InferenceOutput::NonStreaming(response) => {
+        InferenceOutput::NonStreaming {
+            response,
+            result,
+            write_info,
+        } => {
             let mut openai_compatible_response =
                 OpenAICompatibleResponse::from((response.clone(), original_model_name.clone()));
 
@@ -203,6 +263,40 @@ pub async fn inference_handler(
                     }
                 }
             }
+            // Capture the gateway response (without null values)
+            let gateway_response = serialize_without_nulls(&openai_compatible_response).ok();
+
+            // Perform the database write if we have write info
+            if let Some(write_info) = write_info {
+                let config = config.clone();
+                let clickhouse_connection_info = clickhouse_connection_info.clone();
+                let kafka_connection_info = kafka_connection_info.clone();
+                let async_writes = config.gateway.observability.async_writes;
+
+                let write_future = tokio::spawn(async move {
+                    write_inference(
+                        &clickhouse_connection_info,
+                        &kafka_connection_info,
+                        &config,
+                        write_info.resolved_input,
+                        result,
+                        write_info.metadata,
+                        write_info.observability_metadata,
+                        write_info.gateway_request,
+                        gateway_response,
+                    )
+                    .await;
+                });
+
+                if !async_writes {
+                    write_future.await.map_err(|e| {
+                        Error::new(ErrorDetails::InternalError {
+                            message: format!("Failed to join write task: {e}"),
+                        })
+                    })?;
+                }
+            }
+
             Ok(Json(openai_compatible_response).into_response())
         }
         InferenceOutput::Streaming(stream) => {
@@ -246,29 +340,29 @@ pub struct OpenAICompatibleToolCallChunk {
     pub function: OpenAICompatibleFunctionCall,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 struct OpenAICompatibleSystemMessage {
     content: Value,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 struct OpenAICompatibleUserMessage {
     content: Value,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 struct OpenAICompatibleAssistantMessage {
     content: Option<Value>,
     tool_calls: Option<Vec<OpenAICompatibleToolCall>>,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 struct OpenAICompatibleToolMessage {
     content: Option<Value>,
     tool_call_id: String,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(tag = "role")]
 #[serde(rename_all = "lowercase")]
 enum OpenAICompatibleMessage {
@@ -279,7 +373,7 @@ enum OpenAICompatibleMessage {
     Tool(OpenAICompatibleToolMessage),
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
 enum OpenAICompatibleResponseFormat {
@@ -288,14 +382,14 @@ enum OpenAICompatibleResponseFormat {
     JsonObject,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(untagged)]
 enum JsonSchemaInfoOption {
     JsonSchema(JsonSchemaInfo),
     DeprecatedJsonSchema(Value),
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 struct JsonSchemaInfo {
     name: String,
     description: Option<String>,
@@ -304,7 +398,7 @@ struct JsonSchemaInfo {
     strict: bool,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(tag = "type", content = "function")]
 #[serde(rename_all = "snake_case")]
 enum OpenAICompatibleTool {
@@ -317,13 +411,13 @@ enum OpenAICompatibleTool {
     },
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 struct FunctionName {
     name: String,
 }
 
 /// Specifies a tool the model should use. Use to force the model to call a specific function.
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 struct OpenAICompatibleNamedToolChoice {
     /// The type of the tool. Currently, only `function` is supported.
     r#type: String,
@@ -337,7 +431,7 @@ struct OpenAICompatibleNamedToolChoice {
 /// Specifying a particular tool via `{"type": "function", "function": {"name": "my_function"}}` forces the model to call that tool.
 ///
 /// `none` is the default when no tools are present. `auto` is the default if tools are present.
-#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
 enum ChatCompletionToolChoiceOption {
     #[default]
@@ -348,14 +442,14 @@ enum ChatCompletionToolChoiceOption {
     Named(OpenAICompatibleNamedToolChoice),
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 struct OpenAICompatibleStreamOptions {
     #[serde(default)]
     include_usage: bool,
 }
 
 /// Helper type for parameters that can be either a single string or an array of strings
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(untagged)]
 enum StringOrVec {
     String(String),
@@ -372,7 +466,7 @@ impl StringOrVec {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Default)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Default, Serialize)]
 pub struct OpenAICompatibleParams {
     messages: Vec<OpenAICompatibleMessage>,
     model: String,
@@ -779,6 +873,7 @@ impl Params {
             extra_body: openai_compatible_params.tensorzero_extra_body,
             extra_headers: openai_compatible_params.tensorzero_extra_headers,
             observability_metadata: None, // Will be set in the handler
+            gateway_request: None,        // Will be set in the handler
         })
     }
 }
@@ -1415,7 +1510,7 @@ impl From<ToolCallChunk> for OpenAICompatibleToolCall {
 
 // OpenAI-compatible embedding types and handler
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct OpenAICompatibleEmbeddingParams {
     input: OpenAICompatibleEmbeddingInput,
     model: String,
@@ -1425,7 +1520,7 @@ pub struct OpenAICompatibleEmbeddingParams {
     unknown_fields: HashMap<String, Value>,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(untagged)]
 enum OpenAICompatibleEmbeddingInput {
     Single(String),
@@ -1460,7 +1555,7 @@ pub async fn embedding_handler(
         config,
         http_client,
         clickhouse_connection_info,
-        kafka_connection_info: _,
+        kafka_connection_info,
         authentication_info: _,
         model_credential_store,
         ..
@@ -1518,6 +1613,9 @@ pub async fn embedding_handler(
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
 
+    // Capture the gateway request (without null values)
+    let _gateway_request = serialize_without_nulls(&openai_compatible_params).ok();
+
     let embedding_request = EmbeddingRequest {
         input: internal_input,
         encoding_format,
@@ -1568,26 +1666,158 @@ pub async fn embedding_handler(
         object: "list".to_string(),
         data: response
             .embeddings
-            .into_iter()
+            .iter()
             .enumerate()
             .map(|(index, embedding)| OpenAICompatibleEmbeddingData {
                 object: "embedding".to_string(),
-                embedding,
+                embedding: embedding.clone(),
                 index,
             })
             .collect(),
-        model: original_model_name,
+        model: original_model_name.clone(),
         usage: OpenAICompatibleEmbeddingUsage {
             prompt_tokens: response.usage.input_tokens,
             total_tokens: response.usage.input_tokens,
         },
     };
 
+    // Capture the gateway response (without null values)
+    let gateway_response = serialize_without_nulls(&openai_response).ok();
+
+    // Write to observability database if enabled
+    if config.gateway.observability.enabled.unwrap_or(true) {
+        // Create the InferenceResult for observability
+        let inference_id = Uuid::now_v7();
+
+        // Create a ModelInferenceResponseWithMetadata for the embedding
+        let model_inference = crate::inference::types::ModelInferenceResponseWithMetadata {
+            id: Uuid::now_v7(),
+            created: response.created,
+            output: vec![], // Embeddings don't have ContentBlockOutput
+            system: None,
+            input_messages: vec![], // Could convert from embedding input if needed
+            raw_request: response.raw_request.clone(),
+            raw_response: response.raw_response.clone(),
+            usage: response.usage.clone(),
+            latency: response.latency.clone(),
+            model_provider_name: response.embedding_provider_name.clone(),
+            model_name: Arc::from(original_model_name.as_str()),
+            cached: response.cached,
+            finish_reason: None,
+            gateway_request: None,
+            gateway_response: None,
+        };
+
+        let result = crate::inference::types::InferenceResult::Embedding(
+            crate::inference::types::EmbeddingInferenceResult {
+                inference_id,
+                created: response.created,
+                embeddings: response.embeddings.clone(),
+                embedding_dimensions: response.embeddings.first()
+                    .map(|e| e.len() as u32)
+                    .unwrap_or(0),
+                input_count: response.embeddings.len() as u32,
+                usage: response.usage.clone(),
+                model_inference_results: vec![model_inference], // Now populated with model inference
+                inference_params: crate::endpoints::inference::InferenceParams::default(),
+                original_response: Some(response.raw_response.clone()),
+            },
+        );
+
+        // Extract observability metadata from headers (set by auth middleware)
+        let observability_metadata = if let (Some(project_id), Some(endpoint_id), Some(model_id)) = (
+            headers
+                .get("x-tensorzero-project-id")
+                .and_then(|v| v.to_str().ok()),
+            headers
+                .get("x-tensorzero-endpoint-id")
+                .and_then(|v| v.to_str().ok()),
+            headers
+                .get("x-tensorzero-model-id")
+                .and_then(|v| v.to_str().ok()),
+        ) {
+            Some(super::inference::ObservabilityMetadata {
+                project_id: project_id.to_string(),
+                endpoint_id: endpoint_id.to_string(),
+                model_id: model_id.to_string(),
+            })
+        } else {
+            None
+        };
+
+        // Use defaults for embedding requests since they don't have function/variant context
+        let episode_id = Uuid::now_v7();
+        let metadata = crate::endpoints::inference::InferenceDatabaseInsertMetadata {
+            function_name: "tensorzero::embedding".to_string(),  // Default function name for embeddings
+            variant_name: original_model_name.clone(),           // Use model name as variant
+            episode_id,
+            tool_config: None,
+            processing_time: Some(match response.latency {
+                crate::inference::types::Latency::NonStreaming { response_time } => response_time,
+                _ => std::time::Duration::from_millis(0),
+            }),
+            tags: HashMap::new(),
+            extra_body: UnfilteredInferenceExtraBody::default(),
+            extra_headers: crate::inference::types::extra_headers::UnfilteredInferenceExtraHeaders::default(),
+        };
+
+        // Convert EmbeddingInput to ResolvedInput for write_inference
+        let resolved_input = ResolvedInput {
+            messages: vec![ResolvedInputMessage {
+                role: Role::User,
+                content: match &embedding_request.input {
+                    crate::embeddings::EmbeddingInput::Single(text) => vec![
+                        ResolvedInputMessageContent::Text {
+                            value: serde_json::Value::String(text.clone()),
+                        }
+                    ],
+                    crate::embeddings::EmbeddingInput::Batch(texts) => texts.iter().map(|text| {
+                        ResolvedInputMessageContent::Text {
+                            value: serde_json::Value::String(text.clone()),
+                        }
+                    }).collect(),
+                },
+            }],
+            system: None,
+        };
+
+        // Write to observability database asynchronously
+        let config_clone = config.clone();
+        let clickhouse_info = clickhouse_connection_info.clone();
+        let kafka_info = kafka_connection_info.clone();
+        let gateway_request_json = _gateway_request;
+        let gateway_response_json = gateway_response.clone();
+        let async_writes = config.gateway.observability.async_writes;
+
+        let write_future = tokio::spawn(async move {
+            write_inference(
+                &clickhouse_info,
+                &kafka_info,
+                &config_clone,
+                resolved_input,
+                result,
+                metadata,
+                observability_metadata,
+                gateway_request_json,
+                gateway_response_json,
+            )
+            .await;
+        });
+
+        if !async_writes {
+            write_future.await.map_err(|e| {
+                Error::new(ErrorDetails::InternalError {
+                    message: format!("Failed to join write task: {e}"),
+                })
+            })?;
+        }
+    }
+
     Ok(Json(openai_response).into_response())
 }
 
 /// OpenAI-compatible moderation request structure
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct OpenAICompatibleModerationParams {
     pub input: OpenAICompatibleModerationInput,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1596,7 +1826,7 @@ pub struct OpenAICompatibleModerationParams {
     pub unknown_fields: HashMap<String, Value>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum OpenAICompatibleModerationInput {
     Single(String),
@@ -1618,7 +1848,7 @@ pub async fn moderation_handler(
         config,
         http_client,
         clickhouse_connection_info,
-        kafka_connection_info: _,
+        kafka_connection_info,
         authentication_info: _,
         model_credential_store,
         ..
@@ -1671,6 +1901,9 @@ pub async fn moderation_handler(
             crate::moderation::ModerationInput::Batch(texts.clone())
         }
     };
+
+    // Capture the gateway request (without null values)
+    let gateway_request_json = serialize_without_nulls(&openai_compatible_params).ok();
 
     let moderation_request = crate::moderation::ModerationRequest {
         input: internal_input,
@@ -1813,14 +2046,175 @@ pub async fn moderation_handler(
     let openai_response = OpenAICompatibleModerationResponse {
         id: format!("modr-{}", Uuid::now_v7()),
         model: model_resolution.original_model_name.to_string(),
-        results: response.results,
+        results: response.results.clone(),
     };
+
+    // Capture the gateway response (without null values)
+    let gateway_response_json = serialize_without_nulls(&openai_response).ok();
+
+    // Write observability data if configured
+    if config.gateway.observability.enabled.unwrap_or(true) {
+        use crate::inference::types::{ResolvedInput, ResolvedInputMessage, ResolvedInputMessageContent, Role};
+        use crate::endpoints::inference::write_inference;
+
+        // Generate inference ID
+        let inference_id = Uuid::now_v7();
+
+        // Create ModelInferenceResponseWithMetadata for moderation
+        let model_inference = crate::inference::types::ModelInferenceResponseWithMetadata {
+            id: inference_id,
+            created: response.created,
+            output: vec![],
+            model_name: Arc::from(resolved_model_name.as_str()),
+            model_provider_name: response.moderation_provider_name.clone(),
+            input_messages: vec![],
+            raw_request: response.raw_request.clone(),
+            raw_response: response.raw_response.clone(),
+            usage: response.usage.clone(),
+            system: None,
+            cached: response.cached,
+            latency: response.latency.clone(),
+            finish_reason: Some(crate::inference::types::FinishReason::Stop),
+            gateway_request: gateway_request_json.clone(),
+            gateway_response: gateway_response_json.clone(),
+        };
+
+        // Create InferenceResult
+        let result = crate::inference::types::InferenceResult::Moderation(
+            crate::inference::types::ModerationInferenceResult {
+                inference_id,
+                created: response.created,
+                results: response.results.iter().map(|r| {
+                    // Convert ModerationCategories struct to HashMap
+                    let mut categories_map = HashMap::new();
+                    categories_map.insert("hate".to_string(), r.categories.hate);
+                    categories_map.insert("hate/threatening".to_string(), r.categories.hate_threatening);
+                    categories_map.insert("harassment".to_string(), r.categories.harassment);
+                    categories_map.insert("harassment/threatening".to_string(), r.categories.harassment_threatening);
+                    categories_map.insert("self-harm".to_string(), r.categories.self_harm);
+                    categories_map.insert("self-harm/intent".to_string(), r.categories.self_harm_intent);
+                    categories_map.insert("self-harm/instructions".to_string(), r.categories.self_harm_instructions);
+                    categories_map.insert("sexual".to_string(), r.categories.sexual);
+                    categories_map.insert("sexual/minors".to_string(), r.categories.sexual_minors);
+                    categories_map.insert("violence".to_string(), r.categories.violence);
+                    categories_map.insert("violence/graphic".to_string(), r.categories.violence_graphic);
+
+                    // Convert ModerationCategoryScores struct to HashMap
+                    let mut scores_map = HashMap::new();
+                    scores_map.insert("hate".to_string(), r.category_scores.hate);
+                    scores_map.insert("hate/threatening".to_string(), r.category_scores.hate_threatening);
+                    scores_map.insert("harassment".to_string(), r.category_scores.harassment);
+                    scores_map.insert("harassment/threatening".to_string(), r.category_scores.harassment_threatening);
+                    scores_map.insert("self-harm".to_string(), r.category_scores.self_harm);
+                    scores_map.insert("self-harm/intent".to_string(), r.category_scores.self_harm_intent);
+                    scores_map.insert("self-harm/instructions".to_string(), r.category_scores.self_harm_instructions);
+                    scores_map.insert("sexual".to_string(), r.category_scores.sexual);
+                    scores_map.insert("sexual/minors".to_string(), r.category_scores.sexual_minors);
+                    scores_map.insert("violence".to_string(), r.category_scores.violence);
+                    scores_map.insert("violence/graphic".to_string(), r.category_scores.violence_graphic);
+
+                    crate::inference::types::ModerationResult {
+                        flagged: r.flagged,
+                        categories: categories_map,
+                        category_scores: scores_map,
+                    }
+                }).collect(),
+                usage: response.usage.clone(),
+                model_inference_results: vec![model_inference],
+                inference_params: crate::endpoints::inference::InferenceParams::default(),
+                original_response: Some(response.raw_response.clone()),
+            },
+        );
+
+        // Extract observability metadata from headers (set by auth middleware)
+        let observability_metadata = if let (Some(project_id), Some(endpoint_id), Some(model_id)) = (
+            headers
+                .get("x-tensorzero-project-id")
+                .and_then(|v| v.to_str().ok()),
+            headers
+                .get("x-tensorzero-endpoint-id")
+                .and_then(|v| v.to_str().ok()),
+            headers
+                .get("x-tensorzero-model-id")
+                .and_then(|v| v.to_str().ok()),
+        ) {
+            Some(super::inference::ObservabilityMetadata {
+                project_id: project_id.to_string(),
+                endpoint_id: endpoint_id.to_string(),
+                model_id: model_id.to_string(),
+            })
+        } else {
+            None
+        };
+
+        // Use defaults for moderation requests
+        let episode_id = Uuid::now_v7();
+        let metadata = crate::endpoints::inference::InferenceDatabaseInsertMetadata {
+            function_name: "tensorzero::moderation".to_string(),  // Default function name for moderation
+            variant_name: resolved_model_name.clone(),            // Use model name as variant
+            episode_id,
+            tool_config: None,
+            processing_time: Some(match response.latency {
+                crate::inference::types::Latency::NonStreaming { response_time } => response_time,
+                _ => std::time::Duration::from_millis(0),
+            }),
+            tags: HashMap::new(),
+            extra_body: crate::inference::types::extra_body::UnfilteredInferenceExtraBody::default(),
+            extra_headers: crate::inference::types::extra_headers::UnfilteredInferenceExtraHeaders::default(),
+        };
+
+        // Convert input to ResolvedInput for write_inference
+        let input_text = match &openai_compatible_params.input {
+            OpenAICompatibleModerationInput::Single(text) => text.clone(),
+            OpenAICompatibleModerationInput::Batch(texts) => texts.join("\n"),
+        };
+
+        let resolved_input = ResolvedInput {
+            messages: vec![ResolvedInputMessage {
+                role: Role::User,
+                content: vec![ResolvedInputMessageContent::Text {
+                    value: serde_json::Value::String(input_text),
+                }],
+            }],
+            system: None,
+        };
+
+        // Write to observability database asynchronously
+        let config_clone = config.clone();
+        let clickhouse_info = clickhouse_connection_info.clone();
+        let kafka_info = kafka_connection_info.clone();
+        let gateway_response_json_clone = gateway_response_json.clone();
+        let async_writes = config.gateway.observability.async_writes;
+
+        let write_future = tokio::spawn(async move {
+            write_inference(
+                &clickhouse_info,
+                &kafka_info,
+                &config_clone,
+                resolved_input,
+                result,
+                metadata,
+                observability_metadata,
+                gateway_request_json,
+                gateway_response_json_clone,
+            )
+            .await;
+        });
+
+        if !async_writes {
+            write_future.await.map_err(|e| {
+                Error::new(ErrorDetails::InternalError {
+                    message: format!("Failed to join write task: {e}"),
+                })
+            })?;
+        }
+    }
 
     Ok(Json(openai_response).into_response())
 }
 
 // Audio transcription types
-#[derive(Clone, Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct OpenAICompatibleAudioTranscriptionParams {
     pub model: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1844,7 +2238,7 @@ pub struct OpenAICompatibleAudioTranscriptionParams {
 }
 
 // Audio translation types
-#[derive(Clone, Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct OpenAICompatibleAudioTranslationParams {
     pub model: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1858,7 +2252,7 @@ pub struct OpenAICompatibleAudioTranslationParams {
 }
 
 // Text-to-speech types
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct OpenAICompatibleTextToSpeechParams {
     pub model: String,
     pub input: String,
@@ -1997,6 +2391,9 @@ pub async fn audio_transcription_handler(
         })
         .transpose()?;
 
+    // Capture the gateway request - serialize the params for logging (without null values)
+    let _gateway_request = serialize_without_nulls(&params).ok();
+
     // Create transcription request
     let transcription_request = AudioTranscriptionRequest {
         id: Uuid::now_v7(),
@@ -2102,6 +2499,23 @@ pub async fn audio_transcription_handler(
                     None
                 },
             };
+
+            // Capture the gateway response
+            let gateway_response_json = serde_json::to_string(&openai_response).ok();
+
+            // Store the gateway response if we have it
+            if let Some(gateway_response) = &gateway_response_json {
+                // Log for debugging
+                tracing::debug!(
+                    "Gateway response captured: {} bytes",
+                    gateway_response.len()
+                );
+
+                // Store the gateway response in the database
+                // This requires updating the storage layer to include the gateway_response
+                // For now, we'll need to update the storage layer separately
+            }
+
             Ok(Json(openai_response).into_response())
         }
         AudioTranscriptionResponseFormat::Srt | AudioTranscriptionResponseFormat::Vtt => {
@@ -2189,6 +2603,9 @@ pub async fn audio_translation_handler(
         })
         .transpose()?;
 
+    // Capture the gateway request - serialize the params for logging (without null values)
+    let _gateway_request = serialize_without_nulls(&params).ok();
+
     // Create translation request
     let translation_request = AudioTranslationRequest {
         id: Uuid::now_v7(),
@@ -2250,6 +2667,23 @@ pub async fn audio_translation_handler(
                 words: None,
                 segments: None,
             };
+
+            // Capture the gateway response
+            let gateway_response_json = serde_json::to_string(&openai_response).ok();
+
+            // Store the gateway response if we have it
+            if let Some(gateway_response) = &gateway_response_json {
+                // Log for debugging
+                tracing::debug!(
+                    "Gateway response captured: {} bytes",
+                    gateway_response.len()
+                );
+
+                // Store the gateway response in the database
+                // This requires updating the storage layer to include the gateway_response
+                // For now, we'll need to update the storage layer separately
+            }
+
             Ok(Json(openai_response).into_response())
         }
         AudioTranscriptionResponseFormat::Srt | AudioTranscriptionResponseFormat::Vtt => {
@@ -2367,6 +2801,9 @@ pub async fn text_to_speech_handler(
             }));
         }
     }
+
+    // Capture the gateway request (without null values)
+    let _gateway_request = serialize_without_nulls(&params).ok();
 
     // Create text-to-speech request
     let tts_request = TextToSpeechRequest {
@@ -2759,7 +3196,7 @@ pub async fn image_generation_handler(
         config,
         http_client,
         clickhouse_connection_info,
-        kafka_connection_info: _,
+        kafka_connection_info,
         authentication_info: _,
         model_credential_store,
         ..
@@ -2850,6 +3287,9 @@ pub async fn image_generation_handler(
         }
     }
 
+    // Capture the gateway request (without null values) before params are consumed
+    let gateway_request_json = serialize_without_nulls(&params).ok();
+
     // Create image generation request
     let image_request = ImageGenerationRequest {
         id: Uuid::now_v7(),
@@ -2896,14 +3336,143 @@ pub async fn image_generation_handler(
         created: response.created,
         data: response
             .data
+            .clone()
             .into_iter()
             .map(|d| OpenAICompatibleImageData {
-                url: d.url,
-                b64_json: d.b64_json,
-                revised_prompt: d.revised_prompt,
+                url: d.url.clone(),
+                b64_json: d.b64_json.clone(),
+                revised_prompt: d.revised_prompt.clone(),
             })
             .collect(),
     };
+
+    // Capture the gateway response (without null values)
+    let gateway_response_json = serialize_without_nulls(&openai_response).ok();
+
+    // Write observability data
+    if config.gateway.observability.enabled.unwrap_or(true) {
+        let inference_id = image_request.id;
+
+        // Create ModelInferenceResponseWithMetadata
+        let model_inference = crate::inference::types::ModelInferenceResponseWithMetadata {
+            id: Uuid::now_v7(),
+            created: response.created,
+            output: vec![],
+            model_name: Arc::from(model_name.as_str()),
+            model_provider_name: model.providers.values().next().map(|p| p.name.clone()).unwrap_or_default(),
+            input_messages: vec![],
+            raw_request: response.raw_request.clone(),
+            raw_response: response.raw_response.clone(),
+            usage: response.usage.clone(),
+            system: None,
+            cached: false,
+            latency: response.latency.clone(),
+            finish_reason: Some(crate::inference::types::FinishReason::Stop),
+            gateway_request: None,
+            gateway_response: None,
+        };
+
+        // Create the InferenceResult
+        let result = crate::inference::types::InferenceResult::ImageGeneration(
+            crate::inference::types::ImageGenerationInferenceResult {
+                inference_id,
+                created: response.created,
+                images: response.data.iter().map(|d| crate::inference::types::ImageData {
+                    url: d.url.clone(),
+                    base64: d.b64_json.clone(),
+                    revised_prompt: d.revised_prompt.clone(),
+                }).collect(),
+                image_count: response.data.len() as u8,
+                size: image_request.size.map(|s| s.as_str().to_string()).unwrap_or_else(|| "1024x1024".to_string()),
+                quality: image_request.quality.map(|q| q.as_str().to_string()).unwrap_or_else(|| "standard".to_string()),
+                style: image_request.style.map(|s| s.as_str().to_string()),
+                usage: response.usage.clone(),
+                model_inference_results: vec![model_inference],
+                inference_params: crate::endpoints::inference::InferenceParams::default(),
+                original_response: Some(response.raw_response.clone()),
+            },
+        );
+
+        // Extract observability metadata from headers (set by auth middleware)
+        let observability_metadata = if let (Some(project_id), Some(endpoint_id), Some(model_id)) = (
+            headers
+                .get("x-tensorzero-project-id")
+                .and_then(|v| v.to_str().ok()),
+            headers
+                .get("x-tensorzero-endpoint-id")
+                .and_then(|v| v.to_str().ok()),
+            headers
+                .get("x-tensorzero-model-id")
+                .and_then(|v| v.to_str().ok()),
+        ) {
+            Some(super::inference::ObservabilityMetadata {
+                project_id: project_id.to_string(),
+                endpoint_id: endpoint_id.to_string(),
+                model_id: model_id.to_string(),
+            })
+        } else {
+            None
+        };
+
+        // Use defaults for image generation requests
+        let episode_id = Uuid::now_v7();
+        let metadata = crate::endpoints::inference::InferenceDatabaseInsertMetadata {
+            function_name: "tensorzero::image_generation".to_string(),  // Default function name for images
+            variant_name: model_name.to_string(),           // Use model name as variant
+            episode_id,
+            tool_config: None,
+            processing_time: Some(match response.latency {
+                crate::inference::types::Latency::NonStreaming { response_time } => response_time,
+                _ => std::time::Duration::from_millis(0),
+            }),
+            tags: HashMap::new(),
+            extra_body: UnfilteredInferenceExtraBody::default(),
+            extra_headers: crate::inference::types::extra_headers::UnfilteredInferenceExtraHeaders::default(),
+        };
+
+        // Convert prompt to ResolvedInput for write_inference
+        let resolved_input = ResolvedInput {
+            messages: vec![ResolvedInputMessage {
+                role: Role::User,
+                content: vec![ResolvedInputMessageContent::Text {
+                    value: serde_json::Value::String(image_request.prompt.clone()),
+                }],
+            }],
+            system: None,
+        };
+
+        // Gateway request already captured before params were consumed
+
+        // Write to observability database asynchronously
+        let config_clone = config.clone();
+        let clickhouse_info = clickhouse_connection_info.clone();
+        let kafka_info = kafka_connection_info.clone();
+        let gateway_response_json = gateway_response_json.clone();
+        let async_writes = config.gateway.observability.async_writes;
+
+        let write_future = tokio::spawn(async move {
+            write_inference(
+                &clickhouse_info,
+                &kafka_info,
+                &config_clone,
+                resolved_input,
+                result,
+                metadata,
+                observability_metadata,
+                gateway_request_json,
+                gateway_response_json,
+            )
+            .await;
+        });
+
+        if !async_writes {
+            write_future.await.map_err(|e| {
+                Error::new(ErrorDetails::InternalError {
+                    message: format!("Failed to join write task: {e}"),
+                })
+            })?;
+        }
+    }
 
     Ok(Json(openai_response).into_response())
 }
@@ -2999,6 +3568,9 @@ pub async fn image_edit_handler(
         }
     }
 
+    // Capture the gateway request (without null values)
+    let _gateway_request = serialize_without_nulls(&params).ok();
+
     // Create image edit request
     let image_request = ImageEditRequest {
         id: Uuid::now_v7(),
@@ -3055,6 +3627,22 @@ pub async fn image_edit_handler(
             })
             .collect(),
     };
+
+    // Capture the gateway response (without null values)
+    let gateway_response_json = serialize_without_nulls(&openai_response).ok();
+
+    // Store the gateway response if we have it
+    if let Some(gateway_response) = &gateway_response_json {
+        // Log for debugging
+        tracing::debug!(
+            "Gateway response captured: {} bytes",
+            gateway_response.len()
+        );
+
+        // Store the gateway response in the database
+        // This requires updating the storage layer to include the gateway_response
+        // For now, we'll need to update the storage layer separately
+    }
 
     Ok(Json(openai_response).into_response())
 }
@@ -3133,6 +3721,9 @@ pub async fn image_variation_handler(
         }
     }
 
+    // Capture the gateway request (without null values)
+    let _gateway_request = serialize_without_nulls(&params).ok();
+
     // Create image variation request
     let image_request = ImageVariationRequest {
         id: Uuid::now_v7(),
@@ -3183,11 +3774,27 @@ pub async fn image_variation_handler(
             .collect(),
     };
 
+    // Capture the gateway response (without null values)
+    let gateway_response_json = serialize_without_nulls(&openai_response).ok();
+
+    // Store the gateway response if we have it
+    if let Some(gateway_response) = &gateway_response_json {
+        // Log for debugging
+        tracing::debug!(
+            "Gateway response captured: {} bytes",
+            gateway_response.len()
+        );
+
+        // Store the gateway response in the database
+        // This requires updating the storage layer to include the gateway_response
+        // For now, we'll need to update the storage layer separately
+    }
+
     Ok(Json(openai_response).into_response())
 }
 
 // OpenAI-compatible Image parameter types
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct OpenAICompatibleImageGenerationParams {
     pub prompt: String,
@@ -3207,7 +3814,7 @@ pub struct OpenAICompatibleImageGenerationParams {
     pub unknown_fields: HashMap<String, Value>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize)]
 pub struct OpenAICompatibleImageEditParams {
     pub model: String,
     pub prompt: String,
@@ -3223,7 +3830,7 @@ pub struct OpenAICompatibleImageEditParams {
     pub unknown_fields: HashMap<String, Value>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize)]
 pub struct OpenAICompatibleImageVariationParams {
     pub model: String,
     pub n: Option<u8>,
@@ -3550,6 +4157,16 @@ pub async fn response_create_handler(
         cache_options: &cache_options,
     };
 
+    // Capture the gateway request for logging purposes (without null values)
+    let gateway_request = serialize_without_nulls(&params).ok();
+
+    if let Some(gw_req) = &gateway_request {
+        tracing::debug!(
+            "Gateway request captured for responses API: {} bytes",
+            gw_req.len()
+        );
+    }
+
     // Check if streaming is requested
     if params.stream.unwrap_or(false) {
         // Handle streaming response
@@ -3573,6 +4190,11 @@ pub async fn response_create_handler(
         let response = model
             .create_response(&params, &model_resolution.original_model_name, &clients)
             .await?;
+
+        // Log the response size for debugging
+        if let Ok(response_json) = serde_json::to_string(&response) {
+            tracing::debug!("Response size: {} bytes", response_json.len());
+        }
 
         Ok(Json(response).into_response())
     }
@@ -4208,6 +4830,22 @@ pub async fn file_delete_handler(
         "object": "file",
         "deleted": true
     });
+
+    // Capture the gateway response (without null values)
+    let gateway_response_json = serialize_without_nulls(&delete_response).ok();
+
+    // Store the gateway response if we have it
+    if let Some(gateway_response) = &gateway_response_json {
+        // Log for debugging
+        tracing::debug!(
+            "Gateway response captured: {} bytes",
+            gateway_response.len()
+        );
+
+        // Store the gateway response in the database
+        // This requires updating the storage layer to include the gateway_response
+        // For now, we'll need to update the storage layer separately
+    }
 
     let response = Json(delete_response).into_response();
     Ok(response)

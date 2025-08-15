@@ -62,13 +62,15 @@ from ..model_ops.models import Provider as ProviderModel
 from ..model_ops.services import ModelServiceUtil
 from ..shared.notification_service import BudNotifyService, NotificationBuilder
 from ..shared.redis_service import RedisService
+from ..user_ops.models import User as UserModel
 from ..workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
 from ..workflow_ops.models import Workflow as WorkflowModel
 from ..workflow_ops.models import WorkflowStep as WorkflowStepModel
 from ..workflow_ops.schemas import WorkflowUtilCreate
 from ..workflow_ops.services import WorkflowService, WorkflowStepService
-from .crud import AdapterDataManager, EndpointDataManager
+from .crud import AdapterDataManager, EndpointDataManager, PublicationHistoryDataManager
 from .models import Adapter as AdapterModel
+from .models import DeploymentPricing
 from .models import Endpoint as EndpointModel
 from .schemas import (
     AddAdapterRequest,
@@ -80,6 +82,7 @@ from .schemas import (
     AWSSageMakerConfig,
     AzureConfig,
     DeepSeekConfig,
+    DeploymentPricingResponse,
     EndpointCreate,
     FireworksConfig,
     GCPVertexConfig,
@@ -104,7 +107,7 @@ class EndpointService(SessionMixin):
 
     async def get_all_endpoints(
         self,
-        project_id: UUID,
+        project_id: Optional[UUID],
         offset: int = 0,
         limit: int = 10,
         filters: Dict = {},
@@ -117,8 +120,9 @@ class EndpointService(SessionMixin):
             # Otherwise it will perform global search on all fields
             filters.pop("status", None)
 
-        # Validate project_id
-        await ProjectDataManager(self.session).retrieve_by_fields(ProjectModel, {"id": project_id})
+        if project_id:
+            # Validate project_id if provided
+            await ProjectDataManager(self.session).retrieve_by_fields(ProjectModel, {"id": project_id})
 
         return await EndpointDataManager(self.session).get_all_active_endpoints(
             project_id, offset, limit, filters, order_by, search
@@ -168,6 +172,7 @@ class EndpointService(SessionMixin):
             try:
                 await self.delete_model_from_proxy_cache(db_endpoint.id)
                 await CredentialService(self.session).update_proxy_cache(db_endpoint.project_id)
+                await self.update_published_model_cache()
                 logger.debug(f"Updated proxy cache for project {db_endpoint.project_id}")
             except (RedisException, Exception) as e:
                 logger.error(f"Failed to delete endpoint details from redis: {e}")
@@ -256,6 +261,7 @@ class EndpointService(SessionMixin):
         try:
             await self.delete_model_from_proxy_cache(db_endpoint.id)
             await CredentialService(self.session).update_proxy_cache(db_endpoint.project_id)
+            await self.update_published_model_cache()
             logger.debug(f"Updated proxy cache for project {db_endpoint.project_id}")
         except (RedisException, Exception) as e:
             logger.error(f"Failed to delete endpoint details from redis: {e}")
@@ -568,19 +574,17 @@ class EndpointService(SessionMixin):
             logger.debug(
                 f"Performing update endpoint status request. payload: {payload}, endpoint: {update_cluster_endpoint}"
             )
-            async with (
-                aiohttp.ClientSession() as session,
-                session.post(update_cluster_endpoint, json=payload) as response,
-            ):
-                response_data = await response.json()
-                if response.status != 200 or response_data.get("object") == "error":
-                    logger.error(f"Failed to update endpoint status: {response.status} {response_data}")
-                    raise ClientException(
-                        "Failed to update endpoint status", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
-                    )
+            async with aiohttp.ClientSession() as session:
+                async with session.post(update_cluster_endpoint, json=payload) as response:
+                    response_data = await response.json()
+                    if response.status != 200 or response_data.get("object") == "error":
+                        logger.error(f"Failed to update endpoint status: {response.status} {response_data}")
+                        raise ClientException(
+                            "Failed to update endpoint status", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+                        )
 
-                logger.debug("Successfully updated endpoint status")
-                return response_data
+                    logger.debug("Successfully updated endpoint status")
+                    return response_data
         except Exception as e:
             logger.exception(f"Failed to send update endpoint status request: {e}")
             raise ClientException(
@@ -720,18 +724,16 @@ class EndpointService(SessionMixin):
             "accept": "application/json",
         }
 
-        async with (
-            aiohttp.ClientSession() as session,
-            session.get(get_worker_logs_endpoint, headers=headers) as response,
-        ):
-            response_data = await response.json()
-            if response.status != 200 or response_data.get("object") == "error":
-                error_message = response_data.get("message", "Failed to get endpoint worker logs")
-                logger.error(f"Failed to get endpoint worker logs: {error_message}")
-                raise ClientException(error_message)
+        async with aiohttp.ClientSession() as session:
+            async with session.get(get_worker_logs_endpoint, headers=headers) as response:
+                response_data = await response.json()
+                if response.status != 200 or response_data.get("object") == "error":
+                    error_message = response_data.get("message", "Failed to get endpoint worker logs")
+                    logger.error(f"Failed to get endpoint worker logs: {error_message}")
+                    raise ClientException(error_message)
 
-            logger.debug("Successfully retrieved endpoint worker logs")
-            return response_data.get("logs", [])
+                logger.debug("Successfully retrieved endpoint worker logs")
+                return response_data.get("logs", [])
 
     async def get_worker_metrics_history(self, endpoint_id: UUID, worker_id: UUID) -> Dict[str, Any]:
         """Get worker metrics history."""
@@ -744,19 +746,17 @@ class EndpointService(SessionMixin):
             "accept": "application/json",
         }
 
-        async with (
-            aiohttp.ClientSession() as session,
-            session.get(get_worker_logs_endpoint, headers=headers) as response,
-        ):
-            response_data = await response.json()
-            if response.status != 200 or response_data.get("object") == "error":
-                error_message = response_data.get("message", "Failed to get endpoint worker metrics history")
-                logger.error(f"Failed to get endpoint worker metrics history: {error_message}")
-                raise ClientException(error_message)
+        async with aiohttp.ClientSession() as session:
+            async with session.get(get_worker_logs_endpoint, headers=headers) as response:
+                response_data = await response.json()
+                if response.status != 200 or response_data.get("object") == "error":
+                    error_message = response_data.get("message", "Failed to get endpoint worker metrics history")
+                    logger.error(f"Failed to get endpoint worker metrics history: {error_message}")
+                    raise ClientException(error_message)
 
-            logger.debug("Successfully retrieved endpoint worker logs")
-            logger.debug(f" ::METRIC:: Response data: {response_data}")
-            return response_data.get("data", None)
+                logger.debug("Successfully retrieved endpoint worker logs")
+                logger.debug(f" ::METRIC:: Response data: {response_data}")
+                return response_data.get("data", None)
 
     async def get_endpoint_worker_detail(self, endpoint_id: UUID, worker_id: UUID, reload: bool) -> dict:
         """Get endpoint worker detail."""
@@ -828,20 +828,18 @@ class EndpointService(SessionMixin):
         while True:
             try:
                 payload = {"namespace": namespace, "cluster_id": cluster_id, "page": page, "limit": PAGE_LIMIT}
-                async with (
-                    aiohttp.ClientSession() as session,
-                    session.get(get_workers_endpoint, params=payload) as response,
-                ):
-                    bud_cluster_response = await response.json()
-                    logger.debug("bud_cluster_response: %s", bud_cluster_response)
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(get_workers_endpoint, params=payload) as response:
+                        bud_cluster_response = await response.json()
+                        logger.debug("bud_cluster_response: %s", bud_cluster_response)
 
-                    if response.status != 200 or bud_cluster_response.get("object") == "error":
-                        error_message = bud_cluster_response.get("message", "Failed to get endpoint workers")
-                        logger.error(f"Failed to get endpoint workers: {error_message}")
-                        break
+                        if response.status != 200 or bud_cluster_response.get("object") == "error":
+                            error_message = bud_cluster_response.get("message", "Failed to get endpoint workers")
+                            logger.error(f"Failed to get endpoint workers: {error_message}")
+                            break
 
-                    logger.debug("Successfully retrieved %s workers for page %s", PAGE_LIMIT, page)
-                    workers_data = bud_cluster_response.get("workers", [])
+                        logger.debug("Successfully retrieved %s workers for page %s", PAGE_LIMIT, page)
+                        workers_data = bud_cluster_response.get("workers", [])
             except Exception as e:
                 logger.exception(
                     "Failed to fetch workers for namespace %s and cluster_id %s: %s", namespace, cluster_id, e
@@ -976,18 +974,16 @@ class EndpointService(SessionMixin):
             logger.debug(
                 f"Performing update endpoint status request. payload: {payload}, endpoint: {delete_worker_endpoint}"
             )
-            async with (
-                aiohttp.ClientSession() as session,
-                session.delete(delete_worker_endpoint, json=payload) as response,
-            ):
-                response_data = await response.json()
-                if response.status != 200 or response_data.get("object") == "error":
-                    logger.error(f"Failed to delete worker: {response.status} {response_data}")
-                    error_message = response_data.get("message", "Failed to delete worker")
-                    raise ClientException(error_message, status_code=response.status)
+            async with aiohttp.ClientSession() as session:
+                async with session.delete(delete_worker_endpoint, json=payload) as response:
+                    response_data = await response.json()
+                    if response.status != 200 or response_data.get("object") == "error":
+                        logger.error(f"Failed to delete worker: {response.status} {response_data}")
+                        error_message = response_data.get("message", "Failed to delete worker")
+                        raise ClientException(error_message, status_code=response.status)
 
-                logger.debug("Successfully deleted worker")
-                return response_data
+                    logger.debug("Successfully deleted worker")
+                    return response_data
         except ClientException as e:
             raise e
         except Exception as e:
@@ -2097,6 +2093,7 @@ class EndpointService(SessionMixin):
                 EndpointModel, {"id": db_adapter.endpoint_id}
             )
             await CredentialService(self.session).update_proxy_cache(db_endpoint.project_id)
+            await self.update_published_model_cache()
             logger.debug(f"Updated proxy cache for project {db_endpoint.project_id} after adapter deletion")
         except (RedisException, Exception) as e:
             logger.error(f"Failed to update proxy cache after adapter deletion: {e}")
@@ -2611,3 +2608,369 @@ class EndpointService(SessionMixin):
         except Exception as e:
             logger.error(f"Failed to publish deployment settings to cache: {e}")
             # Don't raise exception - cache update failure shouldn't block settings update
+
+    async def update_publication_status(
+        self,
+        endpoint_id: UUID,
+        action: str,
+        current_user_id: UUID,
+        action_metadata: Optional[dict] = None,
+        pricing: Optional[dict] = None,
+    ) -> EndpointModel:
+        """Update the publication status of an endpoint (publish/unpublish).
+
+        Args:
+            endpoint_id (UUID): The ID of the endpoint.
+            action (str): The action to perform ("publish" or "unpublish").
+            current_user_id (UUID): The ID of the user performing the action.
+            action_metadata (Optional[dict]): Additional metadata about the action.
+            pricing (Optional[dict]): Pricing information (required when action="publish").
+
+        Returns:
+            EndpointModel: The updated endpoint.
+
+        Raises:
+            ClientException: If endpoint not found, invalid action, or missing pricing when publishing.
+        """
+        # Retrieve the endpoint
+        endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+            EndpointModel,
+            {"id": endpoint_id},
+            exclude_fields={"status": EndpointStatusEnum.DELETED},
+            missing_ok=True,
+        )
+
+        if not endpoint:
+            raise ClientException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                message=f"Endpoint with ID {endpoint_id} not found",
+            )
+
+        # Validate action
+        if action not in ["publish", "unpublish"]:
+            raise ClientException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                message=f"Invalid action: {action}. Must be 'publish' or 'unpublish'.",
+            )
+
+        # Check current state
+        if action == "publish" and endpoint.is_published:
+            # Idempotent - return success without error
+            logger.info(f"Endpoint {endpoint_id} is already published")
+            return endpoint
+
+        if action == "unpublish" and not endpoint.is_published:
+            # Idempotent - return success without error
+            logger.info(f"Endpoint {endpoint_id} is already unpublished")
+            return endpoint
+
+        # For publish action, check if endpoint is in valid state
+        if action == "publish" and endpoint.status != EndpointStatusEnum.RUNNING:
+            raise ClientException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                message=f"Cannot publish endpoint in {endpoint.status} state. Endpoint must be in RUNNING state to be published.",
+            )
+
+        # Validate pricing is provided when publishing
+        if action == "publish" and not pricing:
+            raise ClientException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                message="Pricing information is required when publishing an endpoint.",
+            )
+
+        # Capture previous state for history
+        previous_state = {
+            "is_published": endpoint.is_published,
+            "published_date": endpoint.published_date.isoformat() if endpoint.published_date else None,
+            "published_by": str(endpoint.published_by) if endpoint.published_by else None,
+        }
+
+        # Update publication status
+        action_time = datetime.now(timezone.utc)
+        is_published = action == "publish"
+        published_date = action_time if is_published else None
+
+        # Handle pricing for publish action
+        if is_published and pricing:
+            # Begin transaction to ensure atomicity
+            try:
+                # Update previous pricing records to not current
+                await EndpointDataManager(self.session).update_previous_pricing(endpoint_id)
+
+                # Create new pricing record
+                await EndpointDataManager(self.session).create_deployment_pricing(
+                    endpoint_id=endpoint_id,
+                    pricing_data=pricing,
+                    created_by=current_user_id,
+                )
+            except Exception as e:
+                logger.error(f"Failed to create pricing for endpoint {endpoint_id}: {e}")
+                self.session.rollback()
+                raise ClientException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    message="Failed to create pricing for endpoint",
+                )
+
+        endpoint = await EndpointDataManager(self.session).update_publication_status(
+            endpoint_id=endpoint_id,
+            is_published=is_published,
+            published_by=current_user_id,
+            published_date=published_date,
+        )
+
+        # Capture new state for history
+        new_state = {
+            "is_published": endpoint.is_published,
+            "published_date": endpoint.published_date.isoformat() if endpoint.published_date else None,
+            "published_by": str(endpoint.published_by) if endpoint.published_by else None,
+        }
+
+        # Create publication history entry
+        await PublicationHistoryDataManager(self.session).create_publication_history(
+            deployment_id=endpoint_id,
+            action=action,
+            performed_by=current_user_id,
+            performed_at=action_time,
+            action_metadata=action_metadata,
+            previous_state=previous_state,
+            new_state=new_state,
+        )
+
+        # Invalidate catalog cache when publication status changes
+        redis_service = RedisService()
+        await redis_service.invalidate_catalog_cache(endpoint_id=str(endpoint_id))
+
+        logger.info(f"Endpoint {endpoint_id} {action}ed successfully by user {current_user_id}")
+
+        # Update published model info cache
+        await self.update_published_model_cache()
+
+        return endpoint
+
+    async def update_published_model_cache(self) -> None:
+        """Update the cache with all published model information.
+
+        This method collects all published endpoints across all projects and updates
+        the Redis cache with a mapping of model names to their endpoint metadata.
+
+        Cache format:
+        {
+            <model_name>: {
+                "endpoint_id": <endpoint_id>,
+                "model_id": <model_id>,
+                "project_id": <project_id>
+            }
+        }
+        """
+        try:
+            # Get all published endpoints
+            published_endpoints = await EndpointDataManager(self.session).get_all_published_endpoints()
+
+            # Build the cache data structure
+            published_models = {}
+            for endpoint in published_endpoints:
+                # Use endpoint name as the key (model name)
+                published_models[endpoint.name] = {
+                    "endpoint_id": str(endpoint.id),
+                    "model_id": str(endpoint.model_id),
+                    "project_id": str(endpoint.project_id),
+                }
+
+            # Update the cache
+            redis_service = RedisService()
+            await redis_service.set(name="published_model_info", value=json.dumps(published_models))
+
+            logger.info(f"Updated published model cache with {len(published_models)} endpoints")
+        except Exception as e:
+            logger.error(f"Failed to update published model cache: {e}")
+            # Don't raise exception - cache update failure shouldn't block the main operation
+
+    async def get_current_pricing(self, endpoint_id: UUID) -> Optional["DeploymentPricing"]:
+        """Get the current pricing for an endpoint.
+
+        Args:
+            endpoint_id (UUID): The ID of the endpoint.
+
+        Returns:
+            Optional[DeploymentPricing]: The current pricing record, or None if not found.
+        """
+        return await EndpointDataManager(self.session).get_current_pricing(endpoint_id)
+
+    async def update_pricing(
+        self, endpoint_id: UUID, pricing_data: Dict[str, Any], current_user_id: UUID
+    ) -> DeploymentPricing:
+        """Update pricing for a published endpoint.
+
+        Args:
+            endpoint_id (UUID): The ID of the endpoint.
+            pricing_data (Dict[str, Any]): New pricing information.
+            current_user_id (UUID): The ID of the user updating pricing.
+
+        Returns:
+            DeploymentPricing: The new pricing record.
+
+        Raises:
+            ClientException: If endpoint not found or not published.
+        """
+        # Verify endpoint exists and is published
+        endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+            EndpointModel,
+            {"id": endpoint_id},
+            exclude_fields={"status": EndpointStatusEnum.DELETED},
+            missing_ok=True,
+        )
+        if not endpoint:
+            raise ClientException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                message=f"Endpoint with ID {endpoint_id} not found",
+            )
+
+        if not endpoint.is_published:
+            raise ClientException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                message="Cannot update pricing for unpublished endpoint",
+            )
+
+        try:
+            # Begin transaction
+            # Deactivate current pricing
+            await EndpointDataManager(self.session).update_previous_pricing(endpoint_id)
+
+            # Create new pricing record
+            new_pricing = await EndpointDataManager(self.session).create_deployment_pricing(
+                endpoint_id=endpoint_id,
+                pricing_data=pricing_data,
+                created_by=current_user_id,
+            )
+
+            # Invalidate catalog cache when pricing changes
+            redis_service = RedisService()
+            await redis_service.invalidate_catalog_cache(endpoint_id=str(endpoint_id))
+
+            logger.info(f"Pricing updated for endpoint {endpoint_id} by user {current_user_id}")
+            return new_pricing
+
+        except Exception as e:
+            logger.error(f"Failed to update pricing for endpoint {endpoint_id}: {e}")
+            self.session.rollback()
+            raise ClientException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message="Failed to update pricing",
+            )
+
+    async def get_pricing_history(self, endpoint_id: UUID, page: int = 1, limit: int = 20) -> dict:
+        """Get pricing history for an endpoint.
+
+        Args:
+            endpoint_id (UUID): The ID of the endpoint.
+            page (int): Page number for pagination.
+            limit (int): Number of items per page.
+
+        Returns:
+            dict: Dictionary containing pricing history and pagination info.
+
+        Raises:
+            ClientException: If endpoint not found.
+        """
+        # Verify endpoint exists
+        endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+            EndpointModel,
+            {"id": endpoint_id},
+            exclude_fields={"status": EndpointStatusEnum.DELETED},
+            missing_ok=True,
+        )
+        if not endpoint:
+            raise ClientException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                message=f"Endpoint with ID {endpoint_id} not found",
+            )
+
+        # Get pricing history
+        offset = (page - 1) * limit
+        pricing_history, total_count = await EndpointDataManager(self.session).get_pricing_history(
+            endpoint_id=endpoint_id,
+            offset=offset,
+            limit=limit,
+        )
+
+        return {
+            "pricing_history": [DeploymentPricingResponse.model_validate(p) for p in pricing_history],
+            "page": page,
+            "limit": limit,
+            "total_record": total_count,
+            "code": status.HTTP_200_OK,
+        }
+
+    async def get_publication_history(self, endpoint_id: UUID, page: int = 1, limit: int = 20) -> dict:
+        """Get publication history for an endpoint.
+
+        Args:
+            endpoint_id (UUID): The ID of the endpoint.
+            page (int): Page number for pagination.
+            limit (int): Number of items per page.
+
+        Returns:
+            dict: Dictionary containing history entries and pagination info.
+
+        Raises:
+            ClientException: If endpoint not found.
+        """
+        # Verify endpoint exists
+        endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+            EndpointModel,
+            {"id": endpoint_id},
+            missing_ok=True,
+        )
+
+        if not endpoint:
+            raise ClientException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                message=f"Endpoint with ID {endpoint_id} not found",
+            )
+
+        # Calculate offset
+        offset = (page - 1) * limit
+
+        # Get publication history
+        history_entries, total_count = await PublicationHistoryDataManager(self.session).get_publication_history(
+            deployment_id=endpoint_id,
+            offset=offset,
+            limit=limit,
+        )
+
+        # Transform history entries to include user summary
+        transformed_entries = []
+        for entry in history_entries:
+            entry_dict = {
+                "id": entry.id,
+                "deployment_id": entry.deployment_id,
+                "action": entry.action,
+                "performed_by": entry.performed_by,
+                "performed_at": entry.performed_at,
+                "action_metadata": entry.action_metadata,
+                "previous_state": entry.previous_state,
+                "new_state": entry.new_state,
+                "created_at": entry.created_at,
+                "modified_at": entry.modified_at,
+            }
+
+            # Add user summary if user details are loaded
+            if entry.performed_by_user:
+                entry_dict["performed_by_user"] = {
+                    "id": entry.performed_by_user.id,
+                    "email": entry.performed_by_user.email,
+                    "name": entry.performed_by_user.name,
+                }
+            else:
+                entry_dict["performed_by_user"] = None
+
+            transformed_entries.append(entry_dict)
+
+        return {
+            "history": transformed_entries,
+            "total_record": total_count,
+            "page": page,
+            "limit": limit,
+            "code": status.HTTP_200_OK,
+            "message": "Successfully retrieved publication history",
+        }

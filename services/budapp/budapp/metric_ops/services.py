@@ -16,11 +16,12 @@
 
 """The metric ops services. Contains business logic for metric ops."""
 
-from typing import Dict
+import json
+from typing import Dict, List, Optional, Set
 from uuid import UUID
 
 import aiohttp
-from fastapi import status
+from fastapi import HTTPException, status
 
 from budapp.commons import logging
 from budapp.commons.config import app_settings
@@ -42,7 +43,15 @@ from ..model_ops.crud import ModelDataManager
 from ..model_ops.models import Model
 from ..project_ops.crud import ProjectDataManager
 from ..project_ops.models import Project as ProjectModel
-from .schemas import DashboardStatsResponse
+from ..user_ops.schemas import User
+from .schemas import (
+    DashboardStatsResponse,
+    InferenceDetailResponse,
+    InferenceFeedbackResponse,
+    InferenceListItem,
+    InferenceListRequest,
+    InferenceListResponse,
+)
 
 
 logger = logging.get_logger(__name__)
@@ -70,9 +79,7 @@ class BudMetricService(SessionMixin):
                 # Return the response as-is, including the status code
                 if response.status != status.HTTP_200_OK:
                     logger.error(f"Analytics request failed: {response.status} {response_data}")
-                    raise ClientException(
-                        response_data.get("message", "Analytics request failed"), status_code=response.status
-                    )
+                    raise ClientException("Analytics request failed", status_code=response.status)
 
                 # Enrich response with names
                 await self._enrich_response_with_names(response_data)
@@ -81,7 +88,7 @@ class BudMetricService(SessionMixin):
         except ClientException:
             raise
         except Exception as e:
-            logger.exception(f"Failed to proxy analytics request: {e}")
+            logger.exception("Failed to proxy analytics request")
             raise ClientException(
                 "Failed to proxy analytics request", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
             ) from e
@@ -170,6 +177,301 @@ class BudMetricService(SessionMixin):
         except Exception as e:
             logger.warning(f"Failed to enrich response with names: {e}")
             # Don't fail the entire request if enrichment fails
+
+    async def list_inferences(self, request: InferenceListRequest, current_user: User) -> InferenceListResponse:
+        """List inference requests with access control and enrichment.
+
+        Args:
+            request: The inference list request parameters
+            current_user: The authenticated user
+
+        Returns:
+            InferenceListResponse with enriched data
+        """
+        # Check user access to the specified project if filtered
+        if request.project_id:
+            # Verify user has access to the project
+            project = await ProjectDataManager(self.session).retrieve_project_by_fields(
+                {"id": request.project_id}, missing_ok=True
+            )
+            if not project:
+                raise ClientException("Project not found", status_code=status.HTTP_404_NOT_FOUND)
+
+            # Check if user is member of the project
+            from ..project_ops.services import ProjectService
+
+            project_service = ProjectService(self.session)
+            try:
+                await project_service.check_project_membership(request.project_id, current_user.id)
+            except HTTPException as e:
+                raise ClientException("Access denied: User is not a member of the project", status_code=e.status_code)
+
+        # Proxy request to budmetrics
+        metrics_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/method/observability/inferences/list"
+
+        try:
+            async with (
+                aiohttp.ClientSession() as session,
+                session.post(
+                    metrics_endpoint,
+                    json=request.model_dump(mode="json"),
+                ) as response,
+            ):
+                response_data = await response.json()
+
+                if response.status != status.HTTP_200_OK:
+                    logger.error(f"Inference list request failed: {response.status}")
+                    raise ClientException(
+                        "Failed to list inferences",
+                        status_code=response.status,
+                    )
+
+                # Enrich response with names
+                await self._enrich_inference_list(response_data)
+
+                # Add required message field for SuccessResponse
+                if "message" not in response_data:
+                    response_data["message"] = "Successfully retrieved inference list"
+
+                # Convert to response model
+                return InferenceListResponse(**response_data)
+
+        except ClientException:
+            raise
+        except Exception as e:
+            logger.exception("Failed to list inferences")
+            raise ClientException(
+                "Failed to list inferences", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            ) from e
+
+    async def get_inference_details(self, inference_id: str, current_user: User) -> InferenceDetailResponse:
+        """Get inference details with access control and enrichment.
+
+        Args:
+            inference_id: The inference ID
+            current_user: The authenticated user
+
+        Returns:
+            InferenceDetailResponse with enriched data
+        """
+        # First get the inference details from budmetrics
+        metrics_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/method/observability/inferences/{inference_id}"
+
+        try:
+            async with (
+                aiohttp.ClientSession() as session,
+                session.get(metrics_endpoint) as response,
+            ):
+                response_data = await response.json()
+
+                if response.status == status.HTTP_404_NOT_FOUND:
+                    raise ClientException("Inference not found", status_code=status.HTTP_404_NOT_FOUND)
+
+                if response.status != status.HTTP_200_OK:
+                    logger.error(f"Get inference request failed: {response.status}")
+                    raise ClientException(
+                        "Failed to get inference details",
+                        status_code=response.status,
+                    )
+
+                # Check user access to the project
+                project_id = response_data.get("project_id")
+                if project_id:
+                    project = await ProjectDataManager(self.session).retrieve_project_by_fields(
+                        {"id": UUID(project_id)}, missing_ok=True
+                    )
+                    if not project:
+                        raise ClientException("Access denied", status_code=status.HTTP_403_FORBIDDEN)
+
+                    # Check if user is member of the project
+                    from ..project_ops.services import ProjectService
+
+                    project_service = ProjectService(self.session)
+                    try:
+                        await project_service.check_project_membership(UUID(project_id), current_user.id)
+                    except HTTPException as e:
+                        raise ClientException(
+                            "Access denied: User is not a member of the project", status_code=e.status_code
+                        )
+
+                # Enrich response with names
+                await self._enrich_inference_detail(response_data)
+
+                logger.info(f"Response data: {response_data}")
+
+                # Add required message field for SuccessResponse
+                if "message" not in response_data:
+                    response_data["message"] = "Successfully retrieved inference details"
+
+                # Parse gateway_request and gateway_response from JSON strings if present
+                if "gateway_request" in response_data and response_data["gateway_request"]:
+                    try:
+                        response_data["gateway_request"] = json.loads(response_data["gateway_request"])
+                    except (json.JSONDecodeError, TypeError):
+                        # If parsing fails, set to None (schema expects Dict or None)
+                        response_data["gateway_request"] = None
+
+                if "gateway_response" in response_data and response_data["gateway_response"]:
+                    try:
+                        response_data["gateway_response"] = json.loads(response_data["gateway_response"])
+                    except (json.JSONDecodeError, TypeError):
+                        # If parsing fails, set to None (schema expects Dict or None)
+                        response_data["gateway_response"] = None
+
+                # Convert to response model - extra fields will be ignored due to extra="ignore" in model config
+                return InferenceDetailResponse(**response_data)
+
+        except ClientException:
+            raise
+        except Exception as e:
+            logger.exception("Failed to get inference details")
+            raise ClientException(
+                "Failed to get inference details", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            ) from e
+
+    async def get_inference_feedback(self, inference_id: str, current_user: User) -> InferenceFeedbackResponse:
+        """Get inference feedback with access control.
+
+        Args:
+            inference_id: The inference ID
+            current_user: The authenticated user
+
+        Returns:
+            InferenceFeedbackResponse
+        """
+        # First verify the inference exists and user has access
+        # This will raise appropriate exceptions if not found or no access
+        await self.get_inference_details(inference_id, current_user)
+
+        # Now get the feedback from budmetrics
+        metrics_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/method/observability/inferences/{inference_id}/feedback"
+
+        try:
+            async with (
+                aiohttp.ClientSession() as session,
+                session.get(metrics_endpoint) as response,
+            ):
+                response_data = await response.json()
+
+                if response.status != status.HTTP_200_OK:
+                    logger.error(f"Get feedback request failed: {response.status}")
+                    raise ClientException(
+                        "Failed to get inference feedback",
+                        status_code=response.status,
+                    )
+
+                # Add required message field for SuccessResponse
+                if "message" not in response_data:
+                    response_data["message"] = "Successfully retrieved inference feedback"
+
+                # Convert to response model
+                return InferenceFeedbackResponse(**response_data)
+
+        except ClientException:
+            raise
+        except Exception as e:
+            logger.exception("Failed to get inference feedback")
+            raise ClientException(
+                "Failed to get inference feedback", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            ) from e
+
+    async def _enrich_inference_list(self, response_data: Dict) -> None:
+        """Enrich inference list with project, endpoint, and model names."""
+        try:
+            items = response_data.get("items", [])
+            if not items:
+                return
+
+            # Collect unique IDs
+            project_ids: Set[UUID] = set()
+            model_ids: Set[UUID] = set()
+            endpoint_ids: Set[UUID] = set()
+
+            for item in items:
+                # The items now have IDs from budmetrics
+                if project_id := item.get("project_id"):
+                    project_ids.add(UUID(project_id))
+                if endpoint_id := item.get("endpoint_id"):
+                    endpoint_ids.add(UUID(endpoint_id))
+                if model_id := item.get("model_id"):
+                    model_ids.add(UUID(model_id))
+
+            # Fetch names for all IDs
+            project_names = {}
+            endpoint_names = {}
+            model_names = {}
+
+            if project_ids:
+                # Query projects (including all statuses)
+                from sqlalchemy import select
+
+                stmt = select(ProjectModel).where(ProjectModel.id.in_(list(project_ids)))
+                result = self.session.execute(stmt)
+                projects = result.scalars().all()
+                project_names = {str(p.id): p.name for p in projects}
+
+            if endpoint_ids:
+                # Query endpoints (including all statuses, even deleted)
+                from sqlalchemy import select
+
+                stmt = select(EndpointModel).where(EndpointModel.id.in_(list(endpoint_ids)))
+                result = self.session.execute(stmt)
+                endpoints = result.scalars().all()
+                endpoint_names = {str(e.id): e.name for e in endpoints}
+
+            if model_ids:
+                # Query models (including all statuses, even deleted)
+                from sqlalchemy import select
+
+                stmt = select(Model).where(Model.id.in_(list(model_ids)))
+                result = self.session.execute(stmt)
+                models = result.scalars().all()
+                model_names = {str(m.id): m.name for m in models}
+
+            # Add names to the response items
+            for item in items:
+                if project_id := item.get("project_id"):
+                    item["project_name"] = project_names.get(str(project_id))
+                if endpoint_id := item.get("endpoint_id"):
+                    item["endpoint_name"] = endpoint_names.get(str(endpoint_id))
+                if model_id := item.get("model_id"):
+                    item["model_display_name"] = model_names.get(str(model_id))
+
+        except Exception as e:
+            logger.warning(f"Failed to enrich inference list: {e}")
+
+    async def _enrich_inference_detail(self, response_data: Dict) -> None:
+        """Enrich inference detail with project, endpoint, and model names."""
+        try:
+            # Get the IDs from response
+            project_id = response_data.get("project_id")
+            endpoint_id = response_data.get("endpoint_id")
+            model_id = response_data.get("model_id")
+
+            # Fetch names
+            if project_id:
+                project = await ProjectDataManager(self.session).retrieve_project_by_fields(
+                    {"id": UUID(project_id)}, missing_ok=True
+                )
+                if project:
+                    response_data["project_name"] = project.name
+
+            if endpoint_id:
+                endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+                    EndpointModel, {"id": UUID(endpoint_id)}, missing_ok=True
+                )
+                if endpoint:
+                    response_data["endpoint_name"] = endpoint.name
+
+            if model_id:
+                model = await ModelDataManager(self.session).retrieve_by_fields(
+                    Model, {"id": UUID(model_id)}, missing_ok=True
+                )
+                if model:
+                    response_data["model_display_name"] = model.name
+
+        except Exception as e:
+            logger.warning(f"Failed to enrich inference detail: {e}")
 
 
 class MetricService(SessionMixin):

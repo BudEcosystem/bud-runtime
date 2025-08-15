@@ -1587,6 +1587,8 @@ mod tests {
             finish_reason: Some(FinishReason::Stop),
             latency,
             cached: false,
+            gateway_request: None,
+            gateway_response: None,
         };
         let templates = TemplateConfig::default();
         let inference_config = InferenceConfig {
@@ -1602,6 +1604,7 @@ mod tests {
             extra_body: Default::default(),
             extra_headers: Default::default(),
             extra_cache_key: None,
+            gateway_request: None,
         };
         let response = function_config
             .prepare_response(
@@ -1654,6 +1657,8 @@ mod tests {
             finish_reason: Some(FinishReason::ToolCall),
             latency,
             cached: false,
+            gateway_request: None,
+            gateway_response: None,
         };
         let response = function_config
             .prepare_response(
@@ -1708,6 +1713,8 @@ mod tests {
             finish_reason: Some(FinishReason::ToolCall),
             latency,
             cached: false,
+            gateway_request: None,
+            gateway_response: None,
         };
         let response = function_config
             .prepare_response(
@@ -1764,6 +1771,8 @@ mod tests {
                 response_time: Duration::from_millis(100),
             },
             cached: false,
+            gateway_request: None,
+            gateway_response: None,
         };
         let response = function_config
             .prepare_response(
@@ -1818,6 +1827,8 @@ mod tests {
                 response_time: Duration::from_millis(100),
             },
             cached: false,
+            gateway_request: None,
+            gateway_response: None,
         };
         let response = function_config
             .prepare_response(
@@ -1872,6 +1883,8 @@ mod tests {
                 response_time: Duration::from_millis(100),
             },
             cached: false,
+            gateway_request: None,
+            gateway_response: None,
         };
         let response = function_config
             .prepare_response(
@@ -1919,6 +1932,7 @@ mod tests {
             extra_body: Default::default(),
             extra_headers: Default::default(),
             extra_cache_key: None,
+            gateway_request: None,
         };
         // Test with a correct content block
         let inference_id = Uuid::now_v7();
@@ -1944,6 +1958,8 @@ mod tests {
             finish_reason: Some(FinishReason::Stop),
             latency,
             cached: false,
+            gateway_request: None,
+            gateway_response: None,
         };
         let response = function_config
             .prepare_response(
@@ -1992,6 +2008,8 @@ mod tests {
             finish_reason: None,
             latency,
             cached: false,
+            gateway_request: None,
+            gateway_response: None,
         };
         let response = function_config
             .prepare_response(
@@ -2047,6 +2065,8 @@ mod tests {
                 response_time: Duration::from_millis(100),
             },
             cached: false,
+            gateway_request: None,
+            gateway_response: None,
         };
         let response = function_config
             .prepare_response(
@@ -2100,6 +2120,8 @@ mod tests {
                 response_time: Duration::from_millis(100),
             },
             cached: false,
+            gateway_request: None,
+            gateway_response: None,
         };
         let response = function_config
             .prepare_response(
@@ -2160,6 +2182,8 @@ mod tests {
             finish_reason: Some(FinishReason::Stop),
             latency,
             cached: false,
+            gateway_request: None,
+            gateway_response: None,
         };
         let response = function_config
             .prepare_response(

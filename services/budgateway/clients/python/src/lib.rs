@@ -723,7 +723,9 @@ impl TensorZeroGateway {
         // and then return the result to the Python caller directly (not wrapped in a Python `Future`).
         let resp = tokio_block_on_without_gil(py, fut).map_err(|e| convert_error(py, e))?;
         match resp {
-            InferenceOutput::NonStreaming(data) => parse_inference_response(py, data),
+            InferenceOutput::NonStreaming { response, .. } => {
+                parse_inference_response(py, response)
+            }
             InferenceOutput::Streaming(stream) => Ok(StreamWrapper {
                 stream: Arc::new(Mutex::new(stream)),
             }
@@ -1191,7 +1193,9 @@ impl AsyncTensorZeroGateway {
             Python::with_gil(|py| {
                 let output = res.map_err(|e| convert_error(py, e))?;
                 match output {
-                    InferenceOutput::NonStreaming(data) => parse_inference_response(py, data),
+                    InferenceOutput::NonStreaming { response, .. } => {
+                        parse_inference_response(py, response)
+                    }
                     InferenceOutput::Streaming(stream) => Ok(AsyncStreamWrapper {
                         stream: Arc::new(Mutex::new(stream)),
                     }

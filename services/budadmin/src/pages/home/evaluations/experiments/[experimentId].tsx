@@ -76,143 +76,103 @@ const sampletags = [
 ]
 
 const ExperimentDetailsPage = () => {
-  const { openDrawer } = useDrawer();
+  const { openDrawer, openDrawerWithStep } = useDrawer();
   const [isMounted, setIsMounted] = useState(false);
   const router = useRouter();
   const { experimentId } = router.query;
-  const [experiment, setExperiment] = useState<ExperimentDetails | null>(null);
-  const [loading, setLoading] = useState(true);
   const [showAllTags, setShowAllTags] = useState(false);
 
-  // Mock data - replace with actual API calls
+  // Use the actual API data from useEvaluations hook
+  const {
+    loading,
+    experimentDetails,
+    experimentRuns,
+    getExperimentDetails,
+    getExperimentRuns
+  } = useEvaluations();
+
+  // Dummy data for experimentMetrics
+  const experimentMetrics = {
+    budgetUsed: 45.67,
+    budgetTotal: 100.00,
+    tokensProcessed: 2500000,
+    runtime: 185, // in minutes
+    processingRate: 13500,
+    currentMetrics: [
+      { evaluation: "Code Generation", gpt4Score: 92.5, claude3Score: 89.3 },
+      { evaluation: "Language Understanding", gpt4Score: 94.2, claude3Score: 93.8 },
+      { evaluation: "Reasoning", gpt4Score: 88.7, claude3Score: 91.2 },
+      { evaluation: "Math Problem Solving", gpt4Score: 85.4, claude3Score: 87.9 }
+    ]
+  };
+
+  // Dummy data for experimentBenchmarks
+  const experimentBenchmarks = {
+    benchmarkProgress: [
+      {
+        id: "bench-1",
+        title: "Multi-Modal Understanding Benchmark",
+        objective: "Evaluate model performance on text and image understanding tasks",
+        currentEvaluation: "Image Captioning",
+        currentModel: "GPT-4 Vision",
+        eta: "2h 30m",
+        processingRate: 125,
+        averageScore: 87.5,
+        status: 'Running' as const,
+        progress: 65
+      },
+      {
+        id: "bench-2",
+        title: "Code Generation Quality",
+        objective: "Test code generation accuracy across multiple programming languages",
+        currentEvaluation: "Python Code Generation",
+        currentModel: "Claude-3",
+        eta: "1h 15m",
+        processingRate: 200,
+        averageScore: 91.2,
+        status: 'Running' as const,
+        progress: 82
+      }
+    ]
+  };
+
+  // Dummy data for runs history
+  const dummyRunsHistory = [
+    {
+      runId: "run-001",
+      model: "GPT-4",
+      status: 'Completed' as const,
+      startedDate: "2024-01-15T10:30:00Z",
+      duration: "2h 15m",
+      benchmarkScore: "92.5%"
+    },
+    {
+      runId: "run-002",
+      model: "Claude-3",
+      status: 'Completed' as const,
+      startedDate: "2024-01-15T13:45:00Z",
+      duration: "2h 30m",
+      benchmarkScore: "91.2%"
+    },
+    {
+      runId: "run-003",
+      model: "Llama-2",
+      status: 'Running' as const,
+      startedDate: "2024-01-15T16:00:00Z",
+      duration: "1h 45m",
+      benchmarkScore: "-"
+    }
+  ];
+
   useEffect(() => {
-    if (experimentId) {
-      setLoading(true);
-      setIsMounted(true)
-      // Simulate API call
-      setTimeout(() => {
-        const mockExperiment: ExperimentDetails = {
-          id: experimentId as string,
-          name: "Experiment 1",
-          lastRun: "2024-01-15",
-          createdBy: "user@example.com",
-          owner: "Mark Louis",
-          metrics: {
-            budgetUsed: 45.20,
-            budgetTotal: 100.00,
-            tokensProcessed: 2100000,
-            runtime: 135, // minutes
-            processingRate: 47,
-          },
-          currentMetrics: [
-            { evaluation: "GPT-4 Score", gpt4Score: 75, claude3Score: 75 },
-            { evaluation: "name", gpt4Score: 75, claude3Score: 75 },
-            { evaluation: "name", gpt4Score: 75, claude3Score: 75 },
-            { evaluation: "name", gpt4Score: 75, claude3Score: 75 },
-            { evaluation: "name", gpt4Score: 75, claude3Score: 75 },
-            { evaluation: "name", gpt4Score: 75, claude3Score: 75 },
-            { evaluation: "name", gpt4Score: 75, claude3Score: 75 },
-            { evaluation: "name", gpt4Score: 75, claude3Score: 75 },
-            { evaluation: "name", gpt4Score: 75, claude3Score: 75 },
-          ],
-          benchmarkProgress: [
-            {
-              id: "1",
-              title: "Progress Overview of Run 1",
-              objective: "Compare GPT-4 and Claude 3 performance across academic benchmarks",
-              currentEvaluation: "TruthfulQA",
-              currentModel: "GPT-4 Turbo",
-              eta: "45 minutes remaining",
-              processingRate: 47,
-              averageScore: 78.5,
-              status: "Running",
-              progress: 65,
-            },
-            {
-              id: "2",
-              title: "Progress Overview of Run 2",
-              objective: "Compare GPT-4 and Claude 3 performance across academic benchmarks",
-              currentEvaluation: "TruthfulQA",
-              currentModel: "GPT-4 Turbo",
-              eta: "45 minutes remaining",
-              processingRate: 47,
-              averageScore: 78.5,
-              status: "Running",
-              progress: 65,
-            },
-          ],
-          runsHistory: [
-            {
-              runId: "Run 3",
-              model: "name",
-              status: "Completed",
-              startedDate: "Jan 13, 2024",
-              duration: "1Hr 23Min",
-              benchmarkScore: "Benchmark_Score",
-            },
-            {
-              runId: "Run 4",
-              model: "name",
-              status: "Completed",
-              startedDate: "Jan 13, 2024",
-              duration: "1Hr 23Min",
-              benchmarkScore: "Benchmark_Score",
-            },
-            {
-              runId: "Run 5",
-              model: "name",
-              status: "Failed",
-              startedDate: "Jan 13, 2024",
-              duration: "1Hr 23Min",
-              benchmarkScore: "Benchmark_Score",
-            },
-            {
-              runId: "Run 6",
-              model: "name",
-              status: "Completed",
-              startedDate: "Jan 13, 2024",
-              duration: "1Hr 23Min",
-              benchmarkScore: "Benchmark_Score",
-            },
-            {
-              runId: "Run 7",
-              model: "name",
-              status: "Failed",
-              startedDate: "Jan 13, 2024",
-              duration: "1Hr 23Min",
-              benchmarkScore: "Benchmark_Score",
-            },
-            {
-              runId: "Run 8",
-              model: "name",
-              status: "Failed",
-              startedDate: "Jan 13, 2024",
-              duration: "1Hr 23Min",
-              benchmarkScore: "Benchmark_Score",
-            },
-            {
-              runId: "Run 9",
-              model: "name",
-              status: "Completed",
-              startedDate: "Jan 13, 2024",
-              duration: "1Hr 23Min",
-              benchmarkScore: "Benchmark_Score",
-            },
-            {
-              runId: "Run 10",
-              model: "name",
-              status: "Completed",
-              startedDate: "Jan 13, 2024",
-              duration: "1Hr 23Min",
-              benchmarkScore: "Benchmark_Score",
-            },
-          ],
-        };
-        setExperiment(mockExperiment);
-        setLoading(false);
-      }, 10);
+    if (experimentId && typeof experimentId === 'string') {
+      setIsMounted(true);
+      // Fetch all experiment data
+      getExperimentDetails(experimentId);
+      getExperimentRuns(experimentId);
     }
   }, [experimentId]);
+
 
   const handleNewEvaluation = () => {
     // Navigate to new evaluation flow
@@ -229,7 +189,7 @@ const ExperimentDetailsPage = () => {
     );
   }
 
-  if (!experiment) {
+  if (!experimentDetails) {
     return (
       <DashBoardLayout>
         <div className="flex items-center justify-center h-64">
@@ -270,8 +230,8 @@ const ExperimentDetailsPage = () => {
               </div>
             </button>
             <CustomBreadcrumb
-              urls={["/evaluations", `name`]}
-              data={["experiments", `name`]} />
+              urls={["/evaluations", experimentDetails?.name || "Experiment"]}
+              data={["experiments", experimentDetails?.name || "Experiment"]} />
           </div>
         )}
       </div>
@@ -290,54 +250,65 @@ const ExperimentDetailsPage = () => {
           {/* Metrics Cards */}
           <div className="w-full pt-[1.8rem]">
             <div className="w-full flex justify-between items-center">
-              <Text_28_600_FFFFFF>LiveMathBench</Text_28_600_FFFFFF>
-              <PrimaryButton classNames="shadow-purple-glow" textClass="text-[0.8125rem]" onClick={() => openDrawer('run-evaluation')}>Run Evaluation</PrimaryButton>
+              <Text_28_600_FFFFFF>{experimentDetails?.name || "Loading..."}</Text_28_600_FFFFFF>
+              <PrimaryButton classNames="shadow-purple-glow" textClass="text-[0.8125rem]" onClick={() => openDrawerWithStep('new-evaluation', { experimentId })}>Run Evaluation</PrimaryButton>
             </div>
             <div className="flex flex-wrap justify-start items-center gap-[.45rem] mt-[0.8rem] max-w-[80%]">
-              {(showAllTags ? sampletags : sampletags.slice(0, 5)).map((item, index) => (
+              {experimentDetails?.tags && (showAllTags ? experimentDetails.tags : experimentDetails.tags.slice(0, 5)).map((tag, index) => (
                 <Tags
                   key={index}
-                  name={item.name}
-                  color={item.color}
+                  name={tag}
+                  color="#D1B854"
                   classNames={`${showAllTags && index >= 5 ? "animate-fadeIn" : ""} py-[.25rem]`}
                 />
               ))}
-              {sampletags.length > 5 && (
+              {experimentDetails?.tags && experimentDetails.tags.length > 5 && (
                 <button
                   onClick={() => setShowAllTags(!showAllTags)}
                   className="px-3 py-1 text-[#EEEEEE] hover:text-[#FFFFFF] transition-colors duration-200 text-[.65rem] font-[400]"
                 >
-                  {showAllTags ? "Show less" : `+${sampletags.length - 5} more`}
+                  {showAllTags ? "Show less" : `+${experimentDetails.tags.length - 5} more`}
                 </button>
               )}
             </div>
 
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-[3.1rem]">
-            <MetricCard
-              title="Budget Used / $100.00"
-              value={`$${experiment.metrics.budgetUsed.toFixed(2)}`}
-              subtitle={`/ $${experiment.metrics.budgetTotal.toFixed(2)}`}
-              color="#965CDE"
-            />
-            <MetricCard
-              title="Tokens Processed"
-              value={`${(experiment.metrics.tokensProcessed / 1000000).toFixed(1)}M`}
-              subtitle="tokens processed"
-              color="#965CDE"
-            />
-            <MetricCard
-              title="Runtime"
-              value={`${Math.floor(experiment.metrics.runtime / 60)}h ${experiment.metrics.runtime % 60}m`}
-              subtitle="total runtime"
-              color="#965CDE"
-            />
-            <MetricCard
-              title="Processing Rate"
-              value={`${experiment.metrics.processingRate}/min`}
-              subtitle="tokens per minute"
-              color="#965CDE"
-            />
+            {experimentMetrics ? (
+              <>
+                <MetricCard
+                  title="Budget Used"
+                  value={`$${experimentMetrics.budgetUsed?.toFixed(2) || '0.00'}`}
+                  subtitle={`/ $${experimentMetrics.budgetTotal?.toFixed(2) || '100.00'}`}
+                  color="#965CDE"
+                />
+                <MetricCard
+                  title="Tokens Processed"
+                  value={`${((experimentMetrics.tokensProcessed || 0) / 1000000).toFixed(1)}M`}
+                  subtitle="tokens processed"
+                  color="#965CDE"
+                />
+                <MetricCard
+                  title="Runtime"
+                  value={`${Math.floor((experimentMetrics.runtime || 0) / 60)}h ${(experimentMetrics.runtime || 0) % 60}m`}
+                  subtitle="total runtime"
+                  color="#965CDE"
+                />
+                <MetricCard
+                  title="Processing Rate"
+                  value={`${experimentMetrics.processingRate || 0}/min`}
+                  subtitle="tokens per minute"
+                  color="#965CDE"
+                />
+              </>
+            ) : (
+              <>
+                <MetricCard title="Budget Used" value="$0.00" subtitle="/ $100.00" color="#965CDE" />
+                <MetricCard title="Tokens Processed" value="0M" subtitle="tokens processed" color="#965CDE" />
+                <MetricCard title="Runtime" value="0h 0m" subtitle="total runtime" color="#965CDE" />
+                <MetricCard title="Processing Rate" value="0/min" subtitle="tokens per minute" color="#965CDE" />
+              </>
+            )}
           </div>
 
           {/* Current Metrics */}
@@ -346,7 +317,7 @@ const ExperimentDetailsPage = () => {
             <Text_14_400_FFFFFF className="mb-[1rem] leading-[140%]">
               Current metrics description metrics description metrics description...
             </Text_14_400_FFFFFF>
-            <CurrentMetricsTable data={experiment.currentMetrics} />
+            <CurrentMetricsTable data={experimentMetrics?.currentMetrics || []} />
           </div>
 
           {/* Performance Benchmark Details */}
@@ -356,9 +327,9 @@ const ExperimentDetailsPage = () => {
               Objective: Compare GPT-4 and Claude 3 performance across academic benchmarks
             </Text_14_400_FFFFFF>
             <div className="space-y-[1rem]">
-              {experiment.benchmarkProgress.map((benchmark) => (
+              {experimentBenchmarks?.benchmarkProgress?.map((benchmark) => (
                 <BenchmarkProgress key={benchmark.id} benchmark={benchmark} />
-              ))}
+              )) || <Text_14_400_FFFFFF>No benchmark data available</Text_14_400_FFFFFF>}
             </div>
           </div>
 
@@ -368,7 +339,7 @@ const ExperimentDetailsPage = () => {
             <Text_14_400_FFFFFF className="mb-[1rem] leading-[140%]">
               Runs history description history description history description...
             </Text_14_400_FFFFFF>
-            <RunsHistoryTable data={experiment.runsHistory} />
+            <RunsHistoryTable data={experimentRuns?.runsHistory || experimentRuns || dummyRunsHistory} />
           </div>
         </div>
       </div>
