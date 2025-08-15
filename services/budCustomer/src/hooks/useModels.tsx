@@ -239,6 +239,7 @@ export const useModels = create<{
   fetchModels: (params: GetModelParams) => Promise<Model[]>;
   deleteModel: (modelId: string) => Promise<any>;
   getLeaderBoard: (modelId: string) => Promise<LeaderBoardItem[]>;
+  getModelsCatalog: (params: GetModelParams) => Promise<void>;
 }>((set, get) => ({
   tasks: [],
   models: [],
@@ -474,6 +475,67 @@ export const useModels = create<{
       return response.data;
     } catch (error) {
       console.error("Error creating model:", error);
+    }
+  },
+  getModelsCatalog: async (params: GetModelParams) => {
+    set({ loading: true });
+    try {
+      const response: any = await AppRequest.Get(`/models/catalog`, {
+        params: {
+          page: params.page,
+          limit: params.limit,
+          name: params.name,
+          tag: params.tag,
+          modality:
+            params.modality && params.modality.length > 0
+              ? params.modality
+              : undefined,
+          tasks:
+            params.tasks && params.tasks.length > 0 ? params.tasks : undefined,
+          author:
+            params.author && params.author.length > 0
+              ? params.author
+              : undefined,
+          model_size_min: params.model_size_min,
+          model_size_max: params.model_size_max,
+          table_source: params.table_source || "model",
+          search: Boolean(params.name),
+          order_by: params.order_by || "-created_at",
+        },
+      });
+
+      const listData = response.data.models || [];
+      const updatedListData = listData.map((item: any) => {
+        // Handle both formats: direct model object or nested structure
+        const model = item.model || item;
+        return {
+          ...model,
+          endpoints_count: item.endpoints_count || 0,
+        };
+      });
+
+      if (params.page && params.page > 1) {
+        set({
+          models: [...get().models, ...updatedListData],
+          totalPages: response.data.total_pages || 0,
+          totalModels:
+            response.data.total_record || response.data.total_count || 0,
+          filters: params,
+        });
+      } else {
+        set({
+          models: updatedListData,
+          totalPages: response.data.total_pages || 0,
+          totalModels:
+            response.data.total_record || response.data.total_count || 0,
+          filters: params,
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching models catalog:", error);
+      set({ models: [] });
+    } finally {
+      set({ loading: false });
     }
   },
 }));
