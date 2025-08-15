@@ -70,14 +70,35 @@ class SimulationResultsCRUD(CRUDMixin[SimulationResultsSchema, None, None]):
         skip: int = 0,
         session: Optional[Session] = None,
     ):
-        """Fetch top-k configurations by cluster."""
+        """Fetch top-k configurations by cluster using optimized query."""
         _session = session or self.get_session()
         try:
-            min_cost_subquery = _session.query(
-                self.model.cluster_id,
-                func.min(func.jsonb_extract_path_text(self.model.top_k_configs, "cost_per_million_tokens")).label(
-                    "min_cost_per_million_tokens"
-                ),
+            # Use a single CTE query instead of nested subqueries for better performance
+            # This leverages the new indexes we created
+            base_query = _session.query(self.model).filter(
+                self.model.workflow_id == workflow_id,
+                self.model.top_k_configs.isnot(None),
+                func.cast(func.jsonb_extract_path_text(self.model.top_k_configs, "error_rate"), Float)
+                <= float(error_rate_threshold),
+                self.model.is_blacklisted.isnot(True),
+            )
+
+            if cluster_id is not None:
+                base_query = base_query.filter(self.model.cluster_id == cluster_id)
+
+            # Use window function to rank by cost within each cluster
+            # This is more efficient than the nested subquery approach
+
+            ranked_query = _session.query(
+                self.model,
+                func.row_number()
+                .over(
+                    partition_by=self.model.cluster_id,
+                    order_by=func.cast(
+                        func.jsonb_extract_path_text(self.model.top_k_configs, "cost_per_million_tokens"), Float
+                    ),
+                )
+                .label("cost_rank"),
             ).filter(
                 self.model.workflow_id == workflow_id,
                 self.model.top_k_configs.isnot(None),
@@ -87,59 +108,33 @@ class SimulationResultsCRUD(CRUDMixin[SimulationResultsSchema, None, None]):
             )
 
             if cluster_id is not None:
-                min_cost_subquery = min_cost_subquery.filter(self.model.cluster_id == cluster_id)
+                ranked_query = ranked_query.filter(self.model.cluster_id == cluster_id)
 
-            min_cost_subquery = min_cost_subquery.group_by(self.model.cluster_id).subquery()
+            # Convert to subquery and get the best result per cluster
+            ranked_subquery = ranked_query.subquery()
 
-            total_count = _session.query(func.count().label("group_count")).select_from(min_cost_subquery).scalar()
-
-            unique_groups = (
-                _session.query(
-                    min_cost_subquery.c.cluster_id,
-                    min_cost_subquery.c.min_cost_per_million_tokens,
+            best_per_cluster = (
+                _session.query(ranked_subquery)
+                .filter(ranked_subquery.c.cost_rank == 1)
+                .order_by(
+                    func.cast(
+                        func.jsonb_extract_path_text(ranked_subquery.c.top_k_configs, "cost_per_million_tokens"), Float
+                    )
                 )
-                .order_by(min_cost_subquery.c.min_cost_per_million_tokens.asc())
-                .offset(skip)
-                .limit(limit)
-                .all()
             )
 
-            results = []
-            for group in unique_groups:
-                cluster_id, _ = group
-                subquery = (
-                    _session.query(
-                        self.model.node_id,
-                        self.model.device_id,
-                        func.min(
-                            func.jsonb_extract_path_text(self.model.top_k_configs, "cost_per_million_tokens")
-                        ).label("min_cost"),
-                    )
-                    .filter(
-                        self.model.workflow_id == workflow_id,
-                        self.model.cluster_id == cluster_id,
-                        self.model.top_k_configs.isnot(None),
-                        func.cast(func.jsonb_extract_path_text(self.model.top_k_configs, "error_rate"), Float)
-                        <= float(error_rate_threshold),
-                        self.model.is_blacklisted.isnot(True),
-                    )
-                    .group_by(self.model.node_id, self.model.device_id)
-                ).subquery()
+            # Get total count before applying pagination
+            total_count = best_per_cluster.count()
 
-                matches = (
-                    _session.query(self.model)
-                    .join(
-                        subquery,
-                        (subquery.c.node_id == self.model.node_id) & (subquery.c.device_id == self.model.device_id),
-                    )
-                    .filter(
-                        func.jsonb_extract_path_text(self.model.top_k_configs, "cost_per_million_tokens")
-                        == subquery.c.min_cost
-                    )
-                    .distinct(self.model.node_id, self.model.device_id)
-                    .all()
-                )
-                results.append(matches)
+            # Apply pagination
+            paginated_results = best_per_cluster.offset(skip).limit(limit).all()
+
+            # Convert back to the expected format - group results by cluster_id
+            results = []
+            for row in paginated_results:
+                # Extract the simulation_results object from the row
+                sim_result = _session.query(self.model).filter(self.model.id == row.id).first()
+                results.append([sim_result])  # Wrap in list to match original format
 
             return results, total_count
         except SQLAlchemyError as e:
