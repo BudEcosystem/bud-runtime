@@ -165,22 +165,20 @@ def get_minimal_engine_args_and_envs(engine_name: str, engine_args: Optional[Dic
     minimal_args = {}
     minimal_envs = {}
 
-    # Always include model
-    if "model" in engine_args:
-        minimal_args["model"] = engine_args["model"]
+    # Define mappings from internal arg names to command-line arg names
+    ARG_MAPPING = {
+        "model": "model",
+        "tensor_parallel_size": "tensor-parallel-size",
+        "pipeline_parallel_size": "pipeline-parallel-size",
+    }
 
-    # Include parallelism parameters
-    if "tensor_parallel_size" in engine_args:
-        minimal_args["tensor-parallel-size"] = engine_args["tensor_parallel_size"]
-
-    if "pipeline_parallel_size" in engine_args:
-        minimal_args["pipeline-parallel-size"] = engine_args["pipeline_parallel_size"]
+    for source_key, dest_key in ARG_MAPPING.items():
+        if source_key in engine_args:
+            minimal_args[dest_key] = engine_args[source_key]
 
     # Include target device as environment variable
-    if "target_device" in engine_args and engine_name == "vllm":
+    if engine_name == "vllm" and "target_device" in engine_args:
         minimal_envs["VLLM_TARGET_DEVICE"] = engine_args["target_device"]
-        # Add other engines as needed
-
     return {"args": minimal_args, "envs": minimal_envs}
 
 
