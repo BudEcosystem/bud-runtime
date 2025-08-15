@@ -193,8 +193,7 @@ class Evolution:
         Returns:
             bool: True if combination is valid and feasible
         """
-        logger.info(
-            f"Validating TP={tp_size}, PP={pp_size} for device config: "
+        logger.debug(
             f"type={self.device_config.get('device_type', 'unknown')}, "
             f"available_count={self.device_config.get('available_count', 0)}, "
             f"has_node_distribution={'node_distribution' in self.device_config}"
