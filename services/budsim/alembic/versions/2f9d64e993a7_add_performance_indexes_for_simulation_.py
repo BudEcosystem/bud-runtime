@@ -57,4 +57,4 @@ def downgrade() -> None:
     op.execute("DROP INDEX IF EXISTS idx_simulation_results_workflow_error")
     op.execute("DROP INDEX IF EXISTS idx_simulation_results_error_float")
     op.execute("DROP INDEX IF EXISTS idx_simulation_results_cost_float")
-    op.drop_index('idx_simulation_results_workflow_cluster')
+    op.drop_index('idx_simulation_results_workflow_cluster', table_name='simulation_results')
