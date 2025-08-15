@@ -19,7 +19,7 @@ target-version = "py310"
 [tool.ruff.lint]
 # Never enforce `E501` (line length violations).
 # Relax the convention by _not_ requiring documentation for every function parameter.
-ignore = ["C901", "E501", "E741", "F402", "F823", "D417", "D101", "D100", "D104"]
+ignore = ["C901", "E501", "E741", "F402", "F823", "D417", "D101", "D100", "D104", "B008"]
 # Pycodestyle (E), Pyflakes (F), flake8-bugbear (B), flake8-simplify (SIM), isort (I), pydocstyle (D)
 select = ["C", "E", "F", "B", "SIM", "I", "W", "D", "D401"]
 # Avoid trying to fix flake8-bugbear (`B`) violations.

@@ -103,6 +103,9 @@ class Endpoint(Base, TimestampMixin):
         "RouterEndpoint",
         back_populates="endpoint",
     )
+    blocking_rules: Mapped[list["GatewayBlockingRule"]] = relationship(
+        back_populates="endpoint", cascade="all, delete"
+    )
     # Publication relationships
     published_user: Mapped[Optional["User"]] = relationship(
         "User", foreign_keys=[published_by], back_populates="published_endpoints"

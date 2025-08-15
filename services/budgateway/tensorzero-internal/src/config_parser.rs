@@ -81,6 +81,16 @@ pub struct GatewayConfig {
     pub export: ExportConfig,
     #[serde(default)]
     pub rate_limits: Option<crate::rate_limit::config::GlobalRateLimitConfig>,
+    #[serde(default)]
+    pub analytics: AnalyticsConfig,
+    #[serde(default)]
+    pub blocking: BlockingConfig,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct BlockingConfig {
+    #[serde(default)]
+    pub enabled: bool,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -264,6 +274,13 @@ pub struct AuthenticationConfig {
 pub struct ExportConfig {
     #[serde(default)]
     pub otlp: OtlpConfig,
+}
+
+#[derive(Debug, Default, Deserialize, PartialEq)]
+pub struct AnalyticsConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    pub geoip_db_path: Option<std::path::PathBuf>,
 }
 
 #[derive(Debug, Default, Deserialize, PartialEq)]

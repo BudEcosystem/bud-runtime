@@ -1,9 +1,14 @@
 // This is an internal crate, so we're the only consumers of
 // traits with async fns for now.
 #![expect(async_fn_in_trait)]
+#![allow(dead_code)]
 
+pub mod analytics; // gateway analytics data structures
+pub mod analytics_middleware; // gateway analytics middleware
 pub mod audio; // audio transcription, translation, and text-to-speech
 pub mod auth;
+pub mod blocking_middleware; // blocking rules enforcement middleware
+pub mod blocking_rules; // blocking rules management
 pub mod cache;
 pub mod clickhouse;
 pub mod config_parser; // TensorZero config file
@@ -15,6 +20,7 @@ pub mod evaluations; // evaluation
 pub mod file_storage; // file storage for OpenAI batch API
 pub mod function; // types and methods for working with TensorZero functions
 pub mod gateway_util; // utilities for gateway
+pub mod geoip; // GeoIP lookup service
 pub mod images; // image generation, editing, and variations
 pub mod inference; // model inference
 pub mod jsonl_processor; // JSONL processing for OpenAI batch API

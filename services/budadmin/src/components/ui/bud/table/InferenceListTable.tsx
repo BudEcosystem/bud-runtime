@@ -67,13 +67,6 @@ const InferenceListTable: React.FC<InferenceListTableProps> = ({ projectId: prop
     message.success('Copied to clipboard');
   };
 
-
-  // Format cost display
-  const formatCost = (cost?: number) => {
-    if (!cost) return '-';
-    return `$${cost.toFixed(4)}`;
-  };
-
   // Table columns definition
   const columns: ColumnsType<InferenceListItem> = [
     {
@@ -174,7 +167,6 @@ const InferenceListTable: React.FC<InferenceListTableProps> = ({ projectId: prop
       const sortMap: Record<string, string> = {
         timestamp: 'timestamp',
         response_time_ms: 'latency',
-        cost: 'cost',
       };
 
       const sortBy = sortMap[sorter.field] || 'timestamp';
