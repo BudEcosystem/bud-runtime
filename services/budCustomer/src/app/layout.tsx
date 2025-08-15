@@ -9,6 +9,8 @@ import { ProjectProvider } from "@/context/projectContext";
 import { NotificationProvider } from "@/components/NotificationProvider";
 import { AppInitializer } from "@/components/AppInitializer";
 import AuthGuard from "@/components/auth/AuthGuard";
+import { EnvironmentProvider } from "@/components/providers/EnvironmentProvider";
+import { getServerEnvironment } from "@/lib/environment";
 
 const geistSans = localFont({
   src: "../../public/fonts/Geist-VariableFont_wght.ttf",
@@ -31,28 +33,31 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Get environment variables server-side (picks up both .env and runtime env)
+  const environment = getServerEnvironment();
+
   return (
     <html lang="en">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-bud-bg-primary text-bud-text-primary`}
         suppressHydrationWarning={true}
       >
-        <ThemeProvider>
-          <AntdRegistry>
-            <App>
-              <NotificationProvider>
-                <AppInitializer />
-                <AuthNavigationProvider>
-                  <LoaderProvider>
-                    <ProjectProvider>
-                      <AuthGuard>{children}</AuthGuard>
-                    </ProjectProvider>
-                  </LoaderProvider>
-                </AuthNavigationProvider>
-              </NotificationProvider>
-            </App>
-          </AntdRegistry>
-        </ThemeProvider>
+        <EnvironmentProvider environment={environment}>
+          <ThemeProvider>
+            <AntdRegistry>
+              <App>
+                <NotificationProvider>
+                  <AppInitializer />
+                  <AuthNavigationProvider>
+                    <LoaderProvider>
+                      <ProjectProvider>{children}</ProjectProvider>
+                    </LoaderProvider>
+                  </AuthNavigationProvider>
+                </NotificationProvider>
+              </App>
+            </AntdRegistry>
+          </ThemeProvider>
+        </EnvironmentProvider>
       </body>
     </html>
   );

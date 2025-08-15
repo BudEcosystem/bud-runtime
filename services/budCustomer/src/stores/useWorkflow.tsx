@@ -1,4 +1,3 @@
-import { tempApiBaseUrl } from "@/components/environment";
 import { TagListeItem } from "@/flows/components/TagsList";
 import { Provider } from "@/hooks/useCloudProviders";
 import { Cluster } from "@/hooks/useCluster";
@@ -159,14 +158,11 @@ export const useWorkflow = create<{
   workflowList: [],
   getWorkflowList: async () => {
     try {
-      const response: any = await AppRequest.Get(
-        `${tempApiBaseUrl}/workflows`,
-        {
-          params: {
-            order_by: "-modified_at",
-          },
+      const response: any = await AppRequest.Get(`/workflows`, {
+        params: {
+          order_by: "-modified_at",
         },
-      );
+      });
       if (response) {
         const workflows: WorkflowListItem[] = response.data.workflows;
         set({

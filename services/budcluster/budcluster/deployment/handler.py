@@ -168,7 +168,8 @@ class DeploymentHandler:
         }
 
         full_node_list = copy.deepcopy(node_list)
-        max_loras = 5 if not adapters else max(5, len(adapters))
+
+        max_loras = 1 if not adapters else max(1, len(adapters))
 
         for node in node_list:
             node_values = {"name": node["name"], "devices": []}
@@ -176,16 +177,16 @@ class DeploymentHandler:
                 if not all(key in device for key in ("image", "replica", "memory", "type", "tp_size", "concurrency")):
                     raise ValueError(f"Device configuration is missing required keys: {device}")
                 device["args"]["port"] = app_settings.engine_container_port
-                device["args"]["tensor-parallel-size"] = 1
+                # device["args"]["tensor-parallel-size"] = 1
                 device["args"]["max-loras"] = max_loras
                 device["args"]["max-lora-rank"] = 256
 
-                # Remove scheduler-delay-factor and chunked-prefill-enabled from args
-                device["args"] = {
-                    k: v
-                    for k, v in device["args"].items()
-                    if k not in ["scheduler-delay-factor", "enable-chunked-prefill"]
-                }
+                # # Remove scheduler-delay-factor and chunked-prefill-enabled from args
+                # device["args"] = {
+                #     k: v
+                #     for k, v in device["args"].items()
+                #     if k not in ["scheduler-delay-factor", "enable-chunked-prefill"]
+                # }
                 device["args"] = self._prepare_args(device["args"])
                 device["args"].append(f"--served-model-name={namespace}")
                 device["args"].append("--enable-lora")
@@ -199,7 +200,7 @@ class DeploymentHandler:
                 device["core_count"] = core_count if device["type"] == "cpu" else 1
                 device["memory"] = device["memory"] / (1024**3)
                 device["name"] = self._to_k8s_label(device["name"])
-                device["tp_size"] = 1
+                # device["tp_size"] = 1
 
                 node_values["devices"].append(device)
             values["nodes"].append(node_values)

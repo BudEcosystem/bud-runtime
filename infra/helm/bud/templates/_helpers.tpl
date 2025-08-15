@@ -11,7 +11,6 @@
 {{- end }}
 {{- end }}
 
-
 {{- define "bud.ingress.hosts.budadmin" -}}
 {{- if .Values.ingress.hosts.budadmin }}
 {{- .Values.ingress.hosts.budadmin }}

@@ -376,7 +376,7 @@ export default function ProjectsPage() {
                       className="h-full bg-bud-bg-secondary border-bud-border hover:border-bud-purple hover:shadow-lg transition-all duration-300 cursor-pointer overflow-hidden"
                       styles={{ body: { padding: 0 } }}
                     >
-                      <div className="p-6">
+                      <div className="p-6 mb-20">
                         {/* Header with Icon and Actions */}
                         <div className="flex items-start justify-between mb-6">
                           <div
@@ -483,7 +483,7 @@ export default function ProjectsPage() {
                       </div>
 
                       {/* Footer Section */}
-                      <div className="bg-bud-bg-tertiary px-6 py-4 border-t border-bud-border">
+                      <div className="bg-bud-bg-tertiary px-6 py-4 border-t border-bud-border absolute bottom-0 left-0 w-full">
                         <Text className="text-bud-text-disabled text-[12px] mb-1 block">
                           Last Updated
                         </Text>

@@ -802,6 +802,7 @@ async def list_catalog_models(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
     filters: Annotated[ModelCatalogFilter, Depends()],
+    modality: Optional[List[ModalityEnum]] = Query(None, description="Filter by modality"),
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=100),
     order_by: Optional[List[str]] = Depends(parse_ordering_fields),
@@ -812,8 +813,10 @@ async def list_catalog_models(
         # Calculate offset
         offset = (page - 1) * limit
 
-        # Convert filter to dictionary, ensuring enums are converted to values
-        filters_dict = filters.model_dump(exclude_none=True, mode="json")
+        # Convert filter to dictionary and add modality
+        filters_dict = filters.model_dump(exclude_none=True)
+        if modality:
+            filters_dict["modality"] = modality
 
         # Get models from catalog service
         db_models, count = await ModelCatalogService(session).get_published_models(

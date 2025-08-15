@@ -96,8 +96,8 @@ class ObservabilityMetricsSeeder:
             host=os.getenv("PSQL_HOST", "localhost"),
             port=int(os.getenv("PSQL_PORT", "9000")),
             database=os.getenv("PSQL_DB_NAME", "tensorzero"),
-            user=os.getenv("SECRETS_PSQL_USER", "default"),
-            password=os.getenv("SECRETS_PSQL_PASSWORD", ""),
+            user=os.getenv("PSQL_USER", "default"),
+            password=os.getenv("PSQL_PASSWORD", ""),
         )
 
     async def initialize(self):

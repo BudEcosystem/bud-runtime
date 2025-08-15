@@ -2,6 +2,10 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ .Release.Name }}-budadmin
+  annotations:
+    {{- range $key, $value := .Values.deploymentAnnotations }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
 spec:
   replicas: 1
   selector:
@@ -11,8 +15,6 @@ spec:
     metadata:
       labels:
         app: {{ .Release.Name }}-budadmin
-      annotations:
-        date: "{{ now }}"
     spec:
       containers:
       - name: {{ .Release.Name }}-budadmin

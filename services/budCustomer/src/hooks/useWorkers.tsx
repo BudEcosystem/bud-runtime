@@ -1,4 +1,3 @@
-import { tempApiBaseUrl } from "@/components/environment";
 import { AppRequest } from "@/services/api/requests";
 import { create } from "zustand";
 
@@ -59,7 +58,7 @@ export const useWorkers = create<{
     set({ isLogsLoading: true });
     try {
       const response: any = await AppRequest.Get(
-        `${tempApiBaseUrl}/endpoints/${endpointId}/workers/${workerId}/logs`,
+        `/endpoints/${endpointId}/workers/${workerId}/logs`,
         {
           headers: {
             "x-resource-type": "project",
@@ -83,7 +82,7 @@ export const useWorkers = create<{
     set({ isMetricsLoading: true });
     try {
       const response: any = await AppRequest.Get(
-        `${tempApiBaseUrl}/endpoints/${endpointId}/workers/${workerId}/metrics`,
+        `/endpoints/${endpointId}/workers/${workerId}/metrics`,
         {
           headers: {
             "x-resource-type": "project",
@@ -108,7 +107,7 @@ export const useWorkers = create<{
     set({ loading: true });
     try {
       const response: any = await AppRequest.Get(
-        `${tempApiBaseUrl}/endpoints/${endpointId}/workers/${workerId}`,
+        `/endpoints/${endpointId}/workers/${workerId}`,
         {
           params: {
             reload,
@@ -131,7 +130,7 @@ export const useWorkers = create<{
     set({ loading: true });
     try {
       const response: any = await AppRequest.Get(
-        `${tempApiBaseUrl}/endpoints/${endpointId}/workers`,
+        `/endpoints/${endpointId}/workers`,
         {
           params: {
             ...params,
@@ -158,7 +157,7 @@ export const useWorkers = create<{
 
   deleteWorker: async (endpointId: string, _worker: IWorker, projectId?) => {
     const response: any = await AppRequest.Post(
-      `${tempApiBaseUrl}/endpoints/delete-worker`,
+      `/endpoints/delete-worker`,
       {
         endpoint_id: endpointId,
         worker_id: _worker.id,

@@ -1,5 +1,11 @@
 // Environment configuration
-export const playGroundUrl =
-  process.env.NEXT_PUBLIC_PLAYGROUND_URL || "http://localhost:3001";
-export const askBudUrl = process.env.NEXT_PUBLIC_ASK_BUD_URL || "";
-export const askBudModel = process.env.NEXT_PUBLIC_ASK_BUD_MODEL || "gpt-4";
+// DEPRECATED: Use usePlaygroundConfig() hook from EnvironmentProvider instead
+// This file is kept for backward compatibility but should be migrated
+
+import { getClientEnvironment } from "@/lib/environment";
+
+const clientEnv = getClientEnvironment();
+
+export const playGroundUrl = clientEnv.playgroundUrl || "http://localhost:3001";
+export const askBudUrl = clientEnv.askBudUrl || "";
+export const askBudModel = clientEnv.askBudModel || "gpt-4";

@@ -29,4 +29,4 @@ jobs:
     - name: Run Nix Workflow
       env:
         SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
-      run: nix run .#workflow_${{ github.event.inputs.workflow || inputs.workflow }}
+      run: nix run ".#workflow_${{ github.event.inputs.workflow || inputs.workflow }}"

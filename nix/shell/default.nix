@@ -31,8 +31,11 @@
   pre-commit,
   ruff,
   mypy,
+  pyright,
 }:
-
+let
+  bud_wg = (callPackage ./bud_wg { });
+in
 mkShell {
   buildInputs = [
     k3d
@@ -59,7 +62,8 @@ mkShell {
     prefetch-npm-deps
     gnugrep
     git
-    (callPackage ./bud_wg { })
+    pyright
+    bud_wg
   ];
 
   shellHook = ''

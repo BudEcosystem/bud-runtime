@@ -11,6 +11,8 @@ Follow these steps to complete the task, make a todo list and think ultrahard:
   – Visit the provided repo_url and examine the repository’s structure, existing issues, and documentation.
   – Look for any CONTRIBUTING.md, ISSUE_TEMPLATE.md, or similar files that might contain guidelines for creating issues.
   – Note the project’s coding style, naming conventions, and any specific requirements for submitting issues.
+  - Use sub agents to research various services within the project
+  - Use agent stack-keeper for splitting the task between relevant services.
 
 2. Research best practices:
 

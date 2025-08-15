@@ -105,7 +105,9 @@ export function BudForm(props: BudFormProps) {
       }
     }}
     onFinish={(values) => {
-      if (props.onNext) {
+      if (isExpandedView) {
+        closeExpandedStep();
+      } else if (props.onNext) {
         props.onNext(values);
       }
     }}
