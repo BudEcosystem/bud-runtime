@@ -30,8 +30,13 @@ class CostCalculator:
             "hpu": _device_cost["gaudi2"] / 5 / 365 / 24,
         }
 
-        if device_config["type"] in _device_cost_per_hour:
-            return _device_cost_per_hour[device_config["type"]]
+        device_type = device_config["type"]
+        logger.info(
+            f"Cost calculation using device type: '{device_type}' - Cost per hour: ${_device_cost_per_hour.get(device_type, 'UNKNOWN'):.6f}"
+        )
+
+        if device_type in _device_cost_per_hour:
+            return _device_cost_per_hour[device_type]
         else:
             raise ValueError(f"Invalid device type: {device_config['type']}")
 

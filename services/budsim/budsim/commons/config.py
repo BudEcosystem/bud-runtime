@@ -55,7 +55,7 @@ class AppConfig(BaseAppConfig):
     model_registry_dir: str = Field(..., alias="MODEL_REGISTRY_DIR")
 
     # Simulation method
-    default_simulation_method: str = Field("regressor", alias="DEFAULT_SIMULATION_METHOD")
+    default_simulation_method: str = Field("heuristic", alias="DEFAULT_SIMULATION_METHOD")
 
     # Bud Connect
     bud_connect_url: str = Field(..., alias="BUD_CONNECT_URL")
