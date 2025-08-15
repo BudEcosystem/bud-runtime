@@ -257,11 +257,11 @@ class ModelAnalysis:
                 model_weight_gb = memory_report.model_memory / (1024**3)  # Convert bytes to GB
 
             # KV cache is calculated for total concurrency, divide by concurrency to get per-request
-            if hasattr(memory_report, "kv_cache_gb"):
+            if hasattr(memory_report, "kv_cache_gb") and self.concurrency > 0:
                 kv_cache_per_request_gb = memory_report.kv_cache_gb / self.concurrency
-            elif hasattr(memory_report, "kv_cache_memory_gb"):
+            elif hasattr(memory_report, "kv_cache_memory_gb") and self.concurrency > 0:
                 kv_cache_per_request_gb = memory_report.kv_cache_memory_gb / self.concurrency
-            elif hasattr(memory_report, "kv_cache_memory"):
+            elif hasattr(memory_report, "kv_cache_memory") and self.concurrency > 0:
                 kv_cache_per_request_gb = (memory_report.kv_cache_memory / (1024**3)) / self.concurrency
 
             if model_weight_gb is None or kv_cache_per_request_gb is None:
