@@ -546,7 +546,7 @@ export default function BatchesPage() {
             {selectedBatch && (
               <div className="space-y-[1.5rem]">
                 <div className="grid grid-cols-2 gap-[1rem]">
-                  <div>
+                  <div className="flex gap-4 items-center">
                     <Text className="text-bud-text-disabled text-[12px]">
                       Batch ID
                     </Text>
@@ -554,7 +554,7 @@ export default function BatchesPage() {
                       {selectedBatch.id}
                     </Text>
                   </div>
-                  <div>
+                  <div className="flex gap-4 items-center">
                     <Text className="text-bud-text-disabled text-[12px]">
                       Model
                     </Text>
@@ -562,7 +562,7 @@ export default function BatchesPage() {
                       {selectedBatch.model}
                     </Text>
                   </div>
-                  <div>
+                  <div className="flex gap-4 items-center">
                     <Text className="text-bud-text-disabled text-[12px]">
                       Created At
                     </Text>
@@ -570,7 +570,7 @@ export default function BatchesPage() {
                       {new Date(selectedBatch.createdAt).toLocaleString()}
                     </Text>
                   </div>
-                  <div>
+                  <div className="flex gap-4 items-center">
                     <Text className="text-bud-text-disabled text-[12px]">
                       Status
                     </Text>

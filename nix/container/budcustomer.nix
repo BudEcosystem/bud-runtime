@@ -22,7 +22,6 @@ let
       }
 
       note "fetching api key from $ENTRYPOINT_BUDNOTIFY_SERVICE"
-
       set +o errexit
       novu_app_id="$(curl --retry 5 \
         --connect-timeout 600 \

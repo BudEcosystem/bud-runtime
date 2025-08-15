@@ -502,7 +502,7 @@ export default function APIKeysPage() {
                   <div className="height-1 bg-bud-border mb-[1.5rem] w-full"></div>
                   <div className="w-full flex flex-col gap-size-20 px-[1.5rem] pb-[1.5rem]">
                     <div
-                      className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]`}
+                      className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[1rem]`}
                     >
                       <div className="w-full">
                         <Text className="absolute bg-bud-bg-primary -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap text-bud-text-primary text-[12px] font-light">
@@ -545,7 +545,7 @@ export default function APIKeysPage() {
                     </div>
 
                     <div
-                      className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]`}
+                      className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[1rem]`}
                     >
                       <div className="w-full">
                         <Text className="absolute bg-bud-bg-primary -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap text-bud-text-primary text-[12px] font-light">

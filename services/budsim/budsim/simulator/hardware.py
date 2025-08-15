@@ -1,4 +1,8 @@
+import logging
 from typing import Any, Dict
+
+
+logger = logging.getLogger(__name__)
 
 
 class CostCalculator:
@@ -26,8 +30,13 @@ class CostCalculator:
             "hpu": _device_cost["gaudi2"] / 5 / 365 / 24,
         }
 
-        if device_config["type"] in _device_cost_per_hour:
-            return _device_cost_per_hour[device_config["type"]]
+        device_type = device_config["type"]
+        logger.info(
+            f"Cost calculation using device type: '{device_type}' - Cost per hour: ${_device_cost_per_hour.get(device_type, 'UNKNOWN'):.6f}"
+        )
+
+        if device_type in _device_cost_per_hour:
+            return _device_cost_per_hour[device_type]
         else:
             raise ValueError(f"Invalid device type: {device_config['type']}")
 
@@ -47,6 +56,11 @@ class CostCalculator:
         """
         tokens_in_million = 1e6
         tokens_generated_per_hour = throughput_per_user * concurrency * 60 * 60
+
+        # Avoid division by zero
+        if tokens_generated_per_hour <= 0:
+            logger.warning(f"Invalid tokens_generated_per_hour: {tokens_generated_per_hour}, returning high cost")
+            return 1e6  # Return very high cost for invalid configurations
 
         time_to_generate_million_tokens = tokens_in_million / tokens_generated_per_hour
 
