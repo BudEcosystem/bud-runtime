@@ -1,0 +1,5 @@
+namespace = "kube-system"
+release_name = "keel"
+chart_path_override = "charts/keel-1.0.5.tgz"
+sops_value_paths = [ "values.enc.yaml" ]
+value_paths = [ "values.yaml" ]
