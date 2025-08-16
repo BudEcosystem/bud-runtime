@@ -104,7 +104,7 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({
         }
         size={size}
         className="w-full h-auto"
-        dropdownRender={(menu) => (
+        popupRender={(menu) => (
           <div className="bg-bud-bg-secondary border border-bud-border rounded-lg shadow-lg">
             {activeProjects.length === 0 ? (
               <div className="p-4 text-center">
@@ -140,7 +140,11 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({
           </div>
         )}
         popupMatchSelectWidth={false}
-        popupClassName="project-selector-dropdown"
+        classNames={{
+          popup: {
+            root: "project-selector-dropdown",
+          },
+        }}
       />
 
       {currentProject && (

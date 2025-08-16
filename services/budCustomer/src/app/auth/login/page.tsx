@@ -87,16 +87,11 @@ export default function Login() {
         });
 
         // Handle different login scenarios
-        // For now, always redirect to /models regardless of reset password flags
-        // Uncomment the condition below if you want to handle password reset
-        // if (response.data.is_reset_password || response.data.first_login) {
-        //   router.push("/auth/reset-password");
-        // } else {
-        //   router.push("/models");
-        // }
-
-        // Always go to models page after successful login
-        router.push("/models");
+        if (response.data.is_reset_password || response.data.first_login) {
+          router.push("/auth/resetPassword");
+        } else {
+          router.push("/models");
+        }
       } else if (response.data) {
         // Handle case where login is successful but no token (shouldn't happen normally)
         setAuthError("");
