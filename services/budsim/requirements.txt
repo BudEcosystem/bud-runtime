@@ -4,6 +4,7 @@ budmicroframe @ git+https://github.com/BudEcosystem/bud-microframe.git
 # Core
 transformers >= 4.44.0
 llm-benchmark @ git+https://github.com/BudEcosystem/llm-benchmark.git
+llm-memory-calculator @ git+https://github.com/BudEcosystem/simulator.git#subdirectory=llm-memory-calculator
 deap >= 1.4.1
 
 # ML

@@ -18,7 +18,7 @@ from pydantic import (
 
 from budapp.commons import logging
 from budapp.commons.config import app_settings
-from budapp.commons.constants import CredentialTypeEnum
+from budapp.commons.constants import ApiCredentialTypeEnum, CredentialTypeEnum
 from budapp.commons.schemas import CloudEventBase, PaginatedSuccessResponse, SuccessResponse
 from budapp.initializers.provider_seeder import ProviderSeeder
 
@@ -82,6 +82,8 @@ class BudCredentialCreate(CredentialCreate):
     expiry: datetime | None
     max_budget: float | None
     model_budgets: Optional[model_budget_type] = None
+    credential_type: Optional[ApiCredentialTypeEnum] = ApiCredentialTypeEnum.CLIENT_APP
+    ip_whitelist: Optional[List[str]] = None
 
     model_config = ConfigDict(protected_namespaces=())
 
@@ -105,6 +107,10 @@ class CredentialRequest(BaseModel):
         default=None, gt=0, description="Max budget must be greater than 0 if specified"
     )
     model_budgets: Optional[model_budget_type] = None
+    credential_type: Optional[ApiCredentialTypeEnum] = None
+    ip_whitelist: Optional[List[str]] = Field(
+        default=None, description="List of allowed IP addresses for this credential"
+    )
 
     @model_validator(mode="after")
     def validate_key(self) -> "CredentialRequest":
@@ -131,6 +137,8 @@ class CredentialResponse(BaseModel):
     max_budget: float | None
     model_budgets: Optional[model_budget_type] = None
     id: UUID
+    credential_type: ApiCredentialTypeEnum
+    ip_whitelist: Optional[List[str]] = None
 
     model_config = ConfigDict(protected_namespaces=())
 
@@ -157,6 +165,8 @@ class CredentialDetails(BaseModel):
     model_budgets: Optional[model_budget_type] = None
     id: UUID
     last_used_at: datetime | None
+    credential_type: ApiCredentialTypeEnum
+    ip_whitelist: Optional[List[str]] = None
 
 
 class CredentialUpdate(BaseModel):
@@ -168,6 +178,7 @@ class CredentialUpdate(BaseModel):
     expiry: Optional[ExpiryEnum] = None
     max_budget: float | None = None
     model_budgets: Optional[model_budget_type] = None
+    ip_whitelist: Optional[List[str]] = None
 
     @model_validator(mode="after")
     def validate_key(self) -> "CredentialUpdate":

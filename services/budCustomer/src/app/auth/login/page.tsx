@@ -5,7 +5,8 @@ import AuthLayout from "@/components/auth/AuthLayout";
 import { useAuthNavigation, useLoader } from "@/context/authContext";
 import LoginForm from "@/components/auth/LoginForm";
 import { motion, AnimatePresence } from "framer-motion";
-import { AppRequest } from "@/services/api/requests";
+import { useApiRequest } from "@/hooks/useApiRequest";
+import { useEnvironment } from "@/components/providers/EnvironmentProvider";
 import { useUser } from "@/stores/useUser";
 import { successToast } from "@/components/toast";
 
@@ -20,9 +21,15 @@ export default function Login() {
   const router = useRouter();
   const [isBackToLogin, setIsBackToLogin] = useState(false);
 
+  // Use the new environment system
+  const environment = useEnvironment();
+  const apiRequest = useApiRequest();
+
   useEffect(() => {
-    console.log('From client NEXT_PUBLIC_TEMP_API_BASE_URL:', process.env.NEXT_PUBLIC_TEMP_API_BASE_URL);
-    console.log('From client NEXT_PUBLIC_BASE_URL:', process.env.NEXT_PUBLIC_BASE_URL);
+    console.log("Environment variables from provider:");
+    console.log("baseUrl:", environment.baseUrl);
+    console.log("novuBaseUrl:", environment.novuBaseUrl);
+
     if (activePage === 4) {
       setTimeout(() => {
         setIsBackToLogin(true);
@@ -32,7 +39,7 @@ export default function Login() {
         setIsBackToLogin(false);
       }, 500);
     }
-  }, [activePage]);
+  }, [activePage, environment]);
 
   const { getUser } = useUser();
 
@@ -51,7 +58,7 @@ export default function Login() {
       console.log("Payload:", loginPayload);
 
       // Make the API call
-      const response = await AppRequest.Post("/auth/login", loginPayload);
+      const response = await apiRequest.Post("/auth/login", loginPayload);
       console.log("Login response:", response);
 
       if (response.data?.token) {
