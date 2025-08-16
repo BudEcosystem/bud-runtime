@@ -21,7 +21,7 @@ type JobConfig struct {
 	SlackColor string   `toml:"slack_color" validate:"hexcolor"`
 }
 
-type SCDConfig struct {
+type SCIDonfig struct {
 	Branch         string       `toml:"branch" validate:"required"`
 	RepoUrl        string       `toml:"repo_url" validate:"required"`
 	DryRun         bool         `toml:"dry_run"`
@@ -30,12 +30,12 @@ type SCDConfig struct {
 	Jobs           []JobConfig  `toml:"jobs" validate:"dive"`
 }
 
-var Config SCDConfig
+var Config SCIDonfig
 
 func Init() error {
 	var configPath string
-	defaultConfigPath := "/etc/scd.toml"
-	if value, ok := os.LookupEnv("SCD_CONFIG"); ok {
+	defaultConfigPath := "/etc/scid.toml"
+	if value, ok := os.LookupEnv("SCID_CONFIG"); ok {
 		configPath = value
 	} else {
 		configPath = defaultConfigPath

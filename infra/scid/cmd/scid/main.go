@@ -7,12 +7,12 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
-	"sinanmohd.com/scd/internal/config"
-	"sinanmohd.com/scd/internal/driver"
-	"sinanmohd.com/scd/internal/git"
+	"sinanmohd.com/scid/internal/config"
+	"sinanmohd.com/scid/internal/driver"
+	"sinanmohd.com/scid/internal/git"
 )
 
-func cd(g *git.Git) {
+func scid(g *git.Git) {
 	var wg sync.WaitGroup
 
 	wg.Add(1)
@@ -66,7 +66,6 @@ func main() {
 		return
 	}
 
-	log.Printf("Branch HEAD moved: %s -> %s", g.OldHash, g.NewHash)
-	cd(g)
-	return
+	log.Info().Msgf("Branch HEAD moved: %s -> %s", g.OldHash, g.NewHash)
+	scid(g)
 }

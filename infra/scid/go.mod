@@ -1,4 +1,4 @@
-module sinanmohd.com/scd
+module sinanmohd.com/scid
 
 go 1.24.3
 

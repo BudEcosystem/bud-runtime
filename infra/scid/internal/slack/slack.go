@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"time"
 
-	"sinanmohd.com/scd/internal/config"
-	"sinanmohd.com/scd/internal/git"
+	"sinanmohd.com/scid/internal/config"
+	"sinanmohd.com/scid/internal/git"
 )
 
 type Payload struct {
@@ -51,7 +51,7 @@ func SendMesg(g *git.Git, color, title string, success bool, extraText string) e
 			Color:      color,
 			Title:      fmt.Sprintf("%s Update", title),
 			Text:       text,
-			Footer:     "scd",
+			Footer:     "scid",
 			FooterIcon: "https://avatars.githubusercontent.com/u/69694713?v=4&s=75",
 			Timestamp:  time.Now().Unix(),
 

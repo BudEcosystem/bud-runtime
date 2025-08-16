@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"sync"
 
-	"sinanmohd.com/scd/internal/config"
-	"sinanmohd.com/scd/internal/git"
-	"sinanmohd.com/scd/internal/slack"
+	"sinanmohd.com/scid/internal/config"
+	"sinanmohd.com/scid/internal/git"
+	"sinanmohd.com/scid/internal/slack"
 
 	"github.com/rs/zerolog/log"
 )
@@ -25,9 +25,12 @@ func JobRunIfChaged(job config.JobConfig, g *git.Git) error {
 	}
 
 	if execErr != nil {
-		slack.SendMesg(g, color, job.Name, false, fmt.Sprintf("%s: %s", execErr.Error(), output))
+		err = slack.SendMesg(g, color, job.Name, false, fmt.Sprintf("%s: %s", execErr.Error(), output))
 	} else {
-		slack.SendMesg(g, color, job.Name, true, "")
+		err = slack.SendMesg(g, color, job.Name, true, "")
+	}
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -38,7 +41,7 @@ func JobRunIfChagedWrapped(job config.JobConfig, bg *git.Git, wg *sync.WaitGroup
 	go func() {
 		err := JobRunIfChaged(job, bg)
 		if err != nil {
-			log.Fatal().Err(err).Msg("Running Job")
+			log.Error().Err(err).Msgf("Running Job %s", job.Name)
 		}
 
 		wg.Done()

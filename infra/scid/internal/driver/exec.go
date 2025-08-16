@@ -1,13 +1,12 @@
 package driver
 
 import (
-	"fmt"
 	"os/exec"
 
 	"github.com/rs/zerolog/log"
 
-	"sinanmohd.com/scd/internal/config"
-	"sinanmohd.com/scd/internal/git"
+	"sinanmohd.com/scid/internal/config"
+	"sinanmohd.com/scid/internal/git"
 )
 
 func ExecIfChaged(paths, execLine []string, bg *git.Git) (string, error /* exec error */, error) {
@@ -19,7 +18,7 @@ func ExecIfChaged(paths, execLine []string, bg *git.Git) (string, error /* exec 
 		return "", nil, err
 	}
 
-	log.Info().Msg(fmt.Sprintf("Execing %v", execLine))
+	log.Info().Msgf("Execing %v", execLine)
 
 	if config.Config.DryRun {
 		return "", nil, nil

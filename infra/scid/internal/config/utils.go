@@ -50,15 +50,15 @@ func subEnvString(stringVal reflect.Value) error {
 	s := stringVal.String()
 
 	if strings.HasPrefix(s, "%env%:") {
-		envName := strings.TrimLeft(s, "%env%:")
+		envName := strings.TrimPrefix(s, "%env%:")
 		envVal, ok := os.LookupEnv(envName)
 		if !ok {
-			return errors.New(fmt.Sprintf("Environment variable %v is not set", envName))
+			return fmt.Errorf("Environment variable %v is not set", envName)
 		}
 
 		stringVal.SetString(envVal)
 	} else if strings.HasPrefix(s, "%file%:") {
-		fileName := strings.TrimLeft(s, "%file%:")
+		fileName := strings.TrimPrefix(s, "%file%:")
 		data, err := os.ReadFile(fileName)
 		if err != nil {
 			return err

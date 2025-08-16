@@ -8,7 +8,7 @@ import (
 	"github.com/go-git/go-git/v6"
 	"github.com/go-git/go-git/v6/plumbing"
 	"lukechampine.com/blake3"
-	"sinanmohd.com/scd/internal/config"
+	"sinanmohd.com/scid/internal/config"
 )
 
 type Git struct {
@@ -18,8 +18,8 @@ type Git struct {
 }
 
 func New(repoUrl, branchName string) (*Git, error) {
-	sum256 := blake3.Sum256([]byte(repoUrl))
-	localPath := fmt.Sprintf("%x-%s", sum256, branchName)
+	sum256 := blake3.Sum256([]byte(repoUrl + branchName))
+	localPath := fmt.Sprintf("%x", sum256)
 
 	_, err := os.Stat(localPath)
 	if os.IsNotExist(err) {
@@ -96,7 +96,7 @@ func (bg *Git) HeadMoved() bool {
 		return true
 	}
 
-	return bg.NewHash != bg.OldHash
+	return *bg.NewHash != *bg.OldHash
 }
 
 func (bg *Git) PathsUpdated(prefixPaths []string) (bool, error) {
