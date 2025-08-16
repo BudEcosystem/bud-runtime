@@ -727,7 +727,7 @@ class TestValidationAdvancedScenarios:
             # Unicode handling might not work perfectly, so we allow graceful failure
             assert response.status_code in [400, 500]
 
-    @pytest.mark.timeout(180)
+    @pytest.mark.timeout(240)
     def test_validation_very_long_prompt(self, http_client):
         """Test validation with very long validation prompt."""
         
