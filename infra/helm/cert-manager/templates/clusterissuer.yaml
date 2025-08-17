@@ -2,6 +2,8 @@ apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
   name: letsencrypt-http01
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
 spec:
   acme:
     email: {{ .Values.email }}

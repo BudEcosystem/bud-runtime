@@ -1,9 +1,9 @@
-dapr:
-  enabled: true
-  global:
-    ha:
-      enabled: false
-  dapr_scheduler:
-    ha: true
-  dapr_placement:
-    ha: true
+# dapr:
+enabled: true
+global:
+  ha:
+    enabled: false
+dapr_scheduler:
+  ha: true
+dapr_placement:
+  ha: true

@@ -1,4 +1,2 @@
 namespace = "cert-manager"
 release_name = "cert-manager"
-chart_path_override = "charts/cert-manager-v1.18.2.tgz"
-value_paths = [ "values.yaml" ]
