@@ -201,11 +201,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1755440472,
-        "narHash": "sha256-FJtDRyM0ufT60IBvowaStZE33Affn7m17/mBwkho14g=",
+        "lastModified": 1755441611,
+        "narHash": "sha256-tIhXw18AJ//LvVqvL2QgSLUkihcYU/bmLdrdMqhew4k=",
         "owner": "sinanmohd",
         "repo": "scid",
-        "rev": "49ce3f2299a65ef5b2c3bf5a91035092c3ed6e56",
+        "rev": "18d367f5ccb4d61e1490849538c23050529904a8",
         "type": "github"
       },
       "original": {

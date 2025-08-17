@@ -1,4 +1,4 @@
-{ config, ... }:
+{ config, pkgs, ... }:
 let
   sops_key_path = "/var/secrets/master.sops";
 in {
@@ -7,6 +7,11 @@ in {
   services.scid = {
     enable = true;
     environment.SOPS_AGE_KEY_FILE = sops_key_path;
+    path = with pkgs; [
+      kubernetes-helm
+      nixos-rebuild-ng
+      nix
+    ];
 
     settings = {
       repo_url = "https://github.com/BudEcosystem/bud-runtime.git";
