@@ -1,0 +1,17 @@
+apiVersion: v2
+
+name: keel
+description: Keel Chart for Bud
+type: application
+version: 0.1.0
+
+maintainers:
+  - name: "sinanmohd"
+    email: "sinan@sinanmohd.com"
+    url: "https://www.sinanmohd.com"
+
+dependencies:
+  - name: keel
+    version: 1.0.5
+    repository: https://charts.keel.sh
+    condition: keel.enabled

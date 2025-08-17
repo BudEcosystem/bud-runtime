@@ -1,0 +1,10 @@
+email: sinan@bud.studio
+
+cert-manager:
+  enabled: true
+  crds:
+    enabled: true
+  ingressShim:
+    defaultIssuerName: letsencrypt-http01
+    defaultIssuerKind: ClusterIssuer
+    defaultIssuerGroup: cert-manager.io
