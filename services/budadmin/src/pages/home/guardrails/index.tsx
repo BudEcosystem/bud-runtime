@@ -39,227 +39,321 @@ import IconRender from "src/flows/components/BudIconRender";
 import router from "next/router";
 import { PlusOutlined } from "@ant-design/icons";
 
-function ModelCard(item: Model, index) {
-  const { getModel } = useModels();
-  const { openDrawer } = useDrawer();
+interface GuardRail {
+  id: string;
+  name: string;
+  type: string;
+  category: string[];
+  description?: string;
+  provider?: string;
+  deployments?: number;
+  status?: "active" | "inactive" | "pending";
+  createdAt?: string;
+  icon?: string;
+}
+
+function GuardRailCard({ item, index }: { item: GuardRail; index: number }) {
+  const { openDrawer, openDrawerWithStep } = useDrawer();
+
+  const getTypeIcon = (type: string) => {
+    switch(type) {
+      case 'pii':
+        return '🔒';
+      case 'regex':
+        return '📝';
+      case 'toxicity':
+        return '⚠️';
+      case 'bias':
+        return '⚖️';
+      case 'jailbreak':
+        return '🚫';
+      case 'custom':
+        return '⚙️';
+      case 'profanity':
+        return '🤬';
+      case 'semantic':
+        return '🧠';
+      default:
+        return '🛡️';
+    }
+  };
+
+  const getStatusColor = (status?: string) => {
+    switch(status) {
+      case 'active':
+        return '#52C41A';
+      case 'inactive':
+        return '#757575';
+      case 'pending':
+        return '#FAAD14';
+      default:
+        return '#757575';
+    }
+  };
+
   return (
     <div
-      className="flex flex-col justify-between bg-[#101010] border border-[#1F1F1F] rounded-lg pt-[1.54em] 1680px:pt-[1.85em] min-h-[325px] 1680px:min-h-[400px] 2048px:min-h-[475px] group cursor-pointer hover:shadow-[1px_1px_6px_-1px_#2e3036] overflow-hidden"
+      className="flex flex-col bg-[#101010] border border-[#1F1F1F] rounded-lg p-[1.5rem] min-h-[280px] group cursor-pointer hover:shadow-[1px_1px_6px_-1px_#2e3036] hover:border-[#757575] transition-all"
       key={index}
-      onClick={async () => {
-        const result = await getModel(item.id);
-        if (result) {
-          openDrawer("view-model");
-        }
+      onClick={() => {
+        openDrawer("view-guardrail-details", { guardrail: item });
       }}
     >
-      <div className="px-[1.6rem] min-h-[230px]">
-        <div className="w-[2.40125rem] h-[2.40125rem] bg-[#1F1F1F] rounded-[5px] flex items-center justify-center">
-          <IconRender
-            icon={item?.icon || item?.icon}
-            size={26}
-            imageSize={24}
-            type={item.provider_type}
-            model={item}
-          />
-        </div>
-        {item?.modified_at && (
-          <div className="mt-[1.2rem]">
-            <Text_11_400_808080>
-              {formatDate(item?.created_at)}
-            </Text_11_400_808080>
+      <div className="flex items-start justify-between mb-[1.25rem]">
+        <div className="flex items-center gap-[1rem]">
+          <div className="w-[3rem] h-[3rem] bg-[#1F1F1F] rounded-[8px] flex items-center justify-center text-[1.75rem]">
+            {getTypeIcon(item.type)}
           </div>
-        )}
-        <Text_17_600_FFFFFF
-          className="max-w-[100] truncate w-[calc(100%-20px)] mt-[.4rem]"
-          onClick={(e) => {
-            // e.stopPropagation();
-            // copy to clipboard
-            // navigator.clipboard.writeText(item.name);
-            // successToast("Copied to clipboard");
-          }}
-        >
-          {item.name}
-        </Text_17_600_FFFFFF>
-        <Text_13_400_B3B3B3 className="mt-[.6rem] leading-[1.125rem] h-[1.25rem] tracking-[.01em] line-clamp-1 overflow-hidden display-webkit-box">
-          {item?.description || ""}
-        </Text_13_400_B3B3B3>
-
-        <div className="flex items-center flex-wrap py-[1.1em]  gap-[.3rem]">
-          <ModelTags model={item} maxTags={3} limit={true} />
+          <div className="flex-1">
+            <Text_17_600_FFFFFF className="mb-[0.25rem] line-clamp-1">
+              {item.name}
+            </Text_17_600_FFFFFF>
+            {item.provider && (
+              <Text_12_400_B3B3B3>
+                by {item.provider}
+              </Text_12_400_B3B3B3>
+            )}
+          </div>
         </div>
+        {item.status && (
+          <div
+            className="w-[10px] h-[10px] rounded-full shrink-0"
+            style={{ backgroundColor: getStatusColor(item.status) }}
+            title={item.status}
+          />
+        )}
       </div>
-      <div className="px-[1.6rem] pt-[.9rem] pb-[1rem] bg-[#161616] border-t-[.5px] border-t-[#1F1F1F] min-h-[32%]">
-        <Text_12_400_B3B3B3 className="mb-[.65rem]">
-          Recommended Cluster
-        </Text_12_400_B3B3B3>
-        {item?.model_cluster_recommended ? (
-          <>
-            <Text_12_600_EEEEEE className="mb-[.6rem]">
-              {item?.model_cluster_recommended?.cluster?.name}
-            </Text_12_600_EEEEEE>
-            <div className="flex items-center justify-start">
-              <Tag
-                className={`text-[#B3B3B3] border-[0] rounded-[6px] cursor-pointer hover:text-[#EEEEEE] flex justify-center items-center py-[.3rem] px-[.4rem]`}
-                style={{
-                  backgroundColor: getChromeColor("#1F1F1F"),
-                  background: "#1F1F1F",
-                }}
-              >
-                <div
-                  className={`text-[0.625rem] font-[400] leading-[100%]`}
-                  style={{
-                    color: "#EEEEEE",
-                  }}
-                >
-                  {item?.model_cluster_recommended?.cluster?.availability_percentage}% Available
-                </div>
-              </Tag>
-              {item?.model_cluster_recommended?.hardware_type?.map((resource, index) => (
-                <Tag
-                  key={index}
-                  className={`text-[#B3B3B3] border-[0] rounded-[6px] cursor-pointer hover:text-[#EEEEEE] flex justify-center items-center py-[.3rem] px-[.4rem]`}
-                style={{
-                  backgroundColor: getChromeColor("#1F1F1F"),
-                  background: "#1F1F1F",
-                }}
-              >
-                <div
-                  className={`text-[0.625rem] font-[400] leading-[100%]`}
-                  style={{
-                    color: "#EEEEEE",
-                  }}
-                >
-                  {resource.toUpperCase()}
-                </div>
-              </Tag>
-              ))}
-              <Tag
-                className={`text-[#B3B3B3] border-[0] rounded-[6px] cursor-pointer hover:text-[#EEEEEE] flex justify-center items-center py-[.3rem] px-[.4rem]`}
-                style={{
-                  backgroundColor: getChromeColor("#1F1F1F"),
-                  background: "#1F1F1F",
-                }}
-              >
-                <div
-                  className={`text-[0.625rem] font-[400] leading-[100%]`}
-                  style={{
-                    color: "#EEEEEE",
-                  }}
-                >
-                  ${Number(item?.model_cluster_recommended?.cost_per_million_tokens).toFixed(2)} / 1M Tokens
-                </div>
-              </Tag>
-            </div>
-          </>
-        ) : (
-          <>
+
+      {item.description && (
+        <Text_13_400_B3B3B3 className="mb-[1.25rem] line-clamp-3 leading-[1.4]">
+          {item.description}
+        </Text_13_400_B3B3B3>
+      )}
+
+      <div className="flex items-center justify-between mt-auto pt-[1rem] border-t border-[#1F1F1F]">
+        <div className="flex items-center gap-[0.5rem] flex-wrap">
+          {item.category.slice(0, 3).map((cat, idx) => (
             <Tag
-              className={`text-[#B3B3B3] border-[0] rounded-[6px] cursor-pointer hover:text-[#EEEEEE] justify-center items-center py-[.5rem] px-[.8rem]`}
+              key={idx}
+              className="text-[#B3B3B3] border-[0] rounded-[6px] flex items-center px-[0.75rem] py-[0.375rem]"
               style={{
-                backgroundColor: getChromeColor("#1F1F1F"),
-                background: "#1F1F1F",
+                backgroundColor: "#1F1F1F",
               }}
             >
-              <div
-                className={`text-[0.625rem] font-[400] leading-[100%]`}
-                style={{
-                  color: "#EEEEEE",
-                }}
-              >
-                No data available
-              </div>
+              <span className="text-[0.75rem] font-[400] capitalize">
+                {cat}
+              </span>
             </Tag>
-          </>
+          ))}
+          {item.category.length > 3 && (
+            <Tag
+              className="text-[#757575] border-[0] rounded-[6px] flex items-center px-[0.75rem] py-[0.375rem]"
+              style={{
+                backgroundColor: "#1F1F1F",
+              }}
+            >
+              <span className="text-[0.75rem] font-[400]">
+                +{item.category.length - 3}
+              </span>
+            </Tag>
+          )}
+        </div>
+        {item.deployments !== undefined && (
+          <Text_12_400_B3B3B3 className="shrink-0">
+            {item.deployments} {item.deployments === 1 ? 'deploy' : 'deploys'}
+          </Text_12_400_B3B3B3>
         )}
       </div>
     </div>
   );
 }
 
-const sourceTypes = [
-  { label: "Local", value: "model" },
-  { label: "Cloud", value: "cloud_model" },
+const providerTypes = [
+  { label: "Bud Sentinel", value: "bud-sentinel" },
+  { label: "Azure AI", value: "azure-ai" },
+  { label: "AWS Bedrock", value: "aws-bedrock" },
+  { label: "Custom", value: "custom" },
+];
+
+const guardRailTypes = [
+  { label: "PII Detection", value: "pii" },
+  { label: "Jailbreak Protection", value: "jailbreak" },
+  { label: "Toxicity Filter", value: "toxicity" },
+  { label: "Bias Detection", value: "bias" },
+  { label: "Profanity Filter", value: "profanity" },
+  { label: "Custom Regex", value: "regex" },
+];
+
+const modalityTypes = [
+  { label: "Text", value: "text" },
+  { label: "Image", value: "image" },
+  { label: "Audio", value: "audio" },
+  { label: "Code", value: "code" },
+  { label: "Video", value: "video" },
 ];
 
 const defaultFilter = {
   name: "",
+  provider: [],
+  guardRailType: [],
   modality: [],
-  model_size_min: undefined,
-  model_size_max: undefined,
-  table_source: ["model"],
+  status: [],
 };
 
-interface Filters {
-  author?: string;
-  tasks?: string[];
-  model_size_min?: string;
-  model_size_max?: string;
-  // modality?: string[];
-  // Add other filter properties as needed
+interface GuardRailFilters {
+  name?: string;
+  provider?: string[];
+  guardRailType?: string[];
+  modality?: string[];
+  status?: string[];
 }
 
 const SelectedFilters = ({
   filters,
   removeTag,
 }: {
-  filters: Filters;
+  filters: GuardRailFilters;
   removeTag?: (key, item) => void;
 }) => {
   return (
     <div className="flex justify-start gap-[.4rem] items-center absolute top-[.4rem] left-[3.5rem]">
-      {filters?.author && (
-        <Tags
-          name={`Author: ${filters.author}`}
-          color="#d1b854"
-          closable
-          onClose={() => removeTag("author", filters?.author)}
-        />
-      )}
-      {filters?.tasks?.length > 0 &&
-        filters.tasks.map((item, index) => (
+      {filters?.provider?.length > 0 &&
+        filters.provider.map((item, index) => (
           <Tags
-            name={item}
-            color="#d1b854"
+            name={`Provider: ${item}`}
+            color="#965CDE"
             key={index}
             closable
-            onClose={() => removeTag("tasks", item)}
+            onClose={() => removeTag("provider", item)}
           />
         ))}
-      {filters?.model_size_min && (
-        <Tags
-          name={`Min size: ${filters.model_size_min}`}
-          color="#d1b854"
-          closable
-          onClose={() => removeTag("model_size_min", filters.model_size_min)}
-        />
-      )}
-      {filters?.model_size_max && (
-        <Tags
-          name={`Max size: ${filters.model_size_max}`}
-          color="#d1b854"
-          closable
-          onClose={() => removeTag("model_size_max", filters.model_size_max)}
-        />
-      )}
-      {/* {filters?.modality?.length > 0 &&
+      {filters?.guardRailType?.length > 0 &&
+        filters.guardRailType.map((item, index) => (
+          <Tags
+            name={`Type: ${item}`}
+            color="#965CDE"
+            key={index}
+            closable
+            onClose={() => removeTag("guardRailType", item)}
+          />
+        ))}
+      {filters?.modality?.length > 0 &&
         filters.modality.map((item, index) => (
           <Tags
-            name={item}
-            color="#d1b854"
+            name={`Modality: ${item}`}
+            color="#965CDE"
             key={index}
             closable
             onClose={() => removeTag("modality", item)}
           />
-        ))} */}
-      {/* Uncomment and update if needed
-      {filters?.table_source?.length > 0 &&
-        filters.table_source.map((item, index) => (
-          <Tags name={item} color="#d1b854" key={index} />
-        ))} */}
+        ))}
+      {filters?.status?.length > 0 &&
+        filters.status.map((item, index) => (
+          <Tags
+            name={`Status: ${item}`}
+            color="#965CDE"
+            key={index}
+            closable
+            onClose={() => removeTag("status", item)}
+          />
+        ))}
     </div>
   );
 };
+
+// Dummy guardrail data
+const dummyGuardRails: GuardRail[] = [
+  {
+    id: "1",
+    name: "PII Detection",
+    type: "pii",
+    category: ["harm", "compliance", "privacy"],
+    description: "Detects and masks personal identifiable information including SSN, credit cards, emails, phone numbers",
+    provider: "Bud Sentinel",
+    deployments: 12,
+    status: "active"
+  },
+  {
+    id: "2",
+    name: "Jailbreak Protection",
+    type: "jailbreak",
+    category: ["jailbreak", "security"],
+    description: "Prevents prompt injection and jailbreak attempts to bypass model safety guidelines",
+    provider: "Bud Sentinel",
+    deployments: 8,
+    status: "active"
+  },
+  {
+    id: "3",
+    name: "Toxicity Filter",
+    type: "toxicity",
+    category: ["toxic", "harm", "content"],
+    description: "Filters out toxic, harmful, and inappropriate content from model responses",
+    provider: "Bud Sentinel",
+    deployments: 15,
+    status: "active"
+  },
+  {
+    id: "4",
+    name: "Bias Detection",
+    type: "bias",
+    category: ["bias", "fairness"],
+    description: "Identifies and mitigates bias in AI model outputs including gender, racial, and age bias",
+    provider: "Bud Sentinel",
+    deployments: 5,
+    status: "pending"
+  },
+  {
+    id: "5",
+    name: "Profanity Blocker",
+    type: "profanity",
+    category: ["content", "harm"],
+    description: "Blocks profane language and offensive terms in both input and output",
+    provider: "Azure AI",
+    deployments: 20,
+    status: "active"
+  },
+  {
+    id: "6",
+    name: "RegEx Pattern Matcher",
+    type: "regex",
+    category: ["custom", "pattern"],
+    description: "Custom regex patterns for detecting specific text patterns or formats",
+    provider: "Custom",
+    deployments: 3,
+    status: "active"
+  },
+  {
+    id: "7",
+    name: "Semantic Similarity",
+    type: "semantic",
+    category: ["custom", "similarity"],
+    description: "Checks semantic similarity between prompts and predefined patterns",
+    provider: "Custom",
+    deployments: 0,
+    status: "inactive"
+  },
+  {
+    id: "8",
+    name: "Medical Info Filter",
+    type: "pii",
+    category: ["harm", "compliance", "healthcare"],
+    description: "Specialized filter for medical and health-related personal information",
+    provider: "Bud Sentinel",
+    deployments: 7,
+    status: "active"
+  },
+  {
+    id: "9",
+    name: "Financial Data Protection",
+    type: "pii",
+    category: ["compliance", "finance"],
+    description: "Protects financial data including account numbers, routing numbers, and transaction details",
+    provider: "AWS Bedrock",
+    deployments: 10,
+    status: "active"
+  }
+];
 
 export default function GuardRails() {
   const [isMounted, setIsMounted] = useState(false);
@@ -278,48 +372,53 @@ export default function GuardRails() {
   const { openDrawer, openDrawerWithStep } = useDrawer();
   const { reset } = useDeployModel();
 
+  // State for guardrails
+  const [guardRails, setGuardRails] = useState<GuardRail[]>(dummyGuardRails);
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+
   // for pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [tempFilter, setTempFilter] = useState<any>({});
-  const [filter, setFilter] = useState<{
-    name?: string;
-    modality?: string[];
-    model_size_min?: number;
-    model_size_max?: number;
-    table_source?: string[];
-  }>(defaultFilter);
+  const [tempFilter, setTempFilter] = useState<GuardRailFilters>({});
+  const [filter, setFilter] = useState<GuardRailFilters>(defaultFilter);
   const [filterOpen, setFilterOpen] = React.useState(false);
-
-  const [modalityFilters, setModalityFilters] = useState(cloudProviders);
   const [filterReset, setFilterReset] = useState(false);
 
   const load = useCallback(
-    async (filter) => {
+    async (filter: GuardRailFilters) => {
       if (hasPermission(PermissionEnum.ModelView)) {
-        showLoader();
-        await getGlobalModels({
-          page: currentPage,
-          limit: pageSize,
-          name: filter.name,
-          tag: filter.name,
-          // description: filter.name,
-          modality: filter.modality?.length > 0 ? filter.modality : undefined,
-          tasks: filter.tasks?.length > 0 ? filter.tasks : undefined,
-          author: filter.author?.length > 0 ? filter.author : undefined,
-          model_size_min: isFinite(filter.model_size_min)
-            ? filter.model_size_min
-            : undefined,
-          model_size_max: isFinite(filter.model_size_max)
-            ? filter.model_size_max
-            : undefined,
-          // table_source: filter.table_source,
-          table_source: "model",
-        });
-        hideLoader();
+        // For now, just filter the local dummy data
+        // In real implementation, this would call an API
+        let filteredGuardRails = [...dummyGuardRails];
+
+        if (filter.name) {
+          filteredGuardRails = filteredGuardRails.filter(gr =>
+            gr.name.toLowerCase().includes(filter.name!.toLowerCase())
+          );
+        }
+
+        if (filter.provider?.length > 0) {
+          filteredGuardRails = filteredGuardRails.filter(gr =>
+            filter.provider!.includes(gr.provider?.toLowerCase().replace(/\s+/g, '-') || '')
+          );
+        }
+
+        if (filter.guardRailType?.length > 0) {
+          filteredGuardRails = filteredGuardRails.filter(gr =>
+            filter.guardRailType!.includes(gr.type)
+          );
+        }
+
+        if (filter.status?.length > 0) {
+          filteredGuardRails = filteredGuardRails.filter(gr =>
+            filter.status!.includes(gr.status || '')
+          );
+        }
+
+        setGuardRails(filteredGuardRails);
       }
     },
-    [currentPage, pageSize, getGlobalModels]
+    [hasPermission]
   );
 
   const handleOpenChange = (open) => {
@@ -337,22 +436,18 @@ export default function GuardRails() {
 
   const resetFilter = () => {
     // setFilter(defaultFilter);
-    setTempFilter({ defaultFilter });
+    setTempFilter(defaultFilter);
     setCurrentPage(1);
     // setFilterOpen(false);
     // load(defaultFilter);
     setFilterReset(true);
   };
 
-  const removeSelectedTag = (key, item) => {
-    if (key === "author") {
-      setTempFilter({ ...tempFilter, author: "" });
-    } else if (key === "model_size_max" || key === "model_size_min") {
-      setTempFilter({ ...tempFilter, model_size_max: "", model_size_min: "" });
-    } else {
-      const filteredItems = tempFilter[key].filter(
-        (element) => element != item
-      );
+  const removeSelectedTag = (key: string, item: string) => {
+    if (key === "provider" || key === "guardRailType" || key === "modality" || key === "status") {
+      const filteredItems = tempFilter[key]?.filter(
+        (element) => element !== item
+      ) || [];
       setTempFilter({ ...tempFilter, [key]: filteredItems });
     }
     setFilterReset(true);
@@ -437,25 +532,24 @@ export default function GuardRails() {
                       onOpenChange={handleOpenChange}
                       placement="bottomRight"
                       content={
-                        <div className="bg-[#111113] shadow-none  border border-[#1F1F1F] rounded-[6px] width-348">
+                        <div className="bg-[#111113] shadow-none border border-[#1F1F1F] rounded-[6px] width-348">
                           <div className="p-[1.5rem] flex items-start justify-start flex-col">
                             <div className="text-[#FFFFFF] text-[0.875rem] font-400">
                               Filter
                             </div>
                             <div className="text-[0.75rem] font-400 text-[#757575]">
-                              Apply the following filters to find model of your
-                              choice.
+                              Apply the following filters to find guardrails of your choice.
                             </div>
                           </div>
                           <div className="height-1 bg-[#1F1F1F] mb-[1.5rem] w-full"></div>
                           <div className="w-full flex flex-col gap-size-20 px-[1.5rem] pb-[1.5rem]">
-                            <div
-                              className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]`}
-                            >
+
+                            {/* Provider Filter */}
+                            <div className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]`}>
                               <div className="w-full">
                                 <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap">
-                                  Author
-                                  <CustomPopover title="This is the author">
+                                  Provider
+                                  <CustomPopover title="Filter by guardrail provider">
                                     <Image
                                       src="/images/info.png"
                                       preview={false}
@@ -478,111 +572,44 @@ export default function GuardRails() {
                                   }}
                                 >
                                   <Select
-                                    variant="borderless"
-                                    placeholder="Select Author"
+                                    placeholder="Select Provider"
                                     style={{
                                       backgroundColor: "transparent",
                                       color: "#EEEEEE",
                                       border: "0.5px solid #757575",
                                       width: "100%",
                                     }}
-                                    value={tempFilter.author}
+                                    value={tempFilter.provider}
                                     size="large"
-                                    className="drawerInp !bg-[transparent] text-[#EEEEEE] py-[.6rem] font-[300]  text-[.75rem] shadow-none w-full indent-[.4rem] border-0 outline-0 hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] h-[2.59338rem] outline-none"
-                                    options={authors?.map((author) => ({
-                                      label: author,
-                                      value: author,
-                                    }))}
-                                    onChange={(value) => {
-                                      setTempFilter({
-                                        ...tempFilter,
-                                        author: value,
-                                      });
-                                    }}
-                                    tagRender={(props) => {
-                                      const { label } = props;
-                                      return (
-                                        <Tags name={label} color="#D1B854"></Tags>
-                                      );
-                                    }}
-                                  />
-                                </ConfigProvider>
-                              </div>
-                            </div>
-                            <div
-                              className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]`}
-                            >
-                              <div className="w-full">
-                                <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap">
-                                  Task
-                                  <CustomPopover title="This is the task">
-                                    <Image
-                                      src="/images/info.png"
-                                      preview={false}
-                                      alt="info"
-                                      style={{
-                                        width: ".75rem",
-                                        height: ".75rem",
-                                      }}
-                                    />
-                                  </CustomPopover>
-                                </Text_12_300_EEEEEE>
-                              </div>
-                              <div className="custom-select-two w-full rounded-[6px] relative">
-                                <ConfigProvider
-                                  theme={{
-                                    token: {
-                                      colorTextPlaceholder: "#808080",
-                                      boxShadowSecondary: "none",
-                                    },
-                                  }}
-                                >
-                                  <Select
-                                    placeholder="Select Task"
-                                    style={{
-                                      backgroundColor: "transparent",
-                                      color: "#EEEEEE",
-                                      border: "0.5px solid #757575",
-                                      width: "100%",
-                                    }}
-                                    value={tempFilter.tasks}
-                                    size="large"
-                                    className="drawerInp !bg-[transparent] text-[#EEEEEE] py-[.6rem] font-[300]  text-[.75rem] shadow-none w-full indent-[.4rem] border-0 outline-0 hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] h-[2.59338rem] outline-none"
-                                    options={tasks?.map((task) => ({
-                                      label: task.name,
-                                      value: task.name,
-                                    }))}
                                     mode="multiple"
+                                    className="drawerInp !bg-[transparent] text-[#EEEEEE] py-[.6rem] font-[300] text-[.75rem] shadow-none w-full indent-[.4rem] border-0 outline-0 hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] h-[2.59338rem] outline-none"
+                                    options={providerTypes}
                                     onChange={(value) => {
                                       setTempFilter({
                                         ...tempFilter,
-                                        tasks: value,
+                                        provider: value,
                                       });
                                     }}
                                     tagRender={(props) => {
                                       const { label } = props;
                                       return (
-                                        <Tags
-                                          name={label}
-                                          color="#D1B854"
-                                          classNames="text-center	justify-center items-center"
-                                        ></Tags>
+                                        <Tags name={label} color="#965CDE"></Tags>
                                       );
                                     }}
                                   />
                                 </ConfigProvider>
                               </div>
                             </div>
-                            <div
-                              className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]`}
-                            >
+
+                            {/* GuardRail Type Filter */}
+                            <div className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]`}>
                               <div className="w-full">
-                                <Text_12_300_EEEEEE className="absolute px-1.4 tracking-[.035rem] flex items-center gap-1 text-nowrap">
-                                  Model Size
-                                  <CustomPopover title="The maximum input length you want the model can process.">
+                                <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap">
+                                  GuardRail Type
+                                  <CustomPopover title="Filter by guardrail functionality">
                                     <Image
-                                      preview={false}
                                       src="/images/info.png"
+                                      preview={false}
                                       alt="info"
                                       style={{
                                         width: ".75rem",
@@ -591,56 +618,52 @@ export default function GuardRails() {
                                     />
                                   </CustomPopover>
                                 </Text_12_300_EEEEEE>
-                                <div className="flex items-center justify-center">
-                                  <div className="text-[#757575] text-[.75rem] h-[4px] mr-1  leading-8">
-                                    1
-                                  </div>
-                                  <Slider
-                                    className="budSlider mt-[3.2rem] w-full"
-                                    min={1}
-                                    max={500}
-                                    step={1}
-                                    range
-                                    value={[
-                                      tempFilter.model_size_min || 1,
-                                      tempFilter.model_size_max || 500,
-                                    ]}
+                              </div>
+                              <div className="custom-select-two w-full rounded-[6px] relative">
+                                <ConfigProvider
+                                  theme={{
+                                    token: {
+                                      colorTextPlaceholder: "#808080",
+                                      boxShadowSecondary: "none",
+                                    },
+                                  }}
+                                >
+                                  <Select
+                                    placeholder="Select GuardRail Type"
+                                    style={{
+                                      backgroundColor: "transparent",
+                                      color: "#EEEEEE",
+                                      border: "0.5px solid #757575",
+                                      width: "100%",
+                                    }}
+                                    value={tempFilter.guardRailType}
+                                    size="large"
+                                    mode="multiple"
+                                    className="drawerInp !bg-[transparent] text-[#EEEEEE] py-[.6rem] font-[300] text-[.75rem] shadow-none w-full indent-[.4rem] border-0 outline-0 hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] h-[2.59338rem] outline-none"
+                                    options={guardRailTypes}
                                     onChange={(value) => {
                                       setTempFilter({
                                         ...tempFilter,
-                                        model_size_min: value[0],
-                                        model_size_max: value[1],
+                                        guardRailType: value,
                                       });
                                     }}
-                                    tooltip={{
-                                      open: true,
-                                      getPopupContainer: (trigger) =>
-                                        (trigger.parentNode as HTMLElement) ||
-                                        document.body, // Cast parentNode to HTMLElement
-                                    }}
-                                    styles={{
-                                      track: {
-                                        backgroundColor: "#965CDE",
-                                      },
-                                      rail: {
-                                        backgroundColor: "#212225",
-                                        height: 4,
-                                      },
+                                    tagRender={(props) => {
+                                      const { label } = props;
+                                      return (
+                                        <Tags name={label} color="#965CDE"></Tags>
+                                      );
                                     }}
                                   />
-                                  <div className="text-[#757575] text-[.75rem] h-[4px] ml-1 leading-8">
-                                    500
-                                  </div>
-                                </div>
+                                </ConfigProvider>
                               </div>
                             </div>
-                            <div
-                              className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]`}
-                            >
+
+                            {/* Modality Filter */}
+                            <div className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]`}>
                               <div className="w-full">
                                 <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1">
                                   Modality
-                                  <CustomPopover title="This is the modality">
+                                  <CustomPopover title="Filter by supported data types">
                                     <Image
                                       src="/images/info.png"
                                       preview={false}
@@ -672,23 +695,80 @@ export default function GuardRails() {
                                     value={tempFilter.modality}
                                     maxTagCount={2}
                                     size="large"
-                                    className="drawerInp !bg-[transparent] text-[#EEEEEE] py-[.15rem] font-[300]  text-[.75rem] shadow-none w-full indent-[.4rem] border-0 outline-0 hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] h-[2.59338rem] outline-none"
-                                    options={modalityFilters.map((modality) => ({
-                                      label: modality.label,
-                                      value: modality.modality,
-                                    }))}
-                                    tagRender={(props) => {
-                                      const { label } = props;
-                                      return (
-                                        <Tags name={label} color="#D1B854"></Tags>
-                                      );
-                                    }}
                                     mode="multiple"
+                                    className="drawerInp !bg-[transparent] text-[#EEEEEE] py-[.15rem] font-[300] text-[.75rem] shadow-none w-full indent-[.4rem] border-0 outline-0 hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] h-[2.59338rem] outline-none"
+                                    options={modalityTypes}
                                     onChange={(value) => {
                                       setTempFilter({
                                         ...tempFilter,
                                         modality: value,
                                       });
+                                    }}
+                                    tagRender={(props) => {
+                                      const { label } = props;
+                                      return (
+                                        <Tags name={label} color="#965CDE"></Tags>
+                                      );
+                                    }}
+                                  />
+                                </ConfigProvider>
+                              </div>
+                            </div>
+
+                            {/* Status Filter */}
+                            <div className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]`}>
+                              <div className="w-full">
+                                <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1">
+                                  Status
+                                  <CustomPopover title="Filter by guardrail status">
+                                    <Image
+                                      src="/images/info.png"
+                                      preview={false}
+                                      alt="info"
+                                      style={{
+                                        width: ".75rem",
+                                        height: ".75rem",
+                                      }}
+                                    />
+                                  </CustomPopover>
+                                </Text_12_300_EEEEEE>
+                              </div>
+                              <div className="custom-select-two w-full rounded-[6px] relative">
+                                <ConfigProvider
+                                  theme={{
+                                    token: {
+                                      colorTextPlaceholder: "#808080",
+                                    },
+                                  }}
+                                >
+                                  <Select
+                                    placeholder="Select Status"
+                                    style={{
+                                      backgroundColor: "transparent",
+                                      color: "#EEEEEE",
+                                      border: "0.5px solid #757575",
+                                      width: "100%",
+                                    }}
+                                    value={tempFilter.status}
+                                    size="large"
+                                    mode="multiple"
+                                    className="drawerInp !bg-[transparent] text-[#EEEEEE] py-[.15rem] font-[300] text-[.75rem] shadow-none w-full indent-[.4rem] border-0 outline-0 hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] h-[2.59338rem] outline-none"
+                                    options={[
+                                      { label: "Active", value: "active" },
+                                      { label: "Inactive", value: "inactive" },
+                                      { label: "Pending", value: "pending" },
+                                    ]}
+                                    onChange={(value) => {
+                                      setTempFilter({
+                                        ...tempFilter,
+                                        status: value,
+                                      });
+                                    }}
+                                    tagRender={(props) => {
+                                      const { label } = props;
+                                      return (
+                                        <Tags name={label} color="#965CDE"></Tags>
+                                      );
                                     }}
                                   />
                                 </ConfigProvider>
@@ -736,54 +816,108 @@ export default function GuardRails() {
         {hasPermission(PermissionEnum.ModelView) ? (
           <>
             <div
-              className="boardMainContainer  listingContainer scroll-smooth pt-[2.95rem] relative"
-              id="model-repo"
-              onScroll={handleScroll}
+              className="boardMainContainer listingContainer scroll-smooth pt-[1rem] relative"
+              id="guardrails-container"
             >
-              <SelectedFilters
-                filters={tempFilter}
-                removeTag={(key, item) => {
-                  removeSelectedTag(key, item);
-                }}
-              />
-              {models?.length > 0 ? (
-                <div className="grid gap-[1.1rem] grid-cols-3  1680px:mt-[1.75rem] pb-[1.1rem]">
-                  <>
-                    {models.map((item, index) => (
-                      <ModelCard key={index} {...item} />
+              {/* Category Filter Tags */}
+              <div className="flex items-center gap-[0.75rem] mb-[2rem] px-[1.5rem]">
+                <Tag
+                  className={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
+                    selectedCategory === "all"
+                      ? "bg-[#965CDE] text-white border-[#965CDE]"
+                      : "bg-transparent text-[#B3B3B3] border-[#757575] hover:border-[#965CDE] hover:text-[#965CDE]"
+                  }`}
+                  onClick={() => setSelectedCategory("all")}
+                >
+                  All
+                </Tag>
+                <Tag
+                  className={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
+                    selectedCategory === "harm"
+                      ? "bg-[#965CDE] text-white border-[#965CDE]"
+                      : "bg-transparent text-[#B3B3B3] border-[#757575] hover:border-[#965CDE] hover:text-[#965CDE]"
+                  }`}
+                  onClick={() => setSelectedCategory("harm")}
+                >
+                  Harm
+                </Tag>
+                <Tag
+                  className={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
+                    selectedCategory === "jailbreak"
+                      ? "bg-[#965CDE] text-white border-[#965CDE]"
+                      : "bg-transparent text-[#B3B3B3] border-[#757575] hover:border-[#965CDE] hover:text-[#965CDE]"
+                  }`}
+                  onClick={() => setSelectedCategory("jailbreak")}
+                >
+                  Jailbreak
+                </Tag>
+                <Tag
+                  className={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
+                    selectedCategory === "toxic"
+                      ? "bg-[#965CDE] text-white border-[#965CDE]"
+                      : "bg-transparent text-[#B3B3B3] border-[#757575] hover:border-[#965CDE] hover:text-[#965CDE]"
+                  }`}
+                  onClick={() => setSelectedCategory("toxic")}
+                >
+                  Toxic
+                </Tag>
+                <Tag
+                  className={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
+                    selectedCategory === "bias"
+                      ? "bg-[#965CDE] text-white border-[#965CDE]"
+                      : "bg-transparent text-[#B3B3B3] border-[#757575] hover:border-[#965CDE] hover:text-[#965CDE]"
+                  }`}
+                  onClick={() => setSelectedCategory("bias")}
+                >
+                  Bias
+                </Tag>
+                <Tag
+                  className={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
+                    selectedCategory === "compliance"
+                      ? "bg-[#965CDE] text-white border-[#965CDE]"
+                      : "bg-transparent text-[#B3B3B3] border-[#757575] hover:border-[#965CDE] hover:text-[#965CDE]"
+                  }`}
+                  onClick={() => setSelectedCategory("compliance")}
+                >
+                  Compliance
+                </Tag>
+                <Tag
+                  className={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
+                    selectedCategory === "custom"
+                      ? "bg-[#965CDE] text-white border-[#965CDE]"
+                      : "bg-transparent text-[#B3B3B3] border-[#757575] hover:border-[#965CDE] hover:text-[#965CDE]"
+                  }`}
+                  onClick={() => setSelectedCategory("custom")}
+                >
+                  Custom
+                </Tag>
+              </div>
+
+              {/* GuardRails Grid */}
+              {(() => {
+                const filteredGuardRails = selectedCategory === "all"
+                  ? guardRails
+                  : guardRails.filter(gr => gr.category.includes(selectedCategory));
+
+                return filteredGuardRails.length > 0 ? (
+                  <div className="grid gap-[1.5rem] grid-cols-3 pb-[1.5rem] px-[1.5rem]">
+                    {filteredGuardRails.map((item, index) => (
+                      <GuardRailCard key={item.id} item={item} index={index} />
                     ))}
-                  </>
-                </div>
-              ) : (
-                <div>
-                  <>
-                    {Object.keys(filter).filter(
-                      (key) =>
-                        filter[key] !== undefined && filter[key] !== "" && key !== "table_source"
-                    ).length > 0 ? (
-                      <NoDataFount
-                        classNames="h-[60vh]"
-                        textMessage={`No models found for the ${filter.name
-                          ? `search term "${filter.name}"`
-                          : "selected filters"
-                          }`}
-                      />
-                    ) : (
-                      <NoDataFount
-                        classNames="h-[60vh]"
-                        textMessage="Let’s start adding models to Bud Inference engine.
-                        Currently there are no models in the model repository."
-                      />
-                    )}
-                  </>
-                </div>
-              )}
+                  </div>
+                ) : (
+                  <NoDataFount
+                    classNames="h-[50vh]"
+                    textMessage={`No guardrails found for the "${selectedCategory}" category`}
+                  />
+                );
+              })()}
             </div>
           </>
         ) : (
           !loadingUser && (
             <>
-              <NoAccess textMessage="You do not have access to view models, please ask admin to give you access to either view or edit for models." />
+              <NoAccess textMessage="You do not have access to view guardrails, please ask admin to give you access to either view or edit for guardrails." />
             </>
           )
         )}

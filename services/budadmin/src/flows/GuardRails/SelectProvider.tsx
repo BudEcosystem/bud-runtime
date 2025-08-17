@@ -62,7 +62,11 @@ export default function SelectProvider() {
     }
 
     // Navigate to the appropriate next step based on provider
-    if (selectedProvider === "azure-ai-foundry") {
+    if (selectedProvider === "bud-sentinel") {
+      openDrawerWithStep("bud-sentinel-probes");
+    } else if (selectedProvider === "custom-probe") {
+      openDrawerWithStep("select-probe-type");
+    } else if (selectedProvider === "azure-ai-foundry") {
       openDrawerWithStep("politeness-detection");
     } else {
       // For other providers, we can add different flows later
@@ -81,7 +85,7 @@ export default function SelectProvider() {
       nextText="Next"
       showBack={false}
     >
-      <BudWraperBox>
+      <BudWraperBox >
         <BudDrawerLayout>
           <DrawerTitleCard
             title="Select your Provider"

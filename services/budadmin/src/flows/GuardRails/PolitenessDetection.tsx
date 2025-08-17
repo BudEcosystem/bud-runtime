@@ -40,7 +40,7 @@ export default function PolitenessDetection() {
       nextText="Create"
       disableNext={!config.name}
     >
-      <BudWraperBox>
+      <BudWraperBox >
         <BudDrawerLayout>
           <DrawerTitleCard
             title="Politeness Detection"

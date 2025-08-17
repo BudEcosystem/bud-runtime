@@ -116,6 +116,21 @@ import Publish from "./Project/Publish";
 import ViewEvalDetailscopy from "./Evaluations/RunEvaluation/ViewEvalDetail";
 import SelectProvider from "./GuardRails/SelectProvider";
 import PolitenessDetection from "./GuardRails/PolitenessDetection";
+import SelectProbeType from "./GuardRails/SelectProbeType";
+import AddCustomGuardRail from "./GuardRails/AddCustomGuardRail";
+import UploadDataset from "./GuardRails/UploadDataset";
+import TrainingProbe from "./GuardRails/TrainingProbe";
+import GuardRailDetails from "./GuardRails/GuardRailDetails";
+import BudSentinelProbes from "./GuardRails/BudSentinelProbes";
+import PIIDetectionConfig from "./GuardRails/PIIDetectionConfig";
+import DeploymentTypes from "./GuardRails/DeploymentTypes";
+import SelectProject from "./GuardRails/SelectProject";
+import SelectDeployment from "./GuardRails/SelectDeployment";
+import ProbeSettings from "./GuardRails/ProbeSettings";
+import DeployingProbe from "./GuardRails/DeployingProbe";
+import ProbeDeploymentSuccess from "./GuardRails/ProbeDeploymentSuccess";
+import ProbeDetails from "./GuardRails/ProbeDetails";
+import ViewGuardRailDetails from "./GuardRails/ViewGuardRailDetails";
 
 export const StepComponents = {
   "new-project": NewProject,
@@ -249,6 +264,21 @@ export const StepComponents = {
   // GuardRails
   "select-provider": SelectProvider,
   "politeness-detection": PolitenessDetection,
+  "select-probe-type": SelectProbeType,
+  "add-custom-guardrail": AddCustomGuardRail,
+  "upload-dataset": UploadDataset,
+  "training-probe": TrainingProbe,
+  "guardrail-details": GuardRailDetails,
+  "bud-sentinel-probes": BudSentinelProbes,
+  "pii-detection-config": PIIDetectionConfig,
+  "deployment-types": DeploymentTypes,
+  "select-project": SelectProject,
+  "select-deployment": SelectDeployment,
+  "probe-settings": ProbeSettings,
+  "deploying-probe": DeployingProbe,
+  "probe-deployment-success": ProbeDeploymentSuccess,
+  "probe-details": ProbeDetails,
+  "view-guardrail-details": ViewGuardRailDetails,
 
 };
 
