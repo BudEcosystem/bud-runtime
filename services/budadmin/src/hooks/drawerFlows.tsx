@@ -3636,6 +3636,346 @@ const viewEvalDetails: DrawerFlowType = {
   ],
 };
 
+const viewProbeDetails: DrawerFlowType = {
+  title: "Probe Details",
+  description: "View Probe Details",
+  totalSteps: 1,
+  steps: [
+    {
+      navigation: () => ["Guardrails", "Probe Details"],
+      id: "probe-details",
+      step: 1,
+      component: StepComponents["probe-details"],
+      progress: [
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Probe Details",
+        },
+      ],
+      confirmClose: false,
+    },
+  ],
+};
+
+const viewGuardrailDetails: DrawerFlowType = {
+  title: "Guardrail Details",
+  description: "View guardrail details and deploy",
+  totalSteps: 1,
+  steps: [
+    {
+      navigation: () => ["Guardrails", "Guardrail Details"],
+      id: "view-guardrail-details",
+      step: 1,
+      component: StepComponents["view-guardrail-details"],
+      progress: [],
+      confirmClose: false,
+    },
+  ],
+};
+
+const addGuardrail: DrawerFlowType = {
+  title: "Add Guardrail",
+  description: "Configure guardrails for your models",
+  totalSteps: 15,
+  steps: [
+    {
+      navigation: () => ["Guardrails", "Select Provider"],
+      id: "select-provider",
+      step: 1,
+      component: StepComponents["select-provider"],
+      progress: [
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Select Provider",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Configure",
+        },
+      ],
+      confirmClose: true,
+    },
+    {
+      navigation: () => ["Guardrails", "Probes List"],
+      id: "bud-sentinel-probes",
+      step: 2,
+      component: StepComponents["bud-sentinel-probes"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Provider",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Select Probes",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Configure",
+        },
+      ],
+      confirmClose: true,
+    },
+    {
+      navigation: () => ["Guardrails", "PII Detection"],
+      id: "pii-detection-config",
+      step: 3,
+      component: StepComponents["pii-detection-config"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Probes",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Configure PII",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Details",
+        },
+      ],
+      confirmClose: true,
+    },
+    {
+      navigation: () => ["Guardrails", "Deployment Types"],
+      id: "deployment-types",
+      step: 4,
+      component: StepComponents["deployment-types"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Configure PII",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Deployment Type",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Details",
+        },
+      ],
+      confirmClose: true,
+    },
+    {
+      navigation: () => ["Guardrails", "Select Project"],
+      id: "select-project",
+      step: 5,
+      component: StepComponents["select-project"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Deployment Type",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Select Project",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Details",
+        },
+      ],
+      confirmClose: true,
+    },
+    {
+      navigation: () => ["Guardrails", "Select Deployment"],
+      id: "select-deployment",
+      step: 6,
+      component: StepComponents["select-deployment"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Project",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Select Deployment",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Details",
+        },
+      ],
+      confirmClose: true,
+    },
+    {
+      navigation: () => ["Guardrails", "Probe Settings"],
+      id: "probe-settings",
+      step: 7,
+      component: StepComponents["probe-settings"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Deployment",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Probe Settings",
+        },
+      ],
+      confirmClose: true,
+    },
+    {
+      navigation: () => ["Guardrails", "Deploying"],
+      id: "deploying-probe",
+      step: 8,
+      component: StepComponents["deploying-probe"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Probe Settings",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Deploying",
+        },
+      ],
+      confirmClose: false,
+    },
+    {
+      navigation: () => ["Guardrails", "Success"],
+      id: "probe-deployment-success",
+      step: 9,
+      component: StepComponents["probe-deployment-success"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Deploying",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Success",
+        },
+      ],
+      confirmClose: false,
+    },
+    {
+      navigation: () => ["Guardrails", "Configure"],
+      id: "politeness-detection",
+      step: 10,
+      component: StepComponents["politeness-detection"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Provider",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Configure",
+        },
+      ],
+      confirmClose: true,
+    },
+    {
+      navigation: () => ["Guardrails", "Select Probe Type"],
+      id: "select-probe-type",
+      step: 11,
+      component: StepComponents["select-probe-type"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Provider",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Select Type",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Configure",
+        },
+      ],
+      confirmClose: true,
+    },
+    {
+      navigation: () => ["Guardrails", "Custom GuardRail"],
+      id: "add-custom-guardrail",
+      step: 12,
+      component: StepComponents["add-custom-guardrail"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Type",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Configure Rules",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Details",
+        },
+      ],
+      confirmClose: true,
+    },
+    {
+      navigation: () => ["Guardrails", "Upload Dataset"],
+      id: "upload-dataset",
+      step: 13,
+      component: StepComponents["upload-dataset"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Type",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Upload Dataset",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Train",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Details",
+        },
+      ],
+      confirmClose: true,
+    },
+    {
+      navigation: () => ["Guardrails", "Training"],
+      id: "training-probe",
+      step: 14,
+      component: StepComponents["training-probe"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Upload Dataset",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Train",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Details",
+        },
+      ],
+      confirmClose: false,
+    },
+    {
+      navigation: () => ["Guardrails", "Details"],
+      id: "guardrail-details",
+      step: 15,
+      component: StepComponents["guardrail-details"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Configure",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Details",
+        },
+      ],
+      confirmClose: true,
+    },
+  ],
+};
+
 const flows = {
   "new-project": newProject,
   "deploy-model": deployModel,
@@ -3691,6 +4031,10 @@ const flows = {
   "new-experiment": newExperiment,
   "run-evaluation": runEvaluation,
   "eval-details": viewEvalDetails,
+  // guardrails
+  "add-guardrail": addGuardrail,
+  "probe-details": viewProbeDetails,
+  "view-guardrail-details": viewGuardrailDetails,
 };
 
 export const flowMapping: {
