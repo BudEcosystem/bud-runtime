@@ -3015,3 +3015,29 @@ class ExperimentWorkflowStepEnum(StrEnum):
     TRAITS_SELECTION = "traits_selection"
     PERFORMANCE_POINT = "performance_point"
     FINALIZE = "finalize"
+
+
+class GuardrailDeploymentTypeEnum(StrEnum):
+    """Guardrail deployment type enumeration."""
+
+    STANDALONE = "standalone"
+    ENDPOINT_MAPPED = "endpoint_mapped"
+
+
+class GuardrailDeploymentStatusEnum(StrEnum):
+    """Guardrail deployment status enumeration."""
+
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+    DEPLOYING = "deploying"
+    FAILED = "failed"
+    DELETED = "deleted"
+
+
+class GuardrailProviderEnum(StrEnum):
+    """Guardrail provider enumeration."""
+
+    BUD_SENTINEL = "bud_sentinel"
+    AZURE_AI_FOUNDRY = "azure_ai_foundry"
+    AWS_BEDROCK = "aws_bedrock"
+    CUSTOM = "custom"
