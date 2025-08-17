@@ -8,7 +8,6 @@
 
     ./modules/k3s.nix
     ./modules/scid.nix
-    ./modules/cd
     ./modules/wireguard.nix
     ./modules/docker.nix
   ];
