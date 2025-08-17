@@ -190,7 +190,29 @@
         "nixos-facter-modules": "nixos-facter-modules",
         "nixpkgs": "nixpkgs",
         "pre-commit-hooks": "pre-commit-hooks",
+        "scid": "scid",
         "sinan": "sinan"
+      }
+    },
+    "scid": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1755437663,
+        "narHash": "sha256-R3jDCmv7DGU5Cqaj6CijCxMHg4UHMeKf1wu4jeVaUC0=",
+        "owner": "sinanmohd",
+        "repo": "scid",
+        "rev": "93bb9b66dce39159c01cece2b604bfa8d65e16e5",
+        "type": "github"
+      },
+      "original": {
+        "owner": "sinanmohd",
+        "ref": "master",
+        "repo": "scid",
+        "type": "github"
       }
     },
     "sinan": {
