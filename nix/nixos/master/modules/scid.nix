@@ -6,10 +6,15 @@ in {
 
   services.scid = {
     enable = true;
-    environment.SOPS_AGE_KEY_FILE = sops_key_path;
+
+    environment = {
+      SOPS_AGE_KEY_FILE = sops_key_path;
+      KUBECONFIG = "/etc/rancher/k3s/k3s.yaml";
+      HOME = "/var/lib/scid";
+    };
     path = with pkgs; [
       kubernetes-helm
-      nixos-rebuild-ng
+      nixos-rebuild
       nix
     ];
 
