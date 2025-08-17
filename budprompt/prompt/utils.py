@@ -44,6 +44,7 @@ def contains_pydantic_model(output_type: Any) -> bool:
     - List of BaseModel: List[MyModel]
     - Union with BaseModel: Union[str, MyModel]
     - Nested combinations: List[Union[str, MyModel]]
+    - NativeOutput wrapper: NativeOutput(MyModel)
 
     Args:
         output_type: The type to check
@@ -51,6 +52,11 @@ def contains_pydantic_model(output_type: Any) -> bool:
     Returns:
         True if the type contains a Pydantic BaseModel, False otherwise
     """
+    # Handle NativeOutput wrapper (from pydantic-ai)
+    if hasattr(output_type, "outputs") and hasattr(output_type.outputs, "__mro__"):
+        # NativeOutput has an outputs attribute that contains the actual type
+        return contains_pydantic_model(output_type.outputs)
+
     # Direct BaseModel check
     if isinstance(output_type, type) and issubclass(output_type, BaseModel):
         return True

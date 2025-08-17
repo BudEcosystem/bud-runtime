@@ -45,6 +45,8 @@ from budprompt.shared.providers import BudServeProvider
 
 from .schema_builder import PydanticModelGenerator
 from .schemas import Message, ModelSettings
+from .streaming_executors import execute_streaming_validation
+from .streaming_validation import add_field_validator_to_model
 from .template_renderer import render_template
 from .utils import contains_pydantic_model, validate_input_data_type
 from .validation import add_validator_to_model_async
@@ -148,8 +150,28 @@ class SimplePromptExecutor:
 
             # Check if streaming is requested
             if stream:
-                # Return the stream generator
-                return self._run_agent_stream(agent, user_prompt, message_history, output_schema)
+                # Check if streaming validation is needed
+                if output_validation_prompt and output_schema and contains_pydantic_model(output_type):
+                    logger.debug(f"Using streaming validation for: {output_validation_prompt}")
+                    # Use streaming validation executor with the enhanced model
+                    # The model already has field validators added in _get_output_type
+                    return execute_streaming_validation(
+                        enhanced_model=output_type,  # Pass the already enhanced model
+                        pydantic_schema=output_schema,
+                        prompt=user_prompt or "",
+                        validation_prompt=output_validation_prompt,
+                        deployment_name=deployment_name,
+                        model_settings=model_settings.model_dump(exclude_none=True) if model_settings else None,
+                        llm_retry_limit=llm_retry_limit or 3,
+                        messages=message_history,
+                        system_prompt_role=system_prompt_role,
+                    )
+                else:
+                    # Regular streaming without validation
+                    logger.debug(
+                        f"Using regular streaming - validation_prompt={bool(output_validation_prompt)}, schema={bool(output_schema)}, contains_pydantic={contains_pydantic_model(output_type) if output_type else False}"
+                    )
+                    return self._run_agent_stream(agent, user_prompt, message_history, output_schema)
             else:
                 # Execute the agent with both history and current prompt
                 return await self._run_agent(agent, user_prompt, message_history, output_schema)
@@ -186,14 +208,20 @@ class SimplePromptExecutor:
         # Extract type from content field using Pydantic v2 field access
         output_type = output_model.__pydantic_fields__["content"].annotation
 
-        # Check if we should add validation (only for non-streaming Pydantic models)
-        if output_validation_prompt and not stream and contains_pydantic_model(output_type):
+        # Check if we should add validation for both streaming and non-streaming
+        if output_validation_prompt and contains_pydantic_model(output_type):
             logger.debug(f"Adding validation to output model: {output_validation_prompt}")
 
             # If output_type is a Pydantic model, enhance it with validation
             if isinstance(output_type, type) and issubclass(output_type, BaseModel):
-                output_type = await add_validator_to_model_async(output_type, output_validation_prompt)
-                logger.debug(f"Enhanced model with validation: {output_type.__name__}")
+                if stream:
+                    # For streaming, use field validators for early validation
+                    output_type = await add_field_validator_to_model(output_type, output_validation_prompt)
+                    logger.debug(f"Enhanced model with field validator for streaming: {output_type.__name__}")
+                else:
+                    # For non-streaming, use model validators
+                    output_type = await add_validator_to_model_async(output_type, output_validation_prompt)
+                    logger.debug(f"Enhanced model with model validator: {output_type.__name__}")
 
         # Return NativeOutput if type contains BaseModel, otherwise return raw type
         if contains_pydantic_model(output_type):
