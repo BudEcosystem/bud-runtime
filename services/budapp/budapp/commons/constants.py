@@ -848,6 +848,56 @@ class ModelStatusEnum(StrEnum):
     DELETED = auto()
 
 
+class PromptTypeEnum(StrEnum):
+    """Enumeration of prompt types.
+
+    Attributes:
+        SIMPLE_PROMPT: Represents a simple prompt type.
+    """
+
+    SIMPLE_PROMPT = auto()
+
+
+class PromptStatusEnum(StrEnum):
+    """Enumeration of prompt statuses.
+
+    Attributes:
+        ACTIVE: Represents an active prompt.
+        DELETED: Represents a deleted prompt.
+    """
+
+    ACTIVE = auto()
+    DELETED = auto()
+
+
+class PromptVersionStatusEnum(StrEnum):
+    """Enumeration of prompt version statuses.
+
+    Attributes:
+        ACTIVE: Represents an active prompt version.
+        DELETED: Represents a deleted prompt version.
+    """
+
+    ACTIVE = auto()
+    DELETED = auto()
+
+
+class RateLimitTypeEnum(StrEnum):
+    """Enumeration of rate limit types.
+
+    Attributes:
+        ENABLED: Rate limiting is enabled with default settings.
+        DISABLED: Rate limiting is disabled.
+        AUTO: Automatic rate limiting based on system load.
+        CUSTOM: Custom rate limiting with user-defined value.
+    """
+
+    ENABLED = auto()
+    DISABLED = auto()
+    AUTO = auto()
+    CUSTOM = auto()
+
+
 class CloudModelStatusEnum(StrEnum):
     """Enumeration of entity statuses in the system.
 
