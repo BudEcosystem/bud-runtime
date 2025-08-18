@@ -9,6 +9,7 @@ import { useApiRequest } from "@/hooks/useApiRequest";
 import { useEnvironment } from "@/components/providers/EnvironmentProvider";
 import { useUser } from "@/stores/useUser";
 import { successToast } from "@/components/toast";
+import { AppRequest } from "@/services/api/requests";
 
 interface DataInterface {
   email?: string;
@@ -22,6 +23,7 @@ export default function Login() {
   const [isBackToLogin, setIsBackToLogin] = useState(false);
 
   // Use the new environment system
+
   const environment = useEnvironment();
   const apiRequest = useApiRequest();
 
@@ -58,7 +60,7 @@ export default function Login() {
       console.log("Payload:", loginPayload);
 
       // Make the API call
-      const response = await apiRequest.Post("/auth/login", loginPayload);
+      const response = await AppRequest.Post("/auth/login", loginPayload);
       console.log("Login response:", response);
 
       if (response.data?.token) {
@@ -87,16 +89,11 @@ export default function Login() {
         });
 
         // Handle different login scenarios
-        // For now, always redirect to /models regardless of reset password flags
-        // Uncomment the condition below if you want to handle password reset
-        // if (response.data.is_reset_password || response.data.first_login) {
-        //   router.push("/auth/reset-password");
-        // } else {
-        //   router.push("/models");
-        // }
-
-        // Always go to models page after successful login
-        router.push("/models");
+        if (response.data.is_reset_password || response.data.first_login) {
+          router.push("/auth/resetPassword");
+        } else {
+          router.push("/models");
+        }
       } else if (response.data) {
         // Handle case where login is successful but no token (shouldn't happen normally)
         setAuthError("");
