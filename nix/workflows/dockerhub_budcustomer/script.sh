@@ -8,7 +8,7 @@ note() {
 }
 
 secret_get() {
-	sops decrypt --extract "[\"app.docker.com\"][\"$1\"]" "$repo_root/nix/workflows/secrets.yaml"
+	sops decrypt --extract "[\"app.docker.com\"][\"$1\"]" "$repo_root/nix/workflows/dockerhub_budcustomer/secrets.yaml"
 }
 
 image_push() {

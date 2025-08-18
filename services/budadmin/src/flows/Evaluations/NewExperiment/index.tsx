@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import DrawerCard from "@/components/ui/bud/card/DrawerCard";
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
@@ -10,26 +10,10 @@ import { successToast } from "@/components/toast";
 import { useDrawer } from "src/hooks/useDrawer";
 import { useEvaluations } from "src/hooks/useEvaluations";
 import { useProjects } from "src/hooks/useProjects";
-import { useModels } from "src/hooks/useModels";
 import TextInput from "src/flows/components/TextInput";
-import SelectInput from "src/flows/components/SelectInput";
 
 const NewExperimentForm = React.memo(function NewExperimentForm() {
   const [options] = useState([]);
-  const [modelOptions, setModelOptions] = useState([]);
-  const { fetchModels } = useModels();
-
-  useEffect(() => {
-    fetchModels({ page: 1, limit: 100 }).then((models) => {
-      if (models) {
-        const options = models.map((model) => ({
-          label: model.name,
-          value: model.id
-        }));
-        setModelOptions(options);
-      }
-    });
-  }, [fetchModels]);
 
   return (
     <DrawerCard>
@@ -57,15 +41,6 @@ const NewExperimentForm = React.memo(function NewExperimentForm() {
         ]}
         ClassNames="mt-[.4rem]"
         InputClasses="py-[.5rem]"
-      />
-      <SelectInput
-        name="model"
-        label="Model"
-        placeholder="Select a model (optional)"
-        options={modelOptions}
-        ClassNames="mt-[.4rem]"
-        SelectClasses="py-[.5rem]"
-        infoText="Select the model you want to use for this experiment"
       />
       <TagsInput
         label="Tags"
@@ -153,7 +128,7 @@ export default function NewExperimentDrawer() {
       const payload = {
         name: cleanedName,
         description: cleanedDescription,
-        project_id: selectedProject?.id || "92ba4cb7-6ab8-49be-b211-a69a1b78feb4",
+        // project_id: selectedProject?.id || "92ba4cb7-6ab8-49be-b211-a69a1b78feb4",
         tags: cleanedTags
       };
 
@@ -182,8 +157,7 @@ export default function NewExperimentDrawer() {
       data={{
         experimentName: "",
         tags: [],
-        description: "",
-        model: "",
+        description: ""
       }}
       onNext={handleSubmit}
       nextText="Create"

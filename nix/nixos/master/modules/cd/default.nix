@@ -1,6 +1,0 @@
-{
-  imports = [
-    ./helm
-    ./nixos.nix
-  ];
-}

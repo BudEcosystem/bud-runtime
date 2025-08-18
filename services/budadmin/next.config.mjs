@@ -143,6 +143,10 @@ export default {
         source: '/evaluations/:evaluationId',
         destination: '/home/evaluations/evalDetailed',
       },
+      {
+        source: '/guardrails',
+        destination: '/home/guardrails',
+      },
     ];
   },
   env: {
