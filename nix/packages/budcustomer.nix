@@ -9,6 +9,10 @@ buildNpmPackage {
   src = ../../services/budCustomer;
   npmDepsHash = builtins.readFile ../../services/budCustomer/nix.hash;
 
+  postPatch = ''
+    cp .env.hack .env
+  '';
+
   installPhase = ''
     mkdir -p $out/share
 
