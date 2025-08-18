@@ -20,9 +20,9 @@ import pytest
 from uuid import uuid4
 
 from budapp.commons.constants import BlockingRuleType, BlockingRuleStatus
-from budapp.gateway_analytics_ops.crud import BlockingRuleDataManager
-from budapp.gateway_analytics_ops.schemas import BlockingRuleCreate, BlockingRuleUpdate
-from budapp.gateway_analytics_ops.services import BlockingRulesService
+from budapp.metric_ops.crud import BlockingRuleDataManager
+from budapp.metric_ops.schemas import BlockingRuleCreate, BlockingRuleUpdate
+from budapp.metric_ops.services import BlockingRulesService
 
 
 @pytest.mark.asyncio
