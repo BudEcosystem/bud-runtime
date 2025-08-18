@@ -1,11 +1,40 @@
 import ipaddress
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Literal, Optional, Union
 from uuid import UUID
 
 from budmicroframe.commons.schemas import CloudEventBase, ResponseBase
 from fastapi.responses import ORJSONResponse
 from pydantic import BaseModel, field_validator, model_validator
+
+
+def validate_date_range(from_date: Optional[datetime], to_date: Optional[datetime], max_days: int = 90) -> None:
+    """Validate date range constraints.
+    
+    Args:
+        from_date: Start date
+        to_date: End date  
+        max_days: Maximum allowed days between dates (default 90)
+        
+    Raises:
+        ValueError: If date range is invalid
+    """
+    if to_date is None:
+        return
+        
+    if from_date and to_date < from_date:
+        raise ValueError("to_date must be after from_date")
+    
+    # Validate date range is not too large
+    if from_date:
+        date_diff = to_date - from_date
+        if date_diff.days > max_days:
+            raise ValueError(f"Date range cannot exceed {max_days} days")
+    
+    # Validate dates are not too far in the future
+    now = datetime.now(to_date.tzinfo) if to_date.tzinfo else datetime.now()
+    if to_date > now + timedelta(days=1):  # Allow 1 day in future for timezone differences
+        raise ValueError("to_date cannot be more than 1 day in the future")
 
 
 MetricType = Literal[
@@ -87,12 +116,8 @@ class ObservabilityMetricsRequest(BaseModel):
     @field_validator("to_date")
     @classmethod
     def validate_to_date(cls, v: Optional[datetime], info) -> Optional[datetime]:
-        """Validate that to_date is after from_date."""
-        if v is None:
-            return v
-        from_date = info.data.get("from_date")
-        if from_date and v < from_date:
-            raise ValueError("to_date must be after from_date")
+        """Validate that to_date is after from_date and within reasonable range."""
+        validate_date_range(info.data.get("from_date"), v)
         return v
 
     @field_validator("filters")
@@ -271,12 +296,8 @@ class InferenceListRequest(BaseModel):
     @field_validator("to_date")
     @classmethod
     def validate_to_date(cls, v: Optional[datetime], info) -> Optional[datetime]:
-        """Validate that to_date is after from_date."""
-        if v is None:
-            return v
-        from_date = info.data.get("from_date")
-        if from_date and v < from_date:
-            raise ValueError("to_date must be after from_date")
+        """Validate that to_date is after from_date and within reasonable range."""
+        validate_date_range(info.data.get("from_date"), v)
         return v
 
 
@@ -604,12 +625,8 @@ class GatewayAnalyticsRequest(BaseModel):
     @field_validator("to_date")
     @classmethod
     def validate_to_date(cls, v: Optional[datetime], info) -> Optional[datetime]:
-        """Validate that to_date is after from_date."""
-        if v is None:
-            return v
-        from_date = info.data.get("from_date")
-        if from_date and v < from_date:
-            raise ValueError("to_date must be after from_date")
+        """Validate that to_date is after from_date and within reasonable range."""
+        validate_date_range(info.data.get("from_date"), v)
         return v
 
     @field_validator("topk")
@@ -760,12 +777,8 @@ class AggregatedMetricsRequest(BaseModel):
     @field_validator("to_date")
     @classmethod
     def validate_to_date(cls, v: Optional[datetime], info) -> Optional[datetime]:
-        """Validate that to_date is after from_date."""
-        if v is None:
-            return v
-        from_date = info.data.get("from_date")
-        if from_date and v < from_date:
-            raise ValueError("to_date must be after from_date")
+        """Validate that to_date is after from_date and within reasonable range."""
+        validate_date_range(info.data.get("from_date"), v)
         return v
 
 
@@ -831,12 +844,8 @@ class TimeSeriesRequest(BaseModel):
     @field_validator("to_date")
     @classmethod
     def validate_to_date(cls, v: Optional[datetime], info) -> Optional[datetime]:
-        """Validate that to_date is after from_date."""
-        if v is None:
-            return v
-        from_date = info.data.get("from_date")
-        if from_date and v < from_date:
-            raise ValueError("to_date must be after from_date")
+        """Validate that to_date is after from_date and within reasonable range."""
+        validate_date_range(info.data.get("from_date"), v)
         return v
 
 
@@ -883,12 +892,8 @@ class GeographicDataRequest(BaseModel):
     @field_validator("to_date")
     @classmethod
     def validate_to_date(cls, v: Optional[datetime], info) -> Optional[datetime]:
-        """Validate that to_date is after from_date."""
-        if v is None:
-            return v
-        from_date = info.data.get("from_date")
-        if from_date and v < from_date:
-            raise ValueError("to_date must be after from_date")
+        """Validate that to_date is after from_date and within reasonable range."""
+        validate_date_range(info.data.get("from_date"), v)
         return v
 
     @field_validator("limit")
@@ -942,12 +947,8 @@ class LatencyDistributionRequest(BaseModel):
     @field_validator("to_date")
     @classmethod
     def validate_to_date(cls, v: Optional[datetime], info) -> Optional[datetime]:
-        """Validate that to_date is after from_date."""
-        if v is None:
-            return v
-        from_date = info.data.get("from_date")
-        if from_date and v < from_date:
-            raise ValueError("to_date must be after from_date")
+        """Validate that to_date is after from_date and within reasonable range."""
+        validate_date_range(info.data.get("from_date"), v)
         return v
 
     @field_validator("buckets")

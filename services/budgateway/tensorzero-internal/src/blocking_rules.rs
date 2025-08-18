@@ -13,6 +13,7 @@ use std::collections::HashSet;
 use std::net::IpAddr;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
@@ -151,6 +152,74 @@ pub struct RateLimitState {
     pub window_start: Instant,
 }
 
+/// Circuit breaker state for Redis operations
+struct CircuitBreaker {
+    /// Whether the circuit is currently open (failing)
+    is_open: AtomicBool,
+    /// Number of consecutive failures
+    failure_count: AtomicU64,
+    /// Timestamp of last failure (as seconds since epoch)
+    last_failure_time: AtomicU64,
+    /// Maximum consecutive failures before opening circuit
+    failure_threshold: u64,
+    /// How long to wait before trying again (in seconds)
+    recovery_timeout: u64,
+}
+
+impl CircuitBreaker {
+    fn new() -> Self {
+        Self {
+            is_open: AtomicBool::new(false),
+            failure_count: AtomicU64::new(0),
+            last_failure_time: AtomicU64::new(0),
+            failure_threshold: 5,  // Open after 5 consecutive failures
+            recovery_timeout: 60,  // Try again after 60 seconds
+        }
+    }
+
+    fn record_success(&self) {
+        self.failure_count.store(0, Ordering::Relaxed);
+        self.is_open.store(false, Ordering::Relaxed);
+    }
+
+    fn record_failure(&self) {
+        let failures = self.failure_count.fetch_add(1, Ordering::Relaxed) + 1;
+        if failures >= self.failure_threshold {
+            self.is_open.store(true, Ordering::Relaxed);
+            self.last_failure_time.store(
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs(),
+                Ordering::Relaxed
+            );
+            warn!("Circuit breaker opened after {} consecutive Redis failures", failures);
+        }
+    }
+
+    fn is_available(&self) -> bool {
+        if !self.is_open.load(Ordering::Relaxed) {
+            return true;
+        }
+
+        // Check if recovery timeout has passed
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        let last_failure = self.last_failure_time.load(Ordering::Relaxed);
+        
+        if now - last_failure > self.recovery_timeout {
+            // Try to close the circuit
+            self.is_open.store(false, Ordering::Relaxed);
+            info!("Circuit breaker closed, attempting Redis reconnection");
+            true
+        } else {
+            false
+        }
+    }
+}
+
 /// High-performance blocking rules manager with lock-free reads
 ///
 /// This manager provides:
@@ -158,6 +227,7 @@ pub struct RateLimitState {
 /// - Pre-compiled patterns for efficient matching
 /// - Real-time updates via Redis Pub/Sub
 /// - Sub-microsecond rule evaluation latency
+/// - Circuit breaker for Redis failure handling
 pub struct BlockingRulesManager {
     /// Global rules that apply to all requests
     global_rules: Arc<RwLock<Vec<Arc<CompiledRule>>>>,
@@ -172,6 +242,9 @@ pub struct BlockingRulesManager {
     /// ClickHouse client for event logging (not used in request path)
     clickhouse_client: Option<Arc<ClickHouseConnectionInfo>>,
 
+    /// Circuit breaker for Redis operations
+    redis_circuit_breaker: Arc<CircuitBreaker>,
+
     /// Metrics tracking
     rules_loaded_at: Arc<RwLock<Instant>>,
     total_rules_count: Arc<RwLock<usize>>,
@@ -185,6 +258,7 @@ impl BlockingRulesManager {
             rate_limits: Arc::new(DashMap::new()),
             redis_client,
             clickhouse_client: None,
+            redis_circuit_breaker: Arc::new(CircuitBreaker::new()),
             rules_loaded_at: Arc::new(RwLock::new(Instant::now())),
             total_rules_count: Arc::new(RwLock::new(0)),
         }
@@ -200,6 +274,7 @@ impl BlockingRulesManager {
             rate_limits: Arc::new(DashMap::new()),
             redis_client,
             clickhouse_client,
+            redis_circuit_breaker: Arc::new(CircuitBreaker::new()),
             rules_loaded_at: Arc::new(RwLock::new(Instant::now())),
             total_rules_count: Arc::new(RwLock::new(0)),
         }
@@ -339,15 +414,27 @@ impl BlockingRulesManager {
             return Ok(());
         };
 
+        // Check circuit breaker before attempting Redis operation
+        if !self.redis_circuit_breaker.is_available() {
+            debug!("Circuit breaker is open, skipping Redis rule loading");
+            return Ok(());  // Return Ok to avoid cascading failures
+        }
+
         let key = format!("blocking_rules:{}", key_suffix);
         debug!("Loading blocking rules from Redis key: {}", key);
 
-        // Get Redis connection
-        let mut conn = redis_client.get_connection().await.map_err(|e| {
-            Error::new(ErrorDetails::InternalError {
-                message: format!("Failed to get Redis connection: {}", e),
-            })
-        })?;
+        // Get Redis connection with error handling
+        let mut conn = match redis_client.get_connection().await {
+            Ok(conn) => {
+                self.redis_circuit_breaker.record_success();
+                conn
+            }
+            Err(e) => {
+                self.redis_circuit_breaker.record_failure();
+                warn!("Failed to get Redis connection for rule loading: {}", e);
+                return Ok(());  // Return Ok to avoid cascading failures
+            }
+        };
 
         // Fetch rules from Redis
         let rules_json: Option<String> = conn.get(&key).await.map_err(|e| {

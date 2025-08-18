@@ -2,12 +2,14 @@
 
 ## Overview
 
-The BudGateway uses MaxMind's GeoLite2 database to enrich API request data with geographic information. This guide covers obtaining, installing, configuring, and maintaining the GeoIP database for production use.
+The BudGateway uses MaxMind's GeoLite2 database to enrich API request data with geographic information (country, city, region, coordinates). This guide covers obtaining, installing, configuring, and maintaining the GeoIP database for production use.
 
 ## Prerequisites
 
-- MaxMind account (free or commercial)
+- MaxMind account (free for GeoLite2 or commercial for GeoIP2)
 - 200MB+ disk space for database files
+- Linux/macOS/Windows system with appropriate permissions
+- Internet connection for database downloads and updates
 - Read permissions for gateway service
 - Optional: Automated update mechanism
 
