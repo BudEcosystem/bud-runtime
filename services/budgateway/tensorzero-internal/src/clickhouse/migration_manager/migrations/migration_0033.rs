@@ -78,26 +78,38 @@ impl Migration for Migration0033<'_> {
             .run_query_synchronous(query.to_string(), None)
             .await?;
 
-        // Create indices for common query patterns
+        // Create indices for common query patterns with idempotent checks
         let indices = vec![
-            // Index for querying by rule and timestamp for statistics
-            r#"ALTER TABLE GatewayBlockingEvents ADD INDEX idx_rule_timestamp (rule_id, blocked_at) TYPE minmax GRANULARITY 1;"#,
-            // Index for client IP analysis
-            r#"ALTER TABLE GatewayBlockingEvents ADD INDEX idx_client_ip client_ip TYPE bloom_filter(0.01) GRANULARITY 8;"#,
-            // Index for country-based analysis
-            r#"ALTER TABLE GatewayBlockingEvents ADD INDEX idx_country_code country_code TYPE set(300) GRANULARITY 4;"#,
-            // Index for rule type analysis
-            r#"ALTER TABLE GatewayBlockingEvents ADD INDEX idx_rule_type rule_type TYPE set(10) GRANULARITY 4;"#,
-            // Index for project-based queries
-            r#"ALTER TABLE GatewayBlockingEvents ADD INDEX idx_project_timestamp (project_id, blocked_at) TYPE minmax GRANULARITY 1;"#,
-            // Index for endpoint-based queries
-            r#"ALTER TABLE GatewayBlockingEvents ADD INDEX idx_endpoint_timestamp (endpoint_id, blocked_at) TYPE minmax GRANULARITY 1;"#,
+            ("idx_rule_timestamp", r#"ALTER TABLE GatewayBlockingEvents ADD INDEX idx_rule_timestamp (rule_id, blocked_at) TYPE minmax GRANULARITY 1;"#),
+            ("idx_client_ip", r#"ALTER TABLE GatewayBlockingEvents ADD INDEX idx_client_ip client_ip TYPE bloom_filter(0.01) GRANULARITY 8;"#),
+            ("idx_country_code", r#"ALTER TABLE GatewayBlockingEvents ADD INDEX idx_country_code country_code TYPE set(300) GRANULARITY 4;"#),
+            ("idx_rule_type", r#"ALTER TABLE GatewayBlockingEvents ADD INDEX idx_rule_type rule_type TYPE set(10) GRANULARITY 4;"#),
+            ("idx_project_timestamp", r#"ALTER TABLE GatewayBlockingEvents ADD INDEX idx_project_timestamp (project_id, blocked_at) TYPE minmax GRANULARITY 1;"#),
+            ("idx_endpoint_timestamp", r#"ALTER TABLE GatewayBlockingEvents ADD INDEX idx_endpoint_timestamp (endpoint_id, blocked_at) TYPE minmax GRANULARITY 1;"#),
         ];
 
-        for index_query in indices {
-            self.clickhouse
-                .run_query_synchronous(index_query.to_string(), None)
+        for (index_name, index_query) in indices {
+            // Check if index already exists
+            let check_query = format!(
+                "SELECT count() FROM system.data_skipping_indices WHERE table = 'GatewayBlockingEvents' AND name = '{}' AND database = currentDatabase()",
+                index_name
+            );
+            let result = self.clickhouse
+                .run_query_synchronous(check_query, None)
                 .await?;
+
+            if result.trim() == "0" {
+                // Index doesn't exist, create it
+                if let Err(e) = self.clickhouse
+                    .run_query_synchronous(index_query.to_string(), None)
+                    .await
+                {
+                    // Handle the case where index was created concurrently
+                    if !e.to_string().contains("index with this name already exists") {
+                        return Err(e);
+                    }
+                }
+            }
         }
 
         Ok(())

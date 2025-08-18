@@ -116,26 +116,38 @@ impl Migration for Migration0032<'_> {
             .run_query_synchronous(query.to_string(), None)
             .await?;
 
-        // Create indices for common query patterns
+        // Create indices for common query patterns with idempotent checks
         let indices = vec![
-            // Index for querying by model
-            r#"ALTER TABLE GatewayAnalytics ADD INDEX idx_model_name model_name TYPE set(100) GRANULARITY 4;"#,
-            // Index for querying by country
-            r#"ALTER TABLE GatewayAnalytics ADD INDEX idx_country_code country_code TYPE set(300) GRANULARITY 4;"#,
-            // Index for querying by status code
-            r#"ALTER TABLE GatewayAnalytics ADD INDEX idx_status_code status_code TYPE set(20) GRANULARITY 4;"#,
-            // Index for blocked requests
-            r#"ALTER TABLE GatewayAnalytics ADD INDEX idx_is_blocked is_blocked TYPE minmax GRANULARITY 1;"#,
-            // Index for endpoint queries
-            r#"ALTER TABLE GatewayAnalytics ADD INDEX idx_endpoint_id endpoint_id TYPE bloom_filter(0.01) GRANULARITY 4;"#,
-            // Index for client IP analysis
-            r#"ALTER TABLE GatewayAnalytics ADD INDEX idx_client_ip client_ip TYPE bloom_filter(0.01) GRANULARITY 8;"#,
+            ("idx_model_name", r#"ALTER TABLE GatewayAnalytics ADD INDEX idx_model_name model_name TYPE set(100) GRANULARITY 4;"#),
+            ("idx_country_code", r#"ALTER TABLE GatewayAnalytics ADD INDEX idx_country_code country_code TYPE set(300) GRANULARITY 4;"#),
+            ("idx_status_code", r#"ALTER TABLE GatewayAnalytics ADD INDEX idx_status_code status_code TYPE set(20) GRANULARITY 4;"#),
+            ("idx_is_blocked", r#"ALTER TABLE GatewayAnalytics ADD INDEX idx_is_blocked is_blocked TYPE minmax GRANULARITY 1;"#),
+            ("idx_endpoint_id", r#"ALTER TABLE GatewayAnalytics ADD INDEX idx_endpoint_id endpoint_id TYPE bloom_filter(0.01) GRANULARITY 4;"#),
+            ("idx_client_ip", r#"ALTER TABLE GatewayAnalytics ADD INDEX idx_client_ip client_ip TYPE bloom_filter(0.01) GRANULARITY 8;"#),
         ];
 
-        for index_query in indices {
-            self.clickhouse
-                .run_query_synchronous(index_query.to_string(), None)
+        for (index_name, index_query) in indices {
+            // Check if index already exists
+            let check_query = format!(
+                "SELECT count() FROM system.data_skipping_indices WHERE table = 'GatewayAnalytics' AND name = '{}' AND database = currentDatabase()",
+                index_name
+            );
+            let result = self.clickhouse
+                .run_query_synchronous(check_query, None)
                 .await?;
+
+            if result.trim() == "0" {
+                // Index doesn't exist, create it
+                if let Err(e) = self.clickhouse
+                    .run_query_synchronous(index_query.to_string(), None)
+                    .await
+                {
+                    // Handle the case where index was created concurrently
+                    if !e.to_string().contains("index with this name already exists") {
+                        return Err(e);
+                    }
+                }
+            }
         }
 
         Ok(())
