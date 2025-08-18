@@ -208,7 +208,7 @@ const ObservabilityDetailPage: React.FC = () => {
   };
 
   if (loading) {
-    return <DashBoardLayout />;
+    return <DashBoardLayout><div>Loading...</div></DashBoardLayout>;
   }
 
   if (error || !inferenceData) {
@@ -349,7 +349,7 @@ const ObservabilityDetailPage: React.FC = () => {
           {inferenceData.gateway_metadata && (
             <div className="flex items-center flex-col border border-[#1F1F1F] rounded-[.4rem] px-[1.4rem] py-[1.3rem] pb-[1.1rem] w-full bg-[#101010] mb-[1.6rem]">
               <div className="w-full">
-                <Text_14_600_EEEEEE className="text-[#EEEEEE] mb-4">Gateway Metadata</Text_14_600_EEEEEE>
+                <Text_14_600_EEEEEE className="text-[#EEEEEE] mb-4">Request Metadata</Text_14_600_EEEEEE>
 
                 <div className="grid grid-cols-3 gap-4">
                   {/* Network Information */}

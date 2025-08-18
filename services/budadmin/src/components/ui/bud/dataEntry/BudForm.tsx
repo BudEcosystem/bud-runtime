@@ -74,12 +74,22 @@ export function BudForm(props: BudFormProps) {
   const { form, isExpandedView } = useContext(BudFormContext);
 
   useEffect(() => {
-    form.setFieldsValue(props.data);
+    // Only set form values if we have actual data (not empty object)
+    if (props.data && Object.keys(props.data).length > 0) {
+      form.setFieldsValue(props.data);
 
+      // Also set after a delay in case fields aren't rendered yet
+      setTimeout(() => {
+        form.setFieldsValue(props.data);
+      }, 100);
+    }
+  }, [props.data]);
+
+  useEffect(() => {
     return () => {
       form.resetFields();
     }
-  }, []);
+  }, [form]);
 
   useEffect(() => {
     if (cancelAlert) {

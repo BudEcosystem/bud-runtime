@@ -2595,3 +2595,278 @@ class ObservabilityMetricsService:
         # This is a simplified implementation - in production you'd want more sophisticated gap filling
         # For now, just return the groups as-is
         return groups
+
+    async def get_blocking_stats(self, from_date, to_date, project_id=None, rule_id=None):
+        """Get comprehensive blocking rule statistics from ClickHouse.
+
+        Args:
+            from_date: Start date for the query
+            to_date: End date for the query
+            project_id: Optional project filter
+            rule_id: Optional specific rule filter
+
+        Returns:
+            Dictionary with blocking statistics
+        """
+        self._ensure_initialized()
+
+        # Check if GatewayBlockingEvents table exists
+        try:
+            table_exists_query = "EXISTS TABLE GatewayBlockingEvents"
+            table_exists_result = await self.clickhouse_client.execute_query(table_exists_query)
+            blocking_table_exists = table_exists_result and table_exists_result[0][0] == 1
+        except Exception as e:
+            logger.warning(f"Failed to check GatewayBlockingEvents table existence: {e}")
+            # Fallback to basic statistics from ModelInferenceDetails
+            return await self._get_blocking_stats_fallback(from_date, to_date, project_id)
+
+        if not blocking_table_exists:
+            logger.info("GatewayBlockingEvents table not found, using fallback")
+            return await self._get_blocking_stats_fallback(from_date, to_date, project_id)
+
+        # Build parameters
+        params = {
+            "from_date": from_date,
+            "to_date": to_date or datetime.now(),
+        }
+
+        # Build base where conditions
+        where_conditions = ["blocked_at >= %(from_date)s", "blocked_at <= %(to_date)s"]
+
+        if project_id:
+            where_conditions.append("project_id = %(project_id)s")
+            params["project_id"] = project_id
+
+        if rule_id:
+            where_conditions.append("rule_id = %(rule_id)s")
+            params["rule_id"] = rule_id
+
+        where_clause = " AND ".join(where_conditions)
+
+        # Get total blocked count and rule breakdown
+        stats_query = f"""
+            SELECT
+                COUNT(*) as total_blocked,
+                uniqExact(rule_id) as unique_rules,
+                uniqExact(client_ip) as unique_ips
+            FROM GatewayBlockingEvents
+            WHERE {where_clause}
+        """
+
+        stats_result = await self.clickhouse_client.execute_query(stats_query, params)
+        total_blocked = stats_result[0][0] if stats_result else 0
+        unique_rules = stats_result[0][1] if stats_result and len(stats_result[0]) > 1 else 0
+        unique_ips = stats_result[0][2] if stats_result and len(stats_result[0]) > 2 else 0
+
+        # Get blocks by rule type and name
+        rule_breakdown_query = f"""
+            SELECT
+                rule_type,
+                rule_name,
+                rule_id,
+                COUNT(*) as block_count,
+                uniqExact(client_ip) as unique_ips_blocked
+            FROM GatewayBlockingEvents
+            WHERE {where_clause}
+            GROUP BY rule_type, rule_name, rule_id
+            ORDER BY block_count DESC
+        """
+
+        rule_breakdown_result = await self.clickhouse_client.execute_query(rule_breakdown_query, params)
+
+        blocked_by_rule = {}
+        blocked_by_type = {}
+
+        for row in rule_breakdown_result:
+            rule_type = row[0]
+            rule_name = row[1]
+            block_count = row[3]
+
+            blocked_by_rule[rule_name] = block_count
+            if rule_type in blocked_by_type:
+                blocked_by_type[rule_type] += block_count
+            else:
+                blocked_by_type[rule_type] = block_count
+
+        # Get blocks by reason
+        reason_query = f"""
+            SELECT
+                block_reason,
+                COUNT(*) as count
+            FROM GatewayBlockingEvents
+            WHERE {where_clause}
+            GROUP BY block_reason
+            ORDER BY count DESC
+        """
+
+        reason_result = await self.clickhouse_client.execute_query(reason_query, params)
+        blocked_by_reason = {row[0]: row[1] for row in reason_result}
+
+        # Get top blocked IPs with country info
+        top_ips_query = f"""
+            SELECT
+                client_ip,
+                any(country_code) as country_code,
+                COUNT(*) as block_count
+            FROM GatewayBlockingEvents
+            WHERE {where_clause}
+            GROUP BY client_ip
+            ORDER BY block_count DESC
+            LIMIT 10
+        """
+
+        top_ips_result = await self.clickhouse_client.execute_query(top_ips_query, params)
+        top_blocked_ips = [{"ip": row[0], "country": row[1] or "Unknown", "count": row[2]} for row in top_ips_result]
+
+        # Get time series data (hourly buckets)
+        time_series_query = f"""
+            SELECT
+                toStartOfHour(blocked_at) as hour,
+                COUNT(*) as blocked_count
+            FROM GatewayBlockingEvents
+            WHERE {where_clause}
+            GROUP BY hour
+            ORDER BY hour
+        """
+
+        time_series_result = await self.clickhouse_client.execute_query(time_series_query, params)
+        time_series = [{"timestamp": row[0].isoformat(), "blocked_count": row[1]} for row in time_series_result]
+
+        # Calculate block rate (need total requests in same period)
+        total_requests_query = f"""
+            SELECT COUNT(*)
+            FROM ModelInferenceDetails
+            WHERE request_arrival_time >= %(from_date)s
+            AND request_arrival_time <= %(to_date)s
+            {"AND project_id = %(project_id)s" if project_id else ""}
+        """
+
+        try:
+            total_requests_result = await self.clickhouse_client.execute_query(total_requests_query, params)
+            total_requests = total_requests_result[0][0] if total_requests_result else 0
+            block_rate = (total_blocked / total_requests * 100) if total_requests > 0 else 0.0
+        except Exception:
+            # If we can't get total requests, set block rate to 0
+            block_rate = 0.0
+            total_requests = 0
+
+        # Import the response model
+        from .schemas import GatewayBlockingRuleStats
+
+        return GatewayBlockingRuleStats(
+            total_blocked=total_blocked,
+            block_rate=round(block_rate, 2),
+            blocked_by_rule=blocked_by_rule,
+            blocked_by_reason=blocked_by_reason,
+            top_blocked_ips=top_blocked_ips,
+            time_series=time_series,
+        )
+
+    async def _get_blocking_stats_fallback(self, from_date, to_date, project_id=None):
+        """Fallback method for blocking stats when GatewayBlockingEvents table doesn't exist."""
+        logger.info("Using fallback blocking stats from GatewayAnalytics table")
+
+        # Build parameters
+        params = {
+            "from_date": from_date,
+            "to_date": to_date or datetime.now(),
+        }
+
+        # Build base where conditions
+        where_conditions = ["timestamp >= %(from_date)s", "timestamp <= %(to_date)s", "is_blocked = true"]
+
+        if project_id:
+            where_conditions.append("project_id = %(project_id)s")
+            params["project_id"] = project_id
+
+        where_clause = " AND ".join(where_conditions)
+
+        try:
+            # Get basic blocking stats from GatewayAnalytics
+            fallback_query = f"""
+                SELECT
+                    COUNT(*) as total_blocked,
+                    uniqExact(block_rule_id) as unique_rules,
+                    uniqExact(client_ip) as unique_ips
+                FROM GatewayAnalytics
+                WHERE {where_clause}
+            """
+
+            result = await self.clickhouse_client.execute_query(fallback_query, params)
+            total_blocked = result[0][0] if result else 0
+            unique_rules = result[0][1] if result and len(result[0]) > 1 else 0
+            unique_ips = result[0][2] if result and len(result[0]) > 2 else 0
+
+            from budmetrics.observability.schemas import GatewayBlockingRuleStats
+
+            return GatewayBlockingRuleStats(
+                total_blocked=total_blocked,
+                block_rate=0.0,
+                blocked_by_rule={},
+                blocked_by_reason={},
+                top_blocked_ips=[],
+                time_series=[],
+            )
+        except Exception as e:
+            logger.error(f"Failed to get fallback blocking stats: {e}")
+            from budmetrics.observability.schemas import GatewayBlockingRuleStats
+
+            return GatewayBlockingRuleStats(
+                total_blocked=0,
+                block_rate=0.0,
+                blocked_by_rule={},
+                blocked_by_reason={},
+                top_blocked_ips=[],
+                time_series=[],
+            )
+
+    async def get_rule_block_count(self, rule_id: str, from_date=None, to_date=None):
+        """Get block count for a specific rule.
+
+        Args:
+            rule_id: The UUID of the blocking rule
+            from_date: Optional start date (defaults to 24 hours ago)
+            to_date: Optional end date (defaults to now)
+
+        Returns:
+            Integer count of blocks for this rule
+        """
+        from datetime import timedelta
+
+        self._ensure_initialized()
+
+        # Default to last 24 hours if no dates provided
+        if not from_date:
+            from_date = datetime.now() - timedelta(days=1)
+        if not to_date:
+            to_date = datetime.now()
+
+        # Check if GatewayBlockingEvents table exists
+        try:
+            table_exists_query = "EXISTS TABLE GatewayBlockingEvents"
+            table_exists_result = await self.clickhouse_client.execute_query(table_exists_query)
+            blocking_table_exists = table_exists_result and table_exists_result[0][0] == 1
+        except Exception:
+            blocking_table_exists = False
+
+        if not blocking_table_exists:
+            logger.warning("GatewayBlockingEvents table not found, returning 0")
+            return 0
+
+        # Query for specific rule
+        query = """
+            SELECT COUNT(*) as block_count
+            FROM GatewayBlockingEvents
+            WHERE rule_id = %(rule_id)s
+            AND blocked_at >= %(from_date)s
+            AND blocked_at <= %(to_date)s
+        """
+
+        params = {"rule_id": rule_id, "from_date": from_date, "to_date": to_date}
+
+        try:
+            result = await self.clickhouse_client.execute_query(query, params)
+            return result[0][0] if result else 0
+        except Exception as e:
+            logger.error(f"Failed to get block count for rule {rule_id}: {e}")
+            return 0

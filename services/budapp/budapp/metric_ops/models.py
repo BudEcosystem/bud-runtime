@@ -76,11 +76,14 @@ class GatewayBlockingRule(Base, TimestampMixin):
     reason: Mapped[str] = mapped_column(String(500), nullable=True)
     priority: Mapped[int] = mapped_column(default=0)  # Higher priority rules are evaluated first
 
-    # Scope - rules are scoped to projects
-    project_id: Mapped[UUID] = mapped_column(ForeignKey("project.id"), nullable=False)
+    # Scope - global rules have no project_id, model-specific rules have model_name
+    project_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("project.id"), nullable=True)
 
-    # Optional endpoint-specific rule
-    endpoint_id: Mapped[UUID] = mapped_column(ForeignKey("endpoint.id"), nullable=True)
+    # Model-specific rule (None for global rules)
+    model_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # Deprecated - kept for backwards compatibility
+    endpoint_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("endpoint.id"), nullable=True)
 
     # User who created the rule
     created_by: Mapped[UUID] = mapped_column(ForeignKey("user.id"), nullable=False)
@@ -90,7 +93,7 @@ class GatewayBlockingRule(Base, TimestampMixin):
     last_matched_at = Column(TIMESTAMP(timezone=True), nullable=True)
 
     # Relationships
-    project: Mapped["Project"] = relationship(back_populates="blocking_rules")
+    project: Mapped[Optional["Project"]] = relationship(back_populates="blocking_rules")
     endpoint: Mapped[Optional["Endpoint"]] = relationship(back_populates="blocking_rules")
     created_user: Mapped["User"] = relationship(foreign_keys=[created_by])
 
@@ -98,5 +101,6 @@ class GatewayBlockingRule(Base, TimestampMixin):
     __table_args__ = (
         Index("idx_blocking_rule_project_status", "project_id", "status"),
         Index("idx_blocking_rule_type_status", "rule_type", "status"),
+        Index("idx_blocking_rule_model_name", "model_name"),
         Index("idx_blocking_rule_endpoint", "endpoint_id"),
     )

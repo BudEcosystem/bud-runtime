@@ -3594,6 +3594,69 @@ const runEvaluation: DrawerFlowType = {
   ],
 };
 
+const createBlockingRule: DrawerFlowType = {
+  title: "Create Blocking Rule",
+  description: "Create a new blocking rule for the gateway",
+  totalSteps: 2,
+  steps: [
+    {
+      navigation: () => ["Blocking Rules", "Create Rule"],
+      id: "create-blocking-rule",
+      step: 1,
+      component: StepComponents["create-blocking-rule"],
+      progress: [
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Configure Rule",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Success",
+        },
+      ],
+      confirmClose: true,
+    },
+    {
+      navigation: () => ["Blocking Rules", "Success"],
+      id: "blocking-rule-success",
+      step: 2,
+      component: StepComponents["blocking-rule-success"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Configure Rule",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Success",
+        },
+      ],
+      confirmClose: false,
+    },
+  ],
+};
+
+const viewBlockingRule: DrawerFlowType = {
+  title: "Blocking Rule Details",
+  description: "View detailed information about a blocking rule",
+  totalSteps: 1,
+  steps: [
+    {
+      navigation: () => ["Blocking Rules", "Rule Details"],
+      id: "view-blocking-rule",
+      step: 1,
+      component: StepComponents["view-blocking-rule"],
+      progress: [
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Rule Details",
+        },
+      ],
+      confirmClose: false,
+    },
+  ],
+};
+
 const flows = {
   "new-project": newProject,
   "deploy-model": deployModel,
@@ -3647,6 +3710,9 @@ const flows = {
   // experiments
   "new-experiment": newExperiment,
   "run-evaluation": runEvaluation,
+  // blocking rules
+  "create-blocking-rule": createBlockingRule,
+  "view-blocking-rule": viewBlockingRule,
 };
 
 export const flowMapping: {

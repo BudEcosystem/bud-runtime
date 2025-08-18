@@ -1385,14 +1385,14 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
               <MultiSeriesLineChart
                 key={`latency-grouped-${metricsKey}`}
                 data={{
-                  categories: [...new Set(Object.values(metrics.groupedLatencyOverTime).flat().map((d: any) => d.time))].sort(),
+                  categories: Array.from(new Set(Object.values(metrics.groupedLatencyOverTime).flat().map((d: any) => d.time))).sort(),
                   series: Object.entries(metrics.groupedLatencyOverTime)
                     .slice(0, 10) // Limit to top 10 for readability
                     .map(([name, data]) => {
                       // Create a map for quick lookup
                       const dataMap = new Map(data.map((d: any) => [d.time, d.value || 0]));
                       // Ensure all categories have a value (0 if missing)
-                      const categories = [...new Set(Object.values(metrics.groupedLatencyOverTime).flat().map((d: any) => d.time))].sort();
+                      const categories = Array.from(new Set(Object.values(metrics.groupedLatencyOverTime).flat().map((d: any) => d.time))).sort();
                       return {
                         name,
                         data: categories.map(cat => dataMap.get(cat) || 0),
@@ -1437,14 +1437,14 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
             {Object.keys(metrics.groupedTokensOverTime).length > 0 ? (
               <MultiSeriesLineChart
                 data={{
-                  categories: [...new Set(Object.values(metrics.groupedTokensOverTime).flat().map((d: any) => d.time))].sort(),
+                  categories: Array.from(new Set(Object.values(metrics.groupedTokensOverTime).flat().map((d: any) => d.time))).sort(),
                   series: Object.entries(metrics.groupedTokensOverTime)
                     .slice(0, 10) // Limit to top 10 for readability
                     .map(([name, data]) => {
                       // Create a map for quick lookup
                       const dataMap = new Map(data.map((d: any) => [d.time, d.value || 0]));
                       // Ensure all categories have a value (0 if missing)
-                      const categories = [...new Set(Object.values(metrics.groupedTokensOverTime).flat().map((d: any) => d.time))].sort();
+                      const categories = Array.from(new Set(Object.values(metrics.groupedTokensOverTime).flat().map((d: any) => d.time))).sort();
                       return {
                         name,
                         data: categories.map(cat => dataMap.get(cat) || 0),
@@ -1486,14 +1486,14 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
             {Object.keys(metrics.groupedRequestsPerSecond).length > 0 ? (
               <MultiSeriesLineChart
                 data={{
-                  categories: [...new Set(Object.values(metrics.groupedRequestsPerSecond).flat().map((d: any) => d.time))].sort(),
+                  categories: Array.from(new Set(Object.values(metrics.groupedRequestsPerSecond).flat().map((d: any) => d.time))).sort(),
                   series: Object.entries(metrics.groupedRequestsPerSecond)
                     .slice(0, 10) // Limit to top 10 for readability
                     .map(([name, data]) => {
                       // Create a map for quick lookup
                       const dataMap = new Map(data.map((d: any) => [d.time, d.rps || 0]));
                       // Ensure all categories have a value (0 if missing)
-                      const categories = [...new Set(Object.values(metrics.groupedRequestsPerSecond).flat().map((d: any) => d.time))].sort();
+                      const categories = Array.from(new Set(Object.values(metrics.groupedRequestsPerSecond).flat().map((d: any) => d.time))).sort();
                       return {
                         name,
                         data: categories.map(cat => dataMap.get(cat) != null ? parseFloat(dataMap.get(cat).toFixed(3)) : 0),
@@ -1522,14 +1522,14 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
             {Object.keys(metrics.groupedTTFTOverTime).length > 0 ? (
               <MultiSeriesLineChart
                 data={{
-                  categories: [...new Set(Object.values(metrics.groupedTTFTOverTime).flat().map((d: any) => d.time))].sort(),
+                  categories: Array.from(new Set(Object.values(metrics.groupedTTFTOverTime).flat().map((d: any) => d.time))).sort(),
                   series: Object.entries(metrics.groupedTTFTOverTime)
                     .slice(0, 10) // Limit to top 10 for readability
                     .map(([name, data]) => {
                       // Create a map for quick lookup
                       const dataMap = new Map(data.map((d: any) => [d.time, d.value || 0]));
                       // Ensure all categories have a value (0 if missing)
-                      const categories = [...new Set(Object.values(metrics.groupedTTFTOverTime).flat().map((d: any) => d.time))].sort();
+                      const categories = Array.from(new Set(Object.values(metrics.groupedTTFTOverTime).flat().map((d: any) => d.time))).sort();
                       return {
                         name,
                         data: categories.map(cat => dataMap.get(cat) != null ? parseFloat(dataMap.get(cat).toFixed(2)) : 0),

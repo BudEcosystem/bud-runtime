@@ -332,6 +332,37 @@ class BlockingStatsResponse(SuccessResponse):
     total_block_events: int = Field(..., description="Total number of blocking events")
 
 
+class BlockingRulesStatsOverview(BaseModel):
+    """Overview statistics for blocking rules dashboard cards."""
+
+    total_rules: int = Field(..., description="Total number of blocking rules")
+    active_rules: int = Field(..., description="Number of active blocking rules")
+    inactive_rules: int = Field(..., description="Number of inactive blocking rules")
+    expired_rules: int = Field(..., description="Number of expired blocking rules")
+    total_blocks_today: int = Field(..., description="Total blocks in the last 24 hours")
+    total_blocks_week: int = Field(..., description="Total blocks in the last 7 days")
+    top_blocked_ips: List[Dict[str, Any]] = Field(default_factory=list, description="Top blocked IP addresses")
+    top_blocked_countries: List[Dict[str, Any]] = Field(default_factory=list, description="Top blocked countries")
+    blocks_by_type: Dict[str, int] = Field(default_factory=dict, description="Blocks grouped by rule type")
+    blocks_timeline: List[Dict[str, Any]] = Field(default_factory=list, description="Timeline of blocking events")
+
+
+class BlockingRulesStatsOverviewResponse(SuccessResponse):
+    """Response schema for blocking rules overview statistics."""
+
+    object: str = "blocking_rules_stats"
+    total_rules: int = Field(..., description="Total number of blocking rules")
+    active_rules: int = Field(..., description="Number of active blocking rules")
+    inactive_rules: int = Field(..., description="Number of inactive blocking rules")
+    expired_rules: int = Field(..., description="Number of expired blocking rules")
+    total_blocks_today: int = Field(..., description="Total blocks in the last 24 hours")
+    total_blocks_week: int = Field(..., description="Total blocks in the last 7 days")
+    top_blocked_ips: List[Dict[str, Any]] = Field(default_factory=list, description="Top blocked IP addresses")
+    top_blocked_countries: List[Dict[str, Any]] = Field(default_factory=list, description="Top blocked countries")
+    blocks_by_type: Dict[str, int] = Field(default_factory=dict, description="Blocks grouped by rule type")
+    blocks_timeline: List[Dict[str, Any]] = Field(default_factory=list, description="Timeline of blocking events")
+
+
 class TopRoute(BaseModel):
     """Top API route item."""
 
@@ -431,7 +462,8 @@ class BlockingRuleBase(BaseModel):
     rule_config: Dict[str, Any] = Field(..., description="Rule configuration (varies by type)")
     reason: Optional[str] = Field(None, description="Reason for creating this rule", max_length=500)
     priority: int = Field(default=0, description="Rule priority (higher values evaluated first)")
-    endpoint_id: Optional[UUID] = Field(None, description="Optional endpoint-specific rule")
+    model_name: Optional[str] = Field(None, description="Model name for model-specific rules (None for global rules)")
+    endpoint_id: Optional[UUID] = Field(None, description="Deprecated - use model_name instead")
 
 
 class BlockingRuleCreate(BlockingRuleBase):
@@ -449,21 +481,24 @@ class BlockingRuleUpdate(BaseModel):
     status: Optional[BlockingRuleStatus] = Field(None, description="Rule status")
     reason: Optional[str] = Field(None, description="Reason for the rule", max_length=500)
     priority: Optional[int] = Field(None, description="Rule priority")
+    model_name: Optional[str] = Field(None, description="Model name for model-specific rules")
 
 
 class BlockingRule(BlockingRuleBase):
     """Schema for blocking rule response."""
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     id: UUID = Field(..., description="Unique identifier of the rule")
-    project_id: UUID = Field(..., description="Project ID this rule belongs to")
+    project_id: Optional[UUID] = Field(None, description="Project ID (None for global rules)")
     status: BlockingRuleStatus = Field(..., description="Current status of the rule")
     created_by: UUID = Field(..., description="User who created the rule")
     match_count: int = Field(default=0, description="Number of times this rule has been matched")
     last_matched_at: Optional[datetime] = Field(None, description="Last time this rule was matched")
     created_at: datetime = Field(..., description="Creation timestamp")
-    updated_at: datetime = Field(..., description="Last update timestamp")
+    updated_at: datetime = Field(
+        ..., validation_alias="modified_at", serialization_alias="updated_at", description="Last update timestamp"
+    )
 
     # Optional enriched fields
     project_name: Optional[str] = Field(None, description="Project name")

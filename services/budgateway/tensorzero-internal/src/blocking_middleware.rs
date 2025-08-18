@@ -1,14 +1,12 @@
 //! Blocking Middleware for Gateway
 
 use axum::{
-    extract::{ConnectInfo, Request},
+    extract::Request,
     http::{HeaderMap, StatusCode},
     middleware::Next,
     response::{IntoResponse, Response},
 };
-use std::net::SocketAddr;
 use std::sync::Arc;
-use uuid::Uuid;
 
 use crate::analytics::RequestAnalytics;
 use crate::blocking_rules::BlockingRulesManager;
@@ -16,11 +14,11 @@ use crate::error::Error;
 
 /// Middleware for enforcing blocking rules
 pub async fn blocking_middleware(
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
     request: Request,
     next: Next,
 ) -> Result<Response, Error> {
+    tracing::debug!("=== BLOCKING MIDDLEWARE CALLED ===");
     // Get blocking rules manager from extensions
     let blocking_manager = request
         .extensions()
@@ -28,12 +26,9 @@ pub async fn blocking_middleware(
         .cloned();
 
     let Some(manager) = blocking_manager else {
-        // No blocking manager configured, proceed with request
+        tracing::debug!("No blocking manager configured, proceeding with request");
         return Ok(next.run(request).await);
     };
-
-    // Extract request metadata
-    let client_ip = get_client_ip(&addr, &headers);
 
     // Get analytics data if available (populated by analytics middleware)
     let analytics = request
@@ -41,48 +36,50 @@ pub async fn blocking_middleware(
         .get::<Arc<tokio::sync::Mutex<RequestAnalytics>>>()
         .cloned();
 
-    let (country_code, user_agent, project_id, endpoint_id) = if let Some(ref analytics) = analytics
+    // Extract request metadata from analytics or headers
+    let (client_ip, country_code, user_agent) = if let Some(ref analytics) = analytics
     {
         let analytics = analytics.lock().await;
+        tracing::debug!(
+            "Using analytics data - IP: {}, Country: {:?}, User-Agent: {:?}",
+            analytics.record.client_ip,
+            analytics.record.country_code,
+            analytics.record.user_agent
+        );
         (
+            analytics.record.client_ip.clone(),
             analytics.record.country_code.clone(),
             analytics.record.user_agent.clone(),
-            analytics.record.project_id,
-            analytics.record.endpoint_id,
         )
     } else {
-        // Try to extract from headers or other sources
-        let project_id = headers
-            .get("x-project-id")
+        // Fall back to extracting from headers when analytics is disabled
+        let client_ip = get_client_ip_from_headers(&headers);
+        let user_agent_from_header = headers
+            .get("user-agent")
             .and_then(|v| v.to_str().ok())
-            .and_then(|s| Uuid::parse_str(s).ok());
-        let endpoint_id = headers
-            .get("x-endpoint-id")
-            .and_then(|v| v.to_str().ok())
-            .and_then(|s| Uuid::parse_str(s).ok());
+            .map(|s| s.to_string());
+
+        tracing::debug!(
+            "Using header data - IP: {}, User-Agent: {:?}",
+            client_ip,
+            user_agent_from_header
+        );
+
         (
+            client_ip,
             None,
-            headers
-                .get("user-agent")
-                .and_then(|v| v.to_str().ok())
-                .map(|s| s.to_string()),
-            project_id,
-            endpoint_id,
+            user_agent_from_header,
         )
     };
 
-    // For now, if no project ID is available, we'll check global rules
-    // or rules based on IP/country/user-agent only
-    let project_id = project_id.unwrap_or_else(|| {
-        // Use a default project ID for global rules
-        Uuid::nil()
-    });
+    tracing::debug!(
+        "Blocking middleware - checking request: IP={}, Country={:?}, User-Agent={:?}",
+        client_ip, country_code, user_agent
+    );
 
     // Check if request should be blocked
     match manager
         .should_block(
-            &project_id,
-            endpoint_id.as_ref(),
             &client_ip,
             country_code.as_deref(),
             user_agent.as_deref(),
@@ -90,6 +87,11 @@ pub async fn blocking_middleware(
         .await
     {
         Ok(Some((rule, reason))) => {
+            tracing::warn!(
+                "Request BLOCKED - Rule: {} (type: {:?}), Reason: {}, IP: {}, User-Agent: {:?}",
+                rule.name, rule.rule_type, reason, client_ip, user_agent
+            );
+
             // Update analytics if available
             if let Some(analytics) = request
                 .extensions()
@@ -106,8 +108,8 @@ pub async fn blocking_middleware(
                 StatusCode::FORBIDDEN,
                 [("x-block-reason", reason.as_str())],
                 format!(
-                    r#"{{"error":"forbidden","message":"{}","rule":"{}"}}"#,
-                    reason, rule.name
+                    r#"{{"error":"forbidden","message":"{}"}}"#,
+                    reason
                 ),
             )
                 .into_response();
@@ -122,7 +124,10 @@ pub async fn blocking_middleware(
             Ok(response)
         }
         Ok(None) => {
-            // No blocking rule matched, proceed
+            tracing::debug!(
+                "Request ALLOWED - No blocking rules matched for IP: {}, User-Agent: {:?}",
+                client_ip, user_agent
+            );
             Ok(next.run(request).await)
         }
         Err(e) => {
@@ -133,8 +138,8 @@ pub async fn blocking_middleware(
     }
 }
 
-/// Extract the real client IP considering proxy headers
-fn get_client_ip(addr: &SocketAddr, headers: &HeaderMap) -> String {
+/// Extract the real client IP from headers only (fallback when analytics is disabled)
+fn get_client_ip_from_headers(headers: &HeaderMap) -> String {
     // Check X-Forwarded-For first
     if let Some(forwarded_for) = headers.get("x-forwarded-for") {
         if let Ok(forwarded_str) = forwarded_for.to_str() {
@@ -152,8 +157,8 @@ fn get_client_ip(addr: &SocketAddr, headers: &HeaderMap) -> String {
         }
     }
 
-    // Fallback to socket address
-    addr.ip().to_string()
+    // Fallback to unknown when no IP can be determined
+    "unknown".to_string()
 }
 
 /// Middleware to attach blocking rules manager to request extensions

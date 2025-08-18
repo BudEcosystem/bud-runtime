@@ -112,6 +112,9 @@ import SelectTrait from "./Evaluations/RunEvaluation/SelectTrait";
 import SelectEvaluation from "./Evaluations/RunEvaluation/SelectEvaluation";
 import EvaluationSummary from "./Evaluations/RunEvaluation/EvaluationSummary";
 import NewExperimentSuccess from "./Evaluations/NewExperiment/newExperimentSuccess";
+import CreateBlockingRuleStep from "./blocking/CreateBlockingRuleStep";
+import BlockingRuleSuccess from "./blocking/BlockingRuleSuccess";
+import ViewBlockingRuleDetails from "./blocking/ViewBlockingRuleDetails";
 
 export const StepComponents = {
   "new-project": NewProject,
@@ -238,6 +241,9 @@ export const StepComponents = {
   "select-traits": SelectTrait,
   "select-evaluation": SelectEvaluation,
   "evaluation-summary": EvaluationSummary,
+  "create-blocking-rule": CreateBlockingRuleStep,
+  "blocking-rule-success": BlockingRuleSuccess,
+  "view-blocking-rule": ViewBlockingRuleDetails,
 
 };
 

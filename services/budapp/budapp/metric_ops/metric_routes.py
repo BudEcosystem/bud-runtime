@@ -43,6 +43,7 @@ from .schemas import (
     BlockingRuleDeleteResponse,
     BlockingRuleListResponse,
     BlockingRuleResponse,
+    BlockingRulesStatsOverviewResponse,
     BlockingRuleSyncRequest,
     BlockingRuleUpdate,
     BlockingStatsResponse,
@@ -413,6 +414,68 @@ async def get_blocking_stats(
 
 
 @metric_router.get(
+    "/gateway/blocking-rules-stats",
+    response_model=BlockingRulesStatsOverviewResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get blocking rules overview statistics",
+    description="Get overview statistics for blocking rules dashboard cards including rule counts and block statistics",
+)
+async def get_blocking_rules_stats_overview(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    start_time: Optional[datetime] = Query(
+        None,
+        description="Start time for time-based statistics (defaults to 7 days ago)",
+    ),
+    end_time: Optional[datetime] = Query(
+        None,
+        description="End time for time-based statistics (defaults to now)",
+    ),
+) -> BlockingRulesStatsOverviewResponse:
+    """Get overview statistics for blocking rules dashboard.
+
+    Returns statistics including:
+    - Total rules count
+    - Active/inactive/expired rules count
+    - Total blocks today and this week
+    - Top blocked IPs and countries
+    - Blocks by rule type
+    """
+    service = BlockingRulesService(session, current_user)
+    return await service.get_blocking_rules_stats_overview(start_time, end_time)
+
+
+@metric_router.get(
+    "/gateway/blocking-dashboard-stats",
+    response_model=Dict[str, Any],
+    status_code=status.HTTP_200_OK,
+    summary="Get blocking rules dashboard statistics",
+    description="Get real-time dashboard statistics for blocking rules, querying PostgreSQL for rule counts and ClickHouse for block counts",
+)
+async def get_blocking_dashboard_stats(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    start_time: Optional[datetime] = Query(
+        None,
+        description="Start time for block statistics (defaults to 7 days ago)",
+    ),
+    end_time: Optional[datetime] = Query(
+        None,
+        description="End time for block statistics (defaults to now)",
+    ),
+) -> Dict[str, Any]:
+    """Get real-time dashboard statistics for blocking rules.
+
+    Returns statistics including:
+    - Rule counts from PostgreSQL (total, active, inactive, expired)
+    - Block counts from ClickHouse (today, this week)
+    - No duplicate data storage - always fresh from source
+    """
+    service = BlockingRulesService(session, current_user)
+    return await service.get_blocking_dashboard_stats(start_time, end_time)
+
+
+@metric_router.get(
     "/gateway/top-routes",
     response_model=TopRoutesResponse,
     status_code=status.HTTP_200_OK,
@@ -497,15 +560,20 @@ async def get_client_analytics(
     response_model=BlockingRuleResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create a blocking rule",
-    description="Create a new blocking rule for a project",
+    description="Create a new blocking rule (global, model-specific, or project-specific)",
 )
 async def create_blocking_rule(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
-    project_id: UUID,
     rule_data: BlockingRuleCreate,
+    project_id: Optional[UUID] = Query(None, description="Project ID for project-specific rules"),
 ) -> BlockingRuleResponse:
     """Create a new blocking rule.
+
+    Rule scopes:
+    - Global: No project_id, no model_name - applies to entire gateway
+    - Model-specific: model_name set - applies to specific model
+    - Project-specific: project_id set - applies to specific project (legacy)
 
     Rule types:
     - IP_BLOCKING: Block specific IP addresses or ranges
@@ -521,7 +589,7 @@ async def create_blocking_rule(
     """
     service = BlockingRulesService(session, current_user)
     rule = await service.create_blocking_rule(project_id, rule_data)
-    return BlockingRuleResponse(success=True, data=rule)
+    return BlockingRuleResponse(message="Blocking rule created successfully", data=rule)
 
 
 @metric_router.get(
@@ -574,7 +642,7 @@ async def get_blocking_rule(
     """
     service = BlockingRulesService(session, current_user)
     rule = await service.get_blocking_rule(rule_id)
-    return BlockingRuleResponse(success=True, data=rule)
+    return BlockingRuleResponse(message="Blocking rule retrieved successfully", data=rule)
 
 
 @metric_router.put(
@@ -597,7 +665,7 @@ async def update_blocking_rule(
     """
     service = BlockingRulesService(session, current_user)
     rule = await service.update_blocking_rule(rule_id, update_data)
-    return BlockingRuleResponse(success=True, data=rule)
+    return BlockingRuleResponse(message="Blocking rule updated successfully", data=rule)
 
 
 @metric_router.delete(
@@ -619,7 +687,7 @@ async def delete_blocking_rule(
     """
     service = BlockingRulesService(session, current_user)
     await service.delete_blocking_rule(rule_id)
-    return BlockingRuleDeleteResponse(success=True, id=rule_id)
+    return BlockingRuleDeleteResponse(message="Blocking rule deleted successfully", id=rule_id)
 
 
 @metric_router.post(
@@ -645,6 +713,34 @@ async def sync_blocking_rules(
         success=True,
         message=f"Successfully synced {result['synced_rules']} rules to Redis",
     )
+
+
+@metric_router.post(
+    "/gateway/blocking-rules/sync-stats",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Sync blocking rule statistics from ClickHouse",
+    description="Sync blocking rule match counts and last matched timestamps from ClickHouse to PostgreSQL",
+)
+async def sync_blocking_rule_stats(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> SuccessResponse:
+    """Sync blocking rule statistics from ClickHouse to PostgreSQL.
+
+    This endpoint triggers a manual sync of blocking rule match counts
+    and last matched timestamps from ClickHouse event data to PostgreSQL.
+    """
+    service = MetricService(session)
+    result = await service.sync_blocking_rule_stats_from_clickhouse()
+
+    # Check if sync was successful
+    if "error" in result:
+        return SuccessResponse(
+            message=f"Sync failed: {result['error']}. Updated {result.get('updated_rules', 0)} rules."
+        )
+    else:
+        return SuccessResponse(message=f"Successfully synced statistics for {result.get('updated_rules', 0)} rules")
 
 
 # New Aggregated Metrics Proxy Endpoints

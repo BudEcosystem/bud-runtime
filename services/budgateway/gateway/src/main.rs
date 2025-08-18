@@ -412,14 +412,32 @@ async fn main() {
         // We log failed requests messages at 'DEBUG', since we already have our own error-logging code,
         .layer(TraceLayer::new_for_http().on_failure(DefaultOnFailure::new().level(Level::DEBUG)));
 
-    // Apply analytics middleware if enabled
+    // Apply blocking middleware if enabled (must run AFTER analytics for data access)
+    if app_state.config.gateway.blocking.enabled {
+        tracing::info!("Gateway blocking rules enabled");
+
+        if let Some(blocking_manager) = app_state.blocking_manager.clone() {
+            // Apply blocking enforcement middleware FIRST (so it runs AFTER analytics)
+            router = router.layer(axum::middleware::from_fn(blocking_middleware));
+
+            // Attach blocking manager to request extensions (runs before blocking middleware)
+            router = router.layer(axum::middleware::from_fn_with_state(
+                blocking_manager,
+                attach_blocking_manager,
+            ));
+        } else {
+            tracing::warn!("Blocking is enabled but no blocking manager available");
+        }
+    }
+
+    // Apply analytics middleware if enabled (must run BEFORE blocking to provide data)
     if app_state.config.gateway.analytics.enabled {
         tracing::info!("Gateway analytics enabled");
 
-        // Apply analytics collection middleware FIRST (so it runs LAST)
+        // Apply analytics collection middleware (will run before blocking)
         router = router.layer(axum::middleware::from_fn(analytics_middleware));
 
-        // Attach required services to request extensions LAST (so they run FIRST)
+        // Attach required services to request extensions (run first to provide data)
         if let Some(parser) = app_state.ua_parser.clone() {
             router = router.layer(axum::middleware::from_fn_with_state(
                 parser,
@@ -438,24 +456,6 @@ async fn main() {
             Arc::new(app_state.clickhouse_connection_info.clone()),
             attach_clickhouse_middleware,
         ));
-    }
-
-    // Apply blocking middleware if enabled
-    if app_state.config.gateway.blocking.enabled {
-        tracing::info!("Gateway blocking rules enabled");
-
-        if let Some(blocking_manager) = app_state.blocking_manager.clone() {
-            // Attach blocking manager to request extensions
-            router = router.layer(axum::middleware::from_fn_with_state(
-                blocking_manager,
-                attach_blocking_manager,
-            ));
-
-            // Apply blocking enforcement middleware
-            router = router.layer(axum::middleware::from_fn(blocking_middleware));
-        } else {
-            tracing::warn!("Blocking is enabled but no blocking manager available");
-        }
     }
 
     let router = router.with_state(app_state);

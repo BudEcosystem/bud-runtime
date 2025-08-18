@@ -270,12 +270,45 @@ pub async fn setup_redis_and_rate_limiter(
     // Get Redis URL from environment
     let redis_url = std::env::var("TENSORZERO_REDIS_URL").ok();
 
-    // Setup Redis client for authentication if needed
+    // Setup blocking manager first if enabled
+    let blocking_manager = if config.gateway.blocking.enabled {
+        if let Some(ref url) = redis_url {
+            if !url.is_empty() {
+                // Create a Redis client for blocking manager operations
+                let auth = auth_info.clone().unwrap_or_else(|| Auth::new(config.api_keys.clone()));
+                match RedisClient::new(url, app_state.clone(), auth).await {
+                    Ok(redis_client) => {
+                        let manager = Arc::new(BlockingRulesManager::new_with_clickhouse(
+                            Some(Arc::new(redis_client)),
+                            Some(Arc::new(app_state.clickhouse_connection_info.clone())),
+                        ));
+                        tracing::info!("Blocking rules manager initialized with ClickHouse logging");
+                        Some(manager)
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to create Redis client for blocking manager: {}", e);
+                        None
+                    }
+                }
+            } else {
+                tracing::warn!("Blocking is enabled but TENSORZERO_REDIS_URL is empty");
+                None
+            }
+        } else {
+            tracing::warn!("Blocking is enabled but TENSORZERO_REDIS_URL is not set");
+            None
+        }
+    } else {
+        tracing::info!("Blocking is disabled in configuration");
+        None
+    };
+
+    // Setup Redis client for authentication/models/blocking if needed
     if let Some(auth) = auth_info {
         if let Some(ref url) = redis_url {
             if !url.is_empty() {
-                // Create and start Redis client for authentication
-                let auth_redis_client = RedisClient::new(url, app_state.clone(), auth.clone())
+                // Create Redis client with optional blocking manager
+                let mut auth_redis_client = RedisClient::new(url, app_state.clone(), auth.clone())
                     .await
                     .map_err(|e| {
                         Error::new(ErrorDetails::AppState {
@@ -285,15 +318,21 @@ pub async fn setup_redis_and_rate_limiter(
                         })
                     })?;
 
+                // Add blocking manager if available
+                if let Some(ref manager) = blocking_manager {
+                    auth_redis_client = auth_redis_client.with_blocking_manager(manager.clone());
+                }
+
                 auth_redis_client.start().await.map_err(|e| {
                     Error::new(ErrorDetails::AppState {
-                        message: format!("Failed to start Redis client for authentication: {e}"),
+                        message: format!("Failed to start Redis client: {e}"),
                     })
                 })?;
 
-                tracing::info!("Redis client for authentication started successfully");
+                tracing::info!("Redis client started successfully with auth{}",
+                    if blocking_manager.is_some() { " and blocking rules" } else { "" });
             } else {
-                tracing::warn!("TENSORZERO_REDIS_URL is empty, authentication Redis client will not be started");
+                tracing::warn!("TENSORZERO_REDIS_URL is empty, Redis client will not be started");
             }
         } else {
             tracing::info!("TENSORZERO_REDIS_URL not set, authentication will work without Redis");
@@ -332,48 +371,12 @@ pub async fn setup_redis_and_rate_limiter(
         app_state
     };
 
-    // Setup blocking manager if configured and Redis is available
-    let app_state = if config.gateway.blocking.enabled {
-        if let Some(ref url) = redis_url {
-            if !url.is_empty() {
-                // Create Redis client for blocking rules
-                let auth = match &app_state.authentication_info {
-                    AuthenticationInfo::Enabled(auth) => auth.clone(),
-                    AuthenticationInfo::Disabled => Auth::new(config.api_keys.clone()),
-                };
-
-                match RedisClient::new(url, app_state.clone(), auth).await {
-                    Ok(redis_client) => {
-                        let blocking_manager =
-                            Arc::new(BlockingRulesManager::new(Some(Arc::new(redis_client))));
-
-                        // Start background sync task
-                        let sync_manager = blocking_manager.clone();
-                        tokio::spawn(crate::blocking_middleware::blocking_rules_sync_task(
-                            sync_manager,
-                        ));
-
-                        tracing::info!("Blocking rules manager initialized successfully");
-
-                        let mut app_state = app_state;
-                        app_state.blocking_manager = Some(blocking_manager);
-                        app_state
-                    }
-                    Err(e) => {
-                        tracing::error!("Failed to initialize blocking manager: {}", e);
-                        app_state
-                    }
-                }
-            } else {
-                tracing::warn!("Blocking is enabled but TENSORZERO_REDIS_URL is empty");
-                app_state
-            }
-        } else {
-            tracing::warn!("Blocking is enabled but TENSORZERO_REDIS_URL is not set");
-            app_state
-        }
+    // Add blocking manager to app_state if it was created
+    let app_state = if let Some(manager) = blocking_manager {
+        let mut app_state = app_state;
+        app_state.blocking_manager = Some(manager);
+        app_state
     } else {
-        tracing::info!("Blocking is disabled in configuration");
         app_state
     };
 

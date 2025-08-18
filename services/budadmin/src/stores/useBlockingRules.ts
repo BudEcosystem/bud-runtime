@@ -1,9 +1,9 @@
 import { create } from 'zustand';
 import { AppRequest } from '../pages/api/requests';
-import { message } from 'antd';
+import { successToast, errorToast } from '@/components/toast';
 
-export type BlockingRuleType = 'IP_BLOCKING' | 'COUNTRY_BLOCKING' | 'USER_AGENT_BLOCKING' | 'RATE_BASED_BLOCKING';
-export type BlockingRuleStatus = 'ACTIVE' | 'INACTIVE' | 'EXPIRED';
+export type BlockingRuleType = 'ip_blocking' | 'country_blocking' | 'user_agent_blocking' | 'rate_based_blocking';
+export type BlockingRuleStatus = 'active' | 'inactive' | 'expired' | 'ACTIVE' | 'INACTIVE' | 'EXPIRED';
 
 export interface BlockingRule {
   id: string;
@@ -14,10 +14,6 @@ export interface BlockingRule {
   status: BlockingRuleStatus;
   reason: string;
   priority: number;
-  project_id: string;
-  project_name?: string;
-  endpoint_id?: string;
-  endpoint_name?: string;
   created_by: string;
   created_by_name?: string;
   match_count: number;
@@ -34,7 +30,6 @@ export interface BlockingRuleCreate {
   status?: BlockingRuleStatus;
   reason: string;
   priority?: number;
-  endpoint_id?: string;
 }
 
 export interface BlockingRuleUpdate {
@@ -44,7 +39,6 @@ export interface BlockingRuleUpdate {
   status?: BlockingRuleStatus;
   reason?: string;
   priority?: number;
-  endpoint_id?: string;
 }
 
 export interface BlockingStats {
@@ -67,24 +61,20 @@ interface BlockingRulesState {
   isCreating: boolean;
   isUpdating: boolean;
   isDeleting: boolean;
-  isSyncing: boolean;
   currentPage: number;
   pageSize: number;
   totalCount: number;
   filters: {
-    project_id?: string;
     rule_type?: BlockingRuleType;
     status?: BlockingRuleStatus;
-    endpoint_id?: string;
   };
 
   // Actions
-  fetchRules: (projectId?: string) => Promise<void>;
-  fetchStats: (projectId?: string, startTime?: string, endTime?: string) => Promise<void>;
-  createRule: (projectId: string, rule: BlockingRuleCreate) => Promise<boolean>;
+  fetchRules: () => Promise<void>;
+  fetchStats: (startTime?: string, endTime?: string) => Promise<void>;
+  createRule: (rule: BlockingRuleCreate) => Promise<boolean>;
   updateRule: (ruleId: string, update: BlockingRuleUpdate) => Promise<boolean>;
   deleteRule: (ruleId: string) => Promise<boolean>;
-  syncRules: (projectIds?: string[]) => Promise<boolean>;
   setFilters: (filters: Partial<BlockingRulesState['filters']>) => void;
   setPagination: (page: number, pageSize: number) => void;
   clearFilters: () => void;
@@ -97,13 +87,12 @@ export const useBlockingRules = create<BlockingRulesState>((set, get) => ({
   isCreating: false,
   isUpdating: false,
   isDeleting: false,
-  isSyncing: false,
   currentPage: 1,
   pageSize: 20,
   totalCount: 0,
   filters: {},
 
-  fetchRules: async (projectId?: string) => {
+  fetchRules: async () => {
     set({ isLoading: true });
     try {
       const { filters, currentPage, pageSize } = get();
@@ -113,55 +102,49 @@ export const useBlockingRules = create<BlockingRulesState>((set, get) => ({
         ...filters,
       };
 
-      if (projectId) {
-        params.project_id = projectId;
-      }
-
       const response = await AppRequest.Get('/metrics/gateway/blocking-rules', { params });
 
       if (response.data) {
         set({
-          rules: response.data.rules || [],
+          rules: response.data.items || response.data.rules || [],
           totalCount: response.data.total || 0,
           isLoading: false,
         });
       }
     } catch (error: any) {
       const errorMsg = error?.response?.data?.message || error?.message || 'Failed to fetch rules';
-      message.error(errorMsg);
+      errorToast(errorMsg);
       set({ isLoading: false });
     }
   },
 
-  fetchStats: async (projectId?: string, startTime?: string, endTime?: string) => {
+  fetchStats: async (startTime?: string, endTime?: string) => {
     try {
       const params: any = {};
-      if (projectId) params.project_id = projectId;
       if (startTime) params.start_time = startTime;
       if (endTime) params.end_time = endTime;
 
-      const response = await AppRequest.Get('/metrics/gateway/blocking-stats', { params });
+      // Call the new dashboard stats endpoint that queries directly from source databases
+      const response = await AppRequest.Get('/metrics/gateway/blocking-dashboard-stats', { params });
 
       if (response.data) {
         set({ stats: response.data });
       }
     } catch (error: any) {
       const errorMsg = error?.response?.data?.message || error?.message || 'Failed to fetch statistics';
-      message.error(errorMsg);
+      errorToast(errorMsg);
+      console.error('Failed to fetch dashboard stats:', error);
     }
   },
 
-  createRule: async (projectId: string, rule: BlockingRuleCreate) => {
+  createRule: async (rule: BlockingRuleCreate) => {
     set({ isCreating: true });
     try {
-      const response = await AppRequest.Post(
-        `/metrics/gateway/blocking-rules?project_id=${projectId}`,
-        rule
-      );
+      const response = await AppRequest.Post('/metrics/gateway/blocking-rules', rule);
 
-      if (response.data?.success) {
-        message.success('Blocking rule created successfully');
-        await get().fetchRules(projectId);
+      if (response.data?.data) {
+        successToast(response.data?.message || 'Blocking rule created successfully');
+        await get().fetchRules();
         set({ isCreating: false });
         return true;
       }
@@ -169,7 +152,7 @@ export const useBlockingRules = create<BlockingRulesState>((set, get) => ({
       return false;
     } catch (error: any) {
       const errorMsg = error?.response?.data?.message || error?.message || 'Failed to create rule';
-      message.error(errorMsg);
+      errorToast(errorMsg);
       set({ isCreating: false });
       return false;
     }
@@ -183,8 +166,12 @@ export const useBlockingRules = create<BlockingRulesState>((set, get) => ({
         update
       );
 
-      if (response.data?.success) {
-        message.success('Blocking rule updated successfully');
+      if (response.data?.data) {
+        // Override the message to ensure it says "updated" not "retrieved"
+        const message = response.data?.message?.includes('retrieved')
+          ? 'Blocking rule updated successfully'
+          : (response.data?.message || 'Blocking rule updated successfully');
+        successToast(message);
         await get().fetchRules();
         set({ isUpdating: false });
         return true;
@@ -193,7 +180,7 @@ export const useBlockingRules = create<BlockingRulesState>((set, get) => ({
       return false;
     } catch (error: any) {
       const errorMsg = error?.response?.data?.message || error?.message || 'Failed to update rule';
-      message.error(errorMsg);
+      errorToast(errorMsg);
       set({ isUpdating: false });
       return false;
     }
@@ -206,8 +193,8 @@ export const useBlockingRules = create<BlockingRulesState>((set, get) => ({
         `/metrics/gateway/blocking-rules/${ruleId}`
       );
 
-      if (response.data?.success) {
-        message.success('Blocking rule deleted successfully');
+      if (response.data?.id) {
+        successToast(response.data?.message || 'Blocking rule deleted successfully');
         await get().fetchRules();
         set({ isDeleting: false });
         return true;
@@ -216,34 +203,12 @@ export const useBlockingRules = create<BlockingRulesState>((set, get) => ({
       return false;
     } catch (error: any) {
       const errorMsg = error?.response?.data?.message || error?.message || 'Failed to delete rule';
-      message.error(errorMsg);
+      errorToast(errorMsg);
       set({ isDeleting: false });
       return false;
     }
   },
 
-  syncRules: async (projectIds?: string[]) => {
-    set({ isSyncing: true });
-    try {
-      const response = await AppRequest.Post(
-        '/metrics/gateway/blocking-rules/sync',
-        { project_ids: projectIds }
-      );
-
-      if (response.data?.success) {
-        message.success(response.data.message || 'Rules synced successfully');
-        set({ isSyncing: false });
-        return true;
-      }
-      set({ isSyncing: false });
-      return false;
-    } catch (error: any) {
-      const errorMsg = error?.response?.data?.message || error?.message || 'Failed to sync rules';
-      message.error(errorMsg);
-      set({ isSyncing: false });
-      return false;
-    }
-  },
 
   setFilters: (filters) => {
     set((state) => ({

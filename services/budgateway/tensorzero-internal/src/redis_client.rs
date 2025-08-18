@@ -8,6 +8,7 @@ use secrecy::SecretString;
 use tracing::instrument;
 
 use crate::auth::{APIConfig, Auth};
+use crate::blocking_rules::BlockingRulesManager;
 use crate::config_parser::ProviderTypesConfig;
 use crate::encryption::{decrypt_api_key, is_decryption_enabled, load_private_key};
 use crate::error::{Error, ErrorDetails};
@@ -16,12 +17,14 @@ use crate::model::{ModelTable, UninitializedModelConfig};
 
 const MODEL_TABLE_KEY_PREFIX: &str = "model_table:";
 const API_KEY_KEY_PREFIX: &str = "api_key:";
+const BLOCKING_RULES_KEY_PREFIX: &str = "blocking_rules:";
 
 pub struct RedisClient {
     pub(crate) client: redis::Client,
     conn: MultiplexedConnection,
     app_state: AppStateData,
     auth: Auth,
+    blocking_manager: Option<Arc<BlockingRulesManager>>,
 }
 
 impl RedisClient {
@@ -37,7 +40,13 @@ impl RedisClient {
             conn,
             app_state,
             auth,
+            blocking_manager: None,
         })
+    }
+
+    pub fn with_blocking_manager(mut self, manager: Arc<BlockingRulesManager>) -> Self {
+        self.blocking_manager = Some(manager);
+        self
     }
 
     async fn init_conn(url: &str) -> Result<(redis::Client, MultiplexedConnection), Error> {
@@ -154,6 +163,7 @@ impl RedisClient {
         conn: &mut MultiplexedConnection,
         app_state: &AppStateData,
         auth: &Auth,
+        blocking_manager: &Option<Arc<BlockingRulesManager>>,
     ) -> Result<(), Error> {
         match key {
             k if k.starts_with(API_KEY_KEY_PREFIX) => {
@@ -193,6 +203,21 @@ impl RedisClient {
                     }
                 }
             }
+            k if k.starts_with(BLOCKING_RULES_KEY_PREFIX) => {
+                if let Some(manager) = blocking_manager {
+                    // Only handle global blocking rules
+                    if let Some(suffix) = k.strip_prefix(BLOCKING_RULES_KEY_PREFIX) {
+                        if suffix == "global" {
+                            tracing::info!("Loading global blocking rules");
+                            if let Err(e) = manager.load_rules(suffix).await {
+                                tracing::error!("Failed to load global blocking rules: {}", e);
+                            }
+                        } else {
+                            tracing::debug!("Ignoring non-global blocking rules key: {}", k);
+                        }
+                    }
+                }
+            }
             _ => {
                 tracing::info!("Received message from unknown key pattern: {key}");
             }
@@ -205,6 +230,7 @@ impl RedisClient {
         key: &str,
         app_state: &AppStateData,
         auth: &Auth,
+        blocking_manager: &Option<Arc<BlockingRulesManager>>,
     ) -> Result<(), Error> {
         match key {
             k if k.starts_with(API_KEY_KEY_PREFIX) => {
@@ -248,6 +274,19 @@ impl RedisClient {
                     tracing::error!("Invalid model table key format: {key}");
                 }
                 tracing::info!("Deleted model table: {key}");
+            }
+            k if k.starts_with(BLOCKING_RULES_KEY_PREFIX) => {
+                if let Some(manager) = blocking_manager {
+                    // Only handle global blocking rules
+                    if let Some(suffix) = k.strip_prefix(BLOCKING_RULES_KEY_PREFIX) {
+                        if suffix == "global" {
+                            tracing::info!("Clearing global blocking rules");
+                            manager.clear_global_rules().await;
+                        } else {
+                            tracing::debug!("Ignoring deletion of non-global blocking rules key: {}", key);
+                        }
+                    }
+                }
             }
             _ => {
                 tracing::info!("Received message from unknown key pattern: {key}");
@@ -344,6 +383,21 @@ impl RedisClient {
             }
         }
 
+        // Fetch global blocking rules only
+        if let Some(ref blocking_manager) = self.blocking_manager {
+            let global_key = format!("{}global", BLOCKING_RULES_KEY_PREFIX);
+            if let Ok(exists) = self.conn.exists::<_, i32>(&global_key).await {
+                if exists > 0 {
+                    tracing::info!("Loading initial global blocking rules");
+                    if let Err(e) = blocking_manager.load_rules("global").await {
+                        tracing::error!("Failed to load initial global blocking rules: {}", e);
+                    }
+                } else {
+                    tracing::info!("No global blocking rules found on startup");
+                }
+            }
+        }
+
         // Get a connection for pubsub
         let mut pubsub_conn = self.client.get_async_pubsub().await.map_err(|e| {
             Error::new(ErrorDetails::Config {
@@ -381,6 +435,7 @@ impl RedisClient {
         let app_state = self.app_state.clone();
         let auth = self.auth.clone();
         let mut conn = self.conn.clone();
+        let blocking_manager = self.blocking_manager.clone();
 
         tokio::spawn(async move {
             let mut stream = pubsub_conn.on_message();
@@ -402,6 +457,7 @@ impl RedisClient {
                             &mut conn,
                             &app_state,
                             &auth,
+                            &blocking_manager,
                         )
                         .await
                         {
@@ -410,14 +466,14 @@ impl RedisClient {
                     }
                     c if c.ends_with("__:del") => {
                         if let Err(e) =
-                            Self::handle_del_key_event(payload.as_str(), &app_state, &auth).await
+                            Self::handle_del_key_event(payload.as_str(), &app_state, &auth, &blocking_manager).await
                         {
                             tracing::error!("Failed to handle del key event: {e}");
                         }
                     }
                     c if c.ends_with("__:expired") => {
                         if let Err(e) =
-                            Self::handle_del_key_event(payload.as_str(), &app_state, &auth).await
+                            Self::handle_del_key_event(payload.as_str(), &app_state, &auth, &blocking_manager).await
                         {
                             tracing::error!("Failed to handle expired key event: {e}");
                         }

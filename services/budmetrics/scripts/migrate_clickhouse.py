@@ -461,6 +461,79 @@ class ClickHouseMigration:
             logger.error(f"Error creating GatewayAnalytics table: {e}")
             raise
 
+    async def create_gateway_blocking_events_table(self):
+        """Create GatewayBlockingEvents table for tracking blocked requests."""
+        query = """
+        CREATE TABLE IF NOT EXISTS GatewayBlockingEvents
+        (
+            -- Event identifiers
+            id UUID,                           -- UUIDv7 for event record
+            rule_id UUID,                      -- Blocking rule that triggered the block
+
+            -- Client information
+            client_ip String,
+            country_code Nullable(String),
+            user_agent Nullable(String),
+
+            -- Request context
+            request_path String,
+            request_method LowCardinality(String),
+            api_key_id Nullable(String),       -- Hashed/masked API key if available
+
+            -- Project/endpoint context (optional)
+            project_id Nullable(UUID),
+            endpoint_id Nullable(UUID),
+            model_name LowCardinality(Nullable(String)),
+
+            -- Rule information
+            rule_type LowCardinality(String),  -- IP_BLOCKING, COUNTRY_BLOCKING, etc.
+            rule_name String,
+            rule_priority Int32,
+
+            -- Block details
+            block_reason String,
+            action_taken LowCardinality(String), -- BLOCK, RATE_LIMIT, etc.
+
+            -- Timing
+            blocked_at DateTime64(3),          -- When the block occurred
+
+            -- Materialized columns for efficient querying
+            timestamp DateTime MATERIALIZED toDateTime(blocked_at),
+            date Date MATERIALIZED toDate(blocked_at),
+            hour DateTime MATERIALIZED toStartOfHour(blocked_at)
+        )
+        ENGINE = MergeTree()
+        PARTITION BY toYYYYMM(blocked_at)
+        ORDER BY (rule_id, blocked_at, id)
+        TTL toDateTime(blocked_at) + INTERVAL 90 DAY
+        SETTINGS index_granularity = 8192
+        """
+
+        try:
+            await self.client.execute_query(query)
+            logger.info("GatewayBlockingEvents table created successfully")
+
+            # Create indexes for efficient queries
+            indexes = [
+                "ALTER TABLE GatewayBlockingEvents ADD INDEX IF NOT EXISTS idx_rule_timestamp (rule_id, blocked_at) TYPE minmax GRANULARITY 1",
+                "ALTER TABLE GatewayBlockingEvents ADD INDEX IF NOT EXISTS idx_client_ip (client_ip) TYPE bloom_filter(0.01) GRANULARITY 8",
+                "ALTER TABLE GatewayBlockingEvents ADD INDEX IF NOT EXISTS idx_country_code (country_code) TYPE set(300) GRANULARITY 4",
+                "ALTER TABLE GatewayBlockingEvents ADD INDEX IF NOT EXISTS idx_rule_type (rule_type) TYPE set(10) GRANULARITY 4",
+                "ALTER TABLE GatewayBlockingEvents ADD INDEX IF NOT EXISTS idx_project_timestamp (project_id, blocked_at) TYPE minmax GRANULARITY 1",
+                "ALTER TABLE GatewayBlockingEvents ADD INDEX IF NOT EXISTS idx_endpoint_timestamp (endpoint_id, blocked_at) TYPE minmax GRANULARITY 1",
+            ]
+
+            for index_query in indexes:
+                try:
+                    await self.client.execute_query(index_query)
+                except Exception as e:
+                    if "already exists" not in str(e):
+                        logger.warning(f"Index creation warning: {e}")
+
+        except Exception as e:
+            logger.error(f"Error creating GatewayBlockingEvents table: {e}")
+            raise
+
     async def verify_tables(self):
         """Verify that tables were created successfully."""
         tables_to_check = [
@@ -470,6 +543,7 @@ class ClickHouseMigration:
             "ImageInference",
             "ModerationInference",
             "GatewayAnalytics",
+            "GatewayBlockingEvents",
         ]
         if self.include_model_inference:
             tables_to_check.append("ModelInference")
@@ -502,6 +576,7 @@ class ClickHouseMigration:
             await self.create_image_inference_table()
             await self.create_moderation_inference_table()
             await self.create_gateway_analytics_table()
+            await self.create_gateway_blocking_events_table()
             await self.verify_tables()
             logger.info("Migration completed successfully!")
 

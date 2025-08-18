@@ -62,7 +62,9 @@ from .schemas import (
     BlockingRuleCreate,
     BlockingRuleListResponse,
     BlockingRuleResponse,
+    BlockingRulesStatsOverviewResponse,
     BlockingRuleUpdate,
+    BlockingStats,
     BlockingStatsResponse,
     ClientAnalyticsResponse,
     DashboardStatsResponse,
@@ -1168,6 +1170,108 @@ class MetricService(SessionMixin):
 
         return db_dashboard_stats
 
+    async def sync_blocking_rule_stats_from_clickhouse(self) -> Dict[str, Any]:
+        """Sync blocking rule match counts from ClickHouse to PostgreSQL.
+
+        This method retrieves the latest block counts from budmetrics ClickHouse
+        and updates the match_count and last_matched_at fields in PostgreSQL.
+
+        Returns:
+            Dictionary with sync summary
+        """
+        logger.info("Starting blocking rule stats sync from ClickHouse")
+
+        try:
+            # Call budmetrics to get rule stats from ClickHouse
+            budmetrics_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/method/observability/gateway/blocking-stats"
+
+            # Get stats for the last 24 hours
+            from datetime import datetime, timedelta
+
+            to_date = datetime.now()
+            from_date = to_date - timedelta(days=1)
+
+            params = {"from_date": from_date.isoformat(), "to_date": to_date.isoformat()}
+
+            logger.debug(f"Calling budmetrics endpoint: {budmetrics_endpoint}")
+            logger.debug(f"Request params: {params}")
+
+            # Make HTTP GET request to budmetrics via Dapr
+            async with aiohttp.ClientSession() as session:
+                async with session.get(budmetrics_endpoint, params=params) as response:
+                    if response.status == 200:
+                        stats_data = await response.json()
+                        logger.debug(f"Received stats data: {stats_data}")
+                    else:
+                        error_text = await response.text()
+                        logger.error(f"BudMetrics API error {response.status}: {error_text}")
+                        return {"error": f"BudMetrics API returned {response.status}", "updated_rules": 0}
+
+            # Process the stats and update PostgreSQL
+            if not stats_data:
+                logger.warning("No stats data received from budmetrics")
+                return {"message": "No stats data received", "updated_rules": 0}
+
+            logger.debug(f"Processing stats data: blocked_by_rule={stats_data.get('blocked_by_rule', {})}")
+
+            # Get all rules from PostgreSQL to sync their stats
+            updated_rules = 0
+            rule_data_manager = BlockingRuleDataManager(self.session)
+            all_rules = await rule_data_manager.get_all_blocking_rules()
+
+            # Get the blocked_by_rule mapping (rule_name -> count)
+            blocked_by_rule = stats_data.get("blocked_by_rule", {})
+
+            # Update each rule's statistics based on rule name match
+            for rule in all_rules:
+                try:
+                    rule_name = rule.name
+                    new_block_count = blocked_by_rule.get(rule_name, 0)
+
+                    # Only update if there are new blocks or if we need to reset to 0
+                    current_count = rule.match_count or 0
+
+                    if new_block_count > current_count:
+                        # There are new blocks - update with new count and current time
+                        update_data = {
+                            "match_count": new_block_count,
+                            "last_matched_at": datetime.now(),  # Use current time as last match
+                        }
+
+                        result = await rule_data_manager.update_blocking_rule_stats(rule.id, update_data)
+                        if result:
+                            updated_rules += 1
+                            logger.debug(f"Updated rule '{rule_name}': {current_count} -> {new_block_count} blocks")
+                    elif new_block_count == 0 and current_count > 0:
+                        # Reset count to 0 if no blocks in current period
+                        update_data = {"match_count": 0}
+
+                        result = await rule_data_manager.update_blocking_rule_stats(rule.id, update_data)
+                        if result:
+                            updated_rules += 1
+                            logger.debug(f"Reset rule '{rule_name}' count to 0")
+                    else:
+                        logger.debug(f"Rule '{rule_name}' count unchanged: {current_count}")
+
+                except Exception as e:
+                    logger.warning(f"Error updating rule {rule.id} ({rule.name}): {e}")
+                    continue
+
+            logger.info(f"Blocking rule stats sync completed: {updated_rules} rules updated")
+            return {
+                "success": True,
+                "updated_rules": updated_rules,
+                "total_stats_received": len(stats_data.get("rules", [])),
+                "sync_time": datetime.now().isoformat(),
+            }
+
+        except aiohttp.ClientError as e:
+            logger.error(f"HTTP error during stats sync: {e}")
+            return {"error": f"HTTP error: {str(e)}", "updated_rules": 0}
+        except Exception as e:
+            logger.error(f"Unexpected error during stats sync: {e}")
+            return {"error": f"Unexpected error: {str(e)}", "updated_rules": 0}
+
 
 # Gateway Analytics Services
 
@@ -1441,25 +1545,86 @@ class GatewayAnalyticsService(SessionMixin):
         if not project_ids:
             project_ids = await self._get_user_accessible_projects()
 
-        # Prepare query parameters
-        params = {
-            "start_time": start_time.isoformat(),
-            "end_time": end_time.isoformat(),
-        }
-        if project_ids:
-            params["project_ids"] = ",".join(str(pid) for pid in project_ids)
+        # Get blocking rules from database
+        from sqlalchemy import and_, func, select
 
-        # Proxy to budmetrics
-        response_data = await self._proxy_to_budmetrics(
-            "/gateway/blocking-stats",
-            method="GET",
-            params=params,
+        from budapp.metric_ops.models import GatewayBlockingRule
+
+        stmt = (
+            select(
+                GatewayBlockingRule.created_at.label("timestamp"),
+                GatewayBlockingRule.rule_config.label("rule_config"),
+                GatewayBlockingRule.rule_type.label("reason"),
+                func.count(GatewayBlockingRule.id).label("block_count"),
+                GatewayBlockingRule.project_id,
+            )
+            .where(
+                and_(
+                    GatewayBlockingRule.project_id.in_(project_ids) if project_ids else True,
+                    GatewayBlockingRule.created_at >= start_time,
+                    GatewayBlockingRule.created_at <= end_time,
+                    GatewayBlockingRule.status == "active",
+                )
+            )
+            .group_by(
+                GatewayBlockingRule.created_at,
+                GatewayBlockingRule.rule_config,
+                GatewayBlockingRule.rule_type,
+                GatewayBlockingRule.project_id,
+            )
+            .order_by(GatewayBlockingRule.created_at.desc())
         )
 
-        # Enrich with project names
-        await self._enrich_with_names(response_data)
+        result = self.session.execute(stmt)
+        rows = result.fetchall()
 
-        return BlockingStatsResponse(**response_data)
+        # Format response
+        items = []
+        unique_ips = set()
+        total_events = 0
+
+        for row in rows:
+            # Extract IP address from rule_config if available
+            ip_address = "N/A"
+            if row.rule_config and isinstance(row.rule_config, dict):
+                if "ip_addresses" in row.rule_config:
+                    ip_list = row.rule_config.get("ip_addresses", [])
+                    ip_address = ip_list[0] if ip_list else "N/A"
+                elif "ip" in row.rule_config:
+                    ip_address = row.rule_config.get("ip", "N/A")
+
+            items.append(
+                BlockingStats(
+                    timestamp=row.timestamp,
+                    ip_address=ip_address,
+                    reason=f"Rule type: {row.reason}",
+                    block_count=row.block_count,
+                    project_id=row.project_id,
+                )
+            )
+            unique_ips.add(ip_address)
+            total_events += row.block_count
+
+        # Enrich with project names
+        if items:
+            project_ids_to_enrich = list({item.project_id for item in items if item.project_id})
+            if project_ids_to_enrich:
+                from budapp.project_ops.models import Project
+
+                projects_stmt = select(Project.id, Project.name).where(Project.id.in_(project_ids_to_enrich))
+                projects_result = self.session.execute(projects_stmt)
+                project_map = {str(p.id): p.name for p in projects_result}
+
+                for item in items:
+                    if item.project_id:
+                        item.project_name = project_map.get(str(item.project_id))
+
+        return BlockingStatsResponse(
+            items=items,
+            total_blocked_ips=len(unique_ips),
+            total_block_events=total_events,
+            message="Blocking statistics retrieved successfully",
+        )
 
     async def get_top_routes(
         self,
@@ -1573,6 +1738,81 @@ class BlockingRulesService(SessionMixin):
         projects = result.get("projects", []) if isinstance(result, dict) else []
         return [project.id for project in projects]
 
+    async def _get_real_time_rule_blocks(
+        self, rule_names: List[str], rule_name_to_id: Dict[str, str]
+    ) -> Dict[str, Dict[str, Any]]:
+        """Get real-time block counts for specific rules from ClickHouse via budmetrics.
+
+        Args:
+            rule_names: List of rule names to get block counts for
+            rule_name_to_id: Mapping of rule names to rule IDs
+
+        Returns:
+            Dictionary mapping rule_id -> {total_blocks: int, last_block_time: datetime}
+        """
+        if not rule_names:
+            return {}
+
+        try:
+            # Use the existing blocking-stats endpoint with a long time range to get all blocks
+            budmetrics_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/method/observability/gateway/blocking-stats"
+
+            # Get blocks from last 30 days to capture most activity
+            from datetime import datetime, timedelta
+
+            end_time = datetime.now()
+            start_time = end_time - timedelta(days=30)
+
+            params = {
+                "from_date": start_time.isoformat(),
+                "to_date": end_time.isoformat(),
+            }
+
+            import aiohttp
+
+            async with aiohttp.ClientSession() as client_session:
+                async with client_session.get(budmetrics_endpoint, params=params) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        logger.info(f"Budmetrics response for rule blocks: {data}")
+
+                        # Process the response to extract per-rule statistics
+                        rule_stats = {}
+
+                        # Initialize all requested rules with zero counts (using rule IDs)
+                        rule_stats = {}
+                        for rule_name in rule_names:
+                            rule_id = rule_name_to_id[rule_name]
+                            rule_stats[rule_id] = {"total_blocks": 0, "last_block_time": None}
+
+                        # Parse blocked_by_rule data (which uses rule names)
+                        blocked_by_rule = data.get("blocked_by_rule", {})
+                        logger.info(f"blocked_by_rule data: {blocked_by_rule}")
+                        logger.info(f"Looking for rule_names: {rule_names}")
+                        logger.info(f"rule_name_to_id mapping: {rule_name_to_id}")
+
+                        for rule_name, count in blocked_by_rule.items():
+                            logger.info(f"Processing rule_name: {rule_name}, count: {count}")
+                            if rule_name in rule_name_to_id:
+                                rule_id = rule_name_to_id[rule_name]
+                                rule_stats[rule_id]["total_blocks"] = count
+                                logger.info(f"Updated rule {rule_name} (ID: {rule_id}) with count {count}")
+
+                        logger.info(f"Final rule_stats: {rule_stats}")
+                        return rule_stats
+                    else:
+                        logger.warning(f"Failed to fetch block counts from budmetrics: {response.status}")
+                        response_text = await response.text()
+                        logger.warning(f"Response body: {response_text}")
+                        return {
+                            rule_name_to_id[name]: {"total_blocks": 0, "last_block_time": None} for name in rule_names
+                        }
+
+        except Exception as e:
+            logger.error(f"Error fetching real-time rule block counts: {e}")
+            # Fallback: return empty counts for all rules
+            return {rule_name_to_id[name]: {"total_blocks": 0, "last_block_time": None} for name in rule_names}
+
     async def _validate_project_access(self, project_id: UUID) -> None:
         """Validate user has access to the project.
 
@@ -1632,26 +1872,59 @@ class BlockingRulesService(SessionMixin):
         Args:
             rule: Blocking rule to sync
         """
-        # Create Redis key for the rule
-        redis_key = f"blocking_rule:{rule.project_id}:{rule.id}"
+        # Determine Redis key based on rule scope
+        if rule.endpoint_id:
+            # Endpoint-specific rule
+            redis_key = f"blocking_rules:endpoint:{rule.endpoint_id}"
+        elif not rule.project_id:
+            # Global rule
+            redis_key = "blocking_rules:global"
+        else:
+            # Legacy project-specific rule (for backwards compatibility)
+            redis_key = f"blocking_rule:{rule.project_id}:{rule.id}"
 
         # Prepare rule data for Redis
         rule_data = {
             "id": str(rule.id),
-            "project_id": str(rule.project_id),
+            "project_id": str(rule.project_id) if rule.project_id else None,
             "endpoint_id": str(rule.endpoint_id) if rule.endpoint_id else None,
-            "rule_type": rule.rule_type,
-            "rule_config": rule.rule_config,
+            "rule_type": rule.rule_type.name,  # Use enum name for SCREAMING_SNAKE_CASE
+            "name": rule.name,  # Required field for Rust BlockingRule struct
+            "config": rule.rule_config,  # Rust expects 'config' not 'rule_config'
             "priority": rule.priority,
-            "status": rule.status,
+            "status": rule.status.name,  # Use enum name for SCREAMING_SNAKE_CASE
+            "action": "block",  # Default action for blocking rules
+            "expires_at": None,  # Currently not used but expected by Rust struct
+            "reason": rule.reason,  # Include reason in the main rule data
         }
 
-        # Store in Redis with 24-hour expiry
-        await self.redis_service.set(redis_key, json.dumps(rule_data), ttl=86400)
+        # Store rule reason separately for gateway blocking middleware access
+        if rule.reason:
+            reason_key = f"blocking_rule_reason:{rule.name}"
+            await self.redis_service.set(reason_key, rule.reason, ex=86400)
+            logger.debug(f"Stored rule reason in Redis: {reason_key} = {rule.reason}")
 
-        # Also add to project's rule set for quick lookup
-        project_rules_key = f"project_blocking_rules:{rule.project_id}"
-        await self.redis_service.sadd(project_rules_key, str(rule.id))
+        # For global and endpoint rules, we need to get all rules and update as a list
+        if rule.endpoint_id or not rule.project_id:
+            # Get existing rules
+            existing_data = await self.redis_service.get(redis_key)
+            existing_rules = json.loads(existing_data) if existing_data else []
+
+            # Remove any existing rule with same ID
+            existing_rules = [r for r in existing_rules if r.get("id") != str(rule.id)]
+
+            # Add new/updated rule
+            existing_rules.append(rule_data)
+
+            # Store back in Redis (ex=86400 is 24 hours in seconds)
+            await self.redis_service.set(redis_key, json.dumps(existing_rules), ex=86400)
+        else:
+            # Legacy single rule storage (ex=86400 is 24 hours in seconds)
+            await self.redis_service.set(redis_key, json.dumps(rule_data), ex=86400)
+
+            # Also add to project's rule set for quick lookup
+            project_rules_key = f"project_blocking_rules:{rule.project_id}"
+            await self.redis_service.sadd(project_rules_key, str(rule.id))
 
     async def _remove_rule_from_redis(self, rule: GatewayBlockingRule) -> None:
         """Remove a rule from Redis.
@@ -1659,40 +1932,97 @@ class BlockingRulesService(SessionMixin):
         Args:
             rule: Blocking rule to remove
         """
-        redis_key = f"blocking_rule:{rule.project_id}:{rule.id}"
-        await self.redis_service.delete(redis_key)
+        # Determine Redis key based on rule scope
+        if rule.endpoint_id:
+            # Endpoint-specific rule
+            redis_key = f"blocking_rules:endpoint:{rule.endpoint_id}"
+        elif not rule.project_id:
+            # Global rule
+            redis_key = "blocking_rules:global"
+        else:
+            # Legacy project-specific rule
+            redis_key = f"blocking_rule:{rule.project_id}:{rule.id}"
 
-        # Remove from project's rule set
-        project_rules_key = f"project_blocking_rules:{rule.project_id}"
-        await self.redis_service.srem(project_rules_key, str(rule.id))
+        # Remove rule reason from Redis
+        reason_key = f"blocking_rule_reason:{rule.name}"
+        await self.redis_service.delete(reason_key)
+        logger.debug(f"Removed rule reason from Redis: {reason_key}")
+
+        # For global and endpoint rules, we need to update the list
+        if rule.endpoint_id or not rule.project_id:
+            # Get existing rules
+            existing_data = await self.redis_service.get(redis_key)
+            existing_rules = json.loads(existing_data) if existing_data else []
+
+            # Remove the rule
+            existing_rules = [r for r in existing_rules if r.get("id") != str(rule.id)]
+
+            # Store back in Redis (or delete if empty)
+            if existing_rules:
+                await self.redis_service.set(redis_key, json.dumps(existing_rules), ex=86400)
+            else:
+                await self.redis_service.delete(redis_key)
+        else:
+            # Legacy single rule removal
+            await self.redis_service.delete(redis_key)
+
+            # Remove from project's rule set
+            project_rules_key = f"project_blocking_rules:{rule.project_id}"
+            await self.redis_service.srem(project_rules_key, str(rule.id))
 
     async def create_blocking_rule(
         self,
-        project_id: UUID,
+        project_id: Optional[UUID],
         rule_data: BlockingRuleCreate,
     ) -> BlockingRule:
         """Create a new blocking rule.
 
         Args:
-            project_id: Project ID
+            project_id: Optional Project ID (None for global rules)
             rule_data: Rule creation data
 
         Returns:
             Created blocking rule
         """
-        # Validate project access
-        await self._validate_project_access(project_id)
+        # Validate project access if project_id provided
+        if project_id:
+            await self._validate_project_access(project_id)
+        elif not rule_data.model_name:
+            # Global rules require admin privileges
+            if not self.user.is_superuser:
+                raise ClientException(
+                    "Only administrators can create global blocking rules",
+                    status_code=status.HTTP_403_FORBIDDEN,
+                )
 
         # Validate rule configuration
         await self._validate_rule_config(rule_data.rule_type, rule_data.rule_config)
 
-        # Check if rule name already exists
-        name_exists = await self.data_manager.check_rule_name_exists(project_id, rule_data.name)
-        if name_exists:
-            raise ClientException(
-                f"A rule with name '{rule_data.name}' already exists in this project",
-                status_code=status.HTTP_409_CONFLICT,
-            )
+        # Check if rule name already exists in the same scope
+        if rule_data.model_name:
+            # Check for model-specific rule name conflict
+            name_exists = await self.data_manager.check_model_rule_name_exists(rule_data.model_name, rule_data.name)
+            if name_exists:
+                raise ClientException(
+                    f"A rule with name '{rule_data.name}' already exists for model '{rule_data.model_name}'",
+                    status_code=status.HTTP_409_CONFLICT,
+                )
+        elif project_id:
+            # Check for project-specific rule name conflict
+            name_exists = await self.data_manager.check_rule_name_exists(project_id, rule_data.name)
+            if name_exists:
+                raise ClientException(
+                    f"A rule with name '{rule_data.name}' already exists in this project",
+                    status_code=status.HTTP_409_CONFLICT,
+                )
+        else:
+            # Check for global rule name conflict
+            name_exists = await self.data_manager.check_global_rule_name_exists(rule_data.name)
+            if name_exists:
+                raise ClientException(
+                    f"A global rule with name '{rule_data.name}' already exists",
+                    status_code=status.HTTP_409_CONFLICT,
+                )
 
         # Create the rule
         db_rule = await self.data_manager.create_blocking_rule(
@@ -1705,7 +2035,26 @@ class BlockingRulesService(SessionMixin):
         await self._sync_rule_to_redis(db_rule)
 
         # Convert to response schema
-        return BlockingRule.model_validate(db_rule)
+        # Create a dictionary with all required fields
+        rule_dict = {
+            "id": db_rule.id,
+            "name": db_rule.name,
+            "description": db_rule.description,
+            "rule_type": db_rule.rule_type,
+            "rule_config": db_rule.rule_config,
+            "status": db_rule.status,
+            "reason": db_rule.reason,
+            "priority": db_rule.priority,
+            "project_id": db_rule.project_id,
+            "model_name": db_rule.model_name,
+            "endpoint_id": db_rule.endpoint_id,
+            "created_by": db_rule.created_by,
+            "match_count": db_rule.match_count,
+            "last_matched_at": db_rule.last_matched_at,
+            "created_at": db_rule.created_at,
+            "updated_at": db_rule.modified_at,  # Schema will map this via validation_alias
+        }
+        return BlockingRule.model_validate(rule_dict)
 
     async def get_blocking_rule(self, rule_id: UUID) -> BlockingRule:
         """Get a specific blocking rule.
@@ -1775,7 +2124,7 @@ class BlockingRulesService(SessionMixin):
         else:
             project_ids = accessible_projects
 
-        # Get rules
+        # Get rules (no sync needed - block counts will come from ClickHouse directly)
         rules, total = await self.data_manager.list_blocking_rules(
             project_ids=project_ids,
             rule_type=rule_type,
@@ -1785,8 +2134,13 @@ class BlockingRulesService(SessionMixin):
             page_size=page_size,
         )
 
-        # Convert to response schema with enriched data
+        # Convert to response schema with enriched real-time data
         items = []
+
+        # Get real-time block counts for all rules from ClickHouse using rule names
+        rule_name_to_id = {rule.name: str(rule.id) for rule in rules}
+        rule_block_counts = await self._get_real_time_rule_blocks(list(rule_name_to_id.keys()), rule_name_to_id)
+
         for rule in rules:
             item = BlockingRule.model_validate(rule)
             if rule.project:
@@ -1795,15 +2149,282 @@ class BlockingRulesService(SessionMixin):
                 item.endpoint_name = rule.endpoint.name
             if rule.created_user:
                 item.created_by_name = rule.created_user.name
+
+            # Use real-time block counts from ClickHouse instead of stale PostgreSQL data
+            rule_id_str = str(rule.id)
+            if rule_id_str in rule_block_counts:
+                block_data = rule_block_counts[rule_id_str]
+                item.match_count = block_data.get("total_blocks", 0)
+                item.last_matched_at = block_data.get("last_block_time")
+            else:
+                # No blocks found for this rule
+                item.match_count = 0
+                item.last_matched_at = None
+
             items.append(item)
 
         return BlockingRuleListResponse(
-            success=True,
+            message="Blocking rules retrieved successfully",
             items=items,
             total=total,
             page=page,
             page_size=page_size,
         )
+
+    async def get_blocking_rules_stats_overview(
+        self,
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None,
+    ) -> BlockingRulesStatsOverviewResponse:
+        """Get blocking rules overview statistics for dashboard cards.
+
+        Args:
+            start_time: Start time for time-based statistics (defaults to 7 days ago)
+            end_time: End time for time-based statistics (defaults to now)
+
+        Returns:
+            BlockingRulesStatsOverviewResponse with dashboard statistics
+        """
+        from datetime import datetime, timedelta
+
+        from ..commons.constants import BlockingRuleStatus
+        from .schemas import BlockingRulesStatsOverviewResponse
+
+        # Default time range to last 7 days if not provided
+        if not start_time:
+            start_time = datetime.now() - timedelta(days=7)
+        if not end_time:
+            end_time = datetime.now()
+
+        # Get accessible projects
+        accessible_projects = await self._get_user_accessible_projects()
+
+        # Get rule counts from database
+        from sqlalchemy import and_, func, select
+
+        from .models import GatewayBlockingRule
+
+        # Base query for rules user has access to
+        base_query = select(GatewayBlockingRule).where(and_(GatewayBlockingRule.project_id.in_(accessible_projects)))
+
+        # Total rules count
+        total_rules_result = await self.session.execute(
+            select(func.count(GatewayBlockingRule.id)).where(GatewayBlockingRule.project_id.in_(accessible_projects))
+        )
+        total_rules = total_rules_result.scalar() or 0
+
+        # Active rules count
+        active_rules_result = await self.session.execute(
+            select(func.count(GatewayBlockingRule.id)).where(
+                and_(
+                    GatewayBlockingRule.project_id.in_(accessible_projects),
+                    GatewayBlockingRule.status == BlockingRuleStatus.ACTIVE,
+                )
+            )
+        )
+        active_rules = active_rules_result.scalar() or 0
+
+        # Inactive rules count
+        inactive_rules_result = await self.session.execute(
+            select(func.count(GatewayBlockingRule.id)).where(
+                and_(
+                    GatewayBlockingRule.project_id.in_(accessible_projects),
+                    GatewayBlockingRule.status == BlockingRuleStatus.INACTIVE,
+                )
+            )
+        )
+        inactive_rules = inactive_rules_result.scalar() or 0
+
+        # Expired rules count
+        expired_rules_result = await self.session.execute(
+            select(func.count(GatewayBlockingRule.id)).where(
+                and_(
+                    GatewayBlockingRule.project_id.in_(accessible_projects),
+                    GatewayBlockingRule.status == BlockingRuleStatus.EXPIRED,
+                )
+            )
+        )
+        expired_rules = expired_rules_result.scalar() or 0
+
+        # Get block counts from ClickHouse via budmetrics
+        total_blocks_today = 0
+        total_blocks_week = 0
+        top_blocked_ips = []
+        top_blocked_countries = []
+        blocks_by_type = {}
+        blocks_timeline = []
+
+        try:
+            # Sync latest stats first
+            await self.sync_blocking_rule_stats_from_clickhouse()
+
+            # Get blocks for today (last 24 hours)
+            today_start = datetime.now() - timedelta(hours=24)
+            today_params = {
+                "from_date": today_start,
+                "to_date": datetime.now(),
+            }
+
+            budmetrics_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/method/observability/gateway/blocking-stats"
+
+            async with aiohttp.ClientSession() as client_session:
+                # Get today's stats
+                async with client_session.get(budmetrics_endpoint, params=today_params) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        total_blocks_today = data.get("total_blocked", 0)
+
+                # Get week's stats
+                week_params = {
+                    "from_date": start_time,
+                    "to_date": end_time,
+                }
+                async with client_session.get(budmetrics_endpoint, params=week_params) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        total_blocks_week = data.get("total_blocked", 0)
+                        top_blocked_ips = data.get("top_blocked_ips", [])[:5]  # Top 5
+                        # Extract more detailed stats if available
+                        blocked_by_reason = data.get("blocked_by_reason", {})
+                        blocks_by_type = blocked_by_reason  # Map to rule types
+
+        except Exception as e:
+            logger.warning(f"Failed to get blocking statistics from ClickHouse: {e}")
+
+        return BlockingRulesStatsOverviewResponse(
+            message="Blocking rules statistics retrieved successfully",
+            total_rules=total_rules,
+            active_rules=active_rules,
+            inactive_rules=inactive_rules,
+            expired_rules=expired_rules,
+            total_blocks_today=total_blocks_today,
+            total_blocks_week=total_blocks_week,
+            top_blocked_ips=top_blocked_ips,
+            top_blocked_countries=top_blocked_countries,
+            blocks_by_type=blocks_by_type,
+            blocks_timeline=blocks_timeline,
+        )
+
+    async def get_blocking_dashboard_stats(
+        self,
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None,
+    ) -> Dict[str, Any]:
+        """Get blocking rules dashboard statistics directly from source databases.
+
+        This method queries PostgreSQL for rule counts and ClickHouse for block counts
+        without storing duplicate data in PostgreSQL.
+
+        Args:
+            start_time: Start time for block statistics (defaults to 24 hours ago for today)
+            end_time: End time for block statistics (defaults to now)
+
+        Returns:
+            Dictionary with dashboard statistics
+        """
+        from datetime import datetime, timedelta
+
+        from ..commons.constants import BlockingRuleStatus
+
+        # Get accessible projects
+        accessible_projects = await self._get_user_accessible_projects()
+
+        # Get rule counts from PostgreSQL (configuration data only)
+        from sqlalchemy import and_, func, or_, select
+
+        from .models import GatewayBlockingRule
+
+        # Build filter: include global rules (project_id IS NULL) + rules for accessible projects
+        rule_filter = GatewayBlockingRule.project_id.is_(None)  # Global rules
+        if accessible_projects:
+            # Add project-specific rules for accessible projects
+            rule_filter = or_(rule_filter, GatewayBlockingRule.project_id.in_(accessible_projects))
+
+        # Total rules count (global + project-specific for accessible projects)
+        total_rules_result = self.session.execute(select(func.count(GatewayBlockingRule.id)).where(rule_filter))
+        total_rules = total_rules_result.scalar() or 0
+
+        # Active rules count
+        active_rules_result = self.session.execute(
+            select(func.count(GatewayBlockingRule.id)).where(
+                and_(rule_filter, GatewayBlockingRule.status == BlockingRuleStatus.ACTIVE)
+            )
+        )
+        active_rules = active_rules_result.scalar() or 0
+
+        # Inactive rules count
+        inactive_rules_result = self.session.execute(
+            select(func.count(GatewayBlockingRule.id)).where(
+                and_(rule_filter, GatewayBlockingRule.status == BlockingRuleStatus.INACTIVE)
+            )
+        )
+        inactive_rules = inactive_rules_result.scalar() or 0
+
+        # Expired rules count
+        expired_rules_result = self.session.execute(
+            select(func.count(GatewayBlockingRule.id)).where(
+                and_(rule_filter, GatewayBlockingRule.status == BlockingRuleStatus.EXPIRED)
+            )
+        )
+        expired_rules = expired_rules_result.scalar() or 0
+
+        # Get block counts directly from ClickHouse via budmetrics
+        total_blocks_today = 0
+        total_blocks_week = 0
+
+        try:
+            # Get current date for proper day boundaries
+            now = datetime.now()
+
+            # Get blocks for today (current calendar day: 00:00 to now)
+            today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            today_params = {
+                "from_date": today_start.isoformat(),
+                "to_date": now.isoformat(),
+            }
+
+            # Get blocks for the week (last 7 calendar days including today)
+            week_start = (now - timedelta(days=6)).replace(hour=0, minute=0, second=0, microsecond=0)
+            week_params = {
+                "from_date": week_start.isoformat(),
+                "to_date": now.isoformat(),
+            }
+
+            budmetrics_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/method/observability/gateway/blocking-stats"
+
+            import aiohttp
+
+            async with aiohttp.ClientSession() as client_session:
+                # Get today's blocks
+                async with client_session.get(budmetrics_endpoint, params=today_params) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        total_blocks_today = data.get("total_blocked", 0)
+
+                # Get week's blocks
+                async with client_session.get(budmetrics_endpoint, params=week_params) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        total_blocks_week = data.get("total_blocked", 0)
+
+        except Exception as e:
+            logger.warning(f"Failed to get blocking statistics from ClickHouse: {e}")
+            # Return zeros if ClickHouse is not available
+            total_blocks_today = 0
+            total_blocks_week = 0
+
+        return {
+            "total_rules": total_rules,
+            "active_rules": active_rules,
+            "inactive_rules": inactive_rules,
+            "expired_rules": expired_rules,
+            "total_blocks_today": total_blocks_today,
+            "total_blocks_week": total_blocks_week,
+            "top_blocked_ips": [],
+            "top_blocked_countries": [],
+            "blocks_by_type": {},
+            "blocks_timeline": [],
+        }
 
     async def update_blocking_rule(
         self,

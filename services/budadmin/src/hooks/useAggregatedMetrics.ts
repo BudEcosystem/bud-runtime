@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { AppRequest } from '@/pages/api/requests';
+import { AppRequest } from '../pages/api/requests';
 import { tempApiBaseUrl } from '@/components/environment';
 import dayjs from 'dayjs';
 

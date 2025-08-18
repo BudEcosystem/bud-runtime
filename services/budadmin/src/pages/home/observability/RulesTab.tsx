@@ -1,9 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { Button, Card, Row, Col, Statistic, Select, Space, Tooltip, message, Modal, Tag } from 'antd';
+import React, { useEffect, useState, useMemo } from 'react';
+import { Button, Card, Row, Col, Statistic, Select, Tooltip, message, Modal, Tag, Space, ConfigProvider } from 'antd';
+import { useDrawer } from '@/hooks/useDrawer';
 import {
   PlusOutlined,
-  ReloadOutlined,
-  SyncOutlined,
   SecurityScanOutlined,
   StopOutlined,
   GlobalOutlined,
@@ -11,13 +10,14 @@ import {
   ClockCircleOutlined,
   ThunderboltOutlined
 } from '@ant-design/icons';
-import { useBlockingRules, BlockingRuleType, BlockingRuleStatus } from '@/stores/useBlockingRules';
-import BlockingRulesList from '@/components/blocking-rules/BlockingRulesList';
-import BlockingRuleForm from '@/components/blocking-rules/BlockingRuleForm';
-import BlockingRuleStats from '@/components/blocking-rules/BlockingRuleStats';
-import { PrimaryButton, SecondaryButton } from '@/components/ui/bud/form/Buttons';
-import { Text_12_400_808080, Text_14_600_EEEEEE } from '@/components/ui/text';
-import { useProjects } from '@/hooks/useProjects';
+import { useBlockingRules, BlockingRuleType, BlockingRuleStatus, BlockingRule } from '@/stores/useBlockingRules';
+import { BlockingRulesList } from '@/components/blocking/BlockingRulesList';
+import { RULE_TYPE_VALUES, RULE_TYPE_LABELS } from '@/constants/blockingRules';
+import { Text_12_400_808080, Text_14_600_EEEEEE, Text_12_400_EEEEEE, Text_12_500_FFFFFF, Text_22_700_EEEEEE } from '@/components/ui/text';
+import { useEndPoints } from '@/hooks/useEndPoint';
+import { useLoader } from '../../../context/appContext';
+import { PrimaryButton } from '@/components/ui/bud/form/Buttons';
+import { useConfirmAction } from 'src/hooks/useConfirmAction';
 import dayjs from 'dayjs';
 
 interface RulesTabProps {
@@ -28,9 +28,7 @@ interface RulesTabProps {
 const RulesTab: React.FC<RulesTabProps> = ({ timeRange, isActive }) => {
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<any>(null);
-  const [selectedProject, setSelectedProject] = useState<string | undefined>(undefined);
-  const [selectedRuleType, setSelectedRuleType] = useState<BlockingRuleType | undefined>(undefined);
-  const [selectedStatus, setSelectedStatus] = useState<BlockingRuleStatus | undefined>(undefined);
+  const [localFilters, setLocalFilters] = useState<any>({});
 
   const {
     rules,
@@ -38,53 +36,100 @@ const RulesTab: React.FC<RulesTabProps> = ({ timeRange, isActive }) => {
     isLoading,
     isCreating,
     isUpdating,
-    isSyncing,
     fetchRules,
     fetchStats,
     createRule,
     updateRule,
     deleteRule,
-    syncRules,
     setFilters,
     clearFilters,
   } = useBlockingRules();
 
-  const { projects, getProjects } = useProjects();
+  const { endPoints, getEndPoints } = useEndPoints();
+  const { showLoader, hideLoader } = useLoader();
+  const { contextHolder, openConfirm } = useConfirmAction();
+  const [deletingRuleId, setDeletingRuleId] = useState<string | null>(null);
 
-  // Fetch projects on mount
+  // Fetch deployments on mount
   useEffect(() => {
-    if (isActive) {
-      getProjects();
-    }
+    const loadInitialData = async () => {
+      if (isActive) {
+        showLoader();
+        try {
+          await getEndPoints();
+        } finally {
+          hideLoader();
+        }
+      }
+    };
+    loadInitialData();
   }, [isActive]);
 
   // Fetch rules and stats when tab is active
   useEffect(() => {
-    if (isActive) {
-      fetchRules(selectedProject);
-      fetchStats(
-        selectedProject,
-        timeRange[0].toISOString(),
-        timeRange[1].toISOString()
-      );
-    }
-  }, [isActive, selectedProject, timeRange]);
+    const loadRulesAndStats = async () => {
+      if (isActive) {
+        showLoader();
+        try {
+          // Fetch rules first, then stats (since stats calculation depends on rules)
+          await fetchRules();
+          await fetchStats(
+            timeRange[0].toISOString(),
+            timeRange[1].toISOString()
+          );
+        } finally {
+          hideLoader();
+        }
+      }
+    };
+    loadRulesAndStats();
+  }, [isActive, timeRange]);
 
-  // Apply filters
-  useEffect(() => {
-    setFilters({
-      project_id: selectedProject,
-      rule_type: selectedRuleType,
-      status: selectedStatus,
-    });
-    if (isActive) {
-      fetchRules(selectedProject);
+  // Filter rules based on filter criteria
+  const filteredRules = useMemo(() => {
+    let result = [...rules];
+
+    // Filter by rule type
+    if (localFilters.rule_type) {
+      result = result.filter(rule => rule.rule_type === localFilters.rule_type);
     }
-  }, [selectedProject, selectedRuleType, selectedStatus]);
+
+    // Filter by status
+    if (localFilters.status) {
+      result = result.filter(rule => rule.status === localFilters.status);
+    }
+
+    return result;
+  }, [rules, localFilters]);
+
+  const handleRuleTypeChange = (value: string) => {
+    const newFilters = { ...localFilters };
+    if (value) {
+      newFilters.rule_type = value;
+    } else {
+      delete newFilters.rule_type;
+    }
+    setLocalFilters(newFilters);
+  };
+
+  const handleStatusChange = (value: string) => {
+    const newFilters = { ...localFilters };
+    if (value) {
+      newFilters.status = value;
+    } else {
+      delete newFilters.status;
+    }
+    setLocalFilters(newFilters);
+  };
+
+  const { openDrawer } = useDrawer();
 
   const handleCreateRule = () => {
-    setEditingRule(null);
-    setIsFormModalOpen(true);
+    openDrawer('create-blocking-rule', {});
+  };
+
+  const handleViewRule = (rule: any) => {
+    openDrawer('view-blocking-rule', { rule });
   };
 
   const handleEditRule = (rule: any) => {
@@ -93,49 +138,63 @@ const RulesTab: React.FC<RulesTabProps> = ({ timeRange, isActive }) => {
   };
 
   const handleDeleteRule = (ruleId: string) => {
-    Modal.confirm({
-      title: 'Delete Blocking Rule',
-      content: 'Are you sure you want to delete this rule? This action cannot be undone.',
-      okText: 'Delete',
-      okType: 'danger',
-      onOk: async () => {
-        await deleteRule(ruleId);
+    const rule = rules.find(r => r.id === ruleId);
+    const ruleName = rule?.name || 'this rule';
+
+    openConfirm({
+      message: `You're about to delete the ${ruleName} blocking rule`,
+      description: 'Once you delete the rule, it will not be recovered. Are you sure?',
+      cancelAction: () => {
+        setDeletingRuleId(null);
       },
+      cancelText: 'Cancel',
+      okAction: async () => {
+        try {
+          setDeletingRuleId(ruleId);
+          showLoader();
+          await deleteRule(ruleId);
+          await fetchRules();
+        } finally {
+          hideLoader();
+          setDeletingRuleId(null);
+        }
+      },
+      okText: 'Delete Rule',
+      type: 'warining',
+      loading: deletingRuleId === ruleId,
+      key: 'delete-rule'
     });
   };
 
-  const handleSyncRules = async () => {
-    const projectIds = selectedProject ? [selectedProject] : undefined;
-    await syncRules(projectIds);
-  };
 
   const handleFormSubmit = async (values: any) => {
-    if (editingRule) {
-      const success = await updateRule(editingRule.id, values);
-      if (success) {
-        setIsFormModalOpen(false);
+    showLoader();
+    try {
+      if (editingRule) {
+        const success = await updateRule(editingRule.id, values);
+        if (success) {
+          setIsFormModalOpen(false);
+        }
+      } else {
+        const success = await createRule(values);
+        if (success) {
+          setIsFormModalOpen(false);
+        }
       }
-    } else {
-      if (!selectedProject) {
-        message.error('Please select a project first');
-        return;
-      }
-      const success = await createRule(selectedProject, values);
-      if (success) {
-        setIsFormModalOpen(false);
-      }
+    } finally {
+      hideLoader();
     }
   };
 
   const getRuleTypeIcon = (type: BlockingRuleType) => {
     switch (type) {
-      case 'IP_BLOCKING':
+      case 'ip_blocking':
         return <StopOutlined />;
-      case 'COUNTRY_BLOCKING':
+      case 'country_blocking':
         return <GlobalOutlined />;
-      case 'USER_AGENT_BLOCKING':
+      case 'user_agent_blocking':
         return <UserOutlined />;
-      case 'RATE_BASED_BLOCKING':
+      case 'rate_based_blocking':
         return <ThunderboltOutlined />;
       default:
         return <SecurityScanOutlined />;
@@ -144,13 +203,13 @@ const RulesTab: React.FC<RulesTabProps> = ({ timeRange, isActive }) => {
 
   const getRuleTypeColor = (type: BlockingRuleType) => {
     switch (type) {
-      case 'IP_BLOCKING':
+      case 'ip_blocking':
         return '#ef4444';
-      case 'COUNTRY_BLOCKING':
+      case 'country_blocking':
         return '#3b82f6';
-      case 'USER_AGENT_BLOCKING':
+      case 'user_agent_blocking':
         return '#f59e0b';
-      case 'RATE_BASED_BLOCKING':
+      case 'rate_based_blocking':
         return '#10b981';
       default:
         return '#6b7280';
@@ -158,163 +217,131 @@ const RulesTab: React.FC<RulesTabProps> = ({ timeRange, isActive }) => {
   };
 
   return (
-    <div className="rulesTabContainer">
+    <div className="rulesTabContainer bg-[#0A0A0A] min-h-screen text-white">
+      {contextHolder}
       {/* Statistics Cards */}
-      <BlockingRuleStats stats={stats} isLoading={isLoading} />
+      <Row gutter={16} className="mb-6">
+        <Col span={6}>
+          <div className="bg-[#101010] p-[1.45rem] pb-[1.2rem] rounded-[6.403px] border-[1.067px] border-[#1F1F1F] min-h-[7.8125rem] flex flex-col items-start justify-between">
+            <div className="flex items-center gap-2 mb-3">
+              <SecurityScanOutlined style={{ fontSize: '1.25rem', color: '#3F8EF7' }} />
+              <Text_12_500_FFFFFF>Total Rules</Text_12_500_FFFFFF>
+            </div>
+            <div className="flex flex-col w-full">
+              <Text_22_700_EEEEEE style={{ color: '#EEEEEE' }}>
+                {stats?.total_rules || 0}
+              </Text_22_700_EEEEEE>
+            </div>
+          </div>
+        </Col>
+        <Col span={6}>
+          <div className="bg-[#101010] p-[1.45rem] pb-[1.2rem] rounded-[6.403px] border-[1.067px] border-[#1F1F1F] min-h-[7.8125rem] flex flex-col items-start justify-between">
+            <div className="flex items-center gap-2 mb-3">
+              <ThunderboltOutlined style={{ fontSize: '1.25rem', color: '#22c55e' }} />
+              <Text_12_500_FFFFFF>Active Rules</Text_12_500_FFFFFF>
+            </div>
+            <div className="flex flex-col w-full">
+              <Text_22_700_EEEEEE style={{ color: '#52c41a' }}>
+                {stats?.active_rules || 0}
+              </Text_22_700_EEEEEE>
+            </div>
+          </div>
+        </Col>
+        <Col span={6}>
+          <div className="bg-[#101010] p-[1.45rem] pb-[1.2rem] rounded-[6.403px] border-[1.067px] border-[#1F1F1F] min-h-[7.8125rem] flex flex-col items-start justify-between">
+            <div className="flex items-center gap-2 mb-3">
+              <StopOutlined style={{ fontSize: '1.25rem', color: '#ef4444' }} />
+              <Text_12_500_FFFFFF>Blocks Today</Text_12_500_FFFFFF>
+            </div>
+            <div className="flex flex-col w-full">
+              <Text_22_700_EEEEEE style={{ color: '#ff4d4f' }}>
+                {stats?.total_blocks_today || 0}
+              </Text_22_700_EEEEEE>
+            </div>
+          </div>
+        </Col>
+        <Col span={6}>
+          <div className="bg-[#101010] p-[1.45rem] pb-[1.2rem] rounded-[6.403px] border-[1.067px] border-[#1F1F1F] min-h-[7.8125rem] flex flex-col items-start justify-between">
+            <div className="flex items-center gap-2 mb-3">
+              <ClockCircleOutlined style={{ fontSize: '1.25rem', color: '#FFC442' }} />
+              <Text_12_500_FFFFFF>Blocks This Week</Text_12_500_FFFFFF>
+            </div>
+            <div className="flex flex-col w-full">
+              <Text_22_700_EEEEEE style={{ color: '#EEEEEE' }}>
+                {stats?.total_blocks_week || 0}
+              </Text_22_700_EEEEEE>
+            </div>
+          </div>
+        </Col>
+      </Row>
 
-      {/* Filters and Actions */}
-      <div className="mb-6 mt-6">
-        <Row gutter={[16, 16]} align="middle">
-          <Col flex="auto">
-            <Space size="middle">
-              <div>
-                <Text_12_400_808080 className="mb-1 block">Project</Text_12_400_808080>
-                <Select
-                  placeholder="All Projects"
-                  allowClear
-                  value={selectedProject}
-                  onChange={setSelectedProject}
-                  style={{ width: 200 }}
-                  options={projects.map(p => ({
-                    label: p.name,
-                    value: p.id,
-                  }))}
-                />
-              </div>
-
-              <div>
-                <Text_12_400_808080 className="mb-1 block">Rule Type</Text_12_400_808080>
-                <Select
-                  placeholder="All Types"
-                  allowClear
-                  value={selectedRuleType}
-                  onChange={setSelectedRuleType}
-                  style={{ width: 180 }}
-                  options={[
-                    {
-                      label: (
-                        <span className="flex items-center gap-2">
-                          <StopOutlined style={{ color: '#ef4444' }} />
-                          IP Blocking
-                        </span>
-                      ),
-                      value: 'IP_BLOCKING'
-                    },
-                    {
-                      label: (
-                        <span className="flex items-center gap-2">
-                          <GlobalOutlined style={{ color: '#3b82f6' }} />
-                          Country Blocking
-                        </span>
-                      ),
-                      value: 'COUNTRY_BLOCKING'
-                    },
-                    {
-                      label: (
-                        <span className="flex items-center gap-2">
-                          <UserOutlined style={{ color: '#f59e0b' }} />
-                          User Agent
-                        </span>
-                      ),
-                      value: 'USER_AGENT_BLOCKING'
-                    },
-                    {
-                      label: (
-                        <span className="flex items-center gap-2">
-                          <ThunderboltOutlined style={{ color: '#10b981' }} />
-                          Rate Limiting
-                        </span>
-                      ),
-                      value: 'RATE_BASED_BLOCKING'
-                    },
-                  ]}
-                />
-              </div>
-
-              <div>
-                <Text_12_400_808080 className="mb-1 block">Status</Text_12_400_808080>
-                <Select
-                  placeholder="All Status"
-                  allowClear
-                  value={selectedStatus}
-                  onChange={setSelectedStatus}
-                  style={{ width: 150 }}
-                  options={[
-                    { label: <Tag color="success">Active</Tag>, value: 'ACTIVE' },
-                    { label: <Tag color="default">Inactive</Tag>, value: 'INACTIVE' },
-                    { label: <Tag color="warning">Expired</Tag>, value: 'EXPIRED' },
-                  ]}
-                />
-              </div>
-
-              <div className="flex items-end">
-                <Button
-                  icon={<ReloadOutlined />}
-                  onClick={clearFilters}
-                  className="mt-auto"
-                >
-                  Clear Filters
-                </Button>
-              </div>
-            </Space>
-          </Col>
-
-          <Col>
-            <Space>
-              <SecondaryButton
-                icon={<SyncOutlined />}
-                onClick={handleSyncRules}
-                loading={isSyncing}
-              >
-                Sync to Gateway
-              </SecondaryButton>
-
-              <SecondaryButton
-                icon={<ReloadOutlined />}
-                onClick={() => fetchRules(selectedProject)}
-                loading={isLoading}
-              >
-                Refresh
-              </SecondaryButton>
-
-              <PrimaryButton
-                icon={<PlusOutlined />}
-                onClick={handleCreateRule}
-                disabled={!selectedProject}
-              >
-                Create Rule
-              </PrimaryButton>
-            </Space>
-          </Col>
-        </Row>
+      {/* Filters and Actions Bar */}
+      <div className="mt-6 mb-4 flex justify-between items-center gap-4">
+        <span className="text-[#B3B3B3]">
+          Showing {filteredRules.length} of {rules.length} rules
+        </span>
+        <div className="flex items-center gap-3">
+          <ConfigProvider
+            theme={{
+              components: {
+                Select: {
+                  colorBgContainer: '#1A1A1A',
+                  colorBorder: '#1F1F1F',
+                  colorText: '#EEEEEE',
+                  colorTextPlaceholder: '#666666',
+                  colorBgElevated: '#1A1A1A',
+                  controlItemBgHover: '#2F2F2F',
+                  optionSelectedBg: '#2A1F3D',
+                },
+              },
+            }}
+          >
+            <Select
+              style={{ width: 160 }}
+              placeholder="Rule Type"
+              allowClear
+              value={localFilters.rule_type}
+              onChange={handleRuleTypeChange}
+              className="bg-[#1A1A1A]"
+              dropdownStyle={{ backgroundColor: '#1A1A1A' }}
+            >
+              {Object.entries(RULE_TYPE_VALUES).map(([key, value]) => (
+                <Select.Option key={value} value={value}>
+                  {RULE_TYPE_LABELS[value]}
+                </Select.Option>
+              ))}
+            </Select>
+            <Select
+              style={{ width: 100 }}
+              placeholder="Status"
+              allowClear
+              value={localFilters.status}
+              onChange={handleStatusChange}
+              className="bg-[#1A1A1A]"
+              dropdownStyle={{ backgroundColor: '#1A1A1A' }}
+            >
+              <Select.Option value="ACTIVE">Active</Select.Option>
+              <Select.Option value="INACTIVE">Inactive</Select.Option>
+            </Select>
+          </ConfigProvider>
+          <PrimaryButton onClick={handleCreateRule}>
+            <PlusOutlined />
+            <span className="ml-2">Create Rule</span>
+          </PrimaryButton>
+        </div>
       </div>
 
       {/* Rules List */}
       <BlockingRulesList
-        rules={rules}
-        isLoading={isLoading}
+        rules={filteredRules}
+        loading={isLoading}
+        onView={handleViewRule}
         onEdit={handleEditRule}
         onDelete={handleDeleteRule}
-        getRuleTypeIcon={getRuleTypeIcon}
-        getRuleTypeColor={getRuleTypeColor}
       />
 
-      {/* Create/Edit Form Modal */}
-      <Modal
-        title={editingRule ? 'Edit Blocking Rule' : 'Create Blocking Rule'}
-        open={isFormModalOpen}
-        onCancel={() => setIsFormModalOpen(false)}
-        footer={null}
-        width={700}
-        destroyOnClose
-      >
-        <BlockingRuleForm
-          initialValues={editingRule}
-          onSubmit={handleFormSubmit}
-          onCancel={() => setIsFormModalOpen(false)}
-          isLoading={isCreating || isUpdating}
-        />
-      </Modal>
+      {/* Edit Form Modal */}
+      {/* Edit Modal - Currently using drawer for create, can add edit later */}
     </div>
   );
 };
