@@ -186,6 +186,9 @@ class ClickHouseMigration:
             is_success Bool,
             request_arrival_time DateTime,
             request_forward_time DateTime,
+            api_key_id Nullable(UUID),
+            user_id Nullable(UUID),
+            api_key_project_id Nullable(UUID),
             created_at DateTime DEFAULT now()
         )
         ENGINE = MergeTree()
@@ -204,6 +207,9 @@ class ClickHouseMigration:
                 "ALTER TABLE ModelInferenceDetails ADD INDEX IF NOT EXISTS idx_model_timestamp (model_id, request_arrival_time) TYPE minmax GRANULARITY 1",
                 "ALTER TABLE ModelInferenceDetails ADD INDEX IF NOT EXISTS idx_endpoint_timestamp (endpoint_id, request_arrival_time) TYPE minmax GRANULARITY 1",
                 "ALTER TABLE ModelInferenceDetails ADD INDEX IF NOT EXISTS idx_project_model_endpoint_timestamp (project_id, model_id, endpoint_id, request_arrival_time) TYPE minmax GRANULARITY 1",
+                "ALTER TABLE ModelInferenceDetails ADD INDEX IF NOT EXISTS idx_api_key_id (api_key_id) TYPE minmax GRANULARITY 1",
+                "ALTER TABLE ModelInferenceDetails ADD INDEX IF NOT EXISTS idx_user_id (user_id) TYPE minmax GRANULARITY 1",
+                "ALTER TABLE ModelInferenceDetails ADD INDEX IF NOT EXISTS idx_api_key_project_id (api_key_project_id) TYPE minmax GRANULARITY 1",
             ]
 
             for index_query in indexes:

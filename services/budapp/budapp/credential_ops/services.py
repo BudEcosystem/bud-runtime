@@ -186,7 +186,7 @@ class CredentialService(SessionMixin):
 
         This method collects all active endpoints and adapters associated with the specified project,
         maps their names to their IDs with additional metadata (model_id, project_id), and updates
-        the Redis cache with this information.
+        the Redis cache with this information. Now includes authentication metadata for API usage tracking.
 
         Args:
             api_key (str): The API key to associate with the project and its models.
@@ -201,9 +201,27 @@ class CredentialService(SessionMixin):
                 filters={"project_id": project_id}
             )
             for credential in db_credentials:
-                keys_to_update.append({"api_key": credential.key, "expiry": credential.expiry})
+                keys_to_update.append(
+                    {
+                        "api_key": credential.key,
+                        "expiry": credential.expiry,
+                        "credential_id": credential.id,
+                        "user_id": credential.user_id,  # Using existing user_id field
+                    }
+                )
         else:
-            keys_to_update.append({"api_key": api_key, "expiry": expiry})
+            # Fetch credential details for single key update
+            credential = await CredentialDataManager(self.session).retrieve_credential_by_fields(
+                {"key": api_key, "project_id": project_id}, missing_ok=True
+            )
+            keys_to_update.append(
+                {
+                    "api_key": api_key,
+                    "expiry": expiry,
+                    "credential_id": credential.id if credential else None,
+                    "user_id": credential.user_id if credential else None,
+                }
+            )
 
         models = {}
 
@@ -228,13 +246,24 @@ class CredentialService(SessionMixin):
 
         redis_service = RedisService()
 
-        for key in keys_to_update:
-            ttl = None
-            if key["expiry"]:
-                ttl = int((key["expiry"] - datetime.now()).total_seconds())
-            await redis_service.set(f"api_key:{key['api_key']}", json.dumps({key["api_key"]: models}), ex=ttl)
+        for key_info in keys_to_update:
+            # Create cache data with models and metadata
+            cache_data = models.copy()  # Copy to avoid modifying original
 
-        logger.info("Updated api keys in proxy cache")
+            # Always add metadata - even with None values for consistency
+            cache_data["__metadata__"] = {
+                "api_key_id": str(key_info["credential_id"]) if key_info.get("credential_id") else None,
+                "user_id": str(key_info["user_id"]) if key_info.get("user_id") else None,
+                "api_key_project_id": str(project_id),  # project_id is always available
+            }
+
+            ttl = None
+            if key_info["expiry"]:
+                ttl = int((key_info["expiry"] - datetime.now()).total_seconds())
+            # Store with flat structure including metadata
+            await redis_service.set(f"api_key:{key_info['api_key']}", json.dumps(cache_data), ex=ttl)
+
+        logger.info(f"Updated {len(keys_to_update)} api keys in proxy cache with metadata")
 
     async def get_credentials(
         self,

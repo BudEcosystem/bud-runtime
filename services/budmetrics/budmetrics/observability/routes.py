@@ -68,6 +68,9 @@ async def add_metrics(request: BulkCloudEventBase) -> Response:
                     inference_metric.is_success,  # is_success
                     inference_metric.request_arrival_time,  # request_arrival_time
                     inference_metric.request_forward_time,  # request_forward_time
+                    inference_metric.api_key_id,  # api_key_id (auth metadata)
+                    inference_metric.user_id,  # user_id (auth metadata)
+                    inference_metric.api_key_project_id,  # api_key_project_id (auth metadata)
                 )
                 batch_data.append(inference_data)
                 # logger.debug(

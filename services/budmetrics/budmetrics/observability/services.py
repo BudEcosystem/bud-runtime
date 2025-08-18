@@ -492,7 +492,7 @@ class ObservabilityMetricsService:
         Args:
             batch_data: List of tuples containing (inference_id, request_ip, project_id,
                        endpoint_id, model_id, cost, response_analysis, is_success,
-                       request_arrival_time, request_forward_time)
+                       request_arrival_time, request_forward_time, api_key_id, user_id, api_key_project_id)
 
         Returns:
             dict: Insertion results with counts and duplicate inference_ids
@@ -553,19 +553,41 @@ class ObservabilityMetricsService:
         # Build VALUES clause using raw SQL similar to simple_seeder
         values = []
         for record in new_records:
-            # Unpack the tuple
-            (
-                inference_id,
-                request_ip,
-                project_id,
-                endpoint_id,
-                model_id,
-                cost,
-                response_analysis,
-                is_success,
-                request_arrival_time,
-                request_forward_time,
-            ) = record
+            # Handle both old format (10 fields) and new format (13 fields)
+            if len(record) == 10:
+                # Legacy format without auth metadata
+                (
+                    inference_id,
+                    request_ip,
+                    project_id,
+                    endpoint_id,
+                    model_id,
+                    cost,
+                    response_analysis,
+                    is_success,
+                    request_arrival_time,
+                    request_forward_time,
+                ) = record
+                api_key_id = None
+                user_id = None
+                api_key_project_id = None
+            else:
+                # New format with auth metadata
+                (
+                    inference_id,
+                    request_ip,
+                    project_id,
+                    endpoint_id,
+                    model_id,
+                    cost,
+                    response_analysis,
+                    is_success,
+                    request_arrival_time,
+                    request_forward_time,
+                    api_key_id,
+                    user_id,
+                    api_key_project_id,
+                ) = record
 
             # Format each row
             row = (
@@ -578,7 +600,10 @@ class ObservabilityMetricsService:
                 f"{self._escape_string(response_analysis) if response_analysis else 'NULL'}, "
                 f"{1 if is_success else 0}, "
                 f"'{request_arrival_time.strftime('%Y-%m-%d %H:%M:%S')}', "
-                f"'{request_forward_time.strftime('%Y-%m-%d %H:%M:%S')}')"
+                f"'{request_forward_time.strftime('%Y-%m-%d %H:%M:%S')}', "
+                f"{self._escape_string(str(api_key_id)) if api_key_id else 'NULL'}, "
+                f"{self._escape_string(str(user_id)) if user_id else 'NULL'}, "
+                f"{self._escape_string(str(api_key_project_id)) if api_key_project_id else 'NULL'})"
             )
             values.append(row)
 
@@ -587,7 +612,8 @@ class ObservabilityMetricsService:
         query = f"""
         INSERT INTO ModelInferenceDetails
         (inference_id, request_ip, project_id, endpoint_id, model_id,
-         cost, response_analysis, is_success, request_arrival_time, request_forward_time)
+         cost, response_analysis, is_success, request_arrival_time, request_forward_time,
+         api_key_id, user_id, api_key_project_id)
         VALUES {",".join(values)}
         """  # nosec B608
 

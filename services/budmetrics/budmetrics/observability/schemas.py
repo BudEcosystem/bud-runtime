@@ -188,6 +188,11 @@ class InferenceDetailsMetrics(CloudEventBase):
     cost: Optional[float] = None
     response_analysis: Optional[Dict[str, Any]] = None
 
+    # Authentication metadata fields
+    api_key_id: Optional[UUID] = None
+    user_id: Optional[UUID] = None
+    api_key_project_id: Optional[UUID] = None
+
     @field_validator("request_ip")
     @classmethod
     def validate_ip(cls, v: Optional[str]) -> Optional[str]:
