@@ -612,11 +612,11 @@ const ModelDetailDrawer: React.FC<ModelDetailDrawerProps> = ({
       label: "Modality & Endpoints",
       children: <ModalityTab />,
     },
-    {
-      key: "architecture",
-      label: "Architecture",
-      children: <ArchitectureTab />,
-    },
+    // {
+    //   key: "architecture",
+    //   label: "Architecture",
+    //   children: <ArchitectureTab />,
+    // },
   ];
 
   return (
