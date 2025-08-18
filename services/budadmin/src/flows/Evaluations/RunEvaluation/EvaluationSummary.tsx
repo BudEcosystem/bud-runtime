@@ -14,14 +14,16 @@ import { SpecificationTableItem, SpecificationTableItemProps } from "src/flows/c
 import DrawerCard from "@/components/ui/bud/card/DrawerCard";
 import IconRender from "src/flows/components/BudIconRender";
 import ModelTags from "src/flows/components/ModelTags";
-import { Model } from "src/hooks/useModels";
+import { Model, useModels } from "src/hooks/useModels";
 
 
 export default function EvaluationSummary() {
   const { getWorkflowData, workflowData, currentWorkflow, loading } = useEvaluations();
+  const { getModel, selectedModel: selectedModelFromStore } = useModels();
   const [isLoadingData, setIsLoadingData] = React.useState(true);
   const [evaluations, setEvaluations] = React.useState<Evaluation[]>([]);
   const [selectedModelData, setSelectedModelData] = React.useState<Model | null>(null);
+  const [modelId, setModelId] = React.useState<string | null>(null);
 
   // Mock evaluation data - will be replaced with actual data
   const mockEvaluations: Evaluation[] = [
@@ -63,7 +65,7 @@ export default function EvaluationSummary() {
   ];
 
   // Mock selected model data - replace with actual data from store
-  const selectedModel: Model = {
+  const mockSelectedModel: Model = {
     id: "model-1",
     name: "GPT-4o",
     author: "OpenAI",
@@ -163,68 +165,185 @@ export default function EvaluationSummary() {
   const [selectedEvaluation, setSelectedEvaluation] = React.useState<Evaluation | null>(null);
   const { openDrawerWithStep } = useDrawer();
 
-  // Fetch workflow data on component mount
+  // Use existing workflowData if available, otherwise fetch it
   React.useEffect(() => {
-    const fetchWorkflowData = async () => {
+    const initializeData = async () => {
       try {
         setIsLoadingData(true);
 
-        // Get experiment ID and workflow ID from currentWorkflow or props
-        if (currentWorkflow?.experiment_id && currentWorkflow?.workflow_id) {
-          const data = await getWorkflowData(
+        let data = workflowData;
+
+        // Only fetch if we don't have workflowData already
+        if (!data && currentWorkflow?.experiment_id && currentWorkflow?.workflow_id) {
+          data = await getWorkflowData(
             currentWorkflow.experiment_id,
             currentWorkflow.workflow_id
           );
+        }
 
-          // Extract data from workflow response
-          if (data) {
-            // Set evaluations from workflow data if available
-            if (data.evaluations) {
-              setEvaluations(data.evaluations);
-            } else {
-              // Fallback to mock data if no evaluations in response
-              setEvaluations(mockEvaluations);
-            }
+        // Extract data from workflow response
+        if (data) {
+          // Check for model ID in next_step_data.summary.model_selected
+          const extractedModelId = data.next_step_data?.summary?.model_selected;
 
-            // Set selected model from workflow data if available
-            if (data.selected_model) {
-              setSelectedModelData(data.selected_model);
-            } else if (data.workflow_steps?.stage_data?.selected_model) {
-              setSelectedModelData(data.workflow_steps.stage_data.selected_model);
-            } else {
-              // Fallback to mock model
-              setSelectedModelData(selectedModel);
-            }
-
-            // Update deployment specs if available in workflow data
-            if (data.deployment_specs) {
-              detDeploymentSpecs(data.deployment_specs);
-            } else if (data.workflow_steps?.stage_data?.deployment_specs) {
-              detDeploymentSpecs(data.workflow_steps.stage_data.deployment_specs);
-            }
+          if (extractedModelId) {
+            // Store model ID to trigger separate effect for fetching
+            setModelId(extractedModelId);
+          } else if (data.selected_model) {
+            setSelectedModelData(data.selected_model);
+          } else if (data.workflow_steps?.stage_data?.selected_model) {
+            setSelectedModelData(data.workflow_steps.stage_data.selected_model);
           } else {
-            // Use mock data if no workflow data
-            setEvaluations(mockEvaluations);
-            setSelectedModelData(selectedModel);
+            // Fallback to mock model
+            setSelectedModelData(mockSelectedModel);
           }
+
+          // Set evaluations from workflow data if available
+          if (data.next_step_data?.summary?.evaluations) {
+            setEvaluations(data.next_step_data.summary.evaluations);
+          } else if (data.evaluations) {
+            setEvaluations(data.evaluations);
+          } else {
+            // Fallback to mock data if no evaluations in response
+            setEvaluations(mockEvaluations);
+          }
+
+          // Update deployment specs from workflow data
+          if (data.next_step_data?.summary?.deployment_specs) {
+            detDeploymentSpecs(data.next_step_data.summary.deployment_specs);
+          } else if (data.deployment_specs) {
+            detDeploymentSpecs(data.deployment_specs);
+          } else if (data.workflow_steps?.stage_data?.deployment_specs) {
+            detDeploymentSpecs(data.workflow_steps.stage_data.deployment_specs);
+          }
+
+          // Extract other relevant data from next_step_data.summary
+          if (data.next_step_data?.summary) {
+              const summary = data.next_step_data.summary;
+
+              // Update deployment specs with data from summary if available
+              const updatedSpecs: SpecificationTableItemProps[] = [];
+
+              if (summary.model_name || selectedModelData?.name) {
+                updatedSpecs.push({
+                  name: "Model",
+                  value: summary.model_name || selectedModelData?.name || "GPT-4o",
+                  icon: "/images/drawer/tag.png",
+                });
+              }
+
+              if (summary.deployment_name) {
+                updatedSpecs.push({
+                  name: "Deployment",
+                  value: summary.deployment_name,
+                  icon: "/images/drawer/tag.png",
+                });
+              }
+
+              if (summary.template_name) {
+                updatedSpecs.push({
+                  name: "Template",
+                  value: summary.template_name,
+                  icon: "/images/drawer/template-1.png",
+                });
+              }
+
+              if (summary.cluster_name) {
+                updatedSpecs.push({
+                  name: "Cluster",
+                  value: summary.cluster_name,
+                  icon: "/images/drawer/tag.png",
+                });
+              }
+
+              if (summary.dataset_size) {
+                updatedSpecs.push({
+                  name: "Dataset Size",
+                  value: summary.dataset_size,
+                  icon: "/images/drawer/context.png",
+                });
+              }
+
+              if (summary.evaluation_type) {
+                updatedSpecs.push({
+                  name: "Evaluation Type",
+                  value: Array.isArray(summary.evaluation_type) ? summary.evaluation_type : [summary.evaluation_type],
+                  tagColor: "#4CAF50",
+                });
+              }
+
+              if (summary.created_by) {
+                updatedSpecs.push({
+                  name: "Created By",
+                  value: summary.created_by,
+                  icon: "/images/drawer/tag.png",
+                });
+              }
+
+              if (summary.status) {
+                updatedSpecs.push({
+                  name: "Status",
+                  value: summary.status,
+                  icon: "/images/drawer/current.png",
+                });
+              }
+
+              // Only update specs if we have data from summary
+              if (updatedSpecs.length > 0) {
+                detDeploymentSpecs(updatedSpecs);
+              }
+            }
         } else {
-          // Use mock data if no workflow IDs available
-          console.log('No workflow IDs available, using mock data');
+          // Use mock data if no workflow data available
+          console.log('No workflow data available, using mock data');
           setEvaluations(mockEvaluations);
-          setSelectedModelData(selectedModel);
+          setSelectedModelData(mockSelectedModel);
         }
       } catch (error) {
         console.error('Error fetching workflow data:', error);
         // Fallback to mock data on error
         setEvaluations(mockEvaluations);
-        setSelectedModelData(selectedModel);
+        setSelectedModelData(mockSelectedModel);
       } finally {
         setIsLoadingData(false);
       }
     };
 
-    fetchWorkflowData();
-  }, [currentWorkflow?.experiment_id, currentWorkflow?.workflow_id]);
+    initializeData();
+  }, [currentWorkflow?.experiment_id, currentWorkflow?.workflow_id, workflowData]);
+
+  // Separate effect to fetch model details when modelId changes
+  React.useEffect(() => {
+    if (modelId) {
+      console.log('Fetching model details for ID:', modelId);
+      getModel(modelId).then((response) => {
+        if (response) {
+          // The model data is in response.model and response.model_tree
+          const modelData = {
+            ...response.model,
+            ...response.model_tree,
+            endpoints_count: response.endpoints_count,
+            eval_result: response.eval_result,
+            scan_result: response.scan_result,
+          };
+          console.log('Model data fetched:', modelData);
+          setSelectedModelData(modelData);
+        }
+      }).catch((error) => {
+        console.error('Error fetching model details:', error);
+        // Fallback to mock model
+        setSelectedModelData(mockSelectedModel);
+      });
+    }
+  }, [modelId]);
+
+  // Watch for selectedModel changes from store (if model was already fetched)
+  React.useEffect(() => {
+    if (selectedModelFromStore && modelId) {
+      console.log('Using selectedModel from store:', selectedModelFromStore);
+      setSelectedModelData(selectedModelFromStore);
+    }
+  }, [selectedModelFromStore, modelId]);
 
   const filteredEvaluations = evaluations.filter((evaluation) =>
     evaluation.name.toLowerCase().includes(search.toLowerCase()) ||
