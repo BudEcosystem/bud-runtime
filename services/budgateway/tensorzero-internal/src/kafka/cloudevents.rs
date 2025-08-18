@@ -55,6 +55,14 @@ pub struct ObservabilityEvent {
     pub cost: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub response_analysis: Option<Value>,
+
+    // Authentication metadata fields
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub api_key_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub api_key_project_id: Option<String>,
 }
 
 impl CloudEvent {
@@ -147,6 +155,9 @@ mod tests {
             request_ip: Some("192.168.1.100".to_string()),
             cost: Some(0.002),
             response_analysis: None,
+            api_key_id: None,
+            user_id: None,
+            api_key_project_id: None,
         };
 
         let entry = ObservabilityEntry::new(event);
@@ -172,6 +183,9 @@ mod tests {
             request_ip: Some("192.168.1.100".to_string()),
             cost: Some(0.002),
             response_analysis: None,
+            api_key_id: None,
+            user_id: None,
+            api_key_project_id: None,
         };
 
         // Valid event
