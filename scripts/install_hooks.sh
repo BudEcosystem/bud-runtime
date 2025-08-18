@@ -71,6 +71,18 @@ if [[ -d "services/budplayground" && -f "services/budplayground/package.json" ]]
     cd ../..
 fi
 
+# Install dependencies for budCustomer
+if [[ -d "services/budCustomer" && -f "services/budCustomer/package.json" ]]; then
+    echo "Installing dependencies for budCustomer..."
+    cd services/budCustomer
+    if command_exists npm; then
+        npm install
+    else
+        echo "Warning: npm not found, skipping budCustomer dependency installation"
+    fi
+    cd ../..
+fi
+
 # Check if Rust is available for budgateway
 if [[ -d "services/budgateway" ]]; then
     if ! command_exists cargo; then
