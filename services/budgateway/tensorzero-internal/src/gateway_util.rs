@@ -307,8 +307,8 @@ pub async fn setup_redis_and_rate_limiter(
     if let Some(auth) = auth_info {
         if let Some(ref url) = redis_url {
             if !url.is_empty() {
-                // Create Redis client with optional blocking manager
-                let mut auth_redis_client = RedisClient::new(url, app_state.clone(), auth.clone())
+                // Create Redis client
+                let auth_redis_client = RedisClient::new(url, app_state.clone(), auth.clone())
                     .await
                     .map_err(|e| {
                         Error::new(ErrorDetails::AppState {
@@ -317,11 +317,6 @@ pub async fn setup_redis_and_rate_limiter(
                             ),
                         })
                     })?;
-
-                // Add blocking manager if available
-                if let Some(ref manager) = blocking_manager {
-                    auth_redis_client = auth_redis_client.with_blocking_manager(manager.clone());
-                }
 
                 auth_redis_client.start().await.map_err(|e| {
                     Error::new(ErrorDetails::AppState {

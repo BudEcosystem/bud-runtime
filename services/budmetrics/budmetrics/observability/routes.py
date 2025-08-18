@@ -52,6 +52,15 @@ async def add_metrics(request: BulkCloudEventBase) -> Response:
     """
     response: Union[SuccessResponse, ErrorResponse]
     entries = request.entries
+
+    # Enforce batch size limit
+    MAX_BATCH_SIZE = 1000
+    if len(entries) > MAX_BATCH_SIZE:
+        return ErrorResponse(
+            message=f"Batch size exceeds maximum limit of {MAX_BATCH_SIZE} entries",
+            details={"received": len(entries), "max_allowed": MAX_BATCH_SIZE},
+        ).to_http_response()
+
     logger.info(f"Received {len(entries)} entries")
 
     try:
@@ -82,9 +91,6 @@ async def add_metrics(request: BulkCloudEventBase) -> Response:
                     inference_metric.request_forward_time,  # request_forward_time
                 )
                 batch_data.append(inference_data)
-                # logger.debug(
-                #     f"Processing metric for inference_id: {inference_metric.inference_id}"
-                # )
             except ValidationError as e:
                 validation_errors.append(
                     {

@@ -2,7 +2,7 @@ import React from 'react';
 import { Table, Tag, Button, Space, Tooltip, ConfigProvider } from 'antd';
 import { EditOutlined, DeleteOutlined, EyeOutlined } from '@ant-design/icons';
 import { BlockingRule, BlockingRuleType, BlockingRuleStatus } from '@/stores/useBlockingRules';
-import { getRuleTypeColor, getRuleTypeLabel, RULE_TYPE_VALUES } from '@/constants/blockingRules';
+import { RULE_TYPE_LABELS, RULE_STATUS_COLORS } from '@/constants/blockingRules';
 import { formatDistanceToNow } from 'date-fns';
 import ProjectTags from 'src/flows/components/ProjectTags';
 import { endpointStatusMapping } from '@/lib/colorMapping';
@@ -23,19 +23,8 @@ export const BlockingRulesList: React.FC<BlockingRulesListProps> = ({
   onDelete,
 }) => {
 
-  // Use imported getRuleTypeColor from constants
-
   const getStatusColor = (status: BlockingRuleStatus) => {
-    switch (status) {
-      case 'ACTIVE':
-        return 'success';
-      case 'INACTIVE':
-        return 'default';
-      case 'EXPIRED':
-        return 'error';
-      default:
-        return 'default';
-    }
+    return RULE_STATUS_COLORS[status] || 'default';
   };
 
 
@@ -52,22 +41,11 @@ export const BlockingRulesList: React.FC<BlockingRulesListProps> = ({
       title: 'Type',
       dataIndex: 'rule_type',
       key: 'rule_type',
-      render: (type: BlockingRuleType) => {
-        const formatType = (type: string) => {
-          const typeMap = {
-            'ip_blocking': 'IP',
-            'country_blocking': 'Country',
-            'user_agent_blocking': 'User Agent',
-            'rate_based_blocking': 'Rate Based'
-          };
-          return typeMap[type] || type;
-        };
-        return (
-          <span className="text-[#EEEEEE]">
-            {formatType(type)}
-          </span>
-        );
-      },
+      render: (type: BlockingRuleType) => (
+        <span className="text-[#EEEEEE]">
+          {RULE_TYPE_LABELS[type] || type}
+        </span>
+      ),
     },
     {
       title: 'Priority',
