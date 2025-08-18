@@ -9,6 +9,7 @@ import { useApiRequest } from "@/hooks/useApiRequest";
 import { useEnvironment } from "@/components/providers/EnvironmentProvider";
 import { useUser } from "@/stores/useUser";
 import { successToast } from "@/components/toast";
+import { AppRequest } from "@/services/api/requests";
 
 interface DataInterface {
   email?: string;
@@ -22,6 +23,7 @@ export default function Login() {
   const [isBackToLogin, setIsBackToLogin] = useState(false);
 
   // Use the new environment system
+
   const environment = useEnvironment();
   const apiRequest = useApiRequest();
 
@@ -58,7 +60,7 @@ export default function Login() {
       console.log("Payload:", loginPayload);
 
       // Make the API call
-      const response = await apiRequest.Post("/auth/login", loginPayload);
+      const response = await AppRequest.Post("/auth/login", loginPayload);
       console.log("Login response:", response);
 
       if (response.data?.token) {
