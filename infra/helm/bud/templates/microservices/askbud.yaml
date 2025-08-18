@@ -2,6 +2,11 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ .Release.Name }}-askbud
+  annotations:
+    {{- range $key, $value := .Values.deploymentAnnotations }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
+
 spec:
   replicas: 1
   selector:
@@ -12,7 +17,6 @@ spec:
       labels:
         app: {{ .Release.Name }}-askbud
       annotations:
-        date: "{{ now }}"
         dapr.io/enabled: "true"
         dapr.io/app-id: "askbud"
         dapr.io/app-port: "3000"

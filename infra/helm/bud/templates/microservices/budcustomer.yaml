@@ -3,6 +3,10 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ .Release.Name }}-budcustomer
+  annotations:
+    {{- range $key, $value := .Values.deploymentAnnotations }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
 spec:
   replicas: 1
   selector:
@@ -12,8 +16,6 @@ spec:
     metadata:
       labels:
         app: {{ .Release.Name }}-budcustomer
-      annotations:
-        date: "{{ now }}"
     spec:
       containers:
       - name: {{ .Release.Name }}-budcustomer
@@ -28,6 +30,28 @@ spec:
             value: {{ .Values.microservices.rsaKeys.privateKeyPassword }}
           - name: NEXT_PUBLIC_PRIVATE_KEY
             value: {{ .Values.microservices.rsaKeys.privateKey | b64enc }}
+          - name: NEXT_PUBLIC_NOVU_SOCKET_URL
+            value: {{ include "bud.ingress.url.novuws" $ }}
+          - name: NEXT_PUBLIC_NOVU_BASE_URL
+            value: {{ include "bud.ingress.url.novuapi" $ }}
+          - name: NEXT_PUBLIC_BASE_URL
+            value: {{ include "bud.ingress.url.budapp" $ }}
+          - name: NEXT_PUBLIC_TEMP_API_BASE_URL
+            value: {{ include "bud.ingress.url.budapp" $ }}
+          - name: NEXT_PUBLIC_COPY_CODE_API_BASE_URL
+            value: {{ include "bud.ingress.url.budgateway" $ }}
+          - name: NEXT_PUBLIC_PLAYGROUND_URL
+            value: {{ include "bud.ingress.url.budplayground" $ }}
+          - name: NEXT_PUBLIC_ASK_BUD_URL
+            value: {{ include "bud.ingress.url.budask" $ }}
+          - name: ESLINT_NO_DEV_WARNINGS
+            value: 'true'
+          - name: NEXT_HIDE_ERROR_OVERLAY
+            value: 'true'
+          - name: NEXT_PUBLIC_ANTD_HASH_SEED
+            value: 'budcustomer'
+          - name: NEXT_PUBLIC_ASK_BUD_MODEL
+            value: 'qwen3-32b'
         {{ $root := . }}
         {{- range $key, $value := .Values.microservices.budcustomer.env }}
           - name: {{ $key }}

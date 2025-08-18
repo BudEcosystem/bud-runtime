@@ -115,6 +115,7 @@ export interface Evaluation {
 export const useEvaluations = create<{
   loading: boolean;
   evaluationsList: Evaluation[];
+  selectedEvals: Evaluation[];
   evaluationsListTotal: number;
   traitsList: TraitSimple[];
   experimentsList: ExperimentData[];
@@ -125,8 +126,11 @@ export const useEvaluations = create<{
   experimentRuns: any;
   currentWorkflow: EvaluationWorkflow | null;
   workflowData: any;
+  evaluationDetails: any;
 
+  setSelectedEvals: (evaluation: any) => void;
   getEvaluations: (payload?: GetEvaluationsPayload) => Promise<any>;
+  getEvaluationDetails: (datasetId: string) => Promise<any>;
   getTraits: (payload?: any) => Promise<any>;
   getExperiments: (payload?: GetExperimentsPayload) => Promise<any>;
   getExperimentDetails: (id: string) => Promise<any>;
@@ -138,6 +142,7 @@ export const useEvaluations = create<{
   getWorkflowData: (experimentId: string, workflowId: string) => Promise<any>;
 }>((set, get) => ({
   loading: false,
+  selectedEvals: [],
   evaluationsList: [],
   traitsList: [],
   evaluationsListTotal: 0,
@@ -149,6 +154,7 @@ export const useEvaluations = create<{
   experimentRuns: null,
   currentWorkflow: null,
   workflowData: null,
+  evaluationDetails: null,
 
   getEvaluations: async (payload) => {
     set({ loading: true });
@@ -181,6 +187,28 @@ export const useEvaluations = create<{
     }
   },
 
+  setSelectedEvals: (evaluation: Evaluation[]) => {
+    set({ selectedEvals: evaluation });
+  },
+
+  getEvaluationDetails: async (datasetId: string) => {
+    set({ loading: true });
+    try {
+      const url = `${tempApiBaseUrl}/experiments/datasets/${datasetId}`;
+      console.log('Fetching evaluation details with URL:', url);
+
+      const response: any = await AppRequest.Get(url);
+      console.log('Evaluation details response:', response.data);
+
+      set({ evaluationDetails: response.data });
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching evaluation details:", error);
+      throw error;
+    } finally {
+      set({ loading: false });
+    }
+  },
   getTraits: async (payload) => {
     set({ loading: true });
     try {

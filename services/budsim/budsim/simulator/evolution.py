@@ -12,6 +12,7 @@ from tqdm import tqdm
 from ..engine_ops import check_config_compatibility, get_engine_properties
 from ..model_ops.analysis import ModelAnalysis
 from .hardware import CostCalculator
+from .heuristic import HeuristicCalculator
 from .regressor import BenchmarkPredictor
 
 
@@ -51,6 +52,7 @@ class Evolution:
         top_k: int = 5,
         error_threshold: float = 0.01,
         convergence_generations: int = 10,
+        use_heuristic: bool = False,
     ):
         """Initialize the Evolution class.
 
@@ -71,6 +73,7 @@ class Evolution:
             top_k (int, optional): The number of top individuals to be returned. Defaults to 5.
             error_threshold (float, optional): The error threshold. Defaults to 0.01.
             convergence_generations (int, optional): The number of generations to wait for convergence. Defaults to 10.
+            use_heuristic (bool, optional): Whether to use heuristic calculations instead of ML predictions. Defaults to False.
         """
         self.model = model
         self.input_tokens = input_tokens
@@ -88,13 +91,21 @@ class Evolution:
         self.top_k = top_k
         self.convergence_generations = convergence_generations
         self.error_threshold = error_threshold
+        self.use_heuristic = use_heuristic
 
         self.engine_config = get_engine_properties(self.engine_name, {"model": self.model})
         self.optimizer_params = self._get_optimizer_params()
 
-        self.benchmark_predictor = BenchmarkPredictor(
-            self.engine_name, self.device_config["type"], benchmark_predictor_models_dir
-        )
+        # Initialize predictor based on simulation method
+        if self.use_heuristic:
+            self.heuristic_calculator = HeuristicCalculator()
+            logger.info("Using heuristic-based performance calculations")
+        else:
+            self.benchmark_predictor = BenchmarkPredictor(
+                self.engine_name, self.device_config["type"], benchmark_predictor_models_dir
+            )
+            logger.info("Using ML regressor-based performance predictions")
+
         self.cost_calculator = CostCalculator()
 
         self._init_boundaries()
@@ -104,28 +115,304 @@ class Evolution:
         self.top_configs: Deque[EvaluationResult] = deque(maxlen=self.top_k)
         self.generations_since_improvement = 0
 
+    def get_node_device_count(self) -> int:
+        """Get max devices available in a single node for the current device type.
+
+        This method calculates the maximum TP size by finding the node with most devices.
+        TP should not exceed this limit to avoid cross-node communication which degrades performance.
+
+        Returns:
+            int: Maximum number of devices of current type available in any single node
+        """
+        # Check if this is cluster-wide device configuration
+        if "node_distribution" in self.device_config:
+            # New cluster-wide format: use max devices per node
+            max_devices = self.device_config.get("max_devices_per_node", 0)
+            node_distribution = self.device_config.get("node_distribution", {})
+            logger.info(f"Cluster-wide config: max_devices_per_node = {max_devices}")
+            logger.info(f"Node distribution: {node_distribution}")
+
+            if max_devices <= 0:
+                logger.error(f"Invalid cluster config: max_devices_per_node = {max_devices}")
+                logger.error(f"Node distribution: {node_distribution}")
+                logger.error(f"Full device config: {self.device_config}")
+                raise ValueError(f"No devices available for type {self.device_config.get('device_type', 'unknown')}")
+
+            return max_devices
+        else:
+            # Legacy per-device format: use available_count from the device itself
+            available_count = self.device_config.get("available_count", 0)
+            current_device_type = self.device_config.get("type", "unknown")
+            node_id = self.device_config.get("node_id", "unknown")
+
+            logger.debug(f"Legacy device config: Node {node_id} has {available_count} {current_device_type} devices")
+
+            if available_count <= 0:
+                logger.error(
+                    f"Legacy device config has invalid available_count: {available_count} "
+                    f"for device type {current_device_type} in node {node_id}"
+                )
+                raise ValueError(f"No devices available for type {current_device_type}")
+
+            return available_count
+
+    def get_pipeline_parallel_size(self, value: Optional[int] = None, min_val: int = 1, max_val: int = 1) -> int:
+        """Generate pipeline parallel size considering cluster node availability.
+
+        Pipeline parallelism can span across nodes, with each PP stage typically
+        deployed to a different node for optimal performance.
+
+        Args:
+            value: Current value for mutation (optional)
+            min_val: Minimum PP size (default 1)
+            max_val: Maximum PP size based on available nodes
+
+        Returns:
+            int: Pipeline parallel size between min_val and max_val
+        """
+        if value is not None:
+            # Mutation: +/- 1 node, but more conservative than random
+            mutation = random.choice([-1, 0, 1])
+            mutated_value = min(max_val, max(min_val, value + mutation))
+            return mutated_value
+        return random.randint(min_val, max_val)
+
+    def validate_tp_pp_combination(self, tp_size: int, pp_size: int) -> bool:
+        """Validate TP+PP combination against cluster resource constraints.
+
+        This method checks multiple constraints:
+        1. TP cannot exceed node capacity (performance constraint)
+        2. PP cannot exceed available nodes with this device type
+        3. Total devices needed (TP * PP) must be available in cluster
+        4. For cluster-wide configs, check actual node distribution feasibility
+
+        Args:
+            tp_size: Tensor parallel size
+            pp_size: Pipeline parallel size
+
+        Returns:
+            bool: True if combination is valid and feasible
+        """
+        logger.debug(
+            f"type={self.device_config.get('device_type', 'unknown')}, "
+            f"available_count={self.device_config.get('available_count', 0)}, "
+            f"has_node_distribution={'node_distribution' in self.device_config}"
+        )
+
+        try:
+            node_device_count = self.get_node_device_count()
+            logger.debug(f"Node device count for validation: {node_device_count}")
+        except ValueError as e:
+            logger.warning(f"Failed to get node device count: {e}")
+            return False
+
+        cluster_topology = self.device_config.get("cluster_topology", {})
+
+        # Constraint 1: TP cannot exceed node capacity (critical for performance)
+        if tp_size > node_device_count:
+            logger.info(f"Invalid TP+PP: TP={tp_size} exceeds node capacity {node_device_count}")
+            return False
+
+        # Special case: Always allow TP=1, PP=1 as baseline configuration
+        if tp_size == 1 and pp_size == 1:
+            logger.info("Allowing baseline configuration TP=1, PP=1")
+            return True
+
+        # For cluster-wide device configuration, use device-type-specific constraints
+        if "node_distribution" in self.device_config:
+            # Constraint 2: PP cannot exceed nodes that have this device type
+            nodes_with_device = self.device_config.get("total_nodes_with_device", 1)
+            if pp_size > nodes_with_device:
+                logger.info(f"Invalid TP+PP: PP={pp_size} exceeds nodes with device type ({nodes_with_device})")
+                return False
+
+            # Constraint 3: Check if we have enough total devices
+            total_devices_needed = tp_size * pp_size
+            total_devices_available = self.device_config.get("total_devices", 0)
+            logger.debug(f"Total devices check: needed={total_devices_needed}, available={total_devices_available}")
+            if total_devices_needed > total_devices_available:
+                logger.info(
+                    f"Invalid TP+PP: Need {total_devices_needed} devices, only {total_devices_available} available"
+                )
+                return False
+
+            # Constraint 4: Verify actual distribution feasibility
+            if not self._check_node_distribution_feasibility(tp_size, pp_size):
+                logger.info(f"Invalid TP+PP: Cannot distribute TP={tp_size}, PP={pp_size} across available nodes")
+                return False
+        else:
+            # Legacy validation for per-device configuration
+            max_nodes = cluster_topology.get("total_nodes", 1)
+            if pp_size > max_nodes:
+                logger.debug(f"Invalid TP+PP: PP={pp_size} exceeds available nodes {max_nodes}")
+                return False
+
+            total_devices_needed = tp_size * pp_size
+            cluster_total_devices = cluster_topology.get("total_cluster_devices", 0)
+            if total_devices_needed > cluster_total_devices:
+                logger.debug(
+                    f"Invalid TP+PP: Need {total_devices_needed} devices, only {cluster_total_devices} available"
+                )
+                return False
+
+        logger.info(f"Valid TP+PP combination: TP={tp_size}, PP={pp_size} (total={tp_size * pp_size})")
+        return True
+
+    def _check_node_distribution_feasibility(self, tp_size: int, pp_size: int) -> bool:
+        """Check if TP+PP can be distributed across actual node topology.
+
+        Args:
+            tp_size: Tensor parallel size (devices per PP stage)
+            pp_size: Pipeline parallel size (number of stages)
+
+        Returns:
+            bool: True if distribution is feasible
+        """
+        node_distribution = self.device_config.get("node_distribution", {})
+        if not node_distribution:
+            return True  # No distribution info, assume feasible
+
+        # Sort nodes by device count (descending) for greedy assignment
+        sorted_nodes = sorted(node_distribution.items(), key=lambda x: x[1], reverse=True)
+
+        # Try to assign PP stages to nodes
+        stages_assigned = 0
+        for _node_id, device_count in sorted_nodes:
+            if device_count >= tp_size:
+                # This node can host a PP stage
+                stages_assigned += 1
+                if stages_assigned >= pp_size:
+                    return True
+
+        return stages_assigned >= pp_size
+
+    def get_pp_stage_assignment(self, tp_size: int, pp_size: int) -> Optional[Dict[int, str]]:
+        """Generate PP stage assignment to nodes for the given TP+PP configuration.
+
+        This method assigns each PP stage to a specific node, ensuring:
+        - Each stage gets TP devices within a single node
+        - Stages are distributed optimally across nodes
+        - Minimizes cross-node communication between adjacent stages
+
+        Args:
+            tp_size: Tensor parallel size (devices per stage)
+            pp_size: Pipeline parallel size (number of stages)
+
+        Returns:
+            Dict mapping stage number to node ID, or None if assignment impossible
+        """
+        if "node_distribution" not in self.device_config:
+            # Legacy config doesn't need explicit assignment
+            return None
+
+        node_distribution = self.device_config.get("node_distribution", {})
+        if not node_distribution:
+            return None
+
+        # Sort nodes by device count (descending) for greedy assignment
+        sorted_nodes = sorted(node_distribution.items(), key=lambda x: x[1], reverse=True)
+
+        # Assign stages to nodes
+        stage_assignment = {}
+        stage_idx = 0
+
+        for node_id, device_count in sorted_nodes:
+            # Calculate how many stages this node can host
+            stages_in_node = device_count // tp_size
+
+            for _ in range(stages_in_node):
+                if stage_idx < pp_size:
+                    stage_assignment[stage_idx] = node_id
+                    stage_idx += 1
+                else:
+                    break
+
+            if stage_idx >= pp_size:
+                break
+
+        # Return assignment only if all stages were assigned
+        if len(stage_assignment) == pp_size:
+            logger.debug(f"PP stage assignment for TP={tp_size}, PP={pp_size}: {stage_assignment}")
+            return stage_assignment
+        else:
+            logger.debug(f"Failed to assign all PP stages: only {len(stage_assignment)}/{pp_size} assigned")
+            return None
+
     def _init_boundaries(self) -> None:
-        # TODO: Use TP based on the evolution
+        # TODO: Use TP and PP based on the evolution
+        device_config = self.device_config.copy()
+        # Remove fields that GPUConfig doesn't expect
+        device_config.pop("cluster_id", None)
+        device_config.pop("node_id", None)
+        device_config.pop("node_name", None)
+        device_config.pop("id", None)
+        # Don't remove 'type' as it's used later
+        # device_config.pop("type", None)
+        device_config.pop("node_distribution", None)
+        device_config.pop("max_devices_per_node", None)
+        device_config.pop("cluster_topology", None)
+        device_config.pop("devices_by_node", None)
+        device_config.pop("total_devices", None)
+
         model_analysis = ModelAnalysis(
             model=self.model,
-            device_config=self.device_config.copy(),
+            device_config=device_config,
             input_tokens=self.input_tokens,
             output_tokens=self.output_tokens,
             concurrency=1,
             tp_size=1,
+            pp_size=1,  # Start with PP=1 for boundary initialization
         )
         max_concurrency = model_analysis.get_max_concurrency(self.device_config["mem_per_GPU_in_GB"])
         self.max_concurrency = min(max_concurrency, self.max_concurrency)
 
     def _get_optimizer_params(self) -> Dict[str, Any]:
         engine_config_dict = dict(self.engine_config.items())
+
+        # Calculate node-specific TP limit (performance constraint)
+        node_device_count = self.get_node_device_count()
+        cluster_topology = self.device_config.get("cluster_topology", {})
+
+        logger.debug(f"Setting up optimizer params: node_device_count={node_device_count}")
+        logger.debug(f"Device config keys: {list(self.device_config.keys())}")
+        logger.debug(f"Device config type: {self.device_config.get('device_type', 'unknown')}")
+
+        # TP constraint: Limited by devices in current node to avoid cross-node communication
+        if node_device_count <= 0:
+            logger.error(f"Invalid node_device_count: {node_device_count}, device_config: {self.device_config}")
+            raise ValueError(f"Invalid node device count: {node_device_count}")
+
         engine_config_dict["tensor_parallel_size"] = partial(
             engine_config_dict["tensor_parallel_size"],
             min_val=1,
-            max_val=self.device_config["available_count"],
+            max_val=node_device_count,  # Node limit, not cluster limit
         )
+
+        # PP constraint: Depends on configuration type
+        if "node_distribution" in self.device_config:
+            # Cluster-wide config: PP limited by nodes with this device type
+            max_pp_size = self.device_config.get("total_nodes_with_device", 1)
+        else:
+            # Legacy config: PP limited by total cluster nodes
+            max_pp_size = cluster_topology.get("max_pp_size", 1)
+
+        if "pipeline_parallel_size" not in engine_config_dict:
+            # Add PP parameter if not already present (for engines that support it)
+            engine_config_dict["pipeline_parallel_size"] = partial(
+                self.get_pipeline_parallel_size, min_val=1, max_val=max_pp_size
+            )
+        else:
+            # Update existing PP parameter with cluster-aware limits
+            engine_config_dict["pipeline_parallel_size"] = partial(
+                engine_config_dict["pipeline_parallel_size"], min_val=1, max_val=max_pp_size
+            )
+
         engine_config_dict["concurrency"] = partial(self.get_concurrency, self.max_concurrency)
+
         logger.info(f"Evolution Dtype: {self.dtype}")
+        logger.info(f"TP constraint: max {node_device_count} (node limit)")
+        logger.info(f"PP constraint: max {max_pp_size} (available nodes with device type)")
+
         if self.dtype is None:
             engine_config_dict.pop("quantization", None)
         return engine_config_dict
@@ -275,11 +562,21 @@ class Evolution:
             Dict[str, Any]: The data for the predictor.
         """
         device_config = self.device_config.copy()
-        # device_config.pop("cluster_id", None)
-        # device_config.pop("node_id", None)
-        # device_config.pop("node_name", None)
-        # device_config.pop("id", None)
+        # Remove fields that GPUConfig doesn't expect
+        device_config.pop("cluster_id", None)
+        device_config.pop("node_id", None)
+        device_config.pop("node_name", None)
+        device_config.pop("id", None)
+        # Don't remove 'type' as it's used later
         # device_config.pop("type", None)
+        device_config.pop("node_distribution", None)
+        device_config.pop("max_devices_per_node", None)
+        device_config.pop("cluster_topology", None)
+        device_config.pop("devices_by_node", None)
+        device_config.pop("total_devices", None)
+        logger.info(
+            f"Creating ModelAnalysis with TP={ind_config['tensor_parallel_size']}, PP={ind_config.get('pipeline_parallel_size', 1)}"
+        )
         model_analysis = ModelAnalysis(
             model=self.model,
             device_config=device_config,
@@ -287,8 +584,15 @@ class Evolution:
             output_tokens=self.output_tokens,
             concurrency=ind_config["concurrency"],
             tp_size=ind_config["tensor_parallel_size"],
+            pp_size=ind_config.get("pipeline_parallel_size", 1),  # Include PP size
         )
+        logger.info("Calling model_analysis.analyze()")
         model_data = model_analysis.analyze()
+        logger.info("ModelAnalysis complete")
+
+        # Add PP-specific features to the data dictionary
+        pp_size = ind_config.get("pipeline_parallel_size", 1)
+        cluster_topology = self.device_config.get("cluster_topology", {})
 
         data = {
             "block_size": ind_config["block_size"],
@@ -333,9 +637,46 @@ class Evolution:
             "total_tokens_per_sec": model_data["total_tokens_per_sec"],
             "weight_memory_embedding_per_gpu": model_data["weight_memory_embedding_per_gpu"],
             "weight_memory_per_gpu": model_data["weight_memory_per_gpu"],
+            # PP-specific features for enhanced prediction accuracy
+            "pipeline_parallel_size": pp_size,
+            "cross_node_bandwidth": self.device_config.get("inter_node_bandwidth_in_GB_per_sec", 200),
+            "intra_node_bandwidth": self.device_config.get("intra_node_bandwidth_in_GB_per_sec", 300),
+            "pp_communication_overhead": self._calculate_pp_overhead(pp_size),
+            "nodes_used": min(pp_size, cluster_topology.get("total_nodes", 1)),
         }
         # print(f"Data: {data}")
         return data
+
+    def _calculate_pp_overhead(self, pp_size: int) -> float:
+        """Calculate communication overhead for pipeline parallelism.
+
+        PP introduces overhead due to:
+        1. Cross-node communication for pipeline stages
+        2. Bubble time when pipeline stages are not fully utilized
+        3. Synchronization overhead between stages
+
+        Args:
+            pp_size: Pipeline parallel size
+
+        Returns:
+            float: Estimated communication overhead factor (1.0 = no overhead)
+        """
+        if pp_size <= 1:
+            return 1.0
+
+        # Base overhead increases with PP size
+        base_overhead = 1.0 + (pp_size - 1) * 0.05  # 5% per additional stage
+
+        # Additional overhead for cross-node communication
+        cluster_topology = self.device_config.get("cluster_topology", {})
+        nodes_used = min(pp_size, cluster_topology.get("total_nodes", 1))
+
+        if nodes_used > 1:
+            # Inter-node communication is slower than intra-node
+            cross_node_penalty = (nodes_used - 1) * 0.15  # 15% penalty per cross-node hop
+            base_overhead += cross_node_penalty
+
+        return base_overhead
 
     def apply_quantization_performance(
         self, ttft: float, throughput_per_user: float, e2e_latency: float
@@ -354,14 +695,33 @@ class Evolution:
     def _evaluate_func(self, population: List[Any]) -> List[Any]:
         # Evaluate the individuals with an invalid fitness
         individuals = [ind for ind in population if not ind.fitness.valid]
+        logger.info(f"Evaluating {len(individuals)} individuals in population")
 
-        for ind in individuals:
+        for idx, ind in enumerate(individuals):
             ind_config = self._individual_to_config(ind)
+            logger.info(f"Evaluating individual {idx + 1}/{len(individuals)}: {ind_config}")
             config_tuple = self._config_to_tuple(ind_config)
 
             try:
                 ind_config["target_device"] = self.device_config["type"]
+
+                # Validate TP+PP combination against cluster constraints
+                tp_size = ind_config.get("tensor_parallel_size", 1)
+                pp_size = ind_config.get("pipeline_parallel_size", 1)
+
+                logger.debug(f"Evolution generated config: TP={tp_size}, PP={pp_size}")
+
+                if not self.validate_tp_pp_combination(tp_size, pp_size):
+                    # Invalid TP+PP combination: assign worst possible fitness (finite values for JSON serialization)
+                    worst_fitness = (1e6, 0, 1e6)  # Large finite values instead of infinity
+                    ind.fitness.values = worst_fitness
+                    eval_result = EvaluationResult(ind_config, 0, 0, 0, 0, 0, worst_fitness, 1.0, 1e6)
+                    self.evaluated_configs[config_tuple] = eval_result
+                    continue
+
+                # Check engine compatibility
                 if not check_config_compatibility(self.engine_name, ind_config):
+                    logger.debug(f"Engine {self.engine_name} not compatible with config: {ind_config}")
                     ind.fitness.values = (0, 0, 0)
                     eval_result = EvaluationResult(ind_config, 0, 0, 0, 0, 0, (0, 0, 0), 0, 0)
                     self.evaluated_configs[config_tuple] = eval_result
@@ -373,8 +733,19 @@ class Evolution:
                 self.evaluated_configs[config_tuple] = eval_result
                 continue
 
+            logger.info(f"Preparing predictor data for config: {ind_config}")
             data = self.prepare_predictor_data(ind_config)
-            ttft, throughput_per_user, e2e_latency = self.benchmark_predictor(data)
+
+            # Route to appropriate prediction method
+            logger.info(f"Using {'heuristic' if self.use_heuristic else 'ML predictor'} for performance prediction")
+            if self.use_heuristic:
+                ttft, throughput_per_user, e2e_latency = self.heuristic_calculator(data)
+            else:
+                ttft, throughput_per_user, e2e_latency = self.benchmark_predictor(data)
+            logger.info(
+                f"Performance prediction complete: TTFT={ttft}, Throughput={throughput_per_user}, E2E={e2e_latency}"
+            )
+
             ttft, throughput_per_user, e2e_latency = self.apply_quantization_performance(
                 ttft, throughput_per_user, e2e_latency
             )
@@ -385,10 +756,10 @@ class Evolution:
                 f"Evaluating {ind_config}, Result TTFT: {ttft}, Throughput: {throughput_per_user}, E2E Latency: {e2e_latency}"
             )
             # TODO: Update the fitness calculation
-            # Calculate fitness
-            ttft_fitness = ttft / self.target_ttft
-            e2e_latency_fitness = e2e_latency / self.target_e2e_latency
-            throughput_per_user_fitness = throughput_per_user / self.target_throughput_per_user
+            # Calculate fitness (avoid division by zero)
+            ttft_fitness = ttft / max(self.target_ttft, 1e-9)
+            e2e_latency_fitness = e2e_latency / max(self.target_e2e_latency, 1e-9)
+            throughput_per_user_fitness = throughput_per_user / max(self.target_throughput_per_user, 1e-9)
             concurrency_fitness = max(0, ind_config["concurrency"] / self.max_concurrency)
             # cost_per_million_tokens_per_hour_fitness = 1 / cost_per_million_tokens
 
@@ -509,7 +880,8 @@ class Evolution:
         num_elite = int(self.population_size * self.elite_ratio)
 
         # Evolve the population
-        for gen in tqdm(range(self.generation), desc="Running evolution"):
+        pbar = tqdm(range(self.generation), desc="Running evolution")
+        for gen in pbar:
             # Select and preserve elite individuals
             elite = tools.selBest(population, k=num_elite)
             # Remove duplicates from elite
@@ -568,12 +940,19 @@ class Evolution:
                 logger.info(f"Early stopping at generation {gen} due to no new unique combinations.")
                 break
 
+        # Close the progress bar properly
+        pbar.close()
+
         # top_5_individuals = tools.selBest(population, k=5)
         top_5_scores = list(self.top_configs)  # Convert deque to list
         # top_5_scores = [
         #     self.evaluated_configs[self._config_to_tuple(self._individual_to_config(ind))] for ind in top_5_individuals
         # ]
         logger.info(f"Top 5 scores: {top_5_scores}")
+
+        # Log more details about the top configurations
+        for i, score in enumerate(top_5_scores):
+            logger.info(f"Top config {i + 1}: fitness={score.fitness}, config={score.config}")
 
         # kvcache, config, predictions, score/error rate
         return top_5_scores

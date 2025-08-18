@@ -1,12 +1,17 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Dropdown, Button, MenuProps } from "antd";
 import { Icon } from "@iconify/react";
 import { useTheme, ThemeMode } from "@/context/themeContext";
 
 const ThemeSwitcher: React.FC = () => {
   const { theme, effectiveTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const themeOptions = [
     {
@@ -62,6 +67,18 @@ const ThemeSwitcher: React.FC = () => {
     backgroundColor: "var(--bg-primary)",
     borderColor: "var(--border-color)",
   };
+
+  // Return a placeholder button during SSR and initial mount to prevent hydration issues
+  if (!mounted) {
+    return (
+      <Button
+        type="text"
+        className="flex items-center justify-center w-10 h-10 rounded-lg"
+        icon={<Icon icon="ph:moon" className="w-5 h-5 text-bud-text-muted" />}
+        disabled
+      />
+    );
+  }
 
   return (
     <Dropdown

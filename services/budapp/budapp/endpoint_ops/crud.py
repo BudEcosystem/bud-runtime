@@ -152,6 +152,24 @@ class EndpointDataManager(DataManagerUtils):
         )
         return self.scalars_all(stmt)
 
+    async def get_all_published_endpoints(self) -> List[EndpointModel]:
+        """Get all published endpoints across all projects.
+
+        Returns:
+            List[EndpointModel]: List of all published endpoints with their model and project information.
+        """
+        stmt = (
+            select(EndpointModel)
+            .filter(
+                and_(
+                    EndpointModel.is_published.is_(True),
+                    EndpointModel.status != EndpointStatusEnum.DELETED,
+                )
+            )
+            .options(joinedload(EndpointModel.model), joinedload(EndpointModel.project))
+        )
+        return self.scalars_all(stmt)
+
     async def get_all_endpoints_in_cluster(
         self,
         cluster_id: Optional[UUID],
@@ -277,7 +295,7 @@ class EndpointDataManager(DataManagerUtils):
 
     async def get_all_playground_deployments(
         self,
-        project_ids: List[UUID],
+        project_ids: Optional[List[UUID]],
         offset: int,
         limit: int,
         filters: Optional[Dict[str, Any]] = None,
@@ -362,14 +380,12 @@ class EndpointDataManager(DataManagerUtils):
                 )
                 .filter(or_(*search_conditions, *explicit_conditions))
                 .filter(EndpointModel.status == EndpointStatusEnum.RUNNING)
-                .filter(EndpointModel.project_id.in_(project_ids))
             )
             count_stmt = (
                 select(func.count(distinct(EndpointModel.id)))
                 .join(Model, EndpointModel.model_id == Model.id)
                 .filter(or_(*search_conditions, *explicit_conditions))
                 .filter(EndpointModel.status == EndpointStatusEnum.RUNNING)
-                .filter(EndpointModel.project_id.in_(project_ids))
             )
         else:
             if explicit_filters["model_name"]:
@@ -407,7 +423,6 @@ class EndpointDataManager(DataManagerUtils):
                 )
                 .where(and_(*explicit_conditions))
                 .filter(EndpointModel.status == EndpointStatusEnum.RUNNING)
-                .filter(EndpointModel.project_id.in_(project_ids))
             )
             count_stmt = (
                 select(func.count(distinct(EndpointModel.id)))
@@ -415,8 +430,12 @@ class EndpointDataManager(DataManagerUtils):
                 .join(Model, EndpointModel.model_id == Model.id)
                 .where(and_(*explicit_conditions))
                 .filter(EndpointModel.status == EndpointStatusEnum.RUNNING)
-                .filter(EndpointModel.project_id.in_(project_ids))
             )
+
+        # Only filter by project_ids if provided
+        if project_ids is not None:
+            stmt = stmt.filter(EndpointModel.project_id.in_(project_ids))
+            count_stmt = count_stmt.filter(EndpointModel.project_id.in_(project_ids))
 
         # Calculate count before applying limit and offset
         count = self.execute_scalar(count_stmt)

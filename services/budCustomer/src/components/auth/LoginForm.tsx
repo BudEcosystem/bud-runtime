@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import {
   Text_12_300_EEEEEE,
@@ -27,7 +27,7 @@ const LoginForm = ({ onSubmit }: LoginPageModalProps) => {
   const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [submittable, setSubmittable] = useState(false);
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const emailRegex = useMemo(() => /^[^\s@]+@[^\s@]+\.[^\s@]+$/, []);
 
   const [mounted, setMounted] = useState(false);
 
@@ -185,7 +185,49 @@ const LoginForm = ({ onSubmit }: LoginPageModalProps) => {
               onClick={() => setIsShow(!isShow)}
               className="text-bud-text-muted cursor-pointer pr-3"
             >
-              {isShow ? "👁️" : "🙈"}
+                {isShow ? (
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                  <path
+                  d="M2 10C3.5 6.5 7 4 10 4C13 4 16.5 6.5 18 10C16.5 13.5 13 16 10 16C7 16 3.5 13.5 2 10Z"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  fill="none"
+                  />
+                  <circle
+                  cx="10"
+                  cy="10"
+                  r="3"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  fill="none"
+                  />
+                </svg>
+                ) : (
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                  <path
+                  d="M2 10C3.5 6.5 7 4 10 4C13 4 16.5 6.5 18 10C16.5 13.5 13 16 10 16C7 16 3.5 13.5 2 10Z"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  fill="none"
+                  />
+                  <circle
+                  cx="10"
+                  cy="10"
+                  r="3"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  fill="none"
+                  />
+                  <line
+                  x1="4"
+                  y1="16"
+                  x2="16"
+                  y2="4"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  />
+                </svg>
+                )}
             </button>
           </div>
           {passwordError && (
@@ -210,7 +252,7 @@ const LoginForm = ({ onSubmit }: LoginPageModalProps) => {
               id="isRemember"
               defaultCheck={false}
               checkedChange={isRememberCheck}
-              onClick={() => setIsRememberCheck(!isRememberCheck)}
+              // onClick={() => setIsRememberCheck(!isRememberCheck)}
             />
             <Text_12_400_808080 className="ml-[.45rem] tracking-[.01rem] cursor-pointer select-none">
               Remember me

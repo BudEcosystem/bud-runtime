@@ -1,0 +1,32 @@
+name: "Nix: Run a Workflow"
+on:
+  workflow_call:
+    inputs:
+      workflow:
+        description: "Workflow Name"
+        required: true
+        type: string
+    secrets:
+      SOPS_AGE_KEY:
+        required: false
+  workflow_dispatch:
+    inputs:
+      workflow:
+        description: "Workflow Name"
+        required: true
+        type: string
+
+jobs:
+  nix-workflow:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    - name: Install Nix
+      uses: DeterminateSystems/nix-installer-action@main
+    - name: Setup Nix Cache
+      uses: DeterminateSystems/magic-nix-cache-action@main
+    - name: Run Nix Workflow
+      env:
+        SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
+      run: nix run ".#workflow_${{ github.event.inputs.workflow || inputs.workflow }}"

@@ -2,6 +2,10 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ .Release.Name }}-budmetrics
+  annotations:
+    {{- range $key, $value := .Values.deploymentAnnotations }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
 spec:
   replicas: 1
   selector:
@@ -12,7 +16,6 @@ spec:
       labels:
         app: {{ .Release.Name }}-budmetrics
       annotations:
-        date: "{{ now }}"
         dapr.io/enabled: "true"
         dapr.io/app-id: "budmetrics"
         dapr.io/app-port: "3005"

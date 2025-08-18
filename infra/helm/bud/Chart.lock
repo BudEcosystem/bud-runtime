@@ -1,4 +1,7 @@
 dependencies:
+- name: keel
+  repository: https://charts.keel.sh
+  version: 1.0.5
 - name: postgresql
   repository: https://charts.bitnami.com/bitnami
   version: 16.7.18
@@ -23,5 +26,5 @@ dependencies:
 - name: mongodb
   repository: https://charts.bitnami.com/bitnami
   version: 16.5.31
-digest: sha256:a235bc8eb83d8f392c55a76d06e339cb474872f7924f58972183f47716000bbb
-generated: "2025-08-07T11:54:29.877843373+05:30"
+digest: sha256:a6340b361f5acec8a99ca4124be53b22577c87a1c1e30b5a48127d60c27aa151
+generated: "2025-08-13T11:26:21.367260593+05:30"

@@ -7,9 +7,23 @@ export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    // Redirect to login page when the app loads
-    router.push("/login");
+    // Check if user is authenticated
+    const token = localStorage.getItem("access_token");
+
+    if (token) {
+      // If authenticated, redirect to models page
+      router.push("/models");
+    } else {
+      // If not authenticated, redirect to login
+      router.push("/login");
+    }
   }, [router]);
 
-  return null;
+  return (
+    <div className="min-h-screen bg-bud-bg-primary flex items-center justify-center">
+      <div className="animate-pulse">
+        <div className="text-bud-text-primary">Loading...</div>
+      </div>
+    </div>
+  );
 }

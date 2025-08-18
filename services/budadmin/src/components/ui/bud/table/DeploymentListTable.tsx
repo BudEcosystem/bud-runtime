@@ -4,7 +4,7 @@ import ProjectTags from 'src/flows/components/ProjectTags';
 import { Model } from 'src/hooks/useModels';
 import { Cluster } from 'src/hooks/useCluster';
 import { assetBaseUrl } from '@/components/environment';
-import { PrimaryButton, SecondaryButton } from '../form/Buttons';
+import { BorderlessButton, PrimaryButton, SecondaryButton } from '../form/Buttons';
 import { useRouter as useRouter } from "next/router";
 import { useDrawer } from 'src/hooks/useDrawer';
 import { useDeployModel } from 'src/stores/useDeployModel';
@@ -212,12 +212,21 @@ function DeploymentListTable() {
                             dataIndex: 'created_on',
                             key: 'created_on',
                             render: (text, record) => <div className='min-w-[130px]'>
-                                <div className='flex flex-row items-center visible-on-hover'
-                                    style={{
-                                        display: confirmVisible && 'flex'
-                                    }}
+                                <div className='flex flex-row items-center'
+
                                 >
-                                    <PrimaryButton
+                                    <BorderlessButton
+                                        permission={hasPermission(PermissionEnum.ModelManage)}
+                                        onClick={async (event) => {
+                                            event.stopPropagation();
+                                            await getEndpointClusterDetails(record.id, projectId as string);
+                                            openDrawer('publish', { endpoint: record });
+                                        }}
+                                    >
+                                        Publish
+                                    </BorderlessButton>
+                                    <BorderlessButton
+                                        classNames='ml-[.3rem]'
                                         permission={hasPermission(PermissionEnum.ModelManage)}
                                         onClick={async (event) => {
                                             event.stopPropagation();
@@ -226,19 +235,21 @@ function DeploymentListTable() {
                                         }}
                                     >
                                         Use this model
-                                    </PrimaryButton>
-                                    <Button
-                                        className='ml-[.3rem] bg-transparent border-none p-0'
-                                        onClick={(event) => {
-                                            event.stopPropagation();
-                                            if (!hasPermission(PermissionEnum.ModelManage)) return;
-                                            confirmDelete(record)
-                                        }}
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" width=".875rem" height=".875rem" viewBox="0 0 14 15" fill="none">
-                                            <path fillRule="evenodd" clipRule="evenodd" d="M5.13327 1.28906C4.85713 1.28906 4.63327 1.51292 4.63327 1.78906C4.63327 2.0652 4.85713 2.28906 5.13327 2.28906H8.8666C9.14274 2.28906 9.3666 2.0652 9.3666 1.78906C9.3666 1.51292 9.14274 1.28906 8.8666 1.28906H5.13327ZM2.7666 3.65573C2.7666 3.37959 2.99046 3.15573 3.2666 3.15573H10.7333C11.0094 3.15573 11.2333 3.37959 11.2333 3.65573C11.2333 3.93187 11.0094 4.15573 10.7333 4.15573H10.2661C10.2664 4.1668 10.2666 4.17791 10.2666 4.18906V11.5224C10.2666 12.0747 9.81889 12.5224 9.2666 12.5224H4.73327C4.18098 12.5224 3.73327 12.0747 3.73327 11.5224V4.18906C3.73327 4.17791 3.73345 4.1668 3.73381 4.15573H3.2666C2.99046 4.15573 2.7666 3.93187 2.7666 3.65573ZM9.2666 4.18906L4.73327 4.18906V11.5224L9.2666 11.5224V4.18906Z" fill="#B3B3B3" />
-                                        </svg>
-                                    </Button>
+                                    </BorderlessButton>
+                                    <div className='ml-[.3rem] w-[1rem] h-auto block' />
+                                        <Button
+                                            className='bg-transparent border-none p-0 opacity-0 group-hover:opacity-100'
+                                            onClick={(event) => {
+                                                event.stopPropagation();
+                                                if (!hasPermission(PermissionEnum.ModelManage)) return;
+                                                confirmDelete(record)
+                                            }}
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" width=".875rem" height=".875rem" viewBox="0 0 14 15" fill="none">
+                                                <path fillRule="evenodd" clipRule="evenodd" d="M5.13327 1.28906C4.85713 1.28906 4.63327 1.51292 4.63327 1.78906C4.63327 2.0652 4.85713 2.28906 5.13327 2.28906H8.8666C9.14274 2.28906 9.3666 2.0652 9.3666 1.78906C9.3666 1.51292 9.14274 1.28906 8.8666 1.28906H5.13327ZM2.7666 3.65573C2.7666 3.37959 2.99046 3.15573 3.2666 3.15573H10.7333C11.0094 3.15573 11.2333 3.37959 11.2333 3.65573C11.2333 3.93187 11.0094 4.15573 10.7333 4.15573H10.2661C10.2664 4.1668 10.2666 4.17791 10.2666 4.18906V11.5224C10.2666 12.0747 9.81889 12.5224 9.2666 12.5224H4.73327C4.18098 12.5224 3.73327 12.0747 3.73327 11.5224V4.18906C3.73327 4.17791 3.73345 4.1668 3.73381 4.15573H3.2666C2.99046 4.15573 2.7666 3.93187 2.7666 3.65573ZM9.2666 4.18906L4.73327 4.18906V11.5224L9.2666 11.5224V4.18906Z" fill="#B3B3B3" />
+                                            </svg>
+                                        </Button>
+                                    <div/>
                                 </div>
                             </div>,
                             sortIcon: SortIcon,
@@ -251,6 +262,7 @@ function DeploymentListTable() {
                     virtual
                     onRow={(record, rowIndex) => {
                         return {
+                            className: 'group',
                             onClick: async event => {
                                 router.push(`/projects/${projectId}/deployments/${record.id}`)
                                 setEndpointDetails(record.id, projectId as string);

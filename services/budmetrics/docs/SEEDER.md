@@ -64,8 +64,8 @@ When using `--seed-model-inference`, configure these for direct DB access:
 - `PSQL_HOST`: ClickHouse host
 - `PSQL_PORT`: ClickHouse port
 - `PSQL_DB_NAME`: Database name
-- `SECRETS_PSQL_USER`: Username
-- `SECRETS_PSQL_PASSWORD`: Password
+- `PSQL_USER`: Username
+- `PSQL_PASSWORD`: Password
 
 ## Example Output
 

@@ -73,4 +73,5 @@ export const AuthNavigationProvider: React.FC<{
   );
 };
 
-export default { LoaderProvider, AuthNavigationProvider };
+const providers = { LoaderProvider, AuthNavigationProvider };
+export default providers;

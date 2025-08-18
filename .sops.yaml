@@ -1,14 +1,34 @@
 keys:
+  # people
   - &sinan  age1q5sfy74d53n6jxlgsc2zrsz4wcl9d830nxuagc3wfmdkrrp55ckq9ev6nv
+  - &ditto  age18xn7rqxu27kschgqs7u5x7af9evnpcp4sru34th6zhhwlwnwycpsajeeh9
+  # machines
   - &runner age1ueq3k22vcfet3y0uqu7wu385wd0pwx5nslqp2z30v4e3zf9stpesx7wjxr
-  - &devbox age138ut93gvvwkaudl3wxtwn8z9e50ptuhe2yukg6vhwcgncxpplpsqtmhp7t
+  - &budk8s age138ut93gvvwkaudl3wxtwn8z9e50ptuhe2yukg6vhwcgncxpplpsqtmhp7t
 
 creation_rules:
-  - path_regex: nix/nixos/devbox/.*
+  - path_regex: nix/nixos/master/.*
     age: >-
       age1q5sfy74d53n6jxlgsc2zrsz4wcl9d830nxuagc3wfmdkrrp55ckq9ev6nv,
+      age18xn7rqxu27kschgqs7u5x7af9evnpcp4sru34th6zhhwlwnwycpsajeeh9,
       age138ut93gvvwkaudl3wxtwn8z9e50ptuhe2yukg6vhwcgncxpplpsqtmhp7t
+  - path_regex: infra/helm/.*
+    age: >-
+      age1q5sfy74d53n6jxlgsc2zrsz4wcl9d830nxuagc3wfmdkrrp55ckq9ev6nv,
+      age18xn7rqxu27kschgqs7u5x7af9evnpcp4sru34th6zhhwlwnwycpsajeeh9,
+      age138ut93gvvwkaudl3wxtwn8z9e50ptuhe2yukg6vhwcgncxpplpsqtmhp7t
+  - path_regex: infra/terraform/main/secrets.yaml
+    age: >-
+      age1q5sfy74d53n6jxlgsc2zrsz4wcl9d830nxuagc3wfmdkrrp55ckq9ev6nv,
+      age18xn7rqxu27kschgqs7u5x7af9evnpcp4sru34th6zhhwlwnwycpsajeeh9,
+      age138ut93gvvwkaudl3wxtwn8z9e50ptuhe2yukg6vhwcgncxpplpsqtmhp7t
+
+  - path_regex: nix/workflows/dockerhub_budcustomer/secrets.yaml
+    age: >-
+      age1q5sfy74d53n6jxlgsc2zrsz4wcl9d830nxuagc3wfmdkrrp55ckq9ev6nv,
+      age18xn7rqxu27kschgqs7u5x7af9evnpcp4sru34th6zhhwlwnwycpsajeeh9,
+      age1ueq3k22vcfet3y0uqu7wu385wd0pwx5nslqp2z30v4e3zf9stpesx7wjxr
 
   - age: >-
       age1q5sfy74d53n6jxlgsc2zrsz4wcl9d830nxuagc3wfmdkrrp55ckq9ev6nv,
-      age1ueq3k22vcfet3y0uqu7wu385wd0pwx5nslqp2z30v4e3zf9stpesx7wjxr
+      age18xn7rqxu27kschgqs7u5x7af9evnpcp4sru34th6zhhwlwnwycpsajeeh9

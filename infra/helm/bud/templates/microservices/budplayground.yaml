@@ -2,6 +2,10 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ .Release.Name }}-budplayground
+  annotations:
+    {{- range $key, $value := .Values.deploymentAnnotations }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
 spec:
   replicas: 1
   selector:
@@ -11,8 +15,6 @@ spec:
     metadata:
       labels:
         app: {{ .Release.Name }}-budplayground
-      annotations:
-        date: "{{ now }}"
     spec:
       containers:
       - name: {{ .Release.Name }}-budplayground
@@ -25,6 +27,10 @@ spec:
             value: {{ .Values.microservices.rsaKeys.privateKeyPassword }}
           - name: NEXT_PUBLIC_PRIVATE_KEY
             value: {{ .Values.microservices.rsaKeys.privateKey | b64enc }}
+          - name: NEXT_PUBLIC_TEMP_API_BASE_URL
+            value: {{ include "bud.ingress.url.budapp" $ }}
+          - name: NEXT_PUBLIC_COPY_CODE_API_BASE_URL
+            value: {{ include "bud.ingress.url.budgateway" $ }}
         {{ $root := . }}
         {{- range $key, $value := .Values.microservices.budplayground.env }}
           - name: {{ $key }}

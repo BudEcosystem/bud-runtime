@@ -144,6 +144,44 @@ def get_engine_args_and_envs(engine_name: str, engine_args: Optional[Dict[str, A
     return engine_args_model.get_args_and_envs()
 
 
+def get_minimal_engine_args_and_envs(engine_name: str, engine_args: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Get minimal engine args and envs for heuristic-based configurations.
+
+    This function generates only the essential arguments and environment variables
+    for deployment, excluding parameters that weren't optimized in heuristic mode.
+    Only includes: model, tensor-parallel-size, pipeline-parallel-size, and target_device.
+
+    Args:
+        engine_name (str): The name of the engine.
+        engine_args (Dict[str, Any], optional): The engine arguments containing
+            model, tensor_parallel_size, pipeline_parallel_size, target_device.
+
+    Returns:
+        Dict[str, Any]: A dictionary containing minimal 'args' and 'envs'.
+    """
+    engine_args = engine_args or {}
+
+    # Essential parameters for deployment
+    minimal_args = {}
+    minimal_envs = {}
+
+    # Define mappings from internal arg names to command-line arg names
+    ARG_MAPPING = {
+        "model": "model",
+        "tensor_parallel_size": "tensor-parallel-size",
+        "pipeline_parallel_size": "pipeline-parallel-size",
+    }
+
+    for source_key, dest_key in ARG_MAPPING.items():
+        if source_key in engine_args:
+            minimal_args[dest_key] = engine_args[source_key]
+
+    # Include target device as environment variable
+    if engine_name == "vllm" and "target_device" in engine_args:
+        minimal_envs["VLLM_TARGET_DEVICE"] = engine_args["target_device"]
+    return {"args": minimal_args, "envs": minimal_envs}
+
+
 def get_compatible_engines(model_name: str, proprietary_only: bool = False) -> List[Dict[str, str]]:
     """Retrieve a list of compatible engines for a given model.
 
