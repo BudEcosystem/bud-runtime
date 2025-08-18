@@ -10,27 +10,27 @@ from pydantic import BaseModel, field_validator, model_validator
 
 def validate_date_range(from_date: Optional[datetime], to_date: Optional[datetime], max_days: int = 90) -> None:
     """Validate date range constraints.
-    
+
     Args:
         from_date: Start date
-        to_date: End date  
+        to_date: End date
         max_days: Maximum allowed days between dates (default 90)
-        
+
     Raises:
         ValueError: If date range is invalid
     """
     if to_date is None:
         return
-        
+
     if from_date and to_date < from_date:
         raise ValueError("to_date must be after from_date")
-    
+
     # Validate date range is not too large
     if from_date:
         date_diff = to_date - from_date
         if date_diff.days > max_days:
             raise ValueError(f"Date range cannot exceed {max_days} days")
-    
+
     # Validate dates are not too far in the future
     now = datetime.now(to_date.tzinfo) if to_date.tzinfo else datetime.now()
     if to_date > now + timedelta(days=1):  # Allow 1 day in future for timezone differences

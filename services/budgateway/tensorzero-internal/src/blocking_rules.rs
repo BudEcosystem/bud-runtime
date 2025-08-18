@@ -208,7 +208,7 @@ impl CircuitBreaker {
             .unwrap_or_default()
             .as_secs();
         let last_failure = self.last_failure_time.load(Ordering::Relaxed);
-        
+
         if now - last_failure > self.recovery_timeout {
             // Try to close the circuit
             self.is_open.store(false, Ordering::Relaxed);

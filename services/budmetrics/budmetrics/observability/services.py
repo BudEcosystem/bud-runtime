@@ -1423,41 +1423,6 @@ class ObservabilityMetricsService:
             heatmap_data=heatmap_data,
         )
 
-    async def get_blocking_stats(self, from_date, to_date, project_id):
-        """Get blocking rule statistics."""
-        self._ensure_initialized()
-
-        # Build and execute blocking stats query
-        query = self._build_blocking_stats_query(from_date, to_date, project_id)
-        result = await self._clickhouse_client.execute_query(query)
-
-        # Process results
-        total_blocked = 0
-        blocked_by_rule = {}
-
-        if result:
-            for row in result:
-                total_blocked += row[1]
-                blocked_by_rule[row[0]] = row[1]
-
-        # Get total requests for block rate calculation
-        total_query = self._build_total_requests_query(from_date, to_date, project_id)
-        total_result = await self._clickhouse_client.execute_query(total_query)
-        total_requests = total_result[0][0] if total_result else 0
-
-        block_rate = (total_blocked / total_requests * 100) if total_requests > 0 else 0
-
-        from budmetrics.observability.schemas import GatewayBlockingRuleStats
-
-        return GatewayBlockingRuleStats(
-            total_blocked=total_blocked,
-            block_rate=block_rate,
-            blocked_by_rule=blocked_by_rule,
-            blocked_by_reason={},
-            top_blocked_ips=[],
-            time_series=[],
-        )
-
     async def get_top_routes(self, from_date, to_date, limit, project_id):
         """Get top API routes by request count."""
         self._ensure_initialized()
@@ -2655,8 +2620,6 @@ class ObservabilityMetricsService:
 
         stats_result = await self.clickhouse_client.execute_query(stats_query, params)
         total_blocked = stats_result[0][0] if stats_result else 0
-        unique_rules = stats_result[0][1] if stats_result and len(stats_result[0]) > 1 else 0
-        unique_ips = stats_result[0][2] if stats_result and len(stats_result[0]) > 2 else 0
 
         # Get blocks by rule type and name
         rule_breakdown_query = f"""
@@ -2794,8 +2757,6 @@ class ObservabilityMetricsService:
 
             result = await self.clickhouse_client.execute_query(fallback_query, params)
             total_blocked = result[0][0] if result else 0
-            unique_rules = result[0][1] if result and len(result[0]) > 1 else 0
-            unique_ips = result[0][2] if result and len(result[0]) > 2 else 0
 
             from budmetrics.observability.schemas import GatewayBlockingRuleStats
 

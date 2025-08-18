@@ -2204,8 +2204,7 @@ class BlockingRulesService(SessionMixin):
 
         from .models import GatewayBlockingRule
 
-        # Base query for rules user has access to
-        base_query = select(GatewayBlockingRule).where(and_(GatewayBlockingRule.project_id.in_(accessible_projects)))
+        # Query rules for user's accessible projects
 
         # Total rules count
         total_rules_result = await self.session.execute(
