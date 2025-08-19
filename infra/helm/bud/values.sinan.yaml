@@ -1,3 +1,6 @@
 ingress:
     hosts:
         root: sinan.bud.studio
+
+# disable keel
+deploymentAnnotations: null
