@@ -69,7 +69,9 @@ class Prompt(Base, TimestampMixin):
         default=RateLimitTypeEnum.DISABLED,
     )
     rate_limit_value: Mapped[int] = mapped_column(Integer, nullable=True)
-    default_version_id: Mapped[UUID] = mapped_column(Uuid, nullable=True)
+    default_version_id: Mapped[UUID] = mapped_column(
+        ForeignKey("prompt_version.id", ondelete="SET NULL", use_alter=True), nullable=True
+    )
     status: Mapped[str] = mapped_column(
         Enum(
             PromptStatusEnum,
@@ -86,6 +88,11 @@ class Prompt(Base, TimestampMixin):
         cascade="all, delete-orphan",
         foreign_keys="PromptVersion.prompt_id",
     )
+    default_version: Mapped["PromptVersion"] = relationship(
+        "PromptVersion",
+        foreign_keys=[default_version_id],
+        post_update=True,
+    )
     project: Mapped["Project"] = relationship("Project", foreign_keys=[project_id])
     endpoint: Mapped["Endpoint"] = relationship("Endpoint", foreign_keys=[endpoint_id])
     model: Mapped["Model"] = relationship("Model", foreign_keys=[model_id])
@@ -97,9 +104,7 @@ class PromptVersion(Base, TimestampMixin):
     """Prompt version model for managing different versions of prompts."""
 
     __tablename__ = "prompt_version"
-    __table_args__ = (
-        UniqueConstraint("prompt_id", "version", name="uq_prompt_version_prompt_id_version"),
-    )
+    __table_args__ = (UniqueConstraint("prompt_id", "version", name="uq_prompt_version_prompt_id_version"),)
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     prompt_id: Mapped[UUID] = mapped_column(ForeignKey("prompt.id", ondelete="CASCADE"), nullable=False)

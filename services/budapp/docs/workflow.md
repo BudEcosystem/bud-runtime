@@ -281,33 +281,114 @@ curl --location 'https://<base_url>/clusters/clusters' \
 
 // Select prompt type
 {
-  "workflow_id": "bd30eaf8-1a82-401a-bd38-52cecd1ee17d",
+  "workflow_id": "39590514-e32f-4a7d-be18-3344f010a039",
   "step_number": 2,
   "prompt_type": "simple_prompt"
 }
 
 // Insert prompt schema
 {
-  "workflow_id": "bd30eaf8-1a82-401a-bd38-52cecd1ee17d",
+  "workflow_id": "39590514-e32f-4a7d-be18-3344f010a039",
   "step_number": 3,
   "prompt_schema": {
+    "deployment_name": "qwen3-32b",
+    "model_settings": {
+        "temperature": 0.5
+    },
+    "stream": true,
+    "input_schema": null,
+    "output_schema": {
+        "$defs": {
+            "Batch": {
+                "properties": {
+                    "name": {
+                        "description": "The name of the batch",
+                        "title": "Name",
+                        "type": "string"
+                    },
+                    "people": {
+                        "description": "The list of people",
+                        "items": {
+                            "$ref": "#/$defs/Person"
+                        },
+                        "title": "People",
+                        "type": "array"
+                    }
+                },
+                "required": [
+                    "name",
+                    "people"
+                ],
+                "title": "Batch",
+                "type": "object"
+            },
+            "Person": {
+                "properties": {
+                    "name": {
+                        "description": "The name of the person",
+                        "maxLength": 100,
+                        "minLength": 3,
+                        "title": "Name",
+                        "type": "string"
+                    },
+                    "age": {
+                        "description": "The age of the person",
+                        "maximum": 100,
+                        "minimum": 0,
+                        "title": "Age",
+                        "type": "integer"
+                    },
+                    "email": {
+                        "description": "The email of the person",
+                        "pattern": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
+                        "title": "Email",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "name",
+                    "age",
+                    "email"
+                ],
+                "title": "Person",
+                "type": "object"
+            }
+        },
+        "properties": {
+            "content": {
+                "$ref": "#/$defs/Batch"
+            }
+        },
+        "required": [
+            "content"
+        ],
+        "title": "Input",
+        "type": "object"
+    },
     "messages": [
-      {
-        "role": "user",
-        "content": "Hello"
-      },
-      {
-        "role": "assistant",
-        "content": "Hello"
-      }
-    ]
+        {
+            "role": "developer",
+            "content": "As a developer Give person details in specified format"
+        },
+        {
+            "role": "assistant",
+            "content": "As an assistant Give person details in specified format"
+        },
+        {
+            "role": "user",
+            "content": "As an User Give person details in specified format"
+        }
+    ],
+    "system_prompt": "You are a helpful assistant",
+    "input_data": "Create random person details and add them to a random batch",
+    "output_validation_prompt": "Name of branch should start with varun"
   },
   "endpoint_id": "096cee59-af1f-4fba-b873-7f540d77f7bf"
 }
 
 // Insert prompt metadata
 {
-  "workflow_id": "bd30eaf8-1a82-401a-bd38-52cecd1ee17d",
+  "workflow_id": "39590514-e32f-4a7d-be18-3344f010a039",
   "step_number": 4,
   "name": "test prompt",
   "description": "This is a test prompt",
