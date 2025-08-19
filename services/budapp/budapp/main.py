@@ -49,6 +49,7 @@ from .project_ops import project_routes
 from .router_ops import router_routes
 from .user_ops import user_routes
 from .workflow_ops import workflow_routes
+from .guardrails import guardrail_routes
 
 
 logger = logging.get_logger(__name__)
@@ -219,6 +220,7 @@ internal_router.include_router(playground_routes.playground_router)
 internal_router.include_router(project_routes.project_router)
 internal_router.include_router(router_routes.router_router)
 internal_router.include_router(eval_routes.router)
+internal_router.include_router(guardrail_routes.router)
 
 app.include_router(internal_router)
 

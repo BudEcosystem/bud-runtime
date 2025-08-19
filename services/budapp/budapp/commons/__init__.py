@@ -51,4 +51,16 @@ from ..dataset_ops.models import DatasetSchema as DatasetSchema
 from ..playground_ops.models import ChatSession as ChatSession
 from ..playground_ops.models import Message as Message
 from ..playground_ops.models import Note as Note
+from ..guardrails.models import GuardrailProvider as GuardrailProvider
+from ..guardrails.models import GuardrailProbe as GuardrailProbe
+from ..guardrails.models import GuardrailRule as GuardrailRule
+from ..guardrails.models import GuardrailScannerType as GuardrailScannerType
+from ..guardrails.models import GuardrailModalityType as GuardrailModalityType
+from ..guardrails.models import GuardrailGuardType as GuardrailGuardType
+from ..guardrails.models import GuardrailRuleScanner as GuardrailRuleScanner
+from ..guardrails.models import GuardrailRuleModality as GuardrailRuleModality
+from ..guardrails.models import GuardrailRuleGuardType as GuardrailRuleGuardType
+from ..guardrails.models import GuardrailDeployment as GuardrailDeployment
+from ..guardrails.models import GuardrailDeploymentProbe as GuardrailDeploymentProbe
+from ..guardrails.models import GuardrailDeploymentRuleConfig as GuardrailDeploymentRuleConfig
 from .database import Base as Base

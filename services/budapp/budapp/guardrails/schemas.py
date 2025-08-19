@@ -70,7 +70,7 @@ class GuardrailProviderResponse(GuardrailProviderBase):
     user_id: Optional[UUID] = None
     project_id: Optional[UUID] = None
     created_at: datetime
-    updated_at: datetime
+    modified_at: datetime
 
 
 # Scanner type schemas
@@ -95,7 +95,7 @@ class GuardrailScannerTypeResponse(GuardrailScannerTypeBase):
 
     id: UUID
     created_at: datetime
-    updated_at: datetime
+    modified_at: datetime
 
 
 # Modality type schemas
@@ -118,7 +118,7 @@ class GuardrailModalityTypeResponse(GuardrailModalityTypeBase):
 
     id: UUID
     created_at: datetime
-    updated_at: datetime
+    modified_at: datetime
 
 
 # Guard type schemas
@@ -141,7 +141,7 @@ class GuardrailGuardTypeResponse(GuardrailGuardTypeBase):
 
     id: UUID
     created_at: datetime
-    updated_at: datetime
+    modified_at: datetime
 
 
 # Rule schemas
@@ -193,7 +193,7 @@ class GuardrailRuleResponse(GuardrailBaseSchema):
     is_enabled: bool
     is_custom: bool
     created_at: datetime
-    updated_at: datetime
+    modified_at: datetime
 
 
 # Probe schemas
@@ -232,7 +232,7 @@ class GuardrailProbeResponse(GuardrailProbeBase):
     user_id: Optional[UUID] = None
     project_id: Optional[UUID] = None
     created_at: datetime
-    updated_at: datetime
+    modified_at: datetime
     rules: List[GuardrailRuleResponse] = []
 
 
@@ -275,7 +275,23 @@ class GuardrailDeploymentRuleConfigResponse(GuardrailDeploymentRuleConfigBase):
     is_overridden: bool = False
     effective_configuration: Optional[Dict] = None
     created_at: datetime
-    updated_at: datetime
+    modified_at: datetime
+
+
+# Selection schemas for sparse probe/rule selection
+class RuleSelection(GuardrailBaseSchema):
+    """Schema for sparse rule selection."""
+
+    rule_id: UUID
+    enabled: bool
+
+
+class ProbeSelection(GuardrailBaseSchema):
+    """Schema for sparse probe selection."""
+
+    probe_id: UUID
+    enabled: bool
+    rule_selections: Optional[List[RuleSelection]] = []
 
 
 # Deployment probe schemas
@@ -283,7 +299,6 @@ class GuardrailDeploymentProbeBase(GuardrailBaseSchema):
     """Base schema for deployment probe associations."""
 
     probe_id: UUID
-    execution_order: int = 0
     is_enabled: bool = True
     configuration: Optional[Dict] = None
     threshold_override: Optional[float] = Field(None, ge=0.0, le=1.0)
@@ -303,7 +318,7 @@ class GuardrailDeploymentProbeResponse(GuardrailDeploymentProbeBase):
     probe_name: Optional[str] = None
     rules: List[GuardrailDeploymentRuleConfigResponse] = []
     created_at: datetime
-    updated_at: datetime
+    modified_at: datetime
 
 
 # Deployment schemas
@@ -342,10 +357,17 @@ class GuardrailDeploymentBase(GuardrailBaseSchema):
 
 
 class GuardrailDeploymentCreate(GuardrailDeploymentBase):
-    """Schema for creating a guardrail deployment."""
+    """Schema for creating a guardrail deployment.
+
+    Uses sparse probe selection:
+    - Empty probe_selections list = enable all probes from selected providers
+    - Non-empty probe_selections = apply only specified probe/rule overrides
+    """
 
     project_id: UUID
-    probes: List[GuardrailDeploymentProbeCreate]
+    probes: Optional[List[GuardrailDeploymentProbeCreate]] = None  # Deprecated, use probe_selections
+    probe_selections: Optional[List[ProbeSelection]] = []  # Empty = all probes enabled
+    provider_ids: Optional[List[UUID]] = []  # Provider IDs to fetch all probes from when probe_selections is empty
 
 
 class GuardrailDeploymentUpdate(GuardrailBaseSchema):
@@ -367,7 +389,7 @@ class GuardrailDeploymentResponse(GuardrailDeploymentBase):
     project_id: UUID
     probes: List[GuardrailDeploymentProbeResponse] = []
     created_at: datetime
-    updated_at: datetime
+    modified_at: datetime
 
 
 class GuardrailDeploymentListResponse(GuardrailBaseSchema):
@@ -423,6 +445,100 @@ class GuardrailDeploymentListResponseSchema(GuardrailBaseSchema):
     """Schema for deployment list response."""
 
     deployments: List[GuardrailDeploymentListResponse]
+    total: int
+    page: int
+    page_size: int
+
+
+# Workflow schemas
+class GuardrailDeploymentWorkflowStepData(GuardrailBaseSchema):
+    """Schema for guardrail deployment workflow step data."""
+
+    # Step 1: Probe selection
+    selected_probes: Optional[List[UUID]] = None  # Deprecated
+    selected_rules: Optional[Dict[UUID, List[UUID]]] = None  # Deprecated
+    probe_selections: Optional[List[ProbeSelection]] = []  # New sparse selection format
+    provider_ids: Optional[List[UUID]] = []  # Provider IDs when probe_selections is empty
+
+    # Step 2: Deployment type
+    deployment_type: Optional[GuardrailDeploymentTypeEnum] = None
+
+    # Step 3: Project selection
+    project_id: Optional[UUID] = None
+
+    # Step 4: Endpoint selection (for endpoint_mapped)
+    endpoint_id: Optional[UUID] = None
+    deployment_endpoint_url: Optional[str] = None  # for standalone
+
+    # Step 5: Configuration
+    guard_types: Optional[Dict[UUID, List[UUID]]] = None  # probe_id -> [guard_type_ids]
+    thresholds: Optional[Dict[UUID, float]] = None  # probe_id -> threshold
+    probe_configs: Optional[Dict[UUID, Dict]] = None  # probe_id -> configuration
+    rule_configs: Optional[Dict[str, Dict]] = None  # f"{probe_id}:{rule_id}" -> configuration
+
+    # Step 6: ETA
+    estimated_deployment_time: Optional[int] = None  # seconds
+
+    # Step 7: Deployment status
+    deployment_status: Optional[str] = None
+    deployment_message: Optional[str] = None
+    deployment_id: Optional[UUID] = None
+
+
+class CreateGuardrailDeploymentWorkflowRequest(GuardrailBaseSchema):
+    """Request schema for creating/updating guardrail deployment workflow."""
+
+    workflow_id: Optional[UUID] = None
+    step_number: int = Field(..., ge=1, le=7)
+    workflow_total_steps: int = Field(default=7)
+
+    # Step-specific data
+    selected_probes: Optional[List[UUID]] = None  # Deprecated, use probe_selections
+    selected_rules: Optional[Dict[UUID, List[UUID]]] = None  # Deprecated, use probe_selections
+    probe_selections: Optional[List[ProbeSelection]] = []  # New sparse selection format
+    provider_ids: Optional[List[UUID]] = []  # Provider IDs when probe_selections is empty
+    deployment_type: Optional[GuardrailDeploymentTypeEnum] = None
+    project_id: Optional[UUID] = None
+    endpoint_id: Optional[UUID] = None
+    deployment_endpoint_url: Optional[str] = None
+    guard_types: Optional[Dict[UUID, List[UUID]]] = None
+    thresholds: Optional[Dict[UUID, float]] = None
+    probe_configs: Optional[Dict[UUID, Dict]] = None
+    rule_configs: Optional[Dict[str, Dict]] = None
+
+    # Workflow control
+    trigger_workflow: bool = Field(default=False)
+    deployment_name: Optional[str] = Field(None, max_length=255)
+    deployment_description: Optional[str] = None
+
+
+class ProbeTagSearchResponse(GuardrailBaseSchema):
+    """Schema for probe tag search response."""
+
+    tags: List[str]
+    total: int
+    page: int
+    page_size: int
+
+
+# Rule list schemas for paginated rules within a probe
+class GuardrailRuleListRequestSchema(GuardrailBaseSchema):
+    """Schema for rule list request parameters within a probe."""
+
+    search: Optional[str] = None
+    scanner_type_ids: Optional[List[UUID]] = None
+    modality_type_ids: Optional[List[UUID]] = None
+    guard_type_ids: Optional[List[UUID]] = None
+    is_enabled: Optional[bool] = None
+    is_custom: Optional[bool] = None
+    page: int = Field(1, ge=1)
+    page_size: int = Field(20, ge=1, le=100)
+
+
+class GuardrailRuleListResponseSchema(GuardrailBaseSchema):
+    """Schema for paginated rule list response."""
+
+    rules: List[GuardrailRuleResponse]
     total: int
     page: int
     page_size: int

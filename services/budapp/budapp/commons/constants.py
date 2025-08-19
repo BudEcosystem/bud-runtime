@@ -573,6 +573,7 @@ class WorkflowTypeEnum(StrEnum):
     ADD_ADAPTER = auto()
     DELETE_ADAPTER = auto()
     EVALUATION_CREATION = auto()
+    GUARDRAIL_DEPLOYMENT = auto()
 
 
 class NotificationType(Enum):
@@ -2801,6 +2802,7 @@ WORKFLOW_DELETE_MESSAGES = {
     WorkflowTypeEnum.CLOUD_MODEL_ONBOARDING: "Successfully cancelled model onboarding.",
     WorkflowTypeEnum.LOCAL_MODEL_ONBOARDING: "Successfully cancelled model onboarding.",
     WorkflowTypeEnum.ADD_WORKER_TO_ENDPOINT: "Successfully cancelled worker to deployment.",
+    WorkflowTypeEnum.GUARDRAIL_DEPLOYMENT: "Successfully cancelled guardrail deployment.",
 }
 
 

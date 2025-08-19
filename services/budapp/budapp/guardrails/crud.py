@@ -21,8 +21,7 @@ from uuid import UUID
 
 from sqlalchemy import and_, delete, func, or_
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy.sql import select
 
 from budapp.commons.constants import GuardrailDeploymentStatusEnum, GuardrailProviderEnum
@@ -48,77 +47,76 @@ from budapp.guardrails.schemas import (
     GuardrailGuardTypeCreate,
     GuardrailModalityTypeCreate,
     GuardrailProbeCreate,
-    GuardrailProviderCreate,
-    GuardrailProviderUpdate,
     GuardrailProbeListRequestSchema,
     GuardrailProbeUpdate,
+    GuardrailProviderCreate,
+    GuardrailProviderUpdate,
     GuardrailRuleCreate,
+    GuardrailRuleListRequestSchema,
     GuardrailRuleUpdate,
     GuardrailScannerTypeCreate,
 )
 
 
 # Scanner type CRUD operations
-async def create_scanner_type(db: AsyncSession, scanner_data: GuardrailScannerTypeCreate) -> GuardrailScannerType:
+async def create_scanner_type(db: Session, scanner_data: GuardrailScannerTypeCreate) -> GuardrailScannerType:
     """Create a new scanner type."""
     scanner = GuardrailScannerType(**scanner_data.model_dump())
     db.add(scanner)
-    await db.commit()
-    await db.refresh(scanner)
+    db.commit()
+    db.refresh(scanner)
     return scanner
 
 
-async def get_scanner_type(db: AsyncSession, scanner_id: UUID) -> Optional[GuardrailScannerType]:
+async def get_scanner_type(db: Session, scanner_id: UUID) -> Optional[GuardrailScannerType]:
     """Get a scanner type by ID."""
-    result = await db.execute(select(GuardrailScannerType).where(GuardrailScannerType.id == scanner_id))
+    result = db.execute(select(GuardrailScannerType).where(GuardrailScannerType.id == scanner_id))
     return result.scalar_one_or_none()
 
 
-async def get_scanner_types(db: AsyncSession) -> List[GuardrailScannerType]:
+async def get_scanner_types(db: Session) -> List[GuardrailScannerType]:
     """Get all scanner types."""
-    result = await db.execute(select(GuardrailScannerType).order_by(GuardrailScannerType.name))
+    result = db.execute(select(GuardrailScannerType).order_by(GuardrailScannerType.name))
     return result.scalars().all()
 
 
 # Modality type CRUD operations
-async def create_modality_type(db: AsyncSession, modality_data: GuardrailModalityTypeCreate) -> GuardrailModalityType:
+async def create_modality_type(db: Session, modality_data: GuardrailModalityTypeCreate) -> GuardrailModalityType:
     """Create a new modality type."""
     modality = GuardrailModalityType(**modality_data.model_dump())
     db.add(modality)
-    await db.commit()
-    await db.refresh(modality)
+    db.commit()
+    db.refresh(modality)
     return modality
 
 
-async def get_modality_type(db: AsyncSession, modality_id: UUID) -> Optional[GuardrailModalityType]:
+async def get_modality_type(db: Session, modality_id: UUID) -> Optional[GuardrailModalityType]:
     """Get a modality type by ID."""
-    result = await db.execute(select(GuardrailModalityType).where(GuardrailModalityType.id == modality_id))
+    result = db.execute(select(GuardrailModalityType).where(GuardrailModalityType.id == modality_id))
     return result.scalar_one_or_none()
 
 
-async def get_modality_types(db: AsyncSession) -> List[GuardrailModalityType]:
+async def get_modality_types(db: Session) -> List[GuardrailModalityType]:
     """Get all modality types."""
-    result = await db.execute(select(GuardrailModalityType).order_by(GuardrailModalityType.name))
+    result = db.execute(select(GuardrailModalityType).order_by(GuardrailModalityType.name))
     return result.scalars().all()
 
 
 # Provider CRUD operations
-async def create_provider(
-    db: AsyncSession, provider_data: GuardrailProviderCreate, created_by: UUID
-) -> GuardrailProvider:
+async def create_provider(db: Session, provider_data: GuardrailProviderCreate, created_by: UUID) -> GuardrailProvider:
     """Create a new guardrail provider."""
     provider_dict = provider_data.model_dump()
     provider_dict["created_by"] = created_by
     provider = GuardrailProvider(**provider_dict)
     db.add(provider)
-    await db.commit()
-    await db.refresh(provider)
+    db.commit()
+    db.refresh(provider)
     return provider
 
 
-async def get_provider(db: AsyncSession, provider_id: UUID) -> Optional[GuardrailProvider]:
+async def get_provider(db: Session, provider_id: UUID) -> Optional[GuardrailProvider]:
     """Get a provider by ID."""
-    result = await db.execute(
+    result = db.execute(
         select(GuardrailProvider)
         .where(GuardrailProvider.id == provider_id)
         .options(selectinload(GuardrailProvider.probes))
@@ -126,17 +124,17 @@ async def get_provider(db: AsyncSession, provider_id: UUID) -> Optional[Guardrai
     return result.scalar_one_or_none()
 
 
-async def get_providers(db: AsyncSession, include_inactive: bool = False) -> List[GuardrailProvider]:
+async def get_providers(db: Session, include_inactive: bool = False) -> List[GuardrailProvider]:
     """Get all providers."""
     query = select(GuardrailProvider).order_by(GuardrailProvider.display_name)
     if not include_inactive:
         query = query.where(GuardrailProvider.is_active.is_(True))
-    result = await db.execute(query)
+    result = db.execute(query)
     return result.scalars().all()
 
 
 async def update_provider(
-    db: AsyncSession, provider_id: UUID, provider_data: GuardrailProviderUpdate, user_id: UUID
+    db: Session, provider_id: UUID, provider_data: GuardrailProviderUpdate, user_id: UUID
 ) -> Optional[GuardrailProvider]:
     """Update a provider (only custom providers can be updated by their owner)."""
     provider = await get_provider(db, provider_id)
@@ -150,12 +148,12 @@ async def update_provider(
     for field, value in provider_data.model_dump(exclude_unset=True).items():
         setattr(provider, field, value)
 
-    await db.commit()
-    await db.refresh(provider)
+    db.commit()
+    db.refresh(provider)
     return provider
 
 
-async def delete_provider(db: AsyncSession, provider_id: UUID, user_id: UUID) -> bool:
+async def delete_provider(db: Session, provider_id: UUID, user_id: UUID) -> bool:
     """Delete a provider (only custom providers can be deleted by their owner)."""
     provider = await get_provider(db, provider_id)
     if not provider:
@@ -165,40 +163,40 @@ async def delete_provider(db: AsyncSession, provider_id: UUID, user_id: UUID) ->
     if provider.provider_type != GuardrailProviderEnum.CUSTOM or provider.user_id != user_id:
         return False
 
-    await db.delete(provider)
-    await db.commit()
+    db.delete(provider)
+    db.commit()
     return True
 
 
 # Guard type CRUD operations
-async def create_guard_type(db: AsyncSession, guard_data: GuardrailGuardTypeCreate) -> GuardrailGuardType:
+async def create_guard_type(db: Session, guard_data: GuardrailGuardTypeCreate) -> GuardrailGuardType:
     """Create a new guard type."""
     guard = GuardrailGuardType(**guard_data.model_dump())
     db.add(guard)
-    await db.commit()
-    await db.refresh(guard)
+    db.commit()
+    db.refresh(guard)
     return guard
 
 
-async def get_guard_type(db: AsyncSession, guard_id: UUID) -> Optional[GuardrailGuardType]:
+async def get_guard_type(db: Session, guard_id: UUID) -> Optional[GuardrailGuardType]:
     """Get a guard type by ID."""
-    result = await db.execute(select(GuardrailGuardType).where(GuardrailGuardType.id == guard_id))
+    result = db.execute(select(GuardrailGuardType).where(GuardrailGuardType.id == guard_id))
     return result.scalar_one_or_none()
 
 
-async def get_guard_types(db: AsyncSession) -> List[GuardrailGuardType]:
+async def get_guard_types(db: Session) -> List[GuardrailGuardType]:
     """Get all guard types."""
-    result = await db.execute(select(GuardrailGuardType).order_by(GuardrailGuardType.name))
+    result = db.execute(select(GuardrailGuardType).order_by(GuardrailGuardType.name))
     return result.scalars().all()
 
 
 # Rule CRUD operations
-async def create_rule(db: AsyncSession, rule_data: GuardrailRuleCreate, created_by: UUID) -> GuardrailRule:
+async def create_rule(db: Session, rule_data: GuardrailRuleCreate, created_by: UUID) -> GuardrailRule:
     """Create a new guardrail rule with junction table associations."""
     rule_dict = rule_data.model_dump(exclude={"scanner_type_ids", "modality_type_ids", "guard_type_ids"})
     rule = GuardrailRule(**rule_dict)
     db.add(rule)
-    await db.flush()  # Flush to get the ID
+    db.flush()  # Flush to get the ID
 
     # Create scanner associations
     for scanner_type_id in rule_data.scanner_type_ids:
@@ -215,14 +213,14 @@ async def create_rule(db: AsyncSession, rule_data: GuardrailRuleCreate, created_
         guard_assoc = GuardrailRuleGuardType(rule_id=rule.id, guard_type_id=guard_type_id)
         db.add(guard_assoc)
 
-    await db.commit()
-    await db.refresh(rule)
+    db.commit()
+    db.refresh(rule)
     return rule
 
 
-async def get_rule(db: AsyncSession, rule_id: UUID) -> Optional[GuardrailRule]:
+async def get_rule(db: Session, rule_id: UUID) -> Optional[GuardrailRule]:
     """Get a rule by ID."""
-    result = await db.execute(
+    result = db.execute(
         select(GuardrailRule)
         .options(
             joinedload(GuardrailRule.probe),
@@ -235,15 +233,13 @@ async def get_rule(db: AsyncSession, rule_id: UUID) -> Optional[GuardrailRule]:
     return result.scalar_one_or_none()
 
 
-async def get_rules_by_probe(db: AsyncSession, probe_id: UUID) -> List[GuardrailRule]:
+async def get_rules_by_probe(db: Session, probe_id: UUID) -> List[GuardrailRule]:
     """Get all rules for a probe."""
-    result = await db.execute(
-        select(GuardrailRule).where(GuardrailRule.probe_id == probe_id).order_by(GuardrailRule.name)
-    )
+    result = db.execute(select(GuardrailRule).where(GuardrailRule.probe_id == probe_id).order_by(GuardrailRule.name))
     return result.scalars().all()
 
 
-async def update_rule(db: AsyncSession, rule_id: UUID, rule_data: GuardrailRuleUpdate) -> Optional[GuardrailRule]:
+async def update_rule(db: Session, rule_id: UUID, rule_data: GuardrailRuleUpdate) -> Optional[GuardrailRule]:
     """Update a rule with junction table associations."""
     rule = await get_rule(db, rule_id)
     if not rule:
@@ -258,7 +254,7 @@ async def update_rule(db: AsyncSession, rule_id: UUID, rule_data: GuardrailRuleU
     # Update scanner associations if provided
     if rule_data.scanner_type_ids is not None:
         # Delete existing associations
-        await db.execute(delete(GuardrailRuleScanner).where(GuardrailRuleScanner.rule_id == rule_id))
+        db.execute(delete(GuardrailRuleScanner).where(GuardrailRuleScanner.rule_id == rule_id))
 
         # Create new associations
         for scanner_type_id in rule_data.scanner_type_ids:
@@ -268,7 +264,7 @@ async def update_rule(db: AsyncSession, rule_id: UUID, rule_data: GuardrailRuleU
     # Update modality associations if provided
     if rule_data.modality_type_ids is not None:
         # Delete existing associations
-        await db.execute(delete(GuardrailRuleModality).where(GuardrailRuleModality.rule_id == rule_id))
+        db.execute(delete(GuardrailRuleModality).where(GuardrailRuleModality.rule_id == rule_id))
 
         # Create new associations
         for modality_type_id in rule_data.modality_type_ids:
@@ -278,44 +274,114 @@ async def update_rule(db: AsyncSession, rule_id: UUID, rule_data: GuardrailRuleU
     # Update guard type associations if provided
     if rule_data.guard_type_ids is not None:
         # Delete existing associations
-        await db.execute(delete(GuardrailRuleGuardType).where(GuardrailRuleGuardType.rule_id == rule_id))
+        db.execute(delete(GuardrailRuleGuardType).where(GuardrailRuleGuardType.rule_id == rule_id))
 
         # Create new associations
         for guard_type_id in rule_data.guard_type_ids:
             guard_assoc = GuardrailRuleGuardType(rule_id=rule.id, guard_type_id=guard_type_id)
             db.add(guard_assoc)
 
-    await db.commit()
-    await db.refresh(rule)
+    db.commit()
+    db.refresh(rule)
     return rule
 
 
-async def delete_rule(db: AsyncSession, rule_id: UUID) -> bool:
+async def delete_rule(db: Session, rule_id: UUID) -> bool:
     """Delete a rule."""
     rule = await get_rule(db, rule_id)
     if not rule:
         return False
 
-    await db.delete(rule)
-    await db.commit()
+    db.delete(rule)
+    db.commit()
     return True
 
 
+async def get_rules_paginated(
+    db: Session, probe_id: UUID, filters: GuardrailRuleListRequestSchema
+) -> Tuple[List[GuardrailRule], int]:
+    """Get paginated rules for a probe with filtering."""
+    # Base query for rules in the probe
+    query = (
+        select(GuardrailRule)
+        .where(GuardrailRule.probe_id == probe_id)
+        .options(
+            selectinload(GuardrailRule.scanner_associations).selectinload(GuardrailRuleScanner.scanner_type),
+            selectinload(GuardrailRule.modality_associations).selectinload(GuardrailRuleModality.modality_type),
+            selectinload(GuardrailRule.guard_type_associations).selectinload(GuardrailRuleGuardType.guard_type),
+        )
+    )
+    count_query = select(func.count(GuardrailRule.id)).where(GuardrailRule.probe_id == probe_id)
+
+    # Apply filters
+    conditions = []
+
+    # Search filter
+    if filters.search:
+        search_term = f"%{filters.search}%"
+        conditions.append(or_(GuardrailRule.name.ilike(search_term), GuardrailRule.description.ilike(search_term)))
+
+    # Scanner type filter
+    if filters.scanner_type_ids:
+        query = query.join(GuardrailRuleScanner)
+        count_query = count_query.join(GuardrailRuleScanner)
+        conditions.append(GuardrailRuleScanner.scanner_type_id.in_(filters.scanner_type_ids))
+
+    # Modality type filter
+    if filters.modality_type_ids:
+        query = query.join(GuardrailRuleModality)
+        count_query = count_query.join(GuardrailRuleModality)
+        conditions.append(GuardrailRuleModality.modality_type_id.in_(filters.modality_type_ids))
+
+    # Guard type filter
+    if filters.guard_type_ids:
+        query = query.join(GuardrailRuleGuardType)
+        count_query = count_query.join(GuardrailRuleGuardType)
+        conditions.append(GuardrailRuleGuardType.guard_type_id.in_(filters.guard_type_ids))
+
+    # Enabled filter
+    if filters.is_enabled is not None:
+        conditions.append(GuardrailRule.is_enabled == filters.is_enabled)
+
+    # Custom filter
+    if filters.is_custom is not None:
+        conditions.append(GuardrailRule.is_custom == filters.is_custom)
+
+    # Apply all conditions
+    if conditions:
+        query = query.where(and_(*conditions))
+        count_query = count_query.where(and_(*conditions))
+
+    # Get total count
+    count_result = db.execute(count_query)
+    total = count_result.scalar()
+
+    # Apply pagination and ordering
+    query = query.order_by(GuardrailRule.name)
+    query = query.offset((filters.page - 1) * filters.page_size).limit(filters.page_size)
+
+    # Execute query
+    result = db.execute(query)
+    rules = result.scalars().all()
+
+    return rules, total
+
+
 # Probe CRUD operations
-async def create_probe(db: AsyncSession, probe_data: GuardrailProbeCreate, created_by: UUID) -> GuardrailProbe:
+async def create_probe(db: Session, probe_data: GuardrailProbeCreate, created_by: UUID) -> GuardrailProbe:
     """Create a new guardrail probe."""
     probe_dict = probe_data.model_dump()
     probe_dict["created_by"] = created_by
     probe = GuardrailProbe(**probe_dict)
     db.add(probe)
-    await db.commit()
-    await db.refresh(probe)
+    db.commit()
+    db.refresh(probe)
     return probe
 
 
-async def get_probe(db: AsyncSession, probe_id: UUID) -> Optional[GuardrailProbe]:
+async def get_probe(db: Session, probe_id: UUID) -> Optional[GuardrailProbe]:
     """Get a probe by ID with rules."""
-    result = await db.execute(
+    result = db.execute(
         select(GuardrailProbe)
         .options(
             selectinload(GuardrailProbe.provider),
@@ -335,7 +401,7 @@ async def get_probe(db: AsyncSession, probe_id: UUID) -> Optional[GuardrailProbe
 
 
 async def get_probes(
-    db: AsyncSession, filters: GuardrailProbeListRequestSchema, user_id: UUID
+    db: Session, filters: GuardrailProbeListRequestSchema, user_id: UUID
 ) -> Tuple[List[GuardrailProbe], int]:
     """Get probes with filtering and pagination."""
     query = select(GuardrailProbe).options(
@@ -400,7 +466,7 @@ async def get_probes(
         count_query = count_query.where(and_(*conditions))
 
     # Get total count
-    count_result = await db.execute(count_query)
+    count_result = db.execute(count_query)
     total = count_result.scalar()
 
     # Apply pagination and ordering
@@ -408,14 +474,27 @@ async def get_probes(
     query = query.offset((filters.page - 1) * filters.page_size).limit(filters.page_size)
 
     # Execute query
-    result = await db.execute(query)
+    result = db.execute(query)
     probes = result.scalars().all()
 
     return probes, total
 
 
+async def get_probes_by_provider(db: Session, provider_id: UUID) -> List[GuardrailProbe]:
+    """Get all probes for a specific provider."""
+    result = db.execute(
+        select(GuardrailProbe)
+        .where(GuardrailProbe.provider_id == provider_id)
+        .options(
+            selectinload(GuardrailProbe.provider),
+            selectinload(GuardrailProbe.rules),
+        )
+    )
+    return result.scalars().all()
+
+
 async def update_probe(
-    db: AsyncSession, probe_id: UUID, probe_data: GuardrailProbeUpdate, user_id: UUID
+    db: Session, probe_id: UUID, probe_data: GuardrailProbeUpdate, user_id: UUID
 ) -> Optional[GuardrailProbe]:
     """Update a probe (only if user owns it)."""
     probe = await get_probe(db, probe_id)
@@ -429,12 +508,12 @@ async def update_probe(
     for field, value in probe_data.model_dump(exclude_unset=True).items():
         setattr(probe, field, value)
 
-    await db.commit()
-    await db.refresh(probe)
+    db.commit()
+    db.refresh(probe)
     return probe
 
 
-async def delete_probe(db: AsyncSession, probe_id: UUID, user_id: UUID) -> bool:
+async def delete_probe(db: Session, probe_id: UUID, user_id: UUID) -> bool:
     """Delete a probe (only if user owns it)."""
     probe = await get_probe(db, probe_id)
     if not probe:
@@ -444,14 +523,14 @@ async def delete_probe(db: AsyncSession, probe_id: UUID, user_id: UUID) -> bool:
     if not probe.is_custom or (probe.is_custom and probe.user_id != user_id):
         return False
 
-    await db.delete(probe)
-    await db.commit()
+    db.delete(probe)
+    db.commit()
     return True
 
 
 # Deployment CRUD operations
 async def create_deployment(
-    db: AsyncSession, deployment_data: GuardrailDeploymentCreate, user_id: UUID
+    db: Session, deployment_data: GuardrailDeploymentCreate, user_id: UUID
 ) -> GuardrailDeployment:
     """Create a new guardrail deployment with probes."""
     # Create deployment
@@ -459,20 +538,20 @@ async def create_deployment(
     deployment_dict["user_id"] = user_id
     deployment = GuardrailDeployment(**deployment_dict)
     db.add(deployment)
-    await db.flush()  # Flush to get the ID
+    db.flush()  # Flush to get the ID
 
     # Create probe associations
     for probe_data in deployment_data.probes:
         deployment_probe = await _create_deployment_probe(db, deployment.id, probe_data)
         deployment.probe_associations.append(deployment_probe)
 
-    await db.commit()
-    await db.refresh(deployment)
+    db.commit()
+    db.refresh(deployment)
     return deployment
 
 
 async def _create_deployment_probe(
-    db: AsyncSession, deployment_id: UUID, probe_data: GuardrailDeploymentProbeCreate
+    db: Session, deployment_id: UUID, probe_data: GuardrailDeploymentProbeCreate
 ) -> GuardrailDeploymentProbe:
     """Create a deployment-probe association with rule configs."""
     # Create deployment-probe association
@@ -480,7 +559,7 @@ async def _create_deployment_probe(
     deployment_probe_dict["deployment_id"] = deployment_id
     deployment_probe = GuardrailDeploymentProbe(**deployment_probe_dict)
     db.add(deployment_probe)
-    await db.flush()  # Flush to get the ID
+    db.flush()  # Flush to get the ID
 
     # Create rule configurations if provided
     if probe_data.rule_configs:
@@ -493,9 +572,9 @@ async def _create_deployment_probe(
     return deployment_probe
 
 
-async def get_deployment(db: AsyncSession, deployment_id: UUID) -> Optional[GuardrailDeployment]:
+async def get_deployment(db: Session, deployment_id: UUID) -> Optional[GuardrailDeployment]:
     """Get a deployment by ID with all related data."""
-    result = await db.execute(
+    result = db.execute(
         select(GuardrailDeployment)
         .options(
             selectinload(GuardrailDeployment.probe_associations).selectinload(GuardrailDeploymentProbe.probe),
@@ -509,7 +588,7 @@ async def get_deployment(db: AsyncSession, deployment_id: UUID) -> Optional[Guar
 
 
 async def get_deployments(
-    db: AsyncSession, filters: GuardrailDeploymentListRequestSchema, user_id: UUID
+    db: Session, filters: GuardrailDeploymentListRequestSchema, user_id: UUID
 ) -> Tuple[List[GuardrailDeployment], int]:
     """Get deployments with filtering and pagination."""
     query = select(GuardrailDeployment)
@@ -544,7 +623,7 @@ async def get_deployments(
     count_query = count_query.where(and_(*conditions))
 
     # Get total count
-    count_result = await db.execute(count_query)
+    count_result = db.execute(count_query)
     total = count_result.scalar()
 
     # Apply pagination and ordering
@@ -555,14 +634,14 @@ async def get_deployments(
     query = query.options(selectinload(GuardrailDeployment.probe_associations))
 
     # Execute query
-    result = await db.execute(query)
+    result = db.execute(query)
     deployments = result.scalars().all()
 
     return deployments, total
 
 
 async def update_deployment(
-    db: AsyncSession, deployment_id: UUID, deployment_data: GuardrailDeploymentUpdate, user_id: UUID
+    db: Session, deployment_id: UUID, deployment_data: GuardrailDeploymentUpdate, user_id: UUID
 ) -> Optional[GuardrailDeployment]:
     """Update a deployment."""
     deployment = await get_deployment(db, deployment_id)
@@ -579,7 +658,7 @@ async def update_deployment(
     if deployment_data.probes is not None:
         # Delete existing associations
         for existing_probe in deployment.probe_associations:
-            await db.delete(existing_probe)
+            db.delete(existing_probe)
 
         # Create new associations
         deployment.probe_associations = []
@@ -587,12 +666,12 @@ async def update_deployment(
             deployment_probe = await _create_deployment_probe(db, deployment.id, probe_data)
             deployment.probe_associations.append(deployment_probe)
 
-    await db.commit()
-    await db.refresh(deployment)
+    db.commit()
+    db.refresh(deployment)
     return deployment
 
 
-async def delete_deployment(db: AsyncSession, deployment_id: UUID, user_id: UUID) -> bool:
+async def delete_deployment(db: Session, deployment_id: UUID, user_id: UUID) -> bool:
     """Delete a deployment (soft delete by updating status)."""
     deployment = await get_deployment(db, deployment_id)
     if not deployment or deployment.user_id != user_id:
@@ -600,13 +679,13 @@ async def delete_deployment(db: AsyncSession, deployment_id: UUID, user_id: UUID
 
     # Soft delete: update status to DELETED instead of removing the row
     deployment.status = GuardrailDeploymentStatusEnum.DELETED
-    await db.commit()
+    db.commit()
     return True
 
 
-async def get_deployments_by_endpoint(db: AsyncSession, endpoint_id: UUID, user_id: UUID) -> List[GuardrailDeployment]:
+async def get_deployments_by_endpoint(db: Session, endpoint_id: UUID, user_id: UUID) -> List[GuardrailDeployment]:
     """Get all deployments for a specific endpoint."""
-    result = await db.execute(
+    result = db.execute(
         select(GuardrailDeployment)
         .where(
             and_(
@@ -625,9 +704,9 @@ async def get_deployments_by_endpoint(db: AsyncSession, endpoint_id: UUID, user_
     return result.scalars().all()
 
 
-async def get_deployments_by_project(db: AsyncSession, project_id: UUID, user_id: UUID) -> List[GuardrailDeployment]:
+async def get_deployments_by_project(db: Session, project_id: UUID, user_id: UUID) -> List[GuardrailDeployment]:
     """Get all deployments for a specific project."""
-    result = await db.execute(
+    result = db.execute(
         select(GuardrailDeployment)
         .where(
             and_(

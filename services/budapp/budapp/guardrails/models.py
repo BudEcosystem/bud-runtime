@@ -25,11 +25,11 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from budapp.auth.models import User
 from budapp.commons.constants import GuardrailDeploymentStatusEnum, GuardrailDeploymentTypeEnum, GuardrailProviderEnum
 from budapp.commons.database import Base, TimestampMixin
 from budapp.endpoint_ops.models import Endpoint
 from budapp.project_ops.models import Project
+from budapp.user_ops.models import User
 
 
 class GuardrailProvider(Base, TimestampMixin):
@@ -287,7 +287,6 @@ class GuardrailDeploymentProbe(Base, TimestampMixin):
         ForeignKey("guardrail_deployments.id", ondelete="CASCADE"), nullable=False
     )
     probe_id: Mapped[UUID] = mapped_column(ForeignKey("guardrail_probes.id", ondelete="CASCADE"), nullable=False)
-    execution_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     is_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     configuration: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     threshold_override: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
