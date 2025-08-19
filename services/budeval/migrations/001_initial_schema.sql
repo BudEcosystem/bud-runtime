@@ -84,25 +84,25 @@ GROUP BY model_name, dataset_name, eval_date;
 
 -- Bloom filter indexes for fast job lookups
 -- These enable efficient filtering without full table scans
-CREATE INDEX IF NOT EXISTS idx_job_id_jobs 
-ON budeval.evaluation_jobs (job_id) 
+CREATE INDEX IF NOT EXISTS idx_job_id_jobs
+ON budeval.evaluation_jobs (job_id)
 TYPE bloom_filter GRANULARITY 1;
 
-CREATE INDEX IF NOT EXISTS idx_job_id_results 
-ON budeval.dataset_results (job_id) 
+CREATE INDEX IF NOT EXISTS idx_job_id_results
+ON budeval.dataset_results (job_id)
 TYPE bloom_filter GRANULARITY 1;
 
-CREATE INDEX IF NOT EXISTS idx_job_id_predictions 
-ON budeval.predictions (job_id) 
+CREATE INDEX IF NOT EXISTS idx_job_id_predictions
+ON budeval.predictions (job_id)
 TYPE bloom_filter GRANULARITY 1;
 
 -- Minmax indexes for efficient date range queries
-CREATE INDEX IF NOT EXISTS idx_evaluated_at_results 
-ON budeval.dataset_results (evaluated_at) 
+CREATE INDEX IF NOT EXISTS idx_evaluated_at_results
+ON budeval.dataset_results (evaluated_at)
 TYPE minmax GRANULARITY 1;
 
-CREATE INDEX IF NOT EXISTS idx_evaluated_at_predictions 
-ON budeval.predictions (evaluated_at) 
+CREATE INDEX IF NOT EXISTS idx_evaluated_at_predictions
+ON budeval.predictions (evaluated_at)
 TYPE minmax GRANULARITY 1;
 
 -- Set compression settings at database level
@@ -114,25 +114,25 @@ TYPE minmax GRANULARITY 1;
 -- GRANT SELECT, INSERT, ALTER ON budeval.* TO budeval_app;
 
 -- Display table information
-SELECT 
+SELECT
     database,
     table,
     engine,
     total_rows,
     total_bytes,
     formatReadableSize(total_bytes) as size
-FROM system.tables 
+FROM system.tables
 WHERE database = 'budeval'
 ORDER BY total_bytes DESC;
 
 -- Show partition information
-SELECT 
+SELECT
     database,
     table,
     partition,
     rows,
     bytes_on_disk,
     formatReadableSize(bytes_on_disk) as size_on_disk
-FROM system.parts 
+FROM system.parts
 WHERE database = 'budeval' AND active = 1
 ORDER BY bytes_on_disk DESC;

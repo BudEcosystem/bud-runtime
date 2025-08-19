@@ -15,7 +15,7 @@
     - name: Extract UUID from job_id if it has engine prefix
       set_fact:
         uuid_part: "{{ job_id.split('-', 1)[1] if '-' in job_id and (job_id.startswith('opencompass-') or job_id.startswith('vllm-') or job_id.startswith('lighteval-')) else job_id }}"
-    
+
     - name: Verify PVC exists before extraction
       community.kubernetes.k8s_info:
         api_version: v1
@@ -25,7 +25,7 @@
         kubeconfig: "{{ kubeconfig_path | default(omit) }}"
       register: pvc_info
       failed_when: pvc_info.resources | length == 0
-      
+
     - name: Display PVC status
       debug:
         msg: "PVC {{ uuid_part }}-output-pvc found with status: {{ pvc_info.resources[0].status.phase }}"
@@ -87,7 +87,7 @@
       delay: 3
       failed_when: >
         pod_info.resources | length == 0 or
-        (pod_info.resources[0].status is defined and 
+        (pod_info.resources[0].status is defined and
          pod_info.resources[0].status.phase == "Failed")
 
     - name: Check if output directory exists in pod

@@ -134,7 +134,7 @@ ConfigMap: preloaded-engines (state tracking)
 
 ### Next Steps / Future Enhancements
 
-1. **Immediate Testing** 
+1. **Immediate Testing**
    - Test the implementation in development environment
    - Validate all API endpoints and status tools
    - Measure actual performance improvements
@@ -168,4 +168,4 @@ feat: implement evaluation engine preloading during startup
 - Add API endpoints for manual engine preloading operations
 - Include status check tools and comprehensive documentation
 - Reduces evaluation job startup time by eliminating image pulls
-``` 
+```

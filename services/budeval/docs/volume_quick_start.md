@@ -68,7 +68,7 @@ kubectl get pv | grep Released | awk '{print $1}' | xargs kubectl delete pv
    ```bash
    # Check for volume initialization logs
    tail -f /home/ubuntu/bud-serve-eval/logs/app.log | grep -E "(Volume|eval-datasets)"
-   
+
    # Check Dapr logs
    tail -f /home/ubuntu/bud-serve-eval/.dapr/logs/budeval_app_*.log
    ```
@@ -150,7 +150,7 @@ python -c "from budeval.commons.storage_config import StorageConfig; print(Stora
    ```bash
    # Get job pod name
    kubectl get pods -n budeval -l job-name=<job-id>
-   
+
    # Check volume mounts
    kubectl describe pod <pod-name> -n budeval | grep -A5 "Mounts:"
    ```

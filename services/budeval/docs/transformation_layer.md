@@ -60,15 +60,15 @@ from budeval.core.schemas import EvaluationEngine
 class MyEngineTransformer(BaseTransformer):
     def __init__(self):
         super().__init__(EvaluationEngine.MYENGINE)
-    
+
     def generate_config_files(self, request):
         # Generate engine-specific configs
         return {"config.yaml": "..."}
-    
+
     def build_command(self, request):
         # Build container command
         return ["python", "run.py"], ["--config", "config.yaml"]
-    
+
     # Implement other required methods...
 ```
 

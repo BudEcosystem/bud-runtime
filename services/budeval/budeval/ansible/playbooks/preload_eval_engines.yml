@@ -103,13 +103,13 @@
                       set -e
                       echo "Starting container image preloading on node: $(hostname)"
                       echo "Container runtime: $(ls -la /run/containerd/containerd.sock 2>/dev/null && echo 'containerd' || echo 'docker')"
-                      
+
                       # Create preload jobs for each engine image
                       echo "Creating preload jobs for engine images..."
-                      
+
                       # This container just coordinates - actual image pulls happen via Jobs
                       echo "Preload coordinator started successfully on node: $(hostname)"
-                      
+
                       # Keep running to maintain DaemonSet
                       while true; do
                         echo "$(date): Preload coordinator running on $(hostname)"
@@ -169,7 +169,7 @@
                       echo "Engine: {{ item.name }} ({{ item.version }})"
                       echo "Image size: $(du -sh / 2>/dev/null | head -1 | cut -f1 || echo 'unknown')"
                       echo "Cached at: $(date)"
-                      
+
                       # Keep container running briefly to ensure image is cached
                       sleep 10
                       echo "Image caching completed for {{ item.name }}"
@@ -284,4 +284,4 @@
           Total engines preloaded: {{ engines_to_preload | length }}
           Engines: {{ engines_to_preload | map(attribute='name') | list }}
           Method: Kubernetes Jobs (compatible with containerd/K3s)
-          ConfigMap updated: preloaded-engines 
+          ConfigMap updated: preloaded-engines

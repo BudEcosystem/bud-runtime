@@ -77,7 +77,7 @@ Engines are registered using the `@EngineRegistry.register` decorator:
 ```python
 @EngineRegistry.register(EngineMetadata(
     name="OpenCompass",
-    version="0.4.2", 
+    version="0.4.2",
     docker_image_url="ghcr.io/rahulvramesh/opencompass:latest",
     # ... other metadata
 ))
@@ -99,7 +99,7 @@ Engine preloading happens automatically during application startup:
 async def startup_event():
     # Volume initialization
     volume_task = asyncio.create_task(volume_init.ensure_eval_datasets_volume())
-    
+
     # Engine preloading
     engine_task = asyncio.create_task(engine_preloader.preload_all_engines())
 ```
@@ -432,4 +432,4 @@ engine_preloading:
 
 ## Conclusion
 
-Engine preloading significantly improves the user experience by reducing evaluation job startup times. The Kubernetes-native approach ensures compatibility with all container runtimes including K3s (containerd), making it suitable for edge deployments and traditional Kubernetes clusters alike. The system is designed to be automatic and maintenance-free while providing manual controls for advanced use cases. 
+Engine preloading significantly improves the user experience by reducing evaluation job startup times. The Kubernetes-native approach ensures compatibility with all container runtimes including K3s (containerd), making it suitable for edge deployments and traditional Kubernetes clusters alike. The system is designed to be automatic and maintenance-free while providing manual controls for advanced use cases.

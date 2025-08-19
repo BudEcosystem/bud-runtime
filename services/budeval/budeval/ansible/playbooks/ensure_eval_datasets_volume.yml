@@ -85,36 +85,36 @@
             containers:
             - name: init
               image: ubuntu:22.04
-              command: 
+              command:
                 - /bin/bash
                 - -c
                 - |
                   set -e
                   echo "Starting volume initialization and dataset download..."
-                  
+
                   # Check if data already exists
                   if [ -f /data/dataset_initialized ]; then
                     echo "Datasets already initialized, skipping download"
                     exit 0
                   fi
-                  
+
                   # Install required packages
                   apt-get update && apt-get install -y wget unzip
-                  
+
                   # Download OpenCompass dataset
                   echo "Downloading OpenCompass dataset..."
                   cd /data
                   wget "{{ opencompass_dataset_url }}"
-                  
+
                   # Extract the main archive
                   echo "Extracting main archive..."
                   unzip "{{ opencompass_dataset_filename }}"
-                  
+
                   # Extract all nested zip files
                   echo "Extracting nested archives..."
                   cd ./data
                   find . -name "*.zip" -exec unzip "{}" \;
-                  
+
                   # Mark as initialized
                   echo "Dataset download and extraction completed at $(date)" > /data/dataset_initialized
                   echo "Volume initialization completed successfully"
@@ -172,7 +172,7 @@
             containers:
             - name: check
               image: ubuntu:22.04
-              command: 
+              command:
                 - /bin/bash
                 - -c
                 - |
@@ -225,30 +225,30 @@
             containers:
             - name: init
               image: ubuntu:22.04
-              command: 
+              command:
                 - /bin/bash
                 - -c
                 - |
                   set -e
                   echo "Starting dataset download for existing volume..."
-                  
+
                   # Install required packages
                   apt-get update && apt-get install -y wget unzip
-                  
+
                   # Download OpenCompass dataset
                   echo "Downloading OpenCompass dataset..."
                   cd /data
                   wget https://github.com/open-compass/opencompass/releases/download/0.2.2.rc1/OpenCompassData-complete-20240207.zip
-                  
+
                   # Extract the main archive
                   echo "Extracting main archive..."
                   unzip OpenCompassData-complete-20240207.zip
-                  
+
                   # Extract all nested zip files
                   echo "Extracting nested archives..."
                   cd ./data
                   find . -name "*.zip" -exec unzip "{}" \;
-                  
+
                   # Mark as initialized
                   echo "Dataset download and extraction completed at $(date)" > /data/dataset_initialized
                   echo "Dataset initialization completed successfully"

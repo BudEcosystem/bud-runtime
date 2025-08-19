@@ -66,4 +66,4 @@
           failed: "{{ job_info.resources[0].status.failed | default(0) | int }}"
           pod_count: "{{ pod_info.resources | length | int }}"
           data_pvc_status: "{{ data_pvc_info.resources[0].status.phase if data_pvc_info.resources else 'NotFound' }}"
-          output_pvc_status: "{{ output_pvc_info.resources[0].status.phase if output_pvc_info.resources else 'NotFound' }}" 
+          output_pvc_status: "{{ output_pvc_info.resources[0].status.phase if output_pvc_info.resources else 'NotFound' }}"

@@ -58,9 +58,9 @@ async def start_eval(request: EvaluationRequest):
 async def evaluate_model(self, evaluate_model_request: StartEvaluationRequest) -> Union[WorkflowMetadataResponse, ErrorResponse]:
     """Evaluate model by triggering Dapr workflow."""
     logger.info(f"Model Evaluation Started for workflow_id: {evaluate_model_request.model_name}")
-    
+
     from .workflows import EvaluationWorkflow
-    
+
     try:
         response = await EvaluationWorkflow().__call__(evaluate_model_request)
     except Exception as e:
@@ -87,15 +87,15 @@ async def evaluate_model(self, evaluate_model_request: StartEvaluationRequest) -
 async def __call__(self, request: StartEvaluationRequest, workflow_id: Optional[str] = None) -> Union[WorkflowMetadataResponse, ErrorResponse]:
     """Evaluate a model with the given name."""
     workflow_id = str(workflow_id or uuid.uuid4())
-    
+
     workflow_steps = [
         WorkflowStep(id="verify_cluster_connection", title="Verifying Cluster Connection", description="Verify if the cluster is reachable"),
         WorkflowStep(id="deploy_eval_job", title="Deploying Evaluation Job", description="Deploy the evaluation job to the cluster"),
         WorkflowStep(id="monitor_eval_job_progress", title="Monitoring Evaluation Job Progress", description="Monitor the progress of the evaluation job"),
     ]
-    
+
     eta = 30 * 5  # 150 seconds estimate
-    
+
     # Schedule the workflow
     response = await dapr_workflows.schedule_workflow(
         workflow_name="evaluate_model",
@@ -106,7 +106,7 @@ async def __call__(self, request: StartEvaluationRequest, workflow_id: Optional[
         target_topic_name=request.source_topic,
         target_name=request.source,
     )
-    
+
     return response
 ```
 
@@ -191,26 +191,26 @@ dapr_workflows.publish_notification(
 @staticmethod
 def verify_cluster_connection(ctx: wf.WorkflowActivityContext, verify_cluster_connection_request: str) -> dict:
     """Verify the cluster connection."""
-    
+
     workflow_id = ctx.workflow_id
     task_id = ctx.task_id
-    
+
     verify_cluster_connection_request_json = StartEvaluationRequest.model_validate_json(verify_cluster_connection_request)
-    
+
     try:
         cluster_verified = asyncio.run(
             EvaluationOpsService.verify_cluster_connection(
                 verify_cluster_connection_request_json, task_id, workflow_id
             )
         )
-        
+
         if cluster_verified:
             response = SuccessResponse(message="Cluster connection verified successfully", param={"cluster_verified": cluster_verified})
         else:
             response = ErrorResponse(message="Cluster connection verification failed", code=HTTPStatus.BAD_REQUEST.value)
     except Exception as e:
         response = ErrorResponse(message="Cluster connection verification failed", code=HTTPStatus.BAD_REQUEST.value)
-    
+
     return response.model_dump(mode="json")
 ```
 
@@ -239,16 +239,16 @@ def verify_cluster_connection(self, kubeconfig: str) -> bool:
     """Verify cluster connection using an Ansible playbook via a kubeconfig in JSON form."""
     temp_id = f"verify-{uuid.uuid4().hex}"
     playbook = "verify_cluster_k8s.yml"
-    
+
     # 1) Parse the incoming JSON string into a Python dict
     kubeconfig_dict = json.loads(kubeconfig)
-    
+
     # 2) Dump that dict out as YAML
     kubeconfig_yaml = yaml.safe_dump(kubeconfig_dict, sort_keys=False, default_flow_style=False)
-    
+
     files = {f"{temp_id}_kubeconfig.yaml": kubeconfig_yaml}
     extravars = {"kubeconfig_path": f"{temp_id}_kubeconfig.yaml"}
-    
+
     try:
         self._run_ansible_playbook(playbook, temp_id, files, extravars)
         logger.info("::: EVAL Ansible ::: Ansible-based cluster verification succeeded for %s", temp_id)
@@ -304,10 +304,10 @@ def verify_cluster_connection(self, kubeconfig: str) -> bool:
 @staticmethod
 def deploy_eval_job(ctx: wf.WorkflowActivityContext, evaluate_model_request: str) -> dict:
     """Deploy the evaluation job."""
-    
+
     workflow_id = ctx.workflow_id
     task_id = ctx.task_id
-    
+
     evaluate_model_request_json = StartEvaluationRequest.model_validate_json(evaluate_model_request)
     payload = DeployEvalJobRequest(
        engine="OpenCompass",
@@ -317,12 +317,12 @@ def deploy_eval_job(ctx: wf.WorkflowActivityContext, evaluate_model_request: str
        kubeconfig=evaluate_model_request_json.kubeconfig,
        dataset=["dataset1"] #TODO: Make this from the request
     )
-    
+
     try:
         job_details = asyncio.run(
             EvaluationOpsService.deploy_eval_job(payload, task_id, workflow_id)
         )
-        
+
         response = SuccessResponse(
             message="Evaluation job deployed successfully",
             param=dict(job_details)
@@ -599,28 +599,28 @@ graph TD
     B --> C[EvaluationWorkflow.__call__]
     C --> D[Schedule Dapr Workflow]
     D --> E[Workflow Execution Starts]
-    
+
     E --> F[Store State in Redis]
     F --> G[Publish Initial Notification]
     G --> H[Activity 1: Verify Cluster]
-    
+
     H --> I[KubernetesClusterHandler]
     I --> J[AnsibleOrchestrator]
     J --> K[verify_cluster_k8s.yml]
     K --> L[Kubernetes API Call]
     L --> M[Publish Verification Result]
-    
+
     M --> N[Activity 2: Deploy Job]
     N --> O[Create DeployEvalJobRequest]
     O --> P[EvaluationOpsService.deploy_eval_job]
     P --> Q[Future: Ansible Job Deployment]
     Q --> R[Publish Deployment Result]
-    
+
     R --> S[Activity 3: Monitor Progress]
     S --> T[Future: Job Status Monitoring]
     T --> U[Publish Final Results]
     U --> V[Workflow Complete]
-    
+
     style A fill:#e1f5fe
     style V fill:#c8e6c9
     style F fill:#fff3e0
@@ -744,9 +744,9 @@ async def start_eval(request: EvaluationRequest):
 async def evaluate_model(self, evaluate_model_request: StartEvaluationRequest) -> Union[WorkflowMetadataResponse, ErrorResponse]:
     """Evaluate model by triggering Dapr workflow."""
     logger.info(f"Model Evaluation Started for workflow_id: {evaluate_model_request.model_name}")
-    
+
     from .workflows import EvaluationWorkflow
-    
+
     try:
         response = await EvaluationWorkflow().__call__(evaluate_model_request)
     except Exception as e:
@@ -759,15 +759,15 @@ async def evaluate_model(self, evaluate_model_request: StartEvaluationRequest) -
 async def __call__(self, request: StartEvaluationRequest, workflow_id: Optional[str] = None) -> Union[WorkflowMetadataResponse, ErrorResponse]:
     """Evaluate a model with the given name."""
     workflow_id = str(workflow_id or uuid.uuid4())
-    
+
     workflow_steps = [
         WorkflowStep(id="verify_cluster_connection", title="Verifying Cluster Connection", description="Verify if the cluster is reachable"),
         WorkflowStep(id="deploy_eval_job", title="Deploying Evaluation Job", description="Deploy the evaluation job to the cluster"),
         WorkflowStep(id="monitor_eval_job_progress", title="Monitoring Evaluation Job Progress", description="Monitor the progress of the evaluation job"),
     ]
-    
+
     eta = 30 * 5  # 150 seconds estimate
-    
+
     # Schedule the workflow
     response = await dapr_workflows.schedule_workflow(
         workflow_name="evaluate_model",
@@ -778,7 +778,7 @@ async def __call__(self, request: StartEvaluationRequest, workflow_id: Optional[
         target_topic_name=request.source_topic,
         target_name=request.source,
     )
-    
+
     return response
 ```
 
@@ -823,26 +823,26 @@ dapr_workflows.publish_notification(
 @staticmethod
 def verify_cluster_connection(ctx: wf.WorkflowActivityContext, verify_cluster_connection_request: str) -> dict:
     """Verify the cluster connection."""
-    
+
     workflow_id = ctx.workflow_id
     task_id = ctx.task_id
-    
+
     verify_cluster_connection_request_json = StartEvaluationRequest.model_validate_json(verify_cluster_connection_request)
-    
+
     try:
         cluster_verified = asyncio.run(
             EvaluationOpsService.verify_cluster_connection(
                 verify_cluster_connection_request_json, task_id, workflow_id
             )
         )
-        
+
         if cluster_verified:
             response = SuccessResponse(message="Cluster connection verified successfully", param={"cluster_verified": cluster_verified})
         else:
             response = ErrorResponse(message="Cluster connection verification failed", code=HTTPStatus.BAD_REQUEST.value)
     except Exception as e:
         response = ErrorResponse(message="Cluster connection verification failed", code=HTTPStatus.BAD_REQUEST.value)
-    
+
     return response.model_dump(mode="json")
 ```
 
@@ -863,16 +863,16 @@ def verify_cluster_connection(self, kubeconfig: str) -> bool:
     """Verify cluster connection using an Ansible playbook via a kubeconfig in JSON form."""
     temp_id = f"verify-{uuid.uuid4().hex}"
     playbook = "verify_cluster_k8s.yml"
-    
+
     # 1) Parse the incoming JSON string into a Python dict
     kubeconfig_dict = json.loads(kubeconfig)
-    
+
     # 2) Dump that dict out as YAML
     kubeconfig_yaml = yaml.safe_dump(kubeconfig_dict, sort_keys=False, default_flow_style=False)
-    
+
     files = {f"{temp_id}_kubeconfig.yaml": kubeconfig_yaml}
     extravars = {"kubeconfig_path": f"{temp_id}_kubeconfig.yaml"}
-    
+
     try:
         self._run_ansible_playbook(playbook, temp_id, files, extravars)
         logger.info("::: EVAL Ansible ::: Ansible-based cluster verification succeeded for %s", temp_id)
@@ -910,10 +910,10 @@ def verify_cluster_connection(self, kubeconfig: str) -> bool:
 @staticmethod
 def deploy_eval_job(ctx: wf.WorkflowActivityContext, evaluate_model_request: str) -> dict:
     """Deploy the evaluation job."""
-    
+
     workflow_id = ctx.workflow_id
     task_id = ctx.task_id
-    
+
     evaluate_model_request_json = StartEvaluationRequest.model_validate_json(evaluate_model_request)
     payload = DeployEvalJobRequest(
        engine="OpenCompass",
@@ -923,12 +923,12 @@ def deploy_eval_job(ctx: wf.WorkflowActivityContext, evaluate_model_request: str
        kubeconfig=evaluate_model_request_json.kubeconfig,
        dataset=["dataset1"] #TODO: Make this from the request
     )
-    
+
     try:
         job_details = asyncio.run(
             EvaluationOpsService.deploy_eval_job(payload, task_id, workflow_id)
         )
-        
+
         response = SuccessResponse(
             message="Evaluation job deployed successfully",
             param=dict(job_details)
@@ -1100,28 +1100,28 @@ graph TD
     B --> C[EvaluationWorkflow.__call__]
     C --> D[Schedule Dapr Workflow]
     D --> E[Workflow Execution Starts]
-    
+
     E --> F[Store State in Redis]
     F --> G[Publish Initial Notification]
     G --> H[Activity 1: Verify Cluster]
-    
+
     H --> I[KubernetesClusterHandler]
     I --> J[AnsibleOrchestrator]
     J --> K[verify_cluster_k8s.yml]
     K --> L[Kubernetes API Call]
     L --> M[Publish Verification Result]
-    
+
     M --> N[Activity 2: Deploy Job]
     N --> O[Create DeployEvalJobRequest]
     O --> P[EvaluationOpsService.deploy_eval_job]
     P --> Q[Future: Ansible Job Deployment]
     Q --> R[Publish Deployment Result]
-    
+
     R --> S[Activity 3: Monitor Progress]
     S --> T[Future: Job Status Monitoring]
     T --> U[Publish Final Results]
     U --> V[Workflow Complete]
-    
+
     style A fill:#e1f5fe
     style V fill:#c8e6c9
     style F fill:#fff3e0
@@ -1162,4 +1162,3 @@ spec:
   topic: budSimMessages
   deadLetterTopic: poisonMessages
 ```
-

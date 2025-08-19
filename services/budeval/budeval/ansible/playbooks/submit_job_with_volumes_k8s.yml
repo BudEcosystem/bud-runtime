@@ -58,4 +58,4 @@
           Datasets: eval-datasets-pvc mounted at /workspace/data (read-only)
           Output Volume: {{ job_name }}-output-pvc mounted at /workspace/outputs
           Cache: emptyDir mounted at /workspace/cache
-          Configs: ConfigMap mounted at /workspace/configs (read-only) 
+          Configs: ConfigMap mounted at /workspace/configs (read-only)

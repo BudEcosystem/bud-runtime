@@ -28,14 +28,14 @@ budeval/
 ```python
 class StorageConfig:
     """Storage configuration based on environment."""
-    
+
     @staticmethod
     def get_environment() -> str:
         """Detect the current environment."""
         if os.path.exists("/home/ubuntu/bud-serve-eval/k3s.yaml"):
             return "local"
         return os.environ.get("BUDEVAL_ENV", "production").lower()
-    
+
     @staticmethod
     def get_storage_config() -> Dict[str, Any]:
         """Get storage configuration for current environment."""
@@ -47,7 +47,7 @@ class StorageConfig:
 ```python
 class VolumeInitializer:
     """Handles initialization of required persistent volumes."""
-    
+
     async def ensure_eval_datasets_volume(self, kubeconfig: Optional[str] = None):
         """Ensure the eval-datasets volume exists in the budeval namespace."""
         # 1. Detect environment
@@ -109,7 +109,7 @@ volumes:
     volume_size: "10Gi"  # Overridden by extravars
     storage_class: ""
     access_mode: "ReadWriteMany"  # Overridden by extravars
-  
+
   tasks:
     - name: Create PVC if it doesn't exist
       community.kubernetes.k8s:
@@ -217,10 +217,10 @@ def test_storage_config():
    ```bash
    # Clean up
    kubectl delete pvc eval-datasets-pvc -n budeval
-   
+
    # Trigger creation
    curl -X POST http://localhost:8099/evals/init-volume
-   
+
    # Verify
    kubectl get pvc -n budeval
    ```
@@ -231,7 +231,7 @@ def test_storage_config():
    curl -X POST http://localhost:8099/evals/start \
      -H "Content-Type: application/json" \
      -d '{...job data...}'
-   
+
    # Check volume mounts
    kubectl describe pod <job-pod> -n budeval
    ```
