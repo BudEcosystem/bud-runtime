@@ -225,7 +225,7 @@ export default function ModelsPage() {
               icon="ph:magnifying-glass"
               className="text-bud-text-disabled text-[1.25rem] cursor-pointer hover:text-bud-text-primary"
             />
-            <Button
+            {/* <Button
               type="text"
               icon={<Icon icon="ph:chart-line-up" />}
               className="text-bud-text-primary hover:text-bud-purple"
@@ -238,7 +238,7 @@ export default function ModelsPage() {
               className="bg-bud-purple border-bud-purple hover:bg-bud-purple-hover px-[1.5rem]"
             >
               Model
-            </Button>
+            </Button> */}
           </Flex>
         </div>
 

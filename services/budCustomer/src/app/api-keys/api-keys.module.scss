@@ -1,11 +1,11 @@
-// Color variables
-$bg-main: #101010;
-$bg-card: #18191b;
-$border-color: #1f1f1f;
-$text-white: #eeeeee;
-$text-gray: #b3b3b3;
-$text-dark-gray: #757575;
-$primary-color: #965cde;
+// Using CSS variables for theme support
+$bg-main: var(--bg-primary);
+$bg-card: var(--bg-secondary);
+$border-color: var(--border-color);
+$text-white: var(--text-primary);
+$text-gray: var(--text-muted);
+$text-dark-gray: var(--text-disabled);
+$primary-color: var(--purple);
 
 .apiKeysTable {
   width: 100%;
@@ -138,7 +138,7 @@ $primary-color: #965cde;
     }
 
     .ant-input {
-      background: #1f1f1f;
+      background: $bg-main;
       border-color: #2f2f2f;
       color: $text-white;
 

@@ -538,7 +538,7 @@ html.dark {
 /* Custom Scrollbar Styles */
 .scrollbar-thin {
   scrollbar-width: thin;
-  scrollbar-color: var(--bud-border) transparent;
+  scrollbar-color: var(--text-disabled) transparent;
 }
 
 .scrollbar-thin::-webkit-scrollbar {
@@ -562,7 +562,7 @@ html.dark {
 /* Sidebar scrolling area */
 .sidebar-scroll {
   scrollbar-width: thin;
-  scrollbar-color: var(--bud-border) transparent;
+  scrollbar-color: var(--text-disabled) transparent;
 }
 
 .sidebar-scroll::-webkit-scrollbar {
