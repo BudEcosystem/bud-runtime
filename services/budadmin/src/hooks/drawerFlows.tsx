@@ -3636,6 +3636,69 @@ const viewEvalDetails: DrawerFlowType = {
   ],
 };
 
+const createBlockingRule: DrawerFlowType = {
+  title: "Create Blocking Rule",
+  description: "Create a new blocking rule for the gateway",
+  totalSteps: 2,
+  steps: [
+    {
+      navigation: () => ["Blocking Rules", "Create Rule"],
+      id: "create-blocking-rule",
+      step: 1,
+      component: StepComponents["create-blocking-rule"],
+      progress: [
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Rule Details",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Success",
+        },
+      ],
+      confirmClose: true,
+    },
+    {
+      navigation: () => ["Blocking Rules", "Success"],
+      id: "blocking-rule-success",
+      step: 2,
+      component: StepComponents["blocking-rule-success"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Rule Details",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Success",
+        },
+      ],
+      confirmClose: false,
+    },
+  ],
+};
+
+const viewBlockingRule: DrawerFlowType = {
+  title: "Blocking Rule Details",
+  description: "View blocking rule details",
+  totalSteps: 1,
+  steps: [
+    {
+      navigation: () => ["Blocking Rules", "Rule Details"],
+      id: "view-blocking-rule",
+      step: 1,
+      component: StepComponents["view-blocking-rule"],
+      progress: [
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Rule Details",
+        },
+      ],
+      confirmClose: false,
+    },
+  ],
+};
+
 const viewProbeDetails: DrawerFlowType = {
   title: "Probe Details",
   description: "View Probe Details",
@@ -4035,6 +4098,9 @@ const flows = {
   "add-guardrail": addGuardrail,
   "probe-details": viewProbeDetails,
   "view-guardrail-details": viewGuardrailDetails,
+  // blocking rules
+  "create-blocking-rule": createBlockingRule,
+  "view-blocking-rule": viewBlockingRule,
 };
 
 export const flowMapping: {

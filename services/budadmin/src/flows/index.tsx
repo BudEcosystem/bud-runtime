@@ -112,6 +112,9 @@ import SelectTrait from "./Evaluations/RunEvaluation/SelectTrait";
 import SelectEvaluation from "./Evaluations/RunEvaluation/SelectEvaluation";
 import EvaluationSummary from "./Evaluations/RunEvaluation/EvaluationSummary";
 import NewExperimentSuccess from "./Evaluations/NewExperiment/newExperimentSuccess";
+import CreateBlockingRuleStep from "./blocking/CreateBlockingRuleStep";
+import BlockingRuleSuccess from "./blocking/BlockingRuleSuccess";
+import ViewBlockingRuleDetails from "./blocking/ViewBlockingRuleDetails";
 import Publish from "./Project/Publish";
 import ViewEvalDetailscopy from "./Evaluations/RunEvaluation/ViewEvalDetail";
 import SelectProvider from "./GuardRails/SelectProvider";
@@ -260,6 +263,9 @@ export const StepComponents = {
   // "view-eval-details": ViewEvalDetails,
   "view-eval-details": ViewEvalDetailscopy,
   "evaluation-summary": EvaluationSummary,
+  "create-blocking-rule": CreateBlockingRuleStep,
+  "blocking-rule-success": BlockingRuleSuccess,
+  "view-blocking-rule": ViewBlockingRuleDetails,
 
   // GuardRails
   "select-provider": SelectProvider,

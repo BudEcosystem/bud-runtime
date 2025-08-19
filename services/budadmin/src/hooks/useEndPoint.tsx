@@ -98,10 +98,10 @@ export const useEndPoints = create<{
     page,
     limit,
     name,
-  }: {
-    id: any;
-    page: any;
-    limit: any;
+  }?: {
+    id?: any;
+    page?: any;
+    limit?: any;
     name?: string;
     order_by?: string;
   }) => void;
@@ -164,7 +164,7 @@ getEndpointClusterDetails: async (endpointId: string, projectId?) => {
     }
   },
 
-  getEndPoints: async ({ id, page, limit, name, order_by = "-created_at" }) => {
+  getEndPoints: async ({ id, page, limit, name, order_by = "-created_at" } = {}) => {
     const url = `${tempApiBaseUrl}/endpoints/`;
     set({ loading: true });
     try {

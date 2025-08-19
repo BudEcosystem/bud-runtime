@@ -27,9 +27,18 @@ FROM base AS gateway
 
 RUN useradd -m -s /bin/bash gateway
 
-USER gateway
-
+# Copy gateway binary and GeoIP database before switching to gateway user
 COPY --from=builder /release/gateway /usr/local/bin/gateway
+
+# Create directory structure and download GeoIP database for location data enrichment
+RUN mkdir -p /app/geo && \
+    wget -O /app/geo/GeoLite2-City.mmdb https://git.io/GeoLite2-City.mmdb && \
+    chmod 644 /app/geo/GeoLite2-City.mmdb
+
+# Set proper ownership for the gateway user
+RUN chown -R gateway:gateway /app
+
+USER gateway
 
 WORKDIR /app
 
