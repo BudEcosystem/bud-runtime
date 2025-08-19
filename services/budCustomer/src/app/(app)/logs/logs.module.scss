@@ -1,11 +1,11 @@
 // Using CSS variables for theme support
-$bg-main: var(--bud-bg-primary);
-$bg-card: var(--bud-bg-secondary);
-$border-color: var(--bud-border);
-$text-white: var(--bud-text-primary);
-$text-gray: var(--bud-text-muted);
-$text-dark-gray: var(--bud-text-disabled);
-$primary-color: var(--bud-purple);
+$bg-main: var(--bg-primary);
+$bg-card: var(--bg-secondary);
+$border-color: var(--border-color);
+$text-white: var(--text-primary);
+$text-gray: var(--text-muted);
+$text-dark-gray: var(--text-disabled);
+$primary-color: var(--purple);
 
 .searchInput {
   :global {
