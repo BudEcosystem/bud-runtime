@@ -200,6 +200,12 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
           colorBgElevated: getCSSVarValue("--bg-card"),
           colorText: getCSSVarValue("--text-primary"),
         },
+        Dropdown: {
+          colorBgElevated: getCSSVarValue("--bg-primary"), // menu background
+          colorText: getCSSVarValue("--text-primary"),     // text color
+          controlItemBgActive: getCSSVarValue("--bg-hover"), // active item bg
+          controlItemBgHover: getCSSVarValue("--bg-hover"),  // hover bg
+        },
       },
     }),
     [effectiveTheme, mounted, getCSSVarValue],
