@@ -1,0 +1,61 @@
+---
+- name: Deploy Kubernetes Job with Persistent Volumes
+  hosts: localhost
+  connection: local
+  gather_facts: no
+  collections:
+    - community.kubernetes
+
+  tasks:
+    - name: Ensure namespace exists
+      community.kubernetes.k8s:
+        name: "{{ namespace }}"
+        api_version: v1
+        kind: Namespace
+        state: present
+        kubeconfig: "{{ kubeconfig_path | default(omit) }}"
+
+    - name: Create output persistent volume claim
+      community.kubernetes.k8s:
+        state: present
+        definition: "{{ lookup('file', pvc_output_template_path) | from_yaml }}"
+        kubeconfig: "{{ kubeconfig_path | default(omit) }}"
+        namespace: "{{ namespace }}"
+
+    - name: Deploy evaluation job
+      community.kubernetes.k8s:
+        state: present
+        definition: "{{ lookup('file', job_template_path) | from_yaml }}"
+        kubeconfig: "{{ kubeconfig_path | default(omit) }}"
+        namespace: "{{ namespace }}"
+
+    - name: Verify job was created
+      community.kubernetes.k8s_info:
+        api_version: batch/v1
+        kind: Job
+        name: "{{ job_name }}"
+        namespace: "{{ namespace }}"
+        kubeconfig: "{{ kubeconfig_path | default(omit) }}"
+      register: job_creation_result
+      until: job_creation_result.resources | length > 0
+      retries: 10
+      delay: 3
+
+    - name: Get job status
+      community.kubernetes.k8s_info:
+        api_version: batch/v1
+        kind: Job
+        name: "{{ job_name }}"
+        namespace: "{{ namespace }}"
+        kubeconfig: "{{ kubeconfig_path | default(omit) }}"
+      register: job_status
+
+    - name: Display job information
+      debug:
+        msg: |
+          Job {{ job_name }} has been deployed successfully.
+          Status: {{ job_status.resources[0].status | default('Unknown') }}
+          Datasets: eval-datasets-pvc mounted at /workspace/data (read-only)
+          Output Volume: {{ job_name }}-output-pvc mounted at /workspace/outputs
+          Cache: emptyDir mounted at /workspace/cache
+          Configs: ConfigMap mounted at /workspace/configs (read-only) 

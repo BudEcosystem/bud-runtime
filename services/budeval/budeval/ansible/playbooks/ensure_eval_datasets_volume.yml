@@ -1,0 +1,299 @@
+---
+- name: Ensure eval-datasets volume exists
+  hosts: localhost
+  connection: local
+  gather_facts: no
+  collections:
+    - community.kubernetes
+
+  vars:
+    namespace: "budeval"  # Namespace where jobs run
+    pvc_name: "eval-datasets-pvc"
+    volume_size: "10Gi"  # TODO: change to 100Gi for production
+    storage_class: ""  # Empty string means use default storage class
+    # Access mode - can be overridden via extravars
+    access_mode: "ReadWriteMany"  # Default to RWX for shared access
+    # Dataset URL - can be overridden via extravars
+    opencompass_dataset_url: "https://github.com/open-compass/opencompass/releases/download/0.2.2.rc1/OpenCompassData-complete-20240207.zip"
+    # Dataset filename extracted from URL
+    opencompass_dataset_filename: "OpenCompassData-complete-20240207.zip"
+
+  tasks:
+    - name: Ensure namespace exists
+      community.kubernetes.k8s:
+        name: "{{ namespace }}"
+        api_version: v1
+        kind: Namespace
+        state: present
+        kubeconfig: "{{ kubeconfig_path | default(omit) }}"
+
+    - name: Check if PVC exists
+      community.kubernetes.k8s_info:
+        api_version: v1
+        kind: PersistentVolumeClaim
+        name: "{{ pvc_name }}"
+        namespace: "{{ namespace }}"
+        kubeconfig: "{{ kubeconfig_path | default(omit) }}"
+      register: pvc_check
+      failed_when: false
+
+    - name: Create PVC if it doesn't exist
+      community.kubernetes.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: PersistentVolumeClaim
+          metadata:
+            name: "{{ pvc_name }}"
+            namespace: "{{ namespace }}"
+            labels:
+              app: budeval
+              purpose: shared-datasets
+          spec:
+            accessModes:
+              - "{{ access_mode }}"  # RWX for production, can fallback to RWO for local
+            storageClassName: "{{ storage_class }}"  # Use default storage class
+            resources:
+              requests:
+                storage: "{{ volume_size }}"
+        kubeconfig: "{{ kubeconfig_path | default(omit) }}"
+      when: pvc_check.resources | length == 0
+
+    - name: Check if PVC needs first consumer (for local-path)
+      community.kubernetes.k8s_info:
+        api_version: v1
+        kind: PersistentVolumeClaim
+        name: "{{ pvc_name }}"
+        namespace: "{{ namespace }}"
+        kubeconfig: "{{ kubeconfig_path | default(omit) }}"
+      register: pvc_initial_status
+      when: pvc_check.resources | length == 0
+
+    - name: Create temporary pod to trigger volume binding and download datasets
+      community.kubernetes.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Pod
+          metadata:
+            name: "{{ pvc_name }}-init-pod"
+            namespace: "{{ namespace }}"
+            labels:
+              app: budeval
+              purpose: volume-init
+          spec:
+            containers:
+            - name: init
+              image: ubuntu:22.04
+              command: 
+                - /bin/bash
+                - -c
+                - |
+                  set -e
+                  echo "Starting volume initialization and dataset download..."
+                  
+                  # Check if data already exists
+                  if [ -f /data/dataset_initialized ]; then
+                    echo "Datasets already initialized, skipping download"
+                    exit 0
+                  fi
+                  
+                  # Install required packages
+                  apt-get update && apt-get install -y wget unzip
+                  
+                  # Download OpenCompass dataset
+                  echo "Downloading OpenCompass dataset..."
+                  cd /data
+                  wget "{{ opencompass_dataset_url }}"
+                  
+                  # Extract the main archive
+                  echo "Extracting main archive..."
+                  unzip "{{ opencompass_dataset_filename }}"
+                  
+                  # Extract all nested zip files
+                  echo "Extracting nested archives..."
+                  cd ./data
+                  find . -name "*.zip" -exec unzip "{}" \;
+                  
+                  # Mark as initialized
+                  echo "Dataset download and extraction completed at $(date)" > /data/dataset_initialized
+                  echo "Volume initialization completed successfully"
+              volumeMounts:
+              - name: data
+                mountPath: /data
+            volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: "{{ pvc_name }}"
+            restartPolicy: Never
+        kubeconfig: "{{ kubeconfig_path | default(omit) }}"
+      when: pvc_check.resources | length == 0 and pvc_initial_status.resources | length > 0 and pvc_initial_status.resources[0].status.phase == "Pending"
+      register: init_pod_created
+
+    - name: Wait for initial dataset download completion
+      community.kubernetes.k8s_info:
+        api_version: v1
+        kind: Pod
+        name: "{{ pvc_name }}-init-pod"
+        namespace: "{{ namespace }}"
+        kubeconfig: "{{ kubeconfig_path | default(omit) }}"
+      register: initial_init_pod_status
+      until: initial_init_pod_status.resources | length > 0 and initial_init_pod_status.resources[0].status.phase in ["Succeeded", "Failed"]
+      retries: 60
+      delay: 30
+      when: pvc_check.resources | length == 0 and init_pod_created is defined and init_pod_created.changed
+
+    - name: Wait for PVC to be bound (if newly created)
+      community.kubernetes.k8s_info:
+        api_version: v1
+        kind: PersistentVolumeClaim
+        name: "{{ pvc_name }}"
+        namespace: "{{ namespace }}"
+        kubeconfig: "{{ kubeconfig_path | default(omit) }}"
+      register: pvc_status
+      until: pvc_status.resources | length > 0 and pvc_status.resources[0].status.phase == "Bound"
+      retries: 30
+      delay: 10
+      when: pvc_check.resources | length == 0
+
+    - name: Check if existing volume needs dataset initialization
+      community.kubernetes.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Pod
+          metadata:
+            name: "{{ pvc_name }}-check-pod"
+            namespace: "{{ namespace }}"
+            labels:
+              app: budeval
+              purpose: dataset-check
+          spec:
+            containers:
+            - name: check
+              image: ubuntu:22.04
+              command: 
+                - /bin/bash
+                - -c
+                - |
+                  if [ -f /data/dataset_initialized ]; then
+                    echo "Datasets already initialized"
+                    exit 0
+                  else
+                    echo "Datasets not found, need initialization"
+                    exit 1
+                  fi
+              volumeMounts:
+              - name: data
+                mountPath: /data
+            volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: "{{ pvc_name }}"
+            restartPolicy: Never
+        kubeconfig: "{{ kubeconfig_path | default(omit) }}"
+      when: pvc_check.resources | length > 0
+      register: dataset_check_pod
+      failed_when: false
+
+    - name: Wait for dataset check pod completion
+      community.kubernetes.k8s_info:
+        api_version: v1
+        kind: Pod
+        name: "{{ pvc_name }}-check-pod"
+        namespace: "{{ namespace }}"
+        kubeconfig: "{{ kubeconfig_path | default(omit) }}"
+      register: check_pod_status
+      until: check_pod_status.resources | length > 0 and check_pod_status.resources[0].status.phase in ["Succeeded", "Failed"]
+      retries: 10
+      delay: 5
+      when: pvc_check.resources | length > 0 and dataset_check_pod is defined
+
+    - name: Initialize datasets for existing volume
+      community.kubernetes.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Pod
+          metadata:
+            name: "{{ pvc_name }}-dataset-init-pod"
+            namespace: "{{ namespace }}"
+            labels:
+              app: budeval
+              purpose: dataset-init
+          spec:
+            containers:
+            - name: init
+              image: ubuntu:22.04
+              command: 
+                - /bin/bash
+                - -c
+                - |
+                  set -e
+                  echo "Starting dataset download for existing volume..."
+                  
+                  # Install required packages
+                  apt-get update && apt-get install -y wget unzip
+                  
+                  # Download OpenCompass dataset
+                  echo "Downloading OpenCompass dataset..."
+                  cd /data
+                  wget https://github.com/open-compass/opencompass/releases/download/0.2.2.rc1/OpenCompassData-complete-20240207.zip
+                  
+                  # Extract the main archive
+                  echo "Extracting main archive..."
+                  unzip OpenCompassData-complete-20240207.zip
+                  
+                  # Extract all nested zip files
+                  echo "Extracting nested archives..."
+                  cd ./data
+                  find . -name "*.zip" -exec unzip "{}" \;
+                  
+                  # Mark as initialized
+                  echo "Dataset download and extraction completed at $(date)" > /data/dataset_initialized
+                  echo "Dataset initialization completed successfully"
+              volumeMounts:
+              - name: data
+                mountPath: /data
+            volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: "{{ pvc_name }}"
+            restartPolicy: Never
+        kubeconfig: "{{ kubeconfig_path | default(omit) }}"
+      when: pvc_check.resources | length > 0 and check_pod_status.resources | length > 0 and check_pod_status.resources[0].status.phase == "Failed"
+
+    - name: Wait for dataset initialization completion
+      community.kubernetes.k8s_info:
+        api_version: v1
+        kind: Pod
+        name: "{{ pvc_name }}-dataset-init-pod"
+        namespace: "{{ namespace }}"
+        kubeconfig: "{{ kubeconfig_path | default(omit) }}"
+      register: init_pod_status
+      until: init_pod_status.resources | length > 0 and init_pod_status.resources[0].status.phase in ["Succeeded", "Failed"]
+      retries: 60
+      delay: 30
+      when: pvc_check.resources | length > 0 and check_pod_status.resources | length > 0 and check_pod_status.resources[0].status.phase == "Failed"
+
+    - name: Clean up temporary pods
+      community.kubernetes.k8s:
+        state: absent
+        api_version: v1
+        kind: Pod
+        name: "{{ item }}"
+        namespace: "{{ namespace }}"
+        kubeconfig: "{{ kubeconfig_path | default(omit) }}"
+      loop:
+        - "{{ pvc_name }}-init-pod"
+        - "{{ pvc_name }}-check-pod"
+        - "{{ pvc_name }}-dataset-init-pod"
+      ignore_errors: yes
+
+    - name: Display volume status
+      debug:
+        msg: |
+          PVC {{ pvc_name }} status: {{ 'Created' if pvc_check.resources | length == 0 else 'Already exists' }}
+          Namespace: {{ namespace }}
+          Storage Class: {{ storage_class if storage_class else 'default' }}
+          Size: {{ volume_size }}

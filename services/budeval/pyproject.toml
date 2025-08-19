@@ -14,7 +14,7 @@ exclude = [
 ]
 line-length = 119
 indent-width = 4
-target-version = "py310"
+target-version = "py38"
 
 [tool.ruff.lint]
 # Never enforce `E501` (line length violations).
@@ -32,7 +32,7 @@ unfixable = ["B"]
 
 [tool.ruff.lint.isort]
 lines-after-imports = 2
-known-first-party = ["pyguard"]
+known-first-party = ["budeval"]
 
 [tool.ruff.format]
 # Like Black, use double quotes for strings.
@@ -57,7 +57,7 @@ convention = "google"
 plugins = [
     "pydantic.mypy"
 ]
-python_version = "3.10"
+python_version = "3.8"
 
 follow_imports = "silent"
 warn_redundant_casts = true
