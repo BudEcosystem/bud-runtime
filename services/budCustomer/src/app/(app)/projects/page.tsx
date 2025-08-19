@@ -428,7 +428,7 @@ export default function ProjectsPage() {
                               project.status.slice(1)}
                           </Tag>
 
-                          <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-bud-bg-tertiary text-bud-text-muted">
+                          <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-[var(--bg-tertiary)] text-[var(--text-muted)]">
                             <Icon
                               icon={getProjectTypeIcon(project.project_type)}
                               className="text-xs"

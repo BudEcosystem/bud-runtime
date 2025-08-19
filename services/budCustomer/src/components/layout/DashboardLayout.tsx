@@ -200,39 +200,40 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
               </div>
             )}
           </div>
-          {isCollapsed && (
+          {/* {isCollapsed && (
             <div className="flex justify-center mb-4">
               <ThemeSwitcher />
             </div>
-          )}
+          )} */}
 
           {/* Notifications */}
-          {!isCollapsed && (
+          
             <div className="bg-bud-bg-secondary rounded-lg p-3 mb-1 cursor-pointer hover:bg-bud-bg-tertiary transition-colors">
               <Badge
                 count={88}
-                offset={[50, -10]}
+                offset={isCollapsed ? [0, -10] : [50, -10]}
                 style={{ backgroundColor: "#965CDE" }}
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-bud-purple rounded flex items-center justify-center">
+                  <div className={`${
+                      isCollapsed ? "w-6 h-6" : "w-8 h-8"
+                    } bg-bud-purple rounded flex items-center justify-center`}>
                     <Icon
                       icon="heroicons-outline:bell"
                       className="text-white text-lg"
                     />
                   </div>
-                  <div>
+                  {!isCollapsed && (<div>
                     <Text className="text-bud-text-disabled text-xs block">
                       88 New
                     </Text>
                     <Text className="text-bud-text-primary text-sm">
                       Notifications
                     </Text>
-                  </div>
+                  </div>)}
                 </div>
               </Badge>
             </div>
-          )}
         </div>
 
         {/* Scrollable Content Area */}

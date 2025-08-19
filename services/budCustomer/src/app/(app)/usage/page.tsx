@@ -419,8 +419,8 @@ export default function UsagePage() {
                       onChange={() => toggleAlert(alert.id)}
                       style={{
                         backgroundColor: alert.isActive
-                          ? "var(--bud-purple)"
-                          : "var(--bud-border-secondary)",
+                          ? "var(--color-purple)"
+                          : "var(--border-secondary)",
                       }}
                     />
                   </Flex>

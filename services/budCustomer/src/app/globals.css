@@ -550,11 +550,24 @@ html.dark {
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  background-color: var(--bud-border);
+  background-color: var(--text-disabled);
   border-radius: 3px;
   transition: background-color 0.2s ease;
 }
-
+/* theme ant-dropdown */
+.ant-dropdown .ant-dropdown-menu {
+  background: var(--bg-modal) !important;
+}
+.ant-dropdown .ant-dropdown-menu .ant-dropdown-menu-item:not(.ant-dropdown-menu-item-danger) .ant-dropdown-menu-title-content {
+  color: var(--text-secondary) !important;
+}
+.ant-dropdown .ant-dropdown-menu .ant-dropdown-menu-item:not(.ant-dropdown-menu-item-danger) svg {
+  fill: var(--text-secondary) !important;  /* for shape-based icons */
+  color: var(--text-secondary) !important; /* for stroke-based icons */
+}
+.ant-dropdown .ant-dropdown-menu .ant-dropdown-menu-item:hover {
+  background-color: var(--bg-hover) !important;
+}
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
   background-color: var(--bud-border-secondary);
 }
@@ -573,8 +586,11 @@ html.dark {
   background: transparent;
 }
 
+.ant-popover-inner {
+  padding: 0 !important;
+}
 .sidebar-scroll::-webkit-scrollbar-thumb {
-  background-color: var(--bud-border);
+  background-color: var(--text-disabled);
   border-radius: 2px;
   transition: all 0.2s ease;
 }
