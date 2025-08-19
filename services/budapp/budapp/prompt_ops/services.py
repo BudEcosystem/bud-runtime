@@ -23,15 +23,15 @@ from fastapi import status
 from ..commons import logging
 from ..commons.constants import (
     APP_ICONS,
+    EndpointStatusEnum,
     ModelProviderTypeEnum,
+    ProjectStatusEnum,
     PromptStatusEnum,
     PromptTypeEnum,
     PromptVersionStatusEnum,
     RateLimitTypeEnum,
     WorkflowStatusEnum,
     WorkflowTypeEnum,
-    EndpointStatusEnum,
-    ProjectStatusEnum,
 )
 from ..commons.db_utils import SessionMixin
 from ..commons.exceptions import ClientException
@@ -57,7 +57,9 @@ logger = logging.get_logger(__name__)
 class PromptWorkflowService(SessionMixin):
     """Service for managing prompt workflows."""
 
-    async def create_prompt_workflow(self, current_user_id: UUID, request: CreatePromptWorkflowRequest) -> WorkflowModel:
+    async def create_prompt_workflow(
+        self, current_user_id: UUID, request: CreatePromptWorkflowRequest
+    ) -> WorkflowModel:
         """Create a prompt workflow with validation."""
         # Get request data
         current_step_number = request.step_number
@@ -69,11 +71,11 @@ class PromptWorkflowService(SessionMixin):
         name = request.name
         description = request.description
         tags = request.tags
-        prompt_type = request.prompt_type or PromptTypeEnum.SIMPLE_PROMPT
-        auto_scale = request.auto_scale or False
-        caching = request.caching or False
+        prompt_type = request.prompt_type
+        auto_scale = request.auto_scale
+        caching = request.caching
         concurrency = request.concurrency
-        rate_limit_type = request.rate_limit_type or RateLimitTypeEnum.DISABLED
+        rate_limit_type = request.rate_limit_type
         rate_limit_value = request.rate_limit_value
         prompt_schema = request.prompt_schema
 
@@ -94,17 +96,21 @@ class PromptWorkflowService(SessionMixin):
         cluster_id = None
         if endpoint_id:
             db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
-                EndpointModel, {"id": endpoint_id}, exclude_fields={"status": EndpointStatusEnum.DELETED}, missing_ok=True
+                EndpointModel,
+                {"id": endpoint_id},
+                exclude_fields={"status": EndpointStatusEnum.DELETED},
+                missing_ok=True,
             )
             if not db_endpoint:
-                raise ClientException(
-                    message="Endpoint not found", status_code=status.HTTP_404_NOT_FOUND
-                )
+                raise ClientException(message="Endpoint not found", status_code=status.HTTP_404_NOT_FOUND)
             model_id = db_endpoint.model_id
             cluster_id = db_endpoint.cluster_id
 
             # Update workflow icon
-            if db_endpoint.model.provider_type in [ModelProviderTypeEnum.HUGGING_FACE, ModelProviderTypeEnum.CLOUD_MODEL]:
+            if db_endpoint.model.provider_type in [
+                ModelProviderTypeEnum.HUGGING_FACE,
+                ModelProviderTypeEnum.CLOUD_MODEL,
+            ]:
                 db_provider = await ProviderDataManager(self.session).retrieve_by_fields(
                     ProviderModel, {"id": db_endpoint.model.provider_id}
                 )
@@ -121,9 +127,7 @@ class PromptWorkflowService(SessionMixin):
                 ProjectModel, {"id": project_id, "status": ProjectStatusEnum.ACTIVE}, missing_ok=True
             )
             if not db_project:
-                raise ClientException(
-                    message="Project not found", status_code=status.HTTP_404_NOT_FOUND
-                )
+                raise ClientException(message="Project not found", status_code=status.HTTP_404_NOT_FOUND)
 
             # Update workflow tag
             db_workflow = await WorkflowDataManager(self.session).update_by_fields(
@@ -148,13 +152,13 @@ class PromptWorkflowService(SessionMixin):
             name=name,
             description=description,
             tags=tags,
-            prompt_type=prompt_type.value if prompt_type else PromptTypeEnum.SIMPLE_PROMPT.value,
+            prompt_type=prompt_type.value if prompt_type else None,
             auto_scale=auto_scale,
             caching=caching,
             concurrency=concurrency,
-            rate_limit_type=rate_limit_type.value if rate_limit_type else RateLimitTypeEnum.DISABLED.value,
+            rate_limit_type=rate_limit_type.value if rate_limit_type else None,
             rate_limit_value=rate_limit_value,
-            prompt_schema=prompt_schema
+            prompt_schema=prompt_schema,
         ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
 
         # Create or update workflow step
@@ -243,9 +247,7 @@ class PromptWorkflowService(SessionMixin):
             )
 
             # Update prompt with default version
-            await PromptDataManager(self.session).update_by_fields(
-                db_prompt, {"default_version_id": db_version.id}
-            )
+            await PromptDataManager(self.session).update_by_fields(db_prompt, {"default_version_id": db_version.id})
 
             # Store final result in workflow step
             # NOTE: increment step to display success message

@@ -17,7 +17,7 @@
 """Pydantic schemas for the prompt ops module."""
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional, Union
 from uuid import UUID
 
 from pydantic import UUID4, BaseModel, Field, field_validator, model_validator
@@ -31,18 +31,150 @@ from budapp.commons.constants import (
 from budapp.commons.schemas import Tag
 
 
+class ModelSettings(BaseModel):
+    """Model settings for LLM configuration.
+
+    Supports all OpenAI and BudEcosystem parameters. Parameters not in
+    OpenAIModelSettings are automatically routed to extra_body.
+
+    Standard OpenAI parameters:
+        temperature: Controls randomness in the model's output (0-2)
+        max_tokens: Maximum number of tokens to generate
+        top_p: Controls diversity of the output (0-1)
+        frequency_penalty: Penalizes frequently used tokens (-2 to 2)
+        presence_penalty: Penalizes tokens based on presence in the text (-2 to 2)
+        stop_sequences: List of sequences where the model will stop generating
+        seed: Random seed for reproducibility
+        timeout: Request timeout in seconds
+        parallel_tool_calls: Allow parallel tool calls
+        logprobs: Return token log probabilities
+        logit_bias: Token likelihood modifications
+        extra_headers: Additional HTTP headers
+
+    BudEcosystem-specific parameters (auto-routed to extra_body):
+        max_completion_tokens: Alternative to max_tokens (OpenAI compatibility)
+        stream_options: Streaming configuration
+        response_format: Output format control
+        tool_choice: Tool selection strategy
+        chat_template: Custom chat template
+        chat_template_kwargs: Template parameters (e.g., {'enable_thinking': true})
+        mm_processor_kwargs: Multi-modal processor parameters
+        guided_json: JSON schema for guided generation
+        guided_regex: Regex pattern for guided generation
+        guided_choice: List of allowed values
+        guided_grammar: Grammar for guided generation
+        structural_tag: Structural generation tag
+        guided_decoding_backend: Backend for guided decoding
+        guided_whitespace_pattern: Whitespace pattern for guided generation
+    """
+
+    # Standard OpenAI-compatible parameters
+    temperature: float = Field(default=0.7, ge=0.0, le=2.0, description="Sampling temperature")
+    max_tokens: int = Field(default=2000, gt=0, description="Maximum tokens to generate")
+    top_p: float = Field(default=0.9, ge=0.0, le=1.0, description="Nucleus sampling parameter")
+    frequency_penalty: float = Field(default=0.0, ge=-2.0, le=2.0, description="Penalize repeated tokens")
+    presence_penalty: float = Field(default=0.0, ge=-2.0, le=2.0, description="Penalize tokens based on presence")
+    stop_sequences: List[str] = Field(default_factory=list, description="Stop generation sequences")
+    seed: Optional[int] = Field(None, description="Random seed for reproducibility")
+
+    # Additional pydantic-ai supported parameters
+    timeout: Optional[float] = Field(None, description="Request timeout in seconds")
+    parallel_tool_calls: Optional[bool] = Field(None, description="Allow parallel tool calls")
+    logprobs: Optional[bool] = Field(None, description="Return token log probabilities")
+    logit_bias: Optional[Dict[str, int]] = Field(None, description="Token likelihood modifications")
+    extra_headers: Optional[Dict[str, str]] = Field(None, description="Additional HTTP headers")
+
+    # BudEcosystem-specific parameters (will go to extra_body)
+    max_completion_tokens: Optional[int] = Field(None, description="Alternative to max_tokens (OpenAI compatibility)")
+    stream_options: Optional[Dict[str, Any]] = Field(None, description="Streaming configuration")
+    response_format: Optional[Dict[str, Any]] = Field(None, description="Output format control")
+    tool_choice: Optional[Union[str, Dict[str, Any]]] = Field(None, description="Tool selection strategy")
+
+    # Template customization
+    chat_template: Optional[str] = Field(None, description="Custom chat template")
+    chat_template_kwargs: Optional[Dict[str, Any]] = Field(
+        None, description="Template parameters (e.g., {'enable_thinking': true})"
+    )
+    mm_processor_kwargs: Optional[Dict[str, Any]] = Field(None, description="Multi-modal processor parameters")
+
+    # Guided generation parameters
+    guided_json: Optional[Dict[str, Any]] = Field(None, description="JSON schema for guided generation")
+    guided_regex: Optional[str] = Field(None, description="Regex pattern for guided generation")
+    guided_choice: Optional[List[str]] = Field(None, description="List of allowed values")
+    guided_grammar: Optional[str] = Field(None, description="Grammar for guided generation")
+    structural_tag: Optional[str] = Field(None, description="Structural generation tag")
+    guided_decoding_backend: Optional[str] = Field(None, description="Backend for guided decoding")
+    guided_whitespace_pattern: Optional[str] = Field(None, description="Whitespace pattern for guided generation")
+
+
+class Message(BaseModel):
+    """Message structure for prompt execution.
+
+    Attributes:
+        role: The role of the message sender (system, developer, user, or assistant)
+        content: The content of the message
+    """
+
+    role: Literal["system", "developer", "user", "assistant"] = Field(default="user")
+    content: str = Field(..., min_length=1)
+
+
 class PromptSchemaConfig(BaseModel):
     """Schema for prompt configuration stored in prompt_schema field."""
 
-    messages: Optional[List[Dict[str, Any]]] = Field(default=None, description="Prompt messages")
-    system_prompt: Optional[str] = Field(default=None, description="System prompt")
-    model_parameters: Optional[Dict[str, Any]] = Field(
-        default=None,
-        description="Model parameters like temperature, max_tokens, etc."
+    """Request model for prompt execution.
+
+    Supports both structured and unstructured inputs/outputs:
+    - If input_schema is provided: input_data should be a Dict matching the schema
+    - If input_schema is None: input_data should be a string (unstructured)
+    - If output_schema is provided: output will be structured according to the schema
+    - If output_schema is None: output will be an unstructured string
+
+    Attributes:
+        model_settings: Configuration settings for the model
+        stream: Whether to stream the response
+        input_schema: Optional JSON schema for structured input (None for unstructured)
+        output_schema: Optional JSON schema for structured output (None for unstructured)
+        messages: List of messages to provide context (can include system/developer roles)
+        input_data: Input data (Dict for structured, str for unstructured)
+    """
+
+    model_settings: ModelSettings = Field(default_factory=ModelSettings)
+    stream: bool = Field(default=False, description="Enable streaming response")
+    input_schema: Optional[Dict[str, Any]] = Field(
+        None, description="JSON schema for structured input (None for unstructured)"
     )
-    input_schema: Optional[Dict[str, Any]] = Field(default=None, description="Input validation schema")
-    output_schema: Optional[Dict[str, Any]] = Field(default=None, description="Output validation schema")
-    validation_rules: Optional[Dict[str, Any]] = Field(default=None, description="Validation rules")
+    output_schema: Optional[Dict[str, Any]] = Field(
+        None, description="JSON schema for structured output (None for unstructured)"
+    )
+    messages: List[Message] = Field(
+        default_factory=list, description="Conversation messages (can include system/developer messages)"
+    )
+    input_data: Optional[Union[Dict[str, Any], str]] = Field(
+        None, description="Input data (Dict for structured, str for unstructured)"
+    )
+    output_validation_prompt: Optional[str] = Field(
+        None,
+        description="Natural language validation rules for output (only for Pydantic models in non-streaming mode)",
+    )
+    input_validation_prompt: Optional[str] = Field(
+        None,
+        description="Natural language validation rules for input (only for structured input with Pydantic models)",
+    )
+    llm_retry_limit: Optional[int] = Field(
+        default=3, ge=0, description="Number of LLM retries when validation fails (non-streaming only)"
+    )
+    enable_tools: bool = Field(
+        default=False, description="Enable tool calling capability (requires allow_multiple_calls=true)"
+    )
+    allow_multiple_calls: bool = Field(
+        default=True,
+        description="Allow multiple LLM calls for retries and tool usage. When false, only a single LLM call is made",
+    )
+    system_prompt_role: Optional[Literal["system", "developer", "user"]] = Field(
+        None,
+        description="Role for system prompts in OpenAI models. 'developer' only works with compatible models (not o1-mini)",
+    )
 
 
 class CreatePromptWorkflowRequest(BaseModel):

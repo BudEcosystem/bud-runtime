@@ -8,6 +8,8 @@ from ..cluster_ops.schemas import ClusterResponse
 from ..commons.constants import (
     AddModelModalityEnum,
     ModelProviderTypeEnum,
+    PromptTypeEnum,
+    RateLimitTypeEnum,
     VisibilityEnum,
     WorkflowStatusEnum,
     WorkflowTypeEnum,
@@ -24,6 +26,7 @@ from ..model_ops.schemas import (
     ScalingSpecification,
 )
 from ..project_ops.schemas import ProjectResponse
+from ..prompt_ops.schemas import PromptSchemaConfig
 
 
 class RetrieveWorkflowStepData(BaseModel):
@@ -83,6 +86,13 @@ class RetrieveWorkflowStepData(BaseModel):
     endpoint_details: dict | None = None
     template: ModelTemplateResponse | None = None
     add_model_modality: list[AddModelModalityEnum] | None = None
+    prompt_type: PromptTypeEnum | None = None
+    prompt_schema: PromptSchemaConfig | None = None
+    auto_scale: bool | None = None
+    caching: bool | None = None
+    concurrency: list[int] | None = None
+    rate_limit_type: RateLimitTypeEnum | None = None
+    rate_limit_value: int | None = None
 
 
 class RetrieveWorkflowDataResponse(SuccessResponse):
