@@ -20,15 +20,51 @@ from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional, Union
 from uuid import UUID
 
-from pydantic import UUID4, BaseModel, Field, field_validator, model_validator
+from pydantic import UUID4, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from budapp.commons.constants import (
+    ModalityEnum,
     PromptStatusEnum,
     PromptTypeEnum,
     PromptVersionStatusEnum,
     RateLimitTypeEnum,
 )
-from budapp.commons.schemas import Tag
+from budapp.commons.schemas import PaginatedSuccessResponse, Tag
+
+
+class PromptFilter(BaseModel):
+    """Filter schema for prompt list API."""
+
+    name: str | None = None
+    prompt_type: PromptTypeEnum | None = None
+    project_id: UUID4 | None = None
+
+
+class PromptListItem(BaseModel):
+    """Schema for individual prompt item in list."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID4
+    name: str
+    description: str | None
+    tags: list[dict] | None
+    created_at: datetime
+    modified_at: datetime
+    prompt_type: str
+    model_icon: str | None
+    model_name: str
+    default_version: int | None
+    modality: list[str] | None
+    status: str  # Endpoint status
+
+
+class PromptListResponse(PaginatedSuccessResponse):
+    """Prompt list response schema."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    prompts: list[PromptListItem] = []
 
 
 class ModelSettings(BaseModel):

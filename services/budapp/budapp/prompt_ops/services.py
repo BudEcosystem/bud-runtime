@@ -48,10 +48,56 @@ from ..workflow_ops.services import WorkflowService, WorkflowStepService
 from .crud import PromptDataManager, PromptVersionDataManager
 from .models import Prompt as PromptModel
 from .models import PromptVersion as PromptVersionModel
-from .schemas import CreatePromptWorkflowRequest, CreatePromptWorkflowSteps
+from .schemas import CreatePromptWorkflowRequest, CreatePromptWorkflowSteps, PromptFilter, PromptListItem
 
 
 logger = logging.get_logger(__name__)
+
+
+class PromptService(SessionMixin):
+    """Service for managing prompts."""
+
+    async def get_all_prompts(
+        self,
+        offset: int = 0,
+        limit: int = 10,
+        filters: dict = {},
+        order_by: list = [],
+        search: bool = False,
+    ) -> tuple[list[PromptModel], int]:
+        """Get all active prompts with their related data."""
+        # Fetch active prompts
+        filters["status"] = PromptStatusEnum.ACTIVE
+
+        # Fetch prompts with related data
+        db_prompts, count = await PromptDataManager(self.session).get_all_active_prompts(
+            offset, limit, filters, order_by, search
+        )
+
+        # Transform to response format
+        prompts_list = []
+        for prompt in db_prompts:
+            endpoint = prompt.endpoint
+            model = endpoint.model if endpoint else None
+            default_version_obj = prompt.default_version
+
+            prompt_item = PromptListItem(
+                id=prompt.id,
+                name=prompt.name,
+                description=prompt.description,
+                tags=prompt.tags,
+                created_at=prompt.created_at,
+                modified_at=prompt.modified_at,
+                prompt_type=prompt.prompt_type,
+                model_icon=model.icon if model else None,
+                model_name=model.name if model else "",
+                default_version=default_version_obj.version if default_version_obj else None,
+                modality=model.modality if model else None,
+                status=endpoint.status if endpoint else "",
+            )
+            prompts_list.append(prompt_item)
+
+        return prompts_list, count
 
 
 class PromptWorkflowService(SessionMixin):

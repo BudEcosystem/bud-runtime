@@ -16,14 +16,18 @@
 
 """API routes for the prompt ops module."""
 
-from typing import Annotated, Union
+from typing import Annotated, List, Optional, Union
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from budapp.commons import logging
 from budapp.commons.constants import PermissionEnum
-from budapp.commons.dependencies import get_current_active_user, get_session
+from budapp.commons.dependencies import (
+    get_current_active_user,
+    get_session,
+    parse_ordering_fields,
+)
 from budapp.commons.exceptions import ClientException
 from budapp.commons.permission_handler import require_permissions
 from budapp.commons.schemas import ErrorResponse
@@ -31,12 +35,72 @@ from budapp.user_ops.schemas import User
 from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.workflow_ops.services import WorkflowService
 
-from .schemas import CreatePromptWorkflowRequest
-from .services import PromptWorkflowService
+from .schemas import CreatePromptWorkflowRequest, PromptFilter, PromptListItem, PromptListResponse
+from .services import PromptService, PromptWorkflowService
+
 
 logger = logging.get_logger(__name__)
 
 router = APIRouter(prefix="/prompts", tags=["prompt"])
+
+
+@router.get(
+    "",
+    responses={
+        status.HTTP_200_OK: {
+            "model": PromptListResponse,
+            "description": "Successfully listed prompts",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Invalid request data",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Server error",
+        },
+    },
+    description="List all prompts with filtering and sorting",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
+async def list_prompts(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    filters: Annotated[PromptFilter, Depends()],
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=0),
+    order_by: Optional[List[str]] = Depends(parse_ordering_fields),
+    search: bool = False,
+) -> Union[PromptListResponse, ErrorResponse]:
+    """List all prompts with pagination, filtering, and sorting."""
+    # Calculate offset
+    offset = (page - 1) * limit
+
+    # Convert filter to dictionary
+    filters_dict = filters.model_dump(exclude_none=True)
+
+    try:
+        # Get prompts from service
+        prompts_list, count = await PromptService(session).get_all_prompts(
+            offset, limit, filters_dict, order_by, search
+        )
+
+        return PromptListResponse(
+            prompts=prompts_list,
+            total_record=count,
+            page=page,
+            limit=limit,
+            object="prompts.list",
+            code=status.HTTP_200_OK,
+        ).to_http_response()
+    except ClientException as e:
+        logger.exception(f"Failed to list prompts: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to list prompts: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to list prompts"
+        ).to_http_response()
 
 
 @router.post(
