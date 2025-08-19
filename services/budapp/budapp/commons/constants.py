@@ -573,6 +573,7 @@ class WorkflowTypeEnum(StrEnum):
     ADD_ADAPTER = auto()
     DELETE_ADAPTER = auto()
     EVALUATION_CREATION = auto()
+    PROMPT_CREATION = auto()
 
 
 class NotificationType(Enum):

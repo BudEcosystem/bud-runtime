@@ -16,4 +16,29 @@
 
 """CRUD operations for the prompt ops module."""
 
-# Placeholder for CRUD operations - to be implemented later
+from uuid import UUID
+
+from sqlalchemy import func, select
+
+from budapp.commons.db_utils import DataManagerUtils
+
+from .models import Prompt as PromptModel
+from .models import PromptVersion as PromptVersionModel
+
+
+class PromptDataManager(DataManagerUtils):
+    """CRUD operations for Prompt model."""
+
+    pass
+
+
+class PromptVersionDataManager(DataManagerUtils):
+    """CRUD operations for PromptVersion model."""
+
+    async def get_next_version(self, prompt_id: UUID) -> int:
+        """Get the next version number for a prompt."""
+        result = await self.session.execute(
+            select(func.max(PromptVersionModel.version)).where(PromptVersionModel.prompt_id == prompt_id)
+        )
+        max_version = result.scalar()
+        return (max_version or 0) + 1

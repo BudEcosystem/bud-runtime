@@ -46,6 +46,7 @@ from .model_ops.workflows import CloudModelSyncWorkflows
 from .permissions import permission_routes
 from .playground_ops import playground_routes
 from .project_ops import project_routes
+from .prompt_ops import prompt_routes
 from .router_ops import router_routes
 from .user_ops import user_routes
 from .workflow_ops import workflow_routes
@@ -217,6 +218,7 @@ internal_router.include_router(user_routes.user_router)
 internal_router.include_router(workflow_routes.workflow_router)
 internal_router.include_router(playground_routes.playground_router)
 internal_router.include_router(project_routes.project_router)
+internal_router.include_router(prompt_routes.router)
 internal_router.include_router(router_routes.router_router)
 internal_router.include_router(eval_routes.router)
 

@@ -268,3 +268,55 @@ curl --location 'https://<base_url>/clusters/clusters' \
   "trigger_workflow": true
 }
 ```
+
+## Create Prompt
+
+```json
+// Select provider type
+{
+  "workflow_total_steps": 6,
+  "step_number": 1,
+  "project_id": "1cd00bfc-23c3-4b61-aea1-29b68966048b"
+}
+
+// Select prompt type
+{
+  "workflow_id": "bd30eaf8-1a82-401a-bd38-52cecd1ee17d",
+  "step_number": 2,
+  "prompt_type": "simple_prompt"
+}
+
+// Insert prompt schema
+{
+  "workflow_id": "bd30eaf8-1a82-401a-bd38-52cecd1ee17d",
+  "step_number": 3,
+  "prompt_schema": {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hello"
+      },
+      {
+        "role": "assistant",
+        "content": "Hello"
+      }
+    ]
+  },
+  "endpoint_id": "096cee59-af1f-4fba-b873-7f540d77f7bf"
+}
+
+// Insert prompt metadata
+{
+  "workflow_id": "bd30eaf8-1a82-401a-bd38-52cecd1ee17d",
+  "step_number": 4,
+  "name": "test prompt",
+  "description": "This is a test prompt",
+  "tags": [{"name": "Tag1", "color": "#000000"}, {"name": "Tag2", "color": "#000000"}],
+  "auto_scale": true,
+  "caching": true,
+  "concurrency": [10, 100],
+  "rate_limit_type": "custom",
+  "rate_limit_value": 10,
+  "trigger_workflow": true
+}
+```
