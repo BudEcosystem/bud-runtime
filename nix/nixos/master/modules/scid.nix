@@ -24,7 +24,7 @@ in {
       helm_charts_path = "infra/helm";
 
       slack = {
-        channel = "infratest";
+        channel = "infra";
         token = "%file%:${config.sops.secrets."misc/slack_token".path}";
       };
 
