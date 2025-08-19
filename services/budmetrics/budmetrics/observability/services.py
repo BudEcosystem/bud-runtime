@@ -1,7 +1,8 @@
 import asyncio
 import math
 from collections import defaultdict
-from typing import Optional
+from datetime import datetime
+from typing import Optional, Union
 from uuid import UUID
 
 from budmicroframe.commons import logging
@@ -20,11 +21,16 @@ from budmetrics.observability.schemas import (
     EmbeddingInferenceDetail,
     EnhancedInferenceDetailResponse,
     FeedbackItem,
+    GatewayAnalyticsRequest,
+    GatewayAnalyticsResponse,
+    GatewayMetadata,
     ImageInferenceDetail,
     InferenceFeedbackResponse,
     InferenceListItem,
     InferenceListRequest,
     InferenceListResponse,
+    LatencyDistributionRequest,
+    LatencyDistributionResponse,
     MetricsData,
     ModerationInferenceDetail,
     ObservabilityMetricsRequest,
@@ -794,43 +800,140 @@ class ObservabilityMetricsService:
         except ValueError:
             raise ValueError("Invalid inference ID format") from None
 
-        query = """
-        SELECT
-            mi.inference_id,
-            mi.timestamp,
-            mi.model_name,
-            mi.model_provider_name,
-            mid.model_id,
-            mi.system,
-            coalesce(ci.input, mi.input_messages) as input_messages,
-            coalesce(ci.output, mi.output) as output,
-            ci.function_name,
-            ci.variant_name,
-            ci.episode_id,
-            mi.input_tokens,
-            mi.output_tokens,
-            mi.response_time_ms,
-            mi.ttft_ms,
-            ci.processing_time_ms,
-            mid.request_ip,
-            mid.request_arrival_time,
-            mid.request_forward_time,
-            mid.project_id,
-            mid.endpoint_id,
-            mid.is_success,
-            mi.cached,
-            mi.finish_reason,
-            mid.cost,
-            mi.raw_request,
-            mi.raw_response,
-            mi.gateway_request,
-            mi.gateway_response,
-            coalesce(mi.endpoint_type, 'chat') as endpoint_type
-        FROM ModelInference mi
-        INNER JOIN ModelInferenceDetails mid ON mi.inference_id = mid.inference_id
-        LEFT JOIN ChatInference ci ON mi.inference_id = ci.id
-        WHERE mi.inference_id = %(inference_id)s
-        """
+        # First check if GatewayAnalytics table exists
+        try:
+            table_exists_query = "EXISTS TABLE GatewayAnalytics"
+            table_exists_result = await self.clickhouse_client.execute_query(table_exists_query)
+            gateway_table_exists = table_exists_result and table_exists_result[0][0] == 1
+            logger.info(f"GatewayAnalytics table exists: {gateway_table_exists}")
+
+            # If table exists, do some debugging checks
+            if gateway_table_exists:
+                await self._debug_gateway_analytics_table(inference_id)
+        except Exception as e:
+            logger.warning(f"Failed to check GatewayAnalytics table existence: {e}")
+            gateway_table_exists = False
+
+        # Build query conditionally based on table existence
+        if gateway_table_exists:
+            query = """
+            SELECT
+                mi.inference_id,
+                mi.timestamp,
+                mi.model_name,
+                mi.model_provider_name,
+                mid.model_id,
+                mi.system,
+                coalesce(ci.input, mi.input_messages) as input_messages,
+                coalesce(ci.output, mi.output) as output,
+                ci.function_name,
+                ci.variant_name,
+                ci.episode_id,
+                mi.input_tokens,
+                mi.output_tokens,
+                mi.response_time_ms,
+                mi.ttft_ms,
+                ci.processing_time_ms,
+                mid.request_ip,
+                mid.request_arrival_time,
+                mid.request_forward_time,
+                mid.project_id,
+                mid.endpoint_id,
+                mid.is_success,
+                mi.cached,
+                mi.finish_reason,
+                mid.cost,
+                mi.raw_request,
+                mi.raw_response,
+                mi.gateway_request,
+                mi.gateway_response,
+                coalesce(mi.endpoint_type, 'chat') as endpoint_type,
+                -- Gateway Analytics fields
+                ga.client_ip,
+                ga.proxy_chain,
+                ga.protocol_version,
+                ga.country_code,
+                ga.region,
+                ga.city,
+                ga.latitude,
+                ga.longitude,
+                ga.timezone,
+                ga.asn,
+                ga.isp,
+                ga.user_agent,
+                ga.device_type,
+                ga.browser_name,
+                ga.browser_version,
+                ga.os_name,
+                ga.os_version,
+                ga.is_bot,
+                ga.method,
+                ga.path,
+                ga.query_params,
+                ga.request_headers,
+                ga.body_size,
+                ga.api_key_id,
+                ga.auth_method,
+                ga.user_id,
+                ga.gateway_processing_ms,
+                ga.total_duration_ms,
+                ga.routing_decision,
+                ga.model_version,
+                ga.status_code,
+                ga.response_size,
+                ga.response_headers,
+                ga.error_type,
+                ga.error_message,
+                ga.is_blocked,
+                ga.block_reason,
+                ga.block_rule_id,
+                ga.tags
+            FROM ModelInference mi
+            INNER JOIN ModelInferenceDetails mid ON mi.inference_id = mid.inference_id
+            LEFT JOIN ChatInference ci ON mi.inference_id = ci.id
+            LEFT JOIN GatewayAnalytics ga ON mi.inference_id = ga.inference_id
+            WHERE mi.inference_id = %(inference_id)s
+            """
+        else:
+            # Query without GatewayAnalytics table
+            logger.info("GatewayAnalytics table not found, querying without gateway metadata")
+            query = """
+            SELECT
+                mi.inference_id,
+                mi.timestamp,
+                mi.model_name,
+                mi.model_provider_name,
+                mid.model_id,
+                mi.system,
+                coalesce(ci.input, mi.input_messages) as input_messages,
+                coalesce(ci.output, mi.output) as output,
+                ci.function_name,
+                ci.variant_name,
+                ci.episode_id,
+                mi.input_tokens,
+                mi.output_tokens,
+                mi.response_time_ms,
+                mi.ttft_ms,
+                ci.processing_time_ms,
+                mid.request_ip,
+                mid.request_arrival_time,
+                mid.request_forward_time,
+                mid.project_id,
+                mid.endpoint_id,
+                mid.is_success,
+                mi.cached,
+                mi.finish_reason,
+                mid.cost,
+                mi.raw_request,
+                mi.raw_response,
+                mi.gateway_request,
+                mi.gateway_response,
+                coalesce(mi.endpoint_type, 'chat') as endpoint_type
+            FROM ModelInference mi
+            INNER JOIN ModelInferenceDetails mid ON mi.inference_id = mid.inference_id
+            LEFT JOIN ChatInference ci ON mi.inference_id = ci.id
+            WHERE mi.inference_id = %(inference_id)s
+            """
 
         params = {"inference_id": inference_id}
         results = await self.clickhouse_client.execute_query(query, params)
@@ -839,7 +942,104 @@ class ObservabilityMetricsService:
             raise ValueError("Inference not found")
 
         row = results[0]
-        endpoint_type = row[29]  # Get endpoint_type
+
+        # Extract gateway metadata based on whether table exists and data is available
+        gateway_metadata = None
+        if gateway_table_exists:
+            # With GatewayAnalytics table, endpoint_type is at index 29 and gateway fields start at 30
+            endpoint_type = row[29] if len(row) > 29 else "chat"
+
+            logger.debug(f"Row length: {len(row)}, checking gateway fields from index 30")
+
+            if len(row) > 30:
+                # Check if any gateway fields are present (not all None/empty)
+                gateway_fields = row[30:69] if len(row) >= 69 else row[30:]
+                has_gateway_data = any(field is not None and field != "" for field in gateway_fields)
+
+                logger.debug(f"Gateway fields present: {has_gateway_data}")
+                logger.debug(
+                    f"Sample gateway fields: client_ip={row[30] if len(row) > 30 else None}, "
+                    f"country_code={row[33] if len(row) > 33 else None}, "
+                    f"user_agent={row[41] if len(row) > 41 else None}"
+                )
+
+                if has_gateway_data:
+                    try:
+                        # Parse headers and tags if they exist
+                        request_headers = None
+                        if len(row) > 51 and row[51]:
+                            try:
+                                request_headers = dict(row[51]) if isinstance(row[51], (dict, tuple)) else None
+                            except (TypeError, ValueError):
+                                request_headers = None
+
+                        response_headers = None
+                        if len(row) > 62 and row[62]:
+                            try:
+                                response_headers = dict(row[62]) if isinstance(row[62], (dict, tuple)) else None
+                            except (TypeError, ValueError):
+                                response_headers = None
+
+                        tags = None
+                        if len(row) > 68 and row[68]:
+                            try:
+                                tags = dict(row[68]) if isinstance(row[68], (dict, tuple)) else None
+                            except (TypeError, ValueError):
+                                tags = None
+
+                        gateway_metadata = GatewayMetadata(
+                            client_ip=row[30] if len(row) > 30 and row[30] else None,
+                            proxy_chain=row[31] if len(row) > 31 and row[31] else None,
+                            protocol_version=row[32] if len(row) > 32 and row[32] else None,
+                            country_code=row[33] if len(row) > 33 and row[33] else None,
+                            region=row[34] if len(row) > 34 and row[34] else None,
+                            city=row[35] if len(row) > 35 and row[35] else None,
+                            latitude=row[36] if len(row) > 36 and row[36] is not None else None,
+                            longitude=row[37] if len(row) > 37 and row[37] is not None else None,
+                            timezone=row[38] if len(row) > 38 and row[38] else None,
+                            asn=row[39] if len(row) > 39 and row[39] is not None else None,
+                            isp=row[40] if len(row) > 40 and row[40] else None,
+                            user_agent=row[41] if len(row) > 41 and row[41] else None,
+                            device_type=row[42] if len(row) > 42 and row[42] else None,
+                            browser_name=row[43] if len(row) > 43 and row[43] else None,
+                            browser_version=row[44] if len(row) > 44 and row[44] else None,
+                            os_name=row[45] if len(row) > 45 and row[45] else None,
+                            os_version=row[46] if len(row) > 46 and row[46] else None,
+                            is_bot=row[47] if len(row) > 47 and row[47] is not None else None,
+                            method=row[48] if len(row) > 48 and row[48] else None,
+                            path=row[49] if len(row) > 49 and row[49] else None,
+                            query_params=row[50] if len(row) > 50 and row[50] else None,
+                            request_headers=request_headers,
+                            body_size=row[52] if len(row) > 52 and row[52] is not None else None,
+                            api_key_id=row[53] if len(row) > 53 and row[53] else None,
+                            auth_method=row[54] if len(row) > 54 and row[54] else None,
+                            user_id=row[55] if len(row) > 55 and row[55] else None,
+                            gateway_processing_ms=row[56] if len(row) > 56 and row[56] is not None else None,
+                            total_duration_ms=row[57] if len(row) > 57 and row[57] is not None else None,
+                            routing_decision=row[58] if len(row) > 58 and row[58] else None,
+                            model_version=row[59] if len(row) > 59 and row[59] else None,
+                            status_code=row[60] if len(row) > 60 and row[60] is not None else None,
+                            response_size=row[61] if len(row) > 61 and row[61] is not None else None,
+                            response_headers=response_headers,
+                            error_type=row[63] if len(row) > 63 and row[63] else None,
+                            error_message=row[64] if len(row) > 64 and row[64] else None,
+                            is_blocked=row[65] if len(row) > 65 and row[65] is not None else None,
+                            block_reason=row[66] if len(row) > 66 and row[66] else None,
+                            block_rule_id=row[67] if len(row) > 67 and row[67] else None,
+                            tags=tags,
+                        )
+                        logger.info(f"Successfully parsed gateway metadata for inference {inference_id}")
+                    except (IndexError, TypeError) as e:
+                        logger.warning(f"Failed to parse gateway metadata for inference {inference_id}: {e}")
+                        gateway_metadata = None
+                else:
+                    logger.debug(f"No gateway data found for inference {inference_id}")
+            else:
+                logger.warning(f"Row too short for gateway data: {len(row)} columns")
+        else:
+            # Without GatewayAnalytics table, endpoint_type is at the last index
+            endpoint_type = row[-1] if len(row) > 0 else "chat"
+            logger.info("GatewayAnalytics table not available, gateway_metadata will be null")
 
         # Parse messages from JSON string
         import json
@@ -1013,6 +1213,7 @@ class ObservabilityMetricsService:
                 raw_response=str(row[26]) if row[26] else None,
                 gateway_request=str(row[27]) if row[27] else None,
                 gateway_response=str(row[28]) if row[28] else None,
+                gateway_metadata=gateway_metadata,  # New gateway metadata
                 feedback_count=feedback_count,
                 average_rating=average_rating,
                 endpoint_type=endpoint_type,
@@ -1133,3 +1334,1500 @@ class ObservabilityMetricsService:
             feedback_items=feedback_items,
             total_count=len(feedback_items),
         )
+
+    async def get_gateway_metrics(self, request: GatewayAnalyticsRequest) -> GatewayAnalyticsResponse:
+        """Get gateway analytics metrics based on request parameters."""
+        self._ensure_initialized()
+
+        # Build and execute query
+        query = self._build_gateway_analytics_query(request)
+        result = await self._clickhouse_client.execute_query(query)
+
+        # Process results into response format
+        items = await self._process_gateway_metrics_results(result, request)
+
+        # Calculate summary statistics if requested
+        summary = None
+        if len(items) > 0:
+            summary = self._calculate_gateway_summary_stats(items, request)
+
+        return GatewayAnalyticsResponse(object="gateway_analytics", code=200, items=items, summary=summary)
+
+    async def get_geographical_stats(self, from_date, to_date, project_id):
+        """Get geographical distribution statistics."""
+        self._ensure_initialized()
+
+        # Build queries for country and city stats
+        country_query = self._build_geographical_query(from_date, to_date, project_id, "country")
+        city_query = self._build_geographical_query(from_date, to_date, project_id, "city")
+
+        # Execute queries in parallel
+        country_result, city_result = await asyncio.gather(
+            self._clickhouse_client.execute_query(country_query), self._clickhouse_client.execute_query(city_query)
+        )
+
+        # Process results
+        total_requests = sum(row[1] for row in country_result) if country_result else 0
+
+        countries = (
+            [
+                {
+                    "country_code": row[0],
+                    "count": row[1],
+                    "percent": round((row[1] / total_requests) * 100, 2) if total_requests > 0 else 0,
+                }
+                for row in country_result
+            ]
+            if country_result
+            else []
+        )
+
+        cities = (
+            [
+                {
+                    "city": row[0],
+                    "country_code": row[1],
+                    "count": row[2],
+                    "percent": round((row[2] / total_requests) * 100, 2) if total_requests > 0 else 0,
+                    "latitude": row[3] if len(row) > 3 else None,
+                    "longitude": row[4] if len(row) > 4 else None,
+                }
+                for row in city_result
+                if row[0] is not None
+            ]
+            if city_result
+            else []
+        )
+
+        # Create heatmap data for visualization
+        heatmap_data = [
+            {
+                "lat": city["latitude"],
+                "lng": city["longitude"],
+                "count": city["count"],
+                "city": city["city"],
+                "country_code": city["country_code"],
+            }
+            for city in cities
+            if city.get("latitude") and city.get("longitude")
+        ]
+
+        from budmetrics.observability.schemas import GatewayGeographicalStats
+
+        return GatewayGeographicalStats(
+            total_requests=total_requests,
+            unique_countries=len(countries),
+            unique_cities=len(cities),
+            countries=countries[:50],
+            cities=cities[:100],
+            heatmap_data=heatmap_data,
+        )
+
+    async def get_top_routes(self, from_date, to_date, limit, project_id):
+        """Get top API routes by request count."""
+        self._ensure_initialized()
+
+        query = self._build_top_routes_query(from_date, to_date, limit, project_id)
+        result = await self._clickhouse_client.execute_query(query)
+
+        routes = []
+        if result:
+            for row in result:
+                routes.append(
+                    {
+                        "path": row[0],
+                        "method": row[1] if len(row) > 1 else "GET",
+                        "count": row[2] if len(row) > 2 else row[1],
+                        "avg_response_time": row[3] if len(row) > 3 else 0,
+                        "error_rate": row[4] if len(row) > 4 else 0,
+                    }
+                )
+
+        return routes
+
+    async def get_client_analytics(self, from_date, to_date, group_by, project_id):
+        """Get client analytics (device, browser, OS distribution)."""
+        self._ensure_initialized()
+
+        query = self._build_client_analytics_query(from_date, to_date, group_by, project_id)
+        result = await self._clickhouse_client.execute_query(query)
+
+        distribution = {}
+        total = 0
+
+        if result:
+            for row in result:
+                distribution[row[0]] = row[1]
+                total += row[1]
+
+        # Calculate percentages
+        distribution_with_percent = [
+            {"name": name, "count": count, "percent": round((count / total * 100), 2) if total > 0 else 0}
+            for name, count in distribution.items()
+        ]
+
+        return {"distribution": distribution_with_percent, "total": total, "group_by": group_by}
+
+    def _build_gateway_analytics_query(self, request):
+        """Build ClickHouse query for gateway analytics."""
+        # This is a simplified version - you would need to implement the full query builder
+        return """
+            SELECT
+                toStartOfHour(timestamp) as time_bucket,
+                count(*) as request_count,
+                avg(response_time_ms) as avg_response_time
+            FROM bud.ModelInferenceDetails
+            WHERE timestamp >= %(from_date)s
+                AND timestamp <= %(to_date)s
+            GROUP BY time_bucket
+            ORDER BY time_bucket
+        """
+
+    def _build_geographical_query(self, from_date, to_date, project_id, group_type):
+        """Build query for geographical statistics."""
+        if group_type == "country":
+            return f"""
+                SELECT
+                    country_code,
+                    count(*) as count
+                FROM bud.ModelInferenceDetails
+                WHERE timestamp >= '{from_date.isoformat()}'
+                    {f"AND timestamp <= '{to_date.isoformat()}'" if to_date else ""}
+                    {f"AND project_id = '{project_id}'" if project_id else ""}
+                GROUP BY country_code
+                ORDER BY count DESC
+                LIMIT 50
+            """
+        else:  # city
+            return f"""
+                SELECT
+                    city,
+                    country_code,
+                    count(*) as count,
+                    any(latitude) as latitude,
+                    any(longitude) as longitude
+                FROM bud.ModelInferenceDetails
+                WHERE timestamp >= '{from_date.isoformat()}'
+                    {f"AND timestamp <= '{to_date.isoformat()}'" if to_date else ""}
+                    {f"AND project_id = '{project_id}'" if project_id else ""}
+                    AND city IS NOT NULL
+                GROUP BY city, country_code
+                ORDER BY count DESC
+                LIMIT 100
+            """
+
+    def _build_blocking_stats_query(self, from_date, to_date, project_id):
+        """Build query for blocking statistics."""
+        return f"""
+            SELECT
+                blocking_rule,
+                count(*) as count
+            FROM bud.ModelInferenceDetails
+            WHERE timestamp >= '{from_date.isoformat()}'
+                {f"AND timestamp <= '{to_date.isoformat()}'" if to_date else ""}
+                {f"AND project_id = '{project_id}'" if project_id else ""}
+                AND is_blocked = true
+            GROUP BY blocking_rule
+            ORDER BY count DESC
+        """
+
+    def _build_total_requests_query(self, from_date, to_date, project_id):
+        """Build query for total requests count."""
+        return f"""
+            SELECT count(*) as total
+            FROM bud.ModelInferenceDetails
+            WHERE timestamp >= '{from_date.isoformat()}'
+                {f"AND timestamp <= '{to_date.isoformat()}'" if to_date else ""}
+                {f"AND project_id = '{project_id}'" if project_id else ""}
+        """
+
+    def _build_top_routes_query(self, from_date, to_date, limit, project_id):
+        """Build query for top routes."""
+        return f"""
+            SELECT
+                path,
+                http_method,
+                count(*) as count,
+                avg(response_time_ms) as avg_response_time,
+                sum(CASE WHEN status_code >= 400 THEN 1 ELSE 0 END) / count(*) * 100 as error_rate
+            FROM bud.ModelInferenceDetails
+            WHERE timestamp >= '{from_date.isoformat()}'
+                {f"AND timestamp <= '{to_date.isoformat()}'" if to_date else ""}
+                {f"AND project_id = '{project_id}'" if project_id else ""}
+            GROUP BY path, http_method
+            ORDER BY count DESC
+            LIMIT {limit}
+        """
+
+    def _build_client_analytics_query(self, from_date, to_date, group_by, project_id):
+        """Build query for client analytics."""
+        field_map = {"device_type": "device_type", "browser": "browser_name", "os": "os_name"}
+        field = field_map.get(group_by, "device_type")
+
+        return f"""
+            SELECT
+                {field},
+                count(*) as count
+            FROM bud.ModelInferenceDetails
+            WHERE timestamp >= '{from_date.isoformat()}'
+                {f"AND timestamp <= '{to_date.isoformat()}'" if to_date else ""}
+                {f"AND project_id = '{project_id}'" if project_id else ""}
+                AND {field} IS NOT NULL
+            GROUP BY {field}
+            ORDER BY count DESC
+        """
+
+    def _process_gateway_metrics_results(self, result, request):
+        """Process gateway metrics query results."""
+        # Simplified processing - would need full implementation
+        from budmetrics.observability.schemas import GatewayMetricsData, GatewayPeriodBin
+
+        items = []
+
+        if result:
+            for row in result:
+                items.append(
+                    GatewayPeriodBin(
+                        time_period=row[0],
+                        items=[
+                            GatewayMetricsData(
+                                data={
+                                    "request_count": {"count": row[1]},
+                                    "avg_response_time": {"avg": row[2]} if len(row) > 2 else {"avg": 0},
+                                }
+                            )
+                        ],
+                    )
+                )
+
+        return items
+
+    async def _debug_gateway_analytics_table(self, inference_id: str):
+        """Debug method to check GatewayAnalytics table status and data."""
+        try:
+            # Check total count in GatewayAnalytics table
+            count_query = "SELECT COUNT(*) FROM GatewayAnalytics"
+            count_result = await self.clickhouse_client.execute_query(count_query)
+            total_count = count_result[0][0] if count_result else 0
+            logger.info(f"Total records in GatewayAnalytics: {total_count}")
+
+            # Check count with non-null inference_id
+            non_null_query = "SELECT COUNT(*) FROM GatewayAnalytics WHERE inference_id IS NOT NULL"
+            non_null_result = await self.clickhouse_client.execute_query(non_null_query)
+            non_null_count = non_null_result[0][0] if non_null_result else 0
+            logger.info(f"Records with non-null inference_id: {non_null_count}")
+
+            # Check for specific inference_id
+            specific_query = "SELECT COUNT(*) FROM GatewayAnalytics WHERE inference_id = %(inference_id)s"
+            params = {"inference_id": inference_id}
+            specific_result = await self.clickhouse_client.execute_query(specific_query, params)
+            specific_count = specific_result[0][0] if specific_result else 0
+            logger.info(f"Records for inference_id {inference_id}: {specific_count}")
+
+            # If no specific record, show some sample records
+            if specific_count == 0 and non_null_count > 0:
+                sample_query = "SELECT inference_id, client_ip, country_code, user_agent FROM GatewayAnalytics WHERE inference_id IS NOT NULL LIMIT 3"
+                sample_result = await self.clickhouse_client.execute_query(sample_query)
+                logger.info(f"Sample records from GatewayAnalytics: {sample_result}")
+
+        except Exception as e:
+            logger.error(f"Failed to debug GatewayAnalytics table: {e}")
+
+    def _calculate_gateway_summary_stats(self, items, request):
+        """Calculate summary statistics for gateway metrics."""
+        total_requests = sum(
+            item.items[0].data.get("request_count", {}).get("count", 0) for item in items if item.items
+        )
+
+        return {
+            "total_requests": total_requests,
+            "time_range": {
+                "from": request.from_date.isoformat(),
+                "to": request.to_date.isoformat() if request.to_date else None,
+            },
+        }
+
+    # New Aggregated Metrics Methods
+    async def get_aggregated_metrics(self, request) -> dict:
+        """Get aggregated metrics with server-side calculations."""
+        from budmetrics.observability.schemas import (
+            AggregatedMetricsGroup,
+            AggregatedMetricsResponse,
+            AggregatedMetricValue,
+        )
+
+        # Build the base query with efficient aggregations
+        select_fields = []
+
+        # Add grouping fields if specified
+        group_by_fields = []
+        if request.group_by:
+            for group in request.group_by:
+                if group == "model":
+                    group_by_fields.extend(["mid.model_id", "mi.model_name"])
+                    select_fields.extend(["mid.model_id", "mi.model_name"])
+                elif group == "project":
+                    group_by_fields.append("mid.project_id")
+                    select_fields.append("mid.project_id")
+                elif group == "endpoint":
+                    group_by_fields.append("mid.endpoint_id")
+                    select_fields.append("mid.endpoint_id")
+                elif group == "user":
+                    group_by_fields.append("ga.user_id")
+                    select_fields.append("ga.user_id")
+
+        # Build aggregation fields based on requested metrics
+        for metric in request.metrics:
+            if metric == "total_requests":
+                select_fields.append("COUNT(*) as total_requests")
+            elif metric == "success_rate":
+                select_fields.append("AVG(CASE WHEN mid.is_success THEN 1.0 ELSE 0.0 END) * 100 as success_rate")
+            elif metric == "avg_latency":
+                select_fields.append("AVG(mi.response_time_ms) as avg_latency")
+            elif metric == "p95_latency":
+                select_fields.append("quantile(0.95)(mi.response_time_ms) as p95_latency")
+            elif metric == "p99_latency":
+                select_fields.append("quantile(0.99)(mi.response_time_ms) as p99_latency")
+            elif metric == "total_tokens":
+                select_fields.append("SUM(mi.input_tokens + mi.output_tokens) as total_tokens")
+            elif metric == "avg_tokens":
+                select_fields.append("AVG(mi.input_tokens + mi.output_tokens) as avg_tokens")
+            elif metric == "total_cost":
+                select_fields.append("SUM(mid.cost) as total_cost")
+            elif metric == "avg_cost":
+                select_fields.append("AVG(mid.cost) as avg_cost")
+            elif metric == "ttft_avg":
+                select_fields.append("AVG(mi.ttft_ms) as ttft_avg")
+            elif metric == "ttft_p95":
+                select_fields.append("quantile(0.95)(mi.ttft_ms) as ttft_p95")
+            elif metric == "ttft_p99":
+                select_fields.append("quantile(0.99)(mi.ttft_ms) as ttft_p99")
+            elif metric == "cache_hit_rate":
+                select_fields.append("AVG(CASE WHEN mi.cached THEN 1.0 ELSE 0.0 END) * 100 as cache_hit_rate")
+            elif metric == "throughput_avg":
+                select_fields.append(
+                    "AVG(mi.output_tokens * 1000.0 / NULLIF(mi.response_time_ms, 0)) as throughput_avg"
+                )
+            elif metric == "error_rate":
+                select_fields.append("AVG(CASE WHEN NOT mid.is_success THEN 1.0 ELSE 0.0 END) * 100 as error_rate")
+            elif metric == "unique_users":
+                select_fields.append("uniqExact(ga.user_id) as unique_users")
+
+        # Build FROM clause with joins
+        from_clause = """
+        FROM ModelInferenceDetails mid
+        INNER JOIN ModelInference mi ON mid.inference_id = mi.inference_id
+        LEFT JOIN GatewayAnalytics ga ON mid.inference_id = ga.inference_id
+        """
+
+        # Build WHERE clause
+        where_conditions = ["mid.request_arrival_time >= %(from_date)s", "mid.request_arrival_time <= %(to_date)s"]
+
+        params = {
+            "from_date": request.from_date,
+            "to_date": request.to_date or datetime.now(),
+        }
+
+        # Add filters
+        if request.filters:
+            for filter_key, filter_value in request.filters.items():
+                if filter_key == "project_id":
+                    if isinstance(filter_value, list):
+                        placeholders = [f"%(project_{i})s" for i in range(len(filter_value))]
+                        where_conditions.append(f"mid.project_id IN ({','.join(placeholders)})")
+                        for i, val in enumerate(filter_value):
+                            params[f"project_{i}"] = val
+                    else:
+                        where_conditions.append("mid.project_id = %(project_id)s")
+                        params["project_id"] = filter_value
+                elif filter_key == "model_id":
+                    where_conditions.append("mid.model_id = %(model_id)s")
+                    params["model_id"] = filter_value
+                elif filter_key == "endpoint_id":
+                    where_conditions.append("mid.endpoint_id = %(endpoint_id)s")
+                    params["endpoint_id"] = filter_value
+
+        # Build final query
+        order_by = "total_requests DESC" if "total_requests" in request.metrics else "1"
+        query = f"""
+        SELECT {", ".join(select_fields)}
+        {from_clause}
+        WHERE {" AND ".join(where_conditions)}
+        {f"GROUP BY {', '.join(group_by_fields)}" if group_by_fields else ""}
+        ORDER BY {order_by}
+        """
+
+        # Execute query
+        logger = logging.get_logger(__name__)
+        logger.info(f"Executing aggregated metrics query: {query}")
+        logger.info(f"Query parameters: {params}")
+        logger.info(f"Group by fields: {group_by_fields}")
+        results = await self.clickhouse_client.execute_query(query, params)
+        logger.info(f"Query returned {len(results) if results else 0} results")
+
+        # Process results
+        groups = []
+        overall_summary = {}
+
+        if not results:
+            return AggregatedMetricsResponse(
+                groups=[],
+                summary={},
+                total_groups=0,
+                date_range={"from": request.from_date, "to": request.to_date or datetime.now()},
+            )
+
+        # If no grouping, create summary from single result
+        if not request.group_by:
+            row = results[0]
+            for i, metric in enumerate(request.metrics):
+                value = row[i] if i < len(row) else 0
+                formatted_value, unit = self._format_metric_value(metric, value)
+                overall_summary[metric] = AggregatedMetricValue(
+                    value=value or 0, formatted_value=formatted_value, unit=unit
+                )
+        else:
+            # Process grouped results
+            field_offset = len(
+                [
+                    f
+                    for group in request.group_by
+                    for f in (
+                        ["model_id", "model_name"]
+                        if group == "model"
+                        else [f"{group}_id" if group != "user" else "user_id"]
+                    )
+                ]
+            )
+
+            for row in results:
+                group = AggregatedMetricsGroup(metrics={})
+
+                # Extract grouping dimensions
+                field_idx = 0
+                for group_by in request.group_by:
+                    if group_by == "model":
+                        group.model_id = row[field_idx]
+                        group.model_name = row[field_idx + 1]
+                        field_idx += 2
+                    elif group_by == "project":
+                        group.project_id = row[field_idx]
+                        field_idx += 1
+                    elif group_by == "endpoint":
+                        group.endpoint_id = row[field_idx]
+                        field_idx += 1
+                    elif group_by == "user":
+                        group.user_id = row[field_idx]
+                        field_idx += 1
+
+                # Extract metrics
+                for i, metric in enumerate(request.metrics):
+                    value = row[field_offset + i] if field_offset + i < len(row) else 0
+                    formatted_value, unit = self._format_metric_value(metric, value)
+                    group.metrics[metric] = AggregatedMetricValue(
+                        value=value or 0, formatted_value=formatted_value, unit=unit
+                    )
+
+                groups.append(group)
+
+        return AggregatedMetricsResponse(
+            groups=groups,
+            summary=overall_summary,
+            total_groups=len(groups),
+            date_range={"from": request.from_date, "to": request.to_date or datetime.now()},
+        )
+
+    async def get_time_series_data(self, request) -> dict:
+        """Get time-series data with efficient bucketing."""
+        from budmetrics.observability.schemas import (
+            TimeSeriesGroup,
+            TimeSeriesPoint,
+            TimeSeriesResponse,
+        )
+
+        # Map interval to ClickHouse interval functions
+        # For simple functions, we'll add the column parameter later
+        # For toStartOfInterval, include the full expression
+        if request.interval == "1m":
+            time_bucket_expr = "toStartOfMinute(mid.request_arrival_time)"
+        elif request.interval == "5m":
+            time_bucket_expr = "toStartOfInterval(mid.request_arrival_time, INTERVAL 5 minute)"
+        elif request.interval == "15m":
+            time_bucket_expr = "toStartOfInterval(mid.request_arrival_time, INTERVAL 15 minute)"
+        elif request.interval == "30m":
+            time_bucket_expr = "toStartOfInterval(mid.request_arrival_time, INTERVAL 30 minute)"
+        elif request.interval == "1h":
+            time_bucket_expr = "toStartOfHour(mid.request_arrival_time)"
+        elif request.interval == "6h":
+            time_bucket_expr = "toStartOfInterval(mid.request_arrival_time, INTERVAL 6 hour)"
+        elif request.interval == "12h":
+            time_bucket_expr = "toStartOfInterval(mid.request_arrival_time, INTERVAL 12 hour)"
+        elif request.interval == "1d":
+            time_bucket_expr = "toStartOfDay(mid.request_arrival_time)"
+        elif request.interval == "1w":
+            time_bucket_expr = "toStartOfWeek(mid.request_arrival_time)"
+        else:
+            time_bucket_expr = "toStartOfHour(mid.request_arrival_time)"
+
+        # Build select fields
+        select_fields = [f"{time_bucket_expr} as time_bucket"]
+
+        # Add grouping fields
+        group_by_fields = ["time_bucket"]
+        if request.group_by:
+            for group in request.group_by:
+                if group == "model":
+                    group_by_fields.extend(["mid.model_id", "mi.model_name"])
+                    select_fields.extend(["mid.model_id", "mi.model_name"])
+                elif group == "project":
+                    group_by_fields.append("mid.project_id")
+                    select_fields.append("mid.project_id")
+                elif group == "endpoint":
+                    group_by_fields.append("mid.endpoint_id")
+                    select_fields.append("mid.endpoint_id")
+
+        # Add metric calculations
+        for metric in request.metrics:
+            if metric == "requests":
+                select_fields.append("COUNT(*) as requests")
+            elif metric == "success_rate":
+                select_fields.append("AVG(CASE WHEN mid.is_success THEN 1.0 ELSE 0.0 END) * 100 as success_rate")
+            elif metric == "avg_latency":
+                select_fields.append("AVG(mi.response_time_ms) as avg_latency")
+            elif metric == "p95_latency":
+                select_fields.append("quantile(0.95)(mi.response_time_ms) as p95_latency")
+            elif metric == "p99_latency":
+                select_fields.append("quantile(0.99)(mi.response_time_ms) as p99_latency")
+            elif metric == "tokens":
+                select_fields.append("SUM(mi.input_tokens + mi.output_tokens) as tokens")
+            elif metric == "cost":
+                select_fields.append("SUM(mid.cost) as cost")
+            elif metric == "ttft_avg":
+                select_fields.append("AVG(mi.ttft_ms) as ttft_avg")
+            elif metric == "cache_hit_rate":
+                select_fields.append("AVG(CASE WHEN mi.cached THEN 1.0 ELSE 0.0 END) * 100 as cache_hit_rate")
+            elif metric == "throughput":
+                select_fields.append("AVG(mi.output_tokens * 1000.0 / NULLIF(mi.response_time_ms, 0)) as throughput")
+            elif metric == "error_rate":
+                select_fields.append("AVG(CASE WHEN NOT mid.is_success THEN 1.0 ELSE 0.0 END) * 100 as error_rate")
+
+        # Build WHERE clause
+        where_conditions = ["mid.request_arrival_time >= %(from_date)s", "mid.request_arrival_time <= %(to_date)s"]
+
+        params = {
+            "from_date": request.from_date,
+            "to_date": request.to_date or datetime.now(),
+        }
+
+        # Add filters
+        if hasattr(request, "filters") and request.filters:
+            for filter_key, filter_value in request.filters.items():
+                if filter_key == "project_id":
+                    if isinstance(filter_value, list):
+                        placeholders = [f"%(project_{i})s" for i in range(len(filter_value))]
+                        where_conditions.append(f"mid.project_id IN ({','.join(placeholders)})")
+                        for i, val in enumerate(filter_value):
+                            params[f"project_{i}"] = val
+                    else:
+                        where_conditions.append("mid.project_id = %(project_id)s")
+                        params["project_id"] = filter_value
+                elif filter_key == "model_id":
+                    where_conditions.append("mid.model_id = %(model_id)s")
+                    params["model_id"] = filter_value
+                elif filter_key == "endpoint_id":
+                    where_conditions.append("mid.endpoint_id = %(endpoint_id)s")
+                    params["endpoint_id"] = filter_value
+
+        # Build query
+        query = f"""
+        SELECT {", ".join(select_fields)}
+        FROM ModelInferenceDetails mid
+        INNER JOIN ModelInference mi ON mid.inference_id = mi.inference_id
+        WHERE {" AND ".join(where_conditions)}
+        GROUP BY {", ".join(group_by_fields)}
+        ORDER BY time_bucket ASC
+        """
+
+        # Execute query
+        results = await self.clickhouse_client.execute_query(query, params)
+
+        # Process results into groups
+        groups_dict = defaultdict(list)
+
+        for row in results:
+            time_bucket = row[0]
+
+            # Extract grouping info
+            group_key = "default"
+            group_info = {}
+            field_idx = 1
+
+            if request.group_by:
+                group_key_parts = []
+                for group in request.group_by:
+                    if group == "model":
+                        model_id = row[field_idx]
+                        model_name = row[field_idx + 1]
+                        group_info["model_id"] = model_id
+                        group_info["model_name"] = model_name
+                        group_key_parts.append(f"model:{model_id}")
+                        field_idx += 2
+                    elif group == "project":
+                        project_id = row[field_idx]
+                        group_info["project_id"] = project_id
+                        group_key_parts.append(f"project:{project_id}")
+                        field_idx += 1
+                    elif group == "endpoint":
+                        endpoint_id = row[field_idx]
+                        group_info["endpoint_id"] = endpoint_id
+                        group_key_parts.append(f"endpoint:{endpoint_id}")
+                        field_idx += 1
+
+                group_key = "|".join(group_key_parts)
+
+            # Extract metric values
+            values = {}
+            for i, metric in enumerate(request.metrics):
+                metric_value = row[field_idx + i] if field_idx + i < len(row) else None
+                values[metric] = metric_value
+
+            groups_dict[group_key].append({"timestamp": time_bucket, "values": values, "group_info": group_info})
+
+        # Convert to response format
+        groups = []
+        for _group_key, data_points in groups_dict.items():
+            group = TimeSeriesGroup(
+                data_points=[TimeSeriesPoint(timestamp=dp["timestamp"], values=dp["values"]) for dp in data_points]
+            )
+
+            # Set group info
+            if data_points and data_points[0]["group_info"]:
+                group_info = data_points[0]["group_info"]
+                group.model_id = group_info.get("model_id")
+                group.model_name = group_info.get("model_name")
+                group.project_id = group_info.get("project_id")
+                group.endpoint_id = group_info.get("endpoint_id")
+
+            groups.append(group)
+
+        # Fill gaps if requested
+        if request.fill_gaps and groups:
+            groups = self._fill_time_series_gaps(groups, request)
+
+        return TimeSeriesResponse(
+            groups=groups,
+            interval=request.interval,
+            date_range={"from": request.from_date, "to": request.to_date or datetime.now()},
+        )
+
+    async def get_geographic_data(self, request) -> dict:
+        """Get geographic distribution data from GatewayAnalytics table."""
+        from budmetrics.observability.schemas import (
+            GeographicDataPoint,
+            GeographicDataResponse,
+        )
+
+        # Build query based on group_by parameter
+        if request.group_by == "country":
+            select_fields = [
+                "ga.country_code",
+                "COUNT(*) as request_count",
+                "AVG(CASE WHEN mid.is_success THEN 1.0 ELSE 0.0 END) * 100 as success_rate",
+                "AVG(mi.response_time_ms) as avg_latency_ms",
+                "uniqExact(ga.user_id) as unique_users",
+                "any(ga.latitude) as latitude",
+                "any(ga.longitude) as longitude",
+            ]
+            group_by_clause = "ga.country_code"
+            having_clause = "ga.country_code IS NOT NULL AND ga.country_code != ''"
+        elif request.group_by == "region":
+            select_fields = [
+                "ga.country_code",
+                "ga.region",
+                "COUNT(*) as request_count",
+                "AVG(CASE WHEN mid.is_success THEN 1.0 ELSE 0.0 END) * 100 as success_rate",
+                "AVG(mi.response_time_ms) as avg_latency_ms",
+                "uniqExact(ga.user_id) as unique_users",
+            ]
+            group_by_clause = "ga.country_code, ga.region"
+            having_clause = "ga.region IS NOT NULL AND ga.region != ''"
+        else:  # city
+            select_fields = [
+                "ga.country_code",
+                "ga.region",
+                "ga.city",
+                "COUNT(*) as request_count",
+                "AVG(CASE WHEN mid.is_success THEN 1.0 ELSE 0.0 END) * 100 as success_rate",
+                "AVG(mi.response_time_ms) as avg_latency_ms",
+                "uniqExact(ga.user_id) as unique_users",
+                "any(ga.latitude) as latitude",
+                "any(ga.longitude) as longitude",
+            ]
+            group_by_clause = "ga.country_code, ga.region, ga.city"
+            having_clause = "ga.city IS NOT NULL AND ga.city != ''"
+
+        # Build WHERE conditions
+        where_conditions = ["ga.timestamp >= %(from_date)s", "ga.timestamp <= %(to_date)s"]
+
+        params = {
+            "from_date": request.from_date,
+            "to_date": request.to_date or datetime.now(),
+        }
+
+        # Add filters
+        if request.filters:
+            for filter_key, filter_value in request.filters.items():
+                if filter_key == "project_id":
+                    where_conditions.append("ga.project_id = %(project_id)s")
+                    params["project_id"] = filter_value
+                elif filter_key == "country_code":
+                    if isinstance(filter_value, list):
+                        placeholders = [f"%(country_{i})s" for i in range(len(filter_value))]
+                        where_conditions.append(f"ga.country_code IN ({','.join(placeholders)})")
+                        for i, val in enumerate(filter_value):
+                            params[f"country_{i}"] = val
+                    else:
+                        where_conditions.append("ga.country_code = %(country_code)s")
+                        params["country_code"] = filter_value
+
+        # Build main query
+        query = f"""
+        WITH total_requests AS (
+            SELECT COUNT(*) as total
+            FROM GatewayAnalytics ga
+            LEFT JOIN ModelInferenceDetails mid ON ga.inference_id = mid.inference_id
+            LEFT JOIN ModelInference mi ON mid.inference_id = mi.inference_id
+            WHERE {" AND ".join(where_conditions)}
+        )
+        SELECT
+            {", ".join(select_fields)},
+            (request_count * 100.0 / (SELECT total FROM total_requests)) as percentage
+        FROM GatewayAnalytics ga
+        LEFT JOIN ModelInferenceDetails mid ON ga.inference_id = mid.inference_id
+        LEFT JOIN ModelInference mi ON mid.inference_id = mi.inference_id
+        WHERE {" AND ".join(where_conditions)}
+        GROUP BY {group_by_clause}
+        HAVING {having_clause}
+        ORDER BY request_count DESC
+        LIMIT %(limit)s
+        """
+
+        params["limit"] = request.limit
+
+        # Execute query
+        results = await self.clickhouse_client.execute_query(query, params)
+
+        # Get total count for summary
+        total_query = f"""
+        SELECT COUNT(*) as total_requests
+        FROM GatewayAnalytics ga
+        WHERE {" AND ".join(where_conditions)}
+        """
+        total_result = await self.clickhouse_client.execute_query(
+            total_query, {k: v for k, v in params.items() if k != "limit"}
+        )
+        total_requests = total_result[0][0] if total_result else 0
+
+        # Process results
+        locations = []
+        for row in results:
+            if request.group_by == "country":
+                location = GeographicDataPoint(
+                    country_code=row[0],
+                    request_count=row[1],
+                    success_rate=row[2] if len(row) > 2 else 0.0,
+                    avg_latency_ms=row[3] if len(row) > 3 else None,
+                    unique_users=row[4] if len(row) > 4 else None,
+                    latitude=row[5] if len(row) > 5 else None,
+                    longitude=row[6] if len(row) > 6 else None,
+                    percentage=row[7] if len(row) > 7 else 0.0,
+                )
+            elif request.group_by == "region":
+                location = GeographicDataPoint(
+                    country_code=row[0],
+                    region=row[1],
+                    request_count=row[2],
+                    success_rate=row[3] if len(row) > 3 else 0.0,
+                    avg_latency_ms=row[4] if len(row) > 4 else None,
+                    unique_users=row[5] if len(row) > 5 else None,
+                    percentage=row[6] if len(row) > 6 else 0.0,
+                )
+            else:  # city
+                location = GeographicDataPoint(
+                    country_code=row[0],
+                    region=row[1],
+                    city=row[2],
+                    request_count=row[3],
+                    success_rate=row[4] if len(row) > 4 else 0.0,
+                    avg_latency_ms=row[5] if len(row) > 5 else None,
+                    unique_users=row[6] if len(row) > 6 else None,
+                    latitude=row[7] if len(row) > 7 else None,
+                    longitude=row[8] if len(row) > 8 else None,
+                    percentage=row[9] if len(row) > 9 else 0.0,
+                )
+
+            locations.append(location)
+
+        return GeographicDataResponse(
+            locations=locations,
+            total_requests=total_requests,
+            total_locations=len(locations),
+            date_range={"from": request.from_date, "to": request.to_date or datetime.now()},
+            group_by=request.group_by,
+        )
+
+    async def get_latency_distribution(self, request: LatencyDistributionRequest) -> LatencyDistributionResponse:
+        """Get latency distribution data with optional grouping.
+
+        This method calculates latency distribution by creating histogram buckets
+        and counting requests that fall into each bucket. It supports custom buckets
+        and grouping by various dimensions.
+
+        Args:
+            request: The latency distribution request parameters.
+
+        Returns:
+            LatencyDistributionResponse: Response containing distribution data.
+        """
+        from budmetrics.observability.schemas import (
+            LatencyDistributionBucket,
+            LatencyDistributionGroup,
+            LatencyDistributionResponse,
+        )
+
+        logger.info(f"Getting latency distribution for date range {request.from_date} to {request.to_date}")
+
+        # Default latency buckets if none provided
+        default_buckets = [
+            {"min": 0, "max": 100, "label": "0-100ms"},
+            {"min": 100, "max": 500, "label": "100-500ms"},
+            {"min": 500, "max": 1000, "label": "500ms-1s"},
+            {"min": 1000, "max": 2000, "label": "1-2s"},
+            {"min": 2000, "max": 5000, "label": "2-5s"},
+            {"min": 5000, "max": 10000, "label": "5-10s"},
+            {"min": 10000, "max": float("inf"), "label": ">10s"},
+        ]
+
+        buckets = request.buckets or default_buckets
+
+        # Base query components
+        from_date_str = request.from_date.strftime("%Y-%m-%d %H:%M:%S")
+        to_date_str = (request.to_date or datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
+
+        # Build filters
+        filter_conditions = [
+            f"toDateTime('{from_date_str}') <= request_arrival_time",
+            f"request_arrival_time < toDateTime('{to_date_str}')",
+        ]
+
+        if request.filters:
+            if "project_id" in request.filters:
+                project_ids = request.filters["project_id"]
+                if isinstance(project_ids, str):
+                    project_ids = [project_ids]
+                project_filter = "', '".join(str(pid) for pid in project_ids)
+                filter_conditions.append(f"toString(project_id) IN ('{project_filter}')")
+
+            if "endpoint_id" in request.filters:
+                endpoint_ids = request.filters["endpoint_id"]
+                if isinstance(endpoint_ids, str):
+                    endpoint_ids = [endpoint_ids]
+                endpoint_filter = "', '".join(str(eid) for eid in endpoint_ids)
+                filter_conditions.append(f"toString(endpoint_id) IN ('{endpoint_filter}')")
+
+            if "model_id" in request.filters:
+                model_ids = request.filters["model_id"]
+                if isinstance(model_ids, str):
+                    model_ids = [model_ids]
+                model_filter = "', '".join(str(mid) for mid in model_ids)
+                filter_conditions.append(f"toString(model_id) IN ('{model_filter}')")
+
+        where_clause = " AND ".join(filter_conditions)
+
+        # Calculate latency from ModelInference table's response_time_ms column
+        # We need to join with ModelInference table to get the actual response time
+        latency_expr = "COALESCE(mid.response_time_ms, 0)"
+
+        # Build bucket case expressions for distribution
+        bucket_cases = []
+        for bucket in buckets:
+            if bucket["max"] == float("inf"):
+                condition = f"{latency_expr} >= {bucket['min']}"
+            else:
+                condition = f"{latency_expr} >= {bucket['min']} AND {latency_expr} < {bucket['max']}"
+            bucket_cases.append(f"WHEN {condition} THEN '{bucket['label']}'")
+
+        # If no grouping, create simple overall distribution
+        if not request.group_by:
+            bucket_case_expr = f"CASE {' '.join(bucket_cases)} ELSE 'Other' END"
+
+            query = f"""
+                SELECT
+                    {bucket_case_expr} as bucket,
+                    count() as request_count,
+                    avg({latency_expr}) as avg_latency_in_bucket
+                FROM ModelInferenceDetails mdi
+                LEFT JOIN ModelInference mid ON mid.inference_id = mdi.inference_id
+                WHERE {where_clause}
+                GROUP BY bucket
+                ORDER BY
+                    CASE bucket
+                        WHEN '{buckets[0]["label"]}' THEN 1
+                        WHEN '{buckets[1]["label"]}' THEN 2
+                        WHEN '{buckets[2]["label"]}' THEN 3
+                        WHEN '{buckets[3]["label"]}' THEN 4
+                        WHEN '{buckets[4]["label"]}' THEN 5
+                        WHEN '{buckets[5]["label"]}' THEN 6
+                        WHEN '{buckets[6]["label"]}' THEN 7
+                        ELSE 8
+                    END
+            """
+
+            logger.debug(f"Executing latency distribution query: {query}")
+            result = await self.clickhouse_client.execute_query(query)
+
+            # Get total count for percentage calculation
+            total_query = f"SELECT count() FROM ModelInferenceDetails mdi LEFT JOIN ModelInference mid ON mid.inference_id = mdi.inference_id WHERE {where_clause}"
+            total_result = await self.clickhouse_client.execute_query(total_query)
+            total_requests = total_result[0][0] if total_result else 0
+
+            # Process results
+            overall_buckets = []
+            bucket_data = {row[0]: (row[1], row[2]) for row in result}
+
+            for bucket in buckets:
+                count, avg_latency = bucket_data.get(bucket["label"], (0, 0))
+                percentage = (count / total_requests * 100) if total_requests > 0 else 0
+
+                overall_buckets.append(
+                    LatencyDistributionBucket(
+                        range=bucket["label"],
+                        count=count,
+                        percentage=round(percentage, 2),
+                        avg_latency=round(avg_latency, 2) if avg_latency else None,
+                    )
+                )
+
+            return LatencyDistributionResponse(
+                groups=[],
+                overall_distribution=overall_buckets,
+                total_requests=total_requests,
+                date_range={"from": request.from_date, "to": request.to_date or datetime.now()},
+                bucket_definitions=buckets,
+            )
+
+        # Handle grouped queries
+        groups = []
+        total_requests = 0
+
+        # Determine grouping columns and joins needed
+        group_columns = []
+        join_tables = []
+
+        # Always join with ModelInference to get response_time_ms
+        join_tables.append("LEFT JOIN ModelInference mid ON mid.inference_id = mdi.inference_id")
+
+        if "model" in request.group_by:
+            group_columns.extend(["toString(mdi.model_id) as model_id", "mid.model_name as model_name"])
+
+        if "project" in request.group_by:
+            # We have project_id in ModelInferenceDetails, but might need project name
+            group_columns.extend(["toString(mdi.project_id) as project_id", "'Unknown' as project_name"])
+
+        if "endpoint" in request.group_by:
+            group_columns.extend(["toString(mdi.endpoint_id) as endpoint_id", "'Unknown' as endpoint_name"])
+
+        if "user" in request.group_by:
+            # User info would need additional joins - for now use project as proxy
+            group_columns.extend(["toString(mdi.project_id) as user_id"])
+
+        group_by_clause = ", ".join([col.split(" as ")[1] if " as " in col else col for col in group_columns])
+        select_columns = ", ".join(group_columns)
+
+        # Build grouped query with bucket distribution
+        bucket_case_expr = f"CASE {' '.join(bucket_cases)} ELSE 'Other' END"
+
+        joins_clause = " ".join(join_tables) if join_tables else ""
+
+        query = f"""
+            WITH grouped_data AS (
+                SELECT
+                    {select_columns},
+                    {bucket_case_expr} as bucket,
+                    count() as request_count,
+                    avg({latency_expr}) as avg_latency_in_bucket
+                FROM ModelInferenceDetails mdi
+                {joins_clause}
+                WHERE {where_clause}
+                GROUP BY {group_by_clause}, bucket
+            )
+            SELECT
+                *,
+                sum(request_count) OVER (PARTITION BY {group_by_clause}) as group_total
+            FROM grouped_data
+            ORDER BY group_total DESC, bucket
+        """
+
+        logger.debug(f"Executing grouped latency distribution query: {query}")
+        result = await self.clickhouse_client.execute_query(query)
+
+        # Get overall total for percentage calculations
+        total_query = f"SELECT count() FROM ModelInferenceDetails mdi {joins_clause} WHERE {where_clause}"
+        total_result = await self.clickhouse_client.execute_query(total_query)
+        total_requests = total_result[0][0] if total_result else 0
+
+        # Process grouped results
+        groups_data = {}
+
+        for row in result:
+            # Extract group identifiers based on what was selected
+            group_key = []
+            group_values = {}
+            col_idx = 0
+
+            if "model" in request.group_by:
+                group_values["model_id"] = row[col_idx]
+                group_values["model_name"] = row[col_idx + 1] or "Unknown"
+                group_key.append(f"model:{group_values['model_id']}")
+                col_idx += 2
+
+            if "project" in request.group_by:
+                group_values["project_id"] = row[col_idx]
+                group_values["project_name"] = row[col_idx + 1] or "Unknown"
+                group_key.append(f"project:{group_values['project_id']}")
+                col_idx += 2
+
+            if "endpoint" in request.group_by:
+                group_values["endpoint_id"] = row[col_idx]
+                group_values["endpoint_name"] = row[col_idx + 1] or "Unknown"
+                group_key.append(f"endpoint:{group_values['endpoint_id']}")
+                col_idx += 2
+
+            if "user" in request.group_by:
+                group_values["user_id"] = row[col_idx]
+                group_key.append(f"user:{group_values['user_id']}")
+                col_idx += 1
+
+            group_key_str = "|".join(group_key)
+            bucket = row[col_idx]
+            request_count = row[col_idx + 1]
+            avg_latency = row[col_idx + 2]
+            group_total = row[col_idx + 3]
+
+            if group_key_str not in groups_data:
+                groups_data[group_key_str] = {"group_values": group_values, "buckets": {}, "total": group_total}
+
+            groups_data[group_key_str]["buckets"][bucket] = {"count": request_count, "avg_latency": avg_latency}
+
+        # Convert to response format
+        for _group_key, group_data in groups_data.items():
+            group_buckets = []
+            group_total = group_data["total"]
+
+            for bucket in buckets:
+                bucket_info = group_data["buckets"].get(bucket["label"], {"count": 0, "avg_latency": 0})
+                count = bucket_info["count"]
+                avg_latency = bucket_info["avg_latency"]
+                percentage = (count / group_total * 100) if group_total > 0 else 0
+
+                group_buckets.append(
+                    LatencyDistributionBucket(
+                        range=bucket["label"],
+                        count=count,
+                        percentage=round(percentage, 2),
+                        avg_latency=round(avg_latency, 2) if avg_latency else None,
+                    )
+                )
+
+            group_obj = LatencyDistributionGroup(buckets=group_buckets, total_requests=group_total)
+
+            # Set group identifiers
+            group_vals = group_data["group_values"]
+            if "model_id" in group_vals:
+                try:
+                    group_obj.model_id = UUID(group_vals["model_id"]) if group_vals["model_id"] else None
+                except (ValueError, TypeError):
+                    group_obj.model_id = None
+                group_obj.model_name = group_vals["model_name"]
+            if "project_id" in group_vals:
+                try:
+                    group_obj.project_id = UUID(group_vals["project_id"]) if group_vals["project_id"] else None
+                except (ValueError, TypeError):
+                    group_obj.project_id = None
+                group_obj.project_name = group_vals["project_name"]
+            if "endpoint_id" in group_vals:
+                try:
+                    group_obj.endpoint_id = UUID(group_vals["endpoint_id"]) if group_vals["endpoint_id"] else None
+                except (ValueError, TypeError):
+                    group_obj.endpoint_id = None
+                group_obj.endpoint_name = group_vals["endpoint_name"]
+            if "user_id" in group_vals:
+                group_obj.user_id = group_vals["user_id"]
+
+            groups.append(group_obj)
+
+        # Calculate overall distribution across all groups
+        overall_bucket_counts = {}
+        for group in groups:
+            for bucket in group.buckets:
+                if bucket.range not in overall_bucket_counts:
+                    overall_bucket_counts[bucket.range] = {"count": 0, "latencies": []}
+                overall_bucket_counts[bucket.range]["count"] += bucket.count
+                if bucket.avg_latency:
+                    overall_bucket_counts[bucket.range]["latencies"].append(bucket.avg_latency)
+
+        overall_buckets = []
+        for bucket in buckets:
+            bucket_data = overall_bucket_counts.get(bucket["label"], {"count": 0, "latencies": []})
+            count = bucket_data["count"]
+            percentage = (count / total_requests * 100) if total_requests > 0 else 0
+            avg_latency = (
+                (sum(bucket_data["latencies"]) / len(bucket_data["latencies"])) if bucket_data["latencies"] else None
+            )
+
+            overall_buckets.append(
+                LatencyDistributionBucket(
+                    range=bucket["label"],
+                    count=count,
+                    percentage=round(percentage, 2),
+                    avg_latency=round(avg_latency, 2) if avg_latency else None,
+                )
+            )
+
+        # Clean up bucket definitions for response (replace inf with large number for JSON serialization)
+        clean_buckets = []
+        for bucket in buckets:
+            clean_bucket = {
+                "min": bucket["min"],
+                "max": 999999999 if bucket["max"] == float("inf") else bucket["max"],
+                "label": bucket["label"],
+            }
+            clean_buckets.append(clean_bucket)
+
+        return LatencyDistributionResponse(
+            groups=groups,
+            overall_distribution=overall_buckets,
+            total_requests=total_requests,
+            date_range={"from": request.from_date, "to": request.to_date or datetime.now()},
+            bucket_definitions=clean_buckets,
+        )
+
+    def _format_metric_value(self, metric: str, value: Union[int, float, None]) -> tuple[str, str]:
+        """Format metric values with appropriate units and human-readable formatting."""
+        if value is None:
+            return "0", ""
+
+        # Percentage metrics
+        if metric in ["success_rate", "cache_hit_rate", "error_rate"]:
+            return f"{value:.1f}%", "%"
+
+        # Time metrics (milliseconds)
+        elif metric in ["avg_latency", "p95_latency", "p99_latency", "ttft_avg", "ttft_p95", "ttft_p99"]:
+            if value >= 1000:
+                return f"{value / 1000:.2f}s", "ms"
+            return f"{value:.0f}ms", "ms"
+
+        # Token metrics
+        elif metric in ["total_tokens", "avg_tokens"]:
+            if value >= 1_000_000:
+                return f"{value / 1_000_000:.1f}M", "tokens"
+            elif value >= 1_000:
+                return f"{value / 1_000:.1f}K", "tokens"
+            return f"{value:.0f}", "tokens"
+
+        # Cost metrics
+        elif metric in ["total_cost", "avg_cost"]:
+            return f"${value:.4f}", "$"
+
+        # Count metrics
+        elif metric in ["total_requests", "unique_users"]:
+            if value >= 1_000_000:
+                return f"{value / 1_000_000:.1f}M", "requests" if "request" in metric else "users"
+            elif value >= 1_000:
+                return f"{value / 1_000:.1f}K", "requests" if "request" in metric else "users"
+            return f"{value:.0f}", "requests" if "request" in metric else "users"
+
+        # Throughput
+        elif metric == "throughput_avg":
+            return f"{value:.1f}", "tokens/sec"
+
+        # Default formatting
+        else:
+            return f"{value:.2f}", ""
+
+    def _fill_time_series_gaps(self, groups: list, request) -> list:
+        """Fill gaps in time series data with zero values."""
+        # This is a simplified implementation - in production you'd want more sophisticated gap filling
+        # For now, just return the groups as-is
+        return groups
+
+    async def get_blocking_stats(self, from_date, to_date, project_id=None, rule_id=None):
+        """Get comprehensive blocking rule statistics from ClickHouse.
+
+        Args:
+            from_date: Start date for the query
+            to_date: End date for the query
+            project_id: Optional project filter
+            rule_id: Optional specific rule filter
+
+        Returns:
+            Dictionary with blocking statistics
+        """
+        self._ensure_initialized()
+
+        # Check if GatewayBlockingEvents table exists
+        try:
+            table_exists_query = "EXISTS TABLE GatewayBlockingEvents"
+            table_exists_result = await self.clickhouse_client.execute_query(table_exists_query)
+            blocking_table_exists = table_exists_result and table_exists_result[0][0] == 1
+        except Exception as e:
+            logger.warning(f"Failed to check GatewayBlockingEvents table existence: {e}")
+            # Fallback to basic statistics from ModelInferenceDetails
+            return await self._get_blocking_stats_fallback(from_date, to_date, project_id)
+
+        if not blocking_table_exists:
+            logger.info("GatewayBlockingEvents table not found, using fallback")
+            return await self._get_blocking_stats_fallback(from_date, to_date, project_id)
+
+        # Build parameters
+        params = {
+            "from_date": from_date,
+            "to_date": to_date or datetime.now(),
+        }
+
+        # Build base where conditions
+        where_conditions = ["blocked_at >= %(from_date)s", "blocked_at <= %(to_date)s"]
+
+        if project_id:
+            where_conditions.append("project_id = %(project_id)s")
+            params["project_id"] = project_id
+
+        if rule_id:
+            where_conditions.append("rule_id = %(rule_id)s")
+            params["rule_id"] = rule_id
+
+        where_clause = " AND ".join(where_conditions)
+
+        # Get total blocked count and rule breakdown
+        stats_query = f"""
+            SELECT
+                COUNT(*) as total_blocked,
+                uniqExact(rule_id) as unique_rules,
+                uniqExact(client_ip) as unique_ips
+            FROM GatewayBlockingEvents
+            WHERE {where_clause}
+        """
+
+        stats_result = await self.clickhouse_client.execute_query(stats_query, params)
+        total_blocked = stats_result[0][0] if stats_result else 0
+
+        # Get blocks by rule type and name
+        rule_breakdown_query = f"""
+            SELECT
+                rule_type,
+                rule_name,
+                rule_id,
+                COUNT(*) as block_count,
+                uniqExact(client_ip) as unique_ips_blocked
+            FROM GatewayBlockingEvents
+            WHERE {where_clause}
+            GROUP BY rule_type, rule_name, rule_id
+            ORDER BY block_count DESC
+        """
+
+        rule_breakdown_result = await self.clickhouse_client.execute_query(rule_breakdown_query, params)
+
+        blocked_by_rule = {}
+        blocked_by_type = {}
+
+        for row in rule_breakdown_result:
+            rule_type = row[0]
+            rule_name = row[1]
+            block_count = row[3]
+
+            blocked_by_rule[rule_name] = block_count
+            if rule_type in blocked_by_type:
+                blocked_by_type[rule_type] += block_count
+            else:
+                blocked_by_type[rule_type] = block_count
+
+        # Get blocks by reason
+        reason_query = f"""
+            SELECT
+                block_reason,
+                COUNT(*) as count
+            FROM GatewayBlockingEvents
+            WHERE {where_clause}
+            GROUP BY block_reason
+            ORDER BY count DESC
+        """
+
+        reason_result = await self.clickhouse_client.execute_query(reason_query, params)
+        blocked_by_reason = {row[0]: row[1] for row in reason_result}
+
+        # Get top blocked IPs with country info
+        top_ips_query = f"""
+            SELECT
+                client_ip,
+                any(country_code) as country_code,
+                COUNT(*) as block_count
+            FROM GatewayBlockingEvents
+            WHERE {where_clause}
+            GROUP BY client_ip
+            ORDER BY block_count DESC
+            LIMIT 10
+        """
+
+        top_ips_result = await self.clickhouse_client.execute_query(top_ips_query, params)
+        top_blocked_ips = [{"ip": row[0], "country": row[1] or "Unknown", "count": row[2]} for row in top_ips_result]
+
+        # Get time series data (hourly buckets)
+        time_series_query = f"""
+            SELECT
+                toStartOfHour(blocked_at) as hour,
+                COUNT(*) as blocked_count
+            FROM GatewayBlockingEvents
+            WHERE {where_clause}
+            GROUP BY hour
+            ORDER BY hour
+        """
+
+        time_series_result = await self.clickhouse_client.execute_query(time_series_query, params)
+        time_series = [{"timestamp": row[0].isoformat(), "blocked_count": row[1]} for row in time_series_result]
+
+        # Calculate block rate (need total requests in same period)
+        total_requests_query = f"""
+            SELECT COUNT(*)
+            FROM ModelInferenceDetails
+            WHERE request_arrival_time >= %(from_date)s
+            AND request_arrival_time <= %(to_date)s
+            {"AND project_id = %(project_id)s" if project_id else ""}
+        """
+
+        try:
+            total_requests_result = await self.clickhouse_client.execute_query(total_requests_query, params)
+            total_requests = total_requests_result[0][0] if total_requests_result else 0
+            block_rate = (total_blocked / total_requests * 100) if total_requests > 0 else 0.0
+        except Exception:
+            # If we can't get total requests, set block rate to 0
+            block_rate = 0.0
+            total_requests = 0
+
+        # Import the response model
+        from .schemas import GatewayBlockingRuleStats
+
+        return GatewayBlockingRuleStats(
+            total_blocked=total_blocked,
+            block_rate=round(block_rate, 2),
+            blocked_by_rule=blocked_by_rule,
+            blocked_by_reason=blocked_by_reason,
+            top_blocked_ips=top_blocked_ips,
+            time_series=time_series,
+        )
+
+    async def _get_blocking_stats_fallback(self, from_date, to_date, project_id=None):
+        """Fallback method for blocking stats when GatewayBlockingEvents table doesn't exist."""
+        logger.info("Using fallback blocking stats from GatewayAnalytics table")
+
+        # Build parameters
+        params = {
+            "from_date": from_date,
+            "to_date": to_date or datetime.now(),
+        }
+
+        # Build base where conditions
+        where_conditions = ["timestamp >= %(from_date)s", "timestamp <= %(to_date)s", "is_blocked = true"]
+
+        if project_id:
+            where_conditions.append("project_id = %(project_id)s")
+            params["project_id"] = project_id
+
+        where_clause = " AND ".join(where_conditions)
+
+        try:
+            # Get basic blocking stats from GatewayAnalytics
+            fallback_query = f"""
+                SELECT
+                    COUNT(*) as total_blocked,
+                    uniqExact(block_rule_id) as unique_rules,
+                    uniqExact(client_ip) as unique_ips
+                FROM GatewayAnalytics
+                WHERE {where_clause}
+            """
+
+            result = await self.clickhouse_client.execute_query(fallback_query, params)
+            total_blocked = result[0][0] if result else 0
+
+            from budmetrics.observability.schemas import GatewayBlockingRuleStats
+
+            return GatewayBlockingRuleStats(
+                total_blocked=total_blocked,
+                block_rate=0.0,
+                blocked_by_rule={},
+                blocked_by_reason={},
+                top_blocked_ips=[],
+                time_series=[],
+            )
+        except Exception as e:
+            logger.error(f"Failed to get fallback blocking stats: {e}")
+            from budmetrics.observability.schemas import GatewayBlockingRuleStats
+
+            return GatewayBlockingRuleStats(
+                total_blocked=0,
+                block_rate=0.0,
+                blocked_by_rule={},
+                blocked_by_reason={},
+                top_blocked_ips=[],
+                time_series=[],
+            )
+
+    async def get_rule_block_count(self, rule_id: str, from_date=None, to_date=None):
+        """Get block count for a specific rule.
+
+        Args:
+            rule_id: The UUID of the blocking rule
+            from_date: Optional start date (defaults to 24 hours ago)
+            to_date: Optional end date (defaults to now)
+
+        Returns:
+            Integer count of blocks for this rule
+        """
+        from datetime import timedelta
+
+        self._ensure_initialized()
+
+        # Default to last 24 hours if no dates provided
+        if not from_date:
+            from_date = datetime.now() - timedelta(days=1)
+        if not to_date:
+            to_date = datetime.now()
+
+        # Check if GatewayBlockingEvents table exists
+        try:
+            table_exists_query = "EXISTS TABLE GatewayBlockingEvents"
+            table_exists_result = await self.clickhouse_client.execute_query(table_exists_query)
+            blocking_table_exists = table_exists_result and table_exists_result[0][0] == 1
+        except Exception:
+            blocking_table_exists = False
+
+        if not blocking_table_exists:
+            logger.warning("GatewayBlockingEvents table not found, returning 0")
+            return 0
+
+        # Query for specific rule
+        query = """
+            SELECT COUNT(*) as block_count
+            FROM GatewayBlockingEvents
+            WHERE rule_id = %(rule_id)s
+            AND blocked_at >= %(from_date)s
+            AND blocked_at <= %(to_date)s
+        """
+
+        params = {"rule_id": rule_id, "from_date": from_date, "to_date": to_date}
+
+        try:
+            result = await self.clickhouse_client.execute_query(query, params)
+            return result[0][0] if result else 0
+        except Exception as e:
+            logger.error(f"Failed to get block count for rule {rule_id}: {e}")
+            return 0

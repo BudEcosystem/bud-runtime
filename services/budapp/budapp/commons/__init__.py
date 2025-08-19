@@ -32,6 +32,7 @@ from budapp.eval_ops.models import (  # noqa: F401
     ExpTrait,
     ExpTraitsDatasetPivot,
 )
+from budapp.metric_ops.models import GatewayBlockingRule as GatewayBlockingRule
 from budapp.model_ops.models import CloudModel as CloudModel
 from budapp.model_ops.models import Model as Model
 from budapp.model_ops.models import Provider as Provider

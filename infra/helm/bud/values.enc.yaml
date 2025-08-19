@@ -50,6 +50,9 @@ minio:
     auth:
         rootUser: ENC[AES256_GCM,data:4Wv2BVKu,iv:eS2FtBlWJ5G3+nwsQluLAw83MK3rl9iBOHBblvWOLQY=,tag:al2ODUgHHJEGQDHEGeQn0g==,type:str]
         rootPassword: ENC[AES256_GCM,data:IxJBqh9jyIphUg==,iv:zTZgNrVk808U3/+F4huhNvl5e6Ns64rnWK7dmFy+WIY=,tag:FW7WGPivXNR/hspTdWRLtg==,type:str]
+novuExtra:
+    email: ENC[AES256_GCM,data:b8JTBSq3tkLtJAfG5rzVjg==,iv:wiLx8sJl22QN/Pu2Yt9Mswx5KsOHGqicQBrFfIi4eFU=,tag:l8WoIShK+kLTaszhxDc9sQ==,type:str]
+    password: ENC[AES256_GCM,data:Mlitqu37QK8yJ48qAhtPLRfyaZRddymT,iv:0WViKRJSjuzYnZBf5Ht2/mbSjhDrRLy8JGAepBrOPpA=,tag:ryVYuneUwgh0N6STnRdgYg==,type:str]
 sops:
     age:
         - recipient: age1q5sfy74d53n6jxlgsc2zrsz4wcl9d830nxuagc3wfmdkrrp55ckq9ev6nv
@@ -79,7 +82,7 @@ sops:
             VC9KL0s0dkJWcklCU1d3dVN4ZmthS1UKtwbUeLVgc1SXXgfLXkKFyGQRlMXu0PLC
             xrB6PiAeEEBm0OG4u/3EK7s2JQwpZbTfp45DG9g0fXEvsZa/D+U7ew==
             -----END AGE ENCRYPTED FILE-----
-    lastmodified: "2025-08-11T06:13:40Z"
-    mac: ENC[AES256_GCM,data:I8C11gEhKh1oPzinvIZ8CMA5I7oUh0R6luZapdAsSQljSFmDSExN8s4zHAE7FXNC+hj4gjeSQaQjn66qLGVCOqd+bYc+Tx5H9zlKNHlCluYQ1UxMphKqZLgvLDyukPyqEw/krp5/3w84brIlzaMA2/EIMNAlBScy47TaO10j8qs=,iv:IYYn5F3my13uHy5PBORCYZcwnP2bXYF4OsWNDLZ2y3M=,tag:uZTrBUzSbpktXIFhBMujQg==,type:str]
+    lastmodified: "2025-08-16T16:06:12Z"
+    mac: ENC[AES256_GCM,data:pRhNobpp1wdUm5Rrl9fOxJ3pzLT0ijYuOZMTzqQEMr9nTQeZQfUuzWmNGfDgYyW4D1/FpLQdW/V1eT0s2adZFsqi0dLYMk62wCzvnRgyUeeFcUmlbwdOgZWJNSX7sjI99aP40cs0T5MgfwUhnq0L0REHrEnumPFifFHeUapUS7A=,iv:XSPe4hJpv82j+wYHUY+1zZTDxHAhrNg6el4qZpHt9kA=,tag:foxtxxOpc2C+09J8mVdEYg==,type:str]
     unencrypted_suffix: _unencrypted
     version: 3.10.2

@@ -121,6 +121,14 @@ repos:
         files: ^services/budplayground/(app|components|lib)/
         pass_filenames: false
 
+      - id: budcustomer-lint
+        name: budcustomer lint
+        entry: bash -c 'cd services/budCustomer && ([ -d node_modules ] || npm install) && npm run lint'
+        language: system
+        types_or: [javascript, jsx, ts, tsx]
+        files: ^services/budCustomer/(src|app)/
+        pass_filenames: false
+
       - id: budadmin-typecheck
         name: budadmin typecheck
         entry: bash -c 'cd services/budadmin && ([ -d node_modules ] || npm install) && npm run typecheck'
@@ -135,6 +143,14 @@ repos:
         language: system
         types_or: [ts, tsx]
         files: ^services/budplayground/(app|components|lib)/
+        pass_filenames: false
+
+      - id: budcustomer-typecheck
+        name: budcustomer typecheck
+        entry: bash -c 'cd services/budCustomer && ([ -d node_modules ] || npm install) && npm run typecheck'
+        language: system
+        types_or: [ts, tsx]
+        files: ^services/budCustomer/(src|app)/
         pass_filenames: false
 
   # Commit message linting

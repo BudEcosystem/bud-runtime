@@ -1,20 +1,32 @@
-from typing import Union
+from datetime import datetime
+from typing import Optional, Union
+from uuid import UUID
 
 import orjson
 from budmicroframe.commons import logging
 from budmicroframe.commons.schemas import ErrorResponse, SuccessResponse
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, Query, Response
+from fastapi.responses import ORJSONResponse
 from pydantic import ValidationError
 
 from budmetrics.commons.schemas import BulkCloudEventBase
 from budmetrics.observability.schemas import (
+    AggregatedMetricsRequest,
+    AggregatedMetricsResponse,
     EnhancedInferenceDetailResponse,
+    GatewayAnalyticsRequest,
+    GeographicDataRequest,
+    GeographicDataResponse,
     InferenceDetailsMetrics,
     InferenceFeedbackResponse,
     InferenceListRequest,
     InferenceListResponse,
+    LatencyDistributionRequest,
+    LatencyDistributionResponse,
     ObservabilityMetricsRequest,
     ObservabilityMetricsResponse,
+    TimeSeriesRequest,
+    TimeSeriesResponse,
 )
 from budmetrics.observability.services import ObservabilityMetricsService
 
@@ -40,6 +52,15 @@ async def add_metrics(request: BulkCloudEventBase) -> Response:
     """
     response: Union[SuccessResponse, ErrorResponse]
     entries = request.entries
+
+    # Enforce batch size limit
+    MAX_BATCH_SIZE = 1000
+    if len(entries) > MAX_BATCH_SIZE:
+        return ErrorResponse(
+            message=f"Batch size exceeds maximum limit of {MAX_BATCH_SIZE} entries",
+            details={"received": len(entries), "max_allowed": MAX_BATCH_SIZE},
+        ).to_http_response()
+
     logger.info(f"Received {len(entries)} entries")
 
     try:
@@ -70,9 +91,6 @@ async def add_metrics(request: BulkCloudEventBase) -> Response:
                     inference_metric.request_forward_time,  # request_forward_time
                 )
                 batch_data.append(inference_data)
-                # logger.debug(
-                #     f"Processing metric for inference_id: {inference_metric.inference_id}"
-                # )
             except ValidationError as e:
                 validation_errors.append(
                     {
@@ -291,5 +309,278 @@ async def get_inference_feedback(inference_id: str) -> Response:
     except Exception as e:
         logger.error(f"Error getting inference feedback: {e}")
         response = ErrorResponse(message=f"Error getting inference feedback: {str(e)}")
+
+    return response.to_http_response()
+
+
+# Gateway Analytics Routes
+@observability_router.post("/gateway/analytics", tags=["Gateway Analytics"])
+async def get_gateway_analytics(
+    request: GatewayAnalyticsRequest,
+) -> Response:
+    """Get gateway analytics metrics."""
+    try:
+        response = await service.get_gateway_metrics(request)
+        return response.to_http_response()
+    except Exception as e:
+        error_response = ErrorResponse(
+            object="error",
+            code=500,
+            message=f"Failed to fetch gateway analytics: {str(e)}",
+        )
+        return error_response.to_http_response()
+
+
+@observability_router.get("/gateway/geographical-stats", tags=["Gateway Analytics"])
+async def get_geographical_stats(
+    from_date: datetime = Query(..., description="Start date for the analysis"),
+    to_date: Optional[datetime] = Query(None, description="End date for the analysis"),
+    project_id: Optional[UUID] = Query(None, description="Filter by project ID"),
+) -> Response:
+    """Get geographical distribution statistics."""
+    try:
+        response = await service.get_geographical_stats(from_date=from_date, to_date=to_date, project_id=project_id)
+        return response.to_http_response()
+    except Exception as e:
+        error_response = ErrorResponse(
+            object="error",
+            code=500,
+            message=f"Failed to fetch geographical stats: {str(e)}",
+        )
+        return error_response.to_http_response()
+
+
+@observability_router.get("/gateway/blocking-stats", tags=["Gateway Analytics"])
+async def get_blocking_stats(
+    from_date: datetime = Query(..., description="Start date for the analysis"),
+    to_date: Optional[datetime] = Query(None, description="End date for the analysis"),
+    project_id: Optional[UUID] = Query(None, description="Filter by project ID"),
+) -> Response:
+    """Get blocking rule statistics."""
+    try:
+        response = await service.get_blocking_stats(from_date=from_date, to_date=to_date, project_id=project_id)
+        return response.to_http_response()
+    except Exception as e:
+        error_response = ErrorResponse(
+            object="error",
+            code=500,
+            message=f"Failed to fetch blocking stats: {str(e)}",
+        )
+        return error_response.to_http_response()
+
+
+@observability_router.get("/gateway/top-routes", tags=["Gateway Analytics"])
+async def get_top_routes(
+    from_date: datetime = Query(..., description="Start date for the analysis"),
+    to_date: Optional[datetime] = Query(None, description="End date for the analysis"),
+    limit: int = Query(10, description="Number of top routes to return"),
+    project_id: Optional[UUID] = Query(None, description="Filter by project ID"),
+) -> Response:
+    """Get top API routes by request count."""
+    try:
+        routes = await service.get_top_routes(from_date=from_date, to_date=to_date, limit=limit, project_id=project_id)
+        return ORJSONResponse(content={"routes": routes}, status_code=200)
+    except Exception as e:
+        error_response = ErrorResponse(
+            object="error",
+            code=500,
+            message=f"Failed to fetch top routes: {str(e)}",
+        )
+        return error_response.to_http_response()
+
+
+@observability_router.get("/gateway/client-analytics", tags=["Gateway Analytics"])
+async def get_client_analytics(
+    from_date: datetime = Query(..., description="Start date for the analysis"),
+    to_date: Optional[datetime] = Query(None, description="End date for the analysis"),
+    group_by: str = Query("device_type", description="Group by: device_type, browser, os"),
+    project_id: Optional[UUID] = Query(None, description="Filter by project ID"),
+) -> Response:
+    """Get client analytics (device, browser, OS distribution)."""
+    try:
+        response = await service.get_client_analytics(
+            from_date=from_date, to_date=to_date, group_by=group_by, project_id=project_id
+        )
+        return ORJSONResponse(content=response, status_code=200)
+    except Exception as e:
+        error_response = ErrorResponse(
+            object="error",
+            code=500,
+            message=f"Failed to fetch client analytics: {str(e)}",
+        )
+        return error_response.to_http_response()
+
+
+# New Aggregated Metrics Endpoints
+@observability_router.post("/metrics/aggregated", tags=["Aggregated Metrics"])
+async def get_aggregated_metrics(request: AggregatedMetricsRequest) -> Response:
+    """Get aggregated metrics with server-side calculations.
+
+    This endpoint provides pre-aggregated metrics calculated directly in ClickHouse for
+    high performance. Supports grouping by model, project, endpoint, or user and
+    includes formatted values with proper units.
+
+    Available metrics:
+    - total_requests: Total number of inference requests
+    - success_rate: Percentage of successful requests
+    - avg_latency, p95_latency, p99_latency: Response time statistics
+    - total_tokens, avg_tokens: Token usage statistics
+    - total_cost, avg_cost: Cost analysis
+    - ttft_avg, ttft_p95, ttft_p99: Time to first token statistics
+    - cache_hit_rate: Cache effectiveness
+    - throughput_avg: Average tokens per second
+    - error_rate: Percentage of failed requests
+    - unique_users: Count of distinct users
+
+    Args:
+        request (AggregatedMetricsRequest): The aggregation request parameters.
+
+    Returns:
+        HTTP response containing aggregated metrics with formatting.
+    """
+    response: Union[AggregatedMetricsResponse, ErrorResponse]
+
+    try:
+        response = await service.get_aggregated_metrics(request)
+    except ValidationError as e:
+        logger.error(f"Validation error: {e}")
+        response = ErrorResponse(message=f"Validation error: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error getting aggregated metrics: {e}")
+        response = ErrorResponse(message=f"Error getting aggregated metrics: {str(e)}")
+
+    return response.to_http_response()
+
+
+@observability_router.post("/metrics/time-series", tags=["Aggregated Metrics"])
+async def get_time_series_data(request: TimeSeriesRequest) -> Response:
+    """Get time-series data for chart visualization.
+
+    This endpoint provides time-bucketed metrics data optimized for charts and graphs.
+    Uses efficient ClickHouse time bucketing functions and supports gap filling for
+    smooth chart rendering.
+
+    Supported intervals: 1m, 5m, 15m, 30m, 1h, 6h, 12h, 1d, 1w
+
+    Available metrics:
+    - requests: Request count per time bucket
+    - success_rate: Success rate percentage over time
+    - avg_latency, p95_latency, p99_latency: Latency trends
+    - tokens: Token usage over time
+    - cost: Cost trends
+    - ttft_avg: Time to first token trends
+    - cache_hit_rate: Cache performance over time
+    - throughput: Throughput trends
+    - error_rate: Error rate trends
+
+    Args:
+        request (TimeSeriesRequest): The time-series request parameters.
+
+    Returns:
+        HTTP response containing time-series data points.
+    """
+    response: Union[TimeSeriesResponse, ErrorResponse]
+
+    try:
+        response = await service.get_time_series_data(request)
+    except ValidationError as e:
+        logger.error(f"Validation error: {e}")
+        response = ErrorResponse(message=f"Validation error: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error getting time-series data: {e}")
+        response = ErrorResponse(message=f"Error getting time-series data: {str(e)}")
+
+    return response.to_http_response()
+
+
+@observability_router.get("/metrics/geography", tags=["Aggregated Metrics"])
+async def get_geographic_distribution(
+    from_date: datetime = Query(..., description="Start date for the analysis"),
+    to_date: Optional[datetime] = Query(None, description="End date for the analysis"),
+    group_by: str = Query("country", description="Group by: country, region, city"),
+    limit: int = Query(50, description="Maximum number of locations to return"),
+    project_id: Optional[UUID] = Query(None, description="Filter by project ID"),
+    country_codes: Optional[str] = Query(None, description="Comma-separated country codes to filter by"),
+) -> Response:
+    """Get geographic distribution data from gateway analytics.
+
+    This endpoint analyzes request patterns by geographic location using data from
+    the GatewayAnalytics table. Provides insights into where requests are coming
+    from and performance by location.
+
+    Grouping options:
+    - country: Group by country code
+    - region: Group by country and region/state
+    - city: Group by country, region, and city
+
+    Args:
+        from_date (datetime): Start date for analysis.
+        to_date (Optional[datetime]): End date for analysis.
+        group_by (str): Geographic grouping level.
+        limit (int): Maximum locations to return.
+        project_id (Optional[UUID]): Filter by specific project.
+        country_codes (Optional[str]): Filter by specific countries.
+
+    Returns:
+        HTTP response containing geographic distribution data.
+    """
+    response: Union[GeographicDataResponse, ErrorResponse]
+
+    try:
+        # Build request object
+        filters = {}
+        if project_id:
+            filters["project_id"] = project_id
+        if country_codes:
+            filters["country_code"] = [code.strip() for code in country_codes.split(",")]
+
+        request = GeographicDataRequest(
+            from_date=from_date, to_date=to_date, group_by=group_by, limit=limit, filters=filters if filters else None
+        )
+
+        response = await service.get_geographic_data(request)
+    except ValidationError as e:
+        logger.error(f"Validation error: {e}")
+        response = ErrorResponse(message=f"Validation error: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error getting geographic data: {e}")
+        response = ErrorResponse(message=f"Error getting geographic data: {str(e)}")
+
+    return response.to_http_response()
+
+
+@observability_router.post("/metrics/latency-distribution", tags=["Aggregated Metrics"])
+async def get_latency_distribution(request: LatencyDistributionRequest) -> Response:
+    """Get latency distribution data with server-side calculations.
+
+    This endpoint provides latency distribution analysis calculated directly in ClickHouse for
+    high performance. Supports grouping by model, project, endpoint, or user with
+    customizable latency buckets.
+
+    Default latency buckets:
+    - 0-100ms: Very fast responses
+    - 100-500ms: Fast responses
+    - 500-1000ms: Moderate responses
+    - 1-2s: Slow responses
+    - 2-5s: Very slow responses
+    - 5-10s: Extremely slow responses
+    - >10s: Timeout-prone responses
+
+    Args:
+        request (LatencyDistributionRequest): The latency distribution request parameters.
+
+    Returns:
+        HTTP response containing latency distribution data with optional grouping.
+    """
+    response: Union[LatencyDistributionResponse, ErrorResponse]
+
+    try:
+        response = await service.get_latency_distribution(request)
+    except ValidationError as e:
+        logger.error(f"Validation error: {e}")
+        response = ErrorResponse(message=f"Validation error: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error getting latency distribution: {e}")
+        response = ErrorResponse(message=f"Error getting latency distribution: {str(e)}")
 
     return response.to_http_response()

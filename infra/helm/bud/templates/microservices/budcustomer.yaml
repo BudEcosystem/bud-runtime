@@ -44,6 +44,14 @@ spec:
             value: {{ include "bud.ingress.url.budplayground" $ }}
           - name: NEXT_PUBLIC_ASK_BUD_URL
             value: {{ include "bud.ingress.url.budask" $ }}
+          - name: ESLINT_NO_DEV_WARNINGS
+            value: 'true'
+          - name: NEXT_HIDE_ERROR_OVERLAY
+            value: 'true'
+          - name: NEXT_PUBLIC_ANTD_HASH_SEED
+            value: 'budcustomer'
+          - name: NEXT_PUBLIC_ASK_BUD_MODEL
+            value: 'qwen3-32b'
         {{ $root := . }}
         {{- range $key, $value := .Values.microservices.budcustomer.env }}
           - name: {{ $key }}

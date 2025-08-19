@@ -6,7 +6,7 @@ from pydantic import PostgresDsn
 from sqlalchemy import create_engine, engine_from_config, pool
 from sqlalchemy_utils import create_database, database_exists
 
-from budapp.commons import Base
+from budapp.commons import Base  # This imports Base and all models via commons/__init__.py
 
 
 # this is the Alembic Config object, which provides

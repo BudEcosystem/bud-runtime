@@ -1,8 +1,0 @@
-# high availability mode and scale select services independently of global
-global:
-  ha:
-    enabled: false
-dapr_scheduler:
-  ha: true
-dapr_placement:
-  ha: true

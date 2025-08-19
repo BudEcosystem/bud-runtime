@@ -226,7 +226,7 @@ microservices:
             S3_BUCKET_NAME: novu-local
             S3_REGION: us-east-1
             # TODO
-            SECRETSTORE_NAME: secretstore
+            SECRETSTORE_NAME: '{{ .Release.Name}}-secretstore'
             SECRETSTORE_SECRET_NAME: '{{ .Release.Name }}-secretstore'
             # TODO
             SENTRY_DSN: ""

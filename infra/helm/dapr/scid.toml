@@ -1,0 +1,4 @@
+namespace = "dapr-system"
+release_name = "dapr"
+chart_path_override = "charts/dapr-1.15.8.tgz"
+value_paths = [ "values.yaml" ]

@@ -4,6 +4,7 @@
   opentofu,
   jq,
   git,
+  bash,
 }:
 writeShellApplication {
   name = "tofu_apply";
@@ -13,6 +14,7 @@ writeShellApplication {
     opentofu
     jq
     git
+    bash
   ];
 
   text = builtins.readFile ./script.sh;
