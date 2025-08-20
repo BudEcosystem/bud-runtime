@@ -129,7 +129,7 @@ microservices:
         env:
             PSQL_HOST: '{{ $.Release.Name }}-postgresql'
             PSQL_PORT: "5432"
-            PSQL_USER: bueval
+            PSQL_USER: budeval
             PSQL_PASSWORD: budeval
             PSQL_DB_NAME: budeval
     budsim:
