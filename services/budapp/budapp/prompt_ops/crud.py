@@ -19,7 +19,7 @@
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
-from sqlalchemy import and_, asc, desc, func, or_, select, update
+from sqlalchemy import and_, asc, case, desc, func, or_, select, update
 from sqlalchemy.orm import joinedload
 
 from budapp.commons.constants import EndpointStatusEnum, PromptStatusEnum, PromptVersionStatusEnum
@@ -189,3 +189,79 @@ class PromptVersionDataManager(DataManagerUtils):
         result = self.session.execute(stmt)
         self.session.commit()
         return result.rowcount
+
+    async def get_all_prompt_versions(
+        self,
+        prompt_id: UUID,
+        offset: int = 0,
+        limit: int = 10,
+        filters: dict = {},
+        order_by: list = [],
+        search: bool = False,
+    ) -> tuple[list, int]:
+        """Get all prompt versions for a specific prompt with pagination and filtering."""
+        await self.validate_fields(PromptVersionModel, filters)
+
+        # Generate base query with eager loading and computed is_default_version
+        base_query = (
+            select(
+                PromptVersionModel,
+                case((PromptVersionModel.id == PromptModel.default_version_id, True), else_=False).label(
+                    "is_default_version"
+                ),
+            )
+            .join(PromptModel, PromptVersionModel.prompt_id == PromptModel.id)
+            .filter(PromptVersionModel.prompt_id == prompt_id)
+            .filter(PromptVersionModel.status != PromptVersionStatusEnum.DELETED)
+            .options(
+                joinedload(PromptVersionModel.endpoint),
+                joinedload(PromptVersionModel.prompt),
+            )
+        )
+
+        # Generate statements according to search or filters
+        if search:
+            search_conditions = await self.generate_search_stmt(PromptVersionModel, filters)
+            stmt = base_query.filter(or_(*search_conditions)) if search_conditions else base_query
+
+            count_stmt = (
+                select(func.count(PromptVersionModel.id))
+                .select_from(PromptVersionModel)
+                .filter(PromptVersionModel.prompt_id == prompt_id)
+                .filter(PromptVersionModel.status != PromptVersionStatusEnum.DELETED)
+            )
+            if search_conditions:
+                count_stmt = count_stmt.filter(or_(*search_conditions))
+        else:
+            stmt = base_query
+            count_stmt = (
+                select(func.count(PromptVersionModel.id))
+                .select_from(PromptVersionModel)
+                .filter(PromptVersionModel.prompt_id == prompt_id)
+                .filter(PromptVersionModel.status != PromptVersionStatusEnum.DELETED)
+            )
+
+            # Apply filters
+            for key, value in filters.items():
+                stmt = stmt.filter(getattr(PromptVersionModel, key) == value)
+                count_stmt = count_stmt.filter(getattr(PromptVersionModel, key) == value)
+
+        # Calculate count before applying limit and offset
+        count = self.execute_scalar(count_stmt)
+
+        # Apply limit and offset
+        stmt = stmt.limit(limit).offset(offset)
+
+        # Apply sorting
+        if order_by:
+            sort_conditions = await self.generate_sorting_stmt(PromptVersionModel, order_by)
+            stmt = stmt.order_by(*sort_conditions)
+        else:
+            # Default sorting by version desc
+            stmt = stmt.order_by(desc(PromptVersionModel.version))
+
+        # Execute query and get all results including computed fields
+        result = self.session.execute(stmt)
+        rows = result.all()
+
+        return rows, count

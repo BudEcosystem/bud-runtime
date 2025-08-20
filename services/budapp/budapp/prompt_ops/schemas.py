@@ -44,6 +44,12 @@ class PromptFilter(BaseModel):
     project_id: UUID4 | None = None
 
 
+class PromptVersionFilter(BaseModel):
+    """Filter schema for prompt version list API."""
+
+    version: int | None = None
+
+
 class PromptListItem(BaseModel):
     """Schema for individual prompt item in list."""
 
@@ -69,6 +75,27 @@ class PromptListResponse(PaginatedSuccessResponse):
     model_config = ConfigDict(extra="ignore")
 
     prompts: list[PromptListItem] = []
+
+
+class PromptVersionListItem(BaseModel):
+    """Schema for individual prompt version item in list."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID4
+    endpoint_name: str
+    version: int
+    created_at: datetime
+    modified_at: datetime
+    is_default_version: bool
+
+
+class PromptVersionListResponse(PaginatedSuccessResponse):
+    """Prompt version list response schema."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    versions: list[PromptVersionListItem] = []
 
 
 class ModelSettings(BaseModel):

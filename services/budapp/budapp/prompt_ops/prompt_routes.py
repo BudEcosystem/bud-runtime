@@ -43,6 +43,9 @@ from .schemas import (
     PromptListItem,
     PromptListResponse,
     PromptResponse,
+    PromptVersionFilter,
+    PromptVersionListItem,
+    PromptVersionListResponse,
     SinglePromptResponse,
 )
 from .services import PromptService, PromptWorkflowService
@@ -109,6 +112,66 @@ async def list_prompts(
         logger.exception(f"Failed to list prompts: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to list prompts"
+        ).to_http_response()
+
+
+@router.get(
+    "/{prompt_id}/versions",
+    responses={
+        status.HTTP_200_OK: {
+            "model": PromptVersionListResponse,
+            "description": "Successfully listed prompt versions",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Prompt not found",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Internal Server error",
+        },
+    },
+    description="List all versions for a specific prompt.",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
+async def list_prompt_versions(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    prompt_id: UUID,
+    filters: Annotated[PromptVersionFilter, Depends()],
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=0),
+    order_by: Optional[List[str]] = Depends(parse_ordering_fields),
+    search: bool = False,
+) -> Union[PromptVersionListResponse, ErrorResponse]:
+    """List all versions for a specific prompt with pagination, filtering, and sorting."""
+    # Calculate offset
+    offset = (page - 1) * limit
+
+    # Convert filter to dictionary
+    filters_dict = filters.model_dump(exclude_none=True)
+
+    try:
+        # Get prompt versions from service
+        versions_list, count = await PromptService(session).get_all_prompt_versions(
+            prompt_id, offset, limit, filters_dict, order_by, search
+        )
+
+        return PromptVersionListResponse(
+            versions=versions_list,
+            total_record=count,
+            page=page,
+            limit=limit,
+            object="prompt.versions.list",
+            code=status.HTTP_200_OK,
+        ).to_http_response()
+    except ClientException as e:
+        logger.error(f"Failed to list prompt versions: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to list prompt versions: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to list prompt versions"
         ).to_http_response()
 
 

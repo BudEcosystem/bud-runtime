@@ -55,6 +55,7 @@ from .schemas import (
     PromptFilter,
     PromptListItem,
     PromptResponse,
+    PromptVersionListItem,
 )
 
 
@@ -106,6 +107,52 @@ class PromptService(SessionMixin):
             prompts_list.append(prompt_item)
 
         return prompts_list, count
+
+    async def get_all_prompt_versions(
+        self,
+        prompt_id: UUID,
+        offset: int = 0,
+        limit: int = 10,
+        filters: dict = {},
+        order_by: list = [],
+        search: bool = False,
+    ) -> tuple[list[PromptVersionListItem], int]:
+        """Get all versions for a specific prompt with their related data."""
+        # First validate that the prompt exists and is active
+        db_prompt = await PromptDataManager(self.session).retrieve_by_fields(
+            PromptModel,
+            fields={"id": prompt_id, "status": PromptStatusEnum.ACTIVE},
+        )
+
+        if not db_prompt:
+            raise ClientException(message="Prompt not found", status_code=status.HTTP_404_NOT_FOUND)
+
+        # Fetch prompt versions with related data and computed is_default_version
+        rows, count = await PromptVersionDataManager(self.session).get_all_prompt_versions(
+            prompt_id, offset, limit, filters, order_by, search
+        )
+
+        # Transform to response format
+        versions_list = []
+        for row in rows:
+            # Extract the model and computed field from the row
+            prompt_version = row[0]  # PromptVersionModel
+            is_default_version = row[1]  # Computed is_default_version from database
+
+            # Access endpoint name through relationship
+            endpoint_name = prompt_version.endpoint.name if prompt_version.endpoint else ""
+
+            version_item = PromptVersionListItem(
+                id=prompt_version.id,
+                endpoint_name=endpoint_name,
+                version=prompt_version.version,
+                created_at=prompt_version.created_at,
+                modified_at=prompt_version.modified_at,
+                is_default_version=is_default_version,
+            )
+            versions_list.append(version_item)
+
+        return versions_list, count
 
     async def delete_active_prompt(self, prompt_id: UUID) -> PromptModel:
         """Delete an active prompt by updating its status to DELETED."""
