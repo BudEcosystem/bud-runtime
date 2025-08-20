@@ -156,6 +156,7 @@ class Experiment(BaseModel):
     traits: Optional[List[TraitSummary]] = Field(
         default_factory=list, description="Traits associated with the experiment."
     )
+    created_at: Optional[datetime] = Field(None, description="Timestamp when the experiment was created")
     # New fields for experiment detail
     stats: Optional[ExperimentStats] = Field(None, description="Experiment statistics")
     objective: Optional[str] = Field(None, description="Experiment objective")
