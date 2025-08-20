@@ -660,6 +660,11 @@ class ObservabilityMetricsService:
             where_conditions.append("mid.project_id = %(project_id)s")
             params["project_id"] = str(request.project_id)
 
+        # Support filtering by api_key_project_id (for CLIENT users)
+        if hasattr(request, "filters") and request.filters and "api_key_project_id" in request.filters:
+            where_conditions.append("mid.api_key_project_id = %(api_key_project_id)s")
+            params["api_key_project_id"] = str(request.filters["api_key_project_id"])
+
         if request.endpoint_id:
             where_conditions.append("mid.endpoint_id = %(endpoint_id)s")
             params["endpoint_id"] = str(request.endpoint_id)
@@ -1766,6 +1771,16 @@ class ObservabilityMetricsService:
                     else:
                         where_conditions.append("mid.project_id = %(project_id)s")
                         params["project_id"] = filter_value
+                elif filter_key == "api_key_project_id":
+                    # Support filtering by api_key_project_id for CLIENT users
+                    if isinstance(filter_value, list):
+                        placeholders = [f"%(api_key_project_{i})s" for i in range(len(filter_value))]
+                        where_conditions.append(f"mid.api_key_project_id IN ({','.join(placeholders)})")
+                        for i, val in enumerate(filter_value):
+                            params[f"api_key_project_{i}"] = val
+                    else:
+                        where_conditions.append("mid.api_key_project_id = %(api_key_project_id)s")
+                        params["api_key_project_id"] = filter_value
                 elif filter_key == "model_id":
                     where_conditions.append("mid.model_id = %(model_id)s")
                     params["model_id"] = filter_value
@@ -1957,6 +1972,16 @@ class ObservabilityMetricsService:
                     else:
                         where_conditions.append("mid.project_id = %(project_id)s")
                         params["project_id"] = filter_value
+                elif filter_key == "api_key_project_id":
+                    # Support filtering by api_key_project_id for CLIENT users
+                    if isinstance(filter_value, list):
+                        placeholders = [f"%(api_key_project_{i})s" for i in range(len(filter_value))]
+                        where_conditions.append(f"mid.api_key_project_id IN ({','.join(placeholders)})")
+                        for i, val in enumerate(filter_value):
+                            params[f"api_key_project_{i}"] = val
+                    else:
+                        where_conditions.append("mid.api_key_project_id = %(api_key_project_id)s")
+                        params["api_key_project_id"] = filter_value
                 elif filter_key == "model_id":
                     where_conditions.append("mid.model_id = %(model_id)s")
                     params["model_id"] = filter_value
@@ -2106,6 +2131,10 @@ class ObservabilityMetricsService:
                 if filter_key == "project_id":
                     where_conditions.append("ga.project_id = %(project_id)s")
                     params["project_id"] = filter_value
+                elif filter_key == "api_key_project_id":
+                    # Support filtering by api_key_project_id for CLIENT users
+                    where_conditions.append("ga.api_key_project_id = %(api_key_project_id)s")
+                    params["api_key_project_id"] = filter_value
                 elif filter_key == "country_code":
                     if isinstance(filter_value, list):
                         placeholders = [f"%(country_{i})s" for i in range(len(filter_value))]
@@ -2253,6 +2282,14 @@ class ObservabilityMetricsService:
                     project_ids = [project_ids]
                 project_filter = "', '".join(str(pid) for pid in project_ids)
                 filter_conditions.append(f"toString(project_id) IN ('{project_filter}')")
+
+            if "api_key_project_id" in request.filters:
+                # Support filtering by api_key_project_id for CLIENT users
+                api_key_project_ids = request.filters["api_key_project_id"]
+                if isinstance(api_key_project_ids, str):
+                    api_key_project_ids = [api_key_project_ids]
+                api_key_project_filter = "', '".join(str(pid) for pid in api_key_project_ids)
+                filter_conditions.append(f"toString(api_key_project_id) IN ('{api_key_project_filter}')")
 
             if "endpoint_id" in request.filters:
                 endpoint_ids = request.filters["endpoint_id"]

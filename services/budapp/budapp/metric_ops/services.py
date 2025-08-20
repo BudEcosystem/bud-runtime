@@ -218,6 +218,8 @@ class BudMetricService(SessionMixin):
         Returns:
             InferenceListResponse with enriched data
         """
+        from ..commons.constants import UserTypeEnum
+
         # Check user access to the specified project if filtered
         if request.project_id:
             # Verify user has access to the project
@@ -236,6 +238,17 @@ class BudMetricService(SessionMixin):
             except HTTPException as e:
                 raise ClientException("Access denied: User is not a member of the project", status_code=e.status_code)
 
+        # Prepare request data with CLIENT-specific filtering
+        request_data = request.model_dump(mode="json")
+
+        # For CLIENT users, we need to filter by api_key_project_id instead of project_id
+        if current_user.user_type == UserTypeEnum.CLIENT and request.project_id:
+            # Convert project_id filter to api_key_project_id for CLIENT users
+            request_data["filters"] = request_data.get("filters", {})
+            request_data["filters"]["api_key_project_id"] = str(request.project_id)
+            # Remove the project_id from top-level (it will be in filters)
+            request_data.pop("project_id", None)
+
         # Proxy request to budmetrics
         metrics_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/method/observability/inferences/list"
 
@@ -244,7 +257,7 @@ class BudMetricService(SessionMixin):
                 aiohttp.ClientSession() as session,
                 session.post(
                     metrics_endpoint,
-                    json=request.model_dump(mode="json"),
+                    json=request_data,
                 ) as response,
             ):
                 response_data = await response.json()
@@ -748,48 +761,100 @@ class BudMetricService(SessionMixin):
     async def _apply_user_project_filter(self, request_body: Dict[str, Any], current_user: User) -> None:
         """Apply user's project access restrictions to the request body."""
         try:
-            # Get user's accessible projects
-            from ..project_ops.services import ProjectService
+            # Import UserTypeEnum for user type checking
+            from ..commons.constants import UserTypeEnum
 
-            project_service = ProjectService(self.session)
-            # Get all projects the user has access to
-            user_projects, _ = await project_service.get_all_active_projects(
-                current_user, offset=0, limit=1000, filters={}, order_by=[], search=False
-            )
-            user_project_ids = [str(project.project.id) for project in user_projects]
+            # Check if user is a CLIENT and apply appropriate filtering
+            if current_user.user_type == UserTypeEnum.CLIENT:
+                # For CLIENT users, filter by api_key_project_id instead of project_id
+                # Get user's accessible projects
+                from ..project_ops.services import ProjectService
 
-            # Get existing filters or create new ones
-            filters = request_body.get("filters", {})
+                project_service = ProjectService(self.session)
+                # Get all projects the user has access to
+                user_projects, _ = await project_service.get_all_active_projects(
+                    current_user, offset=0, limit=1000, filters={}, order_by=[], search=False
+                )
+                user_project_ids = [str(project.project.id) for project in user_projects]
 
-            # If project_id filter exists, intersect with user's accessible projects
-            if "project_id" in filters:
-                existing_project_ids = filters["project_id"]
-                if isinstance(existing_project_ids, list):
-                    # Keep only projects that user has access to
-                    accessible_ids = [pid for pid in existing_project_ids if str(pid) in user_project_ids]
-                    if not accessible_ids:
-                        # User has no access to any of the requested projects
-                        raise ClientException(
-                            "Access denied to requested projects", status_code=status.HTTP_403_FORBIDDEN
-                        )
-                    filters["project_id"] = accessible_ids
+                # Get existing filters or create new ones
+                filters = request_body.get("filters", {})
+
+                # For CLIENT users, use api_key_project_id instead of project_id
+                filter_field = "api_key_project_id"
+                old_filter_field = "project_id"
+                if old_filter_field in filters:
+                    filters[filter_field] = filters.pop(old_filter_field)
+
+                # If api_key_project_id filter exists, intersect with user's accessible projects
+                if filter_field in filters:
+                    existing_project_ids = filters[filter_field]
+                    if isinstance(existing_project_ids, list):
+                        # Keep only projects that user has access to
+                        accessible_ids = [pid for pid in existing_project_ids if str(pid) in user_project_ids]
+                        if not accessible_ids:
+                            # User has no access to any of the requested projects
+                            raise ClientException(
+                                "Access denied to requested projects", status_code=status.HTTP_403_FORBIDDEN
+                            )
+                        filters[filter_field] = accessible_ids
+                    else:
+                        # Single project ID
+                        if str(existing_project_ids) not in user_project_ids:
+                            raise ClientException(
+                                "Access denied to requested project", status_code=status.HTTP_403_FORBIDDEN
+                            )
+                        filters[filter_field] = existing_project_ids
                 else:
-                    # Single project ID
-                    if str(existing_project_ids) not in user_project_ids:
-                        raise ClientException(
-                            "Access denied to requested project", status_code=status.HTTP_403_FORBIDDEN
-                        )
-            else:
-                # No project filter specified, apply user's projects
-                filters["project_id"] = user_project_ids
+                    # No api_key_project_id filter specified, apply user's projects
+                    filters[filter_field] = user_project_ids
 
-            request_body["filters"] = filters
+                request_body["filters"] = filters
+            else:
+                # For ADMIN users, keep the existing project_id filtering logic
+                # Get user's accessible projects
+                from ..project_ops.services import ProjectService
+
+                project_service = ProjectService(self.session)
+                # Get all projects the user has access to
+                user_projects, _ = await project_service.get_all_active_projects(
+                    current_user, offset=0, limit=1000, filters={}, order_by=[], search=False
+                )
+                user_project_ids = [str(project.project.id) for project in user_projects]
+
+                # Get existing filters or create new ones
+                filters = request_body.get("filters", {})
+
+                # If project_id filter exists, intersect with user's accessible projects
+                if "project_id" in filters:
+                    existing_project_ids = filters["project_id"]
+                    if isinstance(existing_project_ids, list):
+                        # Keep only projects that user has access to
+                        accessible_ids = [pid for pid in existing_project_ids if str(pid) in user_project_ids]
+                        if not accessible_ids:
+                            # User has no access to any of the requested projects
+                            raise ClientException(
+                                "Access denied to requested projects", status_code=status.HTTP_403_FORBIDDEN
+                            )
+                        filters["project_id"] = accessible_ids
+                    else:
+                        # Single project ID
+                        if str(existing_project_ids) not in user_project_ids:
+                            raise ClientException(
+                                "Access denied to requested project", status_code=status.HTTP_403_FORBIDDEN
+                            )
+                else:
+                    # No project filter specified, apply user's projects
+                    filters["project_id"] = user_project_ids
+
+                request_body["filters"] = filters
 
         except ClientException:
             raise
         except Exception as e:
             logger.warning(f"Failed to apply user project filter: {e}")
             # Fallback: restrict to user's projects only
+            from ..commons.constants import UserTypeEnum
             from ..project_ops.services import ProjectService
 
             project_service = ProjectService(self.session)
@@ -799,7 +864,11 @@ class BudMetricService(SessionMixin):
             user_project_ids = [str(project.project.id) for project in user_projects]
 
             filters = request_body.get("filters", {})
-            filters["project_id"] = user_project_ids
+            # Use appropriate filter field based on user type
+            if current_user.user_type == UserTypeEnum.CLIENT:
+                filters["api_key_project_id"] = user_project_ids
+            else:
+                filters["project_id"] = user_project_ids
             request_body["filters"] = filters
 
     async def _apply_user_project_filter_params(self, request_params: Dict[str, Any], current_user: User) -> None:
@@ -1456,13 +1525,14 @@ class GatewayAnalyticsService(SessionMixin):
         Returns:
             Gateway analytics response with enriched data
         """
+        from ..commons.constants import UserTypeEnum
+
         # If no project IDs specified, use user's accessible projects
         if not request.project_ids:
             request.project_ids = await self._get_user_accessible_projects()
 
         # Prepare request body for budmetrics
         budmetrics_request = {
-            "project_ids": [str(pid) for pid in request.project_ids] if request.project_ids else None,
             "model_ids": [str(mid) for mid in request.model_ids] if request.model_ids else None,
             "endpoint_ids": [str(eid) for eid in request.endpoint_ids] if request.endpoint_ids else None,
             "start_time": request.start_time.isoformat(),
@@ -1470,8 +1540,18 @@ class GatewayAnalyticsService(SessionMixin):
             "time_bucket": request.time_bucket,
             "metrics": request.metrics,
             "group_by": request.group_by,
-            "filters": request.filters,
+            "filters": request.filters or {},
         }
+
+        # For CLIENT users, use api_key_project_id; for others, use project_id
+        if self.user.user_type == UserTypeEnum.CLIENT:
+            budmetrics_request["filters"]["api_key_project_id"] = (
+                [str(pid) for pid in request.project_ids] if request.project_ids else None
+            )
+        else:
+            budmetrics_request["filters"]["project_id"] = (
+                [str(pid) for pid in request.project_ids] if request.project_ids else None
+            )
 
         # Remove None values
         budmetrics_request = {k: v for k, v in budmetrics_request.items() if v is not None}
