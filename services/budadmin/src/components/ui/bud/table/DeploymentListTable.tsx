@@ -34,6 +34,8 @@ interface DataType {
     model?: Model;
     cluster?: Cluster;
     id?: string;
+    is_published?: boolean;
+    is_deprecated?: boolean;
 }
 
 
@@ -49,7 +51,7 @@ function DeploymentListTable() {
     const [searchValue, setSearchValue] = useState('');
     const router = useRouter()
     const { projectId } = router.query; // Access the dynamic part of the route
-    const { endPoints, getEndPoints, deleteEndPoint, loading, getEndpointClusterDetails, setPageSource } = useEndPoints();
+    const { endPoints, getEndPoints, deleteEndPoint, loading, getEndpointClusterDetails, setPageSource, publishEndpoint } = useEndPoints();
     const [order, setOrder] = useState<'-' | ''>('');
     const [orderBy, setOrderBy] = useState<string>('created_at');
     const { hasProjectPermission, hasPermission } = useUser();
@@ -81,6 +83,7 @@ function DeploymentListTable() {
             getData();
         }
     }, [projectId])
+
 
     useEffect(() => {
         // debounce
@@ -212,19 +215,53 @@ function DeploymentListTable() {
                             dataIndex: 'created_on',
                             key: 'created_on',
                             render: (text, record) => <div className='min-w-[130px]'>
-                                <div className='flex flex-row items-center'
+                                <div className='flex flex-row items-center justify-end'>
+                                    {!record.is_published ? (
+                                        <BorderlessButton
+                                            permission={hasPermission(PermissionEnum.ModelManage)}
+                                            disabled={record.is_deprecated}
+                                            onClick={async (event) => {
+                                                event.stopPropagation();
 
-                                >
-                                    <BorderlessButton
-                                        permission={hasPermission(PermissionEnum.ModelManage)}
-                                        onClick={async (event) => {
-                                            event.stopPropagation();
-                                            await getEndpointClusterDetails(record.id, projectId as string);
-                                            openDrawer('publish', { endpoint: record });
-                                        }}
-                                    >
-                                        Publish
-                                    </BorderlessButton>
+                                                // Check if endpoint is deprecated
+                                                if (record.is_deprecated) {
+                                                    errorToast('Cannot publish deprecated endpoint');
+                                                    return;
+                                                }
+
+                                                try {
+                                                    // Publish the endpoint
+                                                    await publishEndpoint(record.id, {
+                                                        action: "publish",
+                                                        pricing: {
+                                                            input_cost: 0,
+                                                            output_cost: 0,
+                                                            currency: "USD",
+                                                            per_tokens: 1000
+                                                        }
+                                                    });
+                                                    // Refresh the data to get updated is_published status
+                                                    await getData();
+                                                    successToast('Endpoint published successfully');
+                                                } catch (error) {
+                                                    errorToast('Failed to publish endpoint');
+                                                }
+                                            }}
+                                        >
+                                            {record.is_deprecated ? 'Deprecated' : 'Publish'}
+                                        </BorderlessButton>
+                                    ) : (
+                                        <BorderlessButton
+                                            permission={hasPermission(PermissionEnum.ModelManage)}
+                                            onClick={async (event) => {
+                                                event.stopPropagation();
+                                                await getEndpointClusterDetails(record.id, projectId as string);
+                                                openDrawer('publish', { endpoint: record });
+                                            }}
+                                        >
+                                            Publish Details
+                                        </BorderlessButton>
+                                    )}
                                     <BorderlessButton
                                         classNames='ml-[.3rem]'
                                         permission={hasPermission(PermissionEnum.ModelManage)}
