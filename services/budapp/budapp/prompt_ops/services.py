@@ -153,6 +153,20 @@ class PromptWorkflowService(SessionMixin):
             workflow_id, workflow_create, current_user_id
         )
 
+        # If workflow_id exists, check previous steps for project_id and endpoint_id
+        previous_project_id = None
+        previous_endpoint_id = None
+        if workflow_id:
+            db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+                {"workflow_id": workflow_id}
+            )
+            for step in db_workflow_steps:
+                if step.data:
+                    if "project_id" in step.data and step.data["project_id"]:
+                        previous_project_id = UUID(step.data["project_id"])
+                    if "endpoint_id" in step.data and step.data["endpoint_id"]:
+                        previous_endpoint_id = UUID(step.data["endpoint_id"])
+
         # Validate and extract entities if endpoint_id is provided
         model_id = None
         cluster_id = None
@@ -167,6 +181,19 @@ class PromptWorkflowService(SessionMixin):
                 raise ClientException(message="Endpoint not found", status_code=status.HTTP_404_NOT_FOUND)
             model_id = db_endpoint.model_id
             cluster_id = db_endpoint.cluster_id
+
+            # Validate project-endpoint consistency
+            if previous_project_id and db_endpoint.project_id != previous_project_id:
+                raise ClientException(
+                    message="Endpoint does not belong to the specified project.",
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                )
+            # Case 2: Current has both endpoint_id and project_id
+            if project_id and db_endpoint.project_id != project_id:
+                raise ClientException(
+                    message="Endpoint does not belong to the specified project.",
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                )
 
             # Update workflow icon
             if db_endpoint.model.provider_type in [
@@ -190,6 +217,22 @@ class PromptWorkflowService(SessionMixin):
             )
             if not db_project:
                 raise ClientException(message="Project not found", status_code=status.HTTP_404_NOT_FOUND)
+
+            # Validate project-endpoint consistency
+            # Case 3: Current has project_id, previous steps have endpoint_id
+            if previous_endpoint_id and not endpoint_id:
+                # Fetch the previous endpoint to validate
+                db_previous_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+                    EndpointModel,
+                    {"id": previous_endpoint_id},
+                    exclude_fields={"status": EndpointStatusEnum.DELETED},
+                    missing_ok=True,
+                )
+                if db_previous_endpoint and db_previous_endpoint.project_id != project_id:
+                    raise ClientException(
+                        message="Endpoint from previous step belongs to different project",
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                    )
 
             # Update workflow tag
             db_workflow = await WorkflowDataManager(self.session).update_by_fields(
