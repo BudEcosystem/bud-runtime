@@ -540,6 +540,76 @@ class ClickHouseMigration:
             logger.error(f"Error creating GatewayBlockingEvents table: {e}")
             raise
 
+    async def add_auth_metadata_columns(self):
+        """Add authentication metadata columns to existing ModelInferenceDetails table.
+
+        This migration adds api_key_id, user_id, and api_key_project_id columns
+        for tracking API usage in existing deployments.
+        """
+        logger.info("Adding authentication metadata columns to ModelInferenceDetails table...")
+
+        # Check if the table exists first
+        try:
+            table_exists = await self.client.execute_query("EXISTS TABLE ModelInferenceDetails")
+            if not table_exists or not table_exists[0][0]:
+                logger.warning("ModelInferenceDetails table does not exist. Creating it first...")
+                await self.create_model_inference_details_table()
+                logger.info("ModelInferenceDetails table created with auth metadata columns included")
+                return
+        except Exception as e:
+            logger.error(f"Error checking if ModelInferenceDetails table exists: {e}")
+            raise
+
+        # Check which columns already exist
+        existing_columns_query = """
+        SELECT name FROM system.columns
+        WHERE database = currentDatabase()
+        AND table = 'ModelInferenceDetails'
+        AND name IN ('api_key_id', 'user_id', 'api_key_project_id')
+        """
+
+        try:
+            existing_columns_result = await self.client.execute_query(existing_columns_query)
+            existing_columns = {row[0] for row in existing_columns_result} if existing_columns_result else set()
+
+            columns_to_add = []
+            if "api_key_id" not in existing_columns:
+                columns_to_add.append("ADD COLUMN IF NOT EXISTS api_key_id Nullable(UUID)")
+            if "user_id" not in existing_columns:
+                columns_to_add.append("ADD COLUMN IF NOT EXISTS user_id Nullable(UUID)")
+            if "api_key_project_id" not in existing_columns:
+                columns_to_add.append("ADD COLUMN IF NOT EXISTS api_key_project_id Nullable(UUID)")
+
+            if columns_to_add:
+                # Add the columns
+                alter_query = f"ALTER TABLE ModelInferenceDetails {', '.join(columns_to_add)}"
+                await self.client.execute_query(alter_query)
+                logger.info(f"Added columns: {', '.join(col.split()[-1] for col in columns_to_add)}")
+            else:
+                logger.info("All authentication metadata columns already exist")
+
+            # Add indexes for the new columns (if they don't exist)
+            indexes = [
+                ("idx_api_key_id", "api_key_id", "minmax", 1),
+                ("idx_user_id", "user_id", "minmax", 1),
+                ("idx_api_key_project_id", "api_key_project_id", "minmax", 1),
+            ]
+
+            for index_name, column, index_type, granularity in indexes:
+                index_query = f"ALTER TABLE ModelInferenceDetails ADD INDEX IF NOT EXISTS {index_name} ({column}) TYPE {index_type} GRANULARITY {granularity}"
+                try:
+                    await self.client.execute_query(index_query)
+                    logger.info(f"Index {index_name} created or already exists")
+                except Exception as e:
+                    if "already exists" not in str(e).lower():
+                        logger.warning(f"Index creation warning for {index_name}: {e}")
+
+            logger.info("Authentication metadata columns migration completed successfully")
+
+        except Exception as e:
+            logger.error(f"Error adding authentication metadata columns: {e}")
+            raise
+
     async def verify_tables(self):
         """Verify that tables were created successfully."""
         tables_to_check = [
@@ -583,6 +653,7 @@ class ClickHouseMigration:
             await self.create_moderation_inference_table()
             await self.create_gateway_analytics_table()
             await self.create_gateway_blocking_events_table()
+            await self.add_auth_metadata_columns()  # Add auth metadata columns migration
             await self.verify_tables()
             logger.info("Migration completed successfully!")
 
