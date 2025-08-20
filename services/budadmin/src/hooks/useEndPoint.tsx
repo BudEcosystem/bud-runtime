@@ -119,8 +119,9 @@ createEndPoint: (data: any) => Promise<any>;
   deleteAdapter: (adapterId: string, projectId?: string) => void;
   getEndpointSettings: (endpointId: string) => Promise<any>;
   updateEndpointSettings: (endpointId: string, settings: any) => Promise<any>;
-  getPricingHistory: (endpointId: string) => Promise<any>;
+  getPricingHistory: (endpointId: string, page?: number, limit?: number) => Promise<any>;
   updateTokenPricing: (endpointId: string, pricing: any, projectId?: string) => Promise<any>;
+  publishEndpoint: (endpointId: string, publishData: any) => Promise<any>;
 }>((set, get) => ({
   pageSource: "",
   clusterDetails: undefined,
@@ -405,10 +406,15 @@ getAdapters: async (params: GetAdapterParams, projectId?) => {
     }
   },
 
-  getPricingHistory: async (endpointId: string): Promise<any> => {
+  getPricingHistory: async (endpointId: string, page: number = 1, limit: number = 20): Promise<any> => {
     try {
       const url = `${tempApiBaseUrl}/endpoints/${endpointId}/pricing/history`;
-      const response: any = await AppRequest.Get(url);
+      const response: any = await AppRequest.Get(url, {
+        params: {
+          page,
+          limit
+        }
+      });
       console.log('Pricing history data:', response.data);
       return response.data;
     } catch (error) {
@@ -441,6 +447,31 @@ getAdapters: async (params: GetAdapterParams, projectId?) => {
       return response.data;
     } catch (error) {
       console.error("Error updating token pricing:", error);
+      throw error;
+    }
+  },
+
+  publishEndpoint: async (endpointId: string, publishData: any): Promise<any> => {
+    try {
+      const url = `${tempApiBaseUrl}/endpoints/${endpointId}/publish`;
+      const payload = {
+        action: publishData.action || "publish",
+        pricing: publishData.pricing || {
+          input_cost: 0,
+          output_cost: 0,
+          currency: "USD",
+          per_tokens: 1000
+        },
+        action_metadata: publishData.action_metadata || {
+          additionalProp1: {}
+        }
+      };
+
+      const response: any = await AppRequest.Put(url, payload);
+      successToast(response.message || "Endpoint published successfully");
+      return response.data;
+    } catch (error) {
+      console.error("Error publishing endpoint:", error);
       throw error;
     }
   }

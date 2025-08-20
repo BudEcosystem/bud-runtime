@@ -12,6 +12,7 @@ import {
   Input,
   Switch,
   Table,
+  ConfigProvider,
 } from "antd";
 import { Typography } from "antd";
 
@@ -114,6 +115,19 @@ export default function UsagePage() {
   const totalCost = usageData.reduce((acc, item) => acc + item.cost, 0);
   const totalTokens = usageData.reduce((acc, item) => acc + item.tokens, 0);
   const totalRequests = usageData.reduce((acc, item) => acc + item.requests, 0);
+  const themeConfig = {
+    components: {
+      Select: {
+        colorBgContainer: "var(--bg-tertiary)",
+        colorBorder: "var(--border-secondary)",
+        optionSelectedBg: "var(--bg-hover)",
+        colorBgElevated: "var(--bg-hover)",
+        colorText: "var(--text-primary)",
+        optionSelectedColor: "var(--text-primary)",
+        optionActiveBg: "var(--bg-hover)",
+      }
+    }
+  }
 
   const getUsagePercentage = () =>
     (billingPlan.quotaUsed / billingPlan.quotaLimit) * 100;
@@ -346,32 +360,37 @@ export default function UsagePage() {
 
           {/* Filters */}
           <Flex gap={16} className="mb-[2rem]" wrap="wrap">
-            <Select
-              value={timeRange}
-              onChange={setTimeRange}
-              style={{ width: 150 }}
-              className={styles.selectFilter}
-              options={[
-                { value: "1d", label: "Last 24h" },
-                { value: "7d", label: "Last 7 days" },
-                { value: "30d", label: "Last 30 days" },
-                { value: "90d", label: "Last 90 days" },
-              ]}
-            />
-
-            <Select
-              value={selectedModel}
-              onChange={setSelectedModel}
-              style={{ width: 200 }}
-              className={styles.selectFilter}
-              options={[
-                { value: "all", label: "All Models" },
-                { value: "gpt-4", label: "GPT-4" },
-                { value: "gpt-3.5-turbo", label: "GPT-3.5 Turbo" },
-                { value: "claude-3-opus", label: "Claude 3 Opus" },
-                { value: "claude-3-sonnet", label: "Claude 3 Sonnet" },
-              ]}
-            />
+            <ConfigProvider
+              theme={themeConfig}>
+              <Select
+                value={timeRange}
+                onChange={setTimeRange}
+                style={{ width: 150 }}
+                className={styles.selectFilter}
+                options={[
+                  { value: "1d", label: "Last 24h" },
+                  { value: "7d", label: "Last 7 days" },
+                  { value: "30d", label: "Last 30 days" },
+                  { value: "90d", label: "Last 90 days" },
+                ]}
+              />
+            </ConfigProvider>
+            <ConfigProvider
+              theme={themeConfig}>
+              <Select
+                value={selectedModel}
+                onChange={setSelectedModel}
+                style={{ width: 200 }}
+                className={styles.selectFilter}
+                options={[
+                  { value: "all", label: "All Models" },
+                  { value: "gpt-4", label: "GPT-4" },
+                  { value: "gpt-3.5-turbo", label: "GPT-3.5 Turbo" },
+                  { value: "claude-3-opus", label: "Claude 3 Opus" },
+                  { value: "claude-3-sonnet", label: "Claude 3 Sonnet" },
+                ]}
+              />
+            </ConfigProvider>
           </Flex>
 
           {/* Billing Alerts */}
@@ -419,8 +438,8 @@ export default function UsagePage() {
                       onChange={() => toggleAlert(alert.id)}
                       style={{
                         backgroundColor: alert.isActive
-                          ? "var(--bud-purple)"
-                          : "var(--bud-border-secondary)",
+                          ? "var(--color-purple)"
+                          : "var(--border-secondary)",
                       }}
                     />
                   </Flex>

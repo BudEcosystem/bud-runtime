@@ -13,6 +13,7 @@ import {
   Dropdown,
   Popconfirm,
   Tag,
+  ConfigProvider,
 } from "antd";
 import { Typography } from "antd";
 import { PlusOutlined, MoreOutlined } from "@ant-design/icons";
@@ -281,6 +282,24 @@ export default function ProjectsPage() {
   const activeProjects = projects.filter((p) => p.status === "active");
   const inactiveProjects = projects.filter((p) => p.status === "inactive");
   const archivedProjects = projects.filter((p) => p.status === "archived");
+  const themeConfig={
+    components: {
+      Dropdown: {
+        colorBgElevated: "var(--bg-tertiary)",  // dropdown container bg
+        controlItemBgHover: "var(--bg-hover)",  // hover background
+        controlItemBgActive: "var(--bg-hover)", // active/selected bg
+        colorText: "var(--text-primary)",        // default text
+      },
+      Menu: {
+        itemColor: "var(--text-primary)",        // menu item text
+        itemHoverColor: "var(--text-hover)",    // text on hover
+        itemHoverBg: "var(--bg-hover)",         // hover background
+        itemSelectedColor: "var(--text-primary)", // selected text
+        itemSelectedBg: "var(--bg-hover)",   // selected background
+        colorItemTextDisabled: "var(--text-disabled)", // disabled text
+      }
+    }
+  }
 
   return (
     <DashboardLayout>
@@ -392,18 +411,21 @@ export default function ProjectsPage() {
                             <Text className="text-bud-text-disabled text-[12px]">
                               {dayjs(project.updated_at).format("DD MMM")}
                             </Text>
-                            <Dropdown
-                              menu={{ items: getProjectMenuItems(project) }}
-                              trigger={["click"]}
-                              placement="bottomRight"
-                            >
-                              <Button
-                                type="text"
-                                icon={<MoreOutlined />}
-                                className="text-bud-text-disabled hover:text-bud-text-primary"
-                                size="small"
-                              />
-                            </Dropdown>
+                            <ConfigProvider
+                            theme={themeConfig}>
+                              <Dropdown
+                                menu={{ items: getProjectMenuItems(project) }}
+                                trigger={["click"]}
+                                placement="bottomRight"
+                              >
+                                <Button
+                                  type="text"
+                                  icon={<MoreOutlined />}
+                                  className="text-bud-text-disabled hover:text-bud-text-primary"
+                                  size="small"
+                                />
+                              </Dropdown>
+                            </ConfigProvider>
                           </div>
                         </div>
 
@@ -428,12 +450,12 @@ export default function ProjectsPage() {
                               project.status.slice(1)}
                           </Tag>
 
-                          <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-bud-bg-tertiary text-bud-text-muted">
+                          <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-[var(--bg-tertiary)] text-[var(--text-muted)]">
                             <Icon
                               icon={getProjectTypeIcon(project.project_type)}
                               className="text-xs"
                             />
-                            <Text className="text-[12px]">
+                            <Text className="text-[12px] text-[var(--text-muted)]">
                               {project.project_type === "client_app"
                                 ? "Client App"
                                 : "Existing App"}
@@ -529,18 +551,21 @@ export default function ProjectsPage() {
                             <Text className="text-bud-text-disabled text-[12px]">
                               {dayjs(project.updated_at).format("DD MMM")}
                             </Text>
-                            <Dropdown
-                              menu={{ items: getProjectMenuItems(project) }}
-                              trigger={["click"]}
-                              placement="bottomRight"
-                            >
-                              <Button
-                                type="text"
-                                icon={<MoreOutlined />}
-                                className="text-bud-text-disabled hover:text-bud-text-primary"
-                                size="small"
-                              />
-                            </Dropdown>
+                            <ConfigProvider
+                            theme={themeConfig}>
+                              <Dropdown
+                                menu={{ items: getProjectMenuItems(project) }}
+                                trigger={["click"]}
+                                placement="bottomRight"
+                              >
+                                <Button
+                                  type="text"
+                                  icon={<MoreOutlined />}
+                                  className="text-bud-text-disabled hover:text-bud-text-primary"
+                                  size="small"
+                                />
+                              </Dropdown>
+                            </ConfigProvider>
                           </div>
                         </div>
 
@@ -567,7 +592,7 @@ export default function ProjectsPage() {
                               icon={getProjectTypeIcon(project.project_type)}
                               className="text-xs"
                             />
-                            <Text className="text-[12px]">
+                            <Text className="text-[12px] text-[var(--text-muted)]">
                               {project.project_type === "client_app"
                                 ? "Client App"
                                 : "Existing App"}
@@ -658,18 +683,21 @@ export default function ProjectsPage() {
                             <Text className="text-bud-text-disabled text-[12px]">
                               {dayjs(project.updated_at).format("DD MMM")}
                             </Text>
-                            <Dropdown
-                              menu={{ items: getProjectMenuItems(project) }}
-                              trigger={["click"]}
-                              placement="bottomRight"
-                            >
-                              <Button
-                                type="text"
-                                icon={<MoreOutlined />}
-                                className="text-bud-text-disabled hover:text-bud-text-primary"
-                                size="small"
-                              />
-                            </Dropdown>
+                            <ConfigProvider
+                            theme={themeConfig}>
+                              <Dropdown
+                                menu={{ items: getProjectMenuItems(project) }}
+                                trigger={["click"]}
+                                placement="bottomRight"
+                              >
+                                <Button
+                                  type="text"
+                                  icon={<MoreOutlined />}
+                                  className="text-bud-text-disabled hover:text-bud-text-primary"
+                                  size="small"
+                                />
+                              </Dropdown>
+                            </ConfigProvider>
                           </div>
                         </div>
 
@@ -777,7 +805,7 @@ export default function ProjectsPage() {
                   onChange={(e) =>
                     setFormData({ ...formData, name: e.target.value })
                   }
-                  className="bg-bud-bg-tertiary border-bud-border-secondary"
+                  className="bg-[var(--bg-tertiary)] border-[var(--border-secondary)]"
                 />
               </div>
 

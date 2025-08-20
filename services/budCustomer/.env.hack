@@ -1,5 +1,5 @@
 # TODO:
-# This is a hack to inject variables at runtime, since 
+# This is a hack to inject variables at runtime, since
 # it's not properly implemented on application side
 # used by the nix pacakge & container derivation, since it modifies the
 # src at runtime nix pkg won't work, just the container that's using it

@@ -116,7 +116,7 @@ export default function ApiKeysPage() {
       key: "key",
       render: (text: string, record: ApiKey) => (
         <Flex align="center" gap={12}>
-          <code className="bg-[#1F1F1F] px-[0.75rem] py-[0.25rem] rounded text-[#B3B3B3] text-[0.813rem]">
+          <code className="bg-[var(--border-color)] px-[0.75rem] py-[0.25rem] rounded text-[var(--text-primary)] text-[0.813rem]">
             {maskKey(text)}
           </code>
           <Button

@@ -131,9 +131,9 @@ const LoginForm = ({ onSubmit }: LoginPageModalProps) => {
             className="w-[45px] h-auto mb-1 2xl:w-12"
           />
         </div>
-        <Text_12_400_B3B3B3 className="text-center">
+        <Text_12_400_EEEEEE className="text-center">
           Enter your email and password to access your account
-        </Text_12_400_B3B3B3>
+        </Text_12_400_EEEEEE>
       </div>
 
       <form onSubmit={handleLogin} className="w-[76.6%] mt-[1.6em]">
@@ -281,11 +281,9 @@ const LoginForm = ({ onSubmit }: LoginPageModalProps) => {
       </div>
 
       <div className="mt-[1rem] flex justify-center items-center gap-1">
-        <Text_12_400_808080>Don&apos;t have an account?</Text_12_400_808080>
-        <Link href="/register">
-          <Text_12_400_EEEEEE className="cursor-pointer hover:underline">
-            Sign up
-          </Text_12_400_EEEEEE>
+        <Text_12_400_EEEEEE>Don&apos;t have an account?</Text_12_400_EEEEEE>
+        <Link href="/register" className="text-bud-purple cursor-pointer hover:underline">
+          Sign up
         </Link>
       </div>
 
