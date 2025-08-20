@@ -550,11 +550,10 @@ html.dark {
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  background-color: var(--bud-border);
+  background-color: var(--text-disabled);
   border-radius: 3px;
   transition: background-color 0.2s ease;
 }
-
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
   background-color: var(--bud-border-secondary);
 }
@@ -573,8 +572,11 @@ html.dark {
   background: transparent;
 }
 
+.ant-popover-inner {
+  padding: 0 !important;
+}
 .sidebar-scroll::-webkit-scrollbar-thumb {
-  background-color: var(--bud-border);
+  background-color: var(--text-disabled);
   border-radius: 2px;
   transition: all 0.2s ease;
 }

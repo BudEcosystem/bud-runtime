@@ -428,12 +428,12 @@ export default function ProjectsPage() {
                               project.status.slice(1)}
                           </Tag>
 
-                          <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-bud-bg-tertiary text-bud-text-muted">
+                          <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-[var(--bg-tertiary)] text-[var(--text-muted)]">
                             <Icon
                               icon={getProjectTypeIcon(project.project_type)}
                               className="text-xs"
                             />
-                            <Text className="text-[12px]">
+                            <Text className="text-[12px] text-[var(--text-muted)]">
                               {project.project_type === "client_app"
                                 ? "Client App"
                                 : "Existing App"}
@@ -567,7 +567,7 @@ export default function ProjectsPage() {
                               icon={getProjectTypeIcon(project.project_type)}
                               className="text-xs"
                             />
-                            <Text className="text-[12px]">
+                            <Text className="text-[12px] text-[var(--text-muted)]">
                               {project.project_type === "client_app"
                                 ? "Client App"
                                 : "Existing App"}
