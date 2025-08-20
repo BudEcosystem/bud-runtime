@@ -50,6 +50,10 @@ $primary-color: var(--color-purple);
     .ant-empty-normal {
       color: $text-gray;
     }
+    .ant-btn-variant-text:not(:disabled):not(.ant-btn-disabled):hover {
+      color: var(--text-primary);
+      background-color: var(--bg-hover);
+    }
   }
 }
 
