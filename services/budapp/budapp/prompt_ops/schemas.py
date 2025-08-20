@@ -307,6 +307,9 @@ class PromptVersionResponse(BaseModel):
 
     id: UUID4
     version: int
+    endpoint: EndpointResponse
+    model: ModelResponse
+    cluster: ClusterResponse
 
 
 class PromptResponse(BaseModel):
@@ -319,9 +322,6 @@ class PromptResponse(BaseModel):
     description: str | None
     tags: list[dict] | None
     project: ProjectResponse
-    endpoint: EndpointResponse
-    model: ModelResponse
-    cluster: ClusterResponse
     prompt_type: str
     auto_scale: bool
     caching: bool
