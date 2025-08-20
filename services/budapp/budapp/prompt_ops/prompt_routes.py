@@ -36,7 +36,15 @@ from budapp.user_ops.schemas import User
 from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.workflow_ops.services import WorkflowService
 
-from .schemas import CreatePromptWorkflowRequest, PromptFilter, PromptListItem, PromptListResponse
+from .schemas import (
+    CreatePromptWorkflowRequest,
+    EditPromptRequest,
+    PromptFilter,
+    PromptListItem,
+    PromptListResponse,
+    PromptResponse,
+    SinglePromptResponse,
+)
 from .services import PromptService, PromptWorkflowService
 
 
@@ -147,6 +155,57 @@ async def delete_prompt(
         logger.exception(f"Failed to delete prompt: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to delete prompt"
+        ).to_http_response()
+
+
+@router.patch(
+    "/{prompt_id}",
+    responses={
+        status.HTTP_200_OK: {
+            "model": SinglePromptResponse,
+            "description": "Successfully updated prompt",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Invalid request data",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Prompt not found",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Server error",
+        },
+    },
+    description="Update a prompt by its ID",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
+async def edit_prompt(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    prompt_id: UUID,
+    edit_prompt: EditPromptRequest,
+) -> Union[SinglePromptResponse, ErrorResponse]:
+    """Edit prompt fields."""
+    try:
+        prompt_response = await PromptService(session).edit_prompt(
+            prompt_id=prompt_id, data=edit_prompt.model_dump(exclude_unset=True, exclude_none=True)
+        )
+
+        return SinglePromptResponse(
+            prompt=prompt_response,
+            message="Prompt updated successfully",
+            code=status.HTTP_200_OK,
+            object="prompt.edit",
+        ).to_http_response()
+    except ClientException as e:
+        logger.error(f"Failed to edit prompt: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to edit prompt: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to edit prompt"
         ).to_http_response()
 
 

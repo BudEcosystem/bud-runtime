@@ -16,6 +16,7 @@
 
 """Business logic services for the prompt ops module."""
 
+from typing import Any
 from uuid import UUID
 
 from fastapi import status
@@ -48,7 +49,13 @@ from ..workflow_ops.services import WorkflowService, WorkflowStepService
 from .crud import PromptDataManager, PromptVersionDataManager
 from .models import Prompt as PromptModel
 from .models import PromptVersion as PromptVersionModel
-from .schemas import CreatePromptWorkflowRequest, CreatePromptWorkflowSteps, PromptFilter, PromptListItem
+from .schemas import (
+    CreatePromptWorkflowRequest,
+    CreatePromptWorkflowSteps,
+    PromptFilter,
+    PromptListItem,
+    PromptResponse,
+)
 
 
 logger = logging.get_logger(__name__)
@@ -114,6 +121,51 @@ class PromptService(SessionMixin):
         logger.debug(f"Soft deleted {deleted_count} prompt versions for prompt {prompt_id}")
 
         return db_prompt
+
+    async def edit_prompt(self, prompt_id: UUID, data: dict[str, Any]) -> PromptModel:
+        """Edit prompt by validating and updating specific fields."""
+        # Retrieve existing prompt
+        db_prompt = await PromptDataManager(self.session).retrieve_by_fields(
+            PromptModel, fields={"id": prompt_id, "status": PromptStatusEnum.ACTIVE}
+        )
+
+        # Validate name uniqueness if name is provided
+        if "name" in data:
+            duplicate_prompt = await PromptDataManager(self.session).retrieve_by_fields(
+                PromptModel,
+                fields={"name": data["name"]},
+                exclude_fields={"id": prompt_id, "status": PromptStatusEnum.DELETED},
+                missing_ok=True,
+                case_sensitive=False,
+            )
+            if duplicate_prompt:
+                raise ClientException(message="Prompt name already exists", status_code=status.HTTP_400_BAD_REQUEST)
+
+        # Validate default_version_id if provided
+        if "default_version_id" in data and data["default_version_id"]:
+            # Check if the version exists and belongs to this prompt
+            db_version = await PromptVersionDataManager(self.session).retrieve_by_fields(
+                PromptVersionModel,
+                fields={
+                    "id": data["default_version_id"],
+                    "prompt_id": prompt_id,
+                },
+                exclude_fields={"status": PromptVersionStatusEnum.DELETED},
+                missing_ok=True,
+            )
+            if not db_version:
+                raise ClientException(
+                    message="Invalid default version. Version does not exist or does not belong to this prompt.",
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                )
+
+        # Update the prompt
+        db_prompt = await PromptDataManager(self.session).update_by_fields(db_prompt, data)
+
+        # Convert to response model
+        prompt_response = PromptResponse.model_validate(db_prompt)
+
+        return prompt_response
 
 
 class PromptWorkflowService(SessionMixin):

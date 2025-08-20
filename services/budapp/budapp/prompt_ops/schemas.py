@@ -22,14 +22,18 @@ from uuid import UUID
 
 from pydantic import UUID4, BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from budapp.commons.constants import (
+from ..cluster_ops.schemas import ClusterResponse
+from ..commons.constants import (
     ModalityEnum,
     PromptStatusEnum,
     PromptTypeEnum,
     PromptVersionStatusEnum,
     RateLimitTypeEnum,
 )
-from budapp.commons.schemas import PaginatedSuccessResponse, Tag
+from ..commons.schemas import PaginatedSuccessResponse, SuccessResponse, Tag
+from ..endpoint_ops.schemas import EndpointResponse
+from ..model_ops.schemas import ModelResponse
+from ..project_ops.schemas import ProjectResponse
 
 
 class PromptFilter(BaseModel):
@@ -272,3 +276,66 @@ class CreatePromptWorkflowSteps(BaseModel):
     rate_limit_type: RateLimitTypeEnum | None = None
     rate_limit_value: int | None = None
     prompt_schema: PromptSchemaConfig | None = None
+
+
+class EditPromptRequest(BaseModel):
+    """Edit prompt request schema."""
+
+    name: str | None = Field(
+        None,
+        min_length=1,
+        max_length=255,
+        description="Name of the prompt, must be non-empty and at most 255 characters.",
+    )
+    description: str | None = Field(None, description="Description of the prompt.")
+    tags: list[Tag] | None = Field(None, description="Tags associated with the prompt.")
+    default_version_id: UUID4 | None = Field(None, description="Default version ID for the prompt.")
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def validate_name(cls, value: str | None) -> str | None:
+        """Ensure the name is not empty or only whitespace."""
+        if value is not None and not value.strip():
+            raise ValueError("Prompt name cannot be empty or only whitespace.")
+        return value
+
+
+class PromptVersionResponse(BaseModel):
+    """Prompt version response schema."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID4
+    version: int
+
+
+class PromptResponse(BaseModel):
+    """Prompt response schema."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID4
+    name: str
+    description: str | None
+    tags: list[dict] | None
+    project: ProjectResponse
+    endpoint: EndpointResponse
+    model: ModelResponse
+    cluster: ClusterResponse
+    prompt_type: str
+    auto_scale: bool
+    caching: bool
+    concurrency: list[int] | None
+    rate_limit_type: str
+    rate_limit_value: int | None
+    default_version: PromptVersionResponse
+    status: str
+    created_at: datetime
+    modified_at: datetime
+    created_by: UUID4
+
+
+class SinglePromptResponse(SuccessResponse):
+    """Single prompt response."""
+
+    prompt: PromptResponse
