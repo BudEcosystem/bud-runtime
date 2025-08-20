@@ -9,6 +9,25 @@ from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse
 from budapp.eval_ops.models import RunStatusEnum
 
 
+# ------------------------ Summary Schemas for Experiments ------------------------
+
+
+class ModelSummary(BaseModel):
+    """Summary of a model used in an experiment."""
+
+    id: UUID4 = Field(..., description="The UUID of the model.")
+    name: str = Field(..., description="The name of the model.")
+    deployment_name: Optional[str] = Field(None, description="The deployment name/namespace if deployed.")
+
+
+class TraitSummary(BaseModel):
+    """Summary of a trait associated with datasets in an experiment."""
+
+    id: UUID4 = Field(..., description="The UUID of the trait.")
+    name: str = Field(..., description="The name of the trait.")
+    icon: Optional[str] = Field(None, description="The icon for the trait.")
+
+
 # ------------------------ Experiment Schemas ------------------------
 
 
@@ -29,6 +48,13 @@ class Experiment(BaseModel):
     description: Optional[str] = Field(None, description="The description of the experiment.")
     project_id: Optional[UUID4] = Field(None, description="The project ID for the experiment.")
     tags: Optional[List[str]] = Field(None, description="List of tags for the experiment.")
+    status: Optional[str] = Field(
+        None, description="Computed status based on runs (running/failed/completed/pending/no_runs)."
+    )
+    models: Optional[List[ModelSummary]] = Field(default_factory=list, description="Models used in the experiment.")
+    traits: Optional[List[TraitSummary]] = Field(
+        default_factory=list, description="Traits associated with the experiment."
+    )
 
     class Config:
         """Pydantic model configuration."""

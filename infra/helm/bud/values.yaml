@@ -124,6 +124,14 @@ microservices:
             PSQL_USER: budmodel
             PSQL_PASSWORD: budmodel
             PSQL_DB_NAME: budmodel
+    budeval:
+        image: budstudio/budeval:nightly
+        env:
+            PSQL_HOST: '{{ $.Release.Name }}-postgresql'
+            PSQL_PORT: "5432"
+            PSQL_USER: bueval
+            PSQL_PASSWORD: budeval
+            PSQL_DB_NAME: budeval
     budsim:
         image: budstudio/budsim:nightly
         env:
@@ -257,6 +265,7 @@ clickhouse:
 clickhouseExtra:
     autoCreateDB:
         - budproxy
+        - budeval
 postgresql:
     enabled: true
     architecture: standalone
@@ -273,6 +282,7 @@ postgresqlExtra:
         - budmetrics
         - budmodel
         - budsim
+        - budeval
 
 keycloak:
     proxy: edge

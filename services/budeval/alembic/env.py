@@ -23,6 +23,7 @@ if config.config_file_name is not None:
 # target_metadata = mymodel.Base.metadata
 from budmicroframe.shared.psql_service import PSQLBase
 from budmicroframe.shared.dapr_workflow import WorkflowRunsSchema, WorkflowStepsSchema
+from budeval.evals.eval_sync.models import EvalSyncState
 
 
 target_metadata = PSQLBase.metadata
@@ -39,8 +40,8 @@ def get_psql_url() -> PostgresDsn:
 
     return PostgresDsn.build(
         scheme="postgresql+psycopg",
-        username=os.getenv("PSQL_USER"),
-        password=os.getenv("PSQL_PASSWORD"),
+        username=os.getenv("SECRETS_PSQL_USER"),
+        password=os.getenv("SECRETS_PSQL_PASSWORD"),
         host=os.getenv("PSQL_HOST"),
         port=int(os.getenv("PSQL_PORT")),
         path=os.getenv("PSQL_DB_NAME"),

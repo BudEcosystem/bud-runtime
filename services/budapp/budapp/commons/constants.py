@@ -625,6 +625,7 @@ class PayloadType(str, Enum):
     RUN_BENCHMARK = "performance_benchmark"
     ADD_ADAPTER = "add_adapter"
     DELETE_ADAPTER = "delete_adapter"
+    EVALUATE_MODEL = "evaluate_model"
 
 
 class BudServeWorkflowStepEventName(str, Enum):
@@ -651,6 +652,7 @@ class BudServeWorkflowStepEventName(str, Enum):
     QUANTIZATION_DEPLOYMENT_EVENTS = "quantization_deployment_events"
     ADAPTER_DEPLOYMENT_EVENTS = "adapter_deployment_events"
     ADAPTER_DELETE_EVENTS = "adapter_delete_events"
+    EVALUATION_EVENTS = "evaluation_events"
 
 
 # Mapping between payload types and workflow step event names.
@@ -672,6 +674,7 @@ PAYLOAD_TO_WORKFLOW_STEP_EVENT: dict[PayloadType, BudServeWorkflowStepEventName]
     PayloadType.RUN_BENCHMARK: BudServeWorkflowStepEventName.BUDSERVE_CLUSTER_EVENTS,
     PayloadType.ADD_ADAPTER: BudServeWorkflowStepEventName.ADAPTER_DEPLOYMENT_EVENTS,
     PayloadType.DELETE_ADAPTER: BudServeWorkflowStepEventName.ADAPTER_DELETE_EVENTS,
+    PayloadType.EVALUATE_MODEL: BudServeWorkflowStepEventName.EVALUATION_EVENTS,
 }
 
 

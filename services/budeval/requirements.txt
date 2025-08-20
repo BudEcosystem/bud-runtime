@@ -10,3 +10,17 @@ pydantic-settings >= 2.3.4
 # Utils
 structlog >= 24.4.0
 cachetools >= 5.4.0
+aiohttp >= 3.8.0
+aiofiles >= 23.0.0
+
+# ClickHouse
+asynch >= 0.2.3
+clickhouse-connect >= 0.7.0
+
+# Ops
+ansible-runner >= 2.4.1
+kubernetes >= 32.0.1
+ansible-core >= 2.18.5
+kubernetes-stubs
+
+budmicroframe @ git+https://github.com/BudEcosystem/bud-microframe.git

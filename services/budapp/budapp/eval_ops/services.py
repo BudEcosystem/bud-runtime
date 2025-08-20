@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from budapp.commons import logging
 from budapp.commons.constants import WorkflowTypeEnum
 from budapp.commons.exceptions import ClientException
+from budapp.endpoint_ops.models import Endpoint as EndpointModel
 from budapp.eval_ops.models import ExpDataset as DatasetModel
 from budapp.eval_ops.models import (
     ExpDatasetVersion,
@@ -36,7 +37,9 @@ from budapp.eval_ops.schemas import (
     ExperimentWorkflowResponse,
     ExperimentWorkflowStepData,
     ExperimentWorkflowStepRequest,
+    ModelSummary,
     TraitBasic,
+    TraitSummary,
     UpdateDatasetRequest,
     UpdateExperimentRequest,
     UpdateRunRequest,
@@ -130,7 +133,13 @@ class ExperimentService:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create experiment"
             ) from e
-        return ExperimentSchema.from_orm(ev)
+
+        # Create experiment schema with empty models and traits (new experiment has no runs yet)
+        exp_data = ExperimentSchema.from_orm(ev)
+        exp_data.models = []
+        exp_data.traits = []
+        exp_data.status = "no_runs"  # New experiment has no runs
+        return exp_data
 
     def configure_runs(
         self, experiment_id: uuid.UUID, req: ConfigureRunsRequest, user_id: uuid.UUID
@@ -255,7 +264,23 @@ class ExperimentService:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list experiments"
             ) from e
-        return [ExperimentSchema.from_orm(e) for e in evs], total_count
+
+        # Get statuses for all experiments in one batch query
+        experiment_ids = [exp.id for exp in evs]
+        statuses = self.get_experiment_statuses_batch(experiment_ids)
+
+        # Enrich each experiment with models, traits, and status
+        enriched_experiments = []
+        for exp in evs:
+            exp_data = ExperimentSchema.from_orm(exp)
+            # Add models and traits to the experiment
+            exp_data.models = self.get_models_for_experiment(exp.id)
+            exp_data.traits = self.get_traits_for_experiment(exp.id)
+            # Add computed status
+            exp_data.status = statuses.get(exp.id, "unknown")
+            enriched_experiments.append(exp_data)
+
+        return enriched_experiments, total_count
 
     def get_experiment(self, ev_id: uuid.UUID, user_id: uuid.UUID) -> ExperimentSchema:
         """Get a single Experiment by ID for a given user.
@@ -273,7 +298,13 @@ class ExperimentService:
         ev = self.session.get(ExperimentModel, ev_id)
         if not ev or ev.created_by != user_id or ev.status == "deleted":
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Experiment not found or access denied")
-        return ExperimentSchema.from_orm(ev)
+
+        # Create experiment schema and enrich with models, traits, and status
+        exp_data = ExperimentSchema.from_orm(ev)
+        exp_data.models = self.get_models_for_experiment(ev.id)
+        exp_data.traits = self.get_traits_for_experiment(ev.id)
+        exp_data.status = self.compute_experiment_status(ev.id)
+        return exp_data
 
     def update_experiment(
         self,
@@ -310,7 +341,13 @@ class ExperimentService:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update experiment"
             ) from e
-        return ExperimentSchema.from_orm(ev)
+
+        # Create experiment schema and enrich with models, traits, and status
+        exp_data = ExperimentSchema.from_orm(ev)
+        exp_data.models = self.get_models_for_experiment(ev.id)
+        exp_data.traits = self.get_traits_for_experiment(ev.id)
+        exp_data.status = self.compute_experiment_status(ev.id)
+        return exp_data
 
     def delete_experiment(self, ev_id: uuid.UUID, user_id: uuid.UUID) -> None:
         """Soft-delete an Experiment by setting its status to 'deleted'.
@@ -394,6 +431,191 @@ class ExperimentService:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list traits"
             ) from e
+
+    # ------------------------ Experiment Enhancement Methods ------------------------
+
+    def get_models_for_experiment(self, experiment_id: uuid.UUID) -> List[ModelSummary]:
+        """Get all unique models used in an experiment's runs.
+
+        Parameters:
+            experiment_id (uuid.UUID): ID of the experiment.
+
+        Returns:
+            List[ModelSummary]: List of model summaries with deployment names.
+        """
+        try:
+            # Query for unique models used in the experiment's runs
+            # Join with endpoints to get deployment names
+            models = (
+                self.session.query(
+                    ModelTable.id,
+                    ModelTable.name,
+                    EndpointModel.namespace.label("deployment_name"),
+                )
+                .join(RunModel, RunModel.model_id == ModelTable.id)
+                .outerjoin(EndpointModel, EndpointModel.model_id == ModelTable.id)
+                .filter(
+                    RunModel.experiment_id == experiment_id,
+                    RunModel.status != RunStatusEnum.DELETED.value,
+                )
+                .distinct()
+                .all()
+            )
+
+            return [
+                ModelSummary(
+                    id=model.id,
+                    name=model.name,
+                    deployment_name=model.deployment_name,
+                )
+                for model in models
+            ]
+        except Exception as e:
+            logger.error(f"Failed to get models for experiment {experiment_id}: {e}")
+            return []
+
+    def get_traits_for_experiment(self, experiment_id: uuid.UUID) -> List[TraitSummary]:
+        """Get all unique traits associated with datasets used in an experiment's runs.
+
+        Parameters:
+            experiment_id (uuid.UUID): ID of the experiment.
+
+        Returns:
+            List[TraitSummary]: List of trait summaries.
+        """
+        try:
+            # Query for unique traits through the dataset relationships
+            traits = (
+                self.session.query(
+                    TraitModel.id,
+                    TraitModel.name,
+                    TraitModel.icon,
+                )
+                .join(PivotModel, TraitModel.id == PivotModel.trait_id)
+                .join(DatasetModel, PivotModel.dataset_id == DatasetModel.id)
+                .join(ExpDatasetVersion, DatasetModel.id == ExpDatasetVersion.dataset_id)
+                .join(RunModel, ExpDatasetVersion.id == RunModel.dataset_version_id)
+                .filter(
+                    RunModel.experiment_id == experiment_id,
+                    RunModel.status != RunStatusEnum.DELETED.value,
+                )
+                .distinct()
+                .all()
+            )
+
+            return [
+                TraitSummary(
+                    id=trait.id,
+                    name=trait.name,
+                    icon=trait.icon,
+                )
+                for trait in traits
+            ]
+        except Exception as e:
+            logger.error(f"Failed to get traits for experiment {experiment_id}: {e}")
+            return []
+
+    def compute_experiment_status(self, experiment_id: uuid.UUID) -> str:
+        """Compute experiment status based on all runs' statuses.
+
+        Parameters:
+            experiment_id (uuid.UUID): ID of the experiment.
+
+        Returns:
+            str: Computed status string (running/failed/completed/pending/cancelled/skipped/no_runs).
+        """
+        try:
+            # Query all non-deleted runs for the experiment
+            runs = (
+                self.session.query(RunModel.status)
+                .filter(
+                    RunModel.experiment_id == experiment_id,
+                    RunModel.status != RunStatusEnum.DELETED.value,
+                )
+                .all()
+            )
+
+            if not runs:
+                return "no_runs"
+
+            statuses = [run.status for run in runs]
+
+            # Priority order for status determination
+            if RunStatusEnum.RUNNING.value in statuses:
+                return "running"
+            if RunStatusEnum.FAILED.value in statuses:
+                return "failed"
+            if RunStatusEnum.CANCELLED.value in statuses:
+                return "cancelled"
+            if RunStatusEnum.PENDING.value in statuses:
+                return "pending"
+            if all(s == RunStatusEnum.COMPLETED.value for s in statuses):
+                return "completed"
+            if all(s == RunStatusEnum.SKIPPED.value for s in statuses):
+                return "skipped"
+
+            # Fallback for mixed completed/skipped states
+            return "completed"
+        except Exception as e:
+            logger.error(f"Failed to compute status for experiment {experiment_id}: {e}")
+            return "unknown"
+
+    def get_experiment_statuses_batch(self, experiment_ids: List[uuid.UUID]) -> dict[uuid.UUID, str]:
+        """Get statuses for multiple experiments in one query for optimization.
+
+        Parameters:
+            experiment_ids (List[uuid.UUID]): List of experiment IDs.
+
+        Returns:
+            dict[uuid.UUID, str]: Mapping of experiment_id to computed status.
+        """
+        try:
+            # Query all runs for all experiments in one go
+            runs = (
+                self.session.query(RunModel.experiment_id, RunModel.status)
+                .filter(
+                    RunModel.experiment_id.in_(experiment_ids),
+                    RunModel.status != RunStatusEnum.DELETED.value,
+                )
+                .all()
+            )
+
+            # Group runs by experiment_id
+            runs_by_experiment = {}
+            for run in runs:
+                if run.experiment_id not in runs_by_experiment:
+                    runs_by_experiment[run.experiment_id] = []
+                runs_by_experiment[run.experiment_id].append(run.status)
+
+            # Compute status for each experiment
+            result = {}
+            for exp_id in experiment_ids:
+                if exp_id not in runs_by_experiment:
+                    result[exp_id] = "no_runs"
+                else:
+                    statuses = runs_by_experiment[exp_id]
+
+                    # Apply the same priority logic
+                    if RunStatusEnum.RUNNING.value in statuses:
+                        result[exp_id] = "running"
+                    elif RunStatusEnum.FAILED.value in statuses:
+                        result[exp_id] = "failed"
+                    elif RunStatusEnum.CANCELLED.value in statuses:
+                        result[exp_id] = "cancelled"
+                    elif RunStatusEnum.PENDING.value in statuses:
+                        result[exp_id] = "pending"
+                    elif all(s == RunStatusEnum.COMPLETED.value for s in statuses):
+                        result[exp_id] = "completed"
+                    elif all(s == RunStatusEnum.SKIPPED.value for s in statuses):
+                        result[exp_id] = "skipped"
+                    else:
+                        result[exp_id] = "completed"  # Fallback for mixed completed/skipped
+
+            return result
+        except Exception as e:
+            logger.error(f"Failed to compute statuses for experiments: {e}")
+            # Return unknown status for all experiments on error
+            return dict.fromkeys(experiment_ids, "unknown")
 
     # ------------------------ Run Methods ------------------------
 
