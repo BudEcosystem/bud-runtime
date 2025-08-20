@@ -433,7 +433,7 @@ export default function ProjectsPage() {
                               icon={getProjectTypeIcon(project.project_type)}
                               className="text-xs"
                             />
-                            <Text className="text-[12px]">
+                            <Text className="text-[12px] text-[var(--text-muted)]">
                               {project.project_type === "client_app"
                                 ? "Client App"
                                 : "Existing App"}
@@ -567,7 +567,7 @@ export default function ProjectsPage() {
                               icon={getProjectTypeIcon(project.project_type)}
                               className="text-xs"
                             />
-                            <Text className="text-[12px]">
+                            <Text className="text-[12px] text-[var(--text-muted)]">
                               {project.project_type === "client_app"
                                 ? "Client App"
                                 : "Existing App"}
