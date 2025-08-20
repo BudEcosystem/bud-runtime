@@ -338,82 +338,19 @@ export default function ProjectsPage() {
                         <Text className="text-bud-text-muted text-[13px] mb-6 line-clamp-2 leading-relaxed block">
                           {project.description}
                         </Text>
-
-                        {/* Status and Type Tags */}
-                        <div className="flex items-center gap-2 mb-6">
-                          <Tag
-                            icon={<Icon icon={getStatusIcon(project.status)} />}
-                            color={getStatusColor(project.status)}
-                            className="border-0 px-[0.75rem] py-[0.25rem] text-[0.75rem]"
-                          >
-                            {project.status.charAt(0).toUpperCase() +
-                              project.status.slice(1)}
-                          </Tag>
-
-                          <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-bud-bg-tertiary text-bud-text-muted">
-                            <Icon
-                              icon={getProjectTypeIcon(project.project_type)}
-                              className="text-xs"
-                            />
-                            <Text className="text-[12px]">
-                              {project.project_type === "client_app"
-                                ? "Client App"
-                                : "Existing App"}
-                            </Text>
-                          </div>
-                        </div>
-
-                        {/* Resources Stats */}
-                        <div className="grid grid-cols-2 gap-3 mb-4">
-                          <div className="flex items-center gap-2">
-                            <Icon
-                              icon="ph:key"
-                              className="text-bud-text-disabled text-sm"
-                            />
-                            <Text className="text-bud-text-muted text-[12px]">
-                              {project.resources.api_keys} Keys
-                            </Text>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Icon
-                              icon="ph:stack"
-                              className="text-bud-text-disabled text-sm"
-                            />
-                            <Text className="text-bud-text-muted text-[12px]">
-                              {project.resources.batches} Batches
-                            </Text>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Icon
-                              icon="ph:file-text"
-                              className="text-bud-text-disabled text-sm"
-                            />
-                            <Text className="text-bud-text-muted text-[12px]">
-                              {project.resources.logs.toLocaleString()} Logs
-                            </Text>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Icon
-                              icon="ph:cpu"
-                              className="text-bud-text-disabled text-sm"
-                            />
-                            <Text className="text-bud-text-muted text-[12px]">
-                              {project.resources.models} Models
-                            </Text>
-                          </div>
-                        </div>
                       </div>
 
                       {/* Footer Section */}
                       <div className="bg-bud-bg-tertiary px-6 py-4 border-t border-bud-border absolute bottom-0 left-0 w-full">
-                        <Text className="text-bud-text-disabled text-[12px] mb-1 block">
-                          Last Updated
-                        </Text>
-                        <Text className="text-bud-text-primary text-[13px]">
-                          {dayjs(project.updated_at).format(
-                            "MMM DD, YYYY HH:mm",
-                          )}
-                        </Text>
+                        <div className="flex items-center gap-2">
+                          <Icon
+                            icon="ph:key"
+                            className="text-bud-text-disabled text-sm"
+                          />
+                          <Text className="text-bud-text-primary text-[13px]">
+                            {project.resources.api_keys} API Keys
+                          </Text>
+                        </div>
                       </div>
                     </Card>
                   </Col>
