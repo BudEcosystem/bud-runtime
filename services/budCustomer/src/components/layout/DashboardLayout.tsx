@@ -17,8 +17,6 @@ import styles from "./DashboardLayout.module.scss";
 import { useShortCut } from "@/hooks/useShortCut";
 import ThemeSwitcher from "@/components/ui/ThemeSwitcher";
 import { useTheme } from "@/context/themeContext";
-import ProjectSelector from "@/components/project/ProjectSelector";
-import { useProject } from "@/context/projectContext";
 import { useUser } from "@/stores/useUser";
 
 const { Text } = Typography;
@@ -78,9 +76,6 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
   const { effectiveTheme } = useTheme();
   const [isHovered, setIsHovered] = useState<string | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
-
-  // Project context
-  const { currentProject } = useProject();
 
   // User context
   const { user, logout } = useUser();
@@ -237,52 +232,6 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
 
         {/* Scrollable Content Area */}
         <div className="flex-1 overflow-hidden flex flex-col">
-          {/* Project Selector */}
-          <div
-            className={`${isCollapsed ? "px-4" : "px-6"} mb-4 flex-shrink-0`}
-          >
-            {!isCollapsed ? (
-              <>
-                <div className="mb-2">
-                  <Text className="text-bud-text-disabled text-xs uppercase tracking-wider">
-                    Current Project
-                  </Text>
-                </div>
-                <ProjectSelector
-                  onCreateProject={() => router.push("/projects")}
-                  size="small"
-                  className="w-full"
-                />
-              </>
-            ) : (
-              <div className="flex justify-center">
-                <button
-                  onClick={() => router.push("/projects")}
-                  className="w-10 h-auto rounded-lg bg-bud-bg-secondary border border-bud-border hover:bg-bud-bg-tertiary hover:border-bud-purple transition-all flex items-center justify-center"
-                  title={
-                    currentProject
-                      ? `Current: ${currentProject.name}`
-                      : "Select Project"
-                  }
-                >
-                  {currentProject ? (
-                    <div
-                      className="w-6 h-6 rounded flex items-center justify-center"
-                      style={{ backgroundColor: currentProject.color }}
-                    >
-                      <Icon icon="ph:folder" className="text-white text-sm" />
-                    </div>
-                  ) : (
-                    <Icon
-                      icon="ph:folder-plus"
-                      className="text-bud-text-disabled text-lg"
-                    />
-                  )}
-                </button>
-              </div>
-            )}
-          </div>
-
           {/* Navigation */}
           <nav className="flex-1 px-3 overflow-y-auto sidebar-scroll">
             {tabs.map((tab) => {
