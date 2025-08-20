@@ -322,6 +322,7 @@ class InferenceListItem(BaseModel):
     is_success: bool
     cached: bool
     project_id: Optional[UUID] = None
+    api_key_project_id: Optional[UUID] = None  # Project associated with API key
     endpoint_id: Optional[UUID] = None
     model_id: Optional[UUID] = None
     endpoint_type: str = "chat"  # New field to identify inference type
@@ -437,6 +438,7 @@ class InferenceDetailResponse(ResponseBase):
     request_arrival_time: datetime
     request_forward_time: datetime
     project_id: UUID
+    api_key_project_id: Optional[UUID] = None  # Project associated with API key
     endpoint_id: UUID
 
     # Status

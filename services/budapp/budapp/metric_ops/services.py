@@ -270,7 +270,7 @@ class BudMetricService(SessionMixin):
                     )
 
                 # Enrich response with names
-                await self._enrich_inference_list(response_data)
+                await self._enrich_inference_list(response_data, current_user)
 
                 # Add required message field for SuccessResponse
                 if "message" not in response_data:
@@ -338,7 +338,7 @@ class BudMetricService(SessionMixin):
                         )
 
                 # Enrich response with names
-                await self._enrich_inference_detail(response_data)
+                await self._enrich_inference_detail(response_data, current_user)
 
                 logger.info(f"Response data: {response_data}")
 
@@ -418,8 +418,10 @@ class BudMetricService(SessionMixin):
                 "Failed to get inference feedback", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
             ) from e
 
-    async def _enrich_inference_list(self, response_data: Dict) -> None:
+    async def _enrich_inference_list(self, response_data: Dict, current_user: User) -> None:
         """Enrich inference list with project, endpoint, and model names."""
+        from ..commons.constants import UserTypeEnum
+
         try:
             items = response_data.get("items", [])
             if not items:
@@ -427,13 +429,25 @@ class BudMetricService(SessionMixin):
 
             # Collect unique IDs
             project_ids: Set[UUID] = set()
+            api_key_project_ids: Set[UUID] = set()  # For CLIENT users
             model_ids: Set[UUID] = set()
             endpoint_ids: Set[UUID] = set()
 
+            # Determine which project ID field to use based on user type
+            is_client = current_user.user_type == UserTypeEnum.CLIENT
+
             for item in items:
-                # The items now have IDs from budmetrics
-                if project_id := item.get("project_id"):
-                    project_ids.add(UUID(project_id))
+                # For CLIENT users, get project ID from api_key_project_id field
+                # For ADMIN users, use the regular project_id field
+                if is_client:
+                    # CLIENT users: project name should come from api_key_project_id
+                    if api_key_project_id := item.get("api_key_project_id"):
+                        api_key_project_ids.add(UUID(api_key_project_id))
+                else:
+                    # ADMIN users: use regular project_id
+                    if project_id := item.get("project_id"):
+                        project_ids.add(UUID(project_id))
+
                 if endpoint_id := item.get("endpoint_id"):
                     endpoint_ids.add(UUID(endpoint_id))
                 if model_id := item.get("model_id"):
@@ -444,8 +458,17 @@ class BudMetricService(SessionMixin):
             endpoint_names = {}
             model_names = {}
 
-            if project_ids:
-                # Query projects (including all statuses)
+            # Fetch project names based on user type
+            if is_client and api_key_project_ids:
+                # For CLIENT users, fetch projects using api_key_project_ids
+                from sqlalchemy import select
+
+                stmt = select(ProjectModel).where(ProjectModel.id.in_(list(api_key_project_ids)))
+                result = self.session.execute(stmt)
+                projects = result.scalars().all()
+                project_names = {str(p.id): p.name for p in projects}
+            elif not is_client and project_ids:
+                # For ADMIN users, fetch projects using regular project_ids
                 from sqlalchemy import select
 
                 stmt = select(ProjectModel).where(ProjectModel.id.in_(list(project_ids)))
@@ -473,8 +496,15 @@ class BudMetricService(SessionMixin):
 
             # Add names to the response items
             for item in items:
-                if project_id := item.get("project_id"):
-                    item["project_name"] = project_names.get(str(project_id))
+                if is_client:
+                    # For CLIENT users, use api_key_project_id to get project name
+                    if api_key_project_id := item.get("api_key_project_id"):
+                        item["project_name"] = project_names.get(str(api_key_project_id))
+                else:
+                    # For ADMIN users, use regular project_id
+                    if project_id := item.get("project_id"):
+                        item["project_name"] = project_names.get(str(project_id))
+
                 if endpoint_id := item.get("endpoint_id"):
                     item["endpoint_name"] = endpoint_names.get(str(endpoint_id))
                 if model_id := item.get("model_id"):
@@ -539,11 +569,19 @@ class BudMetricService(SessionMixin):
         }
         return country_map.get(country_code.upper(), country_code)
 
-    async def _enrich_inference_detail(self, response_data: Dict) -> None:
+    async def _enrich_inference_detail(self, response_data: Dict, current_user: User) -> None:
         """Enrich inference detail with project, endpoint, and model names."""
+        from ..commons.constants import UserTypeEnum
+
         try:
+            # Determine which project ID field to use based on user type
+            is_client = current_user.user_type == UserTypeEnum.CLIENT
+
             # Get the IDs from response
-            project_id = response_data.get("project_id")
+            # For CLIENT users, use api_key_project_id for project name
+            # For ADMIN users, use regular project_id
+            project_id = response_data.get("api_key_project_id") if is_client else response_data.get("project_id")
+
             endpoint_id = response_data.get("endpoint_id")
             model_id = response_data.get("model_id")
 

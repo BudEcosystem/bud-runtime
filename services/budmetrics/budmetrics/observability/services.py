@@ -758,6 +758,7 @@ class ObservabilityMetricsService:
             mid.is_success,
             mi.cached,
             mid.project_id,
+            mid.api_key_project_id,
             mid.endpoint_id,
             mid.model_id,
             coalesce(mi.endpoint_type, 'chat') as endpoint_type
@@ -797,9 +798,10 @@ class ObservabilityMetricsService:
                     is_success=bool(row[10]),
                     cached=bool(row[11]),
                     project_id=row[12],
-                    endpoint_id=row[13],
-                    model_id=row[14],
-                    endpoint_type=row[15],
+                    api_key_project_id=row[13],  # Added api_key_project_id
+                    endpoint_id=row[14],
+                    model_id=row[15],
+                    endpoint_type=row[16],
                 )
             )
 
@@ -869,6 +871,7 @@ class ObservabilityMetricsService:
                 mid.request_arrival_time,
                 mid.request_forward_time,
                 mid.project_id,
+                mid.api_key_project_id,
                 mid.endpoint_id,
                 mid.is_success,
                 mi.cached,
@@ -950,6 +953,7 @@ class ObservabilityMetricsService:
                 mid.request_arrival_time,
                 mid.request_forward_time,
                 mid.project_id,
+                mid.api_key_project_id,
                 mid.endpoint_id,
                 mid.is_success,
                 mi.cached,
@@ -1235,15 +1239,16 @@ class ObservabilityMetricsService:
                 request_arrival_time=row[17],
                 request_forward_time=row[18],
                 project_id=safe_uuid(row[19]),  # Keep as UUID
-                endpoint_id=safe_uuid(row[20]),  # Keep as UUID
-                is_success=bool(row[21]) if row[21] is not None else True,
-                cached=bool(row[22]) if row[22] is not None else False,
-                finish_reason=str(row[23]) if row[23] else None,
-                cost=float(row[24]) if row[24] else None,
-                raw_request=str(row[25]) if row[25] else None,
-                raw_response=str(row[26]) if row[26] else None,
-                gateway_request=str(row[27]) if row[27] else None,
-                gateway_response=str(row[28]) if row[28] else None,
+                api_key_project_id=safe_uuid(row[20]),  # API key project ID
+                endpoint_id=safe_uuid(row[21]),  # Keep as UUID
+                is_success=bool(row[22]) if row[22] is not None else True,
+                cached=bool(row[23]) if row[23] is not None else False,
+                finish_reason=str(row[24]) if row[24] else None,
+                cost=float(row[25]) if row[25] else None,
+                raw_request=str(row[26]) if row[26] else None,
+                raw_response=str(row[27]) if row[27] else None,
+                gateway_request=str(row[28]) if row[28] else None,
+                gateway_response=str(row[29]) if row[29] else None,
                 gateway_metadata=gateway_metadata,  # New gateway metadata
                 feedback_count=feedback_count,
                 average_rating=average_rating,
