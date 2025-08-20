@@ -378,9 +378,6 @@ class PromptWorkflowService(SessionMixin):
                     description=merged_data.get("description"),
                     tags=merged_data.get("tags"),
                     project_id=UUID(merged_data.get("project_id")),
-                    endpoint_id=UUID(merged_data.get("endpoint_id")),
-                    model_id=UUID(merged_data.get("model_id")),
-                    cluster_id=UUID(merged_data.get("cluster_id")),
                     prompt_type=merged_data.get("prompt_type", PromptTypeEnum.SIMPLE_PROMPT.value),
                     auto_scale=merged_data.get("auto_scale", False),
                     caching=merged_data.get("caching", False),
@@ -396,6 +393,9 @@ class PromptWorkflowService(SessionMixin):
             db_version = await PromptVersionDataManager(self.session).insert_one(
                 PromptVersionModel(
                     prompt_id=db_prompt.id,
+                    endpoint_id=UUID(merged_data.get("endpoint_id")),
+                    model_id=UUID(merged_data.get("model_id")),
+                    cluster_id=UUID(merged_data.get("cluster_id")),
                     version=1,  # First version
                     prompt_schema=prompt_schema.model_dump() if prompt_schema else {},
                     status=PromptVersionStatusEnum.ACTIVE,

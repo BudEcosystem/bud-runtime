@@ -42,9 +42,6 @@ class Prompt(Base, TimestampMixin):
     description: Mapped[str] = mapped_column(String, nullable=True)
     tags: Mapped[list[dict]] = mapped_column(JSONB, nullable=True)
     project_id: Mapped[UUID] = mapped_column(ForeignKey("project.id", ondelete="CASCADE"), nullable=False)
-    endpoint_id: Mapped[UUID] = mapped_column(ForeignKey("endpoint.id", ondelete="CASCADE"), nullable=False)
-    model_id: Mapped[UUID] = mapped_column(ForeignKey("model.id", ondelete="CASCADE"), nullable=False)
-    cluster_id: Mapped[UUID] = mapped_column(ForeignKey("cluster.id", ondelete="CASCADE"), nullable=False)
     created_by: Mapped[UUID] = mapped_column(ForeignKey("user.id"), nullable=False)
 
     prompt_type: Mapped[str] = mapped_column(
@@ -94,9 +91,6 @@ class Prompt(Base, TimestampMixin):
         post_update=True,
     )
     project: Mapped["Project"] = relationship("Project", foreign_keys=[project_id])
-    endpoint: Mapped["Endpoint"] = relationship("Endpoint", foreign_keys=[endpoint_id])
-    model: Mapped["Model"] = relationship("Model", foreign_keys=[model_id])
-    cluster: Mapped["Cluster"] = relationship("Cluster", foreign_keys=[cluster_id])
     created_user: Mapped["User"] = relationship("User", foreign_keys=[created_by])
 
 
@@ -108,6 +102,9 @@ class PromptVersion(Base, TimestampMixin):
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     prompt_id: Mapped[UUID] = mapped_column(ForeignKey("prompt.id", ondelete="CASCADE"), nullable=False)
+    endpoint_id: Mapped[UUID] = mapped_column(ForeignKey("endpoint.id", ondelete="CASCADE"), nullable=False)
+    model_id: Mapped[UUID] = mapped_column(ForeignKey("model.id", ondelete="CASCADE"), nullable=False)
+    cluster_id: Mapped[UUID] = mapped_column(ForeignKey("cluster.id", ondelete="CASCADE"), nullable=False)
     version: Mapped[int] = mapped_column(Integer, nullable=False)
     prompt_schema: Mapped[dict] = mapped_column(JSONB, nullable=False)
     status: Mapped[str] = mapped_column(
@@ -122,4 +119,7 @@ class PromptVersion(Base, TimestampMixin):
     created_by: Mapped[UUID] = mapped_column(ForeignKey("user.id"), nullable=False)
 
     prompt: Mapped["Prompt"] = relationship("Prompt", back_populates="versions", foreign_keys=[prompt_id])
+    endpoint: Mapped["Endpoint"] = relationship("Endpoint", foreign_keys=[endpoint_id])
+    model: Mapped["Model"] = relationship("Model", foreign_keys=[model_id])
+    cluster: Mapped["Cluster"] = relationship("Cluster", foreign_keys=[cluster_id])
     created_user: Mapped["User"] = relationship("User", foreign_keys=[created_by])
