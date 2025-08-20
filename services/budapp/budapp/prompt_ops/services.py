@@ -84,9 +84,10 @@ class PromptService(SessionMixin):
         # Transform to response format
         prompts_list = []
         for prompt in db_prompts:
-            endpoint = prompt.endpoint
-            model = endpoint.model if endpoint else None
+            # Access endpoint and model through default_version
             default_version_obj = prompt.default_version
+            endpoint = default_version_obj.endpoint if default_version_obj else None
+            model = default_version_obj.model if default_version_obj else None
 
             prompt_item = PromptListItem(
                 id=prompt.id,

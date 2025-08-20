@@ -73,21 +73,23 @@ class PromptDataManager(DataManagerUtils):
                 )
                 explicit_conditions.append(sorting_stmt[0])
 
-        # Generate base query with joins
+        # Generate base query with joins through default_version
         base_query = (
             select(PromptModel)
-            .join(EndpointModel, PromptModel.endpoint_id == EndpointModel.id)
-            .join(ModelModel, EndpointModel.model_id == ModelModel.id)
             .outerjoin(
                 PromptVersionModel,
                 and_(
                     PromptModel.default_version_id == PromptVersionModel.id,
-                    PromptVersionModel.status != PromptStatusEnum.DELETED,
+                    PromptVersionModel.status != PromptVersionStatusEnum.DELETED,
                 ),
             )
+            .outerjoin(EndpointModel, PromptVersionModel.endpoint_id == EndpointModel.id)
+            .outerjoin(ModelModel, PromptVersionModel.model_id == ModelModel.id)
             .options(
-                joinedload(PromptModel.endpoint).joinedload(EndpointModel.model),
-                joinedload(PromptModel.default_version),
+                joinedload(PromptModel.default_version)
+                .joinedload(PromptVersionModel.endpoint)
+                .joinedload(EndpointModel.model),
+                joinedload(PromptModel.default_version).joinedload(PromptVersionModel.model),
             )
         )
 
@@ -97,8 +99,16 @@ class PromptDataManager(DataManagerUtils):
             stmt = base_query.filter(or_(*search_conditions)).filter(PromptModel.status != PromptStatusEnum.DELETED)
             count_stmt = (
                 select(func.count(PromptModel.id))
-                .join(EndpointModel, PromptModel.endpoint_id == EndpointModel.id)
-                .join(ModelModel, EndpointModel.model_id == ModelModel.id)
+                .select_from(PromptModel)
+                .outerjoin(
+                    PromptVersionModel,
+                    and_(
+                        PromptModel.default_version_id == PromptVersionModel.id,
+                        PromptVersionModel.status != PromptVersionStatusEnum.DELETED,
+                    ),
+                )
+                .outerjoin(EndpointModel, PromptVersionModel.endpoint_id == EndpointModel.id)
+                .outerjoin(ModelModel, PromptVersionModel.model_id == ModelModel.id)
                 .filter(or_(*search_conditions))
                 .filter(PromptModel.status != PromptStatusEnum.DELETED)
             )
@@ -107,8 +117,15 @@ class PromptDataManager(DataManagerUtils):
             count_stmt = (
                 select(func.count(PromptModel.id))
                 .select_from(PromptModel)
-                .join(EndpointModel, PromptModel.endpoint_id == EndpointModel.id)
-                .join(ModelModel, EndpointModel.model_id == ModelModel.id)
+                .outerjoin(
+                    PromptVersionModel,
+                    and_(
+                        PromptModel.default_version_id == PromptVersionModel.id,
+                        PromptVersionModel.status != PromptVersionStatusEnum.DELETED,
+                    ),
+                )
+                .outerjoin(EndpointModel, PromptVersionModel.endpoint_id == EndpointModel.id)
+                .outerjoin(ModelModel, PromptVersionModel.model_id == ModelModel.id)
             )
             for key, value in filters.items():
                 stmt = stmt.filter(getattr(PromptModel, key) == value)
