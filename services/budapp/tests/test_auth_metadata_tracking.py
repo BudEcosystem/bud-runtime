@@ -15,8 +15,8 @@ from budapp.credential_ops.services import CredentialService
 async def test_update_proxy_cache_with_metadata_single_key():
     """Test that update_proxy_cache includes metadata for a single API key."""
     # Setup
-    service = CredentialService()
-    service.session = MagicMock()
+    mock_session = MagicMock()
+    service = CredentialService(mock_session)
 
     project_id = uuid.uuid4()
     api_key = "test-api-key-123"
@@ -77,8 +77,8 @@ async def test_update_proxy_cache_with_metadata_single_key():
 async def test_update_proxy_cache_with_metadata_all_keys():
     """Test that update_proxy_cache includes metadata when updating all project keys."""
     # Setup
-    service = CredentialService()
-    service.session = MagicMock()
+    mock_session = MagicMock()
+    service = CredentialService(mock_session)
 
     project_id = uuid.uuid4()
 
@@ -134,8 +134,8 @@ async def test_update_proxy_cache_with_metadata_all_keys():
 async def test_update_proxy_cache_metadata_with_missing_credential():
     """Test that metadata is still included even when credential is not found."""
     # Setup
-    service = CredentialService()
-    service.session = MagicMock()
+    mock_session = MagicMock()
+    service = CredentialService(mock_session)
 
     project_id = uuid.uuid4()
     api_key = "non-existent-key"
@@ -182,8 +182,8 @@ async def test_update_proxy_cache_metadata_with_missing_credential():
 async def test_update_proxy_cache_backward_compatibility():
     """Test that models are still stored correctly alongside metadata."""
     # Setup
-    service = CredentialService()
-    service.session = MagicMock()
+    mock_session = MagicMock()
+    service = CredentialService(mock_session)
 
     project_id = uuid.uuid4()
     api_key = "test-api-key"
