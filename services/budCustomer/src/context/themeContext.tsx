@@ -175,9 +175,9 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
           rowHoverBg: getCSSVarValue("--bg-hover"),
         },
         Modal: {
-          contentBg: getCSSVarValue("--bg-modal"),
-          headerBg: getCSSVarValue("--bg-modal"),
-          footerBg: getCSSVarValue("--bg-modal"),
+          contentBg: "var(--bg-modal)",
+          headerBg: "var(--bg-modal)",
+          footerBg: "var(--bg-modal)",
         },
         Input: {
           colorBgContainer: getCSSVarValue("--bg-tertiary"),
@@ -199,16 +199,6 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
         Popover: {
           colorBgElevated: getCSSVarValue("--bg-card"),
           colorText: getCSSVarValue("--text-primary"),
-        },
-        Menu: {
-          itemColor: "var(--text-normal)",
-          itemHoverColor: "var(--text-hover)",
-          itemHoverBg: "var(--bg-hover)",
-          itemSelectedColor: "var(--text-primary)",
-          itemSelectedBg: "var(--bg-primary)",
-          itemActiveBg: "var(--bg-hover)",
-          colorBgElevated: "var(--bg-tertiary)",
-          colorItemTextDisabled: "var(--text-disabled)",
         },
         DatePicker: {
           colorBgContainer: "var(--bg-tertiary)",
@@ -239,6 +229,13 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
           itemHoverBg: "var(--bg-hover)",
           itemHoverColor: "var(--text-primary)",
           colorTextDescription: "var(--text-secondary)",
+        },
+        Notification: {
+          colorBgElevated: "var(--bg-tertiary)",   // background
+          colorText: "var(--text-primary)",        // main text
+          colorTextHeading: "var(--text-primary)", // title
+          colorTextDescription: "var(--text-primary)", // description
+          boxShadow: "0 4px 12px rgba(0,0,0,0.2)", // custom shadow
         },
       },
     }),

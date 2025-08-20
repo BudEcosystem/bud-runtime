@@ -408,7 +408,7 @@ export default function ModelsPage() {
               >
                 <Button
                   icon={<FilterOutlined />}
-                  className="text-bud-text-primary hover:text-bud-purple border-bud-border"
+                  className="!bg-[var(--bg-primary)] text-bud-text-primary hover:text-bud-purple border-bud-border"
                 >
                   Filter
                 </Button>

@@ -192,6 +192,19 @@ export default function AuditPage() {
   >(null);
   const [searchText, setSearchText] = useState("");
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
+  const themeConfig = {
+    components: {
+      Select: {
+        colorBgContainer: "var(--bg-tertiary)",
+        colorBorder: "var(--border-secondary)",
+        optionSelectedBg: "var(--bg-hover)",
+        colorBgElevated: "var(--bg-hover)",
+        colorText: "var(--text-primary)",
+        optionSelectedColor: "var(--text-primary)",
+        optionActiveBg: "var(--bg-hover)",
+      }
+    }
+  }
 
   // Get action icon and color
   const getActionDisplay = (action: AuditAction) => {
@@ -575,19 +588,7 @@ export default function AuditPage() {
               allowClear
             />
             <ConfigProvider
-              theme={{
-                components: {
-                  Select: {
-                    colorBgContainer: "var(--bg-tertiary)",
-                    colorBorder: "var(--border-secondary)",
-                    optionSelectedBg: "var(--bg-hover)",
-                    colorBgElevated: "var(--bg-hover)",
-                    colorText: "var(--text-primary)",
-                    optionSelectedColor: "var(--text-primary)",
-                    optionActiveBg: "var(--bg-hover)",
-                  }
-                }
-              }}>
+              theme={themeConfig}>
               <Select
                 placeholder="Filter by action"
                 value={selectedAction}
@@ -601,19 +602,7 @@ export default function AuditPage() {
               />
             </ConfigProvider>
             <ConfigProvider
-              theme={{
-                components: {
-                  Select: {
-                    colorBgContainer: "var(--bg-tertiary)",
-                    colorBorder: "var(--border-secondary)",
-                    optionSelectedBg: "var(--bg-hover)",
-                    colorBgElevated: "var(--bg-hover)",
-                    colorText: "var(--text-primary)",
-                    optionSelectedColor: "var(--text-primary)",
-                    optionActiveBg: "var(--bg-hover)",
-                  }
-                }
-              }}>
+              theme={themeConfig}>
               <Select
                 placeholder="Filter by resource"
                 value={selectedResource}

@@ -115,6 +115,19 @@ export default function UsagePage() {
   const totalCost = usageData.reduce((acc, item) => acc + item.cost, 0);
   const totalTokens = usageData.reduce((acc, item) => acc + item.tokens, 0);
   const totalRequests = usageData.reduce((acc, item) => acc + item.requests, 0);
+  const themeConfig = {
+    components: {
+      Select: {
+        colorBgContainer: "var(--bg-tertiary)",
+        colorBorder: "var(--border-secondary)",
+        optionSelectedBg: "var(--bg-hover)",
+        colorBgElevated: "var(--bg-hover)",
+        colorText: "var(--text-primary)",
+        optionSelectedColor: "var(--text-primary)",
+        optionActiveBg: "var(--bg-hover)",
+      }
+    }
+  }
 
   const getUsagePercentage = () =>
     (billingPlan.quotaUsed / billingPlan.quotaLimit) * 100;
@@ -348,19 +361,7 @@ export default function UsagePage() {
           {/* Filters */}
           <Flex gap={16} className="mb-[2rem]" wrap="wrap">
             <ConfigProvider
-              theme={{
-                components: {
-                  Select: {
-                    colorBgContainer: "var(--bg-tertiary)",
-                    colorBorder: "var(--border-secondary)",
-                    optionSelectedBg: "var(--bg-hover)",
-                    colorBgElevated: "var(--bg-hover)",
-                    colorText: "var(--text-primary)",
-                    optionSelectedColor: "var(--text-primary)",
-                    optionActiveBg: "var(--bg-hover)",
-                  }
-                }
-              }}>
+              theme={themeConfig}>
               <Select
                 value={timeRange}
                 onChange={setTimeRange}
@@ -375,19 +376,7 @@ export default function UsagePage() {
               />
             </ConfigProvider>
             <ConfigProvider
-              theme={{
-                components: {
-                  Select: {
-                    colorBgContainer: "var(--bg-tertiary)",
-                    colorBorder: "var(--border-secondary)",
-                    optionSelectedBg: "var(--bg-hover)",
-                    colorBgElevated: "var(--bg-hover)",
-                    colorText: "var(--text-primary)",
-                    optionSelectedColor: "var(--text-primary)",
-                    optionActiveBg: "var(--bg-hover)",
-                  }
-                }
-              }}>
+              theme={themeConfig}>
               <Select
                 value={selectedModel}
                 onChange={setSelectedModel}
