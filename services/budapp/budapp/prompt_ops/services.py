@@ -99,6 +99,22 @@ class PromptService(SessionMixin):
 
         return prompts_list, count
 
+    async def delete_active_prompt(self, prompt_id: UUID) -> PromptModel:
+        """Delete an active prompt by updating its status to DELETED."""
+        # Retrieve and validate prompt
+        db_prompt = await PromptDataManager(self.session).retrieve_by_fields(
+            PromptModel, fields={"id": prompt_id, "status": PromptStatusEnum.ACTIVE}
+        )
+
+        # Update prompt status to DELETED
+        await PromptDataManager(self.session).update_by_fields(db_prompt, {"status": PromptStatusEnum.DELETED})
+
+        # Soft delete all associated prompt versions
+        deleted_count = await PromptVersionDataManager(self.session).soft_delete_by_prompt_id(prompt_id)
+        logger.debug(f"Soft deleted {deleted_count} prompt versions for prompt {prompt_id}")
+
+        return db_prompt
+
 
 class PromptWorkflowService(SessionMixin):
     """Service for managing prompt workflows."""

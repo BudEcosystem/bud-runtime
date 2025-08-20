@@ -17,6 +17,7 @@
 """API routes for the prompt ops module."""
 
 from typing import Annotated, List, Optional, Union
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
@@ -30,7 +31,7 @@ from budapp.commons.dependencies import (
 )
 from budapp.commons.exceptions import ClientException
 from budapp.commons.permission_handler import require_permissions
-from budapp.commons.schemas import ErrorResponse
+from budapp.commons.schemas import ErrorResponse, SuccessResponse
 from budapp.user_ops.schemas import User
 from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.workflow_ops.services import WorkflowService
@@ -94,12 +95,58 @@ async def list_prompts(
             code=status.HTTP_200_OK,
         ).to_http_response()
     except ClientException as e:
-        logger.exception(f"Failed to list prompts: {e}")
+        logger.error(f"Failed to list prompts: {e}")
         return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
     except Exception as e:
         logger.exception(f"Failed to list prompts: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to list prompts"
+        ).to_http_response()
+
+
+@router.delete(
+    "/{prompt_id}",
+    responses={
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Successfully deleted prompt",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Invalid request data",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Prompt not found",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Server error",
+        },
+    },
+    description="Delete a prompt by its ID",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
+async def delete_prompt(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    prompt_id: UUID,
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Delete a prompt by its ID."""
+    try:
+        _ = await PromptService(session).delete_active_prompt(prompt_id)
+        logger.debug(f"Prompt deleted: {prompt_id}")
+
+        return SuccessResponse(
+            message="Prompt deleted successfully", code=status.HTTP_200_OK, object="prompt.delete"
+        ).to_http_response()
+    except ClientException as e:
+        logger.error(f"Failed to delete prompt: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to delete prompt: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to delete prompt"
         ).to_http_response()
 
 
@@ -121,7 +168,7 @@ async def list_prompts(
     },
     description="Create a prompt workflow",
 )
-@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
 async def create_prompt_workflow(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
@@ -136,7 +183,7 @@ async def create_prompt_workflow(
 
         return await WorkflowService(session).retrieve_workflow_data(db_workflow.id)
     except ClientException as e:
-        logger.exception(f"Failed to create prompt workflow: {e}")
+        logger.error(f"Failed to create prompt workflow: {e}")
         return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
     except Exception as e:
         logger.exception(f"Failed to create prompt workflow: {e}")

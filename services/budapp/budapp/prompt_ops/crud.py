@@ -19,10 +19,10 @@
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
-from sqlalchemy import and_, asc, desc, func, or_, select
+from sqlalchemy import and_, asc, desc, func, or_, select, update
 from sqlalchemy.orm import joinedload
 
-from budapp.commons.constants import EndpointStatusEnum, PromptStatusEnum
+from budapp.commons.constants import EndpointStatusEnum, PromptStatusEnum, PromptVersionStatusEnum
 from budapp.commons.db_utils import DataManagerUtils
 from budapp.endpoint_ops.models import Endpoint as EndpointModel
 from budapp.model_ops.models import Model as ModelModel
@@ -156,3 +156,19 @@ class PromptVersionDataManager(DataManagerUtils):
         )
         max_version = result.scalar()
         return (max_version or 0) + 1
+
+    async def soft_delete_by_prompt_id(self, prompt_id: UUID) -> int:
+        """Soft delete all prompt versions for a given prompt."""
+        stmt = (
+            update(PromptVersionModel)
+            .where(
+                and_(
+                    PromptVersionModel.prompt_id == prompt_id,
+                    PromptVersionModel.status != PromptVersionStatusEnum.DELETED,
+                )
+            )
+            .values(status=PromptVersionStatusEnum.DELETED)
+        )
+        result = self.session.execute(stmt)
+        self.session.commit()
+        return result.rowcount
