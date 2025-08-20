@@ -295,9 +295,9 @@ const RegisterForm = ({ onSubmit }: RegisterFormProps) => {
                 validateField("role", value.toLowerCase());
               }}
               triggerClassNames="w-full"
-              contentClassNames="w-full"
+              contentClassNames="w-[--radix-dropdown-menu-trigger-width] min-w-[--radix-dropdown-menu-trigger-width]"
               triggerRenderItem={
-                <div className="flex items-center justify-between w-full h-auto leading-[100%] text-xs text-bud-text-primary font-light pt-[.8rem] pb-[.53rem] px-3">
+                <div className="flex items-center justify-between w-full h-auto leading-[100%] text-xs text-[var(--text-primary)] font-light pt-[.8rem] pb-[.53rem] px-3">
                   <span
                     className={formData.role ? "" : "text-bud-text-disabled"}
                   >

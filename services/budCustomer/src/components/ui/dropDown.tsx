@@ -46,7 +46,7 @@ const CustomDropdownMenu: React.FC<DropDownProps> = ({
         </Flex>
       </DropdownMenu.Trigger>
       <DropdownMenu.Content
-        className={`min-w-[140px] rounded rounded-lg bg-[#111113] p-[.5rem] border border-[#212225] ${contentClassNames}`}
+        className={`min-w-[140px] rounded rounded-lg bg-[var(--bg-tertiary)] p-[.5rem] border border-[var(--border-color)] ${contentClassNames}`}
         side="bottom"
         align={align || "start"}
       >
@@ -54,7 +54,7 @@ const CustomDropdownMenu: React.FC<DropDownProps> = ({
           <>
             {contentRenderItem.map((item: any, index: number) => (
               <DropdownMenu.Item
-                className={`h-[1.75] px-[1rem] py-[.5rem] rounded rounded-md hover:bg-[#18191B] outline-none cursor-pointer ${itemsClassNames}`}
+                className={`h-[1.75] px-[1rem] py-[.5rem] rounded rounded-md hover:bg-[var(--bg-hover)] text-[var(--text-primary)] outline-none cursor-pointer ${itemsClassNames}`}
                 key={index}
                 onSelect={() => handleSelect(item.props.children)}
               >
@@ -66,11 +66,11 @@ const CustomDropdownMenu: React.FC<DropDownProps> = ({
           <>
             {items.map((item: any, index: number) => (
               <DropdownMenu.Item
-                className={`h-[1.75] px-[1rem] py-[.5rem] rounded rounded-md hover:bg-[#18191B] outline-none cursor-pointer ${itemsClassNames}`}
+                className={`h-[1.75] px-[1rem] py-[.5rem] rounded rounded-md hover:bg-[var(--bg-hover)] outline-none cursor-pointer ${itemsClassNames}`}
                 key={index}
                 onSelect={() => handleSelect(item)}
               >
-                <Text_12_400_FFFFFF>{item}</Text_12_400_FFFFFF>
+                <Text_12_400_FFFFFF className="text-[var(--text-primary)]">{item}</Text_12_400_FFFFFF>
               </DropdownMenu.Item>
             ))}
           </>
