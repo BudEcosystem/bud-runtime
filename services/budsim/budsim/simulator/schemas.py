@@ -19,6 +19,7 @@
 
 import time
 import uuid
+from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -27,6 +28,13 @@ from budmicroframe.commons.types import lowercase_string
 from pydantic import BaseModel, Field, RootModel, model_validator
 
 from budsim.commons.config import app_settings
+
+
+class SimulationMethod(str, Enum):
+    """Enum for simulation calculation methods."""
+
+    REGRESSOR = "regressor"
+    HEURISTIC = "heuristic"
 
 
 class Device(BaseModel):
@@ -75,6 +83,7 @@ class ClusterRecommendationRequest(CloudEventBase):
     is_quantization: bool = False
     quantization_method: Optional[str] = None
     quantization_type: Optional[str] = None
+    simulation_method: Optional[SimulationMethod] = Field(None, description="Method to use for performance simulation")
 
     @model_validator(mode="before")
     def validate_pretrained_model_uri(cls, values):

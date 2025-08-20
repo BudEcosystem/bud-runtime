@@ -7,7 +7,7 @@ import BudStepAlert from "src/flows/components/BudStepAlert";
 import { BudForm } from "../dataEntry/BudForm";
 
 const BudDrawer: React.FC = () => {
-  const { step, expandedStep, isDrawerOpen, setCancelAlert, closeDrawer, isFailed } = useDrawer();
+  const { step, expandedStep, isDrawerOpen, setCancelAlert, closeDrawer, isFailed, drawerProps } = useDrawer();
   const { form, submittable, loading, setLoading, values } = useForm({
     initialData: {},
   });
@@ -80,7 +80,7 @@ const BudDrawer: React.FC = () => {
           }}
         >
           <step.component
-            {...step?.properties}
+            {...drawerProps}
           />
         </BudFormContext.Provider>
       </div>}

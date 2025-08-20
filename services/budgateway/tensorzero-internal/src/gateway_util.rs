@@ -2,7 +2,8 @@ use std::collections::HashMap;
 use std::future::IntoFuture;
 use std::net::SocketAddr;
 use std::path::Path;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
+use uaparser::UserAgentParser;
 
 use axum::extract::{rejection::JsonRejection, FromRequest, Json, Request};
 use axum::routing::post;
@@ -14,11 +15,13 @@ use tokio::sync::oneshot::Sender;
 use tracing::instrument;
 
 use crate::auth::Auth;
+use crate::blocking_rules::BlockingRulesManager;
 use crate::clickhouse::migration_manager;
 use crate::clickhouse::ClickHouseConnectionInfo;
 use crate::config_parser::Config;
 use crate::endpoints;
 use crate::error::{Error, ErrorDetails};
+use crate::geoip::GeoIpService;
 use crate::kafka::KafkaConnectionInfo;
 use crate::model::ModelTable;
 use crate::rate_limit::DistributedRateLimiter;
@@ -39,8 +42,11 @@ pub struct AppStateData {
     pub clickhouse_connection_info: ClickHouseConnectionInfo,
     pub kafka_connection_info: KafkaConnectionInfo,
     pub authentication_info: AuthenticationInfo,
-    pub model_credential_store: Arc<RwLock<HashMap<String, SecretString>>>,
+    pub model_credential_store: Arc<std::sync::RwLock<HashMap<String, SecretString>>>,
     pub rate_limiter: Option<Arc<DistributedRateLimiter>>,
+    pub geoip_service: Option<Arc<GeoIpService>>,
+    pub ua_parser: Option<Arc<UserAgentParser>>,
+    pub blocking_manager: Option<Arc<BlockingRulesManager>>,
 }
 pub type AppState = axum::extract::State<AppStateData>;
 
@@ -66,14 +72,39 @@ impl AppStateData {
         let http_client = setup_http_client()?;
         let authentication_info = setup_authentication(&config);
 
+        // Initialize analytics services if enabled
+        let (geoip_service, ua_parser) = if config.gateway.analytics.enabled {
+            let geoip = config
+                .gateway
+                .analytics
+                .geoip_db_path
+                .as_ref()
+                .map(|path| Arc::new(GeoIpService::new(Some(path))));
+
+            let parser = match UserAgentParser::from_bytes(include_bytes!("../regexes.yaml")) {
+                Ok(p) => Some(Arc::new(p)),
+                Err(e) => {
+                    tracing::warn!("Failed to initialize user agent parser: {}", e);
+                    None
+                }
+            };
+
+            (geoip, parser)
+        } else {
+            (None, None)
+        };
+
         Ok(Self {
             config,
             http_client,
             clickhouse_connection_info,
             kafka_connection_info,
             authentication_info,
-            model_credential_store: Arc::new(RwLock::new(HashMap::new())),
+            model_credential_store: Arc::new(std::sync::RwLock::new(HashMap::new())),
             rate_limiter: None, // Will be initialized later with Redis client
+            geoip_service,
+            ua_parser,
+            blocking_manager: None, // Will be initialized later with Redis client
         })
     }
     pub async fn update_model_table(&self, mut new_models: ModelTable) {
@@ -239,11 +270,44 @@ pub async fn setup_redis_and_rate_limiter(
     // Get Redis URL from environment
     let redis_url = std::env::var("TENSORZERO_REDIS_URL").ok();
 
-    // Setup Redis client for authentication if needed
+    // Setup blocking manager first if enabled
+    let blocking_manager = if config.gateway.blocking.enabled {
+        if let Some(ref url) = redis_url {
+            if !url.is_empty() {
+                // Create a Redis client for blocking manager operations
+                let auth = auth_info.clone().unwrap_or_else(|| Auth::new(config.api_keys.clone()));
+                match RedisClient::new(url, app_state.clone(), auth).await {
+                    Ok(redis_client) => {
+                        let manager = Arc::new(BlockingRulesManager::new_with_clickhouse(
+                            Some(Arc::new(redis_client)),
+                            Some(Arc::new(app_state.clickhouse_connection_info.clone())),
+                        ));
+                        tracing::info!("Blocking rules manager initialized with ClickHouse logging");
+                        Some(manager)
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to create Redis client for blocking manager: {}", e);
+                        None
+                    }
+                }
+            } else {
+                tracing::warn!("Blocking is enabled but TENSORZERO_REDIS_URL is empty");
+                None
+            }
+        } else {
+            tracing::warn!("Blocking is enabled but TENSORZERO_REDIS_URL is not set");
+            None
+        }
+    } else {
+        tracing::info!("Blocking is disabled in configuration");
+        None
+    };
+
+    // Setup Redis client for authentication/models/blocking if needed
     if let Some(auth) = auth_info {
         if let Some(ref url) = redis_url {
             if !url.is_empty() {
-                // Create and start Redis client for authentication
+                // Create Redis client
                 let auth_redis_client = RedisClient::new(url, app_state.clone(), auth.clone())
                     .await
                     .map_err(|e| {
@@ -256,13 +320,14 @@ pub async fn setup_redis_and_rate_limiter(
 
                 auth_redis_client.start().await.map_err(|e| {
                     Error::new(ErrorDetails::AppState {
-                        message: format!("Failed to start Redis client for authentication: {e}"),
+                        message: format!("Failed to start Redis client: {e}"),
                     })
                 })?;
 
-                tracing::info!("Redis client for authentication started successfully");
+                tracing::info!("Redis client started successfully with auth{}",
+                    if blocking_manager.is_some() { " and blocking rules" } else { "" });
             } else {
-                tracing::warn!("TENSORZERO_REDIS_URL is empty, authentication Redis client will not be started");
+                tracing::warn!("TENSORZERO_REDIS_URL is empty, Redis client will not be started");
             }
         } else {
             tracing::info!("TENSORZERO_REDIS_URL not set, authentication will work without Redis");
@@ -298,6 +363,15 @@ pub async fn setup_redis_and_rate_limiter(
         }
     } else {
         tracing::info!("No rate limiting configuration found");
+        app_state
+    };
+
+    // Add blocking manager to app_state if it was created
+    let app_state = if let Some(manager) = blocking_manager {
+        let mut app_state = app_state;
+        app_state.blocking_manager = Some(manager);
+        app_state
+    } else {
         app_state
     };
 
@@ -497,9 +571,12 @@ mod tests {
     use tracing_test::traced_test;
 
     use super::*;
-    use crate::config_parser::{AuthenticationConfig, GatewayConfig, ObservabilityConfig};
+    use crate::config_parser::{
+        AnalyticsConfig, AuthenticationConfig, BlockingConfig, GatewayConfig, ObservabilityConfig,
+    };
     use secrecy::SecretString;
     use std::collections::HashMap;
+    use std::sync::RwLock;
 
     #[tokio::test]
     #[traced_test]
@@ -517,6 +594,11 @@ mod tests {
             enable_template_filesystem_access: false,
             export: Default::default(),
             rate_limits: None,
+            analytics: AnalyticsConfig {
+                enabled: false,
+                geoip_db_path: None,
+            },
+            blocking: BlockingConfig { enabled: false },
         };
 
         let config = Box::leak(Box::new(Config {
@@ -573,6 +655,11 @@ mod tests {
             enable_template_filesystem_access: false,
             export: Default::default(),
             rate_limits: None,
+            analytics: AnalyticsConfig {
+                enabled: false,
+                geoip_db_path: None,
+            },
+            blocking: BlockingConfig { enabled: false },
         };
 
         let config = Box::leak(Box::new(Config {
@@ -598,6 +685,11 @@ mod tests {
             enable_template_filesystem_access: false,
             export: Default::default(),
             rate_limits: None,
+            analytics: AnalyticsConfig {
+                enabled: false,
+                geoip_db_path: None,
+            },
+            blocking: BlockingConfig { enabled: false },
         };
         let config = Box::leak(Box::new(Config {
             gateway: gateway_config,
@@ -791,6 +883,11 @@ mod tests {
             enable_template_filesystem_access: false,
             export: Default::default(),
             rate_limits: None,
+            analytics: AnalyticsConfig {
+                enabled: false,
+                geoip_db_path: None,
+            },
+            blocking: BlockingConfig { enabled: false },
         };
         let config = Config {
             gateway: gateway_config,

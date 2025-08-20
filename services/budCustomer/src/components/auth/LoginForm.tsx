@@ -131,9 +131,9 @@ const LoginForm = ({ onSubmit }: LoginPageModalProps) => {
             className="w-[45px] h-auto mb-1 2xl:w-12"
           />
         </div>
-        <Text_12_400_B3B3B3 className="text-center">
+        <Text_12_400_EEEEEE className="text-center">
           Enter your email and password to access your account
-        </Text_12_400_B3B3B3>
+        </Text_12_400_EEEEEE>
       </div>
 
       <form onSubmit={handleLogin} className="w-[76.6%] mt-[1.6em]">
@@ -185,49 +185,49 @@ const LoginForm = ({ onSubmit }: LoginPageModalProps) => {
               onClick={() => setIsShow(!isShow)}
               className="text-bud-text-muted cursor-pointer pr-3"
             >
-                {isShow ? (
+              {isShow ? (
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                   <path
-                  d="M2 10C3.5 6.5 7 4 10 4C13 4 16.5 6.5 18 10C16.5 13.5 13 16 10 16C7 16 3.5 13.5 2 10Z"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  fill="none"
+                    d="M2 10C3.5 6.5 7 4 10 4C13 4 16.5 6.5 18 10C16.5 13.5 13 16 10 16C7 16 3.5 13.5 2 10Z"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    fill="none"
                   />
                   <circle
-                  cx="10"
-                  cy="10"
-                  r="3"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  fill="none"
+                    cx="10"
+                    cy="10"
+                    r="3"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    fill="none"
                   />
                 </svg>
-                ) : (
+              ) : (
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                   <path
-                  d="M2 10C3.5 6.5 7 4 10 4C13 4 16.5 6.5 18 10C16.5 13.5 13 16 10 16C7 16 3.5 13.5 2 10Z"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  fill="none"
+                    d="M2 10C3.5 6.5 7 4 10 4C13 4 16.5 6.5 18 10C16.5 13.5 13 16 10 16C7 16 3.5 13.5 2 10Z"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    fill="none"
                   />
                   <circle
-                  cx="10"
-                  cy="10"
-                  r="3"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  fill="none"
+                    cx="10"
+                    cy="10"
+                    r="3"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    fill="none"
                   />
                   <line
-                  x1="4"
-                  y1="16"
-                  x2="16"
-                  y2="4"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
+                    x1="4"
+                    y1="16"
+                    x2="16"
+                    y2="4"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
                   />
                 </svg>
-                )}
+              )}
             </button>
           </div>
           {passwordError && (
@@ -281,11 +281,9 @@ const LoginForm = ({ onSubmit }: LoginPageModalProps) => {
       </div>
 
       <div className="mt-[1rem] flex justify-center items-center gap-1">
-        <Text_12_400_808080>Don&apos;t have an account?</Text_12_400_808080>
-        <Link href="/register">
-          <Text_12_400_EEEEEE className="cursor-pointer hover:underline">
-            Sign up
-          </Text_12_400_EEEEEE>
+        <Text_12_400_EEEEEE>Don&apos;t have an account?</Text_12_400_EEEEEE>
+        <Link href="/register" className="text-bud-purple cursor-pointer hover:underline">
+          Sign up
         </Link>
       </div>
 

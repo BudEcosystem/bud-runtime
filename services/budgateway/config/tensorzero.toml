@@ -5,6 +5,14 @@ debug = true
 [gateway.authentication]
 enabled = false
 
+[gateway.observability]
+enabled = false
+
+[gateway.analytics]
+enabled = true
+# GeoIP database for location data enrichment
+geoip_db_path = "tensorzero-internal/fixtures/geo/GeoLite2-City.mmdb"
+
 # Kafka configuration disabled until new image is deployed
 [gateway.observability.kafka]
 enabled = false
@@ -21,6 +29,9 @@ security_protocol = "SASL_PLAINTEXT"
 mechanism = "PLAIN"
 username = "user1"
 password = "Htf1v4PW72"
+
+[gateway.blocking]
+enabled = true
 
 [gateway.rate_limits]
 enabled = true

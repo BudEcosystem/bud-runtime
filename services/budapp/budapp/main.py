@@ -22,9 +22,10 @@ from typing import Any, AsyncIterator
 
 from budmicroframe.main import configure_app
 from budmicroframe.shared.dapr_workflow import DaprWorkflow
-from fastapi import APIRouter, FastAPI
+from fastapi import APIRouter, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .auth import auth_routes
@@ -33,6 +34,7 @@ from .cluster_ops import cluster_routes
 from .cluster_ops.workflows import ClusterRecommendedSchedulerWorkflows
 from .commons import logging
 from .commons.config import app_settings, secrets_settings
+from .commons.exceptions import ClientException
 from .core import common_routes, meta_routes, notify_routes
 from .credential_ops import credential_routes
 from .dataset_ops import dataset_routes
@@ -144,6 +146,28 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             # Sleep for 1 hour (3600 seconds)
             await asyncio.sleep(3600)
 
+    async def schedule_blocking_rule_stats_sync() -> None:
+        """Schedule periodic synchronization of blocking rule statistics from ClickHouse."""
+        from .commons.database import SessionLocal
+        from .metric_ops.services import MetricService
+
+        # Wait for services to be ready
+        await asyncio.sleep(15)
+
+        while True:
+            try:
+                logger.info("Running scheduled blocking rule stats sync")
+                # Create a new session for this sync operation
+                with SessionLocal() as session:
+                    metric_service = MetricService(session)
+                    result = await metric_service.sync_blocking_rule_stats_from_clickhouse()
+                    logger.info("Blocking rule stats sync completed: %s", result)
+            except Exception as e:
+                logger.error("Failed to sync blocking rule stats: %s", e)
+
+            # Sleep for 30 minutes (1800 seconds)
+            await asyncio.sleep(1800)
+
     task = asyncio.create_task(schedule_secrets_and_config_sync())
 
     for seeder_name, seeder in seeders.items():
@@ -159,12 +183,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Start the hourly eval data sync scheduler
     eval_sync_task = asyncio.create_task(schedule_eval_data_sync())
 
+    # Start the blocking rule stats sync scheduler
+    blocking_stats_task = asyncio.create_task(schedule_blocking_rule_stats_sync())
+
     yield
 
     try:
         task.cancel()
         dapr_workflow_task.cancel()
         eval_sync_task.cancel()
+        blocking_stats_task.cancel()
     except asyncio.CancelledError:
         logger.exception("Failed to cleanup config & store sync.")
 
@@ -185,6 +213,16 @@ app = configure_app(
     secrets_settings,
     lifespan=lifespan,
 )
+
+
+# Add exception handler for ClientException
+@app.exception_handler(ClientException)
+async def client_exception_handler(request: Request, exc: ClientException):
+    """Handle ClientException and return proper HTTP status code."""
+    return JSONResponse(
+        status_code=exc.status_code, content={"success": False, "message": exc.message, "detail": str(exc)}
+    )
+
 
 # Serve static files
 app.mount("/static", StaticFiles(directory=app_settings.static_dir), name="static")

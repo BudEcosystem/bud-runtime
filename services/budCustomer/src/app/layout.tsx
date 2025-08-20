@@ -50,9 +50,7 @@ export default function RootLayout({
                   <AppInitializer />
                   <AuthNavigationProvider>
                     <LoaderProvider>
-                      <ProjectProvider>
-                        <AuthGuard>{children}</AuthGuard>
-                      </ProjectProvider>
+                      <ProjectProvider>{children}</ProjectProvider>
                     </LoaderProvider>
                   </AuthNavigationProvider>
                 </NotificationProvider>

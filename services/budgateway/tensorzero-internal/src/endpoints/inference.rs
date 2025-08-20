@@ -225,6 +225,30 @@ pub async fn inference_handler(
             result,
             write_info,
         } => {
+            // Extract model latency from the result (using the first model inference result) before moving result
+            let model_latency_ms = match &result {
+                InferenceResult::Chat(chat_result) => {
+                    chat_result.model_inference_results.first()
+                        .and_then(|r| match &r.latency {
+                            crate::inference::types::Latency::NonStreaming { response_time } => Some(response_time.as_millis() as u32),
+                            crate::inference::types::Latency::Streaming { response_time, .. } => Some(response_time.as_millis() as u32),
+                            crate::inference::types::Latency::Batch => None,
+                        })
+                        .unwrap_or(0)
+                },
+                InferenceResult::Json(json_result) => {
+                    json_result.model_inference_results.first()
+                        .and_then(|r| match &r.latency {
+                            crate::inference::types::Latency::NonStreaming { response_time } => Some(response_time.as_millis() as u32),
+                            crate::inference::types::Latency::Streaming { response_time, .. } => Some(response_time.as_millis() as u32),
+                            crate::inference::types::Latency::Batch => None,
+                        })
+                        .unwrap_or(0)
+                },
+                // For other result types, we don't have model_inference_results, so default to 0
+                _ => 0,
+            };
+
             // Serialize the response to capture what we're sending back to the client (without null values)
             let gateway_response =
                 super::openai_compatible::serialize_without_nulls(&response).ok();
@@ -260,8 +284,28 @@ pub async fn inference_handler(
                 }
             }
 
+            // Extract inference_id from the response
+            let inference_id = match &response {
+                InferenceResponse::Chat(chat_response) => chat_response.inference_id,
+                InferenceResponse::Json(json_response) => json_response.inference_id,
+            };
+
             let response_json = Json(response);
-            Ok(response_json.into_response())
+            let mut http_response = response_json.into_response();
+
+            // Add inference_id to response headers for analytics middleware
+            http_response.headers_mut().insert(
+                "x-tensorzero-inference-id",
+                inference_id.to_string().parse().unwrap(),
+            );
+
+            // Add model latency to response headers for analytics middleware
+            http_response.headers_mut().insert(
+                "x-tensorzero-model-latency-ms",
+                model_latency_ms.to_string().parse().unwrap(),
+            );
+
+            Ok(http_response)
         }
         InferenceOutput::Streaming(stream) => {
             let event_stream = prepare_serialized_events(stream);

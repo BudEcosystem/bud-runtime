@@ -17,10 +17,9 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::response::sse::{Event, Sse};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
-use futures::Stream;
+use futures::{Stream, StreamExt as FuturesStreamExt};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
-use tokio_stream::StreamExt;
 use url::Url;
 use uuid::Uuid;
 
@@ -35,7 +34,7 @@ use crate::inference::types::extra_body::UnfilteredInferenceExtraBody;
 use crate::inference::types::extra_headers::UnfilteredInferenceExtraHeaders;
 use crate::inference::types::{
     current_timestamp, ContentBlockChatOutput, ContentBlockChunk, File, FileKind, FinishReason,
-    Input, InputMessage, InputMessageContent, ResolvedInput, ResolvedInputMessage,
+    InferenceResult, Input, InputMessage, InputMessageContent, ResolvedInput, ResolvedInputMessage,
     ResolvedInputMessageContent, Role, TextKind, Usage,
 };
 use crate::tool::{
@@ -243,6 +242,30 @@ pub async fn inference_handler(
             result,
             write_info,
         } => {
+            // Extract model latency from the result (using the first model inference result) before moving result
+            let model_latency_ms = match &result {
+                InferenceResult::Chat(chat_result) => {
+                    chat_result.model_inference_results.first()
+                        .and_then(|r| match &r.latency {
+                            crate::inference::types::Latency::NonStreaming { response_time } => Some(response_time.as_millis() as u32),
+                            crate::inference::types::Latency::Streaming { response_time, .. } => Some(response_time.as_millis() as u32),
+                            crate::inference::types::Latency::Batch => None,
+                        })
+                        .unwrap_or(0)
+                },
+                InferenceResult::Json(json_result) => {
+                    json_result.model_inference_results.first()
+                        .and_then(|r| match &r.latency {
+                            crate::inference::types::Latency::NonStreaming { response_time } => Some(response_time.as_millis() as u32),
+                            crate::inference::types::Latency::Streaming { response_time, .. } => Some(response_time.as_millis() as u32),
+                            crate::inference::types::Latency::Batch => None,
+                        })
+                        .unwrap_or(0)
+                },
+                // For other result types, we don't have model_inference_results, so default to 0
+                _ => 0,
+            };
+
             let mut openai_compatible_response =
                 OpenAICompatibleResponse::from((response.clone(), original_model_name.clone()));
 
@@ -314,17 +337,73 @@ pub async fn inference_handler(
                 }
             }
 
-            Ok(Json(openai_compatible_response).into_response())
+            // Extract inference_id from the original response for analytics
+            let inference_id = match &response {
+                InferenceResponse::Chat(chat_response) => chat_response.inference_id,
+                InferenceResponse::Json(json_response) => json_response.inference_id,
+            };
+
+            let json_response = Json(openai_compatible_response);
+            let mut http_response = json_response.into_response();
+
+            // Add inference_id to response headers for analytics middleware
+            http_response.headers_mut().insert(
+                "x-tensorzero-inference-id",
+                inference_id.to_string().parse().unwrap(),
+            );
+
+            // Add model latency to response headers for analytics middleware
+            http_response.headers_mut().insert(
+                "x-tensorzero-model-latency-ms",
+                model_latency_ms.to_string().parse().unwrap(),
+            );
+
+            Ok(http_response)
         }
-        InferenceOutput::Streaming(stream) => {
+        InferenceOutput::Streaming(mut stream) => {
+            // We need to peek at the first chunk to get the inference_id for analytics
+            let mut inference_id_for_header = None;
+            let mut first_chunk = None;
+
+            // Try to get the first chunk to extract inference_id
+            if let Some(chunk_result) = FuturesStreamExt::next(&mut stream).await {
+                if let Ok(chunk) = &chunk_result {
+                    inference_id_for_header = Some(chunk.inference_id());
+                    first_chunk = Some(chunk_result);
+                }
+            }
+
+            // Create a new stream that includes the first chunk if we have one
+            let combined_stream = async_stream::stream! {
+                // Yield the first chunk if we have it
+                if let Some(chunk) = first_chunk {
+                    yield chunk;
+                }
+                // Then yield the rest of the stream
+                while let Some(chunk) = FuturesStreamExt::next(&mut stream).await {
+                    yield chunk;
+                }
+            };
+
             let openai_compatible_stream = prepare_serialized_openai_compatible_events(
-                stream,
+                Box::pin(combined_stream),
                 original_model_name,
                 stream_options,
             );
-            Ok(Sse::new(openai_compatible_stream)
+
+            let mut response = Sse::new(openai_compatible_stream)
                 .keep_alive(axum::response::sse::KeepAlive::new())
-                .into_response())
+                .into_response();
+
+            // Add inference_id header if we captured it
+            if let Some(inference_id) = inference_id_for_header {
+                response.headers_mut().insert(
+                    "x-tensorzero-inference-id",
+                    inference_id.to_string().parse().unwrap(),
+                );
+            }
+
+            Ok(response)
         }
     }
 }
@@ -1433,7 +1512,7 @@ fn prepare_serialized_openai_compatible_events(
         };
         let mut inference_id = None;
         let mut episode_id = None;
-        while let Some(chunk) = stream.next().await {
+        while let Some(chunk) = tokio_stream::StreamExt::next(&mut stream).await {
             // NOTE - in the future, we may want to end the stream early if we get an error
             // For now, we just ignore the error and try to get more chunks
             let Ok(chunk) = chunk else {
@@ -4243,7 +4322,7 @@ pub async fn response_create_handler(
             .await?;
 
         // Convert to SSE stream
-        let sse_stream = stream.map(|result| match result {
+        let sse_stream = tokio_stream::StreamExt::map(stream, |result| match result {
             Ok(event) => Event::default().json_data(event).map_err(|e| {
                 Error::new(ErrorDetails::Inference {
                     message: format!("Failed to serialize SSE event: {e}"),
@@ -6633,7 +6712,7 @@ async fn convert_openai_response_to_anthropic(
     {
         // Handle streaming response
         let stream = body.into_data_stream();
-        let anthropic_stream = stream.map(|chunk| {
+        let anthropic_stream = tokio_stream::StreamExt::map(stream, |chunk| {
             chunk.map(|bytes| {
                 // Parse the SSE data
                 let data = String::from_utf8_lossy(&bytes);
@@ -6658,11 +6737,11 @@ async fn convert_openai_response_to_anthropic(
                                     event_data
                                 ))
                             }
-                            Err(_) => bytes,
+                            Err(_) => axum::body::Bytes::from(bytes.to_vec()),
                         }
                     }
                 } else {
-                    bytes
+                    axum::body::Bytes::from(bytes.to_vec())
                 }
             })
         });

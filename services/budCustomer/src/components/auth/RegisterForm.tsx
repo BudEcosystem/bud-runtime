@@ -134,9 +134,9 @@ const RegisterForm = ({ onSubmit }: RegisterFormProps) => {
             Create Account
           </Text_32_500_FFFFFF>
         </div>
-        <Text_12_400_B3B3B3 className="text-center">
+        <Text_12_400_EEEEEE className="text-center">
           Enter your details to create your BUD account
-        </Text_12_400_B3B3B3>
+        </Text_12_400_EEEEEE>
       </div>
 
       <form

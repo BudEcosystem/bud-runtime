@@ -355,6 +355,191 @@ class ClickHouseMigration:
             logger.error(f"Error creating ModerationInference table: {e}")
             raise
 
+    async def create_gateway_analytics_table(self):
+        """Create GatewayAnalytics table for API gateway request analytics."""
+        query = """
+        CREATE TABLE IF NOT EXISTS GatewayAnalytics
+        (
+            -- Core identifiers
+            id UUID,                           -- UUIDv7 for analytics record
+            inference_id Nullable(UUID),       -- Associated inference if applicable
+
+            -- Network metadata
+            client_ip String,
+            proxy_chain Nullable(String),      -- X-Forwarded-For chain
+            protocol_version LowCardinality(String),
+
+            -- Geographical data (from GeoIP lookup)
+            country_code Nullable(String),
+            region Nullable(String),
+            city Nullable(String),
+            latitude Nullable(Float32),
+            longitude Nullable(Float32),
+            timezone Nullable(String),
+            asn Nullable(UInt32),              -- Autonomous System Number
+            isp Nullable(String),              -- Internet Service Provider
+
+            -- Client metadata
+            user_agent Nullable(String),
+            device_type LowCardinality(Nullable(String)),
+            browser_name LowCardinality(Nullable(String)),
+            browser_version Nullable(String),
+            os_name LowCardinality(Nullable(String)),
+            os_version Nullable(String),
+            is_bot Bool DEFAULT false,
+
+            -- Request context
+            method LowCardinality(String),
+            path String,
+            query_params Nullable(String),
+            request_headers Map(String, String),
+            body_size Nullable(UInt32),
+
+            -- Authentication context
+            api_key_id Nullable(String),       -- Hashed/masked API key
+            auth_method LowCardinality(Nullable(String)),
+            user_id Nullable(String),
+            project_id Nullable(UUID),
+            endpoint_id Nullable(UUID),
+
+            -- Performance metrics
+            request_timestamp DateTime64(3),
+            response_timestamp DateTime64(3),
+            gateway_processing_ms UInt32,
+            total_duration_ms UInt32,
+
+            -- Model routing information
+            model_name LowCardinality(Nullable(String)),
+            model_provider LowCardinality(Nullable(String)),
+            model_version Nullable(String),
+            routing_decision LowCardinality(Nullable(String)),
+
+            -- Response metadata
+            status_code UInt16,
+            response_size Nullable(UInt32),
+            response_headers Map(String, String),
+            error_type LowCardinality(Nullable(String)),
+            error_message Nullable(String),
+
+            -- Blocking information
+            is_blocked Bool DEFAULT false,
+            block_reason Nullable(String),
+            block_rule_id Nullable(String),
+
+            -- Custom tags
+            tags Map(String, String),
+
+            -- Materialized columns
+            timestamp DateTime MATERIALIZED toDateTime(request_timestamp),
+            date Date MATERIALIZED toDate(request_timestamp),
+            hour DateTime MATERIALIZED toStartOfHour(request_timestamp)
+        )
+        ENGINE = MergeTree()
+        PARTITION BY toYYYYMM(request_timestamp)
+        ORDER BY (timestamp, id)
+        TTL toDateTime(request_timestamp) + INTERVAL 90 DAY
+        SETTINGS index_granularity = 8192
+        """
+
+        try:
+            await self.client.execute_query(query)
+            logger.info("GatewayAnalytics table created successfully")
+
+            # Create indexes
+            indexes = [
+                "ALTER TABLE GatewayAnalytics ADD INDEX IF NOT EXISTS idx_inference_id (inference_id) TYPE minmax GRANULARITY 1",
+                "ALTER TABLE GatewayAnalytics ADD INDEX IF NOT EXISTS idx_model_name (model_name) TYPE set(100) GRANULARITY 4",
+                "ALTER TABLE GatewayAnalytics ADD INDEX IF NOT EXISTS idx_country_code (country_code) TYPE set(300) GRANULARITY 4",
+                "ALTER TABLE GatewayAnalytics ADD INDEX IF NOT EXISTS idx_status_code (status_code) TYPE set(20) GRANULARITY 4",
+                "ALTER TABLE GatewayAnalytics ADD INDEX IF NOT EXISTS idx_is_blocked (is_blocked) TYPE minmax GRANULARITY 1",
+                "ALTER TABLE GatewayAnalytics ADD INDEX IF NOT EXISTS idx_endpoint_id (endpoint_id) TYPE bloom_filter(0.01) GRANULARITY 4",
+                "ALTER TABLE GatewayAnalytics ADD INDEX IF NOT EXISTS idx_client_ip (client_ip) TYPE bloom_filter(0.01) GRANULARITY 8",
+            ]
+
+            for index_query in indexes:
+                try:
+                    await self.client.execute_query(index_query)
+                except Exception as e:
+                    if "already exists" not in str(e):
+                        logger.warning(f"Index creation warning: {e}")
+
+        except Exception as e:
+            logger.error(f"Error creating GatewayAnalytics table: {e}")
+            raise
+
+    async def create_gateway_blocking_events_table(self):
+        """Create GatewayBlockingEvents table for tracking blocked requests."""
+        query = """
+        CREATE TABLE IF NOT EXISTS GatewayBlockingEvents
+        (
+            -- Event identifiers
+            id UUID,                           -- UUIDv7 for event record
+            rule_id UUID,                      -- Blocking rule that triggered the block
+
+            -- Client information
+            client_ip String,
+            country_code Nullable(String),
+            user_agent Nullable(String),
+
+            -- Request context
+            request_path String,
+            request_method LowCardinality(String),
+            api_key_id Nullable(String),       -- Hashed/masked API key if available
+
+            -- Project/endpoint context (optional)
+            project_id Nullable(UUID),
+            endpoint_id Nullable(UUID),
+            model_name LowCardinality(Nullable(String)),
+
+            -- Rule information
+            rule_type LowCardinality(String),  -- IP_BLOCKING, COUNTRY_BLOCKING, etc.
+            rule_name String,
+            rule_priority Int32,
+
+            -- Block details
+            block_reason String,
+            action_taken LowCardinality(String), -- BLOCK, RATE_LIMIT, etc.
+
+            -- Timing
+            blocked_at DateTime64(3),          -- When the block occurred
+
+            -- Materialized columns for efficient querying
+            timestamp DateTime MATERIALIZED toDateTime(blocked_at),
+            date Date MATERIALIZED toDate(blocked_at),
+            hour DateTime MATERIALIZED toStartOfHour(blocked_at)
+        )
+        ENGINE = MergeTree()
+        PARTITION BY toYYYYMM(blocked_at)
+        ORDER BY (rule_id, blocked_at, id)
+        TTL toDateTime(blocked_at) + INTERVAL 90 DAY
+        SETTINGS index_granularity = 8192
+        """
+
+        try:
+            await self.client.execute_query(query)
+            logger.info("GatewayBlockingEvents table created successfully")
+
+            # Create indexes for efficient queries
+            indexes = [
+                "ALTER TABLE GatewayBlockingEvents ADD INDEX IF NOT EXISTS idx_rule_timestamp (rule_id, blocked_at) TYPE minmax GRANULARITY 1",
+                "ALTER TABLE GatewayBlockingEvents ADD INDEX IF NOT EXISTS idx_client_ip (client_ip) TYPE bloom_filter(0.01) GRANULARITY 8",
+                "ALTER TABLE GatewayBlockingEvents ADD INDEX IF NOT EXISTS idx_country_code (country_code) TYPE set(300) GRANULARITY 4",
+                "ALTER TABLE GatewayBlockingEvents ADD INDEX IF NOT EXISTS idx_rule_type (rule_type) TYPE set(10) GRANULARITY 4",
+                "ALTER TABLE GatewayBlockingEvents ADD INDEX IF NOT EXISTS idx_project_timestamp (project_id, blocked_at) TYPE minmax GRANULARITY 1",
+                "ALTER TABLE GatewayBlockingEvents ADD INDEX IF NOT EXISTS idx_endpoint_timestamp (endpoint_id, blocked_at) TYPE minmax GRANULARITY 1",
+            ]
+
+            for index_query in indexes:
+                try:
+                    await self.client.execute_query(index_query)
+                except Exception as e:
+                    if "already exists" not in str(e):
+                        logger.warning(f"Index creation warning: {e}")
+
+        except Exception as e:
+            logger.error(f"Error creating GatewayBlockingEvents table: {e}")
+            raise
+
     async def verify_tables(self):
         """Verify that tables were created successfully."""
         tables_to_check = [
@@ -363,6 +548,8 @@ class ClickHouseMigration:
             "AudioInference",
             "ImageInference",
             "ModerationInference",
+            "GatewayAnalytics",
+            "GatewayBlockingEvents",
         ]
         if self.include_model_inference:
             tables_to_check.append("ModelInference")
@@ -394,6 +581,8 @@ class ClickHouseMigration:
             await self.create_audio_inference_table()
             await self.create_image_inference_table()
             await self.create_moderation_inference_table()
+            await self.create_gateway_analytics_table()
+            await self.create_gateway_blocking_events_table()
             await self.verify_tables()
             logger.info("Migration completed successfully!")
 
