@@ -282,6 +282,24 @@ export default function ProjectsPage() {
   const activeProjects = projects.filter((p) => p.status === "active");
   const inactiveProjects = projects.filter((p) => p.status === "inactive");
   const archivedProjects = projects.filter((p) => p.status === "archived");
+  const themeConfig={
+    components: {
+      Dropdown: {
+        colorBgElevated: "var(--bg-tertiary)",  // dropdown container bg
+        controlItemBgHover: "var(--bg-hover)",  // hover background
+        controlItemBgActive: "var(--bg-hover)", // active/selected bg
+        colorText: "var(--text-primary)",        // default text
+      },
+      Menu: {
+        itemColor: "var(--text-primary)",        // menu item text
+        itemHoverColor: "var(--text-hover)",    // text on hover
+        itemHoverBg: "var(--bg-hover)",         // hover background
+        itemSelectedColor: "var(--text-primary)", // selected text
+        itemSelectedBg: "var(--bg-hover)",   // selected background
+        colorItemTextDisabled: "var(--text-disabled)", // disabled text
+      }
+    }
+  }
 
   return (
     <DashboardLayout>
@@ -394,24 +412,7 @@ export default function ProjectsPage() {
                               {dayjs(project.updated_at).format("DD MMM")}
                             </Text>
                             <ConfigProvider
-                            theme={{
-                              components: {
-                                Dropdown: {
-                                  colorBgElevated: "var(--bg-tertiary)",  // dropdown container bg
-                                  controlItemBgHover: "var(--bg-hover)",  // hover background
-                                  controlItemBgActive: "var(--bg-hover)", // active/selected bg
-                                  colorText: "var(--text-primary)",        // default text
-                                },
-                                Menu: {
-                                  itemColor: "var(--text-primary)",        // menu item text
-                                  itemHoverColor: "var(--text-hover)",    // text on hover
-                                  itemHoverBg: "var(--bg-hover)",         // hover background
-                                  itemSelectedColor: "var(--text-primary)", // selected text
-                                  itemSelectedBg: "var(--bg-hover)",   // selected background
-                                  colorItemTextDisabled: "var(--text-disabled)", // disabled text
-                                }
-                              }
-                            }}>
+                            theme={themeConfig}>
                               <Dropdown
                                 menu={{ items: getProjectMenuItems(project) }}
                                 trigger={["click"]}
@@ -550,18 +551,21 @@ export default function ProjectsPage() {
                             <Text className="text-bud-text-disabled text-[12px]">
                               {dayjs(project.updated_at).format("DD MMM")}
                             </Text>
-                            <Dropdown
-                              menu={{ items: getProjectMenuItems(project) }}
-                              trigger={["click"]}
-                              placement="bottomRight"
-                            >
-                              <Button
-                                type="text"
-                                icon={<MoreOutlined />}
-                                className="text-bud-text-disabled hover:text-bud-text-primary"
-                                size="small"
-                              />
-                            </Dropdown>
+                            <ConfigProvider
+                            theme={themeConfig}>
+                              <Dropdown
+                                menu={{ items: getProjectMenuItems(project) }}
+                                trigger={["click"]}
+                                placement="bottomRight"
+                              >
+                                <Button
+                                  type="text"
+                                  icon={<MoreOutlined />}
+                                  className="text-bud-text-disabled hover:text-bud-text-primary"
+                                  size="small"
+                                />
+                              </Dropdown>
+                            </ConfigProvider>
                           </div>
                         </div>
 
@@ -679,18 +683,21 @@ export default function ProjectsPage() {
                             <Text className="text-bud-text-disabled text-[12px]">
                               {dayjs(project.updated_at).format("DD MMM")}
                             </Text>
-                            <Dropdown
-                              menu={{ items: getProjectMenuItems(project) }}
-                              trigger={["click"]}
-                              placement="bottomRight"
-                            >
-                              <Button
-                                type="text"
-                                icon={<MoreOutlined />}
-                                className="text-bud-text-disabled hover:text-bud-text-primary"
-                                size="small"
-                              />
-                            </Dropdown>
+                            <ConfigProvider
+                            theme={themeConfig}>
+                              <Dropdown
+                                menu={{ items: getProjectMenuItems(project) }}
+                                trigger={["click"]}
+                                placement="bottomRight"
+                              >
+                                <Button
+                                  type="text"
+                                  icon={<MoreOutlined />}
+                                  className="text-bud-text-disabled hover:text-bud-text-primary"
+                                  size="small"
+                                />
+                              </Dropdown>
+                            </ConfigProvider>
                           </div>
                         </div>
 
