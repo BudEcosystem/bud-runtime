@@ -28,6 +28,107 @@ class TraitSummary(BaseModel):
     icon: Optional[str] = Field(None, description="The icon for the trait.")
 
 
+# ------------------------ New Experiment Detail Schemas ------------------------
+
+
+class BudgetStats(BaseModel):
+    """Budget statistics for an experiment."""
+
+    limit_usd: float = Field(..., description="Budget limit in USD")
+    used_usd: float = Field(..., description="Budget used in USD")
+    used_pct: int = Field(..., description="Percentage of budget used")
+
+
+class TokenStats(BaseModel):
+    """Token statistics for an experiment."""
+
+    total: int = Field(..., description="Total tokens")
+    prefix: int = Field(..., description="Prefix tokens")
+    decode: int = Field(..., description="Decode tokens")
+    unit: str = Field(default="tokens", description="Unit of measurement")
+
+
+class RuntimeStats(BaseModel):
+    """Runtime statistics for an experiment."""
+
+    active_seconds: int = Field(..., description="Active runtime in seconds")
+    estimated_total_seconds: int = Field(..., description="Estimated total runtime in seconds")
+
+
+class ProcessingRate(BaseModel):
+    """Processing rate for an experiment."""
+
+    current_per_min: int = Field(..., description="Current processing rate per minute")
+    target_per_min: int = Field(..., description="Target processing rate per minute")
+
+
+class ExperimentStats(BaseModel):
+    """Combined statistics for an experiment."""
+
+    budget: BudgetStats = Field(..., description="Budget statistics")
+    tokens: TokenStats = Field(..., description="Token statistics")
+    runtime: RuntimeStats = Field(..., description="Runtime statistics")
+    processing_rate: ProcessingRate = Field(..., description="Processing rate statistics")
+
+
+class JudgeInfo(BaseModel):
+    """Judge information for evaluation metrics."""
+
+    mode: str = Field(..., description="Judge mode (e.g., llm_as_judge)")
+    model_name: str = Field(..., description="Name of the judge model")
+    score_pct: int = Field(..., description="Score percentage")
+
+
+class CurrentMetric(BaseModel):
+    """Current metric for an evaluation."""
+
+    evaluation: str = Field(..., description="Evaluation name")
+    dataset: str = Field(..., description="Dataset name")
+    deployment_name: str = Field(..., description="Deployment name")
+    judge: JudgeInfo = Field(..., description="Judge information")
+    traits: List[str] = Field(..., description="List of traits")
+    last_run_at: datetime = Field(..., description="Last run timestamp")
+    run_id: str = Field(..., description="UUID of the latest run")
+
+
+class ProgressDataset(BaseModel):
+    """Dataset information in progress overview."""
+
+    dataset_label: str = Field(..., description="Dataset label")
+
+
+class ProgressInfo(BaseModel):
+    """Progress information."""
+
+    percent: int = Field(..., description="Progress percentage")
+    completed: int = Field(..., description="Number of completed items")
+    total: int = Field(..., description="Total number of items")
+
+
+class ProgressActions(BaseModel):
+    """Available actions for a run."""
+
+    can_pause: bool = Field(..., description="Whether the run can be paused")
+    pause_url: str = Field(..., description="URL to pause the run")
+
+
+class ProgressOverview(BaseModel):
+    """Progress overview for a run."""
+
+    run_id: str = Field(..., description="UUID of the run")
+    title: str = Field(..., description="Title of the progress overview")
+    objective: str = Field(..., description="Objective of the run")
+    current: ProgressDataset = Field(..., description="Current dataset being processed")
+    progress: ProgressInfo = Field(..., description="Progress information")
+    current_evaluation: str = Field(..., description="Current evaluation being performed")
+    current_model: str = Field(..., description="Current model being evaluated")
+    processing_rate_per_min: int = Field(..., description="Processing rate per minute")
+    average_score_pct: float = Field(..., description="Average score percentage")
+    eta_minutes: int = Field(..., description="Estimated time to completion in minutes")
+    status: str = Field(..., description="Status of the run")
+    actions: ProgressActions = Field(..., description="Available actions")
+
+
 # ------------------------ Experiment Schemas ------------------------
 
 
@@ -55,6 +156,12 @@ class Experiment(BaseModel):
     traits: Optional[List[TraitSummary]] = Field(
         default_factory=list, description="Traits associated with the experiment."
     )
+    # New fields for experiment detail
+    stats: Optional[ExperimentStats] = Field(None, description="Experiment statistics")
+    objective: Optional[str] = Field(None, description="Experiment objective")
+    current_metrics: Optional[List[CurrentMetric]] = Field(None, description="Current evaluation metrics")
+    progress_overview: Optional[List[ProgressOverview]] = Field(None, description="Progress overview for runs")
+    updated_at: Optional[datetime] = Field(None, description="Last update timestamp")
 
     class Config:
         """Pydantic model configuration."""
@@ -478,3 +585,47 @@ class EvaluationDatasetsData(BaseModel):
     run_name: Optional[str] = None
     run_description: Optional[str] = None
     evaluation_config: Optional[dict] = None
+
+
+# ------------------------ Run History Schemas ------------------------
+
+
+class BenchmarkScore(BaseModel):
+    """Benchmark score for a run."""
+
+    name: str = Field(..., description="Benchmark name")
+    score: str = Field(..., description="Benchmark score")
+
+
+class RunHistoryItem(BaseModel):
+    """A single item in run history."""
+
+    run_id: str = Field(..., description="UUID of the run")
+    model: str = Field(..., description="Model name")
+    status: str = Field(..., description="Run status")
+    started_at: datetime = Field(..., description="Run start timestamp")
+    duration_seconds: int = Field(..., description="Run duration in seconds")
+    benchmarks: List[BenchmarkScore] = Field(..., description="List of benchmark scores")
+
+
+class SortInfo(BaseModel):
+    """Sorting information for run history."""
+
+    field: str = Field(..., description="Field to sort by")
+    direction: str = Field(..., description="Sort direction (asc/desc)")
+
+
+class RunHistoryData(BaseModel):
+    """Run history data with pagination."""
+
+    total: int = Field(..., description="Total number of runs")
+    items: List[RunHistoryItem] = Field(..., description="List of run history items")
+    sort: SortInfo = Field(..., description="Sorting information")
+    page: int = Field(..., description="Current page number")
+    page_size: int = Field(..., description="Page size")
+
+
+class RunHistoryResponse(SuccessResponse):
+    """Response for run history endpoint."""
+
+    runs_history: RunHistoryData = Field(..., description="Run history data")

@@ -295,6 +295,22 @@ class ExperimentService:
         Raises:
             HTTPException(status_code=404): If experiment not found or access denied.
         """
+        from datetime import datetime
+
+        from budapp.eval_ops.schemas import (
+            BudgetStats,
+            CurrentMetric,
+            ExperimentStats,
+            JudgeInfo,
+            ProcessingRate,
+            ProgressActions,
+            ProgressDataset,
+            ProgressInfo,
+            ProgressOverview,
+            RuntimeStats,
+            TokenStats,
+        )
+
         ev = self.session.get(ExperimentModel, ev_id)
         if not ev or ev.created_by != user_id or ev.status == "deleted":
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Experiment not found or access denied")
@@ -304,6 +320,69 @@ class ExperimentService:
         exp_data.models = self.get_models_for_experiment(ev.id)
         exp_data.traits = self.get_traits_for_experiment(ev.id)
         exp_data.status = self.compute_experiment_status(ev.id)
+
+        # Add dummy data for new fields
+        exp_data.stats = ExperimentStats(
+            budget=BudgetStats(limit_usd=100.0, used_usd=45.2, used_pct=45),
+            tokens=TokenStats(total=2100000, prefix=1200000, decode=900000, unit="tokens"),
+            runtime=RuntimeStats(active_seconds=8100, estimated_total_seconds=11100),
+            processing_rate=ProcessingRate(current_per_min=47, target_per_min=50),
+        )
+
+        exp_data.objective = "Compare GPT-4 and Claude-3 performance across academic benchmarks"
+
+        import uuid as uuid_lib
+
+        # Generate actual UUIDs for run IDs
+        run_id_1 = str(uuid_lib.uuid4())
+        run_id_2 = str(uuid_lib.uuid4())
+        latest_run_id = str(uuid_lib.uuid4())
+
+        exp_data.current_metrics = [
+            CurrentMetric(
+                evaluation="TruthfulQA",
+                dataset="dataset_name",
+                deployment_name="deployment_name",
+                judge=JudgeInfo(mode="llm_as_judge", model_name="Judge model name 1", score_pct=75),
+                traits=["trait_name_1", "trait_name_2"],
+                last_run_at=datetime.fromisoformat("2024-01-13T00:00:00Z"),
+                run_id=latest_run_id,
+            )
+        ]
+
+        exp_data.progress_overview = [
+            ProgressOverview(
+                run_id=run_id_1,
+                title="Progress Overview of Run 1",
+                objective="Compare GPT-4 and Claude-3 performance across academic benchmarks",
+                current=ProgressDataset(dataset_label="MMLU - Mathematical Reasoning"),
+                progress=ProgressInfo(percent=65, completed=813, total=1247),
+                current_evaluation="TruthfulQA",
+                current_model="GPT-4 Turbo",
+                processing_rate_per_min=47,
+                average_score_pct=78.5,
+                eta_minutes=45,
+                status="running",
+                actions=ProgressActions(can_pause=True, pause_url=f"/experiments/{ev_id}/runs/{run_id_1}/pause"),
+            ),
+            ProgressOverview(
+                run_id=run_id_2,
+                title="Progress Overview of Run 2",
+                objective="Compare GPT-4 and Claude-3 performance across academic benchmarks",
+                current=ProgressDataset(dataset_label="MMLU - Mathematical Reasoning"),
+                progress=ProgressInfo(percent=65, completed=813, total=1247),
+                current_evaluation="TruthfulQA",
+                current_model="GPT-4 Turbo",
+                processing_rate_per_min=47,
+                average_score_pct=78.5,
+                eta_minutes=45,
+                status="running",
+                actions=ProgressActions(can_pause=True, pause_url=f"/experiments/{ev_id}/runs/{run_id_2}/pause"),
+            ),
+        ]
+
+        exp_data.updated_at = datetime.fromisoformat("2024-01-13T00:00:00Z")
+
         return exp_data
 
     def update_experiment(
@@ -1109,6 +1188,72 @@ class ExperimentService:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete dataset"
             ) from e
+
+    def get_runs_history(
+        self,
+        experiment_id: uuid.UUID,
+        user_id: uuid.UUID,
+        page: int = 1,
+        page_size: int = 50,
+        sort_field: str = "started_at",
+        sort_direction: str = "desc",
+    ):
+        """Get run history for an experiment with pagination.
+
+        Parameters:
+            experiment_id (uuid.UUID): ID of the experiment.
+            user_id (uuid.UUID): ID of the user.
+            page (int): Page number (default: 1).
+            page_size (int): Page size (default: 50).
+            sort_field (str): Field to sort by (default: "started_at").
+            sort_direction (str): Sort direction (default: "desc").
+
+        Returns:
+            RunHistoryData: Paginated run history data.
+
+        Raises:
+            HTTPException(status_code=404): If experiment not found or access denied.
+        """
+        from datetime import datetime
+
+        from budapp.eval_ops.schemas import BenchmarkScore, RunHistoryData, RunHistoryItem, SortInfo
+
+        # Verify experiment exists and user has access
+        experiment = self.session.get(ExperimentModel, experiment_id)
+        if not experiment or experiment.created_by != user_id or experiment.status == "deleted":
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Experiment not found or access denied")
+
+        # Return dummy data for now
+        import uuid as uuid_lib
+
+        dummy_runs = []
+        for _i in range(10):  # Create 10 dummy runs
+            dummy_runs.append(
+                RunHistoryItem(
+                    run_id=str(uuid_lib.uuid4()),  # Generate actual UUID
+                    model="model_name",
+                    status="completed",
+                    started_at=datetime.fromisoformat("2024-01-13T00:00:00Z"),
+                    duration_seconds=4920,
+                    benchmarks=[
+                        BenchmarkScore(name="Benchmark", score="Score"),
+                        BenchmarkScore(name="Benchmark", score="Score"),
+                    ],
+                )
+            )
+
+        # Return only the requested page
+        start_idx = (page - 1) * page_size
+        end_idx = start_idx + page_size
+        paginated_runs = dummy_runs[start_idx:end_idx] if start_idx < len(dummy_runs) else []
+
+        return RunHistoryData(
+            total=10,
+            items=paginated_runs,
+            sort=SortInfo(field=sort_field, direction=sort_direction),
+            page=page,
+            page_size=page_size,
+        )
 
 
 class ExperimentWorkflowService:
