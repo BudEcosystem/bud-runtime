@@ -587,7 +587,7 @@ export default function ModelsPage() {
                                 icon="ph:user"
                                 className="text-bud-text-muted text-xs"
                               />
-                              <span className="text-xs text-bud-yellow">
+                              <span className="text-xs text-[--color-yellow]">
                                 {model.author}
                               </span>
                             </div>
