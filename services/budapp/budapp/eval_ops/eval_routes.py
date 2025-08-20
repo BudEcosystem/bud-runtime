@@ -26,6 +26,7 @@ from budapp.eval_ops.schemas import (
     ListExperimentsResponse,
     ListRunsResponse,
     ListTraitsResponse,
+    RunHistoryResponse,
     UpdateExperimentRequest,
     UpdateExperimentResponse,
     UpdateRunRequest,
@@ -466,6 +467,55 @@ def list_runs(
         object="run.list",
         message="Successfully listed runs",
         runs=runs,
+    )
+
+
+@router.get(
+    "/{experiment_id}/runs/history",
+    response_model=RunHistoryResponse,
+    status_code=status.HTTP_200_OK,
+    responses={status.HTTP_404_NOT_FOUND: {"model": ErrorResponse}},
+)
+def get_runs_history(
+    experiment_id: Annotated[uuid.UUID, Path(..., description="Experiment ID")],
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    page: Annotated[int, Query(ge=1, description="Page number")] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100, description="Page size")] = 50,
+    sort_field: Annotated[str, Query(description="Field to sort by")] = "started_at",
+    sort_direction: Annotated[str, Query(description="Sort direction (asc/desc)")] = "desc",
+):
+    """Get run history for an experiment with pagination.
+
+    - **experiment_id**: UUID of the experiment.
+    - **session**: Database session dependency.
+    - **current_user**: The authenticated user.
+    - **page**: Page number (default: 1).
+    - **page_size**: Page size (default: 50, max: 100).
+    - **sort_field**: Field to sort by (default: "started_at").
+    - **sort_direction**: Sort direction (default: "desc").
+
+    Returns a `RunHistoryResponse` with paginated run history.
+    """
+    try:
+        runs_history = ExperimentService(session).get_runs_history(
+            experiment_id,
+            current_user.id,
+            page=page,
+            page_size=page_size,
+            sort_field=sort_field,
+            sort_direction=sort_direction,
+        )
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to get run history") from e
+
+    return RunHistoryResponse(
+        code=status.HTTP_200_OK,
+        object="runs.history",
+        message="Successfully retrieved run history",
+        runs_history=runs_history,
     )
 
 
