@@ -207,7 +207,7 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
           )} */}
 
           {/* Notifications */}
-          
+
             <div className="bg-bud-bg-secondary rounded-lg p-3 mb-1 cursor-pointer hover:bg-bud-bg-tertiary transition-colors">
               <Badge
                 count={88}
