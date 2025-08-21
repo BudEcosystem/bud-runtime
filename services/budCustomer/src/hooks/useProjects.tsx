@@ -190,7 +190,7 @@ export const useProjects = create<{
 
   updateProject: async (projectId: string, data: any) => {
     try {
-      const response: any = await AppRequest.Put(`/projects/${projectId}`, data);
+      const response: any = await AppRequest.Patch(`/projects/${projectId}`, data);
       successToast(response.data.message || "Project updated successfully");
       return response.data.project;
     } catch (error) {

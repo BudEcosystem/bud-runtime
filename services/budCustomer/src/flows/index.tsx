@@ -2,6 +2,7 @@ import React from "react";
 import CreateBatchJob from "./BatchJob/CreateBatchJob";
 import CreateBatchJobSuccess from "./BatchJob/CreateBatchJobSuccess";
 import NewProject from "./NewProject";
+import EditProject from "./EditProject";
 
 // Placeholder component factory
 const createPlaceholderComponent = (name: string) => {
@@ -146,5 +147,6 @@ export const StepComponents = stepComponentNames.reduce(
 StepComponents["create-batch-job"] = CreateBatchJob;
 StepComponents["create-batch-job-success"] = CreateBatchJobSuccess;
 StepComponents["new-project"] = NewProject;
+StepComponents["edit-project"] = EditProject;
 
 export type StepComponentsType = keyof typeof StepComponents;

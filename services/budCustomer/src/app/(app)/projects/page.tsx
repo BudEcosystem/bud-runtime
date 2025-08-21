@@ -122,7 +122,8 @@ export default function ProjectsPage() {
     globalProjects,
     getGlobalProjects,
     loading,
-    deleteProject: apiDeleteProject
+    deleteProject: apiDeleteProject,
+    getGlobalProject
   } = useProjects();
 
   const { openDrawer } = useDrawer();
@@ -179,16 +180,26 @@ export default function ProjectsPage() {
   };
 
 
-  const handleEditProject = () => {
-    // TODO: Open edit drawer when edit flow is implemented
-    console.log("Edit project functionality not yet implemented");
+  const handleEditProject = (project: ContextProject) => {
+    try {
+      // Fetch the full project data from API
+      const projectData = globalProjects.find(p => p.project.id === project.id);
+      if (projectData) {
+        // Set the selected project for editing
+        getGlobalProject(project.id);
+        // Open the edit drawer
+        openDrawer("edit-project", {});
+      }
+    } catch (error) {
+      console.error("Failed to open edit project:", error);
+    }
   };
 
   const handleDeleteProject = async (projectId: string) => {
     try {
       await apiDeleteProject(projectId, null);
       // Refresh the project list
-      await getGlobalProjects(currentPage, pageSize, searchTerm);
+      getGlobalProjects(currentPage, pageSize, searchTerm);
     } catch (error) {
       console.error("Failed to delete project:", error);
     }
@@ -201,7 +212,7 @@ export default function ProjectsPage() {
       key: "edit",
       label: "Edit Project",
       icon: <Icon icon="ph:pencil" />,
-      onClick: () => handleEditProject(),
+      onClick: () => handleEditProject(project),
     },
     {
       key: "delete",
