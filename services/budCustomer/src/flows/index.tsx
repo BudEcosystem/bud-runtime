@@ -3,6 +3,7 @@ import CreateBatchJob from "./BatchJob/CreateBatchJob";
 import CreateBatchJobSuccess from "./BatchJob/CreateBatchJobSuccess";
 import NewProject from "./NewProject";
 import EditProject from "./EditProject";
+import DeleteProject from "./DeleteProject";
 
 // Placeholder component factory
 const createPlaceholderComponent = (name: string) => {
@@ -148,5 +149,6 @@ StepComponents["create-batch-job"] = CreateBatchJob;
 StepComponents["create-batch-job-success"] = CreateBatchJobSuccess;
 StepComponents["new-project"] = NewProject;
 StepComponents["edit-project"] = EditProject;
+StepComponents["delete-project"] = DeleteProject;
 
 export type StepComponentsType = keyof typeof StepComponents;

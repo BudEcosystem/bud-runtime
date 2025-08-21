@@ -122,7 +122,6 @@ export default function ProjectsPage() {
     globalProjects,
     getGlobalProjects,
     loading,
-    deleteProject: apiDeleteProject,
     getGlobalProject
   } = useProjects();
 
@@ -195,13 +194,18 @@ export default function ProjectsPage() {
     }
   };
 
-  const handleDeleteProject = async (projectId: string) => {
+  const handleDeleteProject = (project: ContextProject) => {
     try {
-      await apiDeleteProject(projectId, null);
-      // Refresh the project list
-      getGlobalProjects(currentPage, pageSize, searchTerm);
+      // Fetch the full project data from API
+      const projectData = globalProjects.find(p => p.project.id === project.id);
+      if (projectData) {
+        // Set the selected project for deletion
+        getGlobalProject(project.id);
+        // Open the delete drawer
+        openDrawer("delete-project", {});
+      }
     } catch (error) {
-      console.error("Failed to delete project:", error);
+      console.error("Failed to open delete project:", error);
     }
   };
 
@@ -219,7 +223,7 @@ export default function ProjectsPage() {
       label: "Delete",
       icon: <Icon icon="ph:trash" />,
       danger: true,
-      onClick: () => handleDeleteProject(project.id),
+      onClick: () => handleDeleteProject(project),
     },
   ];
 
