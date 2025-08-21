@@ -147,8 +147,9 @@ const EvaluationList = () => {
 
               </div>
 
-              {/* Type Tags */}
-              <div className=" flex flex-wrap gap-2 mb-[.5rem]">
+              {/* Combined Type and Trait Tags */}
+              <div className="flex flex-wrap gap-2 mb-[.5rem]">
+                {/* Modality Tags */}
                 {evaluation.modalities?.map((type) => (
                   <div
                     key={type}
@@ -156,6 +157,16 @@ const EvaluationList = () => {
                   >
                     {getTypeIcon(type)}
                     <Text_10_400_D1B854 className="capitalize">{type}</Text_10_400_D1B854>
+                  </div>
+                ))}
+
+                {/* Trait Tags */}
+                {evaluation.traits?.map((trait) => (
+                  <div
+                    key={trait.id || trait.name}
+                    className="flex items-center gap-[.1rem] px-[.5rem] py-[.2rem] bg-[#1F1F1F] rounded-[0.375rem]"
+                  >
+                    <Text_10_400_D1B854 className="capitalize">{trait.name}</Text_10_400_D1B854>
                   </div>
                 ))}
               </div>
