@@ -168,7 +168,7 @@ class PromptVersionDataManager(DataManagerUtils):
 
     async def get_next_version(self, prompt_id: UUID) -> int:
         """Get the next version number for a prompt."""
-        result = await self.session.execute(
+        result = self.session.execute(
             select(func.max(PromptVersionModel.version)).where(PromptVersionModel.prompt_id == prompt_id)
         )
         max_version = result.scalar()

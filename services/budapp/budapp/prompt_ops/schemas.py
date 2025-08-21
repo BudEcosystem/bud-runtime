@@ -366,3 +366,17 @@ class SinglePromptResponse(SuccessResponse):
     """Single prompt response."""
 
     prompt: PromptResponse
+
+
+class CreatePromptVersionRequest(BaseModel):
+    """Create prompt version request schema."""
+
+    endpoint_id: UUID4 = Field(..., description="Endpoint ID for the prompt version")
+    prompt_schema: PromptSchemaConfig = Field(..., description="Prompt schema configuration")
+    set_as_default: bool = Field(default=False, description="Set this version as the default version")
+
+
+class SinglePromptVersionResponse(SuccessResponse):
+    """Single prompt version response."""
+
+    version: PromptVersionResponse

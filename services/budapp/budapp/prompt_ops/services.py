@@ -56,6 +56,7 @@ from .schemas import (
     PromptListItem,
     PromptResponse,
     PromptVersionListItem,
+    PromptVersionResponse,
 )
 
 
@@ -467,3 +468,73 @@ class PromptWorkflowService(SessionMixin):
             )
 
         return db_workflow
+
+
+class PromptVersionService(SessionMixin):
+    """Service for managing prompt versions."""
+
+    async def create_prompt_version(
+        self, prompt_id: UUID, endpoint_id: UUID, prompt_schema: dict, set_as_default: bool, current_user_id: UUID
+    ) -> PromptVersionModel:
+        """Create a new version for an existing prompt."""
+        # Validate that the prompt exists and is active
+        db_prompt = await PromptDataManager(self.session).retrieve_by_fields(
+            PromptModel,
+            fields={"id": prompt_id, "status": PromptStatusEnum.ACTIVE},
+        )
+
+        if not db_prompt:
+            raise ClientException(message="Prompt not found", status_code=status.HTTP_404_NOT_FOUND)
+
+        # Validate and fetch the endpoint
+        db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+            EndpointModel,
+            fields={"id": endpoint_id},
+            exclude_fields={"status": EndpointStatusEnum.DELETED},
+            missing_ok=True,
+        )
+
+        if not db_endpoint:
+            raise ClientException(message="Endpoint not found", status_code=status.HTTP_404_NOT_FOUND)
+
+        # Validate that the endpoint belongs to the same project as the prompt
+        if db_endpoint.project_id != db_prompt.project_id:
+            raise ClientException(
+                message="Endpoint does not belong to the same project as the prompt",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Extract model_id and cluster_id from the endpoint
+        model_id = db_endpoint.model_id
+        cluster_id = db_endpoint.cluster_id
+
+        # Get the next version number
+        next_version = await PromptVersionDataManager(self.session).get_next_version(prompt_id)
+
+        # Create the new prompt version
+        db_version = PromptVersionDataManager(self.session).add_one(
+            PromptVersionModel(
+                prompt_id=prompt_id,
+                endpoint_id=endpoint_id,
+                model_id=model_id,
+                cluster_id=cluster_id,
+                version=next_version,
+                prompt_schema=prompt_schema,
+                status=PromptVersionStatusEnum.ACTIVE,
+                created_by=current_user_id,
+            )
+        )
+
+        # If set_as_default is True, update the prompt's default_version_id
+        if set_as_default:
+            await PromptDataManager(self.session).update_by_fields(db_prompt, {"default_version_id": db_version.id})
+            # Reload the prompt to get the updated default_version
+            self.session.refresh(db_prompt)
+
+        # Load relationships for the response
+        self.session.refresh(db_version)
+
+        # Convert to response model
+        version_response = PromptVersionResponse.model_validate(db_version)
+
+        return version_response

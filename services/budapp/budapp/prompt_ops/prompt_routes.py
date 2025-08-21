@@ -37,6 +37,7 @@ from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.workflow_ops.services import WorkflowService
 
 from .schemas import (
+    CreatePromptVersionRequest,
     CreatePromptWorkflowRequest,
     EditPromptRequest,
     PromptFilter,
@@ -46,9 +47,11 @@ from .schemas import (
     PromptVersionFilter,
     PromptVersionListItem,
     PromptVersionListResponse,
+    PromptVersionResponse,
     SinglePromptResponse,
+    SinglePromptVersionResponse,
 )
-from .services import PromptService, PromptWorkflowService
+from .services import PromptService, PromptVersionService, PromptWorkflowService
 
 
 logger = logging.get_logger(__name__)
@@ -172,6 +175,65 @@ async def list_prompt_versions(
         logger.exception(f"Failed to list prompt versions: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to list prompt versions"
+        ).to_http_response()
+
+
+@router.post(
+    "/{prompt_id}/versions",
+    responses={
+        status.HTTP_200_OK: {
+            "model": SinglePromptVersionResponse,
+            "description": "Successfully created prompt version",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Invalid request data",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Prompt or endpoint not found",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Internal Server error",
+        },
+    },
+    description="Create a new version for a specific prompt",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
+async def create_prompt_version(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    prompt_id: UUID,
+    request: CreatePromptVersionRequest,
+) -> Union[SinglePromptVersionResponse, ErrorResponse]:
+    """Create a new version for a specific prompt."""
+    try:
+        # Create the prompt version
+        db_version = await PromptVersionService(session).create_prompt_version(
+            prompt_id=prompt_id,
+            endpoint_id=request.endpoint_id,
+            prompt_schema=request.prompt_schema.model_dump(),
+            set_as_default=request.set_as_default,
+            current_user_id=current_user.id,
+        )
+
+        # Convert to response model
+        version_response = PromptVersionResponse.model_validate(db_version)
+
+        return SinglePromptVersionResponse(
+            version=version_response,
+            message="Prompt version created successfully",
+            code=status.HTTP_200_OK,
+            object="prompt.version.create",
+        ).to_http_response()
+    except ClientException as e:
+        logger.error(f"Failed to create prompt version: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to create prompt version: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to create prompt version"
         ).to_http_response()
 
 
