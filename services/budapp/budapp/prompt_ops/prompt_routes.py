@@ -291,6 +291,53 @@ async def edit_prompt_version(
 
 
 @router.delete(
+    "/{prompt_id}/versions/{version_id}",
+    responses={
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Successfully deleted prompt version",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Cannot delete default version",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Prompt or version not found",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Server error",
+        },
+    },
+    description="Delete a prompt version by its ID",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
+async def delete_prompt_version(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    prompt_id: UUID,
+    version_id: UUID,
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Delete a prompt version by its ID. Cannot delete the default version."""
+    try:
+        await PromptVersionService(session).delete_prompt_version(prompt_id, version_id)
+        logger.debug(f"Prompt version deleted: {version_id} for prompt {prompt_id}")
+
+        return SuccessResponse(
+            message="Prompt version deleted successfully", code=status.HTTP_200_OK, object="prompt.version.delete"
+        ).to_http_response()
+    except ClientException as e:
+        logger.error(f"Failed to delete prompt version: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to delete prompt version: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to delete prompt version"
+        ).to_http_response()
+
+
+@router.delete(
     "/{prompt_id}",
     responses={
         status.HTTP_200_OK: {

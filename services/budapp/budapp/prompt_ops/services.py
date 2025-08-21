@@ -609,3 +609,40 @@ class PromptVersionService(SessionMixin):
         version_response = PromptVersionResponse.model_validate(db_version)
 
         return version_response
+
+    async def delete_prompt_version(self, prompt_id: UUID, version_id: UUID) -> None:
+        """Delete a prompt version (soft delete) with validation."""
+        # Retrieve the prompt to check default version
+        db_prompt = await PromptDataManager(self.session).retrieve_by_fields(
+            PromptModel,
+            fields={"id": prompt_id, "status": PromptStatusEnum.ACTIVE},
+        )
+
+        if not db_prompt:
+            raise ClientException(message="Prompt not found", status_code=status.HTTP_404_NOT_FOUND)
+
+        # Check if this version is the default version
+        if db_prompt.default_version_id == version_id:
+            raise ClientException(
+                message="Cannot delete the default prompt version",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Retrieve the version to ensure it exists and belongs to this prompt
+        db_version = await PromptVersionDataManager(self.session).retrieve_by_fields(
+            PromptVersionModel,
+            fields={"id": version_id, "prompt_id": prompt_id},
+            exclude_fields={"status": PromptVersionStatusEnum.DELETED},
+        )
+
+        if not db_version:
+            raise ClientException(message="Prompt version not found", status_code=status.HTTP_404_NOT_FOUND)
+
+        # Soft delete the version by updating its status
+        await PromptVersionDataManager(self.session).update_by_fields(
+            db_version, {"status": PromptVersionStatusEnum.DELETED}
+        )
+
+        logger.debug(f"Soft deleted prompt version {version_id} for prompt {prompt_id}")
+
+        return None
