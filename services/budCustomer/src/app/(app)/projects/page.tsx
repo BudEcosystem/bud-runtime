@@ -7,26 +7,22 @@ import {
   Row,
   Col,
   Flex,
-  Modal,
   Input,
-  Select,
   Dropdown,
-  Popconfirm,
-  Tag,
-  ConfigProvider,
 } from "antd";
 import { Typography } from "antd";
 import { PlusOutlined, MoreOutlined } from "@ant-design/icons";
 import { Icon } from "@iconify/react/dist/iconify.js";
 import dayjs from "dayjs";
-import styles from "./projects.module.scss";
-import { useProject, type Project } from "@/context/projectContext";
+import { useProject, type Project as ContextProject } from "@/context/projectContext";
+import { useProjects } from "@/hooks/useProjects";
+import { useDrawer } from "@/hooks/useDrawer";
+import BudDrawer from "@/components/ui/bud/drawer/BudDrawer";
 
 const { Text, Title } = Typography;
-const { TextArea } = Input;
 
 // Mock data for projects
-const mockProjects: Project[] = [
+const mockProjects: ContextProject[] = [
   {
     id: "proj_001",
     name: "E-commerce AI Assistant",
@@ -120,157 +116,127 @@ const mockProjects: Project[] = [
 ];
 
 export default function ProjectsPage() {
-  const { projects, addProject, updateProject, deleteProject, setProjects } =
+  const { projects: contextProjects } =
     useProject();
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [formData, setFormData] = useState({
-    name: "",
-    description: "",
-    project_type: "client_app" as "client_app" | "existing_app",
-    color: "#965CDE",
-  });
+  const {
+    globalProjects,
+    getGlobalProjects,
+    loading,
+    getGlobalProject
+  } = useProjects();
 
-  // Initialize with mock data if no projects exist
+  const { openDrawer } = useDrawer();
+  const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(10);
+
+  // Fetch projects from API on mount
   useEffect(() => {
-    if (projects.length === 0) {
-      setProjects(mockProjects);
-    }
-  }, [projects.length, setProjects]);
+    getGlobalProjects(currentPage, pageSize, searchTerm);
+  }, [currentPage, pageSize]);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "active":
-        return "#479D5F";
-      case "inactive":
-        return "#DE9C5C";
-      case "archived":
-        return "#757575";
-      default:
-        return "#B3B3B3";
-    }
-  };
+  // Debounced search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      getGlobalProjects(1, pageSize, searchTerm);
+      setCurrentPage(1);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "active":
-        return "ph:play-circle";
-      case "inactive":
-        return "ph:pause-circle";
-      case "archived":
-        return "ph:archive";
-      default:
-        return "ph:circle";
-    }
-  };
+  // Convert API projects to context format or use mock data
+  const projects: ContextProject[] = globalProjects.length > 0
+    ? globalProjects.map(p => {
+        // Extract the nested project data
+        const projectData = p.project;
+        const profileColor = p.profile_colors?.[0] || "#965CDE";
 
-  const getProjectTypeIcon = (type: string) => {
-    return type === "client_app" ? "ph:device-mobile" : "ph:cloud";
-  };
+        return {
+          id: projectData.id,
+          name: projectData.name,
+          description: projectData.description || "",
+          created_at: projectData.created_at,
+          updated_at: projectData.modified_at || projectData.created_at,
+          user_id: projectData.created_by,
+          project_type: projectData.project_type,
+          status: "active" as const,
+          resources: {
+            api_keys: p.endpoints_count || 0,
+            batches: 0,
+            logs: 0,
+            models: 0,
+          },
+          color: profileColor,
+        };
+      })
+    : contextProjects.length > 0
+      ? contextProjects
+      : mockProjects;
+
 
   const handleCreateProject = () => {
-    const newProject: Project = {
-      id: `proj_${Date.now()}`,
-      name: formData.name,
-      description: formData.description,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      user_id: "user_123",
-      project_type: formData.project_type,
-      status: "active",
-      resources: {
-        api_keys: 0,
-        batches: 0,
-        logs: 0,
-        models: 0,
-      },
-      color: formData.color,
-    };
-
-    addProject(newProject);
-    setShowCreateModal(false);
-    setFormData({
-      name: "",
-      description: "",
-      project_type: "client_app",
-      color: "#965CDE",
-    });
+    openDrawer("new-project", {});
   };
 
 
-  const handleEditProject = () => {
-    if (!selectedProject) return;
-
-    updateProject(selectedProject.id, {
-      name: formData.name,
-      description: formData.description,
-      project_type: formData.project_type,
-      color: formData.color,
-    });
-
-    setShowEditModal(false);
-    setSelectedProject(null);
-    setFormData({
-      name: "",
-      description: "",
-      project_type: "client_app",
-      color: "#965CDE",
-    });
+  const handleEditProject = (project: ContextProject) => {
+    try {
+      // Fetch the full project data from API
+      const projectData = globalProjects.find(p => p.project.id === project.id);
+      if (projectData) {
+        // Set the selected project for editing
+        getGlobalProject(project.id);
+        // Open the edit drawer
+        openDrawer("edit-project", {});
+      }
+    } catch (error) {
+      console.error("Failed to open edit project:", error);
+    }
   };
 
-  const handleDeleteProject = (projectId: string) => {
-    deleteProject(projectId);
-  };
-
-  const openEditModal = (project: Project) => {
-    setSelectedProject(project);
-    setFormData({
-      name: project.name,
-      description: project.description,
-      project_type: project.project_type,
-      color: project.color,
-    });
-    setShowEditModal(true);
+  const handleDeleteProject = (project: ContextProject) => {
+    try {
+      // Fetch the full project data from API
+      const projectData = globalProjects.find(p => p.project.id === project.id);
+      if (projectData) {
+        // Set the selected project for deletion
+        getGlobalProject(project.id);
+        // Open the delete drawer
+        openDrawer("delete-project", {});
+      }
+    } catch (error) {
+      console.error("Failed to open delete project:", error);
+    }
   };
 
 
-  const getProjectMenuItems = (project: Project) => [
+
+  const getProjectMenuItems = (project: ContextProject) => [
     {
       key: "edit",
       label: "Edit Project",
       icon: <Icon icon="ph:pencil" />,
-      onClick: () => openEditModal(project),
+      onClick: () => handleEditProject(project),
     },
     {
       key: "delete",
       label: "Delete",
       icon: <Icon icon="ph:trash" />,
       danger: true,
-      onClick: () => handleDeleteProject(project.id),
+      onClick: () => handleDeleteProject(project),
     },
   ];
 
-  const colorOptions = [
-    "#965CDE",
-    "#4077E6",
-    "#479D5F",
-    "#DE9C5C",
-    "#EC7575",
-    "#50C7C7",
-    "#F59E0B",
-    "#8B5CF6",
-  ];
 
-  // Filter to only show active projects
-  const activeProjects = projects.filter((p) => p.status === "active");
+  // Filter to only show active projects or all if status is not available
+  const activeProjects = projects.filter((p) => !p.status || p.status === "active");
 
   return (
     <DashboardLayout>
       <div className="boardPageView">
         <div className="boardMainContainer pt-[2.25rem]">
           {/* Header */}
-          <Flex justify="space-between" align="center" className="mb-[4rem]">
+          <Flex justify="space-between" align="center" className="mb-[2rem]">
             <div>
               <Title level={2} className="!text-bud-text-primary !mb-0">
                 Projects
@@ -283,14 +249,38 @@ export default function ProjectsPage() {
               type="primary"
               icon={<PlusOutlined />}
               className="bg-bud-purple border-bud-purple hover:bg-bud-purple-hover h-[2.5rem] px-[1.5rem]"
-              onClick={() => setShowCreateModal(true)}
+              onClick={handleCreateProject}
             >
               Create Project
             </Button>
           </Flex>
 
+          {/* Search Bar */}
+          <div className="mb-[2rem]">
+            <Input
+              placeholder="Search projects..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="max-w-md"
+              prefix={<Icon icon="ph:magnifying-glass" className="text-bud-text-disabled" />}
+            />
+          </div>
+
+          {/* Loading State */}
+          {loading && activeProjects.length === 0 && (
+            <div className="text-center py-16">
+              <Icon
+                icon="ph:spinner"
+                className="text-4xl text-bud-text-disabled mb-4 animate-spin"
+              />
+              <Text className="text-bud-text-muted block">
+                Loading projects...
+              </Text>
+            </div>
+          )}
+
           {/* Projects */}
-          {activeProjects.length > 0 && (
+          {!loading && activeProjects.length > 0 && (
             <div className="mb-[3rem]">
               <Row gutter={[24, 24]}>
                 {activeProjects.map((project) => (
@@ -349,7 +339,7 @@ export default function ProjectsPage() {
                             className="text-bud-text-disabled text-sm"
                           />
                           <Text className="text-bud-text-primary text-[13px]">
-                            {project.resources.api_keys} API Keys
+                            {project.resources?.api_keys || 0} API Keys
                           </Text>
                         </div>
                       </div>
@@ -362,7 +352,7 @@ export default function ProjectsPage() {
 
 
           {/* Empty State */}
-          {activeProjects.length === 0 && (
+          {!loading && activeProjects.length === 0 && (
             <div className="text-center py-16">
               <Icon
                 icon="ph:folder-plus"
@@ -378,254 +368,17 @@ export default function ProjectsPage() {
                 type="primary"
                 icon={<PlusOutlined />}
                 className="bg-bud-purple border-bud-purple hover:bg-bud-purple-hover"
-                onClick={() => setShowCreateModal(true)}
+                onClick={handleCreateProject}
               >
                 Create Your First Project
               </Button>
             </div>
           )}
 
-          {/* Create Project Modal */}
-          <Modal
-            title={
-              <Text className="text-bud-text-primary font-semibold text-[19px]">
-                Create New Project
-              </Text>
-            }
-            open={showCreateModal}
-            onCancel={() => {
-              setShowCreateModal(false);
-              setFormData({
-                name: "",
-                description: "",
-                project_type: "client_app",
-                color: "#965CDE",
-              });
-            }}
-            footer={[
-              <Button key="cancel" onClick={() => setShowCreateModal(false)}>
-                Cancel
-              </Button>,
-              <Button
-                key="create"
-                type="primary"
-                className="bg-bud-purple border-bud-purple hover:bg-bud-purple-hover"
-                onClick={handleCreateProject}
-                disabled={!formData.name.trim()}
-              >
-                Create Project
-              </Button>,
-            ]}
-            className={styles.modal}
-            width={600}
-          >
-            <div className="space-y-[1rem]">
-              <div>
-                <Text className="text-bud-text-muted text-[12px] mb-[0.5rem] block">
-                  Project Name *
-                </Text>
-                <Input
-                  placeholder="e.g., E-commerce AI Assistant"
-                  value={formData.name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
-                  className="bg-[var(--bg-tertiary)] border-[var(--border-secondary)]"
-                />
-              </div>
-
-              <div>
-                <Text className="text-bud-text-muted text-[12px] mb-[0.5rem] block">
-                  Description
-                </Text>
-                <TextArea
-                  placeholder="Describe what this project is for and its main objectives..."
-                  value={formData.description}
-                  onChange={(e) =>
-                    setFormData({ ...formData, description: e.target.value })
-                  }
-                  className="bg-bud-bg-tertiary border-bud-border-secondary"
-                  rows={3}
-                />
-              </div>
-
-              <div>
-                <Text className="text-bud-text-muted text-[12px] mb-[0.5rem] block">
-                  Project Type
-                </Text>
-                <Select
-                  value={formData.project_type}
-                  onChange={(value) =>
-                    setFormData({ ...formData, project_type: value })
-                  }
-                  className="w-full"
-                  options={[
-                    {
-                      value: "client_app",
-                      label: (
-                        <div className="flex items-center gap-2">
-                          <Icon icon="ph:device-mobile" />
-                          Client App - Created in this application
-                        </div>
-                      ),
-                    },
-                    {
-                      value: "existing_app",
-                      label: (
-                        <div className="flex items-center gap-2">
-                          <Icon icon="ph:cloud" />
-                          Existing App - Imported from main platform
-                        </div>
-                      ),
-                    },
-                  ]}
-                />
-              </div>
-
-              <div>
-                <Text className="text-bud-text-muted text-[12px] mb-[0.5rem] block">
-                  Theme Color
-                </Text>
-                <div className="flex gap-2">
-                  {colorOptions.map((color) => (
-                    <button
-                      key={color}
-                      className={`w-8 h-8 rounded-full border-2 transition-all ${
-                        formData.color === color
-                          ? "border-bud-text-primary shadow-md scale-110"
-                          : "border-bud-border hover:border-bud-text-muted"
-                      }`}
-                      style={{ backgroundColor: color }}
-                      onClick={() => setFormData({ ...formData, color })}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-          </Modal>
-
-          {/* Edit Project Modal */}
-          <Modal
-            title={
-              <Text className="text-bud-text-primary font-semibold text-[19px]">
-                Edit Project
-              </Text>
-            }
-            open={showEditModal}
-            onCancel={() => {
-              setShowEditModal(false);
-              setSelectedProject(null);
-              setFormData({
-                name: "",
-                description: "",
-                project_type: "client_app",
-                color: "#965CDE",
-              });
-            }}
-            footer={[
-              <Button key="cancel" onClick={() => setShowEditModal(false)}>
-                Cancel
-              </Button>,
-              <Button
-                key="save"
-                type="primary"
-                className="bg-bud-purple border-bud-purple hover:bg-bud-purple-hover"
-                onClick={handleEditProject}
-                disabled={!formData.name.trim()}
-              >
-                Save Changes
-              </Button>,
-            ]}
-            className={styles.modal}
-            width={600}
-          >
-            <div className="space-y-[1rem]">
-              <div>
-                <Text className="text-bud-text-muted text-[12px] mb-[0.5rem] block">
-                  Project Name *
-                </Text>
-                <Input
-                  placeholder="e.g., E-commerce AI Assistant"
-                  value={formData.name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
-                  className="bg-bud-bg-tertiary border-bud-border-secondary"
-                />
-              </div>
-
-              <div>
-                <Text className="text-bud-text-muted text-[12px] mb-[0.5rem] block">
-                  Description
-                </Text>
-                <TextArea
-                  placeholder="Describe what this project is for and its main objectives..."
-                  value={formData.description}
-                  onChange={(e) =>
-                    setFormData({ ...formData, description: e.target.value })
-                  }
-                  className="bg-bud-bg-tertiary border-bud-border-secondary"
-                  rows={3}
-                />
-              </div>
-
-              <div>
-                <Text className="text-bud-text-muted text-[12px] mb-[0.5rem] block">
-                  Project Type
-                </Text>
-                <Select
-                  value={formData.project_type}
-                  onChange={(value) =>
-                    setFormData({ ...formData, project_type: value })
-                  }
-                  className="w-full"
-                  options={[
-                    {
-                      value: "client_app",
-                      label: (
-                        <div className="flex items-center gap-2">
-                          <Icon icon="ph:device-mobile" />
-                          Client App - Created in this application
-                        </div>
-                      ),
-                    },
-                    {
-                      value: "existing_app",
-                      label: (
-                        <div className="flex items-center gap-2">
-                          <Icon icon="ph:cloud" />
-                          Existing App - Imported from main platform
-                        </div>
-                      ),
-                    },
-                  ]}
-                />
-              </div>
-
-              <div>
-                <Text className="text-bud-text-muted text-[12px] mb-[0.5rem] block">
-                  Theme Color
-                </Text>
-                <div className="flex gap-2">
-                  {colorOptions.map((color) => (
-                    <button
-                      key={color}
-                      className={`w-8 h-8 rounded-full border-2 transition-all ${
-                        formData.color === color
-                          ? "border-bud-text-primary shadow-md scale-110"
-                          : "border-bud-border hover:border-bud-text-muted"
-                      }`}
-                      style={{ backgroundColor: color }}
-                      onClick={() => setFormData({ ...formData, color })}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-          </Modal>
 
         </div>
       </div>
+      <BudDrawer />
     </DashboardLayout>
   );
 }
