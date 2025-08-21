@@ -318,7 +318,15 @@ class BudMetricService(SessionMixin):
                     )
 
                 # Check user access to the project
-                project_id = response_data.get("project_id")
+                # Import UserTypeEnum for user type checking
+                from ..commons.constants import UserTypeEnum
+
+                # For CLIENT users, check api_key_project_id; for others, check project_id
+                if current_user.user_type == UserTypeEnum.CLIENT:
+                    project_id = response_data.get("api_key_project_id")
+                else:
+                    project_id = response_data.get("project_id")
+
                 if project_id:
                     project = await ProjectDataManager(self.session).retrieve_project_by_fields(
                         {"id": UUID(project_id)}, missing_ok=True
