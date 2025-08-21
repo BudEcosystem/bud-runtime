@@ -213,6 +213,11 @@ class InferenceDetailsMetrics(CloudEventBase):
     cost: Optional[float] = None
     response_analysis: Optional[Dict[str, Any]] = None
 
+    # Authentication metadata fields
+    api_key_id: Optional[UUID] = None
+    user_id: Optional[UUID] = None
+    api_key_project_id: Optional[UUID] = None
+
     @field_validator("request_ip")
     @classmethod
     def validate_ip(cls, v: Optional[str]) -> Optional[str]:
@@ -317,6 +322,7 @@ class InferenceListItem(BaseModel):
     is_success: bool
     cached: bool
     project_id: Optional[UUID] = None
+    api_key_project_id: Optional[UUID] = None  # Project associated with API key
     endpoint_id: Optional[UUID] = None
     model_id: Optional[UUID] = None
     endpoint_type: str = "chat"  # New field to identify inference type
@@ -432,6 +438,7 @@ class InferenceDetailResponse(ResponseBase):
     request_arrival_time: datetime
     request_forward_time: datetime
     project_id: UUID
+    api_key_project_id: Optional[UUID] = None  # Project associated with API key
     endpoint_id: UUID
 
     # Status

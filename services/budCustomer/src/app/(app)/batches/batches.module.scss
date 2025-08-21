@@ -1,11 +1,11 @@
 // Using CSS variables for theme support
-$bg-main: var(--bud-bg-primary);
-$bg-card: var(--bud-bg-secondary);
-$border-color: var(--bud-border);
-$text-white: var(--bud-text-primary);
-$text-gray: var(--bud-text-muted);
-$text-dark-gray: var(--bud-text-disabled);
-$primary-color: var(--bud-purple);
+$bg-main: var(--bg-primary);
+$bg-card: var(--bg-secondary);
+$border-color: var(--border);
+$text-white: var(--text-primary);
+$text-gray: var(--text-muted);
+$text-dark-gray: var(--text-disabled);
+$primary-color: var(--color-purple);
 
 .batchesTable {
   :global {
@@ -15,7 +15,7 @@ $primary-color: var(--bud-purple);
     }
 
     .ant-table-thead > tr > th {
-      background: var(--bud-bg-tertiary);
+      background: var(--bg-tertiary);
       border-bottom: 1px solid $border-color;
       color: $text-dark-gray;
       font-weight: 400;
@@ -27,7 +27,7 @@ $primary-color: var(--bud-purple);
     }
 
     .ant-table-tbody > tr > td {
-      border-bottom: 1px solid var(--bud-border-secondary);
+      border-bottom: 1px solid var(--border-secondary);
       padding: 1rem 1.5rem;
     }
 
@@ -36,7 +36,7 @@ $primary-color: var(--bud-purple);
     }
 
     .ant-table-tbody > tr:hover > td {
-      background: var(--bud-bg-hover);
+      background: var(--bg-hover);
     }
 
     .ant-progress-line {
@@ -50,18 +50,22 @@ $primary-color: var(--bud-purple);
     .ant-empty-normal {
       color: $text-gray;
     }
+    .ant-btn-variant-text:not(:disabled):not(.ant-btn-disabled):hover {
+      color: var(--text-primary);
+      background-color: var(--bg-hover);
+    }
   }
 }
 
 .modal {
   :global {
     .ant-modal-content {
-      background: $bg-card;
+      background: $bg-card !important;
       border: 1px solid $border-color;
     }
 
     .ant-modal-header {
-      background: $bg-card;
+      background: $bg-card !important;
       border-bottom: 1px solid $border-color;
     }
 
@@ -79,6 +83,7 @@ $primary-color: var(--bud-purple);
 
     .ant-modal-footer {
       border-top: 1px solid $border-color;
+      background: $bg-card !important;
     }
 
     .ant-input {

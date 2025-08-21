@@ -15,6 +15,14 @@ pub struct ApiKeyMetadata {
     pub project_id: String,
 }
 
+// Auth metadata from Redis __metadata__ field
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuthMetadata {
+    pub api_key_id: Option<String>,
+    pub user_id: Option<String>,
+    pub api_key_project_id: Option<String>,
+}
+
 pub type APIConfig = HashMap<String, ApiKeyMetadata>;
 pub type PublishedModelInfo = HashMap<String, ApiKeyMetadata>;
 
@@ -34,6 +42,7 @@ fn auth_error_response(status: StatusCode, message: &str) -> Response {
 pub struct Auth {
     api_keys: Arc<RwLock<HashMap<String, APIConfig>>>,
     published_model_info: Arc<RwLock<PublishedModelInfo>>,
+    auth_metadata: Arc<RwLock<HashMap<String, AuthMetadata>>>,
 }
 
 impl Auth {
@@ -41,6 +50,7 @@ impl Auth {
         Self {
             api_keys: Arc::new(RwLock::new(api_keys)),
             published_model_info: Arc::new(RwLock::new(HashMap::new())),
+            auth_metadata: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -52,10 +62,27 @@ impl Auth {
         api_keys.insert(api_key.to_string(), api_config);
     }
 
+    pub fn update_auth_metadata(&self, api_key: &str, metadata: AuthMetadata) {
+        #[expect(clippy::expect_used)]
+        let mut auth_metadata = self.auth_metadata.write().expect("RwLock poisoned");
+        auth_metadata.insert(api_key.to_string(), metadata);
+    }
+
     pub fn delete_api_key(&self, api_key: &str) {
         #[expect(clippy::expect_used)]
         let mut api_keys = self.api_keys.write().expect("RwLock poisoned");
         api_keys.remove(api_key);
+
+        // Also remove auth metadata
+        #[expect(clippy::expect_used)]
+        let mut auth_metadata = self.auth_metadata.write().expect("RwLock poisoned");
+        auth_metadata.remove(api_key);
+    }
+
+    pub fn get_auth_metadata(&self, api_key: &str) -> Option<AuthMetadata> {
+        #[expect(clippy::expect_used)]
+        let auth_metadata = self.auth_metadata.read().expect("RwLock poisoned");
+        auth_metadata.get(api_key).cloned()
     }
 
     pub fn validate_api_key(&self, api_key: &str) -> Result<APIConfig, StatusCode> {
@@ -94,16 +121,18 @@ pub async fn require_api_key(
     let (parts, body) = request.into_parts();
     let bytes = to_bytes(body, 1024 * 1024).await.unwrap_or_default();
 
+    // Extract the key as an owned String to avoid borrowing parts
     let key = parts
         .headers
         .get("authorization")
-        .and_then(|v| v.to_str().ok());
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
 
     let key = match key {
         Some(key) => {
             // Strip "Bearer " prefix if present (case-insensitive)
             let key = key.trim();
-            key.strip_prefix("Bearer ").unwrap_or(key)
+            key.strip_prefix("Bearer ").unwrap_or(key).to_string()
         }
         None => {
             return Err(auth_error_response(
@@ -113,7 +142,7 @@ pub async fn require_api_key(
         }
     };
 
-    let mut api_config = auth.validate_api_key(key);
+    let mut api_config = auth.validate_api_key(&key);
     if api_config.is_err() {
         return Err(auth_error_response(
             StatusCode::UNAUTHORIZED,
@@ -195,6 +224,31 @@ pub async fn require_api_key(
             request
                 .headers_mut()
                 .insert("x-tensorzero-model-id", header_value);
+        }
+
+        // Add auth metadata headers if available
+        if let Some(auth_meta) = auth.get_auth_metadata(&key) {
+            if let Some(api_key_id) = auth_meta.api_key_id {
+                if let Ok(header_value) = api_key_id.parse() {
+                    request
+                        .headers_mut()
+                        .insert("x-tensorzero-api-key-id", header_value);
+                }
+            }
+            if let Some(user_id) = auth_meta.user_id {
+                if let Ok(header_value) = user_id.parse() {
+                    request
+                        .headers_mut()
+                        .insert("x-tensorzero-user-id", header_value);
+                }
+            }
+            if let Some(api_key_project_id) = auth_meta.api_key_project_id {
+                if let Ok(header_value) = api_key_project_id.parse() {
+                    request
+                        .headers_mut()
+                        .insert("x-tensorzero-api-key-project-id", header_value);
+                }
+            }
         }
     }
 

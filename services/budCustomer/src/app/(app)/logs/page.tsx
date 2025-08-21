@@ -273,7 +273,7 @@ export default function APIKeysPage() {
             onClick={(e) => {
               e.stopPropagation();
               navigator.clipboard.writeText(key);
-              successToast("Copied..");
+              successToast("API key copied to clipboard.");
             }}
           >
             Copy
@@ -491,7 +491,7 @@ export default function APIKeysPage() {
               open={filterOpen}
               onOpenChange={handleOpenChange}
               content={
-                <div className="bg-[var(--bg-card)] shadow-none border border-bud-border rounded-[6px] width-348">
+                <div className="bg-[var(--bg-card)] shadow-none border border-[var(--border-color)] rounded-[6px] width-348">
                   <div className="p-[1.5rem] flex items-start justify-start flex-col">
                     <Text className="text-[var(--text-primary)] text-[14px] font-normal">
                       Filter

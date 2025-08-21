@@ -23,6 +23,9 @@ async fn test_mock_kafka_observability_event() {
         request_ip: Some("192.168.1.1".to_string()),
         cost: Some(0.001),
         response_analysis: None,
+        api_key_id: None,
+        api_key_project_id: None,
+        user_id: None,
     };
 
     // Send the event
@@ -72,6 +75,9 @@ async fn test_mock_kafka_buffer_and_batch() {
             request_ip: None,
             cost: Some(0.001 * i as f64),
             response_analysis: None,
+            api_key_id: None,
+            api_key_project_id: None,
+            user_id: None,
         };
         events.push(event.clone());
         kafka_conn.add_observability_event(event).await.unwrap();
@@ -108,6 +114,9 @@ async fn test_kafka_disabled() {
         request_ip: None,
         cost: None,
         response_analysis: None,
+        api_key_id: None,
+        api_key_project_id: None,
+        user_id: None,
     };
 
     // This should succeed without doing anything
@@ -134,6 +143,9 @@ async fn test_kafka_event_validation() {
         request_ip: None,
         cost: None,
         response_analysis: None,
+        api_key_id: None,
+        api_key_project_id: None,
+        user_id: None,
     };
 
     let validation_result = cloudevents::validate_event(&event);

@@ -1,13 +1,16 @@
 import uuid
-from typing import List, Optional, Tuple, cast
+from typing import Any, Dict, List, Optional, Tuple, cast
 
+import aiohttp
 from fastapi import HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from budapp.commons import logging
+from budapp.commons.config import app_settings
 from budapp.commons.constants import WorkflowTypeEnum
 from budapp.commons.exceptions import ClientException
+from budapp.endpoint_ops.models import Endpoint as EndpointModel
 from budapp.eval_ops.models import ExpDataset as DatasetModel
 from budapp.eval_ops.models import (
     ExpDatasetVersion,
@@ -36,7 +39,9 @@ from budapp.eval_ops.schemas import (
     ExperimentWorkflowResponse,
     ExperimentWorkflowStepData,
     ExperimentWorkflowStepRequest,
+    ModelSummary,
     TraitBasic,
+    TraitSummary,
     UpdateDatasetRequest,
     UpdateExperimentRequest,
     UpdateRunRequest,
@@ -130,7 +135,13 @@ class ExperimentService:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create experiment"
             ) from e
-        return ExperimentSchema.from_orm(ev)
+
+        # Create experiment schema with empty models and traits (new experiment has no runs yet)
+        exp_data = ExperimentSchema.from_orm(ev)
+        exp_data.models = []
+        exp_data.traits = []
+        exp_data.status = "no_runs"  # New experiment has no runs
+        return exp_data
 
     def configure_runs(
         self, experiment_id: uuid.UUID, req: ConfigureRunsRequest, user_id: uuid.UUID
@@ -255,7 +266,23 @@ class ExperimentService:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list experiments"
             ) from e
-        return [ExperimentSchema.from_orm(e) for e in evs], total_count
+
+        # Get statuses for all experiments in one batch query
+        experiment_ids = [exp.id for exp in evs]
+        statuses = self.get_experiment_statuses_batch(experiment_ids)
+
+        # Enrich each experiment with models, traits, and status
+        enriched_experiments = []
+        for exp in evs:
+            exp_data = ExperimentSchema.from_orm(exp)
+            # Add models and traits to the experiment
+            exp_data.models = self.get_models_for_experiment(exp.id)
+            exp_data.traits = self.get_traits_for_experiment(exp.id)
+            # Add computed status
+            exp_data.status = statuses.get(exp.id, "unknown")
+            enriched_experiments.append(exp_data)
+
+        return enriched_experiments, total_count
 
     def get_experiment(self, ev_id: uuid.UUID, user_id: uuid.UUID) -> ExperimentSchema:
         """Get a single Experiment by ID for a given user.
@@ -270,10 +297,95 @@ class ExperimentService:
         Raises:
             HTTPException(status_code=404): If experiment not found or access denied.
         """
+        from datetime import datetime
+
+        from budapp.eval_ops.schemas import (
+            BudgetStats,
+            CurrentMetric,
+            ExperimentStats,
+            JudgeInfo,
+            ProcessingRate,
+            ProgressActions,
+            ProgressDataset,
+            ProgressInfo,
+            ProgressOverview,
+            RuntimeStats,
+            TokenStats,
+        )
+
         ev = self.session.get(ExperimentModel, ev_id)
         if not ev or ev.created_by != user_id or ev.status == "deleted":
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Experiment not found or access denied")
-        return ExperimentSchema.from_orm(ev)
+
+        # Create experiment schema and enrich with models, traits, and status
+        exp_data = ExperimentSchema.from_orm(ev)
+        exp_data.models = self.get_models_for_experiment(ev.id)
+        exp_data.traits = self.get_traits_for_experiment(ev.id)
+        exp_data.status = self.compute_experiment_status(ev.id)
+
+        # Add dummy data for new fields
+        exp_data.stats = ExperimentStats(
+            budget=BudgetStats(limit_usd=100.0, used_usd=45.2, used_pct=45),
+            tokens=TokenStats(total=2100000, prefix=1200000, decode=900000, unit="tokens"),
+            runtime=RuntimeStats(active_seconds=8100, estimated_total_seconds=11100),
+            processing_rate=ProcessingRate(current_per_min=47, target_per_min=50),
+        )
+
+        exp_data.objective = "Compare GPT-4 and Claude-3 performance across academic benchmarks"
+
+        import uuid as uuid_lib
+
+        # Generate actual UUIDs for run IDs
+        run_id_1 = str(uuid_lib.uuid4())
+        run_id_2 = str(uuid_lib.uuid4())
+        latest_run_id = str(uuid_lib.uuid4())
+
+        exp_data.current_metrics = [
+            CurrentMetric(
+                evaluation="TruthfulQA",
+                dataset="dataset_name",
+                deployment_name="deployment_name",
+                judge=JudgeInfo(mode="llm_as_judge", model_name="Judge model name 1", score_pct=75),
+                traits=["trait_name_1", "trait_name_2"],
+                last_run_at=datetime.fromisoformat("2024-01-13T00:00:00Z"),
+                run_id=latest_run_id,
+            )
+        ]
+
+        exp_data.progress_overview = [
+            ProgressOverview(
+                run_id=run_id_1,
+                title="Progress Overview of Run 1",
+                objective="Compare GPT-4 and Claude-3 performance across academic benchmarks",
+                current=ProgressDataset(dataset_label="MMLU - Mathematical Reasoning"),
+                progress=ProgressInfo(percent=65, completed=813, total=1247),
+                current_evaluation="TruthfulQA",
+                current_model="GPT-4 Turbo",
+                processing_rate_per_min=47,
+                average_score_pct=78.5,
+                eta_minutes=45,
+                status="running",
+                actions=ProgressActions(can_pause=True, pause_url=f"/experiments/{ev_id}/runs/{run_id_1}/pause"),
+            ),
+            ProgressOverview(
+                run_id=run_id_2,
+                title="Progress Overview of Run 2",
+                objective="Compare GPT-4 and Claude-3 performance across academic benchmarks",
+                current=ProgressDataset(dataset_label="MMLU - Mathematical Reasoning"),
+                progress=ProgressInfo(percent=65, completed=813, total=1247),
+                current_evaluation="TruthfulQA",
+                current_model="GPT-4 Turbo",
+                processing_rate_per_min=47,
+                average_score_pct=78.5,
+                eta_minutes=45,
+                status="running",
+                actions=ProgressActions(can_pause=True, pause_url=f"/experiments/{ev_id}/runs/{run_id_2}/pause"),
+            ),
+        ]
+
+        exp_data.updated_at = datetime.fromisoformat("2024-01-13T00:00:00Z")
+
+        return exp_data
 
     def update_experiment(
         self,
@@ -310,7 +422,13 @@ class ExperimentService:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update experiment"
             ) from e
-        return ExperimentSchema.from_orm(ev)
+
+        # Create experiment schema and enrich with models, traits, and status
+        exp_data = ExperimentSchema.from_orm(ev)
+        exp_data.models = self.get_models_for_experiment(ev.id)
+        exp_data.traits = self.get_traits_for_experiment(ev.id)
+        exp_data.status = self.compute_experiment_status(ev.id)
+        return exp_data
 
     def delete_experiment(self, ev_id: uuid.UUID, user_id: uuid.UUID) -> None:
         """Soft-delete an Experiment by setting its status to 'deleted'.
@@ -394,6 +512,191 @@ class ExperimentService:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list traits"
             ) from e
+
+    # ------------------------ Experiment Enhancement Methods ------------------------
+
+    def get_models_for_experiment(self, experiment_id: uuid.UUID) -> List[ModelSummary]:
+        """Get all unique models used in an experiment's runs.
+
+        Parameters:
+            experiment_id (uuid.UUID): ID of the experiment.
+
+        Returns:
+            List[ModelSummary]: List of model summaries with deployment names.
+        """
+        try:
+            # Query for unique models used in the experiment's runs
+            # Join with endpoints to get deployment names
+            models = (
+                self.session.query(
+                    ModelTable.id,
+                    ModelTable.name,
+                    EndpointModel.namespace.label("deployment_name"),
+                )
+                .join(RunModel, RunModel.model_id == ModelTable.id)
+                .outerjoin(EndpointModel, EndpointModel.model_id == ModelTable.id)
+                .filter(
+                    RunModel.experiment_id == experiment_id,
+                    RunModel.status != RunStatusEnum.DELETED.value,
+                )
+                .distinct()
+                .all()
+            )
+
+            return [
+                ModelSummary(
+                    id=model.id,
+                    name=model.name,
+                    deployment_name=model.deployment_name,
+                )
+                for model in models
+            ]
+        except Exception as e:
+            logger.error(f"Failed to get models for experiment {experiment_id}: {e}")
+            return []
+
+    def get_traits_for_experiment(self, experiment_id: uuid.UUID) -> List[TraitSummary]:
+        """Get all unique traits associated with datasets used in an experiment's runs.
+
+        Parameters:
+            experiment_id (uuid.UUID): ID of the experiment.
+
+        Returns:
+            List[TraitSummary]: List of trait summaries.
+        """
+        try:
+            # Query for unique traits through the dataset relationships
+            traits = (
+                self.session.query(
+                    TraitModel.id,
+                    TraitModel.name,
+                    TraitModel.icon,
+                )
+                .join(PivotModel, TraitModel.id == PivotModel.trait_id)
+                .join(DatasetModel, PivotModel.dataset_id == DatasetModel.id)
+                .join(ExpDatasetVersion, DatasetModel.id == ExpDatasetVersion.dataset_id)
+                .join(RunModel, ExpDatasetVersion.id == RunModel.dataset_version_id)
+                .filter(
+                    RunModel.experiment_id == experiment_id,
+                    RunModel.status != RunStatusEnum.DELETED.value,
+                )
+                .distinct()
+                .all()
+            )
+
+            return [
+                TraitSummary(
+                    id=trait.id,
+                    name=trait.name,
+                    icon=trait.icon,
+                )
+                for trait in traits
+            ]
+        except Exception as e:
+            logger.error(f"Failed to get traits for experiment {experiment_id}: {e}")
+            return []
+
+    def compute_experiment_status(self, experiment_id: uuid.UUID) -> str:
+        """Compute experiment status based on all runs' statuses.
+
+        Parameters:
+            experiment_id (uuid.UUID): ID of the experiment.
+
+        Returns:
+            str: Computed status string (running/failed/completed/pending/cancelled/skipped/no_runs).
+        """
+        try:
+            # Query all non-deleted runs for the experiment
+            runs = (
+                self.session.query(RunModel.status)
+                .filter(
+                    RunModel.experiment_id == experiment_id,
+                    RunModel.status != RunStatusEnum.DELETED.value,
+                )
+                .all()
+            )
+
+            if not runs:
+                return "no_runs"
+
+            statuses = [run.status for run in runs]
+
+            # Priority order for status determination
+            if RunStatusEnum.RUNNING.value in statuses:
+                return "running"
+            if RunStatusEnum.FAILED.value in statuses:
+                return "failed"
+            if RunStatusEnum.CANCELLED.value in statuses:
+                return "cancelled"
+            if RunStatusEnum.PENDING.value in statuses:
+                return "pending"
+            if all(s == RunStatusEnum.COMPLETED.value for s in statuses):
+                return "completed"
+            if all(s == RunStatusEnum.SKIPPED.value for s in statuses):
+                return "skipped"
+
+            # Fallback for mixed completed/skipped states
+            return "completed"
+        except Exception as e:
+            logger.error(f"Failed to compute status for experiment {experiment_id}: {e}")
+            return "unknown"
+
+    def get_experiment_statuses_batch(self, experiment_ids: List[uuid.UUID]) -> dict[uuid.UUID, str]:
+        """Get statuses for multiple experiments in one query for optimization.
+
+        Parameters:
+            experiment_ids (List[uuid.UUID]): List of experiment IDs.
+
+        Returns:
+            dict[uuid.UUID, str]: Mapping of experiment_id to computed status.
+        """
+        try:
+            # Query all runs for all experiments in one go
+            runs = (
+                self.session.query(RunModel.experiment_id, RunModel.status)
+                .filter(
+                    RunModel.experiment_id.in_(experiment_ids),
+                    RunModel.status != RunStatusEnum.DELETED.value,
+                )
+                .all()
+            )
+
+            # Group runs by experiment_id
+            runs_by_experiment = {}
+            for run in runs:
+                if run.experiment_id not in runs_by_experiment:
+                    runs_by_experiment[run.experiment_id] = []
+                runs_by_experiment[run.experiment_id].append(run.status)
+
+            # Compute status for each experiment
+            result = {}
+            for exp_id in experiment_ids:
+                if exp_id not in runs_by_experiment:
+                    result[exp_id] = "no_runs"
+                else:
+                    statuses = runs_by_experiment[exp_id]
+
+                    # Apply the same priority logic
+                    if RunStatusEnum.RUNNING.value in statuses:
+                        result[exp_id] = "running"
+                    elif RunStatusEnum.FAILED.value in statuses:
+                        result[exp_id] = "failed"
+                    elif RunStatusEnum.CANCELLED.value in statuses:
+                        result[exp_id] = "cancelled"
+                    elif RunStatusEnum.PENDING.value in statuses:
+                        result[exp_id] = "pending"
+                    elif all(s == RunStatusEnum.COMPLETED.value for s in statuses):
+                        result[exp_id] = "completed"
+                    elif all(s == RunStatusEnum.SKIPPED.value for s in statuses):
+                        result[exp_id] = "skipped"
+                    else:
+                        result[exp_id] = "completed"  # Fallback for mixed completed/skipped
+
+            return result
+        except Exception as e:
+            logger.error(f"Failed to compute statuses for experiments: {e}")
+            # Return unknown status for all experiments on error
+            return dict.fromkeys(experiment_ids, "unknown")
 
     # ------------------------ Run Methods ------------------------
 
@@ -888,6 +1191,72 @@ class ExperimentService:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete dataset"
             ) from e
 
+    def get_runs_history(
+        self,
+        experiment_id: uuid.UUID,
+        user_id: uuid.UUID,
+        page: int = 1,
+        page_size: int = 50,
+        sort_field: str = "started_at",
+        sort_direction: str = "desc",
+    ):
+        """Get run history for an experiment with pagination.
+
+        Parameters:
+            experiment_id (uuid.UUID): ID of the experiment.
+            user_id (uuid.UUID): ID of the user.
+            page (int): Page number (default: 1).
+            page_size (int): Page size (default: 50).
+            sort_field (str): Field to sort by (default: "started_at").
+            sort_direction (str): Sort direction (default: "desc").
+
+        Returns:
+            RunHistoryData: Paginated run history data.
+
+        Raises:
+            HTTPException(status_code=404): If experiment not found or access denied.
+        """
+        from datetime import datetime
+
+        from budapp.eval_ops.schemas import BenchmarkScore, RunHistoryData, RunHistoryItem, SortInfo
+
+        # Verify experiment exists and user has access
+        experiment = self.session.get(ExperimentModel, experiment_id)
+        if not experiment or experiment.created_by != user_id or experiment.status == "deleted":
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Experiment not found or access denied")
+
+        # Return dummy data for now
+        import uuid as uuid_lib
+
+        dummy_runs = []
+        for _i in range(10):  # Create 10 dummy runs
+            dummy_runs.append(
+                RunHistoryItem(
+                    run_id=str(uuid_lib.uuid4()),  # Generate actual UUID
+                    model="model_name",
+                    status="completed",
+                    started_at=datetime.fromisoformat("2024-01-13T00:00:00Z"),
+                    duration_seconds=4920,
+                    benchmarks=[
+                        BenchmarkScore(name="Benchmark", score="Score"),
+                        BenchmarkScore(name="Benchmark", score="Score"),
+                    ],
+                )
+            )
+
+        # Return only the requested page
+        start_idx = (page - 1) * page_size
+        end_idx = start_idx + page_size
+        paginated_runs = dummy_runs[start_idx:end_idx] if start_idx < len(dummy_runs) else []
+
+        return RunHistoryData(
+            total=10,
+            items=paginated_runs,
+            sort=SortInfo(field=sort_field, direction=sort_direction),
+            page=page,
+            page_size=page_size,
+        )
+
 
 class ExperimentWorkflowService:
     """Service layer for Experiment Workflow operations."""
@@ -976,6 +1345,10 @@ class ExperimentWorkflowService:
                     workflow,
                     {"status": WorkflowStatusEnum.COMPLETED.value},  # type: ignore
                 )
+
+                # if experiment_id, then call the eval workflow
+                # if experiment_id:
+                #     await self._call_eval_workflow(experiment_id)
 
             # After storing the workflow step, retrieve all accumulated data
             all_step_data = await self._get_accumulated_step_data(workflow.id)
@@ -1322,6 +1695,19 @@ class ExperimentWorkflowService:
         self.session.commit()
         return experiment.id
 
+    async def _call_eval_workflow(self, experiment_id: uuid.UUID) -> None:
+        """Delegate evaluation workflow to EvaluationWorkflowService.
+
+        Parameters:
+            experiment_id (uuid.UUID): The experiment ID to evaluate.
+        """
+        try:
+            # Use EvaluationWorkflowService to trigger evaluations
+            eval_service = EvaluationWorkflowService(self.session)
+            await eval_service._trigger_evaluations_for_experiment(experiment_id)
+        except Exception as e:
+            logger.error(f"Failed to call eval workflow for experiment {experiment_id}: {e}")
+
     async def get_experiment_workflow_data(
         self, workflow_id: uuid.UUID, current_user_id: uuid.UUID
     ) -> ExperimentWorkflowResponse:
@@ -1494,6 +1880,10 @@ class EvaluationWorkflowService:
             next_step_data = (
                 await self._get_next_step_data(next_step, all_step_data, experiment_id) if next_step else None
             )
+
+            # Trigger budeval evaluation if this is the final step
+            if request.step_number == 5 and request.trigger_workflow:
+                await self._trigger_evaluations_for_experiment(experiment_id)
 
             return EvaluationWorkflowResponse(
                 code=status.HTTP_200_OK,
@@ -1752,6 +2142,10 @@ class EvaluationWorkflowService:
             runs_created += 1
 
         self.session.commit()
+
+        # Trigger budeval evaluation for all created runs
+        await self._trigger_evaluations_for_experiment(experiment_id)
+
         return runs_created
 
     async def _get_next_step_data(
@@ -1998,3 +2392,249 @@ class EvaluationWorkflowService:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to retrieve workflow data"
             ) from e
+
+    async def trigger_budeval_evaluation(
+        self, run_id: uuid.UUID, evaluation_request: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Trigger evaluation in budeval service via Dapr.
+
+        Parameters:
+            run_id (uuid.UUID): The run ID to execute evaluation for.
+            evaluation_request (Dict[str, Any]): The evaluation request data.
+
+        Returns:
+            Dict[str, Any]: Response from budeval service.
+
+        Raises:
+            ClientException: If the budeval request fails.
+        """
+        try:
+            # Prepare request for budeval
+            budeval_endpoint = (
+                f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_eval_app_id}/method/evals/start"
+            )
+
+            # Create evaluation request matching budeval schema
+            eval_request = {
+                "uuid": str(run_id),
+                "eval_model_info": {
+                    "model_name": evaluation_request["model_name"],
+                    "endpoint": evaluation_request["endpoint"],
+                    "api_key": evaluation_request["api_key"],
+                    "extra_args": evaluation_request.get("extra_args", {}),
+                },
+                "eval_datasets": [{"dataset_id": ds} for ds in evaluation_request["datasets"]],
+                "eval_configs": evaluation_request.get("eval_configs", []),
+                "engine": evaluation_request.get("engine", "opencompass"),
+            }
+
+            logger.info(f"Triggering budeval evaluation for run {run_id} with request: {eval_request}")
+
+            # Make async request to budeval
+            async with aiohttp.ClientSession() as session:
+                async with session.post(budeval_endpoint, json=eval_request) as response:
+                    response_data = await response.json()
+                    logger.debug(f"Response from budeval service: {response_data}")
+
+                    if response.status != 200:
+                        error_message = response_data.get("message", "Failed to start evaluation")
+                        logger.error(f"Failed to start evaluation with budeval service: {error_message}")
+                        raise ClientException(error_message)
+
+                    logger.info(f"Successfully triggered evaluation in budeval service for run {run_id}")
+                    return response_data
+
+        except ClientException:
+            raise
+        except Exception as e:
+            logger.error(f"Failed to trigger budeval evaluation: {e}")
+            raise ClientException("Unable to start evaluation with budeval service") from e
+
+    async def get_evaluation_status(self, job_id: str) -> Dict[str, Any]:
+        """Get evaluation job status from budeval.
+
+        Parameters:
+            job_id (str): The evaluation job ID.
+
+        Returns:
+            Dict[str, Any]: Job status information from budeval.
+
+        Raises:
+            ClientException: If the status request fails.
+        """
+        try:
+            status_endpoint = (
+                f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_eval_app_id}/method/evals/status/{job_id}"
+            )
+
+            logger.debug(f"Getting evaluation status for job {job_id}")
+
+            async with aiohttp.ClientSession() as session:
+                async with session.get(status_endpoint) as response:
+                    response_data = await response.json()
+
+                    if response.status != 200:
+                        error_message = response_data.get("message", "Failed to get evaluation status")
+                        logger.error(f"Failed to get evaluation status: {error_message}")
+                        raise ClientException(error_message)
+
+                    return response_data
+
+        except ClientException:
+            raise
+        except Exception as e:
+            logger.error(f"Failed to get evaluation status: {e}")
+            raise ClientException("Unable to get evaluation status from budeval service") from e
+
+    async def cleanup_evaluation_job(self, job_id: str) -> Dict[str, Any]:
+        """Clean up an evaluation job and its resources.
+
+        Parameters:
+            job_id (str): The evaluation job ID to cleanup.
+
+        Returns:
+            Dict[str, Any]: Cleanup status information from budeval.
+
+        Raises:
+            ClientException: If the cleanup request fails.
+        """
+        try:
+            cleanup_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_eval_app_id}/method/evals/cleanup/{job_id}"
+
+            logger.info(f"Cleaning up evaluation job {job_id}")
+
+            async with aiohttp.ClientSession() as session:
+                async with session.delete(cleanup_endpoint) as response:
+                    response_data = await response.json()
+
+                    if response.status != 200:
+                        error_message = response_data.get("message", "Failed to cleanup evaluation job")
+                        logger.error(f"Failed to cleanup evaluation job: {error_message}")
+                        raise ClientException(error_message)
+
+                    logger.info(f"Successfully cleaned up evaluation job {job_id}")
+                    return response_data
+
+        except ClientException:
+            raise
+        except Exception as e:
+            logger.error(f"Failed to cleanup evaluation job: {e}")
+            raise ClientException("Unable to cleanup evaluation job with budeval service") from e
+
+    async def update_run_evaluation_status(self, run_id: uuid.UUID, status_data: Dict[str, Any]) -> None:
+        """Update run evaluation status based on budeval feedback.
+
+        Parameters:
+            run_id (uuid.UUID): The run ID to update.
+            status_data (Dict[str, Any]): Status data from budeval.
+        """
+        try:
+            run = self.session.get(RunModel, run_id)
+            if not run:
+                logger.warning(f"Run {run_id} not found for status update")
+                return
+
+            # Update run status and budeval-specific fields
+            update_data = {
+                "evaluation_status": status_data.get("status"),
+                "budeval_job_id": status_data.get("job_id"),
+                "budeval_workflow_id": status_data.get("workflow_id"),
+            }
+
+            # Set timestamps based on status
+            if status_data.get("status") == "running" and not run.evaluation_started_at:
+                update_data["evaluation_started_at"] = func.now()
+            elif status_data.get("status") in ["completed", "failed"]:
+                update_data["evaluation_completed_at"] = func.now()
+
+            # Update the run
+            for field, value in update_data.items():
+                if value is not None and hasattr(run, field):
+                    setattr(run, field, value)
+
+            self.session.commit()
+            logger.info(f"Updated run {run_id} evaluation status to {status_data.get('status')}")
+
+        except Exception as e:
+            logger.error(f"Failed to update run evaluation status: {e}")
+            self.session.rollback()
+            raise
+
+    async def _trigger_evaluations_for_experiment(self, experiment_id: uuid.UUID) -> None:
+        """Trigger budeval evaluation for all pending runs in the experiment.
+
+        Parameters:
+            experiment_id (uuid.UUID): The experiment ID to evaluate.
+        """
+        try:
+            # Get all pending runs for this experiment
+            runs = (
+                self.session.query(RunModel)
+                .filter(RunModel.experiment_id == experiment_id, RunModel.status == RunStatusEnum.PENDING.value)
+                .all()
+            )
+
+            if not runs:
+                logger.info(f"No pending runs found for experiment {experiment_id}")
+                return
+
+            logger.info(f"Triggering budeval evaluation for {len(runs)} runs in experiment {experiment_id}")
+
+            # Trigger evaluation for each run
+            for run in runs:
+                try:
+                    # Get model information for the run
+                    # model = self.session.get(ModelTable, run.model_id)
+                    # dataset_version = self.session.get(ExpDatasetVersion, run.dataset_version_id)
+
+                    # if not model or not dataset_version:
+                    #     logger.error(f"Missing model or dataset for run {run.id}")
+                    #     continue
+
+                    # Get endpoint information
+                    # Check if model has endpoint information
+                    # endpoint_info = None
+                    # if hasattr(model, 'endpoints') and model.endpoints:
+                    #     endpoint_info = model.endpoints[0] if model.endpoints else None
+
+                    # Prepare evaluation request
+                    evaluation_request = {
+                        "model_name": "qwen3-4b",
+                        "endpoint": "http://20.66.97.208/v1",
+                        "api_key": "sk-BudLiteLLMMasterKey_123",
+                        "datasets": ["demo_gsm8k_chat_gen"],
+                        "engine": "opencompass",  # Default engine
+                        "extra_args": run.config or {},
+                        "kubeconfig": None,  # Will use default kubeconfig
+                    }
+
+                    # Update run status to running
+                    run.status = RunStatusEnum.RUNNING.value
+                    self.session.commit()
+
+                    # Trigger budeval evaluation
+                    response = await self.trigger_budeval_evaluation(
+                        run_id=run.id, evaluation_request=evaluation_request
+                    )
+
+                    # Store budeval job information if we have the fields
+                    # These fields will be added in the database migration
+                    if hasattr(run, "budeval_job_id"):
+                        run.budeval_job_id = response.get("job_id")
+                    if hasattr(run, "budeval_workflow_id"):
+                        run.budeval_workflow_id = response.get("workflow_id")
+                    if hasattr(run, "evaluation_status"):
+                        run.evaluation_status = "initiated"
+                    self.session.commit()
+
+                    logger.info(f"Successfully triggered evaluation for run {run.id}")
+
+                except Exception as e:
+                    logger.error(f"Failed to trigger evaluation for run {run.id}: {e}")
+                    run.status = RunStatusEnum.FAILED.value
+                    if hasattr(run, "evaluation_error"):
+                        run.evaluation_error = str(e)
+                    self.session.commit()
+
+        except Exception as e:
+            logger.error(f"Failed to trigger evaluations for experiment {experiment_id}: {e}")

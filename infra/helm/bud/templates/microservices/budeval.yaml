@@ -1,0 +1,86 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-budeval
+  annotations:
+    {{- range $key, $value := .Values.deploymentAnnotations }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-budeval
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-budeval
+      annotations:
+        dapr.io/enabled: "true"
+        dapr.io/app-id: "budeval"
+        dapr.io/app-port: "3003"
+    spec:
+      containers:
+      - name: {{ .Release.Name }}-budeval
+        image: {{ .Values.microservices.budeval.image }}
+        imagePullPolicy: Always
+        command: ["sh", "-c", "alembic -c ./alembic.ini upgrade head && uvicorn budeval.main:app --host 0.0.0.0 --port 3003"]
+        ports:
+        - containerPort: 3003
+        env:
+          - name: EVAL_MANIFEST_URL
+            value: "place_holder"
+          - name: EVAL_SYNC_ENABLED
+            value: "true"
+          - name: EVAL_SYNC_USE_BUNDLES
+            value: "false"
+          - name: EVAL_SYNC_LOCAL_MODE
+            value: "false"
+          - name: STORAGE_BACKEND
+            value: "clickhouse"
+          - name: CLICKHOUSE_HOST
+            value: "{{ .Release.Name }}-clickhouse"
+          - name: CLICKHOUSE_PORT
+            value: "{{ .Values.clickhouse.containerPorts.tcp }}"
+          - name: CLICKHOUSE_DATABASE
+            value: "budeval"
+          - name: CLICKHOUSE_USER
+            value: "budeval"
+          - name: CLICKHOUSE_PASSWORD
+            value: "budeval"
+          - name: CLICKHOUSE_BATCH_SIZE
+            value: "1000"
+          - name: CLICKHOUSE_POOL_MIN_SIZE
+            value: "1"
+          - name: CLICKHOUSE_POOL_MAX_SIZE
+            value: "10"
+          - name: CLICKHOUSE_ASYNC_INSERT
+            value: "true"
+          - name: CLICKHOUSE_COMPRESSION
+            value: "zstd"
+          - name: CLICKHOUSE_SECURE
+            value: "false"
+        {{ $root := . }}
+        {{- range $key, $value := .Values.microservices.budeval.env }}
+          - name: {{ $key }}
+            value: {{ tpl $value $root | quote }}
+        {{- end }}
+        resources:
+          limits:
+            memory: 1024Mi
+            cpu: 1
+          requests:
+            memory: 256Mi
+            cpu: 250m
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-budeval
+spec:
+  ports:
+  - port: 3003
+    targetPort: 3003
+  selector:
+    app: {{ .Release.Name }}-budeval
+  type: ClusterIP

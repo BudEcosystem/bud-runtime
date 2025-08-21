@@ -13,6 +13,7 @@ import {
   Dropdown,
   Popconfirm,
   Tag,
+  ConfigProvider,
 } from "antd";
 import { Typography } from "antd";
 import { PlusOutlined, MoreOutlined } from "@ant-design/icons";
@@ -429,7 +430,7 @@ export default function ProjectsPage() {
                   onChange={(e) =>
                     setFormData({ ...formData, name: e.target.value })
                   }
-                  className="bg-bud-bg-tertiary border-bud-border-secondary"
+                  className="bg-[var(--bg-tertiary)] border-[var(--border-secondary)]"
                 />
               </div>
 

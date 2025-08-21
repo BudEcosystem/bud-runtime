@@ -148,6 +148,9 @@ mod tests {
             request_ip: None,
             cost: None,
             response_analysis: None,
+            api_key_id: None,
+            api_key_project_id: None,
+            user_id: None,
         };
         ObservabilityEntry::new(event)
     }

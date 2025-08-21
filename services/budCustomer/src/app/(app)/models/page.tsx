@@ -408,7 +408,7 @@ export default function ModelsPage() {
               >
                 <Button
                   icon={<FilterOutlined />}
-                  className="text-bud-text-primary hover:text-bud-purple border-bud-border"
+                  className="!bg-[var(--bg-primary)] text-bud-text-primary hover:text-bud-purple border-bud-border"
                 >
                   Filter
                 </Button>
@@ -587,7 +587,7 @@ export default function ModelsPage() {
                                 icon="ph:user"
                                 className="text-bud-text-muted text-xs"
                               />
-                              <span className="text-xs text-bud-yellow">
+                              <span className="text-xs text-[--color-yellow]">
                                 {model.author}
                               </span>
                             </div>

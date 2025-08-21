@@ -315,6 +315,22 @@ class NotificationService(SessionMixin):
         if payload.event == "results":
             await BenchmarkService(self.session).update_benchmark_status_from_notification_event(payload)
 
+    async def update_evaluation_events(self, payload: NotificationPayload) -> None:
+        """Update the evaluation workflow events for a workflow step.
+
+        Mirrors other workflows: updates the step data and progress, and on completion
+        persists any evaluation results metadata if provided.
+        """
+        # Update workflow step data event
+        await self._update_workflow_step_events(BudServeWorkflowStepEventName.EVALUATION_EVENTS.value, payload)
+
+        # Update progress in workflow
+        await self._update_workflow_progress(BudServeWorkflowStepEventName.EVALUATION_EVENTS.value, payload)
+
+        # If final results are available in payload.content.result, persist summary or link
+        # Currently, persistence of raw metrics is handled by budeval storage; budapp can
+        # later fetch or sync. No-op here unless specific persistence is required.
+
     async def update_adapter_deployment_events(self, payload: NotificationPayload) -> None:
         """Update the quantization deployment events for a workflow step."""
         # Update workflow step data event
@@ -558,6 +574,7 @@ class SubscriberHandler:
             PayloadType.RUN_BENCHMARK: self._handle_run_benchmark,
             PayloadType.ADD_ADAPTER: self._handle_deploy_adapter,
             PayloadType.DELETE_ADAPTER: self._handle_delete_adapter,
+            PayloadType.EVALUATE_MODEL: self._handle_evaluate_model,
         }
 
         handler = handlers.get(payload.type)
@@ -695,6 +712,14 @@ class SubscriberHandler:
         return NotificationResponse(
             object="notification",
             message="Updated delete adapter event in workflow step",
+        ).to_http_response()
+
+    async def _handle_evaluate_model(self, payload: NotificationPayload) -> NotificationResponse:
+        """Handle the evaluate model (budeval) events."""
+        await NotificationService(self.session).update_evaluation_events(payload)
+        return NotificationResponse(
+            object="notification",
+            message="Updated evaluation event in workflow step",
         ).to_http_response()
 
 
