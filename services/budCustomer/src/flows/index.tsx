@@ -1,4 +1,7 @@
 import React from "react";
+import CreateBatchJob from "./BatchJob/CreateBatchJob";
+import CreateBatchJobSuccess from "./BatchJob/CreateBatchJobSuccess";
+import NewProject from "./NewProject";
 
 // Placeholder component factory
 const createPlaceholderComponent = (name: string) => {
@@ -126,6 +129,8 @@ const stepComponentNames = [
   "select-traits",
   "select-evaluation",
   "evaluation-summary",
+  "create-batch-job",
+  "create-batch-job-success",
 ];
 
 // Create StepComponents object with placeholder components
@@ -136,5 +141,10 @@ export const StepComponents = stepComponentNames.reduce(
   },
   {} as Record<string, React.FC>,
 );
+
+// Override with actual components
+StepComponents["create-batch-job"] = CreateBatchJob;
+StepComponents["create-batch-job-success"] = CreateBatchJobSuccess;
+StepComponents["new-project"] = NewProject;
 
 export type StepComponentsType = keyof typeof StepComponents;
