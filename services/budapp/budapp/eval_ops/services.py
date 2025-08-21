@@ -1347,8 +1347,8 @@ class ExperimentWorkflowService:
                 )
 
                 # if experiment_id, then call the eval workflow
-                if experiment_id:
-                    await self._call_eval_workflow(experiment_id)
+                # if experiment_id:
+                #     await self._call_eval_workflow(experiment_id)
 
             # After storing the workflow step, retrieve all accumulated data
             all_step_data = await self._get_accumulated_step_data(workflow.id)
@@ -1696,105 +1696,15 @@ class ExperimentWorkflowService:
         return experiment.id
 
     async def _call_eval_workflow(self, experiment_id: uuid.UUID) -> None:
-        """Trigger budeval evaluation for all runs in the experiment.
+        """Delegate evaluation workflow to EvaluationWorkflowService.
 
         Parameters:
             experiment_id (uuid.UUID): The experiment ID to evaluate.
         """
         try:
-            # Get all runs for this experiment
-            experiment = self.session.get(ExperimentModel, experiment_id)
-            if not experiment:
-                logger.warning(f"Experiment {experiment_id} not found for evaluation")
-                return
-
-            # Get all pending runs
-            runs = (
-                self.session.query(RunModel)
-                .filter(RunModel.experiment_id == experiment_id, RunModel.status == RunStatusEnum.PENDING.value)
-                .all()
-            )
-
-            if not runs:
-                logger.info(f"No pending runs found for experiment {experiment_id}")
-                return
-
-            # Get EvaluationWorkflowService instance to use budeval methods
+            # Use EvaluationWorkflowService to trigger evaluations
             eval_service = EvaluationWorkflowService(self.session)
-
-            # Trigger evaluation for each run
-            for run in runs:
-                try:
-                    # TODO: use actual model
-                    # model = self.session.get(ModelTable, run.model_id)
-                    # dataset_version = self.session.get(ExpDatasetVersion, run.dataset_version_id)
-
-                    # if not model or not dataset_version:
-                    #     logger.error(f"Missing model or dataset for run {run.id}")
-                    #     continue
-
-                    # Get endpoint information
-                    # Check if model has endpoint information
-                    # endpoint_info = None
-                    # if hasattr(model, "endpoints") and model.endpoints:
-                    #     endpoint_info = model.endpoints[0] if model.endpoints else None
-
-                    # Prepare evaluation request
-                    evaluation_request = {
-                        "model_name": "qwen3-4b",
-                        "endpoint": "http://20.66.97.208/v1",
-                        "api_key": "sk-BudLiteLLMMasterKey_123",
-                        "datasets": ["demo_gsm8k_chat_gen"],
-                        "engine": "opencompass",  # Default engine
-                        "extra_args": run.config or {},
-                        "kubeconfig": None,  # Will use default kubeconfig
-                    }
-
-                    # TODO: use actual model
-                    # evaluation_request = {
-                    #     "model_name": model.name if hasattr(model, "name") else f"model_{run.model_id}",
-                    #     "endpoint": endpoint_info.url if endpoint_info and hasattr(endpoint_info, "url") else "",
-                    #     "api_key": endpoint_info.api_key
-                    #     if endpoint_info and hasattr(endpoint_info, "api_key")
-                    #     else "",
-                    #     "datasets": [
-                    #         dataset_version.dataset.name if dataset_version.dataset else str(dataset_version.id)
-                    #     ],
-                    #     "engine": "opencompass",  # Default engine
-                    #     "extra_args": run.config or {},
-                    #     "kubeconfig": None,  # Will use default kubeconfig
-                    # }
-
-                    # Update run status to running
-                    run.status = RunStatusEnum.RUNNING.value
-                    self.session.commit()
-
-                    # Trigger budeval evaluation
-                    response = await eval_service.trigger_budeval_evaluation(
-                        run_id=run.id, evaluation_request=evaluation_request
-                    )
-
-                    logger.info(f"Evaluation response: {response}")
-
-                    # Store budeval job information if we have the fields
-                    # These fields will be added in the database migration
-                    # if hasattr(run, "budeval_job_id"):
-                    #     run.budeval_job_id = response.get("job_id")
-                    # if hasattr(run, "budeval_workflow_id"):
-                    #     run.budeval_workflow_id = response.get("workflow_id")
-                    # if hasattr(run, "evaluation_status"):
-                    #     run.evaluation_status = "initiated"
-                    self.session.commit()
-
-                    logger.info(f"Successfully triggered evaluation for run {run.id}")
-
-                except Exception as e:
-                    logger.error(f"Failed to trigger evaluation for run {run.id}: {e}")
-                    run.status = RunStatusEnum.FAILED.value
-                    if hasattr(run, "evaluation_error"):
-                        run.evaluation_error = str(e)
-                    self.session.commit()
-
+            await eval_service._trigger_evaluations_for_experiment(experiment_id)
         except Exception as e:
             logger.error(f"Failed to call eval workflow for experiment {experiment_id}: {e}")
 
@@ -1970,6 +1880,10 @@ class EvaluationWorkflowService:
             next_step_data = (
                 await self._get_next_step_data(next_step, all_step_data, experiment_id) if next_step else None
             )
+
+            # Trigger budeval evaluation if this is the final step
+            if request.step_number == 5 and request.trigger_workflow:
+                await self._trigger_evaluations_for_experiment(experiment_id)
 
             return EvaluationWorkflowResponse(
                 code=status.HTTP_200_OK,
@@ -2228,6 +2142,10 @@ class EvaluationWorkflowService:
             runs_created += 1
 
         self.session.commit()
+
+        # Trigger budeval evaluation for all created runs
+        await self._trigger_evaluations_for_experiment(experiment_id)
+
         return runs_created
 
     async def _get_next_step_data(
@@ -2641,3 +2559,82 @@ class EvaluationWorkflowService:
             logger.error(f"Failed to update run evaluation status: {e}")
             self.session.rollback()
             raise
+
+    async def _trigger_evaluations_for_experiment(self, experiment_id: uuid.UUID) -> None:
+        """Trigger budeval evaluation for all pending runs in the experiment.
+
+        Parameters:
+            experiment_id (uuid.UUID): The experiment ID to evaluate.
+        """
+        try:
+            # Get all pending runs for this experiment
+            runs = (
+                self.session.query(RunModel)
+                .filter(RunModel.experiment_id == experiment_id, RunModel.status == RunStatusEnum.PENDING.value)
+                .all()
+            )
+
+            if not runs:
+                logger.info(f"No pending runs found for experiment {experiment_id}")
+                return
+
+            logger.info(f"Triggering budeval evaluation for {len(runs)} runs in experiment {experiment_id}")
+
+            # Trigger evaluation for each run
+            for run in runs:
+                try:
+                    # Get model information for the run
+                    # model = self.session.get(ModelTable, run.model_id)
+                    # dataset_version = self.session.get(ExpDatasetVersion, run.dataset_version_id)
+
+                    # if not model or not dataset_version:
+                    #     logger.error(f"Missing model or dataset for run {run.id}")
+                    #     continue
+
+                    # Get endpoint information
+                    # Check if model has endpoint information
+                    # endpoint_info = None
+                    # if hasattr(model, 'endpoints') and model.endpoints:
+                    #     endpoint_info = model.endpoints[0] if model.endpoints else None
+
+                    # Prepare evaluation request
+                    evaluation_request = {
+                        "model_name": "qwen3-4b",
+                        "endpoint": "http://20.66.97.208/v1",
+                        "api_key": "sk-BudLiteLLMMasterKey_123",
+                        "datasets": ["demo_gsm8k_chat_gen"],
+                        "engine": "opencompass",  # Default engine
+                        "extra_args": run.config or {},
+                        "kubeconfig": None,  # Will use default kubeconfig
+                    }
+
+                    # Update run status to running
+                    run.status = RunStatusEnum.RUNNING.value
+                    self.session.commit()
+
+                    # Trigger budeval evaluation
+                    response = await self.trigger_budeval_evaluation(
+                        run_id=run.id, evaluation_request=evaluation_request
+                    )
+
+                    # Store budeval job information if we have the fields
+                    # These fields will be added in the database migration
+                    if hasattr(run, "budeval_job_id"):
+                        run.budeval_job_id = response.get("job_id")
+                    if hasattr(run, "budeval_workflow_id"):
+                        run.budeval_workflow_id = response.get("workflow_id")
+                    if hasattr(run, "evaluation_status"):
+                        run.evaluation_status = "initiated"
+                    self.session.commit()
+
+                    logger.info(f"Successfully triggered evaluation for run {run.id}")
+
+                except Exception as e:
+                    logger.error(f"Failed to trigger evaluation for run {run.id}: {e}")
+                    run.status = RunStatusEnum.FAILED.value
+                    if hasattr(run, "evaluation_error"):
+                        run.evaluation_error = str(e)
+                    self.session.commit()
+
+        except Exception as e:
+            logger.error(f"Failed to trigger evaluations for experiment {experiment_id}: {e}")
