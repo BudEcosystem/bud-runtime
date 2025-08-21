@@ -24,195 +24,51 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy.sql import select
 
-from budapp.commons.constants import GuardrailDeploymentStatusEnum, GuardrailProviderEnum
+from budapp.commons.constants import GuardrailDeploymentStatusEnum
 from budapp.guardrails.models import (
     GuardrailDeployment,
     GuardrailDeploymentProbe,
-    GuardrailDeploymentRuleConfig,
-    GuardrailGuardType,
-    GuardrailModalityType,
+    GuardrailDeploymentRule,
     GuardrailProbe,
-    GuardrailProvider,
     GuardrailRule,
-    GuardrailRuleGuardType,
-    GuardrailRuleModality,
-    GuardrailRuleScanner,
-    GuardrailScannerType,
 )
 from budapp.guardrails.schemas import (
     GuardrailDeploymentCreate,
     GuardrailDeploymentListRequestSchema,
     GuardrailDeploymentProbeCreate,
     GuardrailDeploymentUpdate,
-    GuardrailGuardTypeCreate,
-    GuardrailModalityTypeCreate,
     GuardrailProbeCreate,
     GuardrailProbeListRequestSchema,
     GuardrailProbeUpdate,
-    GuardrailProviderCreate,
-    GuardrailProviderUpdate,
     GuardrailRuleCreate,
     GuardrailRuleListRequestSchema,
     GuardrailRuleUpdate,
-    GuardrailScannerTypeCreate,
 )
+from budapp.model_ops.models import Provider
 
 
-# Scanner type CRUD operations
-async def create_scanner_type(db: Session, scanner_data: GuardrailScannerTypeCreate) -> GuardrailScannerType:
-    """Create a new scanner type."""
-    scanner = GuardrailScannerType(**scanner_data.model_dump())
-    db.add(scanner)
-    db.commit()
-    db.refresh(scanner)
-    return scanner
-
-
-async def get_scanner_type(db: Session, scanner_id: UUID) -> Optional[GuardrailScannerType]:
-    """Get a scanner type by ID."""
-    result = db.execute(select(GuardrailScannerType).where(GuardrailScannerType.id == scanner_id))
-    return result.scalar_one_or_none()
-
-
-async def get_scanner_types(db: Session) -> List[GuardrailScannerType]:
-    """Get all scanner types."""
-    result = db.execute(select(GuardrailScannerType).order_by(GuardrailScannerType.name))
-    return result.scalars().all()
-
-
-# Modality type CRUD operations
-async def create_modality_type(db: Session, modality_data: GuardrailModalityTypeCreate) -> GuardrailModalityType:
-    """Create a new modality type."""
-    modality = GuardrailModalityType(**modality_data.model_dump())
-    db.add(modality)
-    db.commit()
-    db.refresh(modality)
-    return modality
-
-
-async def get_modality_type(db: Session, modality_id: UUID) -> Optional[GuardrailModalityType]:
-    """Get a modality type by ID."""
-    result = db.execute(select(GuardrailModalityType).where(GuardrailModalityType.id == modality_id))
-    return result.scalar_one_or_none()
-
-
-async def get_modality_types(db: Session) -> List[GuardrailModalityType]:
-    """Get all modality types."""
-    result = db.execute(select(GuardrailModalityType).order_by(GuardrailModalityType.name))
-    return result.scalars().all()
-
-
-# Provider CRUD operations
-async def create_provider(db: Session, provider_data: GuardrailProviderCreate, created_by: UUID) -> GuardrailProvider:
-    """Create a new guardrail provider."""
-    provider_dict = provider_data.model_dump()
-    provider_dict["created_by"] = created_by
-    provider = GuardrailProvider(**provider_dict)
-    db.add(provider)
-    db.commit()
-    db.refresh(provider)
-    return provider
-
-
-async def get_provider(db: Session, provider_id: UUID) -> Optional[GuardrailProvider]:
+# Provider CRUD operations - using Provider model from model_ops
+async def get_provider(db: Session, provider_id: UUID) -> Optional[Provider]:
     """Get a provider by ID."""
-    result = db.execute(
-        select(GuardrailProvider)
-        .where(GuardrailProvider.id == provider_id)
-        .options(selectinload(GuardrailProvider.probes))
-    )
+    result = db.execute(select(Provider).where(Provider.id == provider_id))
     return result.scalar_one_or_none()
 
 
-async def get_providers(db: Session, include_inactive: bool = False) -> List[GuardrailProvider]:
+async def get_providers(db: Session, include_inactive: bool = False) -> List[Provider]:
     """Get all providers."""
-    query = select(GuardrailProvider).order_by(GuardrailProvider.display_name)
+    query = select(Provider).order_by(Provider.name)
     if not include_inactive:
-        query = query.where(GuardrailProvider.is_active.is_(True))
+        query = query.where(Provider.is_active.is_(True))
     result = db.execute(query)
-    return result.scalars().all()
-
-
-async def update_provider(
-    db: Session, provider_id: UUID, provider_data: GuardrailProviderUpdate, user_id: UUID
-) -> Optional[GuardrailProvider]:
-    """Update a provider (only custom providers can be updated by their owner)."""
-    provider = await get_provider(db, provider_id)
-    if not provider:
-        return None
-
-    # Only custom providers can be updated, and only by their owner
-    if provider.provider_type != GuardrailProviderEnum.CUSTOM or provider.user_id != user_id:
-        return None
-
-    for field, value in provider_data.model_dump(exclude_unset=True).items():
-        setattr(provider, field, value)
-
-    db.commit()
-    db.refresh(provider)
-    return provider
-
-
-async def delete_provider(db: Session, provider_id: UUID, user_id: UUID) -> bool:
-    """Delete a provider (only custom providers can be deleted by their owner)."""
-    provider = await get_provider(db, provider_id)
-    if not provider:
-        return False
-
-    # Only custom providers can be deleted, and only by their owner
-    if provider.provider_type != GuardrailProviderEnum.CUSTOM or provider.user_id != user_id:
-        return False
-
-    db.delete(provider)
-    db.commit()
-    return True
-
-
-# Guard type CRUD operations
-async def create_guard_type(db: Session, guard_data: GuardrailGuardTypeCreate) -> GuardrailGuardType:
-    """Create a new guard type."""
-    guard = GuardrailGuardType(**guard_data.model_dump())
-    db.add(guard)
-    db.commit()
-    db.refresh(guard)
-    return guard
-
-
-async def get_guard_type(db: Session, guard_id: UUID) -> Optional[GuardrailGuardType]:
-    """Get a guard type by ID."""
-    result = db.execute(select(GuardrailGuardType).where(GuardrailGuardType.id == guard_id))
-    return result.scalar_one_or_none()
-
-
-async def get_guard_types(db: Session) -> List[GuardrailGuardType]:
-    """Get all guard types."""
-    result = db.execute(select(GuardrailGuardType).order_by(GuardrailGuardType.name))
     return result.scalars().all()
 
 
 # Rule CRUD operations
 async def create_rule(db: Session, rule_data: GuardrailRuleCreate, created_by: UUID) -> GuardrailRule:
-    """Create a new guardrail rule with junction table associations."""
-    rule_dict = rule_data.model_dump(exclude={"scanner_type_ids", "modality_type_ids", "guard_type_ids"})
+    """Create a new guardrail rule."""
+    rule_dict = rule_data.model_dump()
     rule = GuardrailRule(**rule_dict)
     db.add(rule)
-    db.flush()  # Flush to get the ID
-
-    # Create scanner associations
-    for scanner_type_id in rule_data.scanner_type_ids:
-        scanner_assoc = GuardrailRuleScanner(rule_id=rule.id, scanner_type_id=scanner_type_id)
-        db.add(scanner_assoc)
-
-    # Create modality associations
-    for modality_type_id in rule_data.modality_type_ids:
-        modality_assoc = GuardrailRuleModality(rule_id=rule.id, modality_type_id=modality_type_id)
-        db.add(modality_assoc)
-
-    # Create guard type associations
-    for guard_type_id in rule_data.guard_type_ids:
-        guard_assoc = GuardrailRuleGuardType(rule_id=rule.id, guard_type_id=guard_type_id)
-        db.add(guard_assoc)
-
     db.commit()
     db.refresh(rule)
     return rule
@@ -221,14 +77,7 @@ async def create_rule(db: Session, rule_data: GuardrailRuleCreate, created_by: U
 async def get_rule(db: Session, rule_id: UUID) -> Optional[GuardrailRule]:
     """Get a rule by ID."""
     result = db.execute(
-        select(GuardrailRule)
-        .options(
-            joinedload(GuardrailRule.probe),
-            selectinload(GuardrailRule.scanner_associations).selectinload(GuardrailRuleScanner.scanner_type),
-            selectinload(GuardrailRule.modality_associations).selectinload(GuardrailRuleModality.modality_type),
-            selectinload(GuardrailRule.guard_type_associations).selectinload(GuardrailRuleGuardType.guard_type),
-        )
-        .where(GuardrailRule.id == rule_id)
+        select(GuardrailRule).options(joinedload(GuardrailRule.probe)).where(GuardrailRule.id == rule_id)
     )
     return result.scalar_one_or_none()
 
@@ -240,46 +89,14 @@ async def get_rules_by_probe(db: Session, probe_id: UUID) -> List[GuardrailRule]
 
 
 async def update_rule(db: Session, rule_id: UUID, rule_data: GuardrailRuleUpdate) -> Optional[GuardrailRule]:
-    """Update a rule with junction table associations."""
+    """Update a rule."""
     rule = await get_rule(db, rule_id)
     if not rule:
         return None
 
-    update_dict = rule_data.model_dump(
-        exclude_unset=True, exclude={"scanner_type_ids", "modality_type_ids", "guard_type_ids"}
-    )
+    update_dict = rule_data.model_dump(exclude_unset=True)
     for field, value in update_dict.items():
         setattr(rule, field, value)
-
-    # Update scanner associations if provided
-    if rule_data.scanner_type_ids is not None:
-        # Delete existing associations
-        db.execute(delete(GuardrailRuleScanner).where(GuardrailRuleScanner.rule_id == rule_id))
-
-        # Create new associations
-        for scanner_type_id in rule_data.scanner_type_ids:
-            scanner_assoc = GuardrailRuleScanner(rule_id=rule.id, scanner_type_id=scanner_type_id)
-            db.add(scanner_assoc)
-
-    # Update modality associations if provided
-    if rule_data.modality_type_ids is not None:
-        # Delete existing associations
-        db.execute(delete(GuardrailRuleModality).where(GuardrailRuleModality.rule_id == rule_id))
-
-        # Create new associations
-        for modality_type_id in rule_data.modality_type_ids:
-            modality_assoc = GuardrailRuleModality(rule_id=rule.id, modality_type_id=modality_type_id)
-            db.add(modality_assoc)
-
-    # Update guard type associations if provided
-    if rule_data.guard_type_ids is not None:
-        # Delete existing associations
-        db.execute(delete(GuardrailRuleGuardType).where(GuardrailRuleGuardType.rule_id == rule_id))
-
-        # Create new associations
-        for guard_type_id in rule_data.guard_type_ids:
-            guard_assoc = GuardrailRuleGuardType(rule_id=rule.id, guard_type_id=guard_type_id)
-            db.add(guard_assoc)
 
     db.commit()
     db.refresh(rule)
@@ -298,19 +115,11 @@ async def delete_rule(db: Session, rule_id: UUID) -> bool:
 
 
 async def get_rules_paginated(
-    db: Session, probe_id: UUID, filters: GuardrailRuleListRequestSchema
+    db: Session, probe_id: UUID, filters: GuardrailRuleListRequestSchema, page: int, page_size: int
 ) -> Tuple[List[GuardrailRule], int]:
     """Get paginated rules for a probe with filtering."""
     # Base query for rules in the probe
-    query = (
-        select(GuardrailRule)
-        .where(GuardrailRule.probe_id == probe_id)
-        .options(
-            selectinload(GuardrailRule.scanner_associations).selectinload(GuardrailRuleScanner.scanner_type),
-            selectinload(GuardrailRule.modality_associations).selectinload(GuardrailRuleModality.modality_type),
-            selectinload(GuardrailRule.guard_type_associations).selectinload(GuardrailRuleGuardType.guard_type),
-        )
-    )
+    query = select(GuardrailRule).where(GuardrailRule.probe_id == probe_id)
     count_query = select(func.count(GuardrailRule.id)).where(GuardrailRule.probe_id == probe_id)
 
     # Apply filters
@@ -322,22 +131,16 @@ async def get_rules_paginated(
         conditions.append(or_(GuardrailRule.name.ilike(search_term), GuardrailRule.description.ilike(search_term)))
 
     # Scanner type filter
-    if filters.scanner_type_ids:
-        query = query.join(GuardrailRuleScanner)
-        count_query = count_query.join(GuardrailRuleScanner)
-        conditions.append(GuardrailRuleScanner.scanner_type_id.in_(filters.scanner_type_ids))
+    if filters.scanner_types:
+        conditions.append(GuardrailRule.scanner_types.contains(filters.scanner_types))
 
     # Modality type filter
-    if filters.modality_type_ids:
-        query = query.join(GuardrailRuleModality)
-        count_query = count_query.join(GuardrailRuleModality)
-        conditions.append(GuardrailRuleModality.modality_type_id.in_(filters.modality_type_ids))
+    if filters.modality_types:
+        conditions.append(GuardrailRule.modality_types.contains(filters.modality_types))
 
     # Guard type filter
-    if filters.guard_type_ids:
-        query = query.join(GuardrailRuleGuardType)
-        count_query = count_query.join(GuardrailRuleGuardType)
-        conditions.append(GuardrailRuleGuardType.guard_type_id.in_(filters.guard_type_ids))
+    if filters.guard_types:
+        conditions.append(GuardrailRule.guard_types.contains(filters.guard_types))
 
     # Enabled filter
     if filters.is_enabled is not None:
@@ -358,7 +161,7 @@ async def get_rules_paginated(
 
     # Apply pagination and ordering
     query = query.order_by(GuardrailRule.name)
-    query = query.offset((filters.page - 1) * filters.page_size).limit(filters.page_size)
+    query = query.offset((page - 1) * page_size).limit(page_size)
 
     # Execute query
     result = db.execute(query)
@@ -372,6 +175,11 @@ async def create_probe(db: Session, probe_data: GuardrailProbeCreate, created_by
     """Create a new guardrail probe."""
     probe_dict = probe_data.model_dump()
     probe_dict["created_by"] = created_by
+
+    # Set is_custom to True by default if not specified
+    if probe_dict.get("is_custom") is None:
+        probe_dict["is_custom"] = True
+
     probe = GuardrailProbe(**probe_dict)
     db.add(probe)
     db.commit()
@@ -383,39 +191,17 @@ async def get_probe(db: Session, probe_id: UUID) -> Optional[GuardrailProbe]:
     """Get a probe by ID with rules."""
     result = db.execute(
         select(GuardrailProbe)
-        .options(
-            selectinload(GuardrailProbe.provider),
-            selectinload(GuardrailProbe.rules)
-            .selectinload(GuardrailRule.scanner_associations)
-            .selectinload(GuardrailRuleScanner.scanner_type),
-            selectinload(GuardrailProbe.rules)
-            .selectinload(GuardrailRule.modality_associations)
-            .selectinload(GuardrailRuleModality.modality_type),
-            selectinload(GuardrailProbe.rules)
-            .selectinload(GuardrailRule.guard_type_associations)
-            .selectinload(GuardrailRuleGuardType.guard_type),
-        )
+        .options(selectinload(GuardrailProbe.provider), selectinload(GuardrailProbe.rules))
         .where(GuardrailProbe.id == probe_id)
     )
     return result.scalar_one_or_none()
 
 
 async def get_probes(
-    db: Session, filters: GuardrailProbeListRequestSchema, user_id: UUID
+    db: Session, filters: GuardrailProbeListRequestSchema, user_id: UUID, page: int, page_size: int
 ) -> Tuple[List[GuardrailProbe], int]:
     """Get probes with filtering and pagination."""
-    query = select(GuardrailProbe).options(
-        selectinload(GuardrailProbe.provider),
-        selectinload(GuardrailProbe.rules)
-        .selectinload(GuardrailRule.scanner_associations)
-        .selectinload(GuardrailRuleScanner.scanner_type),
-        selectinload(GuardrailProbe.rules)
-        .selectinload(GuardrailRule.modality_associations)
-        .selectinload(GuardrailRuleModality.modality_type),
-        selectinload(GuardrailProbe.rules)
-        .selectinload(GuardrailRule.guard_type_associations)
-        .selectinload(GuardrailRuleGuardType.guard_type),
-    )
+    query = select(GuardrailProbe).options(selectinload(GuardrailProbe.provider), selectinload(GuardrailProbe.rules))
     count_query = select(func.count(GuardrailProbe.id))
 
     # Apply filters
@@ -424,10 +210,8 @@ async def get_probes(
     # Provider filter
     if filters.provider_id:
         conditions.append(GuardrailProbe.provider_id == filters.provider_id)
-    elif filters.provider_type:
-        query = query.join(GuardrailProvider)
-        count_query = count_query.join(GuardrailProvider)
-        conditions.append(GuardrailProvider.provider_type == filters.provider_type)
+    if filters.provider_type:
+        conditions.append(GuardrailProbe.provider_type == filters.provider_type)
 
     # Tags filter - using JSONB contains for exact tag name matching
     if filters.tags:
@@ -450,10 +234,10 @@ async def get_probes(
         count_query = count_query.join(GuardrailDeploymentProbe).join(GuardrailDeployment)
         conditions.append(GuardrailDeployment.endpoint_id == filters.endpoint_id)
     else:
-        # Default: show only non-custom probes (provider_type != CUSTOM)
-        query = query.join(GuardrailProvider)
-        count_query = count_query.join(GuardrailProvider)
-        conditions.append(GuardrailProvider.provider_type != GuardrailProviderEnum.CUSTOM)
+        # Default: show only non-custom probes (provider type != 'custom')
+        query = query.join(Provider)
+        count_query = count_query.join(Provider)
+        # conditions.append(Provider.type != "custom")
 
     # Search filter
     if filters.search:
@@ -471,7 +255,7 @@ async def get_probes(
 
     # Apply pagination and ordering
     query = query.order_by(GuardrailProbe.name)
-    query = query.offset((filters.page - 1) * filters.page_size).limit(filters.page_size)
+    query = query.offset((page - 1) * page_size).limit(page_size)
 
     # Execute query
     result = db.execute(query)
@@ -530,20 +314,24 @@ async def delete_probe(db: Session, probe_id: UUID, user_id: UUID) -> bool:
 
 # Deployment CRUD operations
 async def create_deployment(
-    db: Session, deployment_data: GuardrailDeploymentCreate, user_id: UUID
+    db: Session,
+    deployment_data: GuardrailDeploymentCreate,
+    user_id: UUID,
+    probes: Optional[List[GuardrailDeploymentProbeCreate]] = None,
 ) -> GuardrailDeployment:
     """Create a new guardrail deployment with probes."""
     # Create deployment
-    deployment_dict = deployment_data.model_dump(exclude={"probes"})
+    deployment_dict = deployment_data.model_dump(exclude={"probe_selections", "provider_ids"})
     deployment_dict["user_id"] = user_id
     deployment = GuardrailDeployment(**deployment_dict)
     db.add(deployment)
     db.flush()  # Flush to get the ID
 
     # Create probe associations
-    for probe_data in deployment_data.probes:
-        deployment_probe = await _create_deployment_probe(db, deployment.id, probe_data)
-        deployment.probe_associations.append(deployment_probe)
+    if probes:
+        for probe_data in probes:
+            deployment_probe = await _create_deployment_probe(db, deployment.id, probe_data)
+            deployment.probe_associations.append(deployment_probe)
 
     db.commit()
     db.refresh(deployment)
@@ -555,18 +343,18 @@ async def _create_deployment_probe(
 ) -> GuardrailDeploymentProbe:
     """Create a deployment-probe association with rule configs."""
     # Create deployment-probe association
-    deployment_probe_dict = probe_data.model_dump(exclude={"rule_configs"})
+    deployment_probe_dict = probe_data.model_dump(exclude={"rules"})
     deployment_probe_dict["deployment_id"] = deployment_id
     deployment_probe = GuardrailDeploymentProbe(**deployment_probe_dict)
     db.add(deployment_probe)
     db.flush()  # Flush to get the ID
 
     # Create rule configurations if provided
-    if probe_data.rule_configs:
-        for rule_config_data in probe_data.rule_configs:
+    if probe_data.rules:
+        for rule_config_data in probe_data.rules:
             rule_config_dict = rule_config_data.model_dump()
             rule_config_dict["deployment_probe_id"] = deployment_probe.id
-            rule_config = GuardrailDeploymentRuleConfig(**rule_config_dict)
+            rule_config = GuardrailDeploymentRule(**rule_config_dict)
             db.add(rule_config)
 
     return deployment_probe
@@ -579,16 +367,21 @@ async def get_deployment(db: Session, deployment_id: UUID) -> Optional[Guardrail
         .options(
             selectinload(GuardrailDeployment.probe_associations).selectinload(GuardrailDeploymentProbe.probe),
             selectinload(GuardrailDeployment.probe_associations)
-            .selectinload(GuardrailDeploymentProbe.rule_configs)
-            .selectinload(GuardrailDeploymentRuleConfig.rule),
+            .selectinload(GuardrailDeploymentProbe.rule)
+            .selectinload(GuardrailDeploymentRule.rule),
         )
-        .where(GuardrailDeployment.id == deployment_id)
+        .where(
+            and_(
+                GuardrailDeployment.id == deployment_id,
+                GuardrailDeployment.status != GuardrailDeploymentStatusEnum.DELETED,
+            )
+        )
     )
     return result.scalar_one_or_none()
 
 
 async def get_deployments(
-    db: Session, filters: GuardrailDeploymentListRequestSchema, user_id: UUID
+    db: Session, filters: GuardrailDeploymentListRequestSchema, user_id: UUID, page: int, page_size: int
 ) -> Tuple[List[GuardrailDeployment], int]:
     """Get deployments with filtering and pagination."""
     query = select(GuardrailDeployment)
@@ -628,7 +421,7 @@ async def get_deployments(
 
     # Apply pagination and ordering
     query = query.order_by(GuardrailDeployment.created_at.desc())
-    query = query.offset((filters.page - 1) * filters.page_size).limit(filters.page_size)
+    query = query.offset((page - 1) * page_size).limit(page_size)
 
     # Load probe associations for counting
     query = query.options(selectinload(GuardrailDeployment.probe_associations))
@@ -691,14 +484,14 @@ async def get_deployments_by_endpoint(db: Session, endpoint_id: UUID, user_id: U
             and_(
                 GuardrailDeployment.endpoint_id == endpoint_id,
                 GuardrailDeployment.user_id == user_id,
-                GuardrailDeployment.status == GuardrailDeploymentStatusEnum.ACTIVE,
+                GuardrailDeployment.status != GuardrailDeploymentStatusEnum.DELETED,
             )
         )
         .options(
             selectinload(GuardrailDeployment.probe_associations).selectinload(GuardrailDeploymentProbe.probe),
             selectinload(GuardrailDeployment.probe_associations)
-            .selectinload(GuardrailDeploymentProbe.rule_configs)
-            .selectinload(GuardrailDeploymentRuleConfig.rule),
+            .selectinload(GuardrailDeploymentProbe.rule)
+            .selectinload(GuardrailDeploymentRule.rule),
         )
     )
     return result.scalars().all()
@@ -712,14 +505,14 @@ async def get_deployments_by_project(db: Session, project_id: UUID, user_id: UUI
             and_(
                 GuardrailDeployment.project_id == project_id,
                 GuardrailDeployment.user_id == user_id,
-                GuardrailDeployment.status == GuardrailDeploymentStatusEnum.ACTIVE,
+                GuardrailDeployment.status != GuardrailDeploymentStatusEnum.DELETED,
             )
         )
         .options(
             selectinload(GuardrailDeployment.probe_associations).selectinload(GuardrailDeploymentProbe.probe),
             selectinload(GuardrailDeployment.probe_associations)
-            .selectinload(GuardrailDeploymentProbe.rule_configs)
-            .selectinload(GuardrailDeploymentRuleConfig.rule),
+            .selectinload(GuardrailDeploymentProbe.rule)
+            .selectinload(GuardrailDeploymentRule.rule),
         )
     )
     return result.scalars().all()

@@ -25,43 +25,16 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from budapp.commons.constants import GuardrailDeploymentStatusEnum, GuardrailDeploymentTypeEnum, GuardrailProviderEnum
+from budapp.commons.constants import (
+    GuardrailDeploymentStatusEnum,
+    GuardrailDeploymentTypeEnum,
+    GuardrailProviderTypeEnum,
+)
 from budapp.commons.database import Base, TimestampMixin
 from budapp.endpoint_ops.models import Endpoint
+from budapp.model_ops.models import Provider
 from budapp.project_ops.models import Project
 from budapp.user_ops.models import User
-
-
-class GuardrailProvider(Base, TimestampMixin):
-    """Guardrail provider model - represents different guardrail service providers."""
-
-    __tablename__ = "guardrail_providers"
-
-    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
-    name: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
-    display_name: Mapped[str] = mapped_column(String(255), nullable=False)
-    provider_type: Mapped[str] = mapped_column(
-        Enum(
-            GuardrailProviderEnum,
-            name="guardrail_provider_type",
-            values_callable=lambda x: [e.value for e in x],
-        ),
-        nullable=False,
-    )
-    description: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    configuration_schema: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-
-    # Foreign keys
-    created_by: Mapped[Optional[UUID]] = mapped_column(ForeignKey("user.id", ondelete="SET NULL"), nullable=True)
-    user_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("user.id", ondelete="CASCADE"), nullable=True)
-    project_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("project.id", ondelete="CASCADE"), nullable=True)
-
-    # Relationships
-    creator: Mapped[Optional["User"]] = relationship("User", foreign_keys=[created_by])
-    owner: Mapped[Optional["User"]] = relationship("User", foreign_keys=[user_id])
-    project: Mapped[Optional["Project"]] = relationship("Project")
-    probes: Mapped[List["GuardrailProbe"]] = relationship("GuardrailProbe", back_populates="provider")
 
 
 class GuardrailProbe(Base, TimestampMixin):
@@ -73,17 +46,26 @@ class GuardrailProbe(Base, TimestampMixin):
     name: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     description: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     tags: Mapped[list[dict]] = mapped_column(JSONB, nullable=True)
+    sentinel_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
     # Foreign keys
-    provider_id: Mapped[UUID] = mapped_column(
-        ForeignKey("guardrail_providers.id", ondelete="RESTRICT"), nullable=False
-    )
+    provider_id: Mapped[UUID] = mapped_column(ForeignKey("provider.id", ondelete="RESTRICT"), nullable=False)
     created_by: Mapped[Optional[UUID]] = mapped_column(ForeignKey("user.id", ondelete="SET NULL"), nullable=True)
     user_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("user.id", ondelete="CASCADE"), nullable=True)
     project_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("project.id", ondelete="CASCADE"), nullable=True)
 
+    provider_type: Mapped[str] = mapped_column(
+        Enum(
+            GuardrailProviderTypeEnum,
+            name="guardrail_provider_type_enum",
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        nullable=False,
+    )
+    is_custom: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
     # Relationships
-    provider: Mapped["GuardrailProvider"] = relationship("GuardrailProvider", back_populates="probes")
+    provider: Mapped["Provider"] = relationship("Provider")
     creator: Mapped[Optional["User"]] = relationship("User", foreign_keys=[created_by])
     owner: Mapped[Optional["User"]] = relationship("User", foreign_keys=[user_id])
     project: Mapped[Optional["Project"]] = relationship("Project")
@@ -93,11 +75,6 @@ class GuardrailProbe(Base, TimestampMixin):
     deployment_associations: Mapped[List["GuardrailDeploymentProbe"]] = relationship(
         "GuardrailDeploymentProbe", back_populates="probe"
     )
-
-    @hybrid_property
-    def is_custom(self) -> bool:
-        """Check if this probe is custom based on provider type."""
-        return self.provider and self.provider.provider_type == GuardrailProviderEnum.CUSTOM
 
 
 class GuardrailRule(Base, TimestampMixin):
@@ -112,127 +89,17 @@ class GuardrailRule(Base, TimestampMixin):
     examples: Mapped[Optional[List[str]]] = mapped_column(PG_ARRAY(String), nullable=True)
     configuration: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     is_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    is_custom: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_custom: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    guard_types: Mapped[Optional[List[str]]] = mapped_column(PG_ARRAY(String), nullable=True)
+    sentinel_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    scanner_types: Mapped[Optional[List[str]]] = mapped_column(PG_ARRAY(String), nullable=True)
+    modality_types: Mapped[Optional[List[str]]] = mapped_column(PG_ARRAY(String), nullable=True)
 
     # Relationships
     probe: Mapped["GuardrailProbe"] = relationship("GuardrailProbe", back_populates="rules")
-    deployment_configs: Mapped[List["GuardrailDeploymentRuleConfig"]] = relationship(
-        "GuardrailDeploymentRuleConfig", back_populates="rule"
+    deployment_rules: Mapped[List["GuardrailDeploymentRule"]] = relationship(
+        "GuardrailDeploymentRule", back_populates="rule"
     )
-    scanner_associations: Mapped[List["GuardrailRuleScanner"]] = relationship(
-        "GuardrailRuleScanner", back_populates="rule", cascade="all, delete-orphan"
-    )
-    modality_associations: Mapped[List["GuardrailRuleModality"]] = relationship(
-        "GuardrailRuleModality", back_populates="rule", cascade="all, delete-orphan"
-    )
-    guard_type_associations: Mapped[List["GuardrailRuleGuardType"]] = relationship(
-        "GuardrailRuleGuardType", back_populates="rule", cascade="all, delete-orphan"
-    )
-
-
-class GuardrailScannerType(Base, TimestampMixin):
-    """Reference table for available scanner types."""
-
-    __tablename__ = "guardrail_scanner_types"
-
-    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
-    name: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
-    display_name: Mapped[str] = mapped_column(String(255), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    supported_modalities: Mapped[List[str]] = mapped_column(PG_ARRAY(String), nullable=False)
-    configuration_schema: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
-
-    # Relationships
-    rule_associations: Mapped[List["GuardrailRuleScanner"]] = relationship(
-        "GuardrailRuleScanner", back_populates="scanner_type"
-    )
-
-
-class GuardrailModalityType(Base, TimestampMixin):
-    """Reference table for available modality types."""
-
-    __tablename__ = "guardrail_modality_types"
-
-    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
-    name: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
-    display_name: Mapped[str] = mapped_column(String(255), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-
-    # Relationships
-    rule_associations: Mapped[List["GuardrailRuleModality"]] = relationship(
-        "GuardrailRuleModality", back_populates="modality_type"
-    )
-
-
-class GuardrailGuardType(Base, TimestampMixin):
-    """Reference table for available guard types."""
-
-    __tablename__ = "guardrail_guard_types"
-
-    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
-    name: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
-    display_name: Mapped[str] = mapped_column(String(255), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-
-    # Relationships
-    rule_associations: Mapped[List["GuardrailRuleGuardType"]] = relationship(
-        "GuardrailRuleGuardType", back_populates="guard_type"
-    )
-
-
-class GuardrailRuleScanner(Base, TimestampMixin):
-    """Junction table linking rules to scanner types."""
-
-    __tablename__ = "guardrail_rule_scanners"
-    __table_args__ = (UniqueConstraint("rule_id", "scanner_type_id", name="uq_rule_scanner"),)
-
-    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
-    rule_id: Mapped[UUID] = mapped_column(ForeignKey("guardrail_rules.id", ondelete="CASCADE"), nullable=False)
-    scanner_type_id: Mapped[UUID] = mapped_column(
-        ForeignKey("guardrail_scanner_types.id", ondelete="RESTRICT"), nullable=False
-    )
-
-    # Relationships
-    rule: Mapped["GuardrailRule"] = relationship("GuardrailRule", back_populates="scanner_associations")
-    scanner_type: Mapped["GuardrailScannerType"] = relationship(
-        "GuardrailScannerType", back_populates="rule_associations"
-    )
-
-
-class GuardrailRuleModality(Base, TimestampMixin):
-    """Junction table linking rules to modality types."""
-
-    __tablename__ = "guardrail_rule_modalities"
-    __table_args__ = (UniqueConstraint("rule_id", "modality_type_id", name="uq_rule_modality"),)
-
-    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
-    rule_id: Mapped[UUID] = mapped_column(ForeignKey("guardrail_rules.id", ondelete="CASCADE"), nullable=False)
-    modality_type_id: Mapped[UUID] = mapped_column(
-        ForeignKey("guardrail_modality_types.id", ondelete="RESTRICT"), nullable=False
-    )
-
-    # Relationships
-    rule: Mapped["GuardrailRule"] = relationship("GuardrailRule", back_populates="modality_associations")
-    modality_type: Mapped["GuardrailModalityType"] = relationship(
-        "GuardrailModalityType", back_populates="rule_associations"
-    )
-
-
-class GuardrailRuleGuardType(Base, TimestampMixin):
-    """Junction table linking rules to guard types."""
-
-    __tablename__ = "guardrail_rule_guard_types"
-    __table_args__ = (UniqueConstraint("rule_id", "guard_type_id", name="uq_rule_guard_type"),)
-
-    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
-    rule_id: Mapped[UUID] = mapped_column(ForeignKey("guardrail_rules.id", ondelete="CASCADE"), nullable=False)
-    guard_type_id: Mapped[UUID] = mapped_column(
-        ForeignKey("guardrail_guard_types.id", ondelete="RESTRICT"), nullable=False
-    )
-
-    # Relationships
-    rule: Mapped["GuardrailRule"] = relationship("GuardrailRule", back_populates="guard_type_associations")
-    guard_type: Mapped["GuardrailGuardType"] = relationship("GuardrailGuardType", back_populates="rule_associations")
 
 
 class GuardrailDeployment(Base, TimestampMixin):
@@ -252,7 +119,6 @@ class GuardrailDeployment(Base, TimestampMixin):
         nullable=False,
     )
     endpoint_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("endpoint.id", ondelete="CASCADE"), nullable=True)
-    deployment_endpoint_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     status: Mapped[str] = mapped_column(
         Enum(
             GuardrailDeploymentStatusEnum,
@@ -260,10 +126,11 @@ class GuardrailDeployment(Base, TimestampMixin):
             values_callable=lambda x: [e.value for e in x],
         ),
         nullable=False,
-        default=GuardrailDeploymentStatusEnum.INACTIVE.value,
+        default=GuardrailDeploymentStatusEnum.RUNNING.value,
     )
     configuration: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     default_threshold: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    guardrail_types: Mapped[Optional[List[str]]] = mapped_column(PG_ARRAY(String), nullable=True)
     user_id: Mapped[UUID] = mapped_column(ForeignKey("user.id", ondelete="CASCADE"), nullable=False)
     project_id: Mapped[UUID] = mapped_column(ForeignKey("project.id", ondelete="CASCADE"), nullable=False)
 
@@ -296,15 +163,15 @@ class GuardrailDeploymentProbe(Base, TimestampMixin):
         "GuardrailDeployment", back_populates="probe_associations"
     )
     probe: Mapped["GuardrailProbe"] = relationship("GuardrailProbe", back_populates="deployment_associations")
-    rule_configs: Mapped[List["GuardrailDeploymentRuleConfig"]] = relationship(
-        "GuardrailDeploymentRuleConfig", back_populates="deployment_probe", cascade="all, delete-orphan"
+    rule: Mapped[List["GuardrailDeploymentRule"]] = relationship(
+        "GuardrailDeploymentRule", back_populates="deployment_probe", cascade="all, delete-orphan"
     )
 
 
-class GuardrailDeploymentRuleConfig(Base, TimestampMixin):
+class GuardrailDeploymentRule(Base, TimestampMixin):
     """Per-deployment rule configurations allowing granular control."""
 
-    __tablename__ = "guardrail_deployment_rule_configs"
+    __tablename__ = "guardrail_deployment_rule"
     __table_args__ = (UniqueConstraint("deployment_probe_id", "rule_id", name="uq_deployment_probe_rule"),)
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
@@ -318,6 +185,6 @@ class GuardrailDeploymentRuleConfig(Base, TimestampMixin):
 
     # Relationships
     deployment_probe: Mapped["GuardrailDeploymentProbe"] = relationship(
-        "GuardrailDeploymentProbe", back_populates="rule_configs"
+        "GuardrailDeploymentProbe", back_populates="rule"
     )
-    rule: Mapped["GuardrailRule"] = relationship("GuardrailRule", back_populates="deployment_configs")
+    rule: Mapped["GuardrailRule"] = relationship("GuardrailRule", back_populates="deployment_rules")

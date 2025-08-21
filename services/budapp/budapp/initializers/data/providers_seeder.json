@@ -1283,5 +1283,12 @@
                 "order": 1
             }
         ]
+    },
+    "bud_sentinel": {
+        "name": "Bud Sentinel",
+        "type": "bud_sentinel",
+        "description": "A multi-tiered Guardrail framework for LLM safety and compliance, from the Bud Team",
+        "icon": "icons/providers/openai.png",
+        "credentials": []
     }
 }

@@ -16,15 +16,21 @@
 
 """Business logic services for guardrail operations."""
 
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 from uuid import UUID
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from budapp.commons import logging
-from budapp.commons.constants import APP_ICONS, GuardrailDeploymentStatusEnum, GuardrailProviderEnum, WorkflowTypeEnum
+from budapp.commons.constants import (
+    APP_ICONS,
+    GuardrailDeploymentStatusEnum,
+    GuardrailDeploymentTypeEnum,
+    WorkflowTypeEnum,
+)
 from budapp.commons.db_utils import SessionMixin
+from budapp.commons.schemas import ProxyGuardrailConfig
 from budapp.guardrails import crud
 from budapp.guardrails.models import GuardrailDeployment
 from budapp.guardrails.schemas import (
@@ -33,12 +39,9 @@ from budapp.guardrails.schemas import (
     GuardrailDeploymentListRequestSchema,
     GuardrailDeploymentProbeCreate,
     GuardrailDeploymentResponse,
-    GuardrailDeploymentRuleConfigCreate,
-    GuardrailDeploymentRuleConfigResponse,
+    GuardrailDeploymentRuleCreate,
+    GuardrailDeploymentRuleResponse,
     GuardrailDeploymentUpdate,
-    GuardrailDeploymentWorkflowStepData,
-    GuardrailGuardTypeResponse,
-    GuardrailModalityTypeResponse,
     GuardrailProbeCreate,
     GuardrailProbeListRequestSchema,
     GuardrailProbeListResponse,
@@ -48,7 +51,6 @@ from budapp.guardrails.schemas import (
     GuardrailRuleListRequestSchema,
     GuardrailRuleResponse,
     GuardrailRuleUpdate,
-    GuardrailScannerTypeResponse,
     ProbeSelection,
     RuleSelection,
 )
@@ -70,6 +72,7 @@ class GuardrailProbeService:
             description=probe.description,
             tags=probe.tags,
             provider_id=probe.provider_id,
+            provider_type=probe.provider_type,
             provider=probe.provider,
             is_custom=probe.is_custom,
             created_by=probe.created_by,
@@ -87,12 +90,6 @@ class GuardrailProbeService:
         provider = await crud.get_provider(db, probe_data.provider_id)
         if not provider:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Provider not found")
-
-        # Only allow creating probes for custom providers
-        if provider.provider_type != GuardrailProviderEnum.CUSTOM:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN, detail="Can only create probes for custom providers"
-            )
 
         probe = await crud.create_probe(db, probe_data, user_id)
         # Reload with rules
@@ -129,18 +126,18 @@ class GuardrailProbeService:
             description=probe.description,
             tags=probe.tags,
             provider_id=probe.provider_id,
-            provider_name=probe.provider.display_name if probe.provider else None,
-            provider_type=probe.provider.provider_type if probe.provider else None,
+            provider_name=probe.provider.name if probe.provider else None,
+            provider_type=probe.provider_type,
             is_custom=probe.is_custom,
             rule_count=len(probe.rules) if probe.rules else 0,
         )
 
     @staticmethod
     async def get_probes(
-        db: Session, filters: GuardrailProbeListRequestSchema, user_id: UUID
+        db: Session, filters: GuardrailProbeListRequestSchema, user_id: UUID, page: int, page_size: int
     ) -> Tuple[List[GuardrailProbeListResponse], int]:
         """Get probes with filtering and pagination."""
-        probes, total = await crud.get_probes(db, filters, user_id)
+        probes, total = await crud.get_probes(db, filters, user_id, page, page_size)
         probe_responses = [GuardrailProbeService._format_probe_list_response(probe) for probe in probes]
         return probe_responses, total
 
@@ -210,22 +207,15 @@ class GuardrailRuleService:
 
     @staticmethod
     def _format_rule_response(rule) -> GuardrailRuleResponse:
-        """Convert rule model to response format with associated types."""
+        """Convert rule model to response format."""
         return GuardrailRuleResponse(
             id=rule.id,
             probe_id=rule.probe_id,
             name=rule.name,
             description=rule.description,
-            scanner_types=[
-                GuardrailScannerTypeResponse.model_validate(assoc.scanner_type) for assoc in rule.scanner_associations
-            ],
-            modality_types=[
-                GuardrailModalityTypeResponse.model_validate(assoc.modality_type)
-                for assoc in rule.modality_associations
-            ],
-            guard_types=[
-                GuardrailGuardTypeResponse.model_validate(assoc.guard_type) for assoc in rule.guard_type_associations
-            ],
+            scanner_types=rule.scanner_types,
+            modality_types=rule.modality_types,
+            guard_types=rule.guard_types,
             examples=rule.examples,
             configuration=rule.configuration,
             is_enabled=rule.is_enabled,
@@ -297,7 +287,7 @@ class GuardrailRuleService:
 
     @staticmethod
     async def get_rules_paginated(
-        db: Session, probe_id: UUID, filters: GuardrailRuleListRequestSchema, user_id: UUID
+        db: Session, probe_id: UUID, filters: GuardrailRuleListRequestSchema, user_id: UUID, page: int, page_size: int
     ) -> Tuple[List[GuardrailRuleResponse], int]:
         """Get paginated rules for a probe."""
         # First check if probe exists and user has access
@@ -310,7 +300,7 @@ class GuardrailRuleService:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to this probe")
 
         # Get paginated rules
-        rules, total = await crud.get_rules_paginated(db, probe_id, filters)
+        rules, total = await crud.get_rules_paginated(db, probe_id, filters, page, page_size)
         rule_responses = [GuardrailRuleService._format_rule_response(rule) for rule in rules]
 
         return rule_responses, total
@@ -325,19 +315,26 @@ class GuardrailDeploymentService:
     ) -> GuardrailDeploymentResponse:
         """Create a new guardrail deployment."""
         # Handle new sparse selection format
+        probes = []
         if deployment_data.probe_selections is not None:
             # Convert sparse selections to deployment probe configs
-            deployment_data.probes = await GuardrailDeploymentService._process_sparse_selections(
-                db, deployment_data.probe_selections, deployment_data.provider_ids, user_id
+            probes = await GuardrailDeploymentService._process_sparse_selections(
+                db, deployment_data.probe_selections, user_id
             )
 
         # Validate probe access
-        await GuardrailDeploymentService._validate_probe_access(db, deployment_data.probes, user_id)
+        await GuardrailDeploymentService._validate_probe_access(db, probes, user_id)
 
         # Validate deployment configuration
-        await GuardrailDeploymentService._validate_deployment_config(deployment_data)
+        await GuardrailDeploymentService._validate_deployment_config_with_probes(probes)
 
-        deployment = await crud.create_deployment(db, deployment_data, user_id)
+        # Pass probes separately to crud
+        deployment = await crud.create_deployment(db, deployment_data, user_id, probes)
+
+        # Update proxy cache if this is an endpoint deployment
+        if deployment.endpoint_id:
+            await GuardrailDeploymentService._update_endpoint_proxy_cache(db, deployment.endpoint_id, deployment)
+
         return await GuardrailDeploymentService._build_deployment_response(db, deployment)
 
     @staticmethod
@@ -351,10 +348,10 @@ class GuardrailDeploymentService:
 
     @staticmethod
     async def get_deployments(
-        db: Session, filters: GuardrailDeploymentListRequestSchema, user_id: UUID
+        db: Session, filters: GuardrailDeploymentListRequestSchema, user_id: UUID, page: int, page_size: int
     ) -> Tuple[List[Dict], int]:
         """Get deployments with filtering and pagination."""
-        deployments, total = await crud.get_deployments(db, filters, user_id)
+        deployments, total = await crud.get_deployments(db, filters, user_id, page, page_size)
 
         # Build list response with counts
         deployment_list = []
@@ -369,6 +366,7 @@ class GuardrailDeploymentService:
                     "deployment_type": deployment.deployment_type,
                     "endpoint_id": deployment.endpoint_id,
                     "status": deployment.status,
+                    "guardrail_types": deployment.guardrail_types,
                     "probe_count": probe_count,
                     "enabled_probe_count": enabled_probe_count,
                     "created_at": deployment.created_at,
@@ -390,14 +388,27 @@ class GuardrailDeploymentService:
         if not deployment:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Deployment not found")
 
+        # Update proxy cache if this is an endpoint deployment
+        if deployment.endpoint_id:
+            await GuardrailDeploymentService._update_endpoint_proxy_cache(db, deployment.endpoint_id, deployment)
+
         return await GuardrailDeploymentService._build_deployment_response(db, deployment)
 
     @staticmethod
     async def delete_deployment(db: Session, deployment_id: UUID, user_id: UUID) -> bool:
         """Delete a deployment."""
+        # Get deployment first to capture endpoint_id
+        deployment = await crud.get_deployment(db, deployment_id)
+
         success = await crud.delete_deployment(db, deployment_id, user_id)
         if not success:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Deployment not found")
+
+        # Clear guardrails from proxy cache
+        if deployment and deployment.endpoint_id:
+            # Update status to deleted first
+            deployment.status = GuardrailDeploymentStatusEnum.DELETED
+            await GuardrailDeploymentService._update_endpoint_proxy_cache(db, deployment.endpoint_id, deployment)
 
         return True
 
@@ -431,63 +442,35 @@ class GuardrailDeploymentService:
 
     @staticmethod
     async def _process_sparse_selections(
-        db: Session, probe_selections: List[ProbeSelection], provider_ids: List[UUID], user_id: UUID
+        db: Session, probe_selections: List[ProbeSelection], user_id: UUID
     ) -> List[GuardrailDeploymentProbeCreate]:
         """Process sparse probe selections into deployment probe configs.
 
         Args:
             probe_selections: List of probe selections (empty = all enabled)
-            provider_ids: Provider IDs to fetch all probes from when selections is empty
+            provider_id: Provider ID to fetch all probes from when selections is empty
             user_id: Current user ID for access control
 
         Returns:
             List of deployment probe configurations
         """
-        from budapp.guardrails.schemas import ProbeSelection
-
         deployment_probes = []
 
         if not probe_selections:
-            # Empty selections = enable all probes from specified providers
-            if not provider_ids:
-                return []
+            return []
 
-            for provider_id in provider_ids:
-                # Get all probes for this provider
-                provider_probes = await crud.get_probes_by_provider(db, provider_id)
-
-                for probe in provider_probes:
-                    # Check access for custom probes
-                    if probe.is_custom and probe.user_id != user_id:
-                        continue
-
-                    # Create deployment probe with all rules enabled
-                    deployment_probe = GuardrailDeploymentProbeCreate(
-                        probe_id=probe.id,
-                        is_enabled=True,
-                        rule_configs=[],  # Empty = all rules enabled
-                    )
-                    deployment_probes.append(deployment_probe)
-        else:
-            # Process explicit selections
-            for selection in probe_selections:
-                if not selection.enabled:
-                    continue  # Skip disabled probes
-
-                # Convert rule selections to rule configs
-                rule_configs = []
-                if selection.rule_selections:
-                    for rule_selection in selection.rule_selections:
-                        if rule_selection.enabled:
-                            rule_config = GuardrailDeploymentRuleConfigCreate(
-                                rule_id=rule_selection.rule_id, is_enabled=True
-                            )
-                            rule_configs.append(rule_config)
-
-                deployment_probe = GuardrailDeploymentProbeCreate(
-                    probe_id=selection.probe_id, is_enabled=True, rule_configs=rule_configs
+        # Process explicit selections
+        for selection in probe_selections:
+            rules = []
+            for rule_selection in selection.rule_selections or []:
+                rules.append(
+                    GuardrailDeploymentRuleCreate(rule_id=rule_selection.rule_id, is_enabled=rule_selection.enabled)
                 )
-                deployment_probes.append(deployment_probe)
+
+            deployment_probe = GuardrailDeploymentProbeCreate(
+                probe_id=selection.probe_id, is_enabled=selection.enabled, rules=rules
+            )
+            deployment_probes.append(deployment_probe)
 
         return deployment_probes
 
@@ -508,10 +491,10 @@ class GuardrailDeploymentService:
                 )
 
     @staticmethod
-    async def _validate_deployment_config(deployment_data: GuardrailDeploymentCreate) -> None:
+    async def _validate_deployment_config_with_probes(probes: List[GuardrailDeploymentProbeCreate]) -> None:
         """Validate deployment configuration."""
         # Validate probe uniqueness
-        probe_ids = [probe.probe_id for probe in deployment_data.probes]
+        probe_ids = [probe.probe_id for probe in probes]
         if len(probe_ids) != len(set(probe_ids)):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, detail="Each probe can only be added once per deployment"
@@ -524,48 +507,18 @@ class GuardrailDeploymentService:
         probe_responses = []
 
         for deployment_probe in deployment.probe_associations:
-            probe = deployment_probe.probe
-
-            # Get all rules for the probe
-            all_rules = await crud.get_rules_by_probe(db, probe.id)
-
             # Build rule configurations with effective settings
             rule_responses = []
-            for rule in all_rules:
+            for rule_config in deployment_probe.rule:
                 # Find override configuration if exists
-                override_config = None
-                for rule_config in deployment_probe.rule_configs:
-                    if rule_config.rule_id == rule.id:
-                        override_config = rule_config
-                        break
 
-                # Build effective configuration
-                effective_config = rule.configuration or {}
-                is_enabled = rule.is_enabled
-                is_overridden = False
-                threshold_override = None
-
-                if override_config:
-                    is_enabled = override_config.is_enabled
-                    is_overridden = True
-                    threshold_override = override_config.threshold_override
-
-                    # Merge configurations
-                    if override_config.configuration:
-                        effective_config = {**effective_config, **override_config.configuration}
-
-                rule_response = GuardrailDeploymentRuleConfigResponse(
-                    id=override_config.id if override_config else rule.id,
-                    deployment_probe_id=deployment_probe.id,
-                    rule_id=rule.id,
-                    rule_name=rule.name,
-                    is_enabled=is_enabled,
-                    is_overridden=is_overridden,
-                    configuration=override_config.configuration if override_config else None,
-                    threshold_override=threshold_override,
-                    effective_configuration=effective_config,
-                    created_at=override_config.created_at if override_config else rule.created_at,
-                    modified_at=override_config.modified_at if override_config else rule.modified_at,
+                rule_response = GuardrailDeploymentRuleResponse(
+                    id=rule_config.id,
+                    rule_id=rule_config.rule_id,
+                    rule_name=rule_config.rule.name,
+                    is_enabled=rule_config.is_enabled,
+                    configuration=rule_config.configuration,
+                    threshold_override=rule_config.threshold_override,
                 )
                 rule_responses.append(rule_response)
 
@@ -576,12 +529,11 @@ class GuardrailDeploymentService:
                 id=deployment_probe.id,
                 deployment_id=deployment_probe.deployment_id,
                 probe_id=deployment_probe.probe_id,
-                probe_name=probe.name,
+                probe_name=deployment_probe.probe.name,
                 is_enabled=deployment_probe.is_enabled,
                 configuration=deployment_probe.configuration,
+                threshold_override=deployment_probe.threshold_override,
                 rules=rule_responses,
-                created_at=deployment_probe.created_at,
-                modified_at=deployment_probe.modified_at,
             )
             probe_responses.append(probe_response)
 
@@ -593,14 +545,96 @@ class GuardrailDeploymentService:
             description=deployment.description,
             deployment_type=deployment.deployment_type,
             endpoint_id=deployment.endpoint_id,
-            deployment_endpoint_url=deployment.deployment_endpoint_url,
             status=deployment.status,
             configuration=deployment.configuration,
+            default_threshold=deployment.default_threshold,
+            guardrail_types=deployment.guardrail_types,
             user_id=deployment.user_id,
             project_id=deployment.project_id,
             probes=probe_responses,
             created_at=deployment.created_at,
             modified_at=deployment.modified_at,
+        )
+
+    @staticmethod
+    async def _update_endpoint_proxy_cache(db: Session, endpoint_id: UUID, deployment: GuardrailDeployment) -> None:
+        """Update the proxy cache for an endpoint with guardrail information."""
+        import json
+
+        from budapp.endpoint_ops.services import EndpointService
+        from budapp.shared.redis_service import RedisService
+
+        redis_service = RedisService()
+        cache_key = f"model_table:{endpoint_id}"
+
+        # Get existing cache data
+        try:
+            existing_data = await redis_service.get(cache_key)
+        except Exception as e:
+            logging.get_logger(__name__).error(f"Error getting cache for endpoint {endpoint_id}: {e}")
+
+        if not existing_data:
+            logging.get_logger(__name__).warning(f"No cache entry found for endpoint {endpoint_id}")
+            return
+
+        # Parse existing config
+        model_data = json.loads(existing_data)
+        endpoint_config_dict = model_data.get(str(endpoint_id))
+        if not endpoint_config_dict:
+            return
+
+        # Build guardrail configuration if deployment is active
+        if deployment.status in [GuardrailDeploymentStatusEnum.ACTIVE, GuardrailDeploymentStatusEnum.DEPLOYING]:
+            guardrail_config = GuardrailDeploymentService._build_guardrail_config_for_proxy(deployment)
+            endpoint_config_dict["guardrails"] = guardrail_config.model_dump() if guardrail_config else None
+        else:
+            # Remove guardrails if deployment is not active
+            endpoint_config_dict.pop("guardrails", None)
+
+        # Save updated config back to cache
+        await redis_service.set(cache_key, json.dumps(model_data))
+
+    @staticmethod
+    def _build_guardrail_config_for_proxy(deployment: GuardrailDeployment) -> Optional[ProxyGuardrailConfig]:
+        """Build guardrail configuration for proxy from deployment."""
+        from budapp.commons.schemas import ProxyGuardrailConfig, ProxyGuardrailProbeConfig, ProxyGuardrailRuleConfig
+
+        # if not deployment.probe_associations:
+        #     return None
+
+        probe_configs = []
+        for dep_probe in deployment.probe_associations or []:
+            probe = dep_probe.probe
+
+            # Build rule configurations
+            rule_configs = []
+            for rule_config in dep_probe.rule:
+                rule_config = ProxyGuardrailRuleConfig(
+                    rule_id=rule_config.rule_id,
+                    rule_name=rule_config.rule.name,
+                    sentinel_id=rule_config.rule.sentinel_id,
+                    is_enabled=rule_config.is_enabled,
+                    configuration=rule_config.configuration,
+                    threshold_override=rule_config.threshold_override,
+                )
+                rule_configs.append(rule_config)
+
+            probe_config = ProxyGuardrailProbeConfig(
+                probe_id=probe.id,
+                probe_name=probe.name,
+                sentinel_id=probe.sentinel_id,
+                is_enabled=dep_probe.is_enabled,
+                configuration=dep_probe.configuration,
+                threshold_override=dep_probe.threshold_override,
+                rules=rule_configs,
+            )
+            probe_configs.append(probe_config)
+
+        return ProxyGuardrailConfig(
+            name=deployment.name,
+            configuration=deployment.configuration,
+            default_threshold=deployment.default_threshold,
+            probes=probe_configs,
         )
 
 
@@ -644,7 +678,7 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
 
         # Update workflow current step
         db_workflow.current_step = step_number
-        await self.session.commit()
+        self.session.commit()
 
         # If this is the final step and trigger_workflow is True, complete the workflow
         if step_number == workflow_total_steps and trigger_workflow:
@@ -657,56 +691,42 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
         step_data = {}
 
         if step_number == 1:
-            # Step 1: Probe selection
-            # Handle new sparse selection format
-            if request.probe_selections is not None:
-                step_data["probe_selections"] = [sel.model_dump() for sel in request.probe_selections]
-            if request.provider_ids:
-                step_data["provider_ids"] = [str(p) for p in request.provider_ids]
-            # Legacy support
-            if request.selected_probes:
-                step_data["selected_probes"] = [str(p) for p in request.selected_probes]
-            if request.selected_rules:
-                step_data["selected_rules"] = {str(k): [str(r) for r in v] for k, v in request.selected_rules.items()}
+            if request.provider_id:
+                step_data["provider_id"] = str(request.provider_id)
 
         elif step_number == 2:
-            # Step 2: Deployment type
+            # Step 2: Probe selection
+            # Handle new sparse selection format
+            if request.probe_selections is not None:
+                step_data["probe_selections"] = [sel.model_dump(mode="json") for sel in request.probe_selections]
+
+        elif step_number == 3:
+            # Step 3: Deployment type
             if request.deployment_type:
                 step_data["deployment_type"] = request.deployment_type.value
 
-        elif step_number == 3:
+        elif step_number == 4:
             # Step 3: Project selection
             if request.project_id:
                 step_data["project_id"] = str(request.project_id)
 
-        elif step_number == 4:
+        elif step_number == 5:
             # Step 4: Endpoint selection
             if request.endpoint_id:
                 step_data["endpoint_id"] = str(request.endpoint_id)
-            if request.deployment_endpoint_url:
-                step_data["deployment_endpoint_url"] = request.deployment_endpoint_url
-
-        elif step_number == 5:
-            # Step 5: Configuration
-            if request.guard_types:
-                step_data["guard_types"] = {str(k): [str(g) for g in v] for k, v in request.guard_types.items()}
-            if request.thresholds:
-                step_data["thresholds"] = {str(k): v for k, v in request.thresholds.items()}
-            if request.probe_configs:
-                step_data["probe_configs"] = {str(k): v for k, v in request.probe_configs.items()}
-            if request.rule_configs:
-                step_data["rule_configs"] = request.rule_configs
 
         elif step_number == 6:
+            # Step 5: Configuration
+            if request.guard_types:
+                step_data["guard_types"] = request.guard_types
+            if request.threshold:
+                step_data["threshold"] = request.threshold
+
+        elif step_number == 7:
             # Step 6: ETA
             step_data["estimated_deployment_time"] = 30  # 30 seconds placeholder
             step_data["deployment_name"] = request.deployment_name or "Guardrail Deployment"
             step_data["deployment_description"] = request.deployment_description
-
-        elif step_number == 7:
-            # Step 7: Deployment status
-            step_data["deployment_status"] = "deploying"
-            step_data["deployment_message"] = "Initiating guardrail deployment..."
 
         return step_data
 
@@ -740,6 +760,12 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
         # Mark workflow as completed
         await WorkflowService(self.session).mark_workflow_as_completed(workflow_id, current_user_id)
 
+        # Update proxy cache after deployment is active
+        if deployment.endpoint_id:
+            await GuardrailDeploymentService._update_endpoint_proxy_cache(
+                self.session, deployment.endpoint_id, deployment
+            )
+
         return deployment
 
     async def _create_deployment_from_workflow(
@@ -752,7 +778,13 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
 
         # Handle new sparse selection format
         probe_selections_data = workflow_data.get("probe_selections", [])
-        provider_ids = [UUID(p) for p in workflow_data.get("provider_ids", [])]
+        provider_id_str = workflow_data.get("provider_id")
+        provider_id = UUID(provider_id_str) if provider_id_str else None
+
+        if not provider_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="provider_id is required for deployment creation"
+            )
 
         # Convert probe selections back to ProbeSelection objects
         probe_selections = []
@@ -764,13 +796,7 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
                 )
                 probe_selections.append(probe_selection)
 
-        # Legacy support
-        selected_probes = [UUID(p) for p in workflow_data.get("selected_probes", [])]
-        selected_rules = workflow_data.get("selected_rules", {})
-        # guard_types = workflow_data.get("guard_types", {})  # Reserved for future use
-        thresholds = workflow_data.get("thresholds", {})
-        probe_configs = workflow_data.get("probe_configs", {})
-        rule_configs = workflow_data.get("rule_configs", {})
+        guard_types = workflow_data.get("guard_types", [])  # Reserved for future use
 
         # Prepare deployment probes
         deployment_probes = []
@@ -779,64 +805,22 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
         if probe_selections:
             # Already have ProbeSelection objects, just need to enrich with configs
             for selection in probe_selections:
-                if not selection.enabled:
-                    continue
-
-                probe_id_str = str(selection.probe_id)
-                probe_threshold = thresholds.get(probe_id_str)
-                probe_config = probe_configs.get(probe_id_str)
-
                 # Prepare rule configurations
                 rule_configurations = []
                 if selection.rule_selections:
                     for rule_sel in selection.rule_selections:
-                        if rule_sel.enabled:
-                            rule_key = f"{selection.probe_id}:{rule_sel.rule_id}"
-                            rule_config = rule_configs.get(rule_key, {})
-                            rule_configurations.append(
-                                GuardrailDeploymentRuleConfigCreate(
-                                    rule_id=rule_sel.rule_id,
-                                    is_enabled=True,
-                                    configuration=rule_config,
-                                )
+                        rule_configurations.append(
+                            GuardrailDeploymentRuleCreate(
+                                rule_id=rule_sel.rule_id,
+                                is_enabled=rule_sel.enabled,
                             )
+                        )
 
                 deployment_probes.append(
                     GuardrailDeploymentProbeCreate(
                         probe_id=selection.probe_id,
-                        is_enabled=True,
-                        configuration=probe_config,
-                        threshold_override=probe_threshold,
-                        rule_configs=rule_configurations,
-                    )
-                )
-        else:
-            # Legacy format
-            for probe_id in selected_probes:
-                probe_rules = selected_rules.get(str(probe_id), [])
-                probe_threshold = thresholds.get(str(probe_id))
-                probe_config = probe_configs.get(str(probe_id))
-
-                # Prepare rule configurations
-                rule_configurations = []
-                for rule_id in probe_rules:
-                    rule_key = f"{probe_id}:{rule_id}"
-                    rule_config = rule_configs.get(rule_key, {})
-                    rule_configurations.append(
-                        GuardrailDeploymentRuleConfigCreate(
-                            rule_id=UUID(rule_id),
-                            is_enabled=True,
-                            configuration=rule_config,
-                        )
-                    )
-
-                deployment_probes.append(
-                    GuardrailDeploymentProbeCreate(
-                        probe_id=probe_id,
-                        is_enabled=True,
-                        configuration=probe_config,
-                        threshold_override=probe_threshold,
-                        rule_configs=rule_configurations,
+                        is_enabled=selection.enabled,
+                        rules=rule_configurations,
                     )
                 )
 
@@ -846,11 +830,11 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
             description=workflow_data.get("deployment_description"),
             deployment_type=deployment_type,
             endpoint_id=UUID(workflow_data["endpoint_id"]) if workflow_data.get("endpoint_id") else None,
-            deployment_endpoint_url=workflow_data.get("deployment_endpoint_url"),
             project_id=project_id,
-            probes=deployment_probes if deployment_probes else None,
+            # provider_id=provider_id,
+            default_threshold=workflow_data.get("threshold"),
+            guardrail_types=guard_types if guard_types else None,
             probe_selections=probe_selections if probe_selections else None,
-            provider_ids=provider_ids if provider_ids else None,
         )
 
         # Create deployment using existing service
@@ -858,9 +842,9 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
             self.session, deployment_create, current_user_id
         )
 
-        # Set deployment status to active (since we're not doing actual deployment)
-        update_data = GuardrailDeploymentUpdate(status=GuardrailDeploymentStatusEnum.ACTIVE)
-        await crud.update_deployment(self.session, deployment.id, update_data, current_user_id)
-        await self.session.commit()
+        # # Set deployment status to active (since we're not doing actual deployment)
+        # update_data = GuardrailDeploymentUpdate(status=GuardrailDeploymentStatusEnum.RUNNING)
+        # await crud.update_deployment(self.session, deployment.id, update_data, current_user_id)
+        # await self.session.commit()
 
         return deployment

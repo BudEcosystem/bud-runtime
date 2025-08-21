@@ -3022,24 +3022,31 @@ class ExperimentWorkflowStepEnum(StrEnum):
 class GuardrailDeploymentTypeEnum(StrEnum):
     """Guardrail deployment type enumeration."""
 
-    STANDALONE = "standalone"
     ENDPOINT_MAPPED = "endpoint_mapped"
+    STANDALONE = "standalone"
 
 
 class GuardrailDeploymentStatusEnum(StrEnum):
     """Guardrail deployment status enumeration."""
 
-    ACTIVE = "active"
-    INACTIVE = "inactive"
-    DEPLOYING = "deploying"
-    FAILED = "failed"
-    DELETED = "deleted"
+    RUNNING = auto()
+    FAILURE = auto()
+    DEPLOYING = auto()
+    UNHEALTHY = auto()
+    DELETING = auto()
+    DELETED = auto()
+    PENDING = auto()
 
 
-class GuardrailProviderEnum(StrEnum):
-    """Guardrail provider enumeration."""
+class GuardrailProviderTypeEnum(Enum):
+    """Enumeration of guardrail provider types.
 
+    This enum represents different types of guardrail providers or sources.
+
+    Attributes:
+        CLOUD_PROVIDER (str): Represents cloud-based guardrail providers.
+        BUD_SENTINEL (str): Represents guardrails from the Bud Sentinel.
+    """
+
+    CLOUD_PROVIDER = "cloud_provider"
     BUD_SENTINEL = "bud_sentinel"
-    AZURE_AI_FOUNDRY = "azure_ai_foundry"
-    AWS_BEDROCK = "aws_bedrock"
-    CUSTOM = "custom"

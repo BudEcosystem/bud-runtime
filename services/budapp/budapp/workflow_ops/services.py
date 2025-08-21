@@ -458,6 +458,21 @@ class WorkflowService(SessionMixin):
                 "endpoint_details",
                 "scaling_specification",
             ],
+            "guardrail_deployment": [
+                "provider_ids",
+                "probe_selections",
+                "deployment_type",
+                "project_id",
+                "endpoint_id",
+                "guard_types",
+                "threshold",
+                "deployment_name",
+                "deployment_description",
+                "estimated_deployment_time",
+                "deployment_status",
+                "deployment_message",
+                "deployment_id",
+            ],
         }
 
         # Combine all lists using set union

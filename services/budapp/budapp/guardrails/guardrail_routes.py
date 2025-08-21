@@ -23,7 +23,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from budapp.commons.dependencies import get_current_user, get_session
-from budapp.commons.schemas import SingleResponse, SuccessResponse
+from budapp.commons.schemas import SuccessResponse
 from budapp.guardrails import crud
 from budapp.guardrails.schemas import (
     CreateGuardrailDeploymentWorkflowRequest,
@@ -32,25 +32,16 @@ from budapp.guardrails.schemas import (
     GuardrailDeploymentListResponseSchema,
     GuardrailDeploymentResponse,
     GuardrailDeploymentUpdate,
-    GuardrailGuardTypeCreate,
-    GuardrailGuardTypeResponse,
-    GuardrailModalityTypeCreate,
-    GuardrailModalityTypeResponse,
     GuardrailProbeCreate,
     GuardrailProbeListRequestSchema,
     GuardrailProbeListResponseSchema,
     GuardrailProbeResponse,
     GuardrailProbeUpdate,
-    GuardrailProviderCreate,
-    GuardrailProviderResponse,
-    GuardrailProviderUpdate,
     GuardrailRuleCreate,
     GuardrailRuleListRequestSchema,
     GuardrailRuleListResponseSchema,
     GuardrailRuleResponse,
     GuardrailRuleUpdate,
-    GuardrailScannerTypeCreate,
-    GuardrailScannerTypeResponse,
     ProbeTagSearchResponse,
 )
 from budapp.guardrails.services import (
@@ -65,175 +56,6 @@ from budapp.workflow_ops.services import WorkflowService
 
 
 router = APIRouter(prefix="/guardrails", tags=["Guardrails"])
-
-
-# Provider endpoints
-@router.post(
-    "/providers",
-    response_model=GuardrailProviderResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-async def create_provider(
-    provider_data: GuardrailProviderCreate,
-    db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-):
-    """Create a new guardrail provider."""
-    provider = await crud.create_provider(db, provider_data, current_user.id)
-    return GuardrailProviderResponse.model_validate(provider)
-
-
-@router.get(
-    "/providers",
-    response_model=SingleResponse[List[GuardrailProviderResponse]],
-)
-async def get_providers(
-    include_inactive: bool = Query(False, description="Include inactive providers"),
-    db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-):
-    """Get all guardrail providers."""
-    providers = await crud.get_providers(db, include_inactive)
-    provider_responses = [GuardrailProviderResponse.model_validate(provider) for provider in providers]
-    return SingleResponse(success=True, result=provider_responses, message="Providers retrieved successfully")
-
-
-@router.get(
-    "/providers/{provider_id}",
-    response_model=GuardrailProviderResponse,
-)
-async def get_provider(
-    provider_id: UUID,
-    db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-):
-    """Get a specific provider by ID."""
-    provider = await crud.get_provider(db, provider_id)
-    if not provider:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Provider not found")
-    return GuardrailProviderResponse.model_validate(provider)
-
-
-@router.put(
-    "/providers/{provider_id}",
-    response_model=GuardrailProviderResponse,
-)
-async def update_provider(
-    provider_id: UUID,
-    provider_data: GuardrailProviderUpdate,
-    db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-):
-    """Update a provider (only custom providers can be updated by their owner)."""
-    provider = await crud.update_provider(db, provider_id, provider_data, current_user.id)
-    if not provider:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot update this provider")
-    return GuardrailProviderResponse.model_validate(provider)
-
-
-@router.delete(
-    "/providers/{provider_id}",
-    response_model=None,
-    status_code=status.HTTP_204_NO_CONTENT,
-)
-async def delete_provider(
-    provider_id: UUID,
-    db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-):
-    """Delete a provider (only custom providers can be deleted by their owner)."""
-    if not await crud.delete_provider(db, provider_id, current_user.id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot delete this provider")
-    return None
-
-
-@router.post(
-    "/scanner-types",
-    response_model=GuardrailScannerTypeResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-async def create_scanner_type(
-    scanner_data: GuardrailScannerTypeCreate,
-    db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-):
-    """Create a new scanner type."""
-    scanner = await crud.create_scanner_type(db, scanner_data)
-    return GuardrailScannerTypeResponse.model_validate(scanner)
-
-
-@router.get(
-    "/scanner-types",
-    response_model=SingleResponse[List[GuardrailScannerTypeResponse]],
-)
-async def get_scanner_types(
-    db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-):
-    """Get all scanner types."""
-    scanners = await crud.get_scanner_types(db)
-    scanner_responses = [GuardrailScannerTypeResponse.model_validate(scanner) for scanner in scanners]
-    return SingleResponse(success=True, result=scanner_responses, message="Scanner types retrieved successfully")
-
-
-# Modality type endpoints
-@router.post(
-    "/modality-types",
-    response_model=GuardrailModalityTypeResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-async def create_modality_type(
-    modality_data: GuardrailModalityTypeCreate,
-    db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-):
-    """Create a new modality type."""
-    modality = await crud.create_modality_type(db, modality_data)
-    return GuardrailModalityTypeResponse.model_validate(modality)
-
-
-@router.get(
-    "/modality-types",
-    response_model=SingleResponse[List[GuardrailModalityTypeResponse]],
-)
-async def get_modality_types(
-    db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-):
-    """Get all modality types."""
-    modalities = await crud.get_modality_types(db)
-    modality_responses = [GuardrailModalityTypeResponse.model_validate(modality) for modality in modalities]
-    return SingleResponse(success=True, result=modality_responses, message="Modality types retrieved successfully")
-
-
-# Guard type endpoints
-@router.post(
-    "/guard-types",
-    response_model=GuardrailGuardTypeResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-async def create_guard_type(
-    guard_data: GuardrailGuardTypeCreate,
-    db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-):
-    """Create a new guard type."""
-    guard = await crud.create_guard_type(db, guard_data)
-    return GuardrailGuardTypeResponse.model_validate(guard)
-
-
-@router.get(
-    "/guard-types",
-    response_model=SingleResponse[List[GuardrailGuardTypeResponse]],
-)
-async def get_guard_types(
-    db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-):
-    """Get all guard types."""
-    guards = await crud.get_guard_types(db)
-    guard_responses = [GuardrailGuardTypeResponse.model_validate(guard) for guard in guards]
-    return SingleResponse(success=True, result=guard_responses, message="Guard types retrieved successfully")
 
 
 # Probe endpoints
@@ -278,17 +100,16 @@ async def get_probes(
         project_id=project_id,
         endpoint_id=endpoint_id,
         search=search,
-        page=page,
-        page_size=page_size,
     )
 
-    probes, total = await GuardrailProbeService.get_probes(db, filters, current_user.id)
+    probes, total = await GuardrailProbeService.get_probes(db, filters, current_user.id, page, page_size)
 
     response = GuardrailProbeListResponseSchema(
         probes=probes,
-        total=total,
+        total_record=total,
         page=page,
-        page_size=page_size,
+        limit=page_size,
+        message="Successfully retrieved probes",
     )
 
     return response
@@ -300,7 +121,7 @@ async def get_probes(
 )
 async def get_probe(
     probe_id: UUID,
-    include_rules: bool = Query(True, description="Include rules in the response"),
+    include_rules: bool = Query(False, description="Include rules in the response"),
     db: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
@@ -341,7 +162,7 @@ async def delete_probe(
 
 @router.get(
     "/probes/tags/search",
-    response_model=SingleResponse[ProbeTagSearchResponse],
+    response_model=ProbeTagSearchResponse,
 )
 async def search_probe_tags(
     search_term: str = Query(..., description="Tag name to search for"),
@@ -354,14 +175,15 @@ async def search_probe_tags(
     offset = (page - 1) * limit
     tags, total_count = await GuardrailProbeService.search_probe_tags(db, search_term, offset, limit)
 
-    response_data = ProbeTagSearchResponse(
+    response = ProbeTagSearchResponse(
         tags=tags,
-        total=total_count,
+        total_record=total_count,
         page=page,
-        page_size=limit,
+        limit=limit,
+        message="Tags retrieved successfully",
     )
 
-    return SingleResponse(success=True, result=response_data, message="Tags retrieved successfully")
+    return response
 
 
 @router.get(
@@ -371,9 +193,9 @@ async def search_probe_tags(
 async def get_probe_rules(
     probe_id: UUID,
     search: str = Query(None),
-    scanner_type_ids: List[UUID] = Query(None),
-    modality_type_ids: List[UUID] = Query(None),
-    guard_type_ids: List[UUID] = Query(None),
+    scanner_types: List[str] = Query(None),
+    modality_types: List[str] = Query(None),
+    guard_types: List[str] = Query(None),
     is_enabled: bool = Query(None),
     is_custom: bool = Query(None),
     page: int = Query(1, ge=1),
@@ -384,22 +206,23 @@ async def get_probe_rules(
     """Get paginated rules for a specific probe."""
     filters = GuardrailRuleListRequestSchema(
         search=search,
-        scanner_type_ids=scanner_type_ids,
-        modality_type_ids=modality_type_ids,
-        guard_type_ids=guard_type_ids,
+        scanner_types=scanner_types,
+        modality_types=modality_types,
+        guard_types=guard_types,
         is_enabled=is_enabled,
         is_custom=is_custom,
-        page=page,
-        page_size=page_size,
     )
 
-    rules, total = await GuardrailRuleService.get_rules_paginated(db, probe_id, filters, current_user.id)
+    rules, total = await GuardrailRuleService.get_rules_paginated(
+        db, probe_id, filters, current_user.id, page, page_size
+    )
 
     response = GuardrailRuleListResponseSchema(
         rules=rules,
-        total=total,
+        total_record=total,
         page=page,
-        page_size=page_size,
+        limit=page_size,
+        message="Successfully retrieved probe rules",
     )
 
     return response
@@ -503,17 +326,18 @@ async def get_deployments(
         deployment_type=deployment_type,
         status=status,
         search=search,
-        page=page,
-        page_size=page_size,
     )
 
-    deployments, total = await GuardrailDeploymentService.get_deployments(db, filters, current_user.id)
+    deployments, total = await GuardrailDeploymentService.get_deployments(
+        db, filters, current_user.id, page, page_size
+    )
 
     response = GuardrailDeploymentListResponseSchema(
         deployments=deployments,
-        total=total,
+        total_record=total,
         page=page,
-        page_size=page_size,
+        limit=page_size,
+        message="Successfully retrieved deployments",
     )
 
     return response
@@ -568,31 +392,59 @@ async def delete_deployment(
 # Endpoint-specific deployment endpoints
 @router.get(
     "/endpoints/{endpoint_id}/deployments",
-    response_model=SingleResponse[List[GuardrailDeploymentResponse]],
+    response_model=GuardrailDeploymentListResponseSchema,
 )
 async def get_endpoint_deployments(
     endpoint_id: UUID,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
     """Get all active deployments for a specific endpoint."""
-    deployments = await GuardrailDeploymentService.get_deployments_by_endpoint(db, endpoint_id, current_user.id)
-    return SingleResponse(success=True, result=deployments, message="Endpoint deployments retrieved successfully")
+    filters = GuardrailDeploymentListRequestSchema(endpoint_id=endpoint_id)
+    deployments, total = await GuardrailDeploymentService.get_deployments(
+        db, filters, current_user.id, page, page_size
+    )
+
+    response = GuardrailDeploymentListResponseSchema(
+        deployments=deployments,
+        total_record=total,
+        page=page,
+        limit=page_size,
+        message="Endpoint deployments retrieved successfully",
+    )
+
+    return response
 
 
 # Project-specific deployment endpoints
 @router.get(
     "/projects/{project_id}/deployments",
-    response_model=SingleResponse[List[GuardrailDeploymentResponse]],
+    response_model=GuardrailDeploymentListResponseSchema,
 )
 async def get_project_deployments(
     project_id: UUID,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
     """Get all active deployments for a specific project."""
-    deployments = await GuardrailDeploymentService.get_deployments_by_project(db, project_id, current_user.id)
-    return SingleResponse(success=True, result=deployments, message="Project deployments retrieved successfully")
+    filters = GuardrailDeploymentListRequestSchema(project_id=project_id)
+    deployments, total = await GuardrailDeploymentService.get_deployments(
+        db, filters, current_user.id, page, page_size
+    )
+
+    response = GuardrailDeploymentListResponseSchema(
+        deployments=deployments,
+        total_record=total,
+        page=page,
+        limit=page_size,
+        message="Project deployments retrieved successfully",
+    )
+
+    return response
 
 
 # Workflow routes

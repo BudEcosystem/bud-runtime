@@ -22,8 +22,13 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from budapp.commons.constants import GuardrailDeploymentStatusEnum, GuardrailDeploymentTypeEnum, GuardrailProviderEnum
-from budapp.commons.schemas import Tag
+from budapp.commons.constants import (
+    GuardrailDeploymentStatusEnum,
+    GuardrailDeploymentTypeEnum,
+    GuardrailProviderTypeEnum,
+)
+from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Tag
+from budapp.model_ops.schemas import Provider
 
 
 # Base schemas
@@ -33,115 +38,13 @@ class GuardrailBaseSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-# Provider schemas
-class GuardrailProviderBase(GuardrailBaseSchema):
-    """Base schema for guardrail providers."""
+# Extended Provider schema for guardrails
+class GuardrailProviderInfo(Provider):
+    """Extended provider schema with guardrail-specific fields."""
 
-    name: str = Field(..., max_length=255)
-    display_name: str = Field(..., max_length=255)
-    provider_type: GuardrailProviderEnum
-    description: Optional[str] = None
-    configuration_schema: Optional[Dict] = None
     is_active: bool = True
-
-
-class GuardrailProviderCreate(GuardrailProviderBase):
-    """Schema for creating a guardrail provider."""
-
-    user_id: Optional[UUID] = None
-    project_id: Optional[UUID] = None
-
-
-class GuardrailProviderUpdate(GuardrailBaseSchema):
-    """Schema for updating a guardrail provider."""
-
-    name: Optional[str] = Field(None, max_length=255)
-    display_name: Optional[str] = Field(None, max_length=255)
-    description: Optional[str] = None
     configuration_schema: Optional[Dict] = None
-    is_active: Optional[bool] = None
-
-
-class GuardrailProviderResponse(GuardrailProviderBase):
-    """Schema for guardrail provider responses."""
-
-    id: UUID
-    created_by: Optional[UUID] = None
-    user_id: Optional[UUID] = None
-    project_id: Optional[UUID] = None
-    created_at: datetime
-    modified_at: datetime
-
-
-# Scanner type schemas
-class GuardrailScannerTypeBase(GuardrailBaseSchema):
-    """Base schema for scanner types."""
-
-    name: str = Field(..., max_length=100)
-    display_name: str = Field(..., max_length=255)
-    description: Optional[str] = None
-    supported_modalities: List[str]
-    configuration_schema: Optional[Dict] = None
-
-
-class GuardrailScannerTypeCreate(GuardrailScannerTypeBase):
-    """Schema for creating a scanner type."""
-
-    pass
-
-
-class GuardrailScannerTypeResponse(GuardrailScannerTypeBase):
-    """Schema for scanner type responses."""
-
-    id: UUID
-    created_at: datetime
-    modified_at: datetime
-
-
-# Modality type schemas
-class GuardrailModalityTypeBase(GuardrailBaseSchema):
-    """Base schema for modality types."""
-
-    name: str = Field(..., max_length=100)
-    display_name: str = Field(..., max_length=255)
-    description: Optional[str] = None
-
-
-class GuardrailModalityTypeCreate(GuardrailModalityTypeBase):
-    """Schema for creating a modality type."""
-
-    pass
-
-
-class GuardrailModalityTypeResponse(GuardrailModalityTypeBase):
-    """Schema for modality type responses."""
-
-    id: UUID
-    created_at: datetime
-    modified_at: datetime
-
-
-# Guard type schemas
-class GuardrailGuardTypeBase(GuardrailBaseSchema):
-    """Base schema for guard types."""
-
-    name: str = Field(..., max_length=100)
-    display_name: str = Field(..., max_length=255)
-    description: Optional[str] = None
-
-
-class GuardrailGuardTypeCreate(GuardrailGuardTypeBase):
-    """Schema for creating a guard type."""
-
-    pass
-
-
-class GuardrailGuardTypeResponse(GuardrailGuardTypeBase):
-    """Schema for guard type responses."""
-
-    id: UUID
-    created_at: datetime
-    modified_at: datetime
+    object: str = "guardrail.provider"
 
 
 # Rule schemas
@@ -150,9 +53,9 @@ class GuardrailRuleBase(GuardrailBaseSchema):
 
     name: str = Field(..., max_length=255)
     description: Optional[str] = None
-    scanner_type_ids: List[UUID]
-    modality_type_ids: List[UUID]
-    guard_type_ids: List[UUID]
+    scanner_types: Optional[List[str]] = None
+    modality_types: Optional[List[str]] = None
+    guard_types: Optional[List[str]] = None
     examples: Optional[List[str]] = None
     configuration: Optional[Dict] = None
     is_enabled: bool = True
@@ -170,12 +73,13 @@ class GuardrailRuleUpdate(GuardrailBaseSchema):
 
     name: Optional[str] = Field(None, max_length=255)
     description: Optional[str] = None
-    scanner_type_ids: Optional[List[UUID]] = None
-    modality_type_ids: Optional[List[UUID]] = None
-    guard_type_ids: Optional[List[UUID]] = None
+    scanner_types: Optional[List[str]] = None
+    modality_types: Optional[List[str]] = None
+    guard_types: Optional[List[str]] = None
     examples: Optional[List[str]] = None
     configuration: Optional[Dict] = None
     is_enabled: Optional[bool] = None
+    is_custom: Optional[bool] = None
 
 
 class GuardrailRuleResponse(GuardrailBaseSchema):
@@ -185,15 +89,16 @@ class GuardrailRuleResponse(GuardrailBaseSchema):
     probe_id: UUID
     name: str
     description: Optional[str] = None
-    scanner_types: List[GuardrailScannerTypeResponse]
-    modality_types: List[GuardrailModalityTypeResponse]
-    guard_types: List[GuardrailGuardTypeResponse]
+    scanner_types: Optional[List[str]] = None
+    modality_types: Optional[List[str]] = None
+    guard_types: Optional[List[str]] = None
     examples: Optional[List[str]] = None
     configuration: Optional[Dict] = None
     is_enabled: bool
     is_custom: bool
     created_at: datetime
     modified_at: datetime
+    object: str = "guardrail.rule"
 
 
 # Probe schemas
@@ -208,9 +113,11 @@ class GuardrailProbeBase(GuardrailBaseSchema):
 class GuardrailProbeCreate(GuardrailProbeBase):
     """Schema for creating a guardrail probe."""
 
-    provider_id: UUID
+    provider_id: Optional[UUID] = None
+    provider_type: GuardrailProviderTypeEnum
     user_id: Optional[UUID] = None
     project_id: Optional[UUID] = None
+    is_custom: Optional[bool] = None  # Optional override, auto-determined from provider if not specified
 
 
 class GuardrailProbeUpdate(GuardrailBaseSchema):
@@ -219,6 +126,8 @@ class GuardrailProbeUpdate(GuardrailBaseSchema):
     name: Optional[str] = Field(None, max_length=255)
     description: Optional[str] = None
     tags: Optional[List[Tag]] = None
+    provider_type: Optional[GuardrailProviderTypeEnum] = None
+    is_custom: Optional[bool] = None  # Allow updating is_custom flag
 
 
 class GuardrailProbeResponse(GuardrailProbeBase):
@@ -226,7 +135,8 @@ class GuardrailProbeResponse(GuardrailProbeBase):
 
     id: UUID
     provider_id: UUID
-    provider: Optional[GuardrailProviderResponse] = None
+    provider_type: GuardrailProviderTypeEnum
+    provider: Optional[GuardrailProviderInfo] = None
     is_custom: bool = False  # Computed from provider type
     created_by: Optional[UUID] = None
     user_id: Optional[UUID] = None
@@ -234,6 +144,7 @@ class GuardrailProbeResponse(GuardrailProbeBase):
     created_at: datetime
     modified_at: datetime
     rules: List[GuardrailRuleResponse] = []
+    object: str = "guardrail.probe"
 
 
 class GuardrailProbeListResponse(GuardrailBaseSchema):
@@ -245,13 +156,14 @@ class GuardrailProbeListResponse(GuardrailBaseSchema):
     tags: Optional[List[Tag]] = None
     provider_id: UUID
     provider_name: Optional[str] = None
-    provider_type: Optional[GuardrailProviderEnum] = None
+    provider_type: Optional[GuardrailProviderTypeEnum] = None
     is_custom: bool = False
     rule_count: int = 0
+    object: str = "guardrail.probe.summary"
 
 
 # Deployment rule configuration schemas
-class GuardrailDeploymentRuleConfigBase(GuardrailBaseSchema):
+class GuardrailDeploymentRuleBase(GuardrailBaseSchema):
     """Base schema for deployment rule configurations."""
 
     rule_id: UUID
@@ -260,22 +172,18 @@ class GuardrailDeploymentRuleConfigBase(GuardrailBaseSchema):
     threshold_override: Optional[float] = Field(None, ge=0.0, le=1.0)
 
 
-class GuardrailDeploymentRuleConfigCreate(GuardrailDeploymentRuleConfigBase):
+class GuardrailDeploymentRuleCreate(GuardrailDeploymentRuleBase):
     """Schema for creating deployment rule configuration."""
 
     pass
 
 
-class GuardrailDeploymentRuleConfigResponse(GuardrailDeploymentRuleConfigBase):
+class GuardrailDeploymentRuleResponse(GuardrailDeploymentRuleBase):
     """Schema for deployment rule configuration responses."""
 
     id: UUID
-    deployment_probe_id: UUID
     rule_name: Optional[str] = None
-    is_overridden: bool = False
-    effective_configuration: Optional[Dict] = None
-    created_at: datetime
-    modified_at: datetime
+    object: str = "guardrail.deployment.rule"
 
 
 # Selection schemas for sparse probe/rule selection
@@ -307,7 +215,7 @@ class GuardrailDeploymentProbeBase(GuardrailBaseSchema):
 class GuardrailDeploymentProbeCreate(GuardrailDeploymentProbeBase):
     """Schema for creating deployment probe association."""
 
-    rule_configs: Optional[List[GuardrailDeploymentRuleConfigCreate]] = []
+    rules: Optional[List[GuardrailDeploymentRuleCreate]] = []
 
 
 class GuardrailDeploymentProbeResponse(GuardrailDeploymentProbeBase):
@@ -316,9 +224,8 @@ class GuardrailDeploymentProbeResponse(GuardrailDeploymentProbeBase):
     id: UUID
     deployment_id: UUID
     probe_name: Optional[str] = None
-    rules: List[GuardrailDeploymentRuleConfigResponse] = []
-    created_at: datetime
-    modified_at: datetime
+    rules: List[GuardrailDeploymentRuleResponse] = []
+    object: str = "guardrail.deployment.probe"
 
 
 # Deployment schemas
@@ -329,13 +236,13 @@ class GuardrailDeploymentBase(GuardrailBaseSchema):
     description: Optional[str] = None
     deployment_type: GuardrailDeploymentTypeEnum
     endpoint_id: Optional[UUID] = None
-    deployment_endpoint_url: Optional[str] = None
     configuration: Optional[Dict] = None
     default_threshold: Optional[float] = Field(None, ge=0.0, le=1.0)
+    guardrail_types: Optional[List[str]] = None
 
-    @field_validator("endpoint_id", "deployment_endpoint_url")
+    @field_validator("endpoint_id")
     def validate_deployment_fields(cls, v, info):
-        """Validate that endpoint_id or deployment_endpoint_url is set based on deployment_type."""
+        """Validate that endpoint_id is set based on deployment_type."""
         if "deployment_type" in info.data:
             deployment_type = info.data["deployment_type"]
             field_name = info.field_name
@@ -346,12 +253,6 @@ class GuardrailDeploymentBase(GuardrailBaseSchema):
                 and not v
             ):
                 raise ValueError("endpoint_id is required for endpoint_mapped deployments")
-            elif (
-                deployment_type == GuardrailDeploymentTypeEnum.STANDALONE
-                and field_name == "deployment_endpoint_url"
-                and not v
-            ):
-                raise ValueError("deployment_endpoint_url is required for standalone deployments")
 
         return v
 
@@ -360,14 +261,13 @@ class GuardrailDeploymentCreate(GuardrailDeploymentBase):
     """Schema for creating a guardrail deployment.
 
     Uses sparse probe selection:
-    - Empty probe_selections list = enable all probes from selected providers
+    - Empty probe_selections list = enable all probes from selected provider
     - Non-empty probe_selections = apply only specified probe/rule overrides
     """
 
     project_id: UUID
-    probes: Optional[List[GuardrailDeploymentProbeCreate]] = None  # Deprecated, use probe_selections
+    guardrail_types: Optional[List[str]] = None
     probe_selections: Optional[List[ProbeSelection]] = []  # Empty = all probes enabled
-    provider_ids: Optional[List[UUID]] = []  # Provider IDs to fetch all probes from when probe_selections is empty
 
 
 class GuardrailDeploymentUpdate(GuardrailBaseSchema):
@@ -378,6 +278,7 @@ class GuardrailDeploymentUpdate(GuardrailBaseSchema):
     probes: Optional[List[GuardrailDeploymentProbeCreate]] = None
     status: Optional[GuardrailDeploymentStatusEnum] = None
     configuration: Optional[Dict] = None
+    guardrail_types: Optional[List[str]] = None
 
 
 class GuardrailDeploymentResponse(GuardrailDeploymentBase):
@@ -387,9 +288,11 @@ class GuardrailDeploymentResponse(GuardrailDeploymentBase):
     status: GuardrailDeploymentStatusEnum
     user_id: UUID
     project_id: UUID
+    guardrail_types: Optional[List[str]] = None
     probes: List[GuardrailDeploymentProbeResponse] = []
     created_at: datetime
     modified_at: datetime
+    object: str = "guardrail.deployment"
 
 
 class GuardrailDeploymentListResponse(GuardrailBaseSchema):
@@ -400,9 +303,11 @@ class GuardrailDeploymentListResponse(GuardrailBaseSchema):
     deployment_type: GuardrailDeploymentTypeEnum
     endpoint_id: Optional[UUID] = None
     status: GuardrailDeploymentStatusEnum
+    guardrail_types: Optional[List[str]] = None
     probe_count: int = 0
     enabled_probe_count: int = 0
     created_at: datetime
+    object: str = "guardrail.deployment.summary"
 
 
 # List response schemas
@@ -411,22 +316,20 @@ class GuardrailProbeListRequestSchema(GuardrailBaseSchema):
 
     tags: Optional[List[str]] = None
     provider_id: Optional[UUID] = None
-    provider_type: Optional[GuardrailProviderEnum] = None
+    provider_type: Optional[GuardrailProviderTypeEnum] = None
     user_id: Optional[UUID] = None
     project_id: Optional[UUID] = None
     endpoint_id: Optional[UUID] = None
     search: Optional[str] = None
-    page: int = Field(1, ge=1)
-    page_size: int = Field(20, ge=1, le=100)
 
 
-class GuardrailProbeListResponseSchema(GuardrailBaseSchema):
+class GuardrailProbeListResponseSchema(PaginatedSuccessResponse):
     """Schema for probe list response."""
 
-    probes: List[GuardrailProbeListResponse]
-    total: int
-    page: int
-    page_size: int
+    model_config = ConfigDict(extra="ignore")
+
+    probes: List[GuardrailProbeListResponse] = []
+    object: str = "guardrail.probe.list"
 
 
 class GuardrailDeploymentListRequestSchema(GuardrailBaseSchema):
@@ -437,17 +340,15 @@ class GuardrailDeploymentListRequestSchema(GuardrailBaseSchema):
     deployment_type: Optional[GuardrailDeploymentTypeEnum] = None
     status: Optional[GuardrailDeploymentStatusEnum] = None
     search: Optional[str] = None
-    page: int = Field(1, ge=1)
-    page_size: int = Field(20, ge=1, le=100)
 
 
-class GuardrailDeploymentListResponseSchema(GuardrailBaseSchema):
+class GuardrailDeploymentListResponseSchema(PaginatedSuccessResponse):
     """Schema for deployment list response."""
 
-    deployments: List[GuardrailDeploymentListResponse]
-    total: int
-    page: int
-    page_size: int
+    model_config = ConfigDict(extra="ignore")
+
+    deployments: List[GuardrailDeploymentListResponse] = []
+    object: str = "guardrail.deployment.list"
 
 
 # Workflow schemas
@@ -455,10 +356,8 @@ class GuardrailDeploymentWorkflowStepData(GuardrailBaseSchema):
     """Schema for guardrail deployment workflow step data."""
 
     # Step 1: Probe selection
-    selected_probes: Optional[List[UUID]] = None  # Deprecated
-    selected_rules: Optional[Dict[UUID, List[UUID]]] = None  # Deprecated
     probe_selections: Optional[List[ProbeSelection]] = []  # New sparse selection format
-    provider_ids: Optional[List[UUID]] = []  # Provider IDs when probe_selections is empty
+    provider_id: Optional[UUID] = None  # Provider ID when probe_selections is empty
 
     # Step 2: Deployment type
     deployment_type: Optional[GuardrailDeploymentTypeEnum] = None
@@ -468,13 +367,10 @@ class GuardrailDeploymentWorkflowStepData(GuardrailBaseSchema):
 
     # Step 4: Endpoint selection (for endpoint_mapped)
     endpoint_id: Optional[UUID] = None
-    deployment_endpoint_url: Optional[str] = None  # for standalone
 
     # Step 5: Configuration
-    guard_types: Optional[Dict[UUID, List[UUID]]] = None  # probe_id -> [guard_type_ids]
-    thresholds: Optional[Dict[UUID, float]] = None  # probe_id -> threshold
-    probe_configs: Optional[Dict[UUID, Dict]] = None  # probe_id -> configuration
-    rule_configs: Optional[Dict[str, Dict]] = None  # f"{probe_id}:{rule_id}" -> configuration
+    guard_types: Optional[List[str]] = None
+    threshold: Optional[float] = None
 
     # Step 6: ETA
     estimated_deployment_time: Optional[int] = None  # seconds
@@ -493,18 +389,13 @@ class CreateGuardrailDeploymentWorkflowRequest(GuardrailBaseSchema):
     workflow_total_steps: int = Field(default=7)
 
     # Step-specific data
-    selected_probes: Optional[List[UUID]] = None  # Deprecated, use probe_selections
-    selected_rules: Optional[Dict[UUID, List[UUID]]] = None  # Deprecated, use probe_selections
     probe_selections: Optional[List[ProbeSelection]] = []  # New sparse selection format
-    provider_ids: Optional[List[UUID]] = []  # Provider IDs when probe_selections is empty
+    provider_id: Optional[UUID] = None  # Provider ID when probe_selections is empty (optional for workflow)
     deployment_type: Optional[GuardrailDeploymentTypeEnum] = None
     project_id: Optional[UUID] = None
     endpoint_id: Optional[UUID] = None
-    deployment_endpoint_url: Optional[str] = None
-    guard_types: Optional[Dict[UUID, List[UUID]]] = None
-    thresholds: Optional[Dict[UUID, float]] = None
-    probe_configs: Optional[Dict[UUID, Dict]] = None
-    rule_configs: Optional[Dict[str, Dict]] = None
+    guard_types: Optional[List[str]] = None
+    threshold: Optional[float] = None
 
     # Workflow control
     trigger_workflow: bool = Field(default=False)
@@ -512,13 +403,39 @@ class CreateGuardrailDeploymentWorkflowRequest(GuardrailBaseSchema):
     deployment_description: Optional[str] = None
 
 
-class ProbeTagSearchResponse(GuardrailBaseSchema):
+class CreateGuardrailDeploymentWorkflowResponse(SuccessResponse):
+    """Response schema for creating/updating guardrail deployment workflow."""
+
+    workflow_id: UUID
+    status: str
+    current_step: int
+    total_steps: int
+    reason: Optional[str] = None
+    workflow_steps: Optional[GuardrailDeploymentWorkflowStepData] = None
+    object: str = "guardrail.deployment.workflow"
+
+
+class GuardrailProbeDetailResponse(SuccessResponse):
+    """Detailed response schema for single probe."""
+
+    probe: GuardrailProbeResponse
+    object: str = "guardrail.probe.detail"
+
+
+class GuardrailDeploymentDetailResponse(SuccessResponse):
+    """Detailed response schema for single deployment."""
+
+    deployment: GuardrailDeploymentResponse
+    object: str = "guardrail.deployment.detail"
+
+
+class ProbeTagSearchResponse(PaginatedSuccessResponse):
     """Schema for probe tag search response."""
 
-    tags: List[str]
-    total: int
-    page: int
-    page_size: int
+    model_config = ConfigDict(extra="ignore")
+
+    tags: List[str] = []
+    object: str = "guardrail.probe.tags"
 
 
 # Rule list schemas for paginated rules within a probe
@@ -526,19 +443,17 @@ class GuardrailRuleListRequestSchema(GuardrailBaseSchema):
     """Schema for rule list request parameters within a probe."""
 
     search: Optional[str] = None
-    scanner_type_ids: Optional[List[UUID]] = None
-    modality_type_ids: Optional[List[UUID]] = None
-    guard_type_ids: Optional[List[UUID]] = None
+    scanner_types: Optional[List[str]] = None
+    modality_types: Optional[List[str]] = None
+    guard_types: Optional[List[str]] = None
     is_enabled: Optional[bool] = None
     is_custom: Optional[bool] = None
-    page: int = Field(1, ge=1)
-    page_size: int = Field(20, ge=1, le=100)
 
 
-class GuardrailRuleListResponseSchema(GuardrailBaseSchema):
+class GuardrailRuleListResponseSchema(PaginatedSuccessResponse):
     """Schema for paginated rule list response."""
 
-    rules: List[GuardrailRuleResponse]
-    total: int
-    page: int
-    page_size: int
+    model_config = ConfigDict(extra="ignore")
+
+    rules: List[GuardrailRuleResponse] = []
+    object: str = "guardrail.rule.list"

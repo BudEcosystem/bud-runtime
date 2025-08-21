@@ -24,19 +24,13 @@ from uuid import uuid4
 from sqlalchemy.orm import Session
 
 from budapp.commons import logging
-from budapp.commons.constants import GuardrailProviderEnum
+from budapp.commons.constants import GuardrailProviderTypeEnum
 from budapp.commons.database import engine
 from budapp.guardrails.models import (
-    GuardrailGuardType,
-    GuardrailModalityType,
     GuardrailProbe,
-    GuardrailProvider,
     GuardrailRule,
-    GuardrailRuleGuardType,
-    GuardrailRuleModality,
-    GuardrailRuleScanner,
-    GuardrailScannerType,
 )
+from budapp.model_ops.models import Provider
 
 from .base_seeder import BaseSeeder
 
@@ -65,152 +59,65 @@ class GuardrailsSeeder(BaseSeeder):
         """Seed all guardrails data."""
         data = await self._load_seeder_data()
 
-        # Seed in order of dependencies
-        await self._seed_modalities(session, data.get("modalities", {}))
-        await self._seed_guard_types(session, data.get("guard_type", {}))
-        await self._seed_providers_and_scanners(session, data.get("providers", []))
+        # Seed providers and their probes/rules
+        await self._seed_providers_and_probes(session, data)
 
-    async def _seed_modalities(self, session: Session, modalities_data: Dict[str, Any]) -> None:
-        """Seed modality types."""
-        # Get existing modalities
-        existing_modalities = session.query(GuardrailModalityType).all()
-        existing_names = {m.name for m in existing_modalities}
-
-        for key, modality_info in modalities_data.items():
-            if key not in existing_names:
-                modality = GuardrailModalityType(
-                    id=uuid4(),
-                    name=key,
-                    display_name=modality_info["name"],
-                    description=modality_info["description"],
-                )
-                session.add(modality)
-                logger.info(f"Created modality: {key}")
-
-        session.commit()
-
-    async def _seed_guard_types(self, session: Session, guard_types_data: Dict[str, Any]) -> None:
-        """Seed guard types."""
-        # Get existing guard types
-        existing_guard_types = session.query(GuardrailGuardType).all()
-        existing_names = {g.name for g in existing_guard_types}
-
-        for key, guard_info in guard_types_data.items():
-            if key not in existing_names:
-                guard_type = GuardrailGuardType(
-                    id=uuid4(),
-                    name=key,
-                    display_name=guard_info["name"],
-                    description=guard_info["description"],
-                )
-                session.add(guard_type)
-                logger.info(f"Created guard type: {key}")
-
-        session.commit()
-
-    async def _seed_providers_and_scanners(self, session: Session, providers_data: list) -> None:
-        """Seed providers, scanners, probes, and rules."""
+    async def _seed_providers_and_probes(self, session: Session, providers_data: list) -> None:
+        """Seed providers, probes, and rules."""
+        # First, ensure the Bud Sentinel provider exists
         for provider_data in providers_data:
-            # Check if provider exists
-            provider_name = provider_data["name"]
-            provider = session.query(GuardrailProvider).filter_by(name=provider_name).first()
-
+            provider = session.query(Provider).filter_by(type=provider_data["provider_type"]).first()
             if not provider:
-                # Create provider
-                provider = GuardrailProvider(
-                    id=uuid4(),
-                    name=provider_name,
-                    display_name=provider_name,
-                    provider_type=GuardrailProviderEnum.BUD_SENTINEL,
-                    description=provider_data.get("description", ""),
-                    is_active=True,
+                logger.error(
+                    f"{provider_data['provider_type']} provider not found. Please run the provider seeder first."
                 )
-                session.add(provider)
-                session.flush()  # Flush to get the ID
-                logger.info(f"Created provider: {provider_name}")
+                continue
 
-            # Seed scanners for this provider
-            scanners_map = {}
-            for scanner_key, scanner_info in provider_data.get("scanners", {}).items():
-                scanner = session.query(GuardrailScannerType).filter_by(name=scanner_key).first()
-                if not scanner:
-                    scanner = GuardrailScannerType(
-                        id=uuid4(),
-                        name=scanner_key,
-                        display_name=scanner_info["name"],
-                        description=scanner_info["description"],
-                        supported_modalities=["text"],  # From the JSON, all scanners support text
-                    )
-                    session.add(scanner)
-                    session.flush()
-                    logger.info(f"Created scanner: {scanner_key}")
-                scanners_map[scanner_key] = scanner
+            provider_type = (
+                GuardrailProviderTypeEnum.BUD_SENTINEL
+                if hasattr(GuardrailProviderTypeEnum, provider_data["provider_type"].upper())
+                else GuardrailProviderTypeEnum.CLOUD_PROVIDER
+            )
 
             # Seed probes and rules
-            for probe_key, probe_info in provider_data.get("probes", {}).items():
-                probe = session.query(GuardrailProbe).filter_by(name=probe_key).first()
+            for probe_info in provider_data.get("probes", []):
+                probe = session.query(GuardrailProbe).filter_by(sentinel_id=probe_info["id"]).first()
                 if not probe:
                     probe = GuardrailProbe(
                         id=uuid4(),
-                        name=probe_key,
+                        sentinel_id=probe_info["id"],
+                        name=probe_info["title"],
                         description=probe_info["description"],
                         provider_id=provider.id,
-                        tags=[
-                            {"name": "Data Loss Prevention (DLP)", "color": "#1E90FF"}
-                        ],
+                        provider_type=provider_type,
+                        is_custom=False,
+                        tags=[{"name": "Data Loss Prevention (DLP)", "color": "#1E90FF"}],
                     )
                     session.add(probe)
                     session.flush()
-                    logger.info(f"Created probe: {probe_key}")
+                    logger.info(f"Created probe: {probe_info['title']}")
 
                 # Seed rules for this probe
-                for rule_key, rule_info in probe_info.get("rules", {}).items():
-                    rule = session.query(GuardrailRule).filter_by(name=rule_key).first()
+                for rule_info in probe_info.get("rules", []):
+                    rule = session.query(GuardrailRule).filter_by(sentinel_id=rule_info["id"]).first()
                     if not rule:
                         rule = GuardrailRule(
                             id=uuid4(),
                             probe_id=probe.id,
-                            name=rule_key,
+                            sentinel_id=rule_info["id"],
+                            name=rule_info["title"],
                             description=rule_info.get("description", rule_info.get("title", "")),
                             examples=rule_info.get("examples", []),
                             is_enabled=True,
                             is_custom=False,
+                            # Set scanner and modality types directly as arrays
+                            scanner_types=rule_info.get("scanners", []),
+                            modality_types=rule_info.get("modalities", []),
+                            guard_types=rule_info.get("guard_types", []),
                         )
                         session.add(rule)
                         session.flush()
-                        logger.info(f"Created rule: {rule_key}")
-
-                        # Link rule to scanners
-                        for scanner_name in rule_info.get("scanners", []):
-                            if scanner_name in scanners_map:
-                                rule_scanner = GuardrailRuleScanner(
-                                    id=uuid4(),
-                                    rule_id=rule.id,
-                                    scanner_type_id=scanners_map[scanner_name].id,
-                                )
-                                session.add(rule_scanner)
-
-                        # Link rule to modalities
-                        for modality_name in rule_info.get("modalities", []):
-                            modality = session.query(GuardrailModalityType).filter_by(name=modality_name).first()
-                            if modality:
-                                rule_modality = GuardrailRuleModality(
-                                    id=uuid4(),
-                                    rule_id=rule.id,
-                                    modality_type_id=modality.id,
-                                )
-                                session.add(rule_modality)
-
-                        # For now, link all rules to both input and output guard types
-                        for guard_type_name in ["input", "output"]:
-                            guard_type = session.query(GuardrailGuardType).filter_by(name=guard_type_name).first()
-                            if guard_type:
-                                rule_guard_type = GuardrailRuleGuardType(
-                                    id=uuid4(),
-                                    rule_id=rule.id,
-                                    guard_type_id=guard_type.id,
-                                )
-                                session.add(rule_guard_type)
+                        logger.info(f"Created rule: {rule_info['title']}")
 
         session.commit()
 
