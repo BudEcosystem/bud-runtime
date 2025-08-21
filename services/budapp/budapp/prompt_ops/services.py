@@ -56,7 +56,6 @@ from .schemas import (
     PromptListItem,
     PromptResponse,
     PromptSchemaConfig,
-    PromptVersionDetailResponse,
     PromptVersionListItem,
     PromptVersionResponse,
 )
@@ -649,7 +648,7 @@ class PromptVersionService(SessionMixin):
 
         return None
 
-    async def get_prompt_version(self, prompt_id: UUID, version_id: UUID) -> PromptVersionDetailResponse:
+    async def get_prompt_version(self, prompt_id: UUID, version_id: UUID) -> PromptVersionResponse:
         """Retrieve a specific prompt version with its prompt_schema."""
         # Validate that the prompt exists and is active
         db_prompt = await PromptDataManager(self.session).retrieve_by_fields(
@@ -673,19 +672,7 @@ class PromptVersionService(SessionMixin):
         # Load relationships for the response
         self.session.refresh(db_version)
 
-        # Convert prompt_schema from dict to PromptSchemaConfig
-        prompt_schema_config = PromptSchemaConfig.model_validate(db_version.prompt_schema)
-
         # Create the detailed response
-        version_detail = PromptVersionDetailResponse(
-            id=db_version.id,
-            version=db_version.version,
-            endpoint=db_version.endpoint,
-            model=db_version.model,
-            cluster=db_version.cluster,
-            prompt_schema=prompt_schema_config,
-            created_at=db_version.created_at,
-            modified_at=db_version.modified_at,
-        )
+        version_response = PromptVersionResponse.model_validate(db_version)
 
-        return version_detail
+        return version_response

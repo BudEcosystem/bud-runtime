@@ -50,7 +50,6 @@ from .schemas import (
     PromptVersionListResponse,
     PromptVersionResponse,
     SinglePromptResponse,
-    SinglePromptVersionDetailResponse,
     SinglePromptVersionResponse,
 )
 from .services import PromptService, PromptVersionService, PromptWorkflowService
@@ -184,7 +183,7 @@ async def list_prompt_versions(
     "/{prompt_id}/versions/{version_id}",
     responses={
         status.HTTP_200_OK: {
-            "model": SinglePromptVersionDetailResponse,
+            "model": SinglePromptVersionResponse,
             "description": "Successfully retrieved prompt version",
         },
         status.HTTP_404_NOT_FOUND: {
@@ -204,7 +203,7 @@ async def get_prompt_version(
     session: Annotated[Session, Depends(get_session)],
     prompt_id: UUID,
     version_id: UUID,
-) -> Union[SinglePromptVersionDetailResponse, ErrorResponse]:
+) -> Union[SinglePromptVersionResponse, ErrorResponse]:
     """Retrieve a specific prompt version with its prompt schema."""
     try:
         # Get the prompt version
@@ -213,7 +212,7 @@ async def get_prompt_version(
             version_id=version_id,
         )
 
-        return SinglePromptVersionDetailResponse(
+        return SinglePromptVersionResponse(
             version=version_detail,
             message="Prompt version retrieved successfully",
             code=status.HTTP_200_OK,
