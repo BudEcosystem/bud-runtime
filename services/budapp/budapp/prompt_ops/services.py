@@ -55,6 +55,8 @@ from .schemas import (
     PromptFilter,
     PromptListItem,
     PromptResponse,
+    PromptSchemaConfig,
+    PromptVersionDetailResponse,
     PromptVersionListItem,
     PromptVersionResponse,
 )
@@ -646,3 +648,44 @@ class PromptVersionService(SessionMixin):
         logger.debug(f"Soft deleted prompt version {version_id} for prompt {prompt_id}")
 
         return None
+
+    async def get_prompt_version(self, prompt_id: UUID, version_id: UUID) -> PromptVersionDetailResponse:
+        """Retrieve a specific prompt version with its prompt_schema."""
+        # Validate that the prompt exists and is active
+        db_prompt = await PromptDataManager(self.session).retrieve_by_fields(
+            PromptModel,
+            fields={"id": prompt_id, "status": PromptStatusEnum.ACTIVE},
+        )
+
+        if not db_prompt:
+            raise ClientException(message="Prompt not found", status_code=status.HTTP_404_NOT_FOUND)
+
+        # Retrieve the specific version
+        db_version = await PromptVersionDataManager(self.session).retrieve_by_fields(
+            PromptVersionModel,
+            fields={"id": version_id, "prompt_id": prompt_id},
+            exclude_fields={"status": PromptVersionStatusEnum.DELETED},
+        )
+
+        if not db_version:
+            raise ClientException(message="Prompt version not found", status_code=status.HTTP_404_NOT_FOUND)
+
+        # Load relationships for the response
+        self.session.refresh(db_version)
+
+        # Convert prompt_schema from dict to PromptSchemaConfig
+        prompt_schema_config = PromptSchemaConfig.model_validate(db_version.prompt_schema)
+
+        # Create the detailed response
+        version_detail = PromptVersionDetailResponse(
+            id=db_version.id,
+            version=db_version.version,
+            endpoint=db_version.endpoint,
+            model=db_version.model,
+            cluster=db_version.cluster,
+            prompt_schema=prompt_schema_config,
+            created_at=db_version.created_at,
+            modified_at=db_version.modified_at,
+        )
+
+        return version_detail

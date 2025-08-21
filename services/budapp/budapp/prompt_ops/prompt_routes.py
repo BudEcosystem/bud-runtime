@@ -50,6 +50,7 @@ from .schemas import (
     PromptVersionListResponse,
     PromptVersionResponse,
     SinglePromptResponse,
+    SinglePromptVersionDetailResponse,
     SinglePromptVersionResponse,
 )
 from .services import PromptService, PromptVersionService, PromptWorkflowService
@@ -176,6 +177,55 @@ async def list_prompt_versions(
         logger.exception(f"Failed to list prompt versions: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to list prompt versions"
+        ).to_http_response()
+
+
+@router.get(
+    "/{prompt_id}/versions/{version_id}",
+    responses={
+        status.HTTP_200_OK: {
+            "model": SinglePromptVersionDetailResponse,
+            "description": "Successfully retrieved prompt version",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Prompt or version not found",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Internal Server error",
+        },
+    },
+    description="Retrieve a specific prompt version with its prompt schema",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
+async def get_prompt_version(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    prompt_id: UUID,
+    version_id: UUID,
+) -> Union[SinglePromptVersionDetailResponse, ErrorResponse]:
+    """Retrieve a specific prompt version with its prompt schema."""
+    try:
+        # Get the prompt version
+        version_detail = await PromptVersionService(session).get_prompt_version(
+            prompt_id=prompt_id,
+            version_id=version_id,
+        )
+
+        return SinglePromptVersionDetailResponse(
+            version=version_detail,
+            message="Prompt version retrieved successfully",
+            code=status.HTTP_200_OK,
+            object="prompt.version.get",
+        ).to_http_response()
+    except ClientException as e:
+        logger.error(f"Failed to retrieve prompt version: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to retrieve prompt version: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to retrieve prompt version"
         ).to_http_response()
 
 

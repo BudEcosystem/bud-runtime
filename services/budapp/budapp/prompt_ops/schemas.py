@@ -384,7 +384,23 @@ class EditPromptVersionRequest(BaseModel):
     set_as_default: bool | None = Field(None, description="Set this version as the default version")
 
 
+class PromptVersionDetailResponse(PromptVersionResponse):
+    """Prompt version detail response schema with prompt_schema."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    prompt_schema: PromptSchemaConfig
+    created_at: datetime
+    modified_at: datetime
+
+
 class SinglePromptVersionResponse(SuccessResponse):
     """Single prompt version response."""
 
     version: PromptVersionResponse
+
+
+class SinglePromptVersionDetailResponse(SuccessResponse):
+    """Single prompt version detail response with prompt_schema."""
+
+    version: PromptVersionDetailResponse
