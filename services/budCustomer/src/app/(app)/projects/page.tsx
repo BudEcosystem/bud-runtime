@@ -198,6 +198,7 @@ export default function ProjectsPage() {
     });
   };
 
+
   const handleEditProject = () => {
     if (!selectedProject) return;
 
@@ -233,30 +234,13 @@ export default function ProjectsPage() {
     setShowEditModal(true);
   };
 
+
   const getProjectMenuItems = (project: Project) => [
     {
       key: "edit",
       label: "Edit Project",
       icon: <Icon icon="ph:pencil" />,
       onClick: () => openEditModal(project),
-    },
-    {
-      key: "duplicate",
-      label: "Duplicate",
-      icon: <Icon icon="ph:copy" />,
-      onClick: () => console.log("Duplicate project:", project.id),
-    },
-    {
-      type: "divider" as const,
-    },
-    {
-      key: "archive",
-      label: project.status === "archived" ? "Unarchive" : "Archive",
-      icon: <Icon icon="ph:archive" />,
-      onClick: () => {
-        const newStatus = project.status === "archived" ? "active" : "archived";
-        updateProject(project.id, { status: newStatus });
-      },
     },
     {
       key: "delete",
@@ -278,35 +262,15 @@ export default function ProjectsPage() {
     "#8B5CF6",
   ];
 
-  // Filter projects by status for organization
+  // Filter to only show active projects
   const activeProjects = projects.filter((p) => p.status === "active");
-  const inactiveProjects = projects.filter((p) => p.status === "inactive");
-  const archivedProjects = projects.filter((p) => p.status === "archived");
-  const themeConfig={
-    components: {
-      Dropdown: {
-        colorBgElevated: "var(--bg-tertiary)",  // dropdown container bg
-        controlItemBgHover: "var(--bg-hover)",  // hover background
-        controlItemBgActive: "var(--bg-hover)", // active/selected bg
-        colorText: "var(--text-primary)",        // default text
-      },
-      Menu: {
-        itemColor: "var(--text-primary)",        // menu item text
-        itemHoverColor: "var(--text-hover)",    // text on hover
-        itemHoverBg: "var(--bg-hover)",         // hover background
-        itemSelectedColor: "var(--text-primary)", // selected text
-        itemSelectedBg: "var(--bg-hover)",   // selected background
-        colorItemTextDisabled: "var(--text-disabled)", // disabled text
-      }
-    }
-  }
 
   return (
     <DashboardLayout>
       <div className="boardPageView">
         <div className="boardMainContainer pt-[2.25rem]">
           {/* Header */}
-          <Flex justify="space-between" align="center" className="mb-[2rem]">
+          <Flex justify="space-between" align="center" className="mb-[4rem]">
             <div>
               <Title level={2} className="!text-bud-text-primary !mb-0">
                 Projects
@@ -325,69 +289,9 @@ export default function ProjectsPage() {
             </Button>
           </Flex>
 
-          {/* Stats Cards */}
-          <Flex gap={16} className="mb-[2rem]">
-            <div className="bg-bud-bg-secondary border border-bud-border rounded-[8px] px-[1.5rem] py-[1rem] flex-1">
-              <Flex align="center" gap={8}>
-                <Icon
-                  icon="ph:play-circle"
-                  className="text-[#479D5F] text-[1.25rem]"
-                />
-                <Text className="text-bud-text-disabled text-[12px]">
-                  Active Projects
-                </Text>
-              </Flex>
-              <Text className="text-bud-text-primary text-[24px] font-medium mt-[0.5rem] block">
-                {activeProjects.length}
-              </Text>
-            </div>
-            <div className="bg-bud-bg-secondary border border-bud-border rounded-[8px] px-[1.5rem] py-[1rem] flex-1">
-              <Flex align="center" gap={8}>
-                <Icon
-                  icon="ph:archive"
-                  className="text-[#DE9C5C] text-[1.25rem]"
-                />
-                <Text className="text-bud-text-disabled text-[12px]">
-                  Total Projects
-                </Text>
-              </Flex>
-              <Text className="text-bud-text-primary text-[24px] font-medium mt-[0.5rem] block">
-                {projects.length}
-              </Text>
-            </div>
-            <div className="bg-bud-bg-secondary border border-bud-border rounded-[8px] px-[1.5rem] py-[1rem] flex-1">
-              <Flex align="center" gap={8}>
-                <Icon icon="ph:key" className="text-[#4077E6] text-[1.25rem]" />
-                <Text className="text-bud-text-disabled text-[12px]">
-                  Total API Keys
-                </Text>
-              </Flex>
-              <Text className="text-bud-text-primary text-[24px] font-medium mt-[0.5rem] block">
-                {projects.reduce((acc, p) => acc + p.resources.api_keys, 0)}
-              </Text>
-            </div>
-            <div className="bg-bud-bg-secondary border border-bud-border rounded-[8px] px-[1.5rem] py-[1rem] flex-1">
-              <Flex align="center" gap={8}>
-                <Icon
-                  icon="ph:stack"
-                  className="text-[#965CDE] text-[1.25rem]"
-                />
-                <Text className="text-bud-text-disabled text-[12px]">
-                  Total Batches
-                </Text>
-              </Flex>
-              <Text className="text-bud-text-primary text-[24px] font-medium mt-[0.5rem] block">
-                {projects.reduce((acc, p) => acc + p.resources.batches, 0)}
-              </Text>
-            </div>
-          </Flex>
-
-          {/* Active Projects */}
+          {/* Projects */}
           {activeProjects.length > 0 && (
             <div className="mb-[3rem]">
-              <Text className="text-bud-text-primary font-semibold text-[16px] mb-[1.5rem] block">
-                Active Projects ({activeProjects.length})
-              </Text>
               <Row gutter={[24, 24]}>
                 {activeProjects.map((project) => (
                   <Col key={project.id} xs={24} sm={12} lg={8}>
@@ -411,21 +315,18 @@ export default function ProjectsPage() {
                             <Text className="text-bud-text-disabled text-[12px]">
                               {dayjs(project.updated_at).format("DD MMM")}
                             </Text>
-                            <ConfigProvider
-                            theme={themeConfig}>
-                              <Dropdown
-                                menu={{ items: getProjectMenuItems(project) }}
-                                trigger={["click"]}
-                                placement="bottomRight"
-                              >
-                                <Button
-                                  type="text"
-                                  icon={<MoreOutlined />}
-                                  className="text-bud-text-disabled hover:text-bud-text-primary"
-                                  size="small"
-                                />
-                              </Dropdown>
-                            </ConfigProvider>
+                            <Dropdown
+                              menu={{ items: getProjectMenuItems(project) }}
+                              trigger={["click"]}
+                              placement="bottomRight"
+                            >
+                              <Button
+                                type="text"
+                                icon={<MoreOutlined />}
+                                className="text-bud-text-disabled hover:text-bud-text-primary"
+                                size="small"
+                              />
+                            </Dropdown>
                           </div>
                         </div>
 
@@ -438,82 +339,19 @@ export default function ProjectsPage() {
                         <Text className="text-bud-text-muted text-[13px] mb-6 line-clamp-2 leading-relaxed block">
                           {project.description}
                         </Text>
-
-                        {/* Status and Type Tags */}
-                        <div className="flex items-center gap-2 mb-6">
-                          <Tag
-                            icon={<Icon icon={getStatusIcon(project.status)} />}
-                            color={getStatusColor(project.status)}
-                            className="border-0 px-[0.75rem] py-[0.25rem] text-[0.75rem]"
-                          >
-                            {project.status.charAt(0).toUpperCase() +
-                              project.status.slice(1)}
-                          </Tag>
-
-                          <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-[var(--bg-tertiary)] text-[var(--text-muted)]">
-                            <Icon
-                              icon={getProjectTypeIcon(project.project_type)}
-                              className="text-xs"
-                            />
-                            <Text className="text-[12px] text-[var(--text-muted)]">
-                              {project.project_type === "client_app"
-                                ? "Client App"
-                                : "Existing App"}
-                            </Text>
-                          </div>
-                        </div>
-
-                        {/* Resources Stats */}
-                        <div className="grid grid-cols-2 gap-3 mb-4">
-                          <div className="flex items-center gap-2">
-                            <Icon
-                              icon="ph:key"
-                              className="text-bud-text-disabled text-sm"
-                            />
-                            <Text className="text-bud-text-muted text-[12px]">
-                              {project.resources.api_keys} Keys
-                            </Text>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Icon
-                              icon="ph:stack"
-                              className="text-bud-text-disabled text-sm"
-                            />
-                            <Text className="text-bud-text-muted text-[12px]">
-                              {project.resources.batches} Batches
-                            </Text>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Icon
-                              icon="ph:file-text"
-                              className="text-bud-text-disabled text-sm"
-                            />
-                            <Text className="text-bud-text-muted text-[12px]">
-                              {project.resources.logs.toLocaleString()} Logs
-                            </Text>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Icon
-                              icon="ph:cpu"
-                              className="text-bud-text-disabled text-sm"
-                            />
-                            <Text className="text-bud-text-muted text-[12px]">
-                              {project.resources.models} Models
-                            </Text>
-                          </div>
-                        </div>
                       </div>
 
                       {/* Footer Section */}
                       <div className="bg-bud-bg-tertiary px-6 py-4 border-t border-bud-border absolute bottom-0 left-0 w-full">
-                        <Text className="text-bud-text-disabled text-[12px] mb-1 block">
-                          Last Updated
-                        </Text>
-                        <Text className="text-bud-text-primary text-[13px]">
-                          {dayjs(project.updated_at).format(
-                            "MMM DD, YYYY HH:mm",
-                          )}
-                        </Text>
+                        <div className="flex items-center gap-2">
+                          <Icon
+                            icon="ph:key"
+                            className="text-bud-text-disabled text-sm"
+                          />
+                          <Text className="text-bud-text-primary text-[13px]">
+                            {project.resources.api_keys} API Keys
+                          </Text>
+                        </div>
                       </div>
                     </Card>
                   </Col>
@@ -522,222 +360,9 @@ export default function ProjectsPage() {
             </div>
           )}
 
-          {/* Inactive Projects */}
-          {inactiveProjects.length > 0 && (
-            <div className="mb-[3rem]">
-              <Text className="text-bud-text-primary font-semibold text-[16px] mb-[1.5rem] block">
-                Inactive Projects ({inactiveProjects.length})
-              </Text>
-              <Row gutter={[24, 24]}>
-                {inactiveProjects.map((project) => (
-                  <Col key={project.id} xs={24} sm={12} lg={8}>
-                    <Card
-                      className="h-full bg-bud-bg-secondary border-bud-border hover:border-bud-purple hover:shadow-lg transition-all duration-300 cursor-pointer overflow-hidden opacity-75"
-                      styles={{ body: { padding: 0 } }}
-                    >
-                      {/* Similar structure as active projects but with opacity */}
-                      <div className="p-6">
-                        <div className="flex items-start justify-between mb-6">
-                          <div
-                            className="w-12 h-12 rounded-lg flex items-center justify-center"
-                            style={{ backgroundColor: project.color }}
-                          >
-                            <Icon
-                              icon="ph:folder"
-                              className="text-white text-[1.5rem]"
-                            />
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Text className="text-bud-text-disabled text-[12px]">
-                              {dayjs(project.updated_at).format("DD MMM")}
-                            </Text>
-                            <ConfigProvider
-                            theme={themeConfig}>
-                              <Dropdown
-                                menu={{ items: getProjectMenuItems(project) }}
-                                trigger={["click"]}
-                                placement="bottomRight"
-                              >
-                                <Button
-                                  type="text"
-                                  icon={<MoreOutlined />}
-                                  className="text-bud-text-disabled hover:text-bud-text-primary"
-                                  size="small"
-                                />
-                              </Dropdown>
-                            </ConfigProvider>
-                          </div>
-                        </div>
-
-                        <Text className="text-bud-text-primary text-[19px] font-semibold mb-3 line-clamp-1 block">
-                          {project.name}
-                        </Text>
-
-                        <Text className="text-bud-text-muted text-[13px] mb-6 line-clamp-2 leading-relaxed block">
-                          {project.description}
-                        </Text>
-
-                        <div className="flex items-center gap-2 mb-6">
-                          <Tag
-                            icon={<Icon icon={getStatusIcon(project.status)} />}
-                            color={getStatusColor(project.status)}
-                            className="border-0 px-[0.75rem] py-[0.25rem] text-[0.75rem]"
-                          >
-                            {project.status.charAt(0).toUpperCase() +
-                              project.status.slice(1)}
-                          </Tag>
-
-                          <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-bud-bg-tertiary text-bud-text-muted">
-                            <Icon
-                              icon={getProjectTypeIcon(project.project_type)}
-                              className="text-xs"
-                            />
-                            <Text className="text-[12px] text-[var(--text-muted)]">
-                              {project.project_type === "client_app"
-                                ? "Client App"
-                                : "Existing App"}
-                            </Text>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3 mb-4">
-                          <div className="flex items-center gap-2">
-                            <Icon
-                              icon="ph:key"
-                              className="text-bud-text-disabled text-sm"
-                            />
-                            <Text className="text-bud-text-muted text-[12px]">
-                              {project.resources.api_keys} Keys
-                            </Text>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Icon
-                              icon="ph:stack"
-                              className="text-bud-text-disabled text-sm"
-                            />
-                            <Text className="text-bud-text-muted text-[12px]">
-                              {project.resources.batches} Batches
-                            </Text>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Icon
-                              icon="ph:file-text"
-                              className="text-bud-text-disabled text-sm"
-                            />
-                            <Text className="text-bud-text-muted text-[12px]">
-                              {project.resources.logs.toLocaleString()} Logs
-                            </Text>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Icon
-                              icon="ph:cpu"
-                              className="text-bud-text-disabled text-sm"
-                            />
-                            <Text className="text-bud-text-muted text-[12px]">
-                              {project.resources.models} Models
-                            </Text>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="bg-bud-bg-tertiary px-6 py-4 border-t border-bud-border">
-                        <Text className="text-bud-text-disabled text-[12px] mb-1 block">
-                          Last Updated
-                        </Text>
-                        <Text className="text-bud-text-primary text-[13px]">
-                          {dayjs(project.updated_at).format(
-                            "MMM DD, YYYY HH:mm",
-                          )}
-                        </Text>
-                      </div>
-                    </Card>
-                  </Col>
-                ))}
-              </Row>
-            </div>
-          )}
-
-          {/* Archived Projects */}
-          {archivedProjects.length > 0 && (
-            <div className="mb-[3rem]">
-              <Text className="text-bud-text-primary font-semibold text-[16px] mb-[1.5rem] block">
-                Archived Projects ({archivedProjects.length})
-              </Text>
-              <Row gutter={[24, 24]}>
-                {archivedProjects.map((project) => (
-                  <Col key={project.id} xs={24} sm={12} lg={8}>
-                    <Card
-                      className="h-full bg-bud-bg-secondary border-bud-border hover:border-bud-purple hover:shadow-lg transition-all duration-300 cursor-pointer overflow-hidden opacity-60"
-                      styles={{ body: { padding: 0 } }}
-                    >
-                      {/* Similar structure with even more opacity for archived */}
-                      <div className="p-6">
-                        <div className="flex items-start justify-between mb-6">
-                          <div className="w-12 h-12 rounded-lg flex items-center justify-center bg-gray-500">
-                            <Icon
-                              icon="ph:archive"
-                              className="text-white text-[1.5rem]"
-                            />
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Text className="text-bud-text-disabled text-[12px]">
-                              {dayjs(project.updated_at).format("DD MMM")}
-                            </Text>
-                            <ConfigProvider
-                            theme={themeConfig}>
-                              <Dropdown
-                                menu={{ items: getProjectMenuItems(project) }}
-                                trigger={["click"]}
-                                placement="bottomRight"
-                              >
-                                <Button
-                                  type="text"
-                                  icon={<MoreOutlined />}
-                                  className="text-bud-text-disabled hover:text-bud-text-primary"
-                                  size="small"
-                                />
-                              </Dropdown>
-                            </ConfigProvider>
-                          </div>
-                        </div>
-
-                        <Text className="text-bud-text-primary text-[19px] font-semibold mb-3 line-clamp-1 block">
-                          {project.name}
-                        </Text>
-
-                        <Text className="text-bud-text-muted text-[13px] mb-6 line-clamp-2 leading-relaxed block">
-                          {project.description}
-                        </Text>
-
-                        <div className="flex items-center gap-2 mb-6">
-                          <Tag
-                            icon={<Icon icon={getStatusIcon(project.status)} />}
-                            color={getStatusColor(project.status)}
-                            className="border-0 px-[0.75rem] py-[0.25rem] text-[0.75rem]"
-                          >
-                            {project.status.charAt(0).toUpperCase() +
-                              project.status.slice(1)}
-                          </Tag>
-                        </div>
-                      </div>
-
-                      <div className="bg-bud-bg-tertiary px-6 py-4 border-t border-bud-border">
-                        <Text className="text-bud-text-disabled text-[12px] mb-1 block">
-                          Archived On
-                        </Text>
-                        <Text className="text-bud-text-primary text-[13px]">
-                          {dayjs(project.updated_at).format("MMM DD, YYYY")}
-                        </Text>
-                      </div>
-                    </Card>
-                  </Col>
-                ))}
-              </Row>
-            </div>
-          )}
 
           {/* Empty State */}
-          {projects.length === 0 && (
+          {activeProjects.length === 0 && (
             <div className="text-center py-16">
               <Icon
                 icon="ph:folder-plus"
@@ -998,6 +623,7 @@ export default function ProjectsPage() {
               </div>
             </div>
           </Modal>
+
         </div>
       </div>
     </DashboardLayout>
