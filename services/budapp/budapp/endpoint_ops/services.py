@@ -92,6 +92,7 @@ from .schemas import (
     ModelClusterDetail,
     OpenAIConfig,
     ProxyModelConfig,
+    ProxyModelPricing,
     TogetherConfig,
     VLLMConfig,
     WorkerInfoFilter,
@@ -2311,8 +2312,9 @@ class EndpointService(SessionMixin):
         api_base: str,
         supported_endpoints: Union[List[str], Dict[str, bool]],
         encrypted_credential_data: Optional[dict] = None,
+        include_pricing: bool = True,
     ) -> None:
-        """Add model to proxy cache for a project.
+        """Add model to proxy cache for a project with pricing information.
 
         Args:
             endpoint_id: The endpoint ID
@@ -2321,6 +2323,7 @@ class EndpointService(SessionMixin):
             api_base: The base API URL
             supported_endpoints: List of supported endpoints
             encrypted_credential_data: Optional encrypted credential data from ProprietaryCredential.other_provider_creds
+            include_pricing: Whether to include pricing information in the cache
         """
         endpoints = []
 
@@ -2328,31 +2331,90 @@ class EndpointService(SessionMixin):
             try:
                 enum_member = ModelEndpointEnum(support_endpoint)
                 # Use the enum name in lowercase (e.g., "chat", "embedding", etc.)
-                endpoints.append(enum_member.name.lower())
+                endpoints.append(enum_member.name.lower() if enum_member.name else enum_member.name)
             except ValueError:
                 logger.debug(f"Support endpoint {support_endpoint} is not a valid ModelEndpointEnum")
         logger.debug(f"Supported Endpoints: {endpoints}")
 
         # Get the provider enum, default to VLLM if not found
-        provider_enum = self.PROVIDER_MAPPING.get(model_type.lower(), ProxyProviderEnum.VLLM)
+        provider_enum = self.PROVIDER_MAPPING.get(
+            model_type.lower() if model_type else model_type, ProxyProviderEnum.VLLM
+        )
 
         # Create the appropriate provider config using helper method
         provider_config, encrypted_model_api_key = self._create_provider_config(
             provider_enum, model_name, endpoint_id, api_base, encrypted_credential_data
         )
 
-        # Create the proxy model configuration
+        # Get pricing information if requested
+        pricing = None
+        if include_pricing:
+            pricing_info = await self.get_current_pricing(endpoint_id)
+            if pricing_info:
+                pricing = ProxyModelPricing(
+                    input_cost=float(pricing_info.input_cost),
+                    output_cost=float(pricing_info.output_cost),
+                    currency=pricing_info.currency,
+                    per_tokens=pricing_info.per_tokens,
+                )
+
+        # Create the proxy model configuration using the schema
         model_config = ProxyModelConfig(
             routing=[provider_enum],
             providers={provider_enum: provider_config},
             endpoints=endpoints,
             api_key=encrypted_model_api_key,
+            pricing=pricing,
         )
-
+        logger.debug(f"pric2ing: {pricing}")
         redis_service = RedisService()
         await redis_service.set(
             f"model_table:{endpoint_id}", json.dumps({str(endpoint_id): model_config.model_dump(exclude_none=True)})
         )
+
+    async def update_pricing_in_proxy_cache(self, endpoint_id: UUID) -> None:
+        """Update pricing information in the model_table cache.
+
+        Args:
+            endpoint_id: The endpoint ID to update pricing for
+        """
+        try:
+            redis_service = RedisService()
+
+            # Get current model_table entry
+            cache_key = f"model_table:{endpoint_id}"
+            cached_data = await redis_service.get(cache_key)
+
+            if cached_data:
+                model_data = json.loads(cached_data)
+
+                # Get current pricing
+                pricing_info = await self.get_current_pricing(endpoint_id)
+
+                # Update pricing in the model data
+                if str(endpoint_id) in model_data:
+                    if pricing_info:
+                        # Create pricing object using schema
+                        pricing = ProxyModelPricing(
+                            input_cost=float(pricing_info.input_cost),
+                            output_cost=float(pricing_info.output_cost),
+                            currency=pricing_info.currency,
+                            per_tokens=pricing_info.per_tokens,
+                        )
+                        model_data[str(endpoint_id)]["pricing"] = pricing.model_dump()
+                    else:
+                        # Remove pricing if not available
+                        model_data[str(endpoint_id)].pop("pricing", None)
+
+                    # Save back to Redis
+                    await redis_service.set(cache_key, json.dumps(model_data))
+                    logger.info(f"Updated pricing in model_table for endpoint {endpoint_id}")
+            else:
+                logger.warning(f"No model_table entry found for endpoint {endpoint_id}")
+
+        except Exception as e:
+            logger.error(f"Failed to update pricing in proxy cache: {e}")
+            # Don't raise - cache update failure shouldn't block the operation
 
     async def delete_model_from_proxy_cache(self, endpoint_id: UUID) -> None:
         """Delete model from proxy cache for a project."""
@@ -2705,7 +2767,7 @@ class EndpointService(SessionMixin):
                 )
             except Exception as e:
                 logger.error(f"Failed to create pricing for endpoint {endpoint_id}: {e}")
-                self.session.rollback()
+                self.session.rolenum_member.namelback()
                 raise ClientException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     message="Failed to create pricing for endpoint",
@@ -2741,6 +2803,16 @@ class EndpointService(SessionMixin):
         await redis_service.invalidate_catalog_cache(endpoint_id=str(endpoint_id))
 
         logger.info(f"Endpoint {endpoint_id} {action}ed successfully by user {current_user_id}")
+
+        # Update model_table cache for budgateway based on publication status
+        try:
+            if is_published:
+                # Add/update model in cache when publishing
+                await self._update_model_table_cache_for_endpoint(endpoint)
+                logger.info(f"Updated model_table cache for published endpoint {endpoint_id}")
+        except Exception as e:
+            logger.error(f"Failed to update model_table cache for endpoint {endpoint_id}: {e}")
+            # Don't fail the main operation if cache update fails
 
         # Update published model info cache
         await self.update_published_model_cache()
@@ -2784,6 +2856,54 @@ class EndpointService(SessionMixin):
         except Exception as e:
             logger.error(f"Failed to update published model cache: {e}")
             # Don't raise exception - cache update failure shouldn't block the main operation
+
+    async def _update_model_table_cache_for_endpoint(self, endpoint: EndpointModel) -> None:
+        """Update the model_table cache for a specific endpoint.
+
+        This method updates the budgateway model_table cache with endpoint and pricing information.
+
+        Args:
+            endpoint: The endpoint model to update cache for
+        """
+        # Get model information
+        if not endpoint.model:
+            # If model relationship isn't loaded, load it
+            endpoint_with_model = await EndpointDataManager(self.session).retrieve_by_fields(
+                EndpointModel,
+                {"id": endpoint.id},
+                exclude_fields={"status": EndpointStatusEnum.DELETED},
+                missing_ok=True,
+                include_relationships=["model", "credential"],
+            )
+            if not endpoint_with_model:
+                raise Exception(f"Endpoint {endpoint.id} not found")
+            endpoint = endpoint_with_model
+
+        # Get credential data if available
+        encrypted_credential_data = None
+        if endpoint.credential and hasattr(endpoint.credential, "other_provider_creds"):
+            encrypted_credential_data = endpoint.credential.other_provider_creds
+
+        # Call add_model_to_proxy_cache with endpoint information
+        await self.add_model_to_proxy_cache(
+            endpoint_id=endpoint.id,
+            model_name=endpoint.name,
+            model_type=endpoint.model.model_type if endpoint.model else "vllm",  # Default to vllm
+            api_base=endpoint.url,
+            supported_endpoints=endpoint.supported_endpoints,
+            encrypted_credential_data=encrypted_credential_data,
+            include_pricing=True,  # Always include pricing when publishing
+        )
+
+    async def _remove_from_model_table_cache(self, endpoint_id: UUID) -> None:
+        """Remove an endpoint from the model_table cache.
+
+        Args:
+            endpoint_id: The endpoint ID to remove from cache
+        """
+        redis_service = RedisService()
+        cache_key = f"model_table:{endpoint_id}"
+        await redis_service.delete(cache_key)
 
     async def get_current_pricing(self, endpoint_id: UUID) -> Optional["DeploymentPricing"]:
         """Get the current pricing for an endpoint.
@@ -2846,6 +2966,9 @@ class EndpointService(SessionMixin):
             # Invalidate catalog cache when pricing changes
             redis_service = RedisService()
             await redis_service.invalidate_catalog_cache(endpoint_id=str(endpoint_id))
+
+            # Update pricing in model_table cache
+            await self.update_pricing_in_proxy_cache(endpoint_id)
 
             logger.info(f"Pricing updated for endpoint {endpoint_id} by user {current_user_id}")
             return new_pricing

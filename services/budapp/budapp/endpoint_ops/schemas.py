@@ -456,13 +456,23 @@ ProviderConfig = Union[
 ]
 
 
+class ProxyModelPricing(BaseModel):
+    """Pricing configuration for proxy models."""
+
+    input_cost: float = Field(..., description="Cost per input tokens")
+    output_cost: float = Field(..., description="Cost per output tokens")
+    currency: str = Field(default="USD", description="Currency code")
+    per_tokens: int = Field(default=1000, description="Number of tokens for the pricing unit")
+
+
 class ProxyModelConfig(BaseModel):
-    """Proxy model config."""
+    """Proxy model config with pricing information."""
 
     routing: list[ProxyProviderEnum]
     providers: dict[ProxyProviderEnum, ProviderConfig]
     endpoints: list[str]
     api_key: Optional[str] = None
+    pricing: Optional[ProxyModelPricing] = None
 
 
 class RateLimitConfig(BaseModel):

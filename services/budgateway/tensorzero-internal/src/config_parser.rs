@@ -471,6 +471,7 @@ impl<'c> Config<'c> {
                             fallback_models: None,
                             retry_config: None,
                             rate_limits: None, // Embedding models don't have rate limits in this conversion
+                            pricing: None, // Legacy embedding models don't have pricing information
                         };
                         (name, model_config)
                     })
