@@ -199,10 +199,27 @@ pub async fn inference_handler(
             .get("x-tensorzero-model-id")
             .and_then(|v| v.to_str().ok()),
     ) {
+        // Extract auth metadata from headers
+        let api_key_id = headers
+            .get("x-tensorzero-api-key-id")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string());
+        let user_id = headers
+            .get("x-tensorzero-user-id")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string());
+        let api_key_project_id = headers
+            .get("x-tensorzero-api-key-project-id")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string());
+
         params.observability_metadata = Some(super::inference::ObservabilityMetadata {
             project_id: project_id.to_string(),
             endpoint_id: endpoint_id.to_string(),
             model_id: model_id.to_string(),
+            api_key_id,
+            user_id,
+            api_key_project_id,
         });
     }
 
@@ -1815,10 +1832,27 @@ pub async fn embedding_handler(
                 .get("x-tensorzero-model-id")
                 .and_then(|v| v.to_str().ok()),
         ) {
+            // Extract auth metadata from headers
+            let api_key_id = headers
+                .get("x-tensorzero-api-key-id")
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string());
+            let user_id = headers
+                .get("x-tensorzero-user-id")
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string());
+            let api_key_project_id = headers
+                .get("x-tensorzero-api-key-project-id")
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string());
+
             Some(super::inference::ObservabilityMetadata {
                 project_id: project_id.to_string(),
                 endpoint_id: endpoint_id.to_string(),
                 model_id: model_id.to_string(),
+                api_key_id,
+                user_id,
+                api_key_project_id,
             })
         } else {
             None
@@ -2217,10 +2251,27 @@ pub async fn moderation_handler(
                 .get("x-tensorzero-model-id")
                 .and_then(|v| v.to_str().ok()),
         ) {
+            // Extract auth metadata from headers
+            let api_key_id = headers
+                .get("x-tensorzero-api-key-id")
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string());
+            let user_id = headers
+                .get("x-tensorzero-user-id")
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string());
+            let api_key_project_id = headers
+                .get("x-tensorzero-api-key-project-id")
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string());
+
             Some(super::inference::ObservabilityMetadata {
                 project_id: project_id.to_string(),
                 endpoint_id: endpoint_id.to_string(),
                 model_id: model_id.to_string(),
+                api_key_id,
+                user_id,
+                api_key_project_id,
             })
         } else {
             None
@@ -3484,10 +3535,27 @@ pub async fn image_generation_handler(
                 .get("x-tensorzero-model-id")
                 .and_then(|v| v.to_str().ok()),
         ) {
+            // Extract auth metadata from headers
+            let api_key_id = headers
+                .get("x-tensorzero-api-key-id")
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string());
+            let user_id = headers
+                .get("x-tensorzero-user-id")
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string());
+            let api_key_project_id = headers
+                .get("x-tensorzero-api-key-project-id")
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string());
+
             Some(super::inference::ObservabilityMetadata {
                 project_id: project_id.to_string(),
                 endpoint_id: endpoint_id.to_string(),
                 model_id: model_id.to_string(),
+                api_key_id,
+                user_id,
+                api_key_project_id,
             })
         } else {
             None

@@ -121,6 +121,10 @@ pub struct ObservabilityMetadata {
     pub project_id: String,
     pub endpoint_id: String,
     pub model_id: String,
+    // Authentication metadata
+    pub api_key_id: Option<String>,
+    pub user_id: Option<String>,
+    pub api_key_project_id: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -178,10 +182,27 @@ pub async fn inference_handler(
             .get("x-tensorzero-model-id")
             .and_then(|v| v.to_str().ok()),
     ) {
+        // Extract auth metadata from headers
+        let api_key_id = headers
+            .get("x-tensorzero-api-key-id")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string());
+        let user_id = headers
+            .get("x-tensorzero-user-id")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string());
+        let api_key_project_id = headers
+            .get("x-tensorzero-api-key-project-id")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string());
+
         Some(ObservabilityMetadata {
             project_id: project_id.to_string(),
             endpoint_id: endpoint_id.to_string(),
             model_id: model_id.to_string(),
+            api_key_id,
+            user_id,
+            api_key_project_id,
         })
     } else {
         None
@@ -1221,18 +1242,24 @@ pub async fn write_inference(
         };
 
         // Use observability metadata if available, otherwise fall back to function/variant names
-        let (project_id, endpoint_id, obs_model_id) =
+        let (project_id, endpoint_id, obs_model_id, api_key_id, user_id, api_key_project_id) =
             if let Some(obs_metadata) = observability_metadata {
                 (
                     obs_metadata.project_id.clone(),
                     obs_metadata.endpoint_id.clone(),
                     obs_metadata.model_id.clone(),
+                    obs_metadata.api_key_id.clone(),
+                    obs_metadata.user_id.clone(),
+                    obs_metadata.api_key_project_id.clone(),
                 )
             } else {
                 (
                     metadata_clone.function_name.clone(),
                     metadata_clone.variant_name.clone(),
                     model_id.to_string(),
+                    None,
+                    None,
+                    None,
                 )
             };
 
@@ -1247,6 +1274,9 @@ pub async fn write_inference(
             request_ip: None, // Would need to extract from request context
             cost,
             response_analysis: None,
+            api_key_id,
+            user_id,
+            api_key_project_id,
         };
 
         // Send to Kafka observability topic

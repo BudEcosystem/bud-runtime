@@ -498,7 +498,7 @@ class ObservabilityMetricsService:
         Args:
             batch_data: List of tuples containing (inference_id, request_ip, project_id,
                        endpoint_id, model_id, cost, response_analysis, is_success,
-                       request_arrival_time, request_forward_time)
+                       request_arrival_time, request_forward_time, api_key_id, user_id, api_key_project_id)
 
         Returns:
             dict: Insertion results with counts and duplicate inference_ids
@@ -559,19 +559,41 @@ class ObservabilityMetricsService:
         # Build VALUES clause using raw SQL similar to simple_seeder
         values = []
         for record in new_records:
-            # Unpack the tuple
-            (
-                inference_id,
-                request_ip,
-                project_id,
-                endpoint_id,
-                model_id,
-                cost,
-                response_analysis,
-                is_success,
-                request_arrival_time,
-                request_forward_time,
-            ) = record
+            # Handle both old format (10 fields) and new format (13 fields)
+            if len(record) == 10:
+                # Legacy format without auth metadata
+                (
+                    inference_id,
+                    request_ip,
+                    project_id,
+                    endpoint_id,
+                    model_id,
+                    cost,
+                    response_analysis,
+                    is_success,
+                    request_arrival_time,
+                    request_forward_time,
+                ) = record
+                api_key_id = None
+                user_id = None
+                api_key_project_id = None
+            else:
+                # New format with auth metadata
+                (
+                    inference_id,
+                    request_ip,
+                    project_id,
+                    endpoint_id,
+                    model_id,
+                    cost,
+                    response_analysis,
+                    is_success,
+                    request_arrival_time,
+                    request_forward_time,
+                    api_key_id,
+                    user_id,
+                    api_key_project_id,
+                ) = record
 
             # Format each row
             row = (
@@ -584,7 +606,10 @@ class ObservabilityMetricsService:
                 f"{self._escape_string(response_analysis) if response_analysis else 'NULL'}, "
                 f"{1 if is_success else 0}, "
                 f"'{request_arrival_time.strftime('%Y-%m-%d %H:%M:%S')}', "
-                f"'{request_forward_time.strftime('%Y-%m-%d %H:%M:%S')}')"
+                f"'{request_forward_time.strftime('%Y-%m-%d %H:%M:%S')}', "
+                f"{self._escape_string(str(api_key_id)) if api_key_id else 'NULL'}, "
+                f"{self._escape_string(str(user_id)) if user_id else 'NULL'}, "
+                f"{self._escape_string(str(api_key_project_id)) if api_key_project_id else 'NULL'})"
             )
             values.append(row)
 
@@ -593,7 +618,8 @@ class ObservabilityMetricsService:
         query = f"""
         INSERT INTO ModelInferenceDetails
         (inference_id, request_ip, project_id, endpoint_id, model_id,
-         cost, response_analysis, is_success, request_arrival_time, request_forward_time)
+         cost, response_analysis, is_success, request_arrival_time, request_forward_time,
+         api_key_id, user_id, api_key_project_id)
         VALUES {",".join(values)}
         """  # nosec B608
 
@@ -633,6 +659,11 @@ class ObservabilityMetricsService:
         if request.project_id:
             where_conditions.append("mid.project_id = %(project_id)s")
             params["project_id"] = str(request.project_id)
+
+        # Support filtering by api_key_project_id (for CLIENT users)
+        if hasattr(request, "filters") and request.filters and "api_key_project_id" in request.filters:
+            where_conditions.append("mid.api_key_project_id = %(api_key_project_id)s")
+            params["api_key_project_id"] = str(request.filters["api_key_project_id"])
 
         if request.endpoint_id:
             where_conditions.append("mid.endpoint_id = %(endpoint_id)s")
@@ -727,6 +758,7 @@ class ObservabilityMetricsService:
             mid.is_success,
             mi.cached,
             mid.project_id,
+            mid.api_key_project_id,
             mid.endpoint_id,
             mid.model_id,
             coalesce(mi.endpoint_type, 'chat') as endpoint_type
@@ -766,9 +798,10 @@ class ObservabilityMetricsService:
                     is_success=bool(row[10]),
                     cached=bool(row[11]),
                     project_id=row[12],
-                    endpoint_id=row[13],
-                    model_id=row[14],
-                    endpoint_type=row[15],
+                    api_key_project_id=row[13],  # Added api_key_project_id
+                    endpoint_id=row[14],
+                    model_id=row[15],
+                    endpoint_type=row[16],
                 )
             )
 
@@ -838,6 +871,7 @@ class ObservabilityMetricsService:
                 mid.request_arrival_time,
                 mid.request_forward_time,
                 mid.project_id,
+                mid.api_key_project_id,
                 mid.endpoint_id,
                 mid.is_success,
                 mi.cached,
@@ -919,6 +953,7 @@ class ObservabilityMetricsService:
                 mid.request_arrival_time,
                 mid.request_forward_time,
                 mid.project_id,
+                mid.api_key_project_id,
                 mid.endpoint_id,
                 mid.is_success,
                 mi.cached,
@@ -1204,15 +1239,16 @@ class ObservabilityMetricsService:
                 request_arrival_time=row[17],
                 request_forward_time=row[18],
                 project_id=safe_uuid(row[19]),  # Keep as UUID
-                endpoint_id=safe_uuid(row[20]),  # Keep as UUID
-                is_success=bool(row[21]) if row[21] is not None else True,
-                cached=bool(row[22]) if row[22] is not None else False,
-                finish_reason=str(row[23]) if row[23] else None,
-                cost=float(row[24]) if row[24] else None,
-                raw_request=str(row[25]) if row[25] else None,
-                raw_response=str(row[26]) if row[26] else None,
-                gateway_request=str(row[27]) if row[27] else None,
-                gateway_response=str(row[28]) if row[28] else None,
+                api_key_project_id=safe_uuid(row[20]),  # API key project ID
+                endpoint_id=safe_uuid(row[21]),  # Keep as UUID
+                is_success=bool(row[22]) if row[22] is not None else True,
+                cached=bool(row[23]) if row[23] is not None else False,
+                finish_reason=str(row[24]) if row[24] else None,
+                cost=float(row[25]) if row[25] else None,
+                raw_request=str(row[26]) if row[26] else None,
+                raw_response=str(row[27]) if row[27] else None,
+                gateway_request=str(row[28]) if row[28] else None,
+                gateway_response=str(row[29]) if row[29] else None,
                 gateway_metadata=gateway_metadata,  # New gateway metadata
                 feedback_count=feedback_count,
                 average_rating=average_rating,
@@ -1740,6 +1776,16 @@ class ObservabilityMetricsService:
                     else:
                         where_conditions.append("mid.project_id = %(project_id)s")
                         params["project_id"] = filter_value
+                elif filter_key == "api_key_project_id":
+                    # Support filtering by api_key_project_id for CLIENT users
+                    if isinstance(filter_value, list):
+                        placeholders = [f"%(api_key_project_{i})s" for i in range(len(filter_value))]
+                        where_conditions.append(f"mid.api_key_project_id IN ({','.join(placeholders)})")
+                        for i, val in enumerate(filter_value):
+                            params[f"api_key_project_{i}"] = val
+                    else:
+                        where_conditions.append("mid.api_key_project_id = %(api_key_project_id)s")
+                        params["api_key_project_id"] = filter_value
                 elif filter_key == "model_id":
                     where_conditions.append("mid.model_id = %(model_id)s")
                     params["model_id"] = filter_value
@@ -1931,6 +1977,16 @@ class ObservabilityMetricsService:
                     else:
                         where_conditions.append("mid.project_id = %(project_id)s")
                         params["project_id"] = filter_value
+                elif filter_key == "api_key_project_id":
+                    # Support filtering by api_key_project_id for CLIENT users
+                    if isinstance(filter_value, list):
+                        placeholders = [f"%(api_key_project_{i})s" for i in range(len(filter_value))]
+                        where_conditions.append(f"mid.api_key_project_id IN ({','.join(placeholders)})")
+                        for i, val in enumerate(filter_value):
+                            params[f"api_key_project_{i}"] = val
+                    else:
+                        where_conditions.append("mid.api_key_project_id = %(api_key_project_id)s")
+                        params["api_key_project_id"] = filter_value
                 elif filter_key == "model_id":
                     where_conditions.append("mid.model_id = %(model_id)s")
                     params["model_id"] = filter_value
@@ -2080,6 +2136,10 @@ class ObservabilityMetricsService:
                 if filter_key == "project_id":
                     where_conditions.append("ga.project_id = %(project_id)s")
                     params["project_id"] = filter_value
+                elif filter_key == "api_key_project_id":
+                    # Support filtering by api_key_project_id for CLIENT users
+                    where_conditions.append("ga.api_key_project_id = %(api_key_project_id)s")
+                    params["api_key_project_id"] = filter_value
                 elif filter_key == "country_code":
                     if isinstance(filter_value, list):
                         placeholders = [f"%(country_{i})s" for i in range(len(filter_value))]
@@ -2227,6 +2287,14 @@ class ObservabilityMetricsService:
                     project_ids = [project_ids]
                 project_filter = "', '".join(str(pid) for pid in project_ids)
                 filter_conditions.append(f"toString(project_id) IN ('{project_filter}')")
+
+            if "api_key_project_id" in request.filters:
+                # Support filtering by api_key_project_id for CLIENT users
+                api_key_project_ids = request.filters["api_key_project_id"]
+                if isinstance(api_key_project_ids, str):
+                    api_key_project_ids = [api_key_project_ids]
+                api_key_project_filter = "', '".join(str(pid) for pid in api_key_project_ids)
+                filter_conditions.append(f"toString(api_key_project_id) IN ('{api_key_project_filter}')")
 
             if "endpoint_id" in request.filters:
                 endpoint_ids = request.filters["endpoint_id"]
