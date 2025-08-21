@@ -1,11 +1,13 @@
 import uuid
-from typing import List, Optional, Tuple, cast
+from typing import Any, Dict, List, Optional, Tuple, cast
 
+import aiohttp
 from fastapi import HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from budapp.commons import logging
+from budapp.commons.config import app_settings
 from budapp.commons.constants import WorkflowTypeEnum
 from budapp.commons.exceptions import ClientException
 from budapp.endpoint_ops.models import Endpoint as EndpointModel
@@ -1344,6 +1346,10 @@ class ExperimentWorkflowService:
                     {"status": WorkflowStatusEnum.COMPLETED.value},  # type: ignore
                 )
 
+                # if experiment_id, then call the eval workflow
+                # if experiment_id:
+                #     await self._call_eval_workflow(experiment_id)
+
             # After storing the workflow step, retrieve all accumulated data
             all_step_data = await self._get_accumulated_step_data(workflow.id)
 
@@ -1689,6 +1695,19 @@ class ExperimentWorkflowService:
         self.session.commit()
         return experiment.id
 
+    async def _call_eval_workflow(self, experiment_id: uuid.UUID) -> None:
+        """Delegate evaluation workflow to EvaluationWorkflowService.
+
+        Parameters:
+            experiment_id (uuid.UUID): The experiment ID to evaluate.
+        """
+        try:
+            # Use EvaluationWorkflowService to trigger evaluations
+            eval_service = EvaluationWorkflowService(self.session)
+            await eval_service._trigger_evaluations_for_experiment(experiment_id)
+        except Exception as e:
+            logger.error(f"Failed to call eval workflow for experiment {experiment_id}: {e}")
+
     async def get_experiment_workflow_data(
         self, workflow_id: uuid.UUID, current_user_id: uuid.UUID
     ) -> ExperimentWorkflowResponse:
@@ -1861,6 +1880,10 @@ class EvaluationWorkflowService:
             next_step_data = (
                 await self._get_next_step_data(next_step, all_step_data, experiment_id) if next_step else None
             )
+
+            # Trigger budeval evaluation if this is the final step
+            if request.step_number == 5 and request.trigger_workflow:
+                await self._trigger_evaluations_for_experiment(experiment_id)
 
             return EvaluationWorkflowResponse(
                 code=status.HTTP_200_OK,
@@ -2119,6 +2142,10 @@ class EvaluationWorkflowService:
             runs_created += 1
 
         self.session.commit()
+
+        # Trigger budeval evaluation for all created runs
+        await self._trigger_evaluations_for_experiment(experiment_id)
+
         return runs_created
 
     async def _get_next_step_data(
@@ -2365,3 +2392,249 @@ class EvaluationWorkflowService:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to retrieve workflow data"
             ) from e
+
+    async def trigger_budeval_evaluation(
+        self, run_id: uuid.UUID, evaluation_request: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Trigger evaluation in budeval service via Dapr.
+
+        Parameters:
+            run_id (uuid.UUID): The run ID to execute evaluation for.
+            evaluation_request (Dict[str, Any]): The evaluation request data.
+
+        Returns:
+            Dict[str, Any]: Response from budeval service.
+
+        Raises:
+            ClientException: If the budeval request fails.
+        """
+        try:
+            # Prepare request for budeval
+            budeval_endpoint = (
+                f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_eval_app_id}/method/evals/start"
+            )
+
+            # Create evaluation request matching budeval schema
+            eval_request = {
+                "uuid": str(run_id),
+                "eval_model_info": {
+                    "model_name": evaluation_request["model_name"],
+                    "endpoint": evaluation_request["endpoint"],
+                    "api_key": evaluation_request["api_key"],
+                    "extra_args": evaluation_request.get("extra_args", {}),
+                },
+                "eval_datasets": [{"dataset_id": ds} for ds in evaluation_request["datasets"]],
+                "eval_configs": evaluation_request.get("eval_configs", []),
+                "engine": evaluation_request.get("engine", "opencompass"),
+            }
+
+            logger.info(f"Triggering budeval evaluation for run {run_id} with request: {eval_request}")
+
+            # Make async request to budeval
+            async with aiohttp.ClientSession() as session:
+                async with session.post(budeval_endpoint, json=eval_request) as response:
+                    response_data = await response.json()
+                    logger.debug(f"Response from budeval service: {response_data}")
+
+                    if response.status != 200:
+                        error_message = response_data.get("message", "Failed to start evaluation")
+                        logger.error(f"Failed to start evaluation with budeval service: {error_message}")
+                        raise ClientException(error_message)
+
+                    logger.info(f"Successfully triggered evaluation in budeval service for run {run_id}")
+                    return response_data
+
+        except ClientException:
+            raise
+        except Exception as e:
+            logger.error(f"Failed to trigger budeval evaluation: {e}")
+            raise ClientException("Unable to start evaluation with budeval service") from e
+
+    async def get_evaluation_status(self, job_id: str) -> Dict[str, Any]:
+        """Get evaluation job status from budeval.
+
+        Parameters:
+            job_id (str): The evaluation job ID.
+
+        Returns:
+            Dict[str, Any]: Job status information from budeval.
+
+        Raises:
+            ClientException: If the status request fails.
+        """
+        try:
+            status_endpoint = (
+                f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_eval_app_id}/method/evals/status/{job_id}"
+            )
+
+            logger.debug(f"Getting evaluation status for job {job_id}")
+
+            async with aiohttp.ClientSession() as session:
+                async with session.get(status_endpoint) as response:
+                    response_data = await response.json()
+
+                    if response.status != 200:
+                        error_message = response_data.get("message", "Failed to get evaluation status")
+                        logger.error(f"Failed to get evaluation status: {error_message}")
+                        raise ClientException(error_message)
+
+                    return response_data
+
+        except ClientException:
+            raise
+        except Exception as e:
+            logger.error(f"Failed to get evaluation status: {e}")
+            raise ClientException("Unable to get evaluation status from budeval service") from e
+
+    async def cleanup_evaluation_job(self, job_id: str) -> Dict[str, Any]:
+        """Clean up an evaluation job and its resources.
+
+        Parameters:
+            job_id (str): The evaluation job ID to cleanup.
+
+        Returns:
+            Dict[str, Any]: Cleanup status information from budeval.
+
+        Raises:
+            ClientException: If the cleanup request fails.
+        """
+        try:
+            cleanup_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_eval_app_id}/method/evals/cleanup/{job_id}"
+
+            logger.info(f"Cleaning up evaluation job {job_id}")
+
+            async with aiohttp.ClientSession() as session:
+                async with session.delete(cleanup_endpoint) as response:
+                    response_data = await response.json()
+
+                    if response.status != 200:
+                        error_message = response_data.get("message", "Failed to cleanup evaluation job")
+                        logger.error(f"Failed to cleanup evaluation job: {error_message}")
+                        raise ClientException(error_message)
+
+                    logger.info(f"Successfully cleaned up evaluation job {job_id}")
+                    return response_data
+
+        except ClientException:
+            raise
+        except Exception as e:
+            logger.error(f"Failed to cleanup evaluation job: {e}")
+            raise ClientException("Unable to cleanup evaluation job with budeval service") from e
+
+    async def update_run_evaluation_status(self, run_id: uuid.UUID, status_data: Dict[str, Any]) -> None:
+        """Update run evaluation status based on budeval feedback.
+
+        Parameters:
+            run_id (uuid.UUID): The run ID to update.
+            status_data (Dict[str, Any]): Status data from budeval.
+        """
+        try:
+            run = self.session.get(RunModel, run_id)
+            if not run:
+                logger.warning(f"Run {run_id} not found for status update")
+                return
+
+            # Update run status and budeval-specific fields
+            update_data = {
+                "evaluation_status": status_data.get("status"),
+                "budeval_job_id": status_data.get("job_id"),
+                "budeval_workflow_id": status_data.get("workflow_id"),
+            }
+
+            # Set timestamps based on status
+            if status_data.get("status") == "running" and not run.evaluation_started_at:
+                update_data["evaluation_started_at"] = func.now()
+            elif status_data.get("status") in ["completed", "failed"]:
+                update_data["evaluation_completed_at"] = func.now()
+
+            # Update the run
+            for field, value in update_data.items():
+                if value is not None and hasattr(run, field):
+                    setattr(run, field, value)
+
+            self.session.commit()
+            logger.info(f"Updated run {run_id} evaluation status to {status_data.get('status')}")
+
+        except Exception as e:
+            logger.error(f"Failed to update run evaluation status: {e}")
+            self.session.rollback()
+            raise
+
+    async def _trigger_evaluations_for_experiment(self, experiment_id: uuid.UUID) -> None:
+        """Trigger budeval evaluation for all pending runs in the experiment.
+
+        Parameters:
+            experiment_id (uuid.UUID): The experiment ID to evaluate.
+        """
+        try:
+            # Get all pending runs for this experiment
+            runs = (
+                self.session.query(RunModel)
+                .filter(RunModel.experiment_id == experiment_id, RunModel.status == RunStatusEnum.PENDING.value)
+                .all()
+            )
+
+            if not runs:
+                logger.info(f"No pending runs found for experiment {experiment_id}")
+                return
+
+            logger.info(f"Triggering budeval evaluation for {len(runs)} runs in experiment {experiment_id}")
+
+            # Trigger evaluation for each run
+            for run in runs:
+                try:
+                    # Get model information for the run
+                    # model = self.session.get(ModelTable, run.model_id)
+                    # dataset_version = self.session.get(ExpDatasetVersion, run.dataset_version_id)
+
+                    # if not model or not dataset_version:
+                    #     logger.error(f"Missing model or dataset for run {run.id}")
+                    #     continue
+
+                    # Get endpoint information
+                    # Check if model has endpoint information
+                    # endpoint_info = None
+                    # if hasattr(model, 'endpoints') and model.endpoints:
+                    #     endpoint_info = model.endpoints[0] if model.endpoints else None
+
+                    # Prepare evaluation request
+                    evaluation_request = {
+                        "model_name": "qwen3-4b",
+                        "endpoint": "http://20.66.97.208/v1",
+                        "api_key": "sk-BudLiteLLMMasterKey_123",
+                        "datasets": ["demo_gsm8k_chat_gen"],
+                        "engine": "opencompass",  # Default engine
+                        "extra_args": run.config or {},
+                        "kubeconfig": None,  # Will use default kubeconfig
+                    }
+
+                    # Update run status to running
+                    run.status = RunStatusEnum.RUNNING.value
+                    self.session.commit()
+
+                    # Trigger budeval evaluation
+                    response = await self.trigger_budeval_evaluation(
+                        run_id=run.id, evaluation_request=evaluation_request
+                    )
+
+                    # Store budeval job information if we have the fields
+                    # These fields will be added in the database migration
+                    if hasattr(run, "budeval_job_id"):
+                        run.budeval_job_id = response.get("job_id")
+                    if hasattr(run, "budeval_workflow_id"):
+                        run.budeval_workflow_id = response.get("workflow_id")
+                    if hasattr(run, "evaluation_status"):
+                        run.evaluation_status = "initiated"
+                    self.session.commit()
+
+                    logger.info(f"Successfully triggered evaluation for run {run.id}")
+
+                except Exception as e:
+                    logger.error(f"Failed to trigger evaluation for run {run.id}: {e}")
+                    run.status = RunStatusEnum.FAILED.value
+                    if hasattr(run, "evaluation_error"):
+                        run.evaluation_error = str(e)
+                    self.session.commit()
+
+        except Exception as e:
+            logger.error(f"Failed to trigger evaluations for experiment {experiment_id}: {e}")
