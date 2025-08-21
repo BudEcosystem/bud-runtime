@@ -40,6 +40,7 @@ from .schemas import (
     CreatePromptVersionRequest,
     CreatePromptWorkflowRequest,
     EditPromptRequest,
+    EditPromptVersionRequest,
     PromptFilter,
     PromptListItem,
     PromptListResponse,
@@ -231,6 +232,61 @@ async def create_prompt_version(
         logger.exception(f"Failed to create prompt version: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to create prompt version"
+        ).to_http_response()
+
+
+@router.patch(
+    "/{prompt_id}/versions/{version_id}",
+    responses={
+        status.HTTP_200_OK: {
+            "model": SinglePromptVersionResponse,
+            "description": "Successfully updated prompt version",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Invalid request data",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Prompt or version not found",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Server error",
+        },
+    },
+    description="Update a prompt version by its ID",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
+async def edit_prompt_version(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    prompt_id: UUID,
+    version_id: UUID,
+    edit_version: EditPromptVersionRequest,
+) -> Union[SinglePromptVersionResponse, ErrorResponse]:
+    """Edit prompt version fields."""
+    try:
+        # Prepare update data - exclude_unset and exclude_none for proper PATCH behavior
+        update_data = edit_version.model_dump(exclude_unset=True, exclude_none=True)
+
+        version_response = await PromptVersionService(session).edit_prompt_version(
+            prompt_id=prompt_id, version_id=version_id, data=update_data
+        )
+
+        return SinglePromptVersionResponse(
+            version=version_response,
+            message="Prompt version updated successfully",
+            code=status.HTTP_200_OK,
+            object="prompt.version.edit",
+        ).to_http_response()
+    except ClientException as e:
+        logger.error(f"Failed to edit prompt version: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to edit prompt version: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to edit prompt version"
         ).to_http_response()
 
 

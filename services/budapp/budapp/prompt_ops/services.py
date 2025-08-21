@@ -538,3 +538,74 @@ class PromptVersionService(SessionMixin):
         version_response = PromptVersionResponse.model_validate(db_version)
 
         return version_response
+
+    async def edit_prompt_version(
+        self, prompt_id: UUID, version_id: UUID, data: dict[str, Any]
+    ) -> PromptVersionResponse:
+        """Edit prompt version by validating and updating specific fields."""
+        # Retrieve existing prompt version
+        db_version = await PromptVersionDataManager(self.session).retrieve_by_fields(
+            PromptVersionModel,
+            fields={"id": version_id, "prompt_id": prompt_id},
+            exclude_fields={"status": PromptVersionStatusEnum.DELETED},
+        )
+
+        if not db_version:
+            raise ClientException(message="Prompt version not found", status_code=status.HTTP_404_NOT_FOUND)
+
+        # Get the prompt to validate project consistency
+        db_prompt = await PromptDataManager(self.session).retrieve_by_fields(
+            PromptModel,
+            fields={"id": prompt_id, "status": PromptStatusEnum.ACTIVE},
+        )
+
+        if not db_prompt:
+            raise ClientException(message="Prompt not found", status_code=status.HTTP_404_NOT_FOUND)
+
+        # Handle endpoint_id update if provided
+        if "endpoint_id" in data:
+            endpoint_id = data["endpoint_id"]
+
+            # Validate and fetch the endpoint
+            db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+                EndpointModel,
+                fields={"id": endpoint_id},
+                exclude_fields={"status": EndpointStatusEnum.DELETED},
+                missing_ok=True,
+            )
+
+            if not db_endpoint:
+                raise ClientException(message="Endpoint not found", status_code=status.HTTP_404_NOT_FOUND)
+
+            # Validate that the endpoint belongs to the same project as the prompt
+            if db_endpoint.project_id != db_prompt.project_id:
+                raise ClientException(
+                    message="Endpoint does not belong to the same project as the prompt",
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Update model_id and cluster_id from the new endpoint
+            data["model_id"] = db_endpoint.model_id
+            data["cluster_id"] = db_endpoint.cluster_id
+
+        # Handle prompt_schema update if provided
+        if "prompt_schema" in data and data["prompt_schema"] is not None:
+            # The prompt_schema is already validated by Pydantic schema
+            pass
+
+        # Handle set_as_default if provided
+        set_as_default = data.pop("set_as_default", None)
+        if set_as_default is True:
+            await PromptDataManager(self.session).update_by_fields(db_prompt, {"default_version_id": db_version.id})
+
+        # Update the prompt version with remaining fields
+        if data:  # Only update if there are fields to update
+            db_version = await PromptVersionDataManager(self.session).update_by_fields(db_version, data)
+
+        # Load relationships for the response
+        self.session.refresh(db_version)
+
+        # Convert to response model
+        version_response = PromptVersionResponse.model_validate(db_version)
+
+        return version_response

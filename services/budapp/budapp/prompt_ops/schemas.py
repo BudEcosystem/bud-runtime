@@ -376,6 +376,14 @@ class CreatePromptVersionRequest(BaseModel):
     set_as_default: bool = Field(default=False, description="Set this version as the default version")
 
 
+class EditPromptVersionRequest(BaseModel):
+    """Edit prompt version request schema."""
+
+    endpoint_id: UUID4 | None = Field(None, description="Endpoint ID for the prompt version")
+    prompt_schema: PromptSchemaConfig | None = Field(None, description="Prompt schema configuration")
+    set_as_default: bool | None = Field(None, description="Set this version as the default version")
+
+
 class SinglePromptVersionResponse(SuccessResponse):
     """Single prompt version response."""
 
