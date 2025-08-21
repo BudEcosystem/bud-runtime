@@ -6,8 +6,8 @@
     ./hardware-configuration.nix
     ./disko.nix
 
-    ./modules/k8s
-    ./modules/cd
+    ./modules/k3s.nix
+    ./modules/scid.nix
     ./modules/wireguard.nix
     ./modules/docker.nix
   ];

@@ -1,0 +1,6 @@
+dependencies:
+- name: keel
+  repository: https://charts.keel.sh
+  version: 1.0.5
+digest: sha256:6a8b69b6799134f05763e8ba17ea991d4a2358701eb1e1bea447a38a787fe331
+generated: "2025-08-15T12:27:34.401660371+05:30"

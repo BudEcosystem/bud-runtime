@@ -15,7 +15,12 @@ use tokio::signal;
 use tower_http::trace::{DefaultOnFailure, TraceLayer};
 use tracing::Level;
 
+use tensorzero_internal::analytics_middleware::{
+    analytics_middleware, attach_clickhouse_middleware, attach_geoip_middleware,
+    attach_ua_parser_middleware,
+};
 use tensorzero_internal::auth::require_api_key;
+use tensorzero_internal::blocking_middleware::{attach_blocking_manager, blocking_middleware};
 use tensorzero_internal::clickhouse::ClickHouseConnectionInfo;
 use tensorzero_internal::config_parser::Config;
 use tensorzero_internal::endpoints;
@@ -395,7 +400,7 @@ async fn main() {
             get(move || std::future::ready(metrics_handle.render())),
         );
 
-    let router = Router::new()
+    let mut router = Router::new()
         .merge(openai_routes)
         .merge(public_routes)
         .fallback(endpoints::fallback::handle_404)
@@ -405,8 +410,55 @@ async fn main() {
         // This is only used to output request/response information to our logs
         // OTEL exporting is done by the `OtelAxumLayer` above, which is only enabled for certain routes (and includes much more information)
         // We log failed requests messages at 'DEBUG', since we already have our own error-logging code,
-        .layer(TraceLayer::new_for_http().on_failure(DefaultOnFailure::new().level(Level::DEBUG)))
-        .with_state(app_state);
+        .layer(TraceLayer::new_for_http().on_failure(DefaultOnFailure::new().level(Level::DEBUG)));
+
+    // Apply blocking middleware if enabled (must run AFTER analytics for data access)
+    if app_state.config.gateway.blocking.enabled {
+        tracing::info!("Gateway blocking rules enabled");
+
+        if let Some(blocking_manager) = app_state.blocking_manager.clone() {
+            // Apply blocking enforcement middleware FIRST (so it runs AFTER analytics)
+            router = router.layer(axum::middleware::from_fn(blocking_middleware));
+
+            // Attach blocking manager to request extensions (runs before blocking middleware)
+            router = router.layer(axum::middleware::from_fn_with_state(
+                blocking_manager,
+                attach_blocking_manager,
+            ));
+        } else {
+            tracing::warn!("Blocking is enabled but no blocking manager available");
+        }
+    }
+
+    // Apply analytics middleware if enabled (must run BEFORE blocking to provide data)
+    if app_state.config.gateway.analytics.enabled {
+        tracing::info!("Gateway analytics enabled");
+
+        // Apply analytics collection middleware (will run before blocking)
+        router = router.layer(axum::middleware::from_fn(analytics_middleware));
+
+        // Attach required services to request extensions (run first to provide data)
+        if let Some(parser) = app_state.ua_parser.clone() {
+            router = router.layer(axum::middleware::from_fn_with_state(
+                parser,
+                attach_ua_parser_middleware,
+            ));
+        }
+
+        if let Some(geoip) = app_state.geoip_service.clone() {
+            router = router.layer(axum::middleware::from_fn_with_state(
+                geoip,
+                attach_geoip_middleware,
+            ));
+        }
+
+        router = router.layer(axum::middleware::from_fn_with_state(
+            Arc::new(app_state.clickhouse_connection_info.clone()),
+            attach_clickhouse_middleware,
+        ));
+    }
+
+    let router = router.with_state(app_state);
 
     // Bind to the socket address specified in the config, or default to 0.0.0.0:3000
     let bind_address = config

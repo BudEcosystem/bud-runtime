@@ -126,6 +126,9 @@ mkShell {
 
     export_sops_secret_silent s3 access_key AWS_ACCESS_KEY_ID
     export_sops_secret_silent s3 secret_key AWS_SECRET_ACCESS_KEY
+    if [ -r "$HOME/.kube/config.bud" ]; then
+        export KUBECONFIG="$HOME/.kube/config.bud"
+    fi
 
     export PS1="\033[0;35m[bud]\033[0m $PS1"
   '';

@@ -9,6 +9,11 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    scid = {
+      url = "github:sinanmohd/scid/master";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     disko = {
       url = "github:nix-community/disko/latest";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -23,6 +28,7 @@
       disko,
       nixos-facter-modules,
       pre-commit-hooks,
+      scid,
     }:
     let
       lib = nixpkgs.lib;
@@ -49,6 +55,7 @@
 
             disko.nixosModules.disko
             sinan.nixosModules.server
+            scid.nixosModules.scid
             nixos-facter-modules.nixosModules.facter
 
             ./nix/nixos/${host}/configuration.nix

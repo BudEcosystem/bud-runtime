@@ -7,7 +7,7 @@ use redis::AsyncCommands;
 use secrecy::SecretString;
 use tracing::instrument;
 
-use crate::auth::{APIConfig, Auth, PublishedModelInfo};
+use crate::auth::{APIConfig, ApiKeyMetadata, Auth, PublishedModelInfo};
 use crate::config_parser::ProviderTypesConfig;
 use crate::encryption::{decrypt_api_key, is_decryption_enabled, load_private_key};
 use crate::error::{Error, ErrorDetails};
@@ -142,12 +142,32 @@ impl RedisClient {
         })
     }
 
-    async fn parse_api_keys(json: &str) -> Result<HashMap<String, APIConfig>, Error> {
-        serde_json::from_str(json).map_err(|e| {
+    async fn parse_api_keys(json: &str) -> Result<(APIConfig, Option<crate::auth::AuthMetadata>), Error> {
+        // Parse as generic JSON first to extract metadata
+        let json_value: serde_json::Value = serde_json::from_str(json).map_err(|e| {
             Error::new(ErrorDetails::Config {
-                message: format!("Failed to parse API keys from redis: {e}"),
+                message: format!("Failed to parse API keys JSON from redis: {e}"),
             })
-        })
+        })?;
+
+        let mut api_config = APIConfig::new();
+        let mut auth_metadata = None;
+
+        if let serde_json::Value::Object(mut obj) = json_value {
+            // Extract __metadata__ if present
+            if let Some(metadata_value) = obj.remove("__metadata__") {
+                auth_metadata = serde_json::from_value(metadata_value).ok();
+            }
+
+            // Parse the remaining fields as ApiKeyMetadata and add to APIConfig
+            for (key, value) in obj {
+                if let Ok(metadata) = serde_json::from_value::<ApiKeyMetadata>(value) {
+                    api_config.insert(key, metadata);
+                }
+            }
+        }
+
+        Ok((api_config, auth_metadata))
     }
 
     async fn parse_published_model_info(json: &str) -> Result<PublishedModelInfo, Error> {
@@ -173,9 +193,16 @@ impl RedisClient {
                 })?;
 
                 match Self::parse_api_keys(&value).await {
-                    Ok(keys) => {
-                        for (api_key, config) in keys {
-                            auth.update_api_keys(&api_key, config);
+                    Ok((api_config, metadata)) => {
+                        // Extract the actual API key from Redis key format "api_key:actual_key"
+                        let actual_api_key = key.strip_prefix(API_KEY_KEY_PREFIX).unwrap_or(key);
+
+                        // Update the API configuration for this key
+                        auth.update_api_keys(actual_api_key, api_config);
+
+                        // Update auth metadata if present
+                        if let Some(auth_meta) = metadata {
+                            auth.update_auth_metadata(actual_api_key, auth_meta);
                         }
                     }
                     Err(e) => {
@@ -361,9 +388,16 @@ impl RedisClient {
             for key in api_keys_keys {
                 if let Ok(json) = self.conn.get::<_, String>(&key).await {
                     match Self::parse_api_keys(&json).await {
-                        Ok(keys) => {
-                            for (api_key, config) in keys {
-                                self.auth.update_api_keys(&api_key, config);
+                        Ok((api_config, metadata)) => {
+                            // Extract the actual API key from Redis key format "api_key:actual_key"
+                            let actual_api_key = key.strip_prefix(API_KEY_KEY_PREFIX).unwrap_or(&key);
+
+                            // Update the API configuration for this key
+                            self.auth.update_api_keys(actual_api_key, api_config);
+
+                            // Update auth metadata if present
+                            if let Some(auth_meta) = metadata {
+                                self.auth.update_auth_metadata(actual_api_key, auth_meta);
                             }
                         }
                         Err(e) => tracing::error!(

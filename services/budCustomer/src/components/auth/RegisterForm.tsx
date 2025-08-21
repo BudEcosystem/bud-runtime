@@ -134,9 +134,9 @@ const RegisterForm = ({ onSubmit }: RegisterFormProps) => {
             Create Account
           </Text_32_500_FFFFFF>
         </div>
-        <Text_12_400_B3B3B3 className="text-center">
+        <Text_12_400_EEEEEE className="text-center">
           Enter your details to create your BUD account
-        </Text_12_400_B3B3B3>
+        </Text_12_400_EEEEEE>
       </div>
 
       <form
@@ -295,9 +295,9 @@ const RegisterForm = ({ onSubmit }: RegisterFormProps) => {
                 validateField("role", value.toLowerCase());
               }}
               triggerClassNames="w-full"
-              contentClassNames="w-full"
+              contentClassNames="w-[--radix-dropdown-menu-trigger-width] min-w-[--radix-dropdown-menu-trigger-width]"
               triggerRenderItem={
-                <div className="flex items-center justify-between w-full h-auto leading-[100%] text-xs text-bud-text-primary font-light pt-[.8rem] pb-[.53rem] px-3">
+                <div className="flex items-center justify-between w-full h-auto leading-[100%] text-xs text-[var(--text-primary)] font-light pt-[.8rem] pb-[.53rem] px-3">
                   <span
                     className={formData.role ? "" : "text-bud-text-disabled"}
                   >

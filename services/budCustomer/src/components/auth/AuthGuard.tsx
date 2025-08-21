@@ -11,11 +11,11 @@ interface AuthGuardProps {
 
 // List of public routes that don't require authentication
 const publicRoutes = [
-  "/login",
-  "/register",
   "/auth/login",
   "/auth/register",
   "/auth/reset-password",
+  "/login", // Rewritten route
+  "/register", // Rewritten route
 ];
 
 export default function AuthGuard({ children }: AuthGuardProps) {
@@ -41,7 +41,13 @@ export default function AuthGuard({ children }: AuthGuardProps) {
       // If on public route, allow access immediately
       if (isPublicRoute) {
         // If already authenticated and on login/register, redirect to models
-        if (token && (pathname === "/login" || pathname === "/register")) {
+        if (
+          token &&
+          (pathname === "/auth/login" ||
+            pathname === "/auth/register" ||
+            pathname === "/login" ||
+            pathname === "/register")
+        ) {
           console.log("Already authenticated, redirecting to models");
           router.push("/models");
         }

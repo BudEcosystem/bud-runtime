@@ -1,0 +1,17 @@
+apiVersion: v2
+
+name: dapr
+description: Dapr Chart for Bud
+type: application
+version: 0.1.0
+
+maintainers:
+  - name: "sinanmohd"
+    email: "sinan@sinanmohd.com"
+    url: "https://www.sinanmohd.com"
+
+dependencies:
+  - name: dapr
+    version: 1.15.8
+    repository: https://dapr.github.io/helm-charts/
+    condition: dapr.enabled

@@ -123,6 +123,7 @@ class AppConfig(BaseAppConfig):
     bud_simulator_app_id: str = Field(alias="BUD_SIMULATOR_APP_ID")
     bud_metrics_app_id: str = Field(alias="BUD_METRICS_APP_ID")
     bud_notify_app_id: str = Field(alias="BUD_NOTIFY_APP_ID")
+    bud_eval_app_id: str = Field(alias="BUD_EVAL_APP_ID", default="budeval")
     source_topic: str = Field(alias="SOURCE_TOPIC", default="budAppMessages")
 
     # Prometheus URL
