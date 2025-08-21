@@ -20,7 +20,7 @@ from budmicroframe.commons.schemas import (
     WorkflowMetadataResponse,
     WorkflowStep,
 )
-from budmicroframe.shared.dapr_service import DaprService
+from budmicroframe.shared.dapr_service import DaprService, DaprServiceCrypto
 
 # from .dapr_workflow import DaprWorkflow
 from budmicroframe.shared.dapr_workflow import DaprWorkflow
@@ -1724,6 +1724,7 @@ class UpdateClusterStatusWorkflow:
         logger = logging.get_logger("UpdateClusterStatus")
         instance_id = str(ctx.instance_id)
         logger.info(f"Updating cluster status for workflow_id: {instance_id}")
+
         with DBSession() as session:
             db_cluster = asyncio.run(ClusterService(session)._get_cluster(cluster_id, missing_ok=True))
             if db_cluster is None:
@@ -1731,8 +1732,24 @@ class UpdateClusterStatusWorkflow:
                 # condition for update cluster status job completed
                 # will happen when cluster is deleted
                 return
+
+        # Decrypt config inside the workflow, like deployment workflows do
+        config_dict = {}
+        if db_cluster.configuration:
+            try:
+                with DaprServiceCrypto() as dapr_service:
+                    configuration_decrypted = dapr_service.decrypt_data(db_cluster.configuration)
+                    config_dict = json.loads(configuration_decrypted)
+                logger.debug(f"Successfully decrypted config for cluster {cluster_id}")
+            except Exception as e:
+                logger.error(f"Failed to decrypt config for cluster {cluster_id}: {e}")
+                # Can't proceed without config - return early
+                logger.warning(f"Skipping node status update for cluster {cluster_id} due to crypto error")
+                return {"status": "skipped", "cluster_id": cluster_id, "reason": "crypto_unavailable"}
+
+        # Pass the decrypted config to update_node_status
         cluster_status, nodes_info_present, node_info, node_status_change = asyncio.run(
-            ClusterOpsService.update_node_status(db_cluster.id)
+            ClusterOpsService.update_node_status(db_cluster.id, config_dict)
         )
         if cluster_status != db_cluster.status or not nodes_info_present or node_status_change:
             logger.info(f"Sending cluster status notification: {cluster_status}")
@@ -1765,8 +1782,10 @@ class UpdateClusterStatusWorkflow:
                 )
             logger.info(f"Cluster status update notification sent: {notification_request}")
             # yield ctx.call_activity(notify_activity, input=notification_activity_request.model_dump_json())
-        yield ctx.create_timer(fire_at=ctx.current_utc_datetime + timedelta(minutes=5))
-        ctx.continue_as_new(cluster_id)
+
+        # Workflow completes after single execution - no perpetual loop
+        logger.info(f"Cluster status update workflow completed for cluster {cluster_id}")
+        return {"status": "completed", "cluster_id": cluster_id}
 
     async def __call__(
         self, request: str, workflow_id: Optional[str] = None

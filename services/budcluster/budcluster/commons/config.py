@@ -33,12 +33,15 @@ class AppConfig(BaseAppConfig):
 
     # Cluster
     validate_certs: bool = Field(True, alias="VALIDATE_CERTS")
-    node_info_collector_image_cpu: str = Field(..., alias="NODE_INFO_COLLECTOR_IMAGE_CPU")
-    node_info_collector_image_cuda: str = Field(..., alias="NODE_INFO_COLLECTOR_IMAGE_CUDA")
-    node_info_collector_image_hpu: str = Field(..., alias="NODE_INFO_COLLECTOR_IMAGE_HPU")
-    node_info_labeler_image: str = Field(..., alias="NODE_INFO_LABELER_IMAGE")
+    # Node-info-collector removed - NFD is now the only method for hardware detection
     quantization_job_image: Optional[str] = Field(None, alias="QUANTIZATION_JOB_IMAGE")
     engine_container_port: int = Field(..., alias="ENGINE_CONTAINER_PORT")
+
+    # NFD Configuration (Node Feature Discovery - required for hardware detection)
+    enable_nfd_detection: bool = Field(True, alias="ENABLE_NFD_DETECTION")
+    # nfd_fallback_to_configmap deprecated - NFD is now the only method
+    nfd_detection_timeout: int = Field(30, alias="NFD_DETECTION_TIMEOUT")
+    nfd_namespace: str = Field("node-feature-discovery", alias="NFD_NAMESPACE")
 
     registry_server: str = Field(..., alias="REGISTRY_SERVER")
     registry_username: str = Field(..., alias="REGISTRY_USERNAME")

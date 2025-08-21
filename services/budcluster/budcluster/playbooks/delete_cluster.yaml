@@ -46,6 +46,7 @@
         src: https://github.com/BudEcosystem/aibrix/releases/download/0.2.0/aibrix-core-v0.2.0.yaml
         kubeconfig: "{{ kubeconfig_path }}"
         validate_certs: "{{ validate_certs }}"
+      ignore_errors: true  # Continue if CRDs don't exist
 
     - name: Remove Aibrix dependencies
       kubernetes.core.k8s:
@@ -53,6 +54,7 @@
         src: https://github.com/BudEcosystem/aibrix/releases/download/0.2.0/aibrix-dependency-v0.2.0.yaml
         kubeconfig: "{{ kubeconfig_path }}"
         validate_certs: "{{ validate_certs }}"
+      ignore_errors: true  # Continue if CRDs don't exist
 
     - name: Delete all pods in namespace
       kubernetes.core.k8s:

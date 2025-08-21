@@ -1,4 +1,5 @@
 import base64
+import json
 import re
 import time
 from collections import defaultdict
@@ -108,19 +109,18 @@ class KubernetesHandler(BaseClusterHandler):
         Returns:
             str: The status of the setup process.
         """
+        # Deploy NFD (Node Feature Discovery) for hardware detection
         result = self.ansible_executor.run_playbook(
-            playbook="NODE_INFO_COLLECTOR",
+            playbook="DEPLOY_NFD",  # Updated to use NFD-only approach
             extra_vars={
                 "kubeconfig_content": self.config,
-                "node_info_collector_image_cpu": app_settings.node_info_collector_image_cpu,
-                "node_info_collector_image_cuda": app_settings.node_info_collector_image_cuda,
-                "node_info_collector_image_hpu": app_settings.node_info_collector_image_hpu,
-                "node_labeler_image": app_settings.node_info_labeler_image,
                 "image_pull_secrets": self.get_image_pull_secret(),
                 "platform": self.platform,
                 "prometheus_url": f"{app_settings.prometheus_url}/api/v1/write",
                 "prometheus_namespace": "bud-system",
                 "cluster_name": str(cluster_id),
+                "namespace": "bud-system",  # Changed to bud-system for infrastructure components
+                "enable_nfd": True,  # NFD is now required
             },
         )
         if result["status"] == "failed":
@@ -224,45 +224,96 @@ class KubernetesHandler(BaseClusterHandler):
         return urlparse(url).netloc, urlparse(url).scheme
 
     def get_node_info(self) -> List[Dict[str, Any]]:
-        """Get the node information from the Kubernetes cluster.
+        """Get the node information from the Kubernetes cluster using NFD labels.
 
         Returns:
-            Dict[str, Any]: A dictionary containing node information from the Kubernetes cluster.
+            List[Dict[str, Any]]: A list containing node information from the Kubernetes cluster.
 
         Raises:
-            KubernetesException: If there is an error while parsing configmap node info.
+            KubernetesException: If there is an error while extracting node info.
         """
         result = self.ansible_executor.run_playbook(
             playbook="GET_NODE_INFO", extra_vars={"kubeconfig_content": self.config}
         )
-        configmap_data = []
+
+        node_data = []
         if result["status"] == "successful":
             try:
+                # Extract node information from NFD labels
+                # First check for the output fact task
+                node_info_output = None
                 for event in result["events"]:
-                    if (
-                        event["task"] == "Fetch Node Information ConfigMap for each node"
-                        and event["status"] == "runner_on_ok"
-                    ):
-                        node_info = self._parse_configmap_node_info(event)
-                        configmap_data.extend(node_info)
+                    if event["task"] == "Set output fact for node information" and event["status"] == "runner_on_ok":
+                        node_info_output = event["event_data"]["res"]["ansible_facts"].get("node_info_output", [])
+                        break
 
-                # Fetch node status separately
-                node_status_data = self._get_nodes_status(result)
+                # If no output fact task, collect from individual processing tasks
+                if node_info_output is None:
+                    node_info_output = []
+                    for event in result["events"]:
+                        if (
+                            event["task"] == "Process each node and extract NFD information"
+                            and event["status"] == "runner_on_ok"
+                            and "ansible_facts" in event["event_data"]["res"]
+                        ):
+                            node_info = event["event_data"]["res"]["ansible_facts"].get("node_information", [])
+                            if node_info and isinstance(node_info, list) and len(node_info) > 0:
+                                # Get the last item since it's accumulated
+                                node_info_output = node_info
 
-                # Merge node status with configmap data
-                for node in configmap_data:
-                    node_name = node.get("node_name")
-                    if (
-                        node["node_status"] == "True"
-                        and node_name in node_status_data
-                        and node_status_data[node_name] != "Ready"
-                    ):
-                        node["node_status"] = "False"
-                    node["derived_status"] = node_status_data.get(node_name, "Unknown")
+                if node_info_output:
+                    # Process each node's information
+                    from .device_extractor import DeviceExtractor
+
+                    extractor = DeviceExtractor()
+
+                    for node in node_info_output:
+                        # Extract device information from node info (which includes NFD labels)
+                        devices = extractor.extract_from_node_info(node)
+
+                        # Format node data for compatibility with existing structure
+                        # Determine node status based on both Ready condition and schedulability
+                        schedulability = node.get("schedulability", {})
+
+                        # Convert string booleans to actual booleans (Ansible returns strings)
+                        ready_value = schedulability.get("ready", False)
+                        is_ready = ready_value if isinstance(ready_value, bool) else str(ready_value).lower() == "true"
+
+                        schedulable_value = schedulability.get("schedulable", True)
+                        is_schedulable = (
+                            schedulable_value
+                            if isinstance(schedulable_value, bool)
+                            else str(schedulable_value).lower() == "true"
+                        )
+
+                        # Node is truly available only if it's both Ready and schedulable
+                        node_available = is_ready and is_schedulable
+
+                        logger.debug(
+                            f"Node {node.get('node_name')}: ready={is_ready}, schedulable={is_schedulable}, available={node_available}"
+                        )
+
+                        node_formatted = {
+                            "node_name": node.get("node_name"),
+                            "node_id": node.get("node_id"),
+                            "node_status": node_available,  # Use boolean for consistency
+                            "derived_status": "Ready" if node_available else "NotReady",
+                            "devices": json.dumps(devices),
+                            "cpu_info": node.get("cpu_info", {}),
+                            "memory_info": node.get("memory_info", {}),
+                            "gpu_info": node.get("gpu_info", {}),
+                            "kernel_info": node.get("kernel_info", {}),
+                            "capacity": node.get("capacity", {}),
+                            "allocatable": node.get("allocatable", {}),
+                            "labels": node.get("labels", {}),
+                            "schedulability": schedulability,  # Include full schedulability info
+                        }
+                        node_data.append(node_formatted)
+
             except Exception as err:
-                logger.error(f"Found error while parsing configmap node info. {err}")
-                raise KubernetesException("Found error while parsing configmap node info") from err
-        return configmap_data
+                logger.error(f"Error while extracting node info from NFD labels: {err}")
+                raise KubernetesException("Failed to extract node information from NFD labels") from err
+        return node_data
 
     def _get_nodes_status(self, result: Dict[str, Any]) -> Dict[str, str]:
         """To creates a map of node name to node status."""

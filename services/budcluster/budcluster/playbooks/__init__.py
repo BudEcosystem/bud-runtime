@@ -4,7 +4,9 @@ import os
 
 
 _PLAYBOOK_MAP = {
-    "NODE_INFO_COLLECTOR": "deploy_node_info_collector.yaml",
+    # NFD deployment replaces the old node-info-collector
+    "DEPLOY_NFD": "deploy_nfd.yaml",
+    "NODE_INFO_COLLECTOR": "deploy_nfd.yaml",  # Backward compatibility
     "GET_NODE_INFO": "get_node_info.yaml",
     "GET_NODE_STATUS": "get_node_status.yaml",
     "DEPLOY_RUNTIME": "deploy_runtime.yaml",

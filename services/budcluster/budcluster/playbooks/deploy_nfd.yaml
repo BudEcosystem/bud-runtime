@@ -1,0 +1,380 @@
+---
+- name: Deploy Node Feature Discovery (NFD) and GPU/HPU Operators
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars_files:
+    - vars/common.yaml
+
+  vars:
+    nfd_chart_path: "{{ charts_dir }}/nfd"
+    nfd_release_name: node-feature-discovery
+    prometheus_release_name: bud-metrics
+    prometheus_chart_path: "{{ charts_dir }}/prometheus-stack"
+    # Default namespace for infrastructure components
+    namespace: "{{ namespace | default('bud-system') }}"
+    # Deployment control flags
+    update_existing_components: "{{ update_existing | default(false) }}"
+    force_reinstall_components: "{{ force_reinstall | default(false) }}"
+    skip_healthy_components: "{{ skip_healthy | default(true) }}"
+
+  roles:
+    - create_kubeconfig
+
+  tasks:
+    # NFD Deployment Section
+    - name: Check if NFD is already deployed
+      kubernetes.core.helm_info:
+        name: "{{ nfd_release_name }}"
+        namespace: "{{ namespace }}"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: nfd_helm_info
+      ignore_errors: true
+
+    - name: Check NFD pods status
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: "{{ namespace }}"
+        label_selectors:
+          - app.kubernetes.io/name=node-feature-discovery
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: nfd_pods_check
+      ignore_errors: true
+      when: nfd_helm_info is succeeded
+
+    - name: Determine NFD deployment action
+      set_fact:
+        nfd_needs_deployment: >-
+          {{ nfd_helm_info.failed or
+             nfd_helm_info.status is not defined or
+             nfd_helm_info.status.status | default('') != 'deployed' or
+             nfd_pods_check.resources | default([]) | selectattr('status.phase', 'ne', 'Running') | list | length > 0 or
+             force_reinstall_components or
+             update_existing_components }}
+
+    - name: Skip NFD if already deployed and healthy
+      debug:
+        msg: "NFD is already deployed and healthy. Skipping deployment."
+      when:
+        - not nfd_needs_deployment | default(false)
+        - skip_healthy_components
+
+    # Clean up any existing problematic NFD deployment
+    - name: Check for and remove problematic NFD deployment
+      shell: |
+        helm list -n {{ namespace }} --kubeconfig {{ kubeconfig_path }} | grep -q {{ nfd_release_name }} && \
+        helm uninstall {{ nfd_release_name }} -n {{ namespace }} --kubeconfig {{ kubeconfig_path }} || true
+      when:
+        - nfd_helm_info is failed
+        - nfd_needs_deployment | default(true)
+      ignore_errors: true
+
+    # Clean up cluster-scoped resources from previous installations
+    - name: Clean up existing NFD ClusterRoles and ClusterRoleBindings
+      shell: |
+        kubectl --kubeconfig {{ kubeconfig_path }} delete clusterrole node-feature-discovery --ignore-not-found=true
+        kubectl --kubeconfig {{ kubeconfig_path }} delete clusterrolebinding node-feature-discovery --ignore-not-found=true
+        # Also clean up from old bud-runtime namespace if exists
+        helm list -n bud-runtime --kubeconfig {{ kubeconfig_path }} | grep -q {{ nfd_release_name }} && \
+        helm uninstall {{ nfd_release_name }} -n bud-runtime --kubeconfig {{ kubeconfig_path }} || true
+        # Remove any leftover ClusterRoles/ClusterRoleBindings with NFD in the name
+        kubectl --kubeconfig {{ kubeconfig_path }} delete clusterrole -l app.kubernetes.io/name=node-feature-discovery --ignore-not-found=true
+        kubectl --kubeconfig {{ kubeconfig_path }} delete clusterrolebinding -l app.kubernetes.io/name=node-feature-discovery --ignore-not-found=true
+      when: nfd_needs_deployment | default(true)
+      ignore_errors: true
+
+    - name: Add NFD Helm repository
+      kubernetes.core.helm_repository:
+        name: nfd
+        repo_url: https://kubernetes-sigs.github.io/node-feature-discovery/charts
+        kubeconfig: "{{ kubeconfig_path }}"
+      when: nfd_needs_deployment | default(true)
+
+    - name: Deploy NFD from upstream chart
+      kubernetes.core.helm:
+        release_name: "{{ nfd_release_name }}"
+        chart_ref: "nfd/node-feature-discovery"
+        chart_version: "0.15.4"
+        release_namespace: "{{ namespace }}"
+        create_namespace: true
+        atomic: true
+        wait: true
+        wait_timeout: "{{ helm_timeout }}"
+        force: true
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+        # Use inline values with enhanced CPU detection
+        values:
+          master:
+            resources:
+              requests:
+                cpu: 100m
+                memory: 128Mi
+              limits:
+                cpu: 200m
+                memory: 256Mi
+          worker:
+            resources:
+              requests:
+                cpu: 100m
+                memory: 64Mi
+              limits:
+                cpu: 200m
+                memory: 128Mi
+            config:
+              core:
+                sleepInterval: 60s
+                # Allow more labels for better hardware detection
+                labelWhiteList: "^feature\\.node\\.kubernetes\\.io/.*"
+                labelSources:
+                  - custom
+                  - pci
+                  - cpu
+                  - kernel
+                  - local
+                  - memory
+                  - network
+                  - storage
+                  - system
+                  - usb
+              sources:
+                cpu:
+                  cpuid:
+                    # Include all CPUID attributes for full detection
+                    attributeBlacklist: []
+                    attributeWhitelist: []
+                # System detection for OS and node info
+                system:
+                  osRelease:
+                    id:
+                      - "ID"
+                      - "VERSION_ID"
+                  name:
+                    - "nodename"
+                # Local hooks for custom CPU detection
+                local:
+                  hooksEnabled: true
+                # Custom rules to extract CPU information
+                custom:
+                  - name: "cpu-info"
+                    labels:
+                      "cpu-model": "@cpu.model"
+                      "cpu-vendor": "@cpu.vendor_id"
+                    matchOn:
+                      - cpuId:
+                          vendor_id: [".*"]
+                  - name: "cpu-attributes"
+                    labels:
+                      "cpu-family": "@cpu.family"
+                    matchOn:
+                      - cpuId:
+                          family: [".*"]
+                pci:
+                  deviceClassWhitelist:
+                    - "0300"
+                    - "0302"
+                    - "0b40"
+                  deviceLabelFields:
+                    - vendor
+                    - device
+                    - class
+          topologyUpdater:
+            enable: true
+      when: nfd_needs_deployment | default(true)
+
+    - name: Wait for NFD master to be ready
+      kubernetes.core.k8s_info:
+        kind: Deployment
+        namespace: "{{ namespace }}"
+        name: "node-feature-discovery-master"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: nfd_master
+      retries: 3  # Reduced retries to avoid long hangs
+      delay: 10
+      until: nfd_master.resources[0].status.availableReplicas is defined and nfd_master.resources[0].status.availableReplicas > 0
+      when: nfd_needs_deployment | default(true)
+      ignore_errors: true  # Continue even if master isn't ready
+
+    - name: Check NFD master status
+      debug:
+        msg: >
+          NFD Master status:
+          {{ 'Ready' if (nfd_master.resources[0].status.availableReplicas | default(0)) > 0 else 'Not Ready - check pod events for details' }}
+      when: nfd_needs_deployment | default(true)
+
+    - name: Wait for NFD workers to be ready
+      kubernetes.core.k8s_info:
+        kind: DaemonSet
+        namespace: "{{ namespace }}"
+        name: "node-feature-discovery-worker"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: nfd_worker
+      retries: 3  # Reduced retries to avoid long hangs
+      delay: 10
+      until: nfd_worker.resources[0].status.numberReady is defined and nfd_worker.resources[0].status.numberReady > 0
+      when: nfd_needs_deployment | default(true)
+      ignore_errors: true  # Continue even if workers aren't ready
+
+    - name: Check NFD worker status
+      debug:
+        msg: >
+          NFD Worker status:
+          {{ 'Ready' if (nfd_worker.resources[0].status.numberReady | default(0)) > 0 else 'Not Ready - check pod events for details' }}
+      when: nfd_needs_deployment | default(true)
+
+    - name: Brief wait for NFD to start labeling
+      pause:
+        seconds: 10  # Reduced from 30 to 10 seconds
+      when:
+        - nfd_needs_deployment | default(true)
+        - (nfd_master.resources[0].status.availableReplicas | default(0)) > 0
+
+    # GPU Detection and Operator Deployment
+    - name: Check for NVIDIA GPUs in cluster via NFD labels
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Node
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: cluster_nodes
+
+    - name: Set GPU detection fact
+      set_fact:
+        has_nvidia_gpus: >-
+          {{
+            cluster_nodes.resources |
+            selectattr('metadata.labels', 'defined') |
+            selectattr('metadata.labels.nvidia\\.com/gpu\\.present', 'defined') |
+            selectattr('metadata.labels.nvidia\\.com/gpu\\.present', 'equalto', 'true') |
+            list | length > 0 or
+            cluster_nodes.resources |
+            selectattr('metadata.labels', 'defined') |
+            selectattr('metadata.labels.feature\\.node\\.kubernetes\\.io/pci-10de\\.present', 'defined') |
+            selectattr('metadata.labels.feature\\.node\\.kubernetes\\.io/pci-10de\\.present', 'equalto', 'true') |
+            list | length > 0
+          }}
+
+    - name: Add NVIDIA Helm repository
+      kubernetes.core.helm_repository:
+        name: nvidia
+        repo_url: https://helm.ngc.nvidia.com/nvidia
+        kubeconfig: "{{ kubeconfig_path }}"
+      when: has_nvidia_gpus | default(false)
+
+    - name: Deploy GPU Operator if NVIDIA GPUs detected
+      kubernetes.core.helm:
+        release_name: "nvidia-gpu-operator"
+        chart_ref: "nvidia/gpu-operator"
+        release_namespace: "gpu-operator"
+        create_namespace: true
+        atomic: true
+        wait: true
+        wait_timeout: 600
+        force: true
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+        values:
+          operator:
+            defaultRuntime: containerd
+          driver:
+            enabled: true
+          toolkit:
+            enabled: true
+          devicePlugin:
+            enabled: true
+          gfd:
+            enabled: true
+          migManager:
+            enabled: false
+          nodeStatusExporter:
+            enabled: true
+      when: has_nvidia_gpus | default(false)
+
+    # HPU Detection and Device Plugin Deployment
+    - name: Check for Intel Gaudi HPUs via NFD labels
+      set_fact:
+        has_intel_hpus: >-
+          {{
+            cluster_nodes.resources |
+            selectattr('metadata.labels', 'defined') |
+            selectattr('metadata.labels.feature\\.node\\.kubernetes\\.io/pci-8086\\.device-1020', 'defined') |
+            selectattr('metadata.labels.feature\\.node\\.kubernetes\\.io/pci-8086\\.device-1020', 'equalto', 'true') |
+            list | length > 0 or
+            cluster_nodes.resources |
+            selectattr('metadata.labels', 'defined') |
+            selectattr('metadata.labels.feature\\.node\\.kubernetes\\.io/pci-8086\\.device-1021', 'defined') |
+            selectattr('metadata.labels.feature\\.node\\.kubernetes\\.io/pci-8086\\.device-1021', 'equalto', 'true') |
+            list | length > 0 or
+            cluster_nodes.resources |
+            selectattr('metadata.labels', 'defined') |
+            selectattr('metadata.labels.feature\\.node\\.kubernetes\\.io/pci-8086\\.device-1022', 'defined') |
+            selectattr('metadata.labels.feature\\.node\\.kubernetes\\.io/pci-8086\\.device-1022', 'equalto', 'true') |
+            list | length > 0
+          }}
+
+    - name: Deploy Intel Device Plugin if HPUs detected
+      kubernetes.core.helm:
+        release_name: "intel-device-plugins"
+        chart_ref: "{{ nfd_chart_path }}"
+        release_namespace: "{{ namespace }}"
+        atomic: true
+        wait: true
+        wait_timeout: 300
+        force: true
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+        values:
+          global:
+            namespace: "{{ namespace }}"
+          nfd:
+            enabled: false  # NFD already deployed
+          gpuOperator:
+            enabled: false
+          intelDevicePlugin:
+            enabled: true
+            gaudiEnabled: true
+      when: has_intel_hpus | default(false)
+
+    # Wait for NFD to label nodes
+    - name: Wait for NFD to label nodes
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Node
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: labeled_nodes
+      retries: 12
+      delay: 5
+      until: >
+        labeled_nodes.resources | length > 0 and
+        labeled_nodes.resources | map(attribute='metadata.labels') |
+        select('defined') |
+        map('dict2items') |
+        flatten |
+        selectattr('key', 'match', '^(feature\.node\.kubernetes\.io/|nfd\.node\.kubernetes\.io/)') |
+        list | length > 0
+
+    # Summary
+    - name: Display deployment summary
+      debug:
+        msg: |
+          NFD Deployment Complete:
+          - NFD Status: {{ 'Deployed' if nfd_needs_deployment | default(true) else 'Already exists' }}
+          - NVIDIA GPUs Detected: {{ has_nvidia_gpus | default(false) }}
+          - Intel HPUs Detected: {{ has_intel_hpus | default(false) }}
+          - GPU Operator: {{ 'Deployed' if has_nvidia_gpus | default(false) else 'Not needed' }}
+          - Intel Device Plugin: {{ 'Deployed' if has_intel_hpus | default(false) else 'Not needed' }}
+
+          Next Steps:
+          - Use get_node_info.yaml to retrieve hardware information
+          - NFD labels will be automatically updated every 60 seconds
+
+  post_tasks:
+    - name: Cleanup kubeconfig file
+      ansible.builtin.include_role:
+        name: cleanup_kubeconfig

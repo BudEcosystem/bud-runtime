@@ -1,5 +1,5 @@
 ---
-- name: Fetch Node Information from Kubernetes ConfigMap
+- name: Fetch Node Information from NFD Labels
   hosts: localhost
   connection: local
   gather_facts: false
@@ -11,8 +11,7 @@
     - create_kubeconfig
 
   tasks:
-
-    - name: Get list of nodes
+    - name: Get list of nodes with NFD labels
       kubernetes.core.k8s_info:
         api_version: v1
         kind: Node
@@ -20,13 +19,124 @@
         validate_certs: false
       register: nodes_list
 
-    - name: Fetch Node Information ConfigMap for each node
-      kubernetes.core.k8s_info:
-        api_version: v1
-        kind: ConfigMap
-        namespace: "{{ namespace }}"
-        name: "node-info-collector-{{ item.metadata.name }}"
-        kubeconfig: "{{ kubeconfig_path }}"
-        validate_certs: false
+    - name: Check if NFD is available
+      set_fact:
+        nfd_available: >-
+          {% set has_nfd = false %}
+          {% for node in nodes_list.resources %}
+            {% if node.metadata.labels is defined %}
+              {% for label_key in node.metadata.labels.keys() %}
+                {% if label_key.startswith('feature.node.kubernetes.io/') or label_key.startswith('nfd.node.kubernetes.io/') %}
+                  {% set has_nfd = true %}
+                {% endif %}
+              {% endfor %}
+            {% endif %}
+          {% endfor %}
+          {{ has_nfd }}
+
+    - name: Fail if NFD is not installed
+      fail:
+        msg: |
+          Node Feature Discovery (NFD) is not installed on this cluster.
+          Please run deploy_nfd.yaml to install NFD first.
+          NFD is required for hardware detection and node information gathering.
+      when: not nfd_available
+
+    - name: Initialize node information list
+      set_fact:
+        node_information: []
+
+    - name: Process each node and extract NFD information
+      set_fact:
+        node_information: "{{ node_information + [node_info] }}"
+      vars:
+        labels: "{{ item.metadata.labels | default({}) }}"
+        status: "{{ item.status | default({}) }}"
+        spec: "{{ item.spec | default({}) }}"
+        cpu_model_raw: "{{ labels.get('feature.node.kubernetes.io/local-cpu.model', '') }}"
+        cpu_name: "{{ 'Xeon' if 'Xeon' in cpu_model_raw else 'EPYC' if 'EPYC' in cpu_model_raw else 'Core' if 'Core' in cpu_model_raw else 'CPU' }}"
+        node_info:
+          node_name: "{{ item.metadata.name }}"
+          node_id: "{{ item.metadata.uid }}"
+          labels: "{{ labels }}"
+          capacity: "{{ status.capacity | default({}) }}"
+          allocatable: "{{ status.allocatable | default({}) }}"
+          gpu_info:
+            nvidia_present: "{{ labels.get('nvidia.com/gpu.present', 'false') == 'true' or labels.get('feature.node.kubernetes.io/pci-10de.present', 'false') == 'true' }}"
+            nvidia_gpus: "{{ labels.get('nvidia.com/gpu.count', '0') | int }}"
+            gpu_product: "{{ labels.get('nvidia.com/gpu.product', '') }}"
+            gpu_memory: "{{ labels.get('nvidia.com/gpu.memory', '') }}"
+            gpu_family: "{{ labels.get('nvidia.com/gpu.family', '') }}"
+            cuda_version: "{{ labels.get('nvidia.com/cuda.runtime.major', '') }}{{ '.' + labels.get('nvidia.com/cuda.runtime.minor', '') if labels.get('nvidia.com/cuda.runtime.minor', '') else '' }}"
+            compute_capability: "{{ labels.get('nvidia.com/gpu.compute.major', '') }}{{ '.' + labels.get('nvidia.com/gpu.compute.minor', '') if labels.get('nvidia.com/gpu.compute.minor', '') else '' }}"
+            amd_present: "{{ labels.get('feature.node.kubernetes.io/pci-1002.present', 'false') == 'true' }}"
+            intel_hpu_present: "{{ labels.get('feature.node.kubernetes.io/pci-8086.device-1020', 'false') == 'true' or labels.get('feature.node.kubernetes.io/pci-8086.device-1021', 'false') == 'true' or labels.get('feature.node.kubernetes.io/pci-8086.device-1022', 'false') == 'true' }}"
+          cpu_info:
+            architecture: "{{ labels.get('kubernetes.io/arch', '') }}"
+            cpu_family: "{{ labels.get('feature.node.kubernetes.io/cpu-family', '') }}"
+            cpu_model_id: "{{ labels.get('feature.node.kubernetes.io/cpu-model', '') }}"
+            cpu_model_raw: "{{ cpu_model_raw }}"
+            cpu_name: "{{ cpu_name }}"
+            cpu_vendor: "{{ labels.get('feature.node.kubernetes.io/cpu-cpuid.vendor_id', '') }}"
+            hardware_multithreading: "{{ labels.get('feature.node.kubernetes.io/cpu-hardware_multithreading', 'false') == 'true' }}"
+            cpu_cores: "{{ status.capacity.get('cpu', 'unknown') }}"
+            instruction_sets:
+              avx512: "{{ labels.get('feature.node.kubernetes.io/cpu-cpuid.AVX512F', 'false') == 'true' }}"
+              avx512_bf16: "{{ labels.get('feature.node.kubernetes.io/cpu-cpuid.AVX512BF16', 'false') == 'true' }}"
+              vnni: "{{ labels.get('feature.node.kubernetes.io/cpu-cpuid.VNNI', 'false') == 'true' }}"
+              amx: "{{ labels.get('feature.node.kubernetes.io/cpu-cpuid.AMX', 'false') == 'true' }}"
+              avx2: "{{ labels.get('feature.node.kubernetes.io/cpu-cpuid.AVX2', 'false') == 'true' }}"
+              avx: "{{ labels.get('feature.node.kubernetes.io/cpu-cpuid.AVX', 'false') == 'true' }}"
+              sse4_2: "{{ labels.get('feature.node.kubernetes.io/cpu-cpuid.SSE4.2', 'false') == 'true' }}"
+              fma3: "{{ labels.get('feature.node.kubernetes.io/cpu-cpuid.FMA3', 'false') == 'true' }}"
+          memory_info:
+            total_memory: "{{ status.capacity.get('memory', '') }}"
+            allocatable_memory: "{{ status.allocatable.get('memory', '') }}"
+            numa_nodes: "{{ labels.get('feature.node.kubernetes.io/memory-numa', 'false') == 'true' }}"
+            nv_dax: "{{ labels.get('feature.node.kubernetes.io/memory-nv.dax', 'false') == 'true' }}"
+          kernel_info:
+            kernel_version: "{{ labels.get('feature.node.kubernetes.io/kernel-version.full', '') }}"
+            kernel_major: "{{ labels.get('feature.node.kubernetes.io/kernel-version.major', '') }}"
+            kernel_minor: "{{ labels.get('feature.node.kubernetes.io/kernel-version.minor', '') }}"
+            os_release: "{{ labels.get('feature.node.kubernetes.io/system-os_release.ID', '') }}"
+            os_version: "{{ labels.get('feature.node.kubernetes.io/system-os_release.VERSION_ID', '') }}"
+          storage_info:
+            nonrotational_disk: "{{ labels.get('feature.node.kubernetes.io/storage-nonrotationaldisk', 'false') == 'true' }}"
+          network_info:
+            sriov_capable: "{{ labels.get('feature.node.kubernetes.io/network-sriov.capable', 'false') == 'true' }}"
+            sriov_configured: "{{ labels.get('feature.node.kubernetes.io/network-sriov.configured', 'false') == 'true' }}"
+          custom_features:
+            llm_optimized: "{{ labels.get('feature.node.kubernetes.io/custom-bud.llm-optimized', 'false') == 'true' }}"
+            high_memory: "{{ labels.get('feature.node.kubernetes.io/custom-bud.high-memory', 'false') == 'true' }}"
+            gpu_ready: "{{ labels.get('feature.node.kubernetes.io/custom-bud.gpu-ready', 'false') == 'true' }}"
+            multi_gpu: "{{ labels.get('feature.node.kubernetes.io/custom-bud.multi-gpu', 'false') == 'true' }}"
+            hpu_ready: "{{ labels.get('feature.node.kubernetes.io/custom-bud.hpu-ready', 'false') == 'true' }}"
+            nvme_storage: "{{ labels.get('feature.node.kubernetes.io/custom-bud.nvme-storage', 'false') == 'true' }}"
+          schedulability:
+            schedulable: "{{ not spec.unschedulable | default(false) }}"
+            ready: "{{ (status.conditions | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | first | default('Unknown')) == 'True' }}"
+            taints: "{{ spec.taints | default([]) }}"
+            conditions: "{{ status.conditions | default([]) }}"
       loop: "{{ nodes_list.resources }}"
-      register: node_info_configmaps
+      loop_control:
+        label: "{{ item.metadata.name }}"
+
+    - name: Display node information summary
+      debug:
+        msg: |
+          Node Information Summary:
+          - Total nodes: {{ node_information | length }}
+          - Nodes found: {% for node in node_information %}{{ node.node_name }}{% if not loop.last %}, {% endif %}{% endfor %}
+
+          Detection method: NFD (Node Feature Discovery)
+          Data freshness: NFD labels are updated every 60 seconds
+
+    - name: Set output fact for node information
+      set_fact:
+        node_info_output: "{{ node_information }}"
+      when: node_information is defined
+
+  post_tasks:
+    - name: Cleanup kubeconfig file
+      ansible.builtin.include_role:
+        name: cleanup_kubeconfig

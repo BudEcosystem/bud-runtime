@@ -26,11 +26,13 @@ class ClusterNodeTypeEnum(StrEnum):
 
     Attributes:
         CPU: Central Processing Unit cluster.
+        CPU_HIGH: High-performance CPU with AMX (Advanced Matrix Extensions) support.
         GPU: Graphics Processing Unit cluster.
         HPU: AI Accelerator (e.g., Habana Gaudi) cluster.
     """
 
     CPU = auto()
+    CPU_HIGH = auto()
     GPU = auto()
     HPU = auto()
 
