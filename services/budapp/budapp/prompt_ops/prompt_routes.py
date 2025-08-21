@@ -210,16 +210,13 @@ async def create_prompt_version(
     """Create a new version for a specific prompt."""
     try:
         # Create the prompt version
-        db_version = await PromptVersionService(session).create_prompt_version(
+        version_response = await PromptVersionService(session).create_prompt_version(
             prompt_id=prompt_id,
             endpoint_id=request.endpoint_id,
             prompt_schema=request.prompt_schema.model_dump(),
             set_as_default=request.set_as_default,
             current_user_id=current_user.id,
         )
-
-        # Convert to response model
-        version_response = PromptVersionResponse.model_validate(db_version)
 
         return SinglePromptVersionResponse(
             version=version_response,
