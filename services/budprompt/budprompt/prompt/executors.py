@@ -245,6 +245,7 @@ class SimplePromptExecutor:
         """
         # Generate base model from schema
         input_model = await self._get_pydantic_model(input_schema, "InputModel")
+        input_model = input_model.__pydantic_fields__["content"].annotation
 
         # Check if we should add validation
         if input_validation_prompt:
