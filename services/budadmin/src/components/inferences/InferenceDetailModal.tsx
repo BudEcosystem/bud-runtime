@@ -6,6 +6,9 @@ import { formatTimestamp, formatTimestampWithTZ } from '@/utils/formatDate';
 import { useInferences } from '@/stores/useInferences';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { monokai } from 'react-syntax-highlighter/dist/cjs/styles/hljs';
+import RequestMetadata from './RequestMetadata';
+import ClientInfo from './ClientInfo';
+import GeographicInfo from './GeographicInfo';
 
 const { Text, Title, Paragraph } = Typography;
 const { TabPane } = Tabs;
@@ -222,7 +225,7 @@ const InferenceDetailModal: React.FC<InferenceDetailModalProps> = ({
         )}
 
         {selectedInference.gateway_response && (
-          <div>
+          <div style={{ marginBottom: 24 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
               <Title level={5}>Gateway Response</Title>
               <Space>
@@ -256,15 +259,135 @@ const InferenceDetailModal: React.FC<InferenceDetailModalProps> = ({
             </div>
           </div>
         )}
+
+        {selectedInference.raw_response && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <Title level={5}>Raw Response (Streaming Data)</Title>
+              <Space>
+                <Button
+                  size="small"
+                  icon={<CopyOutlined />}
+                  onClick={() => copyToClipboard(selectedInference.raw_response, 'Raw response')}
+                >
+                  Copy
+                </Button>
+                <Button
+                  size="small"
+                  icon={<DownloadOutlined />}
+                  onClick={() => downloadAsFile(
+                    selectedInference.raw_response,
+                    `raw_response_${selectedInference.inference_id}.txt`
+                  )}
+                >
+                  Download
+                </Button>
+              </Space>
+            </div>
+            <div style={{ maxHeight: '40vh', overflowY: 'auto' }}>
+              <SyntaxHighlighter
+                language="text"
+                style={monokai}
+                customStyle={{ borderRadius: 8, fontSize: 12 }}
+              >
+                {selectedInference.raw_response}
+              </SyntaxHighlighter>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderGatewayMetadata = () => {
+    if (!selectedInference?.gateway_metadata) {
+      return <Empty description="No gateway metadata available" />;
+    }
+
+    const { gateway_metadata } = selectedInference;
+
+    // Transform flat gateway_metadata into nested structure for components
+    const requestMetadata = {
+      client_ip: gateway_metadata.client_ip,
+      proxy_chain: gateway_metadata.proxy_chain,
+      protocol_version: gateway_metadata.protocol_version,
+      method: gateway_metadata.method,
+      path: gateway_metadata.path,
+      query_params: gateway_metadata.query_params,
+      request_headers: gateway_metadata.request_headers,
+      body_size: gateway_metadata.body_size,
+      api_key_id: gateway_metadata.api_key_id,
+      auth_method: gateway_metadata.auth_method,
+      user_id: gateway_metadata.user_id,
+      gateway_processing_ms: gateway_metadata.gateway_processing_ms,
+      total_duration_ms: gateway_metadata.total_duration_ms,
+      status_code: gateway_metadata.status_code,
+      response_size: gateway_metadata.response_size,
+      response_headers: gateway_metadata.response_headers,
+    };
+
+    const clientInfo = {
+      user_agent: gateway_metadata.user_agent,
+      device_type: gateway_metadata.device_type,
+      browser_name: gateway_metadata.browser_name,
+      browser_version: gateway_metadata.browser_version,
+      os_name: gateway_metadata.os_name,
+      os_version: gateway_metadata.os_version,
+      is_bot: gateway_metadata.is_bot,
+    };
+
+    const geographicInfo = {
+      country_code: gateway_metadata.country_code,
+      country_name: gateway_metadata.country_name,
+      region: gateway_metadata.region,
+      city: gateway_metadata.city,
+      latitude: gateway_metadata.latitude,
+      longitude: gateway_metadata.longitude,
+      timezone: gateway_metadata.timezone,
+      asn: gateway_metadata.asn,
+      isp: gateway_metadata.isp,
+    };
+
+    // Check if we have any data to display
+    const hasRequestMetadata = requestMetadata.client_ip || requestMetadata.method || requestMetadata.path;
+    const hasClientInfo = clientInfo.user_agent || clientInfo.device_type || clientInfo.browser_name;
+    const hasGeographicInfo = geographicInfo.country_code || geographicInfo.city || geographicInfo.isp;
+
+    return (
+      <div>
+        {hasRequestMetadata && (
+          <div style={{ marginBottom: 24 }}>
+            <RequestMetadata
+              data={requestMetadata}
+              onCopy={copyToClipboard}
+            />
+          </div>
+        )}
+
+        {hasClientInfo && (
+          <div style={{ marginBottom: 24 }}>
+            <ClientInfo
+              data={clientInfo}
+              onCopy={copyToClipboard}
+            />
+          </div>
+        )}
+
+        {hasGeographicInfo && (
+          <div style={{ marginBottom: 24 }}>
+            <GeographicInfo
+              data={geographicInfo}
+              onCopy={copyToClipboard}
+            />
+          </div>
+        )}
+
+        {/* Additional metadata can be added here if needed */}
       </div>
     );
   };
 
   const renderFeedback = () => {
-    if (isLoadingFeedback) {
-      return <Spin />;
-    }
-
     if (!inferenceFeedback || inferenceFeedback.length === 0) {
       return <Empty description="No feedback available for this inference" />;
     }
@@ -365,7 +488,7 @@ const InferenceDetailModal: React.FC<InferenceDetailModalProps> = ({
       footer={null}
       bodyStyle={{ padding: 0 }}
     >
-      {isLoadingDetail ? (
+      {isLoadingDetail || (activeTab === 'feedback' && isLoadingFeedback) ? (
         <div style={{ textAlign: 'center', padding: 50 }}>
           <Spin size="large" />
         </div>
@@ -409,15 +532,41 @@ const InferenceDetailModal: React.FC<InferenceDetailModalProps> = ({
                     {selectedInference.finish_reason}
                   </Descriptions.Item>
                 )}
-                <Descriptions.Item label="Request IP">
-                  {selectedInference.request_ip || 'N/A'}
-                </Descriptions.Item>
                 <Descriptions.Item label="Feedback">
                   {selectedInference.feedback_count} items
                   {selectedInference.average_rating && (
                     <span> (Avg: {selectedInference.average_rating.toFixed(1)})</span>
                   )}
                 </Descriptions.Item>
+                {selectedInference.gateway_metadata?.country_name && (
+                  <Descriptions.Item label="Origin Country">
+                    <Space>
+                      {selectedInference.gateway_metadata.country_code && (
+                        <span style={{ fontSize: '16px' }}>
+                          {selectedInference.gateway_metadata.country_code
+                            .toUpperCase()
+                            .replace(/./g, char => String.fromCodePoint(char.charCodeAt(0) + 127397))}
+                        </span>
+                      )}
+                      <Text>{selectedInference.gateway_metadata.country_name}</Text>
+                      {selectedInference.gateway_metadata.city && (
+                        <Text type="secondary">({selectedInference.gateway_metadata.city})</Text>
+                      )}
+                    </Space>
+                  </Descriptions.Item>
+                )}
+                {selectedInference.gateway_metadata?.device_type && (
+                  <Descriptions.Item label="Device Type">
+                    <Tag color={
+                      selectedInference.gateway_metadata.device_type === 'mobile' ? 'green' :
+                      selectedInference.gateway_metadata.device_type === 'tablet' ? 'blue' :
+                      selectedInference.gateway_metadata.device_type === 'desktop' ? 'purple' : 'default'
+                    }>
+                      {selectedInference.gateway_metadata.device_type}
+                      {selectedInference.gateway_metadata.is_bot && ' (Bot)'}
+                    </Tag>
+                  </Descriptions.Item>
+                )}
               </Descriptions>
             </div>
           </TabPane>
@@ -439,6 +588,12 @@ const InferenceDetailModal: React.FC<InferenceDetailModalProps> = ({
           <TabPane tab="Gateway Data" key="raw">
             <div style={{ padding: 24 }}>
               {renderRawData()}
+            </div>
+          </TabPane>
+
+          <TabPane tab="Gateway Metadata" key="metadata">
+            <div style={{ padding: 24 }}>
+              {renderGatewayMetadata()}
             </div>
           </TabPane>
 

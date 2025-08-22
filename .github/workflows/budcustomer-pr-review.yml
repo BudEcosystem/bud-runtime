@@ -1,0 +1,151 @@
+name: "BudCustomer: PR Review"
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'services/budCustomer/**'
+
+env:
+  NODE_VERSION: "20"
+
+jobs:
+  lint:
+    name: Lint and TypeScript Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./services/budCustomer
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: |
+          echo "::group::Running ESLint"
+          npm run lint
+          echo "::endgroup::"
+
+      - name: Run TypeScript type checking
+        run: |
+          echo "::group::Running TypeScript type check"
+          npm run typecheck
+          echo "::endgroup::"
+
+  build:
+    name: Build Application
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./services/budCustomer
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Next.js application
+        run: |
+          echo "::group::Building Next.js application"
+          npm run build
+          echo "::endgroup::"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          path: services/budCustomer/.next
+
+  dependency-check:
+    name: Check Dependencies
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./services/budCustomer
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit
+        run: |
+          echo "::group::Checking for vulnerable dependencies"
+          npm audit --audit-level=moderate || true
+          echo "::endgroup::"
+
+      - name: Check for outdated dependencies
+        run: |
+          echo "::group::Checking for outdated dependencies"
+          npm outdated || true
+          echo "::endgroup::"
+
+  pr-status:
+    name: PR Review Status
+    runs-on: ubuntu-latest
+    needs: [lint, build, dependency-check]
+    if: always()
+
+    steps:
+      - name: Check job results
+        run: |
+          if [[ "${{ needs.lint.result }}" == "failure" ]]; then
+            echo "❌ Lint and TypeScript check failed"
+            exit 1
+          fi
+          if [[ "${{ needs.build.result }}" == "failure" ]]; then
+            echo "❌ Build failed"
+            exit 1
+          fi
+          if [[ "${{ needs.dependency-check.result }}" == "failure" ]]; then
+            echo "❌ Dependency check failed"
+            exit 1
+          fi
+          echo "✅ All checks passed!"

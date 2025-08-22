@@ -105,6 +105,9 @@ jobs:
           if [ -d "services/budplayground" ]; then
             cd services/budplayground && npm install && cd ../..
           fi
+          if [ -d "services/budCustomer" ]; then
+            cd services/budCustomer && npm install && cd ../..
+          fi
 
       - name: Run pre-commit on changed files
         run: |

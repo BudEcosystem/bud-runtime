@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import { AntdRegistry } from "@ant-design/nextjs-registry";
 import { App } from "antd";
 import "./globals.css";
+import "../styles/globals.scss";
 import { AuthNavigationProvider, LoaderProvider } from "@/context/authContext";
 import { ThemeProvider } from "@/context/themeContext";
 import { ProjectProvider } from "@/context/projectContext";
@@ -50,9 +51,7 @@ export default function RootLayout({
                   <AppInitializer />
                   <AuthNavigationProvider>
                     <LoaderProvider>
-                      <ProjectProvider>
-                        <AuthGuard>{children}</AuthGuard>
-                      </ProjectProvider>
+                      <ProjectProvider>{children}</ProjectProvider>
                     </LoaderProvider>
                   </AuthNavigationProvider>
                 </NotificationProvider>

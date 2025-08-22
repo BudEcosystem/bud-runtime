@@ -57,7 +57,7 @@ class Experiment(Base, TimestampMixin):
         default=ExperimentStatusEnum.ACTIVE.value,
     )
     created_by: Mapped[uuid4] = mapped_column(ForeignKey("user.id"), nullable=False)
-    project_id: Mapped[uuid4] = mapped_column(ForeignKey("project.id"), nullable=False)
+    project_id: Mapped[uuid4] = mapped_column(ForeignKey("project.id"), nullable=True)
     tags: Mapped[list[str]] = mapped_column(PG_ARRAY(String), nullable=True, default=list)
 
     # Relationships

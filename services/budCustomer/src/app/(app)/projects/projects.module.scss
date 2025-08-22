@@ -1,0 +1,132 @@
+// Using CSS variables for theme support
+$bg-main: var(--bg-primary);
+$bg-card: var(--bg-secondary);
+$border-color: var(--border);
+$text-white: var(--text-primary);
+$text-gray: var(--text-muted);
+$text-dark-gray: var(--text-disabled);
+$primary-color: var(--color-purple);
+
+.modal {
+  :global {
+    .ant-modal-content {
+      background: $bg-card;
+      border: 1px solid $border-color;
+    }
+
+    .ant-modal-header {
+      background: $bg-card;
+      border-bottom: 1px solid $border-color;
+    }
+
+    .ant-modal-title {
+      color: $text-white;
+    }
+
+    .ant-modal-close {
+      color: $text-gray;
+
+      &:hover {
+        color: $text-white;
+      }
+    }
+
+    .ant-modal-footer {
+      border-top: 1px solid $border-color;
+    }
+
+    .ant-input,
+    .ant-input:focus,
+    .ant-input-focused {
+      background: var(--bud-bg-tertiary) !important;
+      border-color: var(--bud-border-secondary) !important;
+      color: $text-white !important;
+
+      &::placeholder {
+        color: $text-dark-gray;
+      }
+
+      &:hover {
+        border-color: $primary-color !important;
+      }
+    }
+
+    .ant-select {
+      .ant-select-selector {
+        background: var(--bud-bg-tertiary) !important;
+        border-color: var(--bud-border-secondary) !important;
+        color: $text-white !important;
+
+        &:hover,
+        &:focus {
+          border-color: $primary-color !important;
+        }
+      }
+
+      .ant-select-selection-placeholder {
+        color: $text-dark-gray;
+      }
+    }
+
+    .ant-btn {
+      &:not(.ant-btn-primary) {
+        background: transparent;
+        border-color: $border-color;
+        color: $text-gray;
+
+        &:hover {
+          background: var(--bud-bg-hover);
+          border-color: $primary-color;
+          color: $text-white;
+        }
+      }
+    }
+  }
+}
+
+// Card hover effects
+.projectCard {
+  transition: all 0.3s ease;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  }
+}
+
+// Status indicators
+.statusActive {
+  &::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #479d5f, #5bb573);
+  }
+}
+
+.statusInactive {
+  &::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #de9c5c, #e8a968);
+  }
+}
+
+.statusArchived {
+  &::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #757575, #8a8a8a);
+  }
+}

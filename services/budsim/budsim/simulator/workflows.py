@@ -17,6 +17,25 @@ logger = logging.get_logger(__name__)
 
 dapr_workflow = DaprWorkflow()
 
+
+def ensure_json_serializable(obj: Any) -> Any:
+    """Ensure object is JSON serializable by converting non-serializable types."""
+    if isinstance(obj, dict):
+        return {k: ensure_json_serializable(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [ensure_json_serializable(item) for item in obj]
+    elif isinstance(obj, tuple):
+        return list(obj)
+    elif isinstance(obj, bool):
+        # Python bool is already JSON serializable, but ensure it's not a numpy bool
+        return bool(obj)
+    elif obj is None or isinstance(obj, (str, int, float)):
+        return obj
+    else:
+        # Convert any other type to string
+        return str(obj)
+
+
 retry_policy = wf.RetryPolicy(
     first_retry_interval=timedelta(seconds=1),
     max_number_of_attempts=3,
@@ -31,12 +50,22 @@ class SimulationWorkflows:
     @staticmethod
     def get_topk_engine_configs(ctx: wf.WorkflowActivityContext, kwargs: Dict[str, Any]) -> Dict[str, Any]:
         """Get top-k engine configurations."""
+        # Convert simulation_method string back to enum if present
+        if "simulation_method" in kwargs and isinstance(kwargs["simulation_method"], str):
+            from .schemas import SimulationMethod
+
+            kwargs["simulation_method"] = SimulationMethod(kwargs["simulation_method"])
         return SimulationService.get_topk_engine_configs(**kwargs)
 
     @dapr_workflow.register_activity
     @staticmethod
     def get_topk_proprietary_engine_configs(ctx: wf.WorkflowActivityContext, kwargs: Dict[str, Any]) -> Dict[str, Any]:
         """Get top-k proprietary engine configurations."""
+        # Convert simulation_method string back to enum if present
+        if "simulation_method" in kwargs and isinstance(kwargs["simulation_method"], str):
+            from .schemas import SimulationMethod
+
+            kwargs["simulation_method"] = SimulationMethod(kwargs["simulation_method"])
         return SimulationService.get_topk_proprietary_engine_configs(**kwargs)
 
     @dapr_workflow.register_activity
@@ -45,6 +74,11 @@ class SimulationWorkflows:
         ctx: wf.WorkflowActivityContext, kwargs: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Get top-k quantization engine configurations."""
+        # Convert simulation_method string back to enum if present
+        if "simulation_method" in kwargs and isinstance(kwargs["simulation_method"], str):
+            from .schemas import SimulationMethod
+
+            kwargs["simulation_method"] = SimulationMethod(kwargs["simulation_method"])
         return SimulationService.get_topk_quantization_engine_configs(**kwargs)
 
     @dapr_workflow.register_activity
@@ -94,21 +128,28 @@ class SimulationWorkflows:
         if request.is_quantization:
             method = SimulationWorkflows.get_topk_quantization_engine_configs
 
+        # Determine the simulation method to use
+        simulation_service = SimulationService()
+        simulation_method = simulation_service.get_simulation_method(request)
+
         try:
             parallel_tasks = [
                 ctx.call_activity(
                     method,
-                    input={
-                        "device_config": {
-                            **deepcopy(device),
-                            "cluster_id": cluster["id"],
-                            "node_id": node["id"],
-                            "node_name": node["name"],
-                        },
-                        **request.model_dump(mode="json"),
-                        "engine_name": engine_device_combo["engine_name"],
-                        "engine_image": engine_device_combo["image"],
-                    },
+                    input=ensure_json_serializable(
+                        {
+                            "device_config": {
+                                **deepcopy(device),
+                                "cluster_id": cluster["id"],
+                                "node_id": node["id"],
+                                "node_name": node["name"],
+                            },
+                            **request.model_dump(mode="json"),
+                            "engine_name": engine_device_combo["engine_name"],
+                            "engine_image": engine_device_combo["image"],
+                            "simulation_method": simulation_method.value,  # Pass the simulation method
+                        }
+                    ),
                 )
                 for cluster in cluster_info
                 for node in cluster.get("nodes", [])
@@ -163,8 +204,6 @@ class SimulationWorkflows:
     @staticmethod
     def run_simulation(ctx: wf.DaprWorkflowContext, payload: Dict[str, Any]):
         """Run the simulation workflow."""
-        logger.info("Is workflow replaying: %s", ctx.is_replaying)
-
         workflow_name = "get_cluster_recommendations"
         workflow_id = ctx.instance_id
 
@@ -270,7 +309,9 @@ class SimulationWorkflows:
                     description="Rank the clusters to find the best configuration",
                 ),
             ],
-            eta=SimulationService.get_eta(current_step="validation", cluster_count=1),
+            eta=SimulationService.get_eta(
+                current_step="validation", cluster_count=1, simulation_method=SimulationService.get_simulation_method()
+            ),
             target_topic_name=request.source_topic,
             target_name=request.source,
         )

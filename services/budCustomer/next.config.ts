@@ -10,17 +10,15 @@ const nextConfig: NextConfig = {
     maxInactiveAge: 60 * 60 * 1000,
     pagesBufferLength: 5,
   },
-  async redirects() {
+  async rewrites() {
     return [
       {
-        source: '/auth/login',
-        destination: '/login',
-        permanent: true,
+        source: '/login',
+        destination: '/auth/login',
       },
       {
-        source: '/auth/register',
-        destination: '/register',
-        permanent: true,
+        source: '/register',
+        destination: '/auth/register',
       },
     ];
   },

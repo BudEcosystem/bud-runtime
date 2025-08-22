@@ -3284,37 +3284,41 @@ class ModelService(SessionMixin):
                 Model, {"id": model_id, "status": ModelStatusEnum.ACTIVE}
             )
 
-            # Create next step from backend
-            # Increment workflow_current_step with 1
-            current_step_number = current_step_number + 1
-            workflow_current_step = current_step_number
+            # Skip cluster simulation for cloud models
+            if db_model.provider_type != ModelProviderTypeEnum.CLOUD_MODEL:
+                # Create next step from backend
+                # Increment workflow_current_step with 1
+                current_step_number = current_step_number + 1
+                workflow_current_step = current_step_number
 
-            bud_simulator_events = await self._perform_cluster_simulation(
-                db_workflow.id,
-                deploy_config,
-                current_user_id,
-                db_model.uri,
-                db_model.provider_type,
-                db_model.local_path,
-            )
-            simulator_id = bud_simulator_events.pop("workflow_id")
-            recommended_cluster_events = {
-                "simulator_id": simulator_id,
-                "bud_simulator_events": bud_simulator_events,
-            }
+                bud_simulator_events = await self._perform_cluster_simulation(
+                    db_workflow.id,
+                    deploy_config,
+                    current_user_id,
+                    db_model.uri,
+                    db_model.provider_type,
+                    db_model.local_path,
+                )
+                simulator_id = bud_simulator_events.pop("workflow_id")
+                recommended_cluster_events = {
+                    "simulator_id": simulator_id,
+                    "bud_simulator_events": bud_simulator_events,
+                }
 
-            # Update or create next workflow step
-            db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
-                db_workflow.id, current_step_number, recommended_cluster_events
-            )
-            logger.debug(f"Workflow step updated {db_workflow_step.id}")
+                # Update or create next workflow step
+                db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+                    db_workflow.id, current_step_number, recommended_cluster_events
+                )
+                logger.debug(f"Workflow step updated {db_workflow_step.id}")
 
-            # Update workflow progress
-            bud_simulator_events["progress_type"] = "bud_simulator_events"
-            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
-                db_workflow,
-                {"progress": bud_simulator_events, "current_step": workflow_current_step},
-            )
+                # Update workflow progress
+                bud_simulator_events["progress_type"] = "bud_simulator_events"
+                db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                    db_workflow,
+                    {"progress": bud_simulator_events, "current_step": workflow_current_step},
+                )
+            else:
+                logger.info(f"Skipping cluster simulation for cloud model: {db_model.id}")
 
         # Execute workflow
         if trigger_workflow:

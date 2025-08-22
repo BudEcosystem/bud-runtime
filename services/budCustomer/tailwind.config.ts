@@ -129,6 +129,7 @@ const config = {
   },
   plugins: [
     require("tailwindcss-animate"),
+    require("@tailwindcss/line-clamp"),
     function ({ addUtilities }: { addUtilities: any }) {
       addUtilities({
         '.display-webkit-box': {

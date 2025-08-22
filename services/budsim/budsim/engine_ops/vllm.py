@@ -476,9 +476,12 @@ class EngineCompatibility(BaseEngineCompatibility):
                 f"attention_backend {engine_args.get('attention_backend')} is not compatible with CPU."
             )
 
+        # PP is disabled for CPU since it's designed for multi-node deployments
+        # CPU deployments are typically single-node with intra-node parallelism only
         if engine_args.get("pipeline_parallel_size", 1) is not None:
             assert engine_args.get("pipeline_parallel_size", 1) == 1, (
-                f"pipeline_parallel_size {engine_args.get('pipeline_parallel_size')} is not compatible with CPU."
+                f"pipeline_parallel_size {engine_args.get('pipeline_parallel_size')} is not compatible with CPU. "
+                f"Pipeline parallelism requires multi-node deployment."
             )
 
         if engine_args.get("kv_cache_dtype") is not None:
@@ -515,6 +518,23 @@ class EngineCompatibility(BaseEngineCompatibility):
 
     def check_gpu_compatibility(self, engine_args: Dict[str, Any]) -> bool:
         """Check if the engine args/envs combinations are compatible with GPU."""
+        # GPU supports pipeline parallelism for multi-node deployments
+        pp_size = engine_args.get("pipeline_parallel_size", 1)
+        tp_size = engine_args.get("tensor_parallel_size", 1)
+
+        # Basic validation: PP and TP must be positive integers
+        if pp_size is not None:
+            assert isinstance(pp_size, int) and pp_size >= 1, (
+                f"pipeline_parallel_size must be a positive integer, got {pp_size}"
+            )
+
+        if tp_size is not None:
+            assert isinstance(tp_size, int) and tp_size >= 1, (
+                f"tensor_parallel_size must be a positive integer, got {tp_size}"
+            )
+
+        # Additional constraints can be added here for GPU-specific PP limitations
+        # For now, GPU supports arbitrary PP combinations as long as cluster has nodes
         return True
 
     def check_hpu_compatibility(self, engine_args: Dict[str, Any]) -> bool:
@@ -529,6 +549,22 @@ class EngineCompatibility(BaseEngineCompatibility):
             engine_args.get("enable_prefix_caching", False) is True
             and engine_args.get("enable_chunked_prefill", False) is True
         ), "Prefix caching and chunked prefill is not compatible together."
+
+        # HPU supports pipeline parallelism for multi-node deployments
+        pp_size = engine_args.get("pipeline_parallel_size", 1)
+        tp_size = engine_args.get("tensor_parallel_size", 1)
+
+        # Basic validation: PP and TP must be positive integers
+        if pp_size is not None:
+            assert isinstance(pp_size, int) and pp_size >= 1, (
+                f"pipeline_parallel_size must be a positive integer, got {pp_size}"
+            )
+
+        if tp_size is not None:
+            assert isinstance(tp_size, int) and tp_size >= 1, (
+                f"tensor_parallel_size must be a positive integer, got {tp_size}"
+            )
+
         return True
 
     def check_args_compatibility(self, engine_args: Dict[str, Any]) -> bool:

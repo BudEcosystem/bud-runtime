@@ -1,0 +1,17 @@
+apiVersion: v2
+
+name: cert-manager
+description: Cert Manager Chart for Bud
+type: application
+version: 0.1.0
+
+maintainers:
+  - name: "sinanmohd"
+    email: "sinan@sinanmohd.com"
+    url: "https://www.sinanmohd.com"
+
+dependencies:
+  - name: cert-manager
+    version: 1.18.2
+    repository: https://charts.jetstack.io
+    condition: cert-manager.enabled

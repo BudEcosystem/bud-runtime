@@ -2,6 +2,108 @@ import { create } from 'zustand';
 import { AppRequest } from '../pages/api/requests';
 import { message } from 'antd';
 
+// Gateway metadata interfaces for components
+export interface RequestMetadata {
+  client_ip?: string | null;
+  proxy_chain?: string | null;
+  protocol_version?: string | null;
+  method?: string | null;
+  path?: string | null;
+  query_params?: string | null;
+  request_headers?: Record<string, string> | null;
+  body_size?: number | null;
+  api_key_id?: string | null;
+  auth_method?: string | null;
+  user_id?: string | null;
+  gateway_processing_ms?: number;
+  total_duration_ms?: number;
+  status_code?: number;
+  response_size?: number | null;
+  response_headers?: Record<string, string> | null;
+}
+
+export interface ClientInfo {
+  user_agent?: string | null;
+  device_type?: string | null;
+  browser_name?: string | null;
+  browser_version?: string | null;
+  os_name?: string | null;
+  os_version?: string | null;
+  is_bot?: boolean;
+}
+
+export interface GeographicInfo {
+  country_code?: string | null;
+  country_name?: string | null;
+  region?: string | null;
+  city?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  timezone?: string | null;
+  asn?: number | null;
+  isp?: string | null;
+}
+
+export interface GatewayMetadata {
+  // Network & Request Info
+  client_ip?: string | null;
+  proxy_chain?: string | null;
+  protocol_version?: string | null;
+  method?: string | null;
+  path?: string | null;
+  query_params?: string | null;
+  request_headers?: Record<string, string> | null;
+  body_size?: number | null;
+
+  // Authentication
+  api_key_id?: string | null;
+  auth_method?: string | null;
+  user_id?: string | null;
+
+  // Client Information
+  user_agent?: string | null;
+  device_type?: string | null;
+  browser_name?: string | null;
+  browser_version?: string | null;
+  os_name?: string | null;
+  os_version?: string | null;
+  is_bot?: boolean;
+
+  // Geographic Information
+  country_code?: string | null;
+  country_name?: string | null;
+  region?: string | null;
+  city?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  timezone?: string | null;
+  asn?: number | null;
+  isp?: string | null;
+
+  // Performance Metrics
+  gateway_processing_ms?: number;
+  total_duration_ms?: number;
+  status_code?: number;
+  response_size?: number | null;
+  response_headers?: Record<string, string> | null;
+
+  // Model & Routing
+  routing_decision?: string | null;
+  model_version?: string | null;
+
+  // Error Information
+  error_type?: string | null;
+  error_message?: string | null;
+
+  // Blocking Information
+  is_blocked?: boolean;
+  block_reason?: string | null;
+  block_rule_id?: string | null;
+
+  // Additional
+  tags?: Record<string, string> | null;
+}
+
 export interface InferenceListItem {
   inference_id: string;
   timestamp: string;
@@ -66,9 +168,14 @@ export interface InferenceDetail {
   cost?: number;
   endpoint_type?: string;
 
+  // Raw data
+  raw_request?: string;
+  raw_response?: string;
+
   // Gateway data (optional)
   gateway_request?: any;
   gateway_response?: any;
+  gateway_metadata?: GatewayMetadata;
 
   // Feedback summary
   feedback_count: number;
@@ -123,7 +230,7 @@ interface InferenceStore {
   resetFilters: () => void;
 
   // API calls
-  fetchInferences: (projectId?: string) => Promise<void>;
+  fetchInferences: (projectId?: string, overrideFilters?: Partial<InferenceFilters>) => Promise<void>;
   fetchInferenceDetail: (inferenceId: string) => Promise<void>;
   fetchInferenceFeedback: (inferenceId: string) => Promise<void>;
   exportInferences: (format: 'csv' | 'json') => Promise<void>;
@@ -181,28 +288,26 @@ export const useInferences = create<InferenceStore>((set, get) => ({
   },
 
   // Fetch inferences list
-  fetchInferences: async (projectId?: string) => {
+  fetchInferences: async (projectId?: string, overrideFilters?: Partial<InferenceFilters>) => {
     const { filters, pagination } = get();
     set({ isLoading: true, error: null });
 
     try {
+      // Use override filters if provided, otherwise use store filters
+      const finalFilters = overrideFilters ? { ...filters, ...overrideFilters } : filters;
+
       const requestBody = {
-        ...filters,
-        project_id: projectId || filters.project_id,
+        ...finalFilters,
+        project_id: projectId || finalFilters.project_id,
         offset: pagination.offset,
         limit: pagination.limit,
       };
 
       const response = await AppRequest.Post('/metrics/inferences/list', requestBody);
 
-      console.log('Inference API Response:', response.data); // Debug log
-
       // Check if response is successful (could be 200 or undefined)
       if (response.data && response.data.items) {
         const data = response.data;
-
-        console.log('Parsed items:', data.items); // Debug log
-        console.log('Setting state with items count:', data.items.length); // Debug log
 
         set({
           inferences: data.items,
