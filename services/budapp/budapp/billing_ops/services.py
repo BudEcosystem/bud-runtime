@@ -26,7 +26,8 @@ class BillingService(DataManagerUtils):
     def __init__(self, db: Session):
         """Initialize billing service."""
         super().__init__(db)
-        self.clickhouse_base_url = f"http://{app_settings.budmetrics_host}:{app_settings.budmetrics_port}"
+        # Use Dapr invocation to communicate with budmetrics
+        self.budmetrics_base_url = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/method"
 
     async def get_usage_from_clickhouse(
         self,
@@ -38,21 +39,41 @@ class BillingService(DataManagerUtils):
         """Get usage data from ClickHouse via budmetrics API."""
         try:
             async with httpx.AsyncClient() as client:
+                # Use the new usage/summary endpoint that queries ClickHouse directly
                 params = {
                     "user_id": str(user_id),
                     "start_date": start_date.isoformat(),
                     "end_date": end_date.isoformat(),
                 }
+
                 if project_id:
                     params["project_id"] = str(project_id)
 
                 response = await client.get(
-                    f"{self.clickhouse_base_url}/observability/usage/summary",
+                    f"{self.budmetrics_base_url}/observability/usage/summary",
                     params=params,
                     timeout=30.0,
                 )
                 response.raise_for_status()
-                return response.json()
+                result = response.json()
+
+                # Extract data from the response
+                if result and "param" in result:
+                    data = result["param"]
+                    return {
+                        "total_tokens": data.get("total_tokens", 0),
+                        "total_cost": data.get("total_cost", 0.0),
+                        "request_count": data.get("request_count", 0),
+                        "success_rate": data.get("success_rate", 0.0),
+                    }
+                else:
+                    # Return default values if no data
+                    return {
+                        "total_tokens": 0,
+                        "total_cost": 0.0,
+                        "request_count": 0,
+                        "success_rate": 0.0,
+                    }
         except Exception as e:
             logger.error(f"Error fetching usage from ClickHouse: {e}")
             # Return empty usage on error
@@ -152,18 +173,27 @@ class BillingService(DataManagerUtils):
         """Get historical usage data with specified granularity."""
         try:
             async with httpx.AsyncClient() as client:
+                # Use the new usage/history endpoint that queries ClickHouse directly
+                params = {
+                    "user_id": str(user_id),
+                    "start_date": start_date.isoformat(),
+                    "end_date": end_date.isoformat(),
+                    "granularity": granularity,
+                }
+
                 response = await client.get(
-                    f"{self.clickhouse_base_url}/observability/usage/history",
-                    params={
-                        "user_id": str(user_id),
-                        "start_date": start_date.isoformat(),
-                        "end_date": end_date.isoformat(),
-                        "granularity": granularity,
-                    },
+                    f"{self.budmetrics_base_url}/observability/usage/history",
+                    params=params,
                     timeout=30.0,
                 )
                 response.raise_for_status()
-                return response.json()
+                result = response.json()
+
+                # Extract data from the response
+                if result and "param" in result:
+                    return result["param"]  # Already contains {"data": [...]}
+                else:
+                    return {"data": []}
         except Exception as e:
             logger.error(f"Error fetching usage history: {e}")
             return {"error": str(e), "data": []}

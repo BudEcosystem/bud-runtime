@@ -640,6 +640,40 @@ class ClickHouseMigration:
             except Exception as e:
                 logger.error(f"Error checking table {table}: {e}")
 
+    async def update_api_key_project_id(self):
+        """Update api_key_project_id to project_id where api_key_project_id is null.
+
+        This ensures billing queries work correctly by using the api_key_project_id field
+        which is more accurate for API key based usage tracking.
+        """
+        try:
+            # First check if there are any records to update
+            check_query = """
+            SELECT COUNT(*)
+            FROM ModelInferenceDetails
+            WHERE api_key_project_id IS NULL AND project_id IS NOT NULL
+            """
+            result = await self.client.execute_query(check_query)
+            count_to_update = result[0][0] if result else 0
+
+            if count_to_update > 0:
+                logger.info(f"Found {count_to_update} records with null api_key_project_id to update")
+
+                # Update in batches to avoid locking issues
+                update_query = """
+                ALTER TABLE ModelInferenceDetails
+                UPDATE api_key_project_id = project_id
+                WHERE api_key_project_id IS NULL AND project_id IS NOT NULL
+                """
+
+                await self.client.execute_query(update_query)
+                logger.info(f"Successfully updated {count_to_update} records with api_key_project_id = project_id")
+            else:
+                logger.info("No records found with null api_key_project_id that need updating")
+
+        except Exception as e:
+            logger.warning(f"Could not update api_key_project_id (may not be critical): {e}")
+
     async def run_migration(self):
         """Run the complete migration process."""
         try:
@@ -654,6 +688,7 @@ class ClickHouseMigration:
             await self.create_gateway_analytics_table()
             await self.create_gateway_blocking_events_table()
             await self.add_auth_metadata_columns()  # Add auth metadata columns migration
+            await self.update_api_key_project_id()  # Update api_key_project_id where null
             await self.verify_tables()
             logger.info("Migration completed successfully!")
 
