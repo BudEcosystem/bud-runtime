@@ -4,6 +4,8 @@ import CreateBatchJobSuccess from "./BatchJob/CreateBatchJobSuccess";
 import NewProject from "./NewProject";
 import EditProject from "./EditProject";
 import DeleteProject from "./DeleteProject";
+import AddNewKey from "./ApiKeys/AddNewKey";
+import ApiKeySuccess from "./ApiKeys/ApiKeySuccess";
 
 // Placeholder component factory
 const createPlaceholderComponent = (name: string) => {
@@ -133,6 +135,7 @@ const stepComponentNames = [
   "evaluation-summary",
   "create-batch-job",
   "create-batch-job-success",
+  "api-key-success",
 ];
 
 // Create StepComponents object with placeholder components
@@ -150,5 +153,7 @@ StepComponents["create-batch-job-success"] = CreateBatchJobSuccess;
 StepComponents["new-project"] = NewProject;
 StepComponents["edit-project"] = EditProject;
 StepComponents["delete-project"] = DeleteProject;
+StepComponents["add-new-key"] = AddNewKey;
+StepComponents["api-key-success"] = ApiKeySuccess;
 
 export type StepComponentsType = keyof typeof StepComponents;

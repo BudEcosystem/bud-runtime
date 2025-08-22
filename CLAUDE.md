@@ -438,3 +438,5 @@ Complete API documentation available in `docs/api/inference-endpoints.md` coveri
 - Error handling
 - Rate limiting
 - Best practices
+
+- Don't save any keys as plain text in DBs. Always use encryption. Security is of high priority.

@@ -80,6 +80,7 @@ const BudDrawer: React.FC = () => {
           }}
         >
           <step.component
+            {...step?.properties}
             {...drawerProps}
           />
         </BudFormContext.Provider>

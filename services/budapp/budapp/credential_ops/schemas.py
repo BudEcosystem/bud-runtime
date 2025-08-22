@@ -58,7 +58,7 @@ class CredentialUpdateRequest(CloudEventBase):
 class CredentialBase(BaseModel):
     """Credential base schema."""
 
-    key: str
+    encrypted_key: str
 
 
 class CredentialCreate(CredentialBase):
@@ -74,9 +74,11 @@ class CredentialFilter(BaseModel):
     project_id: Optional[UUID] = None
 
 
-class BudCredentialCreate(CredentialCreate):
+class BudCredentialCreate(BaseModel):
     """Create credential schema."""
 
+    user_id: UUID
+    encrypted_key: str
     name: str
     project_id: UUID
     expiry: datetime | None
