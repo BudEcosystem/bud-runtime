@@ -5,10 +5,10 @@ from typing import Optional
 from uuid import UUID
 
 from budmicroframe.commons import logging
+from budmicroframe.commons.schemas import ErrorResponse, SuccessResponse
 from fastapi import APIRouter, Query
 from fastapi.responses import Response
 
-from budmetrics.observability.schemas import ErrorResponse, SuccessResponse
 from budmetrics.observability.services import ObservabilityMetricsService
 
 

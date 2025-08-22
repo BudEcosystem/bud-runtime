@@ -17,6 +17,7 @@ from budapp.billing_ops.schemas import (
     UserBillingSchema,
 )
 from budapp.billing_ops.services import BillingService
+from budapp.commons.constants import UserTypeEnum
 from budapp.commons.dependencies import get_current_active_user, get_session
 from budapp.commons.logging import get_logger
 from budapp.commons.schemas import SingleResponse
@@ -126,8 +127,8 @@ async def setup_user_billing(
 ) -> SingleResponse[UserBillingSchema]:
     """Set up billing for a user (admin only)."""
     try:
-        # Check if user is admin
-        if current_user.role != "admin":
+        # Check if user is admin (using user_type)
+        if current_user.user_type != UserTypeEnum.ADMIN:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only admins can set up billing",
