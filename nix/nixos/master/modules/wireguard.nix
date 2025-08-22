@@ -40,6 +40,11 @@ let
     # friendly_name = ditto
     PublicKey = moSdO8FsGvJGnS3X09lqv0Fx3Pm+haHcBivuWylUk1k=
     AllowedIPs = 10.54.132.4/32
+
+    [Peer]
+    # friendly_name = adarsh
+    PublicKey = csfqXPnwBeJv60FXn7m+Pno4clx2Bi68+26yhFtNvwM=
+    AllowedIPs = 10.54.132.5/32
   '';
 in
 {
