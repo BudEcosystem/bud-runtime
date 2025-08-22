@@ -13,7 +13,7 @@ The logout functionality has been enhanced to properly invalidate access tokens 
 - More secure than sending token in request body
 - Shows lock icon in Swagger UI indicating authentication support
 
-### 2. Logout Service Enhancement  
+### 2. Logout Service Enhancement
 **File**: `budapp/auth/services.py`
 - Updated `logout_user` method to blacklist access tokens in Redis
 - Calculates appropriate TTL based on token expiration
@@ -52,7 +52,7 @@ To take advantage of the enhanced security, update your logout implementation:
 async function logout() {
   const accessToken = localStorage.getItem('access_token');
   const refreshToken = localStorage.getItem('refresh_token');
-  
+
   try {
     await fetch('/auth/logout', {
       method: 'POST',
@@ -64,11 +64,11 @@ async function logout() {
         refresh_token: refreshToken
       })
     });
-    
+
     // Clear local storage
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
-    
+
     // Redirect to login
     window.location.href = '/login';
   } catch (error) {
