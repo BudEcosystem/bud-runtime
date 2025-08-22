@@ -94,12 +94,15 @@ class CredentialService(SessionMixin):
         # Add or generate credential
         db_credential = await self.add_or_generate_credential(credential, current_user_id)
 
-        await self.update_proxy_cache(db_credential.project_id, db_credential.key, db_credential.expiry)
+        # Decrypt the key for cache update
+        decrypted_key = await RSAHandler().decrypt(db_credential.encrypted_key)
+        await self.update_proxy_cache(db_credential.project_id, decrypted_key, db_credential.expiry)
 
+        # Use the encrypted key directly
         credential_response = CredentialResponse(
             name=db_credential.name,
             project_id=db_credential.project_id,
-            key=await RSAHandler().encrypt(db_credential.key),
+            key=db_credential.encrypted_key,  # Already encrypted
             expiry=db_credential.expiry,
             max_budget=db_credential.max_budget,
             model_budgets=db_credential.model_budgets,
@@ -159,12 +162,16 @@ class CredentialService(SessionMixin):
         api_key = generate_secure_api_key(credential_type.value)
 
         expiry = datetime.now(UTC) + timedelta(days=request.expiry) if request.expiry else None
+
+        # Encrypt the API key for storage
+        encrypted_api_key = await RSAHandler().encrypt(api_key)
+
         credential_data = BudCredentialCreate(
             name=request.name,
             user_id=user_id,
             project_id=request.project_id,
             expiry=expiry,
-            key=api_key,
+            encrypted_key=encrypted_api_key,
             max_budget=request.max_budget,
             model_budgets=request.model_budgets,
             credential_type=credential_type,
@@ -173,7 +180,7 @@ class CredentialService(SessionMixin):
 
         # Insert credential in to database
         credential_model = CredentialModel(**credential_data.model_dump())
-        credential_model.hashed_key = CredentialModel.set_hashed_key(credential_model.key)
+        credential_model.hashed_key = CredentialModel.set_hashed_key(api_key)
         db_credential = await CredentialDataManager(self.session).create_credential(credential_model)
         logger.info(f"Credential inserted to database: {db_credential.id}")
 
@@ -201,18 +208,22 @@ class CredentialService(SessionMixin):
                 filters={"project_id": project_id}
             )
             for credential in db_credentials:
+                # Decrypt API key from encrypted storage
+                decrypted_key = await RSAHandler().decrypt(credential.encrypted_key)
+
                 keys_to_update.append(
                     {
-                        "api_key": credential.key,
+                        "api_key": decrypted_key,
                         "expiry": credential.expiry,
                         "credential_id": credential.id,
                         "user_id": credential.user_id,  # Using existing user_id field
                     }
                 )
         else:
-            # Fetch credential details for single key update
+            # Fetch credential details for single key update using hashed key
+            hashed_key = CredentialModel.set_hashed_key(api_key)
             credential = await CredentialDataManager(self.session).retrieve_credential_by_fields(
-                {"key": api_key, "project_id": project_id}, missing_ok=True
+                {"hashed_key": hashed_key, "project_id": project_id}, missing_ok=True
             )
             keys_to_update.append(
                 {
@@ -290,7 +301,15 @@ class CredentialService(SessionMixin):
         return await self.parse_credentials(db_credentials), count
 
     async def retrieve_credential_details(self, api_key: str) -> CredentialModel:
-        db_credential = await CredentialDataManager(self.session).retrieve_credential_by_fields({"key": api_key})
+        # First try to find by hashed key for better security
+        hashed_key = CredentialModel.set_hashed_key(api_key)
+        db_credential = await CredentialDataManager(self.session).retrieve_credential_by_fields(
+            {"hashed_key": hashed_key}, missing_ok=True
+        )
+
+        if not db_credential:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Credential not found")
+
         return db_credential
 
     async def parse_credentials(
@@ -304,11 +323,14 @@ class CredentialService(SessionMixin):
         for db_credential in db_credentials:
             if db_credential.project and db_credential.project.benchmark:
                 continue
+            # Use encrypted key directly
+            encrypted_key = db_credential.encrypted_key
+
             bud_serve_credentials.append(
                 CredentialDetails(
                     name=db_credential.name,
                     project=db_credential.project,
-                    key=await RSAHandler().encrypt(db_credential.key),
+                    key=encrypted_key,  # Already encrypted
                     expiry=db_credential.expiry,
                     max_budget=db_credential.max_budget,
                     model_budgets=db_credential.model_budgets,
@@ -342,7 +364,9 @@ class CredentialService(SessionMixin):
         #     await ProjectService(self.session).check_project_membership(project_id, user_id)
 
         # delete proxy cache related to this credential
-        api_key = db_credential.key
+        # Decrypt API key from encrypted storage
+        api_key = await RSAHandler().decrypt(db_credential.encrypted_key)
+
         redis_service = RedisService()
         await redis_service.delete_keys_by_pattern(f"api_key:{api_key}*")
         # Delete the credential from the database
@@ -1095,11 +1119,17 @@ class ClusterProviderService(SessionMixin):
                         detail=f"Required field '{field}' is missing in the credential values",
                     )
 
+            # Encrypt credential values before saving
+            encrypted_credential_values = {}
+            for key, value in req.credential_values.items():
+                # Encrypt each credential value
+                encrypted_credential_values[key] = await RSAHandler().encrypt(str(value))
+
             # Save the credential values
             cloud_credential = CloudCredentials(
                 user_id=current_user_id,
                 provider_id=provider_id,
-                credential=req.credential_values,
+                encrypted_credential=encrypted_credential_values,  # Store encrypted version only
                 credential_name=req.credential_name,
             )
             await CloudProviderDataManager(self.session).insert_one(cloud_credential)
