@@ -37,13 +37,13 @@ async def test_logout_blacklists_access_token():
 
                 # Mock tenant retrieval
                 mock_tenant = MagicMock(spec=Tenant)
-                mock_tenant.id = "123e4567-e89b-12d3-a456-426614174000"  # Valid UUID
+                mock_tenant.id = "5f59dc5e-7cdb-4c92-8cee-eab63492e82e"  # Valid UUID v4
                 mock_tenant.realm_name = "test-realm"
                 mock_data_manager.retrieve_by_fields.return_value = mock_tenant
 
                 # Mock tenant client
                 mock_tenant_client = MagicMock(spec=TenantClient)
-                mock_tenant_client.id = "223e4567-e89b-12d3-a456-426614174000"  # Valid UUID
+                mock_tenant_client.id = "8be3c315-1964-4db9-9957-8c62d4ce4559"  # Valid UUID v4
                 mock_tenant_client.client_id = "test-client"
                 mock_tenant_client.client_named_id = "test-client-named"
                 mock_tenant_client.client_secret = "secret"
@@ -103,12 +103,12 @@ async def test_logout_without_access_token():
 
                 # Mock tenant retrieval
                 mock_tenant = MagicMock(spec=Tenant)
-                mock_tenant.id = "523e4567-e89b-12d3-a456-426614174000"  # Valid UUID
+                mock_tenant.id = "9c69891e-8f91-4583-8cdb-6cc05cbf18c1"  # Valid UUID v4
                 mock_tenant.realm_name = "test-realm"
 
                 # Mock tenant client
                 mock_tenant_client = MagicMock(spec=TenantClient)
-                mock_tenant_client.id = "623e4567-e89b-12d3-a456-426614174000"  # Valid UUID
+                mock_tenant_client.id = "6f959769-f619-427d-b7d8-c2fe78ba9fad"  # Valid UUID v4
                 mock_tenant_client.client_id = "test-client"
                 mock_tenant_client.client_named_id = "test-client-named"
                 mock_tenant_client.client_secret = "secret"
@@ -171,11 +171,11 @@ async def test_get_current_user_checks_blacklist():
                 mock_user_manager.return_value = mock_data_manager
 
                 mock_tenant = MagicMock(spec=Tenant)
-                mock_tenant.id = "323e4567-e89b-12d3-a456-426614174000"  # Valid UUID
+                mock_tenant.id = "63b8cb28-1002-4651-9f6d-11478a9334bb"  # Valid UUID v4
                 mock_tenant.realm_name = "test-realm"
 
                 mock_tenant_client = MagicMock(spec=TenantClient)
-                mock_tenant_client.id = "423e4567-e89b-12d3-a456-426614174000"  # Valid UUID
+                mock_tenant_client.id = "326a0d45-8cc0-49aa-9613-636026e04697"  # Valid UUID v4
                 mock_tenant_client.client_id = "test-client"
                 mock_tenant_client.client_named_id = "test-client-named"
                 mock_tenant_client.client_secret = "secret"
@@ -231,12 +231,12 @@ async def test_logout_continues_on_blacklist_failure():
                 mock_user_manager.return_value = mock_data_manager
 
                 mock_tenant = MagicMock(spec=Tenant)
-                mock_tenant.id = "723e4567-e89b-12d3-a456-426614174000"  # Valid UUID
+                mock_tenant.id = "fa1d8a4e-aa70-4b04-af0a-e2865f8b186e"  # Valid UUID v4
                 mock_tenant.realm_name = "test-realm"
 
                 # Mock tenant client
                 mock_tenant_client = MagicMock(spec=TenantClient)
-                mock_tenant_client.id = "823e4567-e89b-12d3-a456-426614174000"  # Valid UUID
+                mock_tenant_client.id = "31a52d0d-c623-49c7-a9b4-03d5ef939f8d"  # Valid UUID v4
                 mock_tenant_client.client_id = "test-client"
                 mock_tenant_client.client_named_id = "test-client-named"
                 mock_tenant_client.client_secret = "secret"
