@@ -36,6 +36,7 @@ from budapp.user_ops.crud import UserDataManager
 from budapp.user_ops.models import Tenant, TenantClient
 from budapp.user_ops.models import User as UserModel
 from budapp.user_ops.schemas import TenantClientSchema, User
+from budapp.shared.redis_service import RedisService
 
 
 logger = logging.get_logger(__name__)
@@ -82,6 +83,15 @@ async def get_current_user(
     )
 
     try:
+        # Check if token is blacklisted
+        redis_service = RedisService()
+        blacklist_key = f"token_blacklist:{token.credentials}"
+        is_blacklisted = await redis_service.get(blacklist_key)
+        
+        if is_blacklisted:
+            logger.warning("::USER:: Token is blacklisted")
+            raise credentials_exception
+        
         realm_name = app_settings.default_realm_name
 
         # logger.debug(f"::USER:: Validating token for realm: {realm_name}")

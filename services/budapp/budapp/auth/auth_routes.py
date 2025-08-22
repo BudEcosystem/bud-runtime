@@ -16,9 +16,10 @@
 
 """Defines authentication routes for the microservices, providing endpoints for user authentication."""
 
-from typing import Union
+from typing import Optional, Union
 
 from fastapi import APIRouter, Depends, Request, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 from typing_extensions import Annotated
 
@@ -45,6 +46,7 @@ from .services import AuthService
 logger = logging.get_logger(__name__)
 
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
+security = HTTPBearer(auto_error=False)  # auto_error=False makes it optional
 
 
 @auth_router.post(
@@ -155,14 +157,21 @@ async def login_user(
             "description": "Successfully logged out user",
         },
     },
-    description="Logout a user by invalidating their refresh token",
+    description="Logout a user by invalidating their refresh token and blacklisting access token",
 )
 async def logout_user(
-    logout_data: LogoutRequest, session: Annotated[Session, Depends(get_session)]
+    logout_data: LogoutRequest, 
+    session: Annotated[Session, Depends(get_session)],
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)
 ) -> Union[LogoutResponse, None]:
-    """Logout a user by invalidating their refresh token."""
+    """Logout a user by invalidating their refresh token and blacklisting access token."""
     try:
-        await AuthService(session).logout_user(logout_data)
+        # Extract access token from credentials if present
+        access_token = None
+        if credentials:
+            access_token = credentials.credentials
+        
+        await AuthService(session).logout_user(logout_data, access_token)
         return LogoutResponse(code=status.HTTP_200_OK, message="User logged out successfully").to_http_response()
     except ClientException as e:
         logger.error(f"ClientException: {e}")
