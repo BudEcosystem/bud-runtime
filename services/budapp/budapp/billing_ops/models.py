@@ -47,7 +47,7 @@ class UserBilling(Base, TimestampMixin):
     __tablename__ = "user_billing"
 
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
-    user_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("users.id"), unique=True, nullable=False)
+    user_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("user.id"), unique=True, nullable=False)
     billing_plan_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("billing_plans.id"), nullable=False)
 
     # Current period
