@@ -226,10 +226,10 @@ class AuthService(SessionMixin):
             try:
                 redis_service = RedisService()
                 import time
-                
+
                 # Try to decode the token to get its expiration
                 ttl = 3600  # Default 1 hour TTL
-                
+
                 try:
                     # Get default tenant for token validation
                     default_tenant = await UserDataManager(self.session).retrieve_by_fields(
@@ -244,23 +244,21 @@ class AuthService(SessionMixin):
                                 id=tenant_client.id,
                                 client_named_id=tenant_client.client_named_id,
                                 client_id=tenant_client.client_id,
-                                client_secret=tenant_client.client_secret
+                                client_secret=tenant_client.client_secret,
                             )
                             keycloak_manager = KeycloakManager()
                             decoded = await keycloak_manager.validate_token(
-                                access_token, 
-                                default_tenant.realm_name, 
-                                credentials
+                                access_token, default_tenant.realm_name, credentials
                             )
                             # Calculate TTL based on token expiration
-                            exp = decoded.get('exp', 0)
+                            exp = decoded.get("exp", 0)
                             current_time = int(time.time())
                             if exp > current_time:
                                 ttl = exp - current_time
                 except Exception as e:
                     logger.warning(f"Could not decode access token for TTL calculation: {e}")
                     # Continue with default TTL
-                
+
                 # Add token to blacklist with TTL
                 blacklist_key = f"token_blacklist:{access_token}"
                 await redis_service.set(blacklist_key, "1", ex=ttl)
@@ -297,7 +295,7 @@ class AuthService(SessionMixin):
             id=tenant_client.id,
             client_id=tenant_client.client_id,
             client_named_id=tenant_client.client_named_id,
-            client_secret=tenant_client.client_secret
+            client_secret=tenant_client.client_secret,
         )
 
         success = await keycloak_manager.logout_user(

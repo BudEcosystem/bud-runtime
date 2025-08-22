@@ -160,15 +160,14 @@ async def login_user(
     description="Logout a user by invalidating their refresh token and blacklisting access token",
 )
 async def logout_user(
-    logout_data: LogoutRequest, 
+    logout_data: LogoutRequest,
     session: Annotated[Session, Depends(get_session)],
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
 ) -> Union[LogoutResponse, None]:
     """Logout a user by invalidating their refresh token and blacklisting access token."""
     try:
         # Extract access token from credentials if present
         access_token = credentials.credentials if credentials else None
-        
         await AuthService(session).logout_user(logout_data, access_token)
         return LogoutResponse(code=status.HTTP_200_OK, message="User logged out successfully").to_http_response()
     except ClientException as e:
