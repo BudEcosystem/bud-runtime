@@ -13,14 +13,17 @@ import { useDrawer } from "@/hooks/useDrawer";
 import { AppRequest } from "@/services/api/requests";
 
 function EditProjectForm() {
-  const { globalSelectedProject, projectValues, setProjectValues } = useProjects();
+  const { globalSelectedProject, projectValues, setProjectValues } =
+    useProjects();
   const { form, values = {} } = useContext(BudFormContext);
   const [options, setOptions] = useState([]);
 
   // Fetch available tags from the projects/tags endpoint
   async function fetchTags() {
     try {
-      const response: any = await AppRequest.Get("/projects/tags?page=1&limit=1000");
+      const response: any = await AppRequest.Get(
+        "/projects/tags?page=1&limit=1000",
+      );
       const data = response.data?.tags?.map((tag: any) => ({
         name: tag.name,
         color: tag.color,
@@ -39,19 +42,25 @@ function EditProjectForm() {
   useEffect(() => {
     if (globalSelectedProject?.project && form) {
       const projectData = globalSelectedProject.project;
-      setProjectValues({
-        name: projectData.name,
-        description: projectData.description,
-        tags: projectData.tags || [],
+
+      // Format tags to ensure they're in the correct structure
+      const formattedTags = projectData.tags
+        ? projectData.tags.map((tag: any) => ({
+            name: tag.name || tag,
+            color: tag.color || "#89C0F2",
+          }))
+        : [];
+
+      const values = {
+        name: projectData.name || "",
+        description: projectData.description || "",
+        tags: formattedTags,
         icon: projectData.icon || "📁",
-      });
+      };
+
+      setProjectValues(values);
       // Set form values for the form components to use
-      form.setFieldsValue({
-        name: projectData.name,
-        description: projectData.description,
-        tags: projectData.tags || [],
-        icon: projectData.icon || "📁",
-      });
+      form.setFieldsValue(values);
     }
   }, [globalSelectedProject, setProjectValues, form]);
 
@@ -66,6 +75,7 @@ function EditProjectForm() {
           <ProjectNameInput
             placeholder="Enter Project Name"
             isEdit={true}
+            showIcon={false}
             onChangeIcon={(icon) =>
               setProjectValues({
                 ...projectValues,
@@ -87,7 +97,7 @@ function EditProjectForm() {
                 placeholder="Enter tags"
                 rules={[
                   {
-                    validator: (rule, value) => {
+                    validator: (_, value) => {
                       if (!value || value.length === 0) {
                         return Promise.reject("Please select at least one tag");
                       }
@@ -112,13 +122,17 @@ function EditProjectForm() {
                 label="Description"
                 info="Write Description Here"
                 placeholder="Write Description Here"
-                rules={[{ required: true, message: "Please enter description" }]}
-                onChange={(description) =>
+                rules={[
+                  { required: true, message: "Please enter description" },
+                ]}
+                onChange={(description) => {
                   setProjectValues({
                     ...projectValues,
                     description: description,
-                  })
-                }
+                  });
+                  // Also update form values
+                  form.setFieldsValue({ description: description });
+                }}
               />
             </div>
           </div>
@@ -129,9 +143,15 @@ function EditProjectForm() {
 }
 
 export default function EditProject() {
-  const { values, submittable } = useContext(BudFormContext);
+  const { submittable } = useContext(BudFormContext);
   const { closeDrawer } = useDrawer();
-  const { globalSelectedProject, updateProject, getGlobalProject, projectValues, setProjectValues } = useProjects();
+  const {
+    globalSelectedProject,
+    updateProject,
+    getGlobalProject,
+    projectValues,
+    setProjectValues,
+  } = useProjects();
 
   // Reset project values when component unmounts
   useEffect(() => {
@@ -155,20 +175,38 @@ export default function EditProject() {
           const updatePayload: any = {};
 
           // Only include fields that have changed
-          if (projectValues?.name && projectValues.name !== globalSelectedProject?.project?.name) {
+          if (
+            projectValues?.name &&
+            projectValues.name !== globalSelectedProject?.project?.name
+          ) {
             updatePayload.name = projectValues.name;
           }
 
-          if (values?.description !== undefined) {
-            updatePayload.description = values.description;
+          // Get description from either projectValues or form values
+          const currentDescription =
+            projectValues?.description !== undefined
+              ? projectValues.description
+              : values?.description;
+          if (
+            currentDescription !== undefined &&
+            currentDescription !== globalSelectedProject?.project?.description
+          ) {
+            updatePayload.description = currentDescription;
           }
 
-          if (projectValues?.icon !== undefined) {
+          if (
+            projectValues?.icon !== undefined &&
+            projectValues.icon !== globalSelectedProject?.project?.icon
+          ) {
             updatePayload.icon = projectValues.icon;
           }
 
           if (values?.tags !== undefined) {
-            updatePayload.tags = values.tags;
+            // Ensure tags are in the correct format for the API
+            updatePayload.tags = values.tags.map((tag: any) => ({
+              name: tag.name || tag,
+              color: tag.color || "#89C0F2",
+            }));
           }
 
           // Call the API to update the project
@@ -176,7 +214,7 @@ export default function EditProject() {
 
           if (result) {
             // Refresh the project data
-            await getGlobalProject(projectId);
+            getGlobalProject(projectId);
             closeDrawer();
           }
         } catch (error) {
@@ -186,7 +224,12 @@ export default function EditProject() {
       data={{
         name: globalSelectedProject?.project?.name || "",
         description: globalSelectedProject?.project?.description || "",
-        tags: globalSelectedProject?.project?.tags || [],
+        tags: globalSelectedProject?.project?.tags
+          ? globalSelectedProject.project.tags.map((tag: any) => ({
+              name: tag.name || tag,
+              color: tag.color || "#89C0F2",
+            }))
+          : [],
         icon: globalSelectedProject?.project?.icon || "📁",
       }}
     >

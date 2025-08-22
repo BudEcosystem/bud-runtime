@@ -37,7 +37,7 @@ interface SelectProps {
 export default function TagsInput(props: SelectProps) {
   // Usage of DebounceSelect
   const [onTouched, setOnTouched] = useState(false);
-  const { name: fieldName, options, required } = props;
+  const { name: fieldName, options, required, onChange } = props;
   const { form } = useContext(BudFormContext);
   const [selected, setSelected] = useState<Tag[]>(props.defaultValue || []);
   const [inputValue, setInputValue] = useState("");
@@ -45,21 +45,20 @@ export default function TagsInput(props: SelectProps) {
 
   useEffect(() => {
     const element = document.getElementById("next-button");
+    const handleClick = () => {
+      setOnTouched(true);
+      form.validateFields([fieldName]);
+    };
+
     if (element) {
-      element.addEventListener("click", () => {
-        setOnTouched(true);
-        form.validateFields([fieldName]);
-      });
+      element.addEventListener("click", handleClick);
     }
     return () => {
       if (element) {
-        element.removeEventListener("click", () => {
-          setOnTouched(true);
-          form.validateFields([fieldName]);
-        });
+        element.removeEventListener("click", handleClick);
       }
     };
-  }, []);
+  }, [fieldName, form]);
 
   useEffect(() => {
     const updated: Tag[] = selected?.map((item) => ({
@@ -71,8 +70,8 @@ export default function TagsInput(props: SelectProps) {
       form.setFieldsValue({
         [fieldName]: updated,
       });
-    props.onChange && props.onChange(updated);
-  }, [selected]);
+    onChange && onChange(updated);
+  }, [selected, fieldName, form, onChange]);
 
   const handleCreate = (inputValue: string) => {
     try {
@@ -101,7 +100,21 @@ export default function TagsInput(props: SelectProps) {
     if (props.defaultValue) {
       setSelected(props.defaultValue);
     }
-  }, []);
+  }, [props.defaultValue]);
+
+  // Watch for form value changes (for edit mode)
+  useEffect(() => {
+    const formValue = form?.getFieldValue?.(fieldName);
+    if (formValue && Array.isArray(formValue) && formValue.length > 0) {
+      // Ensure the tags have the correct structure
+      const formattedTags = formValue.map((tag: any) => ({
+        name: tag.name || tag,
+        color: tag.color || "#89C0F2",
+      }));
+      setSelected(formattedTags);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fieldName, form]);
 
   return (
     <Form.Item
