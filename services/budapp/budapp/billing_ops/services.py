@@ -87,12 +87,12 @@ class BillingService(DataManagerUtils):
     def get_user_billing(self, user_id: UUID) -> Optional[UserBilling]:
         """Get user billing information."""
         stmt = select(UserBilling).where(UserBilling.user_id == user_id)
-        return self.db.execute(stmt).scalar_one_or_none()
+        return self.session.execute(stmt).scalar_one_or_none()
 
     def get_billing_plan(self, plan_id: UUID) -> Optional[BillingPlan]:
         """Get billing plan details."""
         stmt = select(BillingPlan).where(BillingPlan.id == plan_id)
-        return self.db.execute(stmt).scalar_one_or_none()
+        return self.session.execute(stmt).scalar_one_or_none()
 
     async def get_current_usage(self, user_id: UUID) -> Dict[str, Any]:
         """Get current billing period usage for a user."""
@@ -208,7 +208,7 @@ class BillingService(DataManagerUtils):
             BillingAlert.user_billing_id == user_billing.id,
             BillingAlert.is_active,
         )
-        return list(self.db.execute(stmt).scalars().all())
+        return list(self.session.execute(stmt).scalars().all())
 
     async def check_and_trigger_alerts(self, user_id: UUID) -> List[Dict[str, Any]]:
         """Check usage against alert thresholds and return triggered alerts."""
@@ -242,7 +242,7 @@ class BillingService(DataManagerUtils):
                     # Update alert
                     alert.last_triggered_at = datetime.now(timezone.utc)
                     alert.last_triggered_value = Decimal(str(current_value))
-                    self.db.commit()
+                    self.session.commit()
 
                     triggered_alerts.append(
                         {
@@ -283,9 +283,9 @@ class BillingService(DataManagerUtils):
             custom_cost_quota=custom_cost_quota,
         )
 
-        self.db.add(user_billing)
-        self.db.commit()
-        self.db.refresh(user_billing)
+        self.session.add(user_billing)
+        self.session.commit()
+        self.session.refresh(user_billing)
 
         return user_billing
 
@@ -303,4 +303,4 @@ class BillingService(DataManagerUtils):
                 month=user_billing.billing_period_end.month + 1
             )
 
-        self.db.commit()
+        self.session.commit()
