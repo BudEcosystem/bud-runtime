@@ -17,6 +17,8 @@
 
 """Implements auth services and business logic that power the microservices, including key functionality and integrations."""
 
+from uuid import UUID
+
 from fastapi import status
 
 from budapp.commons import logging
@@ -361,6 +363,42 @@ class AuthService(SessionMixin):
 
             await UserDataManager(self.session).insert_one(tenant_user_mapping)
             logger.info(f"User {db_user.email} mapped to tenant {tenant.name}")
+
+            # Assign free billing plan for CLIENT users
+            if user.user_type == UserTypeEnum.CLIENT:
+                try:
+                    from datetime import datetime, timezone
+                    from uuid import uuid4
+
+                    from budapp.billing_ops.models import UserBilling
+
+                    # Calculate billing period (monthly)
+                    now = datetime.now(timezone.utc)
+                    billing_period_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+                    # Get next month
+                    if billing_period_start.month == 12:
+                        billing_period_end = billing_period_start.replace(year=billing_period_start.year + 1, month=1)
+                    else:
+                        billing_period_end = billing_period_start.replace(month=billing_period_start.month + 1)
+
+                    # Create user billing with free plan
+                    user_billing = UserBilling(
+                        id=uuid4(),
+                        user_id=db_user.id,
+                        billing_plan_id=UUID("00000000-0000-0000-0000-000000000001"),  # Free plan ID
+                        billing_period_start=billing_period_start,
+                        billing_period_end=billing_period_end,
+                        is_active=True,
+                        is_suspended=False,
+                    )
+
+                    await UserDataManager(self.session).insert_one(user_billing)
+                    logger.info(f"Free billing plan assigned to client user: {db_user.email}")
+
+                except Exception as billing_error:
+                    logger.error(f"Failed to assign billing plan to user {db_user.email}: {billing_error}")
+                    # Don't fail the registration if billing assignment fails
 
             # Create a default project for CLIENT users
             if user.user_type == UserTypeEnum.CLIENT:

@@ -30,6 +30,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .auth import auth_routes
 from .benchmark_ops import benchmark_routes
+from .billing_ops import billing_router
 from .cluster_ops import cluster_routes
 from .cluster_ops.workflows import ClusterRecommendedSchedulerWorkflows
 from .commons import logging
@@ -257,6 +258,7 @@ internal_router.include_router(playground_routes.playground_router)
 internal_router.include_router(project_routes.project_router)
 internal_router.include_router(router_routes.router_router)
 internal_router.include_router(eval_routes.router)
+internal_router.include_router(billing_router)
 
 app.include_router(internal_router)
 
