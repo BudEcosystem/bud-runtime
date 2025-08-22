@@ -113,6 +113,12 @@ mkShell {
         fi
     }
 
+    bud_sops_sync() {
+        for sec in $(find -name secrets.yaml) $(find -name values.enc.yaml); do
+                sops updatekeys "$sec"
+        done
+    }
+
     export_sops_secret_silent() {
         k1="$1"
         k2="$2"
