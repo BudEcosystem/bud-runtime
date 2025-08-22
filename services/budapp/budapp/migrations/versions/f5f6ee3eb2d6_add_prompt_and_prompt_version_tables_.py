@@ -1,7 +1,7 @@
 """Add prompt and prompt_version tables with workflow enum
 
 Revision ID: f5f6ee3eb2d6
-Revises: 47f73a835ad9
+Revises: b265afde446b
 Create Date: 2025-08-20 06:08:58.690229
 
 """
@@ -16,7 +16,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = "f5f6ee3eb2d6"
-down_revision: Union[str, None] = "47f73a835ad9"
+down_revision: Union[str, None] = "b265afde446b"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
