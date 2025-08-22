@@ -115,7 +115,7 @@ export default function BatchesPage() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "queued":
-        return "var(--bud-text-disabled)";
+        return "#E6C240";
       case "processing":
         return "#4077E6";
       case "completed":
