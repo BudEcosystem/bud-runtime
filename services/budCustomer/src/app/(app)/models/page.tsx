@@ -20,7 +20,6 @@ import { Icon } from "@iconify/react/dist/iconify.js";
 import ModelDetailDrawer from "@/components/ModelDetailDrawer";
 const assetBaseUrl = process.env.NEXT_PUBLIC_BASE_URL;
 import {
-  Text_12_400_757575,
   Text_13_400_EEEEEE,
   Text_19_600_EEEEEE,
   Text_24_500_EEEEEE,
@@ -28,6 +27,7 @@ import {
 import dayjs from "dayjs";
 import { useModels, cloudProviders } from "@/hooks/useModels";
 import { PrimaryButton, SecondaryButton } from "@/components/ui/button";
+import ModelTags from "@/components/ui/ModelTags";
 
 // Filter interface
 interface Filters {
@@ -466,11 +466,11 @@ export default function ModelsPage() {
                               );
                             })()}
                           </div>
-                          <Text_12_400_757575>
+                          <div className="text-xs font-normal text-gray-600 dark:text-gray-400">
                             {dayjs(
                               model.modified_at || model.created_at,
                             ).format("DD MMM, YYYY")}
-                          </Text_12_400_757575>
+                          </div>
                         </div>
 
                         {/* Model Title */}
@@ -485,54 +485,8 @@ export default function ModelsPage() {
                           </p>
                         </div>
 
-                        {/* Tags Row */}
-                        <div className="flex flex-wrap gap-1 mb-4">
-                          {model.endpoints_count !== undefined && (
-                            <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-bud-purple/[0.125] text-bud-purple">
-                              <Icon icon="ph:plug" className="text-xs" />
-                              <span className="text-xs">
-                                {model.endpoints_count} endpoints
-                              </span>
-                            </div>
-                          )}
-
-                          <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-bud-bg-tertiary text-bud-text-muted">
-                            <Icon icon="ph:hard-drives" className="text-xs" />
-                            <span className="text-xs">
-                              {model.provider_type === "cloud_model"
-                                ? "Cloud"
-                                : "Local"}
-                            </span>
-                          </div>
-
-                          {model.model_size && (
-                            <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-bud-bg-tertiary text-bud-text-muted">
-                              <Icon icon="ph:database" className="text-xs" />
-                              <span className="text-xs">
-                                {model.model_size}B
-                              </span>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Tags */}
-                        {model.tags?.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mb-4">
-                            {model.tags.slice(0, 3).map((tag, index) => (
-                              <span
-                                key={index}
-                                className="text-[10px] px-2 py-0.5 rounded bg-bud-bg-tertiary text-bud-text-muted"
-                              >
-                                {tag.name}
-                              </span>
-                            ))}
-                            {model.tags.length > 3 && (
-                              <span className="text-[10px] px-2 py-0.5 rounded bg-bud-bg-tertiary text-bud-text-muted">
-                                +{model.tags.length - 3} more
-                              </span>
-                            )}
-                          </div>
-                        )}
+                        {/* Model Tags */}
+                        <ModelTags model={model} maxTags={3} limit={true} />
 
                         {/* Author and Tasks */}
                         <div className="flex items-center gap-2 flex-wrap">
@@ -560,9 +514,9 @@ export default function ModelsPage() {
 
                     {/* Pricing Section - Always at bottom */}
                     <div className="bg-bud-bg-tertiary px-6 py-4 border-t border-bud-border flex-shrink-0 rounded-b-lg">
-                      <Text_12_400_757575 className="mb-2">
+                      <div className="text-xs font-normal text-gray-700 dark:text-gray-400 mb-2">
                         Pricing Details
-                      </Text_12_400_757575>
+                      </div>
                       {model.pricing ? (
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">

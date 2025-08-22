@@ -13,6 +13,7 @@ interface Props {
   onChangeIcon?: (value: string) => void;
   onChangeName?: (value: string) => void;
   isEdit?: boolean;
+  showIcon?: boolean;
 }
 
 export function NameIconDisplay({
@@ -120,7 +121,7 @@ export function ModelNameInput({
 
   useEffect(() => {
     onChange && onChange(name);
-  }, [icon, name]);
+  }, [icon, name, onChange]);
   const imageUrl = assetBaseUrl + icon;
 
   return (
@@ -184,88 +185,92 @@ export function NameIconInput({
   onChangeIcon,
   disabled,
   isEdit,
+  showIcon = true,
 }: {
   placeholder: string;
   icon: string;
   onChangeIcon?: (value: string) => void;
   disabled?: boolean;
   isEdit?: boolean;
+  showIcon?: boolean;
 }) {
   return (
     <div className="drawerNameInput flex flex-row items-center justify-between  mb-[1rem]">
-      <Form.Item
-        name={"icon"}
-        rules={[
-          {
-            required: false,
-            message: "",
-          },
-        ]}
-        className="relative"
-      >
-        {isEdit && (
-          <div className="absolute group w-[1.125rem] h-[1.125rem] flex justify-center items-center border-none hover:border-transparent top-[-.45rem] right-[0] z-[1200] rounded-full bg-[#1F1F1F] cursor-pointer">
-            <Pencil1Icon className="w-[0.625rem] h-[0.625rem] text-[#5B6168] group-hover:text-[#FFFFFF] text-[0.875em]" />
-          </div>
-        )}
-        <Popover
-          trigger={"click"}
-          open={disabled ? false : undefined}
-          content={
-            <EmojiPicker
-              theme={Theme.DARK}
-              style={{ backgroundColor: "#161616" }}
-              emojiVersion="1.0"
-              skinTonesDisabled
-              previewConfig={{
-                showPreview: false,
-              }}
-              className=" p-2 max-h-[350px]"
-              onEmojiClick={(emojiObject) => {
-                onChangeIcon && onChangeIcon(emojiObject.emoji);
-              }}
-              emojiStyle={EmojiStyle.GOOGLE}
-              categories={[
-                {
-                  category: Categories.SUGGESTED,
-                  name: "Recently Used",
-                },
-                {
-                  category: Categories.CUSTOM,
-                  name: "Custom",
-                },
-                {
-                  category: Categories.TRAVEL_PLACES,
-                  name: "Travel & Places",
-                },
-                {
-                  category: Categories.ACTIVITIES,
-                  name: "Activities",
-                },
-                {
-                  category: Categories.OBJECTS,
-                  name: "Objects",
-                },
-                {
-                  category: Categories.SYMBOLS,
-                  name: "Symbols",
-                },
-                {
-                  category: Categories.FLAGS,
-                  name: "Flags",
-                },
-              ]}
-            />
-          }
+      {showIcon && (
+        <Form.Item
+          name={"icon"}
+          rules={[
+            {
+              required: false,
+              message: "",
+            },
+          ]}
+          className="relative"
         >
-          <Button
-            className="text-2xl items-center flex jutify-center  rounded-[4px] h-[2.25rem] w-[2.25rem]  bg-[#35341B] p-1 mr-[0.5rem]"
-            type="link"
+          {isEdit && (
+            <div className="absolute group w-[1.125rem] h-[1.125rem] flex justify-center items-center border-none hover:border-transparent top-[-.45rem] right-[0] z-[1200] rounded-full bg-[#1F1F1F] cursor-pointer">
+              <Pencil1Icon className="w-[0.625rem] h-[0.625rem] text-[#5B6168] group-hover:text-[#FFFFFF] text-[0.875em]" />
+            </div>
+          )}
+          <Popover
+            trigger={"click"}
+            open={disabled ? false : undefined}
+            content={
+              <EmojiPicker
+                theme={Theme.DARK}
+                style={{ backgroundColor: "#161616" }}
+                emojiVersion="1.0"
+                skinTonesDisabled
+                previewConfig={{
+                  showPreview: false,
+                }}
+                className=" p-2 max-h-[350px]"
+                onEmojiClick={(emojiObject) => {
+                  onChangeIcon && onChangeIcon(emojiObject.emoji);
+                }}
+                emojiStyle={EmojiStyle.GOOGLE}
+                categories={[
+                  {
+                    category: Categories.SUGGESTED,
+                    name: "Recently Used",
+                  },
+                  {
+                    category: Categories.CUSTOM,
+                    name: "Custom",
+                  },
+                  {
+                    category: Categories.TRAVEL_PLACES,
+                    name: "Travel & Places",
+                  },
+                  {
+                    category: Categories.ACTIVITIES,
+                    name: "Activities",
+                  },
+                  {
+                    category: Categories.OBJECTS,
+                    name: "Objects",
+                  },
+                  {
+                    category: Categories.SYMBOLS,
+                    name: "Symbols",
+                  },
+                  {
+                    category: Categories.FLAGS,
+                    name: "Flags",
+                  },
+                ]}
+              />
+            }
           >
-            {icon}
-          </Button>
-        </Popover>
-      </Form.Item>
+            <Button
+              className="text-2xl items-center flex jutify-center  rounded-[4px] h-[2.25rem] w-[2.25rem]  bg-[#35341B] p-1 mr-[0.5rem]"
+              type="link"
+            >
+              {icon}
+            </Button>
+          </Popover>
+        </Form.Item>
+      )}
       <Form.Item
         hasFeedback
         name={"name"}
@@ -282,7 +287,7 @@ export function NameIconInput({
           },
           {
             pattern: projectNameRegex,
-            message: `${placeholder} should contain only alphanumeric characters`,
+            message: `${placeholder} should contain only alphanumeric characters, spaces, hyphens, and underscores`,
           },
         ]}
       >
@@ -303,6 +308,7 @@ export default function ProjectNameInput({
   onChangeIcon,
   onChangeName,
   isEdit,
+  showIcon,
 }: Props) {
   const { form } = useContext(BudFormContext);
   const icon = form.getFieldValue("icon");
@@ -311,7 +317,7 @@ export default function ProjectNameInput({
   useEffect(() => {
     onChangeIcon && onChangeIcon(icon);
     onChangeName && onChangeName(name);
-  }, [icon, name]);
+  }, [icon, name, onChangeIcon, onChangeName]);
 
   return (
     <NameIconInput
@@ -322,6 +328,7 @@ export default function ProjectNameInput({
       }}
       disabled={false}
       isEdit={isEdit}
+      showIcon={showIcon}
     />
   );
 }

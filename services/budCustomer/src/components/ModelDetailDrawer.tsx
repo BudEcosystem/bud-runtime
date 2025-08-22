@@ -1,25 +1,108 @@
 "use client";
 import React, { useState, useEffect, useMemo } from "react";
-import {
-  Tabs,
-  Tag,
-  Image,
-  ConfigProvider,
-} from "antd";
-import type { TabsProps } from 'antd';
+import { Tabs, Tag, Image, ConfigProvider } from "antd";
+import type { TabsProps } from "antd";
 import { CopyOutlined } from "@ant-design/icons";
 import { Drawer } from "antd";
-import IconRender from "@/flows/components/BudIconRender";
-import ModelTags from "@/flows/components/ModelTags";
-import {
-  Text_12_400_757575,
-  Text_12_400_B3B3B3,
-  Text_12_400_EEEEEE,
-  Text_12_600_EEEEEE,
-  Text_14_400_EEEEEE,
-  Text_14_500_EEEEEE,
-  Text_14_400_757575,
-} from "@/components/ui/text";
+import { Icon } from "@iconify/react/dist/iconify.js";
+import ModelTags from "@/components/ui/ModelTags";
+// Using custom text components with better theme support
+interface TextComponentProps {
+  children: React.ReactNode;
+  className?: string;
+  [key: string]: any;
+}
+
+const Text_12_400_757575: React.FC<TextComponentProps> = ({
+  children,
+  className = "",
+  ...props
+}) => (
+  <div
+    className={`block text-xs font-normal text-gray-500 dark:text-gray-400 ${className}`}
+    {...props}
+  >
+    {children}
+  </div>
+);
+
+const Text_12_400_B3B3B3: React.FC<TextComponentProps> = ({
+  children,
+  className = "",
+  ...props
+}) => (
+  <div
+    className={`block text-xs font-normal text-gray-600 dark:text-gray-300 ${className}`}
+    {...props}
+  >
+    {children}
+  </div>
+);
+
+const Text_12_400_EEEEEE: React.FC<TextComponentProps> = ({
+  children,
+  className = "",
+  ...props
+}) => (
+  <div
+    className={`block text-xs font-normal text-gray-800 dark:text-gray-200 ${className}`}
+    {...props}
+  >
+    {children}
+  </div>
+);
+
+const Text_12_600_EEEEEE: React.FC<TextComponentProps> = ({
+  children,
+  className = "",
+  ...props
+}) => (
+  <div
+    className={`block text-xs font-semibold text-gray-800 dark:text-gray-200 ${className}`}
+    {...props}
+  >
+    {children}
+  </div>
+);
+
+const Text_14_400_EEEEEE: React.FC<TextComponentProps> = ({
+  children,
+  className = "",
+  ...props
+}) => (
+  <div
+    className={`block text-sm font-normal text-gray-800 dark:text-gray-200 ${className}`}
+    {...props}
+  >
+    {children}
+  </div>
+);
+
+const Text_14_500_EEEEEE: React.FC<TextComponentProps> = ({
+  children,
+  className = "",
+  ...props
+}) => (
+  <div
+    className={`block text-sm font-medium text-gray-900 dark:text-gray-100 ${className}`}
+    {...props}
+  >
+    {children}
+  </div>
+);
+
+const Text_14_400_757575: React.FC<TextComponentProps> = ({
+  children,
+  className = "",
+  ...props
+}) => (
+  <div
+    className={`block text-sm font-normal text-gray-500 dark:text-gray-400 ${className}`}
+    {...props}
+  >
+    {children}
+  </div>
+);
 import dayjs from "dayjs";
 import { Model } from "@/hooks/useModels";
 import { successToast } from "@/components/toast";
@@ -45,15 +128,7 @@ const ModelDetailDrawer: React.FC<ModelDetailDrawerProps> = ({
       styles={{
         body: {
           padding: 0,
-          overflow: 'auto',
-          backgroundColor: 'var(--bg-primary)',
-          color: 'var(--text-primary)',
-        },
-        wrapper: {
-          backgroundColor: 'var(--bg-primary)',
-        },
-        content: {
-          backgroundColor: 'var(--bg-primary)',
+          overflow: "auto",
         },
       }}
     >
@@ -66,13 +141,39 @@ const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }> = ({
   model,
   onClose,
 }) => {
-  const [filteredItems, setFilteredItems] = useState<TabsProps['items']>([]);
+  const [filteredItems, setFilteredItems] = useState<TabsProps["items"]>([]);
+  const assetBaseUrl = process.env.NEXT_PUBLIC_BASE_URL;
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     successToast("Copied to clipboard");
   };
 
+  const getModelIcon = (model: any) => {
+    // Return an object that indicates whether it's a URL or an icon name
+    if (model.icon) {
+      // If icon exists, it's a URL
+      const iconUrl = model.icon.startsWith("http")
+        ? model.icon
+        : `${assetBaseUrl}/${model.icon.startsWith("/") ? model.icon.slice(1) : model.icon}`;
+      return { type: "url", value: iconUrl };
+    }
+
+    // Fallback to iconify icons
+    const name = model.name?.toLowerCase() || "";
+    if (name.includes("gpt"))
+      return { type: "icon", value: "simple-icons:openai" };
+    if (name.includes("claude"))
+      return { type: "icon", value: "simple-icons:anthropic" };
+    if (name.includes("llama"))
+      return { type: "icon", value: "simple-icons:meta" };
+    if (name.includes("dall")) return { type: "icon", value: "ph:image" };
+    if (name.includes("whisper"))
+      return { type: "icon", value: "ph:microphone" };
+
+    // Default icon
+    return { type: "icon", value: "ph:robot" };
+  };
 
   const GeneralTab = () => {
     const [isExpanded, setIsExpanded] = useState(false);
@@ -100,7 +201,10 @@ const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }> = ({
                   className={`leading-[1.05rem] tracking-[.01em max-w-[100%] ${
                     isExpanded ? "" : "line-clamp-2"
                   } overflow-hidden`}
-                  style={{ display: "-webkit-box", WebkitBoxOrient: "vertical" }}
+                  style={{
+                    display: "-webkit-box",
+                    WebkitBoxOrient: "vertical",
+                  }}
                 >
                   <Text_12_400_B3B3B3 className="leading-[180%]">
                     {model?.description}
@@ -138,14 +242,14 @@ const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }> = ({
             <Text_14_500_EEEEEE className="mb-4">
               Basic Information
             </Text_14_500_EEEEEE>
-            <div className="bg-black/5 dark:bg-white/5 rounded-lg p-4 space-y-3">
+            <div className="bg-gray-100 dark:bg-white/5 rounded-lg p-4 space-y-3">
               <div className="flex justify-between">
                 <Text_12_400_B3B3B3>Model Name</Text_12_400_B3B3B3>
                 <Text_12_400_EEEEEE>{model.name}</Text_12_400_EEEEEE>
               </div>
               <div className="flex justify-between">
-                <Text_12_400_B3B3B3>Author</Text_12_400_B3B3B3>
-                <Text_12_400_EEEEEE>{model.author || "Unknown"}</Text_12_400_EEEEEE>
+                <Text_12_400_B3B3B3>Source</Text_12_400_B3B3B3>
+                <Text_12_400_EEEEEE>{model.source || "N/A"}</Text_12_400_EEEEEE>
               </div>
               <div className="flex justify-between">
                 <Text_12_400_B3B3B3>Model Size</Text_12_400_B3B3B3>
@@ -172,10 +276,14 @@ const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }> = ({
           {/* Modalities */}
           <div className="pt-[1.3rem]">
             <Text_14_400_EEEEEE>Modalities</Text_14_400_EEEEEE>
-            <Text_12_400_757575 className="pt-[.33rem]">Following is the list of things model is really good at doing</Text_12_400_757575>
+            <Text_12_400_757575 className="pt-[.33rem]">
+              Following is the list of things model is really good at doing
+            </Text_12_400_757575>
             <div className="modality flex items-center justify-start gap-[.5rem] mt-[1rem]">
-              <div className="flex flex-col items-center gap-[.5rem] gap-y-[1rem] bg-black/5 dark:bg-white/5 w-[50%] p-[1rem] rounded-[6px]">
-                <Text_14_400_EEEEEE className="leading-[100%]">Input</Text_14_400_EEEEEE>
+              <div className="flex flex-col items-center gap-[.5rem] gap-y-[1rem] bg-gray-100 dark:bg-white/5 w-[50%] p-[1rem] rounded-[6px]">
+                <Text_14_400_EEEEEE className="leading-[100%]">
+                  Input
+                </Text_14_400_EEEEEE>
                 <div className="flex justify-center items-center gap-x-[.5rem]">
                   <div className="h-[1.25rem]">
                     <Image
@@ -224,8 +332,10 @@ const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }> = ({
                     .join(", ")}
                 </Text_12_400_EEEEEE>
               </div>
-              <div className="flex flex-col items-center gap-[.5rem] gap-y-[1rem] bg-black/5 dark:bg-white/5 w-[50%] p-[1rem] rounded-[6px]">
-                <Text_14_400_EEEEEE className="leading-[100%]">Output</Text_14_400_EEEEEE>
+              <div className="flex flex-col items-center gap-[.5rem] gap-y-[1rem] bg-gray-100 dark:bg-white/5 w-[50%] p-[1rem] rounded-[6px]">
+                <Text_14_400_EEEEEE className="leading-[100%]">
+                  Output
+                </Text_14_400_EEEEEE>
                 <div className="flex justify-center items-center gap-x-[.5rem]">
                   <div className="h-[1.25rem]">
                     <Image
@@ -281,12 +391,19 @@ const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }> = ({
           {/* Supported Endpoints */}
           <div className="pt-[1.3rem] pb-[1.4rem]">
             <Text_14_400_EEEEEE>Supported Endpoints</Text_14_400_EEEEEE>
-            <Text_12_400_757575 className="pt-[.33rem]">Following is the list of things model is really good at doing</Text_12_400_757575>
+            <Text_12_400_757575 className="pt-[.33rem]">
+              Following is the list of things model is really good at doing
+            </Text_12_400_757575>
             <div className="modality flex flex-wrap items-start justify-between gap-y-[.5rem] gap-x-[.75rem] mt-[1.5rem]">
               {Object.entries(model.supported_endpoints).map(([key, value]) => {
-                const iconName = value.enabled ? `${key}.png` : `${key}-not.png`;
+                const iconName = value.enabled
+                  ? `${key}.png`
+                  : `${key}-not.png`;
                 return (
-                  <div key={key} className="flex items-center justify-start gap-[.8rem] w-[calc(50%-0.4rem)] bg-black/5 dark:bg-white/5 p-[1rem] rounded-[6px]">
+                  <div
+                    key={key}
+                    className="flex items-center justify-start gap-[.8rem] w-[calc(50%-0.4rem)] bg-gray-100 dark:bg-white/5 p-[1rem] rounded-[6px]"
+                  >
                     <div className="h-[1.25rem]">
                       <Image
                         preview={false}
@@ -328,8 +445,10 @@ const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }> = ({
             <>
               <div className="hR mt-[1.5rem]"></div>
               <div className="pt-[1.3rem]">
-                <Text_14_500_EEEEEE className="mb-4">Model URI</Text_14_500_EEEEEE>
-                <div className="bg-[#FFFFFF08] rounded-lg p-4">
+                <Text_14_500_EEEEEE className="mb-4">
+                  Model URI
+                </Text_14_500_EEEEEE>
+                <div className="bg-gray-100 dark:bg-[#FFFFFF08] rounded-lg p-4">
                   <div className="flex items-center justify-between">
                     <Text_12_400_EEEEEE className="font-mono truncate flex-1 mr-2">
                       {model.uri}
@@ -356,11 +475,7 @@ const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }> = ({
                   {model.tags.map((tag, index) => (
                     <Tag
                       key={index}
-                      style={{
-                        backgroundColor: tag.color || "#1F1F1F",
-                        border: "1px solid #2F2F2F",
-                        color: "#EEEEEE",
-                      }}
+                      className="bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-600"
                     >
                       {tag.name}
                     </Tag>
@@ -378,7 +493,8 @@ const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }> = ({
                 <div>
                   <Text_14_400_EEEEEE>Model is Great at</Text_14_400_EEEEEE>
                   <Text_12_400_757575 className="pt-[.45rem]">
-                    Following is the list of things model is really good at doing
+                    Following is the list of things model is really good at
+                    doing
                   </Text_12_400_757575>
                 </div>
                 <ul className="custom-bullet-list mt-[.9rem]">
@@ -400,7 +516,9 @@ const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }> = ({
               <div className="hR"></div>
               <div className="pt-[1.5rem] mb-[1.4rem]">
                 <div>
-                  <Text_14_400_EEEEEE>Model is Not Good With</Text_14_400_EEEEEE>
+                  <Text_14_400_EEEEEE>
+                    Model is Not Good With
+                  </Text_14_400_EEEEEE>
                   <Text_12_400_757575 className="pt-[.45rem]">
                     Following is the list of things model is not great at
                   </Text_12_400_757575>
@@ -422,13 +540,16 @@ const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }> = ({
     );
   };
 
-  const items: TabsProps['items'] = useMemo(() => [
-    {
-      key: '1',
-      label: 'General',
-      children: <GeneralTab />,
-    },
-  ], [model]);
+  const items: TabsProps["items"] = useMemo(
+    () => [
+      {
+        key: "1",
+        label: "General",
+        children: <GeneralTab />,
+      },
+    ],
+    [model],
+  );
 
   useEffect(() => {
     // Filter tabs based on model type if needed
@@ -441,9 +562,9 @@ const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }> = ({
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-white dark:bg-[#0A0A0A]">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-800">
+      <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
         <button
           onClick={onClose}
           className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
@@ -461,21 +582,35 @@ const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }> = ({
       {/* Content */}
       <div className="flex-1 overflow-auto">
         <div className="flex items-start justify-between w-full p-[1.35rem]">
-          <div className="flex items-start justify-start max-w-[72%]">
+          <div className="flex items-start justify-start max-w-[100%]">
             <div className="mr-[1.05rem] shrink-0 grow-0 flex items-center justify-center">
-              <IconRender
-                icon={model?.icon || ''}
-                size={44}
-                imageSize={28}
-                type={model?.provider_type}
-                model={model}
-              />
+              <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-bud-purple/20 to-bud-purple/10 flex items-center justify-center">
+                {(() => {
+                  const iconData = getModelIcon(model);
+                  return iconData.type === "url" ? (
+                    <img
+                      src={iconData.value}
+                      alt={model.name}
+                      className="w-6 h-6 object-contain"
+                      onError={(e) => {
+                        // Fallback to default icon on error
+                        e.currentTarget.style.display = "none";
+                      }}
+                    />
+                  ) : (
+                    <Icon
+                      icon={iconData.value}
+                      className="text-bud-purple text-[1.5rem]"
+                    />
+                  );
+                })()}
+              </div>
             </div>
             <div>
               <Text_14_400_EEEEEE className="mb-[0.65rem] leading-[140%]">
                 {model?.name}
               </Text_14_400_EEEEEE>
-              <ModelTags model={model} maxTags={3} />
+              <ModelTags model={model} maxTags={3} limit={true} />
             </div>
           </div>
           <div className="flex justify-end items-start">
