@@ -41,7 +41,7 @@ def get_psql_url() -> str:
     port_str = os.getenv("PSQL_PORT")
     if port_str is None:
         raise ValueError("PSQL_PORT must be set")
-        
+
     return PostgresDsn.build(
         scheme="postgresql+psycopg",
         username=os.getenv("PSQL_USER"),

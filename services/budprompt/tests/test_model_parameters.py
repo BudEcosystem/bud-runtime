@@ -39,7 +39,7 @@ class TestModelParameters:
         self, client: httpx.Client, model_settings: Dict[str, Any], input_data: str = "Hello", **kwargs
     ) -> httpx.Response:
         """Execute prompt with specific model settings.
-        
+
         Args:
             client: HTTP client
             model_settings: Model configuration settings
@@ -59,7 +59,7 @@ class TestModelParameters:
             "input_data": input_data,
             "model_settings": model_settings,
         }
-        
+
         # Merge any additional kwargs into request_data
         request_data.update(kwargs)
 
@@ -125,14 +125,14 @@ class TestModelParameters:
     def test_seed(self, http_client):
         """Test seed parameter for reproducibility."""
         model_settings = {"seed": 42, "temperature": 0.7}
-        
+
         # Make two requests with same seed
         response1 = self._execute_prompt(http_client, model_settings, "Generate a random number")
         response2 = self._execute_prompt(http_client, model_settings, "Generate a random number")
-        
+
         assert response1.status_code == 200
         assert response2.status_code == 200
-        
+
         # With same seed, responses should be identical
         result1 = response1.json()
         result2 = response2.json()
@@ -158,7 +158,7 @@ class TestModelParameters:
     def test_stream_options(self, http_client):
         """Test stream_options parameter with streaming enabled."""
         model_settings = {"stream_options": {"include_usage": True}}
-        
+
         # Use httpx.stream for streaming response
         request_data = {
             "deployment_name": self.deployment_name,
@@ -170,19 +170,19 @@ class TestModelParameters:
             "model_settings": model_settings,
             "stream": True  # Enable streaming as required by stream_options
         }
-        
-        with httpx.stream("POST", f"{self.base_url}/prompt/execute", 
-                         json=request_data, 
-                         headers={"Content-Type": "application/json"}, 
+
+        with httpx.stream("POST", f"{self.base_url}/prompt/execute",
+                         json=request_data,
+                         headers={"Content-Type": "application/json"},
                          timeout=30.0) as response:
             assert response.status_code == 200
-            
+
             # Verify we get streaming chunks
             chunks = []
             for chunk in response.iter_text():
                 if chunk.strip():
                     chunks.append(chunk)
-            
+
             assert len(chunks) > 0  # Should receive chunks with usage info
 
     def test_response_format(self, http_client):
@@ -194,12 +194,12 @@ class TestModelParameters:
     @pytest.mark.skip(reason="tool_choice requires tools to be defined per BudInference API")
     def test_tool_choice(self, http_client):
         """Test tool_choice parameter.
-        
+
         Note: This test can be enabled once tools support is implemented.
         Example usage would be:
         response = self._execute_prompt(
-            http_client, 
-            model_settings, 
+            http_client,
+            model_settings,
             tools=[{"type": "function", "function": {...}}]
         )
         """
@@ -387,18 +387,18 @@ class TestModelParameters:
             }
         }
 
-        with httpx.stream("POST", f"{self.base_url}/prompt/execute", 
-                         json=request_data, 
-                         headers={"Content-Type": "application/json"}, 
+        with httpx.stream("POST", f"{self.base_url}/prompt/execute",
+                         json=request_data,
+                         headers={"Content-Type": "application/json"},
                          timeout=30.0) as response:
             assert response.status_code == 200
-            
+
             # Verify we get streaming chunks
             chunks = []
             for chunk in response.iter_text():
                 if chunk.strip():
                     chunks.append(chunk)
-            
+
             assert len(chunks) > 0  # Should receive multiple chunks
 
 # docker exec budserve-development-budprompt pytest tests/test_model_parameters.py -v

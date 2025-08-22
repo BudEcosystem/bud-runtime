@@ -84,7 +84,7 @@ THere are two flows for creating prompts.
       - While connecting the tool user need to provide access keys for the tools.
     - User can choose the prompt version from the list of versions.
       - This will call the api to get prompt details of that particular version.
-    - User can choose the input is a structured or not 
+    - User can choose the input is a structured or not
       - if it is not structured user can provide the input in the text area (it will be a string input)
       - if it is structured user can provide the input in the structured format.
         - Define variable name
@@ -104,7 +104,7 @@ THere are two flows for creating prompts.
         - Assistant (support jinja template)
         - Developer (support jinja template)
         - Tools
-      - User can choose the output is a structured or not 
+      - User can choose the output is a structured or not
       - if it is not structured user can provide the output in the text area (it will be a string output)
       - if it is structured user can provide the output in the structured format.
         - Define variable name
@@ -125,7 +125,7 @@ THere are two flows for creating prompts.
         - Basically a multiple window will be created in frontend with fixed width so user can create different prompts and see how the output is changing in individual execution
   - If user choose to use existing prompt these content will be pre-filled in the form as it is existing in the prompt
   - User can able to save the prompt
-  - User can able to Run the prompt  
+  - User can able to Run the prompt
     - Clicking run will transform the user defined input to a sequential type form inputs (it is in comparable multiple window as how many compare window user created)
     - Example:
     - User defined input:
@@ -139,7 +139,7 @@ THere are two flows for creating prompts.
         - User see a dropdown input
         - User can able to select the dropdown option
         - User can able to click submit button
-        - Basically user can able to interact how the prompt is getting working when it is deployed.  
+        - Basically user can able to interact how the prompt is getting working when it is deployed.
   - After that user will be transform to the UI where user can able to execute the prompt (it is in comparable multiple window as how many compare window user created)
   - User can define the minimum concurrency, maximum concurrency, enable or disable auto scale, enable or disable caching, enable or disable rate limiting
   - Successfully Created prompt
@@ -193,4 +193,3 @@ THere are two flows for creating prompts.
 - From the prompt id it will get the prompt details from the dapr state store.
 - It will execute the prompt and return the output
 - The output will be returned to the user
-

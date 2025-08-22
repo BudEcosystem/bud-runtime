@@ -1,7 +1,7 @@
 """dapr workflow
 
 Revision ID: b6c2eb9ea3bc
-Revises: 
+Revises:
 Create Date: 2025-05-08 14:04:20.101561
 
 """

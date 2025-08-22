@@ -64,22 +64,22 @@ class TestStreamingValidation:
             "stream": True,
             "llm_retry_limit": 3
         }
-        
+
         final_result = None
         events_received = []
         complete_status = None
         retry_count = None
         error_message = None
-        
+
         with client.stream('POST', "/prompt/execute", json=request_data) as response:
             assert response.status_code == 200
-            
+
             for line in response.iter_lines():
                 if line.strip():
                     event_data = self.parse_sse_line(line)
                     if event_data:
                         events_received.append(event_data)
-                        
+
                         if event_data.get('type') == 'final':
                             final_result = event_data.get('content')
                         elif event_data.get('type') == 'complete':
@@ -87,15 +87,15 @@ class TestStreamingValidation:
                             retry_count = event_data.get('retry_count')
                         elif event_data.get('type') == 'error':
                             error_message = event_data.get('message')
-        
+
         # Basic assertions
         assert complete_status == 'success', f"Stream did not complete successfully: {complete_status}, error: {error_message}"
         assert final_result is not None, "No final result received"
-        
+
         # Custom validation if provided
         if expected_validation:
             expected_validation(final_result)
-        
+
         return final_result, retry_count, events_received
 
     def test_simple_name_validation(self, http_client):
@@ -104,10 +104,10 @@ class TestStreamingValidation:
             name: str
             age: int
             email: str
-        
+
         class OutputSchema(BaseModel):
             content: Person
-        
+
         request_data = {
             "deployment_name": self.deployment_name,
             "messages": [
@@ -119,13 +119,13 @@ class TestStreamingValidation:
             "stream": True,
             "llm_retry_limit": 3
         }
-        
+
         final_result = None
         complete_status = None
-        
+
         with http_client.stream('POST', "/prompt/execute", json=request_data) as response:
             assert response.status_code == 200
-            
+
             for line in response.iter_lines():
                 if line.strip():
                     event_data = self.parse_sse_line(line)
@@ -134,7 +134,7 @@ class TestStreamingValidation:
                             final_result = event_data.get('content')
                         elif event_data.get('type') == 'complete':
                             complete_status = event_data.get('status')
-        
+
         assert complete_status == 'success'
         assert final_result is not None
         assert final_result['content']['name'].startswith('Alice')
@@ -145,10 +145,10 @@ class TestStreamingValidation:
             name: str
             age: int
             email: str
-        
+
         class OutputSchema(BaseModel):
             content: Person
-        
+
         request_data = {
             "deployment_name": self.deployment_name,
             "messages": [
@@ -160,13 +160,13 @@ class TestStreamingValidation:
             "stream": True,
             "llm_retry_limit": 3
         }
-        
+
         final_result = None
         complete_status = None
-        
+
         with http_client.stream('POST', "/prompt/execute", json=request_data) as response:
             assert response.status_code == 200
-            
+
             for line in response.iter_lines():
                 if line.strip():
                     event_data = self.parse_sse_line(line)
@@ -175,7 +175,7 @@ class TestStreamingValidation:
                             final_result = event_data.get('content')
                         elif event_data.get('type') == 'complete':
                             complete_status = event_data.get('status')
-        
+
         assert complete_status == 'success'
         assert final_result is not None
         assert 25 <= final_result['content']['age'] <= 35
@@ -186,10 +186,10 @@ class TestStreamingValidation:
             name: str
             age: int
             email: str
-        
+
         class OutputSchema(BaseModel):
             content: Person
-        
+
         request_data = {
             "deployment_name": self.deployment_name,
             "messages": [
@@ -201,13 +201,13 @@ class TestStreamingValidation:
             "stream": True,
             "llm_retry_limit": 3
         }
-        
+
         final_result = None
         complete_status = None
-        
+
         with http_client.stream('POST', "/prompt/execute", json=request_data) as response:
             assert response.status_code == 200
-            
+
             for line in response.iter_lines():
                 if line.strip():
                     event_data = self.parse_sse_line(line)
@@ -216,7 +216,7 @@ class TestStreamingValidation:
                             final_result = event_data.get('content')
                         elif event_data.get('type') == 'complete':
                             complete_status = event_data.get('status')
-        
+
         assert complete_status == 'success'
         assert final_result is not None
         assert final_result['content']['email'].endswith('@company.com')
@@ -227,10 +227,10 @@ class TestStreamingValidation:
             name: str
             description: str
             price: float
-        
+
         class OutputSchema(BaseModel):
             content: Product
-        
+
         request_data = {
             "deployment_name": self.deployment_name,
             "messages": [
@@ -242,13 +242,13 @@ class TestStreamingValidation:
             "stream": True,
             "llm_retry_limit": 3
         }
-        
+
         final_result = None
         complete_status = None
-        
+
         with http_client.stream('POST', "/prompt/execute", json=request_data) as response:
             assert response.status_code == 200
-            
+
             for line in response.iter_lines():
                 if line.strip():
                     event_data = self.parse_sse_line(line)
@@ -257,7 +257,7 @@ class TestStreamingValidation:
                             final_result = event_data.get('content')
                         elif event_data.get('type') == 'complete':
                             complete_status = event_data.get('status')
-        
+
         assert complete_status == 'success'
         assert final_result is not None
         assert len(final_result['content']['name']) >= 10
@@ -268,10 +268,10 @@ class TestStreamingValidation:
             name: str
             description: str
             price: float
-        
+
         class OutputSchema(BaseModel):
             content: Product
-        
+
         request_data = {
             "deployment_name": self.deployment_name,
             "messages": [
@@ -283,13 +283,13 @@ class TestStreamingValidation:
             "stream": True,
             "llm_retry_limit": 3
         }
-        
+
         final_result = None
         complete_status = None
-        
+
         with http_client.stream('POST', "/prompt/execute", json=request_data) as response:
             assert response.status_code == 200
-            
+
             for line in response.iter_lines():
                 if line.strip():
                     event_data = self.parse_sse_line(line)
@@ -298,7 +298,7 @@ class TestStreamingValidation:
                             final_result = event_data.get('content')
                         elif event_data.get('type') == 'complete':
                             complete_status = event_data.get('status')
-        
+
         assert complete_status == 'success'
         assert final_result is not None
         assert final_result['content']['price'] > 100.00
@@ -309,10 +309,10 @@ class TestStreamingValidation:
             name: str
             members: List[str]
             budget: float
-        
+
         class OutputSchema(BaseModel):
             content: Team
-        
+
         request_data = {
             "deployment_name": self.deployment_name,
             "messages": [
@@ -324,13 +324,13 @@ class TestStreamingValidation:
             "stream": True,
             "llm_retry_limit": 3
         }
-        
+
         final_result = None
         complete_status = None
-        
+
         with http_client.stream('POST', "/prompt/execute", json=request_data) as response:
             assert response.status_code == 200
-            
+
             for line in response.iter_lines():
                 if line.strip():
                     event_data = self.parse_sse_line(line)
@@ -339,7 +339,7 @@ class TestStreamingValidation:
                             final_result = event_data.get('content')
                         elif event_data.get('type') == 'complete':
                             complete_status = event_data.get('status')
-        
+
         assert complete_status == 'success'
         assert final_result is not None
         assert len(final_result['content']['members']) >= 3
@@ -350,10 +350,10 @@ class TestStreamingValidation:
             name: str
             age: int
             email: str
-        
+
         class OutputSchema(BaseModel):
             content: Person
-        
+
         request_data = {
             "deployment_name": self.deployment_name,
             "messages": [
@@ -365,15 +365,15 @@ class TestStreamingValidation:
             "stream": True,
             "llm_retry_limit": 5
         }
-        
+
         final_result = None
         complete_status = None
         retry_count = None
         partial_events = []
-        
+
         with http_client.stream('POST', "/prompt/execute", json=request_data) as response:
             assert response.status_code == 200
-            
+
             for line in response.iter_lines():
                 if line.strip():
                     event_data = self.parse_sse_line(line)
@@ -385,12 +385,12 @@ class TestStreamingValidation:
                         elif event_data.get('type') == 'complete':
                             complete_status = event_data.get('status')
                             retry_count = event_data.get('retry_count')
-        
+
         assert complete_status == 'success'
         assert final_result is not None
         assert final_result['content']['name'].startswith('Xyz')
         assert final_result['content']['age'] == 27
-        
+
         # Check that we received partial events during streaming
         assert len(partial_events) > 0, "Should have received partial events during streaming"
 
@@ -400,10 +400,10 @@ class TestStreamingValidation:
             name: str
             age: int
             email: str
-        
+
         class OutputSchema(BaseModel):
             content: Person
-        
+
         request_data = {
             "deployment_name": self.deployment_name,
             "messages": [
@@ -415,14 +415,14 @@ class TestStreamingValidation:
             "stream": True,
             "llm_retry_limit": 3
         }
-        
+
         final_result = None
         complete_status = None
         all_events = []
-        
+
         with http_client.stream('POST', "/prompt/execute", json=request_data) as response:
             assert response.status_code == 200
-            
+
             for line in response.iter_lines():
                 if line.strip():
                     event_data = self.parse_sse_line(line)
@@ -450,14 +450,14 @@ class TestStreamingValidation:
                                         except json.JSONDecodeError:
                                             pass
                             complete_status = 'success'  # Regular streaming completed
-        
+
         # Debug output if test fails
         if complete_status != 'success' or final_result is None:
             print(f"All events received: {all_events}")
-        
+
         assert complete_status == 'success'
         assert final_result is not None
-        
+
         # Handle both possible structures
         if 'content' in final_result:
             # Nested structure
@@ -475,10 +475,10 @@ class TestStreamingValidation:
         class Person(BaseModel):
             name: str
             age: int
-        
+
         class OutputSchema(BaseModel):
             content: Person
-        
+
         request_data = {
             "deployment_name": self.deployment_name,
             "messages": [
@@ -491,13 +491,13 @@ class TestStreamingValidation:
             "stream": True,
             "llm_retry_limit": 2  # Low retry count to speed up test
         }
-        
+
         complete_status = None
         error_messages = []
-        
+
         with http_client.stream('POST', "/prompt/execute", json=request_data) as response:
             assert response.status_code == 200
-            
+
             for line in response.iter_lines():
                 if line.strip():
                     event_data = self.parse_sse_line(line)
@@ -506,7 +506,7 @@ class TestStreamingValidation:
                             complete_status = event_data.get('status')
                         elif event_data.get('type') == 'error':
                             error_messages.append(event_data.get('message'))
-        
+
         # Should fail with max retries exhausted
         assert complete_status == 'max_retries_exceeded'
         assert len(error_messages) > 0
@@ -519,10 +519,10 @@ class TestStreamingValidation:
             name: str
             sku: str
             price: float
-        
+
         class OutputSchema(BaseModel):
             content: Product
-        
+
         request_data = {
             "deployment_name": self.deployment_name,
             "messages": [
@@ -534,13 +534,13 @@ class TestStreamingValidation:
             "stream": True,
             "llm_retry_limit": 3
         }
-        
+
         final_result = None
         complete_status = None
-        
+
         with http_client.stream('POST', "/prompt/execute", json=request_data) as response:
             assert response.status_code == 200
-            
+
             for line in response.iter_lines():
                 if line.strip():
                     event_data = self.parse_sse_line(line)
@@ -549,7 +549,7 @@ class TestStreamingValidation:
                             final_result = event_data.get('content')
                         elif event_data.get('type') == 'complete':
                             complete_status = event_data.get('status')
-        
+
         assert complete_status == 'success'
         assert final_result is not None
         assert final_result['content']['sku'].startswith('PROD-')

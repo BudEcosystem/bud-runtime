@@ -70,7 +70,7 @@ def test_simple_text_streaming(http_client: httpx.Client) -> None:
         # Check for ModelResponse structure
         message_chunks = []
         error_chunks = []
-        
+
         for chunk in chunks:
             if "type" in chunk and chunk["type"] == "error":
                 error_chunks.append(chunk)
@@ -79,7 +79,7 @@ def test_simple_text_streaming(http_client: httpx.Client) -> None:
 
         # Should have message chunks
         assert len(message_chunks) > 0, "Should have received message chunks"
-        
+
         # Verify message structure
         for chunk in message_chunks:
             assert "parts" in chunk, "Chunk should have 'parts' field"
@@ -97,7 +97,7 @@ def test_simple_text_streaming(http_client: httpx.Client) -> None:
                 for part in chunk["parts"]:
                     if isinstance(part, dict) and "content" in part:
                         full_text += part["content"]
-        
+
         assert len(full_text) > 0, "Should have generated some text"
 
 
@@ -147,7 +147,7 @@ def test_structured_output_streaming(http_client: httpx.Client) -> None:
         # Check for ModelResponse structure
         message_chunks = []
         error_chunks = []
-        
+
         for chunk in chunks:
             if "type" in chunk and chunk["type"] == "error":
                 error_chunks.append(chunk)
@@ -156,11 +156,11 @@ def test_structured_output_streaming(http_client: httpx.Client) -> None:
 
         # Should have message chunks
         assert len(message_chunks) > 0, "Should have received message chunks"
-        
+
         # Find the last message
         last_messages = [c for c in message_chunks if c.get("end") is True]
         assert len(last_messages) >= 1, "Should have at least one message marked as last"
-        
+
         # The content might be in the parts field
         # For structured output, the model should return JSON content
         structured_data = None
@@ -178,7 +178,7 @@ def test_structured_output_streaming(http_client: httpx.Client) -> None:
                         except json.JSONDecodeError:
                             # Might be partial JSON or text
                             pass
-        
+
         # Verify structured data if found
         if structured_data:
             assert isinstance(structured_data, dict), "Structured output should be a dict"
@@ -220,7 +220,7 @@ def test_streaming_with_message_history(http_client: httpx.Client) -> None:
 
         # Should have message chunks
         assert len(message_chunks) > 0, "Should have received message chunks"
-        
+
         # Extract text content from parts
         full_text = ""
         for chunk in message_chunks:
@@ -287,7 +287,7 @@ def test_streaming_with_jinja2_template(http_client: httpx.Client) -> None:
 
             # Should have message chunks
             assert len(message_chunks) > 0, "Should have received message chunks"
-            
+
             # Extract text content from parts
             full_text = ""
             for chunk in message_chunks:
@@ -409,13 +409,13 @@ def test_model_response_structure_validation(http_client: httpx.Client) -> None:
                 assert isinstance(chunk["parts"], list), "Parts should be a list"
                 assert "timestamp" in chunk, "ModelResponse should have 'timestamp' field"
                 assert "end" in chunk, "ModelResponse should have 'end' field"
-                
+
                 # Verify timestamp format
                 try:
                     datetime.fromisoformat(chunk["timestamp"].replace('Z', '+00:00'))
                 except ValueError:
                     pytest.fail(f"Invalid timestamp format: {chunk['timestamp']}")
-                
+
                 # Verify end field is boolean
                 assert isinstance(chunk["end"], bool), "End field should be boolean"
 
@@ -445,7 +445,7 @@ def test_streaming_last_message_flag(http_client: httpx.Client) -> None:
         # Count messages with end=True
         end_messages = [c for c in message_chunks if c.get("end") is True]
         assert len(end_messages) == 1, "Should have exactly one message with end=True"
-        
+
         # The last message should be the one with end=True
         if message_chunks:
             assert message_chunks[-1]["end"] is True, "Last message should have end=True"
@@ -491,13 +491,13 @@ def test_streaming_sse_format_compliance(http_client: httpx.Client) -> None:
     with http_client.stream("POST", "/prompt/execute", json=request_data) as response:
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/event-stream; charset=utf-8"
-        
+
         # Read raw lines to verify SSE format
         for line in response.iter_lines():
             if line:  # Skip empty lines
                 # All data lines should start with "data: "
                 assert line.startswith("data: "), f"Invalid SSE format: {line}"
-                
+
                 # Should be valid JSON after "data: "
                 try:
                     json.loads(line[6:])
@@ -509,7 +509,7 @@ def test_concurrent_streaming_requests(http_client: httpx.Client) -> None:
     """Test handling of concurrent streaming requests."""
     import asyncio
     import httpx
-    
+
     async def make_streaming_request(client: httpx.AsyncClient, request_id: int):
         """Make a single streaming request."""
         request_data = {
@@ -521,7 +521,7 @@ def test_concurrent_streaming_requests(http_client: httpx.Client) -> None:
             ],
             "input_data": f"Say 'Response {request_id}'",
         }
-        
+
         chunks = []
         async with client.stream("POST", "/prompt/execute", json=request_data) as response:
             assert response.status_code == 200
@@ -529,25 +529,25 @@ def test_concurrent_streaming_requests(http_client: httpx.Client) -> None:
                 if line.startswith("data: "):
                     data = json.loads(line[6:])
                     chunks.append(data)
-        
+
         return chunks
-    
+
     async def run_concurrent_requests():
         """Run multiple concurrent requests."""
         async with httpx.AsyncClient(base_url=BASE_URL) as client:
             # Run 3 concurrent requests
             tasks = [make_streaming_request(client, i) for i in range(3)]
             results = await asyncio.gather(*tasks)
-            
+
             # Verify each request got a response
             for i, chunks in enumerate(results):
                 assert len(chunks) > 0, f"Request {i} should have received chunks"
-                
+
                 # Verify each has proper end message
                 message_chunks = [c for c in chunks if "parts" in c]
                 end_messages = [c for c in message_chunks if c.get("end") is True]
                 assert len(end_messages) == 1, f"Request {i} should have exactly one end message"
-    
+
     # Run the async test
     asyncio.run(run_concurrent_requests())
 
@@ -605,7 +605,7 @@ def test_streaming_with_complex_structured_output(http_client: httpx.Client) -> 
 
         # Should have received chunks
         assert len(chunks) > 0, "Should have received chunks"
-        
+
         # Verify ModelResponse structure
         message_chunks = [c for c in chunks if "parts" in c]
         assert len(message_chunks) > 0, "Should have message chunks"
@@ -627,7 +627,7 @@ def test_streaming_timeout_handling(http_client: httpx.Client) -> None:
     }
 
     start_time = time.time()
-    
+
     with http_client.stream("POST", "/prompt/execute", json=request_data, timeout=60.0) as response:
         assert response.status_code == 200
 
@@ -638,7 +638,7 @@ def test_streaming_timeout_handling(http_client: httpx.Client) -> None:
 
         # Should have received multiple chunks
         assert chunk_count > 1, "Should have received multiple chunks for long response"
-        
+
         # Verify the streaming took some time (not instant)
         elapsed_time = time.time() - start_time
         assert elapsed_time > 0.1, "Streaming should take some time"
@@ -668,7 +668,7 @@ def test_streaming_with_special_characters(http_client: httpx.Client) -> None:
 
         # Should have received chunks
         assert len(chunks) > 0, "Should have received chunks"
-        
+
         # Extract content and verify it's properly encoded
         full_text = ""
         for chunk in chunks:
@@ -676,7 +676,7 @@ def test_streaming_with_special_characters(http_client: httpx.Client) -> None:
                 for part in chunk["parts"]:
                     if isinstance(part, dict) and "content" in part:
                         full_text += part["content"]
-        
+
         # Just verify we got some text (content verification depends on model)
         assert len(full_text) > 0, "Should have received text content"
 

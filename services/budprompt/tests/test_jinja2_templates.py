@@ -128,14 +128,14 @@ class TestJinja2Templates:
 
     def test_structured_input_with_system_template(self, http_client):
         """Test system prompt template with structured input data."""
-        
+
         class TemplateData(BaseModel):
             personality: str
             domain: str
-            
+
         class InputSchema(BaseModel):
             content: TemplateData
-        
+
         request_data = {
             "deployment_name": "qwen3-32b",  # Use larger model for better system prompt following
             "messages": [
@@ -163,14 +163,14 @@ class TestJinja2Templates:
 
     def test_structured_input_with_message_templates(self, http_client):
         """Test message content templates with structured input."""
-        
+
         class UserInfo(BaseModel):
             name: str
             topic: str
-            
+
         class InputSchema(BaseModel):
             content: UserInfo
-        
+
         request_data = {
             "deployment_name": self.deployment_name,
             "messages": [
@@ -201,13 +201,13 @@ class TestJinja2Templates:
 
     def test_template_with_list_data(self, http_client):
         """Test templates with list data in structured input."""
-        
+
         class ItemList(BaseModel):
             fruits: List[str]
-            
+
         class InputSchema(BaseModel):
             content: ItemList
-        
+
         request_data = {
             "deployment_name": self.deployment_name,
             "messages": [
@@ -237,15 +237,15 @@ class TestJinja2Templates:
 
     def test_template_with_conditionals(self, http_client):
         """Test Jinja2 conditional statements."""
-        
+
         class TaskInfo(BaseModel):
             is_urgent: bool
             task: str
             deadline: str
-            
+
         class InputSchema(BaseModel):
             content: TaskInfo
-        
+
         request_data = {
             "deployment_name": self.deployment_name,
             "messages": [
@@ -278,14 +278,14 @@ class TestJinja2Templates:
 
     def test_template_with_filters(self, http_client):
         """Test Jinja2 filters in templates."""
-        
+
         class TextData(BaseModel):
             case_type: str
             text: str
-            
+
         class InputSchema(BaseModel):
             content: TextData
-        
+
         request_data = {
             "deployment_name": self.deployment_name,
             "messages": [
@@ -317,13 +317,13 @@ class TestJinja2Templates:
 
     def test_conversation_with_all_roles(self, http_client):
         """Test full conversation with all roles and templates."""
-        
+
         class MathProblem(BaseModel):
             multiplier: int
-            
+
         class InputSchema(BaseModel):
             content: MathProblem
-        
+
         request_data = {
             "deployment_name": self.deployment_name,
             "messages": [
@@ -393,15 +393,15 @@ class TestJinja2Templates:
 
     def test_multiple_user_messages_with_templates(self, http_client):
         """Test multiple user messages with different template variables."""
-        
+
         class TravelData(BaseModel):
             origin: str
             destination: str
             duration: int
-            
+
         class InputSchema(BaseModel):
             content: TravelData
-        
+
         request_data = {
             "deployment_name": self.deployment_name,
             "messages": [
@@ -443,15 +443,15 @@ class TestJinja2Templates:
 
     def test_empty_messages_with_structured_input(self, http_client):
         """Test when messages array is empty but structured input_data is provided."""
-        
+
         class BusinessData(BaseModel):
             sales: int
             growth: int
             region: str
-            
+
         class InputSchema(BaseModel):
             content: BusinessData
-        
+
         request_data = {
             "deployment_name": self.deployment_name,
             "messages": [
