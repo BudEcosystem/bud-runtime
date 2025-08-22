@@ -570,11 +570,11 @@ class GuardrailDeploymentService:
         # Get existing cache data
         try:
             existing_data = await redis_service.get(cache_key)
+            if not existing_data:
+                logging.get_logger(__name__).warning(f"No cache entry found for endpoint {endpoint_id}")
+                return
         except Exception as e:
             logging.get_logger(__name__).error(f"Error getting cache for endpoint {endpoint_id}: {e}")
-
-        if not existing_data:
-            logging.get_logger(__name__).warning(f"No cache entry found for endpoint {endpoint_id}")
             return
 
         # Parse existing config
@@ -584,12 +584,8 @@ class GuardrailDeploymentService:
             return
 
         # Build guardrail configuration if deployment is active
-        if deployment.status in [GuardrailDeploymentStatusEnum.ACTIVE, GuardrailDeploymentStatusEnum.DEPLOYING]:
-            guardrail_config = GuardrailDeploymentService._build_guardrail_config_for_proxy(deployment)
-            endpoint_config_dict["guardrails"] = guardrail_config.model_dump() if guardrail_config else None
-        else:
-            # Remove guardrails if deployment is not active
-            endpoint_config_dict.pop("guardrails", None)
+        guardrail_config = GuardrailDeploymentService._build_guardrail_config_for_proxy(deployment)
+        endpoint_config_dict["guardrails"] = guardrail_config.model_dump() if guardrail_config else None
 
         # Save updated config back to cache
         await redis_service.set(cache_key, json.dumps(model_data))
@@ -722,11 +718,11 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
             if request.threshold:
                 step_data["threshold"] = request.threshold
 
-        elif step_number == 7:
-            # Step 6: ETA
-            step_data["estimated_deployment_time"] = 30  # 30 seconds placeholder
-            step_data["deployment_name"] = request.deployment_name or "Guardrail Deployment"
-            step_data["deployment_description"] = request.deployment_description
+        # elif step_number == 7:
+        #     # Step 6: ETA
+        #     step_data["estimated_deployment_time"] = 30  # 30 seconds placeholder
+        #     step_data["deployment_name"] = request.deployment_name or "Guardrail Deployment"
+        #     step_data["deployment_description"] = request.deployment_description
 
         return step_data
 

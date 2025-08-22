@@ -372,21 +372,13 @@ class GuardrailDeploymentWorkflowStepData(GuardrailBaseSchema):
     guard_types: Optional[List[str]] = None
     threshold: Optional[float] = None
 
-    # Step 6: ETA
-    estimated_deployment_time: Optional[int] = None  # seconds
-
-    # Step 7: Deployment status
-    deployment_status: Optional[str] = None
-    deployment_message: Optional[str] = None
-    deployment_id: Optional[UUID] = None
-
 
 class CreateGuardrailDeploymentWorkflowRequest(GuardrailBaseSchema):
     """Request schema for creating/updating guardrail deployment workflow."""
 
     workflow_id: Optional[UUID] = None
-    step_number: int = Field(..., ge=1, le=7)
-    workflow_total_steps: int = Field(default=7)
+    step_number: int = Field(..., ge=1, le=6)
+    workflow_total_steps: int = Field(default=6)
 
     # Step-specific data
     probe_selections: Optional[List[ProbeSelection]] = []  # New sparse selection format
