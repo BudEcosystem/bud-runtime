@@ -3,13 +3,11 @@ import React, { useState, useEffect, useMemo } from "react";
 import {
   Tabs,
   Tag,
-  Badge,
   Image,
   ConfigProvider,
 } from "antd";
 import type { TabsProps } from 'antd';
-import { CopyOutlined, LinkOutlined } from "@ant-design/icons";
-import { Icon } from "@iconify/react/dist/iconify.js";
+import { CopyOutlined } from "@ant-design/icons";
 import { Drawer } from "antd";
 import IconRender from "@/flows/components/BudIconRender";
 import ModelTags from "@/flows/components/ModelTags";
@@ -48,6 +46,14 @@ const ModelDetailDrawer: React.FC<ModelDetailDrawerProps> = ({
         body: {
           padding: 0,
           overflow: 'auto',
+          backgroundColor: 'var(--bg-primary)',
+          color: 'var(--text-primary)',
+        },
+        wrapper: {
+          backgroundColor: 'var(--bg-primary)',
+        },
+        content: {
+          backgroundColor: 'var(--bg-primary)',
         },
       }}
     >
@@ -132,7 +138,7 @@ const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }> = ({
             <Text_14_500_EEEEEE className="mb-4">
               Basic Information
             </Text_14_500_EEEEEE>
-            <div className="bg-[#FFFFFF08] rounded-lg p-4 space-y-3">
+            <div className="bg-black/5 dark:bg-white/5 rounded-lg p-4 space-y-3">
               <div className="flex justify-between">
                 <Text_12_400_B3B3B3>Model Name</Text_12_400_B3B3B3>
                 <Text_12_400_EEEEEE>{model.name}</Text_12_400_EEEEEE>
@@ -168,7 +174,7 @@ const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }> = ({
             <Text_14_400_EEEEEE>Modalities</Text_14_400_EEEEEE>
             <Text_12_400_757575 className="pt-[.33rem]">Following is the list of things model is really good at doing</Text_12_400_757575>
             <div className="modality flex items-center justify-start gap-[.5rem] mt-[1rem]">
-              <div className="flex flex-col items-center gap-[.5rem] gap-y-[1rem] bg-[#ffffff08] w-[50%] p-[1rem] rounded-[6px]">
+              <div className="flex flex-col items-center gap-[.5rem] gap-y-[1rem] bg-black/5 dark:bg-white/5 w-[50%] p-[1rem] rounded-[6px]">
                 <Text_14_400_EEEEEE className="leading-[100%]">Input</Text_14_400_EEEEEE>
                 <div className="flex justify-center items-center gap-x-[.5rem]">
                   <div className="h-[1.25rem]">
@@ -218,7 +224,7 @@ const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }> = ({
                     .join(", ")}
                 </Text_12_400_EEEEEE>
               </div>
-              <div className="flex flex-col items-center gap-[.5rem] gap-y-[1rem] bg-[#ffffff08] w-[50%] p-[1rem] rounded-[6px]">
+              <div className="flex flex-col items-center gap-[.5rem] gap-y-[1rem] bg-black/5 dark:bg-white/5 w-[50%] p-[1rem] rounded-[6px]">
                 <Text_14_400_EEEEEE className="leading-[100%]">Output</Text_14_400_EEEEEE>
                 <div className="flex justify-center items-center gap-x-[.5rem]">
                   <div className="h-[1.25rem]">
@@ -273,14 +279,14 @@ const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }> = ({
           <div className="hR mt-[1.5rem]"></div>
 
           {/* Supported Endpoints */}
-          <div className="pt-[1.3rem]">
+          <div className="pt-[1.3rem] pb-[1.4rem]">
             <Text_14_400_EEEEEE>Supported Endpoints</Text_14_400_EEEEEE>
             <Text_12_400_757575 className="pt-[.33rem]">Following is the list of things model is really good at doing</Text_12_400_757575>
             <div className="modality flex flex-wrap items-start justify-between gap-y-[.5rem] gap-x-[.75rem] mt-[1.5rem]">
               {Object.entries(model.supported_endpoints).map(([key, value]) => {
                 const iconName = value.enabled ? `${key}.png` : `${key}-not.png`;
                 return (
-                  <div key={key} className="flex items-center justify-start gap-[.8rem] w-[calc(50%-0.4rem)] bg-[#ffffff08] p-[1rem] rounded-[6px]">
+                  <div key={key} className="flex items-center justify-start gap-[.8rem] w-[calc(50%-0.4rem)] bg-black/5 dark:bg-white/5 p-[1rem] rounded-[6px]">
                     <div className="h-[1.25rem]">
                       <Image
                         preview={false}
@@ -416,141 +422,11 @@ const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }> = ({
     );
   };
 
-  const ArchitectureTab = () => (
-    <div className="pt-[.25rem]">
-      <div className="space-y-6">
-        {/* Architecture Text Config */}
-        {model.architecture_text_config && (
-          <div>
-            <Text_14_500_EEEEEE className="mb-4">
-              Text Architecture
-            </Text_14_500_EEEEEE>
-            <div className="bg-[#FFFFFF08] rounded-lg p-4 space-y-3">
-              <div className="flex justify-between">
-                <Text_12_400_B3B3B3>Context Length</Text_12_400_B3B3B3>
-                <Text_12_400_EEEEEE>
-                  {model.architecture_text_config.context_length?.toLocaleString() ||
-                    "N/A"}
-                </Text_12_400_EEEEEE>
-              </div>
-              <div className="flex justify-between">
-                <Text_12_400_B3B3B3>Hidden Size</Text_12_400_B3B3B3>
-                <Text_12_400_EEEEEE>
-                  {model.architecture_text_config.hidden_size?.toLocaleString() ||
-                    "N/A"}
-                </Text_12_400_EEEEEE>
-              </div>
-              <div className="flex justify-between">
-                <Text_12_400_B3B3B3>Number of Layers</Text_12_400_B3B3B3>
-                <Text_12_400_EEEEEE>
-                  {model.architecture_text_config.num_layers || "N/A"}
-                </Text_12_400_EEEEEE>
-              </div>
-              <div className="flex justify-between">
-                <Text_12_400_B3B3B3>Attention Heads</Text_12_400_B3B3B3>
-                <Text_12_400_EEEEEE>
-                  {model.architecture_text_config.num_attention_heads || "N/A"}
-                </Text_12_400_EEEEEE>
-              </div>
-              <div className="flex justify-between">
-                <Text_12_400_B3B3B3>Vocab Size</Text_12_400_B3B3B3>
-                <Text_12_400_EEEEEE>
-                  {model.architecture_text_config.vocab_size?.toLocaleString() ||
-                    "N/A"}
-                </Text_12_400_EEEEEE>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* External Links */}
-        <div>
-          <Text_14_500_EEEEEE className="mb-4">External Links</Text_14_500_EEEEEE>
-          <div className="space-y-2">
-            {model.github_url && (
-              <a
-                href={model.github_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 bg-[#FFFFFF08] rounded-lg p-3 hover:bg-[#FFFFFF12] transition-colors"
-              >
-                <Icon icon="mdi:github" className="text-xl" />
-                <Text_12_400_EEEEEE>GitHub Repository</Text_12_400_EEEEEE>
-                <LinkOutlined className="ml-auto text-bud-text-muted" />
-              </a>
-            )}
-            {model.huggingface_url && (
-              <a
-                href={model.huggingface_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 bg-[#FFFFFF08] rounded-lg p-3 hover:bg-[#FFFFFF12] transition-colors"
-              >
-                <Icon icon="simple-icons:huggingface" className="text-xl" />
-                <Text_12_400_EEEEEE>Hugging Face</Text_12_400_EEEEEE>
-                <LinkOutlined className="ml-auto text-bud-text-muted" />
-              </a>
-            )}
-            {model.website_url && (
-              <a
-                href={model.website_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 bg-[#FFFFFF08] rounded-lg p-3 hover:bg-[#FFFFFF12] transition-colors"
-              >
-                <Icon icon="ph:globe" className="text-xl" />
-                <Text_12_400_EEEEEE>Website</Text_12_400_EEEEEE>
-                <LinkOutlined className="ml-auto text-bud-text-muted" />
-              </a>
-            )}
-          </div>
-        </div>
-
-        {/* Verification Status */}
-        <div>
-          <Text_14_500_EEEEEE className="mb-4">
-            Verification Status
-          </Text_14_500_EEEEEE>
-          <div className="bg-[#FFFFFF08] rounded-lg p-4">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Text_12_400_B3B3B3>Bud Verified</Text_12_400_B3B3B3>
-                <Badge
-                  status={model.bud_verified ? "success" : "default"}
-                  text={model.bud_verified ? "Verified" : "Not Verified"}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <Text_12_400_B3B3B3>Security Scan</Text_12_400_B3B3B3>
-                <Badge
-                  status={model.scan_verified ? "success" : "default"}
-                  text={model.scan_verified ? "Passed" : "Not Scanned"}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <Text_12_400_B3B3B3>Evaluation</Text_12_400_B3B3B3>
-                <Badge
-                  status={model.eval_verified ? "success" : "default"}
-                  text={model.eval_verified ? "Evaluated" : "Not Evaluated"}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
   const items: TabsProps['items'] = useMemo(() => [
     {
       key: '1',
       label: 'General',
       children: <GeneralTab />,
-    },
-    {
-      key: '2',
-      label: 'Architecture',
-      children: <ArchitectureTab />,
     },
   ], [model]);
 
@@ -567,16 +443,16 @@ const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }> = ({
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-[#2F2F2F]">
+      <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-800">
         <button
           onClick={onClose}
-          className="text-[#B3B3B3] hover:text-white transition-colors"
+          className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
         >
           ← Back
         </button>
         <button
           onClick={onClose}
-          className="text-[#B3B3B3] hover:text-white transition-colors"
+          className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
         >
           ✕
         </button>
