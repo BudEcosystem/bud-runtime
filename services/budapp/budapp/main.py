@@ -41,6 +41,7 @@ from .dataset_ops import dataset_routes
 from .endpoint_ops import endpoint_routes
 from .eval_ops import eval_routes
 from .eval_ops.workflows import EvalDataSyncWorkflows
+from .guardrails import guardrail_routes
 from .initializers.seeder import seeders
 from .metric_ops import metric_routes
 from .model_ops import model_routes
@@ -51,7 +52,6 @@ from .project_ops import project_routes
 from .router_ops import router_routes
 from .user_ops import user_routes
 from .workflow_ops import workflow_routes
-from .guardrails import guardrail_routes
 
 
 logger = logging.get_logger(__name__)

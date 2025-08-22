@@ -8,10 +8,11 @@ Create Date: 2025-08-18 19:30:51.830967
 
 from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from alembic_postgresql_enum import TableReference
 from sqlalchemy.dialects import postgresql
+
 
 # revision identifiers, used by Alembic.
 revision: str = "59f0ac264062"
@@ -45,15 +46,16 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("endpoint_id", sa.Uuid(), nullable=True),
-        sa.Column("deployment_endpoint_url", sa.String(), nullable=True),
         sa.Column(
             "status",
             postgresql.ENUM(
-                "active",
-                "inactive",
+                "running",
+                "failure",
                 "deploying",
-                "failed",
+                "unhealthy",
+                "deleting",
                 "deleted",
+                "pending",
                 name="guardrail_deployment_status",
                 create_type=False,
             ),
@@ -203,7 +205,6 @@ def downgrade() -> None:
     op.drop_table("guardrail_deployment_probes")
     op.drop_table("guardrail_probes")
     op.drop_table("guardrail_deployments")
-    op.drop_table("guardrail_guard_types")
     sa.Enum("cloud_provider", "bud_sentinel", name="guardrail_provider_type_enum").drop(op.get_bind())
     sa.Enum("endpoint_mapped", "standalone", name="guardrail_deployment_type").drop(op.get_bind())
     sa.Enum(
