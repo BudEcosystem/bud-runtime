@@ -28,7 +28,7 @@ export default function DeployModelSpecification() {
       }}
       disableNext={!deploymentSpecifcation.deployment_name || !deploymentSpecifcation.concurrent_requests || !deploymentSpecifcation.avg_sequence_length }
       onNext={async (values) => {
-        form.submit();
+        // form.submit();
         if (currentWorkflow) {
           // Check if it's a cloud model and skip cluster steps
           if (currentWorkflow.workflow_steps.model.provider_type === "cloud_model") {

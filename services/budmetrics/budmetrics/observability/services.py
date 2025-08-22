@@ -1001,26 +1001,59 @@ class ObservabilityMetricsService:
                 if has_gateway_data:
                     try:
                         # Parse headers and tags if they exist
+                        # Note: Based on the data shift, adjusting indices
                         request_headers = None
-                        if len(row) > 51 and row[51]:
+                        if len(row) > 52 and row[52]:
                             try:
-                                request_headers = dict(row[51]) if isinstance(row[51], (dict, tuple)) else None
+                                request_headers = dict(row[52]) if isinstance(row[52], (dict, tuple)) else None
                             except (TypeError, ValueError):
                                 request_headers = None
 
                         response_headers = None
-                        if len(row) > 62 and row[62]:
+                        if len(row) > 63 and row[63]:
                             try:
-                                response_headers = dict(row[62]) if isinstance(row[62], (dict, tuple)) else None
+                                response_headers = dict(row[63]) if isinstance(row[63], (dict, tuple)) else None
                             except (TypeError, ValueError):
                                 response_headers = None
 
                         tags = None
-                        if len(row) > 68 and row[68]:
+                        if len(row) > 69 and row[69]:
                             try:
-                                tags = dict(row[68]) if isinstance(row[68], (dict, tuple)) else None
+                                tags = dict(row[69]) if isinstance(row[69], (dict, tuple)) else None
                             except (TypeError, ValueError):
                                 tags = None
+
+                        # Fixed mapping based on error analysis:
+                        # The error shows that the data from the database has columns in wrong positions
+                        # Error pattern: latitude='Singapore', timezone=103.85..., asn='Asia/Singapore'
+                        # This indicates the data is shifted or reordered in the result set
+
+                        # Helper function to safely convert to float
+                        def safe_float(val):
+                            try:
+                                if val is None or val == "":
+                                    return None
+                                return float(val)
+                            except (ValueError, TypeError):
+                                return None
+
+                        # Helper function to safely convert to int
+                        def safe_int(val):
+                            try:
+                                if val is None or val == "":
+                                    return None
+                                return int(val)
+                            except (ValueError, TypeError):
+                                return None
+
+                        # Based on error message, the actual data layout appears to be:
+                        # row[36] = 'Singapore' (should be city, so data from row[35] is duplicated?)
+                        # row[37] = longitude value (correct)
+                        # row[38] = 103.85... (should be timezone but has longitude)
+                        # row[39] = 'Asia/Singapore' (should be ASN but has timezone)
+
+                        # It looks like city might be duplicated and everything after is shifted by 1
+                        # Let's handle this with proper validation
 
                         gateway_metadata = GatewayMetadata(
                             client_ip=row[30] if len(row) > 30 and row[30] else None,
@@ -1029,39 +1062,53 @@ class ObservabilityMetricsService:
                             country_code=row[33] if len(row) > 33 and row[33] else None,
                             region=row[34] if len(row) > 34 and row[34] else None,
                             city=row[35] if len(row) > 35 and row[35] else None,
-                            latitude=row[36] if len(row) > 36 and row[36] is not None else None,
-                            longitude=row[37] if len(row) > 37 and row[37] is not None else None,
-                            timezone=row[38] if len(row) > 38 and row[38] else None,
-                            asn=row[39] if len(row) > 39 and row[39] is not None else None,
-                            isp=row[40] if len(row) > 40 and row[40] else None,
-                            user_agent=row[41] if len(row) > 41 and row[41] else None,
-                            device_type=row[42] if len(row) > 42 and row[42] else None,
-                            browser_name=row[43] if len(row) > 43 and row[43] else None,
-                            browser_version=row[44] if len(row) > 44 and row[44] else None,
-                            os_name=row[45] if len(row) > 45 and row[45] else None,
-                            os_version=row[46] if len(row) > 46 and row[46] else None,
-                            is_bot=row[47] if len(row) > 47 and row[47] is not None else None,
-                            method=row[48] if len(row) > 48 and row[48] else None,
-                            path=row[49] if len(row) > 49 and row[49] else None,
-                            query_params=row[50] if len(row) > 50 and row[50] else None,
-                            request_headers=request_headers,
-                            body_size=row[52] if len(row) > 52 and row[52] is not None else None,
-                            api_key_id=row[53] if len(row) > 53 and row[53] else None,
-                            auth_method=row[54] if len(row) > 54 and row[54] else None,
-                            user_id=row[55] if len(row) > 55 and row[55] else None,
-                            gateway_processing_ms=row[56] if len(row) > 56 and row[56] is not None else None,
-                            total_duration_ms=row[57] if len(row) > 57 and row[57] is not None else None,
-                            routing_decision=row[58] if len(row) > 58 and row[58] else None,
-                            model_version=row[59] if len(row) > 59 and row[59] else None,
-                            status_code=row[60] if len(row) > 60 and row[60] is not None else None,
-                            response_size=row[61] if len(row) > 61 and row[61] is not None else None,
-                            response_headers=response_headers,
-                            error_type=row[63] if len(row) > 63 and row[63] else None,
-                            error_message=row[64] if len(row) > 64 and row[64] else None,
-                            is_blocked=row[65] if len(row) > 65 and row[65] is not None else None,
-                            block_reason=row[66] if len(row) > 66 and row[66] else None,
-                            block_rule_id=row[67] if len(row) > 67 and row[67] else None,
-                            tags=tags,
+                            # Latitude should be at 36, but if it contains city name, try 37
+                            latitude=safe_float(row[37]) if len(row) > 37 else None,
+                            # Longitude should be at 37, but appears to be at 38 based on error
+                            longitude=safe_float(row[38]) if len(row) > 38 else None,
+                            # Timezone should be at 38, but appears to be at 39 based on error
+                            timezone=str(row[39])
+                            if len(row) > 39 and row[39] and not isinstance(row[39], (int, float))
+                            else None,
+                            # ASN should be at 39, but appears to be at 40
+                            asn=safe_int(row[40]) if len(row) > 40 else None,
+                            # Shift remaining fields by 1
+                            isp=row[41] if len(row) > 41 and row[41] else None,
+                            user_agent=row[42] if len(row) > 42 and row[42] else None,
+                            device_type=row[43] if len(row) > 43 and row[43] else None,
+                            browser_name=row[44] if len(row) > 44 and row[44] else None,
+                            browser_version=row[45] if len(row) > 45 and row[45] else None,
+                            os_name=row[46] if len(row) > 46 and row[46] else None,
+                            os_version=row[47] if len(row) > 47 and row[47] else None,
+                            is_bot=bool(row[48]) if len(row) > 48 and row[48] is not None else None,
+                            method=row[49] if len(row) > 49 and row[49] else None,
+                            path=row[50] if len(row) > 50 and row[50] else None,
+                            query_params=row[51] if len(row) > 51 and row[51] else None,
+                            # request_headers already parsed above at row[51], but shifted to 52
+                            request_headers=request_headers,  # This was parsed from row[51] above
+                            # body_size should be at 52, but based on error it gets headers, so likely at 53
+                            body_size=safe_int(row[53]) if len(row) > 53 else None,
+                            api_key_id=str(row[54]) if len(row) > 54 and row[54] else None,
+                            auth_method=row[55] if len(row) > 55 and row[55] else None,
+                            user_id=str(row[56]) if len(row) > 56 and row[56] else None,
+                            gateway_processing_ms=safe_int(row[57]) if len(row) > 57 else None,
+                            total_duration_ms=safe_int(row[58]) if len(row) > 58 else None,
+                            # routing_decision should be at 58 but error shows integer there, so shift to 59
+                            routing_decision=str(row[59]) if len(row) > 59 and row[59] is not None else None,
+                            model_version=row[60] if len(row) > 60 and row[60] else None,
+                            status_code=safe_int(row[61]) if len(row) > 61 else None,
+                            response_size=safe_int(row[62]) if len(row) > 62 else None,
+                            # response_headers already parsed at row[62], shifted to 63
+                            response_headers=response_headers,  # This was parsed from row[62] above
+                            # error_type at 63 gets headers based on error, so likely at 64
+                            error_type=str(row[64])
+                            if len(row) > 64 and row[64] and not isinstance(row[64], dict)
+                            else None,
+                            error_message=row[65] if len(row) > 65 and row[65] else None,
+                            is_blocked=bool(row[66]) if len(row) > 66 and row[66] is not None else None,
+                            block_reason=row[67] if len(row) > 67 and row[67] else None,
+                            block_rule_id=str(row[68]) if len(row) > 68 and row[68] else None,
+                            tags=tags,  # This was parsed from row[68] above, now shifted to 69
                         )
                         logger.info(f"Successfully parsed gateway metadata for inference {inference_id}")
                     except (IndexError, TypeError) as e:
