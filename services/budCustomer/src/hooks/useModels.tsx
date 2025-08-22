@@ -190,6 +190,12 @@ export type Model = {
   website_url?: string;
   model_type?: string;
   created_at?: string;
+  pricing?: {
+    input_cost: number;
+    output_cost: number;
+    currency: string;
+    per_tokens: number;
+  };
 };
 
 export interface IModel {
@@ -201,16 +207,14 @@ type GetModelParams = {
   page: number;
   limit: number;
   order_by?: string;
-  name?: string;
+  name?: string; // This will be converted to 'search' parameter internally
   description?: string;
-  tag?: string;
   tasks?: string[];
   modality?: string[];
   author?: string[];
   model_size_min?: number;
   model_size_max?: number;
   table_source?: "model" | "cloud_model";
-  search?: string;
   source?: string;
   base_model?: string;
   base_model_relation?: string;
@@ -379,12 +383,20 @@ export const useModels = create<{
 
     set({ loading: true });
     try {
+      // Build request params with search instead of name
+      const requestParams: any = {
+        ...params,
+        order_by: "-created_at",
+      };
+
+      // Replace name with search parameter
+      if (requestParams.name) {
+        requestParams.search = requestParams.name;
+        delete requestParams.name;
+      }
+
       const response: any = await AppRequest.Get(`/models`, {
-        params: {
-          ...params,
-          search: Boolean(params.name),
-          order_by: "-created_at",
-        },
+        params: requestParams,
       });
       set({
         totalPages: response.data.total_pages,
@@ -486,16 +498,9 @@ export const useModels = create<{
         limit: params.limit,
       };
 
-      // Only add parameters if they have actual values
+      // Only add search parameter if name has a value
       if (params.name && params.name.trim()) {
-        requestParams.name = params.name;
-        requestParams.search = true;
-      }
-
-      if (params.tag && params.tag.trim()) {
-        requestParams.tag = params.tag;
-      } else if (params.name && params.name.trim()) {
-        requestParams.tag = params.name; // Only use name as tag if tag is not provided
+        requestParams.search = params.name;
       }
 
       if (params.modality && params.modality.length > 0) {

@@ -573,6 +573,7 @@ class WorkflowTypeEnum(StrEnum):
     ADD_ADAPTER = auto()
     DELETE_ADAPTER = auto()
     EVALUATION_CREATION = auto()
+    GUARDRAIL_DEPLOYMENT = auto()
 
 
 class NotificationType(Enum):
@@ -2834,6 +2835,7 @@ WORKFLOW_DELETE_MESSAGES = {
     WorkflowTypeEnum.CLOUD_MODEL_ONBOARDING: "Successfully cancelled model onboarding.",
     WorkflowTypeEnum.LOCAL_MODEL_ONBOARDING: "Successfully cancelled model onboarding.",
     WorkflowTypeEnum.ADD_WORKER_TO_ENDPOINT: "Successfully cancelled worker to deployment.",
+    WorkflowTypeEnum.GUARDRAIL_DEPLOYMENT: "Successfully cancelled guardrail deployment.",
 }
 
 
@@ -3048,3 +3050,36 @@ class ExperimentWorkflowStepEnum(StrEnum):
     TRAITS_SELECTION = "traits_selection"
     PERFORMANCE_POINT = "performance_point"
     FINALIZE = "finalize"
+
+
+class GuardrailDeploymentTypeEnum(StrEnum):
+    """Guardrail deployment type enumeration."""
+
+    ENDPOINT_MAPPED = "endpoint_mapped"
+    STANDALONE = "standalone"
+
+
+class GuardrailDeploymentStatusEnum(StrEnum):
+    """Guardrail deployment status enumeration."""
+
+    RUNNING = auto()
+    FAILURE = auto()
+    DEPLOYING = auto()
+    UNHEALTHY = auto()
+    DELETING = auto()
+    DELETED = auto()
+    PENDING = auto()
+
+
+class GuardrailProviderTypeEnum(Enum):
+    """Enumeration of guardrail provider types.
+
+    This enum represents different types of guardrail providers or sources.
+
+    Attributes:
+        CLOUD_PROVIDER (str): Represents cloud-based guardrail providers.
+        BUD_SENTINEL (str): Represents guardrails from the Bud Sentinel.
+    """
+
+    CLOUD_PROVIDER = "cloud_provider"
+    BUD_SENTINEL = "bud_sentinel"

@@ -1263,6 +1263,9 @@ class ModelCatalogItem(BaseModel):
     author: Optional[str] = None
     model_size: Optional[int] = None
     provider_type: ModelProviderTypeEnum
+    uri: str
+    source: str
+    provider_icon: Optional[str] = None
     # Pricing information
     pricing: Optional[DeploymentPricingInfo] = None
     # Publication metadata

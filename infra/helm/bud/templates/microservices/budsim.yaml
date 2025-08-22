@@ -15,8 +15,9 @@ spec:
     metadata:
       labels:
         app: {{ .Release.Name }}-budsim
+      annotations:
         dapr.io/enabled: "true"
-        dapr.io/app-id: "budsim"
+        dapr.io/app-id: {{ .Values.microservices.budsim.daprid }}
         dapr.io/app-port: "3002"
     spec:
       containers:
