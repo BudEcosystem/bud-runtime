@@ -1244,6 +1244,7 @@ mod tests {
                 fallback_models: None,
                 retry_config: None,
                 rate_limits: None,
+                pricing: None,
             },
         )]))
         .expect("Failed to create model table");
@@ -1346,6 +1347,7 @@ mod tests {
                     fallback_models: None,
                     retry_config: None,
                     rate_limits: None,
+                    pricing: None,
                 },
             );
             ModelTable::try_from(map).expect("Failed to create model table")
@@ -1414,6 +1416,7 @@ mod tests {
                     fallback_models: None,
                     retry_config: None,
                     rate_limits: None,
+                    pricing: None,
                 },
             );
             ModelTable::try_from(map).expect("Failed to create model table")
@@ -1499,6 +1502,7 @@ mod tests {
                 fallback_models: None,
                 retry_config: None,
                 rate_limits: None,
+                pricing: None,
             },
         );
         let big_models = ModelTable::try_from(big_models).expect("Failed to create model table");

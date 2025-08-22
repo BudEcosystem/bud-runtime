@@ -17,6 +17,7 @@ mod tests {
                 max_delay_s: 5.0,
             }),
             rate_limits: None,
+            pricing: None,
         };
 
         assert!(model_config.fallback_models.is_some());
@@ -35,6 +36,7 @@ mod tests {
             fallback_models: None,
             retry_config: None,
             rate_limits: None,
+            pricing: None,
         };
 
         assert!(model_config.fallback_models.is_none());
