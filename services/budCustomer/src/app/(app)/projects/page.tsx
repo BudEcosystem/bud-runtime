@@ -198,7 +198,6 @@ export default function ProjectsPage() {
     });
   };
 
-
   const handleEditProject = () => {
     if (!selectedProject) return;
 
@@ -233,7 +232,6 @@ export default function ProjectsPage() {
     });
     setShowEditModal(true);
   };
-
 
   const getProjectMenuItems = (project: Project) => [
     {
@@ -359,7 +357,6 @@ export default function ProjectsPage() {
               </Row>
             </div>
           )}
-
 
           {/* Empty State */}
           {activeProjects.length === 0 && (
@@ -623,7 +620,6 @@ export default function ProjectsPage() {
               </div>
             </div>
           </Modal>
-
         </div>
       </div>
     </DashboardLayout>

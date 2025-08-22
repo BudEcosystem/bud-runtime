@@ -125,9 +125,9 @@ export default function UsagePage() {
         colorText: "var(--text-primary)",
         optionSelectedColor: "var(--text-primary)",
         optionActiveBg: "var(--bg-hover)",
-      }
-    }
-  }
+      },
+    },
+  };
 
   const getUsagePercentage = () =>
     (billingPlan.quotaUsed / billingPlan.quotaLimit) * 100;
@@ -360,8 +360,7 @@ export default function UsagePage() {
 
           {/* Filters */}
           <Flex gap={16} className="mb-[2rem]" wrap="wrap">
-            <ConfigProvider
-              theme={themeConfig}>
+            <ConfigProvider theme={themeConfig}>
               <Select
                 value={timeRange}
                 onChange={setTimeRange}
@@ -375,8 +374,7 @@ export default function UsagePage() {
                 ]}
               />
             </ConfigProvider>
-            <ConfigProvider
-              theme={themeConfig}>
+            <ConfigProvider theme={themeConfig}>
               <Select
                 value={selectedModel}
                 onChange={setSelectedModel}
