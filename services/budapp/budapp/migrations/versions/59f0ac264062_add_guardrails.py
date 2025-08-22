@@ -158,7 +158,7 @@ def upgrade() -> None:
             "cluster_deletion",
             "endpoint_deletion",
             "endpoint_worker_deletion",
-            "cloud_provider_onboarding",
+            "cloud_model_onboarding",
             "local_model_onboarding",
             "add_worker_to_endpoint",
             "license_faq_fetch",
