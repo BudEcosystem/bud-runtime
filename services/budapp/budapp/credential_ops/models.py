@@ -58,7 +58,7 @@ class Credential(Base, TimestampMixin):
     __tablename__ = "credential"
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     user_id: Mapped[UUID] = mapped_column(ForeignKey("user.id", ondelete="CASCADE"), nullable=False)
-    key: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    encrypted_key: Mapped[str] = mapped_column(String, nullable=False)  # Encrypted storage only
     project_id: Mapped[UUID] = mapped_column(ForeignKey("project.id", ondelete="CASCADE"), nullable=True)
     expiry: Mapped[datetime] = mapped_column(DateTime, nullable=True)
     max_budget: Mapped[float] = mapped_column(Float, nullable=True)
@@ -98,7 +98,7 @@ class CloudCredentials(Base, TimestampMixin):
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     user_id: Mapped[UUID] = mapped_column(ForeignKey("user.id", ondelete="CASCADE"), nullable=False)
     provider_id: Mapped[UUID] = mapped_column(ForeignKey("cloud_providers.id", ondelete="CASCADE"), nullable=False)
-    credential: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    encrypted_credential: Mapped[dict] = mapped_column(JSONB, nullable=False)  # Encrypted storage only
     credential_name: Mapped[str] = mapped_column(String, nullable=False, default="No Name")
 
     provider = relationship("CloudProviders", back_populates="credentials")
