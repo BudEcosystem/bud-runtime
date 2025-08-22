@@ -7,6 +7,7 @@ locals {
     "sinan",
     "ditto",
     "varun",
+    "adarsh"
   ]
 
   # a service can be only removed if it's not required by all the environments
