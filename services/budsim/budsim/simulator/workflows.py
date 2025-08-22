@@ -133,30 +133,67 @@ class SimulationWorkflows:
         simulation_method = simulation_service.get_simulation_method(request)
 
         try:
-            parallel_tasks = [
-                ctx.call_activity(
-                    method,
-                    input=ensure_json_serializable(
-                        {
-                            "device_config": {
-                                **deepcopy(device),
-                                "cluster_id": cluster["id"],
-                                "node_id": node["id"],
-                                "node_name": node["name"],
-                            },
-                            **request.model_dump(mode="json"),
-                            "engine_name": engine_device_combo["engine_name"],
-                            "engine_image": engine_device_combo["image"],
-                            "simulation_method": simulation_method.value,  # Pass the simulation method
-                        }
-                    ),
-                )
-                for cluster in cluster_info
-                for node in cluster.get("nodes", [])
-                for device in node.get("devices", [])
-                for engine_device_combo in compatible_engines
-                if device["type"] == engine_device_combo["device"]
-            ]
+            parallel_tasks = []
+            devices_found = 0
+            for cluster in cluster_info:
+                cluster_id = cluster.get("id", "unknown")
+                nodes = cluster.get("nodes", [])
+                if cluster_id == "953b141f-7915-4187-9504-a3790e4a3c":
+                    logger.info(f"Processing target cluster {cluster_id} with {len(nodes)} nodes")
+
+                for node in nodes:
+                    devices = node.get("devices", [])
+                    if cluster_id == "953b141f-7915-4187-9504-a3790e4a3c":
+                        logger.info(f"  Node {node.get('id')} has {len(devices)} devices")
+
+                    for device in devices:
+                        device_type = device.get("type", "unknown")
+                        if cluster_id == "953b141f-7915-4187-9504-a3790e4a3c":
+                            logger.info(
+                                f"    Device: type={device_type}, model={device.get('model')}, memory={device.get('memory')}MB"
+                            )
+
+                        for engine_device_combo in compatible_engines:
+                            if device_type == engine_device_combo["device"]:
+                                devices_found += 1
+                                # Prepare device config with proper memory conversion
+                                device_config = deepcopy(device)
+
+                                # Convert memory from MB to GB if needed
+                                if "memory" in device_config and "mem_per_GPU_in_GB" not in device_config:
+                                    device_config["mem_per_GPU_in_GB"] = device_config["memory"] / 1024.0
+
+                                # Add cluster and node info
+                                device_config.update(
+                                    {
+                                        "cluster_id": cluster_id,
+                                        "node_id": node["id"],
+                                        "node_name": node["name"],
+                                    }
+                                )
+
+                                if cluster_id == "953b141f-7915-4187-9504-a3790e4a3c":
+                                    logger.info(
+                                        f"    Creating task for engine={engine_device_combo['engine_name']}, device_memory_gb={device_config.get('mem_per_GPU_in_GB', 0):.2f}"
+                                    )
+
+                                task = ctx.call_activity(
+                                    method,
+                                    input=ensure_json_serializable(
+                                        {
+                                            "device_config": device_config,
+                                            **request.model_dump(mode="json"),
+                                            "engine_name": engine_device_combo["engine_name"],
+                                            "engine_image": engine_device_combo["image"],
+                                            "simulation_method": simulation_method.value,
+                                        }
+                                    ),
+                                )
+                                parallel_tasks.append(task)
+
+            logger.info(
+                f"Created {len(parallel_tasks)} tasks for {devices_found} devices across {len(cluster_info)} clusters"
+            )
             results = yield wf.when_all(parallel_tasks)  # type: ignore
 
             notification_req.payload.content = NotificationContent(

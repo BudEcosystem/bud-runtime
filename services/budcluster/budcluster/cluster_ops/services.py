@@ -168,10 +168,23 @@ class ClusterOpsService:
                 if isinstance(devices_data, dict):
                     # Process GPUs
                     for gpu in devices_data.get("gpus", []):
+                        # Determine GPU type based on vendor
+                        gpu_vendor = gpu.get("vendor", "").lower()
+                        if "nvidia" in gpu_vendor:
+                            gpu_type = "cuda"
+                        elif "amd" in gpu_vendor or "ati" in gpu_vendor:
+                            gpu_type = "rocm"
+                        elif "intel" in gpu_vendor:
+                            gpu_type = "hpu"  # Intel GPUs might be Arc GPUs
+                        else:
+                            # Default to cuda for unknown vendors (most common)
+                            gpu_type = "cuda"
+                            logger.warning(f"Unknown GPU vendor '{gpu_vendor}', defaulting to cuda")
+
                         formatted_devices.append(
                             {
                                 "device_config": {
-                                    "type": "gpu",
+                                    "type": gpu_type,
                                     "name": gpu.get("raw_name", "Unknown GPU"),
                                     "vendor": gpu.get("vendor", ""),
                                     "model": gpu.get("model", ""),
@@ -185,11 +198,14 @@ class ClusterOpsService:
                                     "inter_node_bandwidth_in_GB_per_sec": 200,
                                     "intra_node_bandwidth_in_GB_per_sec": 300,
                                 },
-                                "available_count": gpu.get("count", 1),
-                                "type": "gpu",
+                                # Store both total_count and available_count
+                                # available_count will be calculated separately if NFD is enabled
+                                "total_count": gpu.get("count", 1),
+                                "available_count": gpu.get("available_count", gpu.get("count", 1)),
+                                "type": gpu_type,
                             }
                         )
-                        device_type = "gpu"
+                        device_type = gpu_type
 
                     # Process HPUs
                     for hpu in devices_data.get("hpus", []):
@@ -372,9 +388,16 @@ class ClusterOpsService:
             devices = []
             for each_info in hardware_info:
                 device_config = each_info.get("device_config", {})
-                total_count = each_info.get("available_count", 0)  # Total devices on the node
+                # Get both total_count and available_count from hardware_info
+                # total_count represents the total devices on the node
+                # available_count represents the currently unallocated devices
+                total_count = each_info.get("total_count", each_info.get("available_count", 0))
+                available_count = each_info.get("available_count", 0)
+
                 # If node is not ready/schedulable, available_count should be 0
-                available_count = total_count if node.status else 0
+                if not node.status:
+                    available_count = 0
+
                 devices.append(
                     {
                         **device_config,
@@ -866,10 +889,23 @@ class ClusterOpsService:
                 if isinstance(devices_data, dict):
                     # Process GPUs
                     for gpu in devices_data.get("gpus", []):
+                        # Determine GPU type based on vendor
+                        gpu_vendor = gpu.get("vendor", "").lower()
+                        if "nvidia" in gpu_vendor:
+                            gpu_type = "cuda"
+                        elif "amd" in gpu_vendor or "ati" in gpu_vendor:
+                            gpu_type = "rocm"
+                        elif "intel" in gpu_vendor:
+                            gpu_type = "hpu"  # Intel GPUs might be Arc GPUs
+                        else:
+                            # Default to cuda for unknown vendors (most common)
+                            gpu_type = "cuda"
+                            logger.warning(f"Unknown GPU vendor '{gpu_vendor}', defaulting to cuda")
+
                         formatted_devices.append(
                             {
                                 "device_config": {
-                                    "type": "gpu",
+                                    "type": gpu_type,
                                     "name": gpu.get("raw_name", "Unknown GPU"),
                                     "vendor": gpu.get("vendor", ""),
                                     "model": gpu.get("model", ""),
@@ -883,11 +919,14 @@ class ClusterOpsService:
                                     "inter_node_bandwidth_in_GB_per_sec": 200,
                                     "intra_node_bandwidth_in_GB_per_sec": 300,
                                 },
-                                "available_count": gpu.get("count", 1),
-                                "type": "gpu",
+                                # Store both total_count and available_count
+                                # The get_node_info in kubernetes.py already calculated real available_count
+                                "total_count": gpu.get("total_count", gpu.get("count", 1)),
+                                "available_count": gpu.get("available_count", gpu.get("count", 1)),
+                                "type": gpu_type,
                             }
                         )
-                        device_type = "gpu"
+                        device_type = gpu_type
 
                     # Process HPUs
                     for hpu in devices_data.get("hpus", []):

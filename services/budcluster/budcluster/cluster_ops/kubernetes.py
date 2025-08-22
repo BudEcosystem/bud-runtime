@@ -223,6 +223,63 @@ class KubernetesHandler(BaseClusterHandler):
             url = f"http://{url}"
         return urlparse(url).netloc, urlparse(url).scheme
 
+    def _get_gpu_allocations(self, node_name: str) -> Dict[str, int]:
+        """Calculate GPU allocations for a specific node.
+
+        Returns dict with total_gpus, allocated_gpus, and available_gpus.
+        """
+        try:
+            # Disable SSL warnings for self-signed certs
+            import urllib3
+
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+            v1 = client.CoreV1Api()
+
+            # Get node to find total GPUs
+            node = v1.read_node(node_name)
+            total_gpus = 0
+
+            if node.status and node.status.capacity:
+                # Check for NVIDIA GPUs
+                nvidia_gpus = node.status.capacity.get("nvidia.com/gpu", "0")
+                total_gpus = int(nvidia_gpus) if nvidia_gpus else 0
+
+                # Check for AMD GPUs
+                amd_gpus = node.status.capacity.get("amd.com/gpu", "0")
+                if amd_gpus:
+                    total_gpus += int(amd_gpus)
+
+            # Get pods on this node
+            field_selector = f"spec.nodeName={node_name}"
+            pods = v1.list_pod_for_all_namespaces(field_selector=field_selector)
+
+            allocated_gpus = 0
+            for pod in pods.items:
+                # Only count Running and Pending pods
+                if pod.status.phase in ["Running", "Pending"]:
+                    for container in pod.spec.containers:
+                        if container.resources and container.resources.requests:
+                            # Check NVIDIA GPUs
+                            nvidia_request = container.resources.requests.get("nvidia.com/gpu", "0")
+                            allocated_gpus += int(nvidia_request) if nvidia_request else 0
+
+                            # Check AMD GPUs
+                            amd_request = container.resources.requests.get("amd.com/gpu", "0")
+                            allocated_gpus += int(amd_request) if amd_request else 0
+
+            available_gpus = max(0, total_gpus - allocated_gpus)
+
+            logger.debug(
+                f"Node {node_name}: {available_gpus}/{total_gpus} GPUs available ({allocated_gpus} allocated)"
+            )
+
+            return {"total_gpus": total_gpus, "allocated_gpus": allocated_gpus, "available_gpus": available_gpus}
+
+        except Exception as e:
+            logger.warning(f"Failed to get GPU allocations for {node_name}: {e}")
+            return None
+
     def get_node_info(self) -> List[Dict[str, Any]]:
         """Get the node information from the Kubernetes cluster using NFD labels.
 
@@ -270,6 +327,22 @@ class KubernetesHandler(BaseClusterHandler):
                     for node in node_info_output:
                         # Extract device information from node info (which includes NFD labels)
                         devices = extractor.extract_from_node_info(node)
+
+                        # Get real GPU allocations for this node
+                        node_name = node.get("node_name")
+                        if node_name and devices.get("gpus"):
+                            gpu_allocations = self._get_gpu_allocations(node_name)
+                            if gpu_allocations:
+                                # Update GPU devices with real available counts
+                                for gpu in devices["gpus"]:
+                                    # The total count from device extractor
+                                    total_count = gpu.get("count", 1)
+                                    # Use real available count from Kubernetes
+                                    gpu["available_count"] = gpu_allocations["available_gpus"]
+                                    gpu["total_count"] = total_count
+                                    logger.debug(
+                                        f"Updated GPU on {node_name}: total={total_count}, available={gpu_allocations['available_gpus']}"
+                                    )
 
                         # Format node data for compatibility with existing structure
                         # Determine node status based on both Ready condition and schedulability
