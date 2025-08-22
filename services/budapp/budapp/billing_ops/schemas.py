@@ -122,6 +122,7 @@ class CreateBillingAlertRequest(BaseModel):
 class UpdateBillingPlanRequest(BaseModel):
     """Request to update user's billing plan."""
 
+    user_id: UUID  # User whose billing to update
     billing_plan_id: UUID
     custom_token_quota: Optional[int] = None
     custom_cost_quota: Optional[Decimal] = None

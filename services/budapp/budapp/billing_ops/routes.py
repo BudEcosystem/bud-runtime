@@ -71,6 +71,76 @@ async def get_current_usage(
         )
 
 
+@router.get("/user/{user_id}", response_model=SingleResponse[UserBillingSchema])
+async def get_user_billing_info(
+    user_id: UUID,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_session),
+) -> SingleResponse[UserBillingSchema]:
+    """Get billing information for a specific user (admin only)."""
+    try:
+        # Check if user is admin
+        if current_user.user_type != UserTypeEnum.ADMIN:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only admins can view other users' billing information",
+            )
+
+        service = BillingService(db)
+        user_billing = service.get_user_billing(user_id)
+
+        if not user_billing:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No billing information found for this user",
+            )
+
+        return SingleResponse(
+            result=UserBillingSchema.from_orm(user_billing),
+            message="User billing information retrieved successfully",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching user billing info: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch user billing information",
+        )
+
+
+@router.get("/user/{user_id}/usage", response_model=SingleResponse[CurrentUsageSchema])
+async def get_user_current_usage(
+    user_id: UUID,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_session),
+) -> SingleResponse[CurrentUsageSchema]:
+    """Get current billing period usage for a specific user (admin only)."""
+    try:
+        # Check if user is admin
+        if current_user.user_type != UserTypeEnum.ADMIN:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only admins can view other users' usage",
+            )
+
+        service = BillingService(db)
+        usage = await service.get_current_usage(user_id)
+
+        return SingleResponse(
+            result=CurrentUsageSchema(**usage),
+            message="User usage retrieved successfully",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching user usage: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch user usage",
+        )
+
+
 @router.post("/history", response_model=SingleResponse)
 async def get_usage_history(
     request: UsageHistoryRequest,
@@ -171,11 +241,19 @@ async def update_billing_plan(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_session),
 ) -> SingleResponse[UserBillingSchema]:
-    """Update user's billing plan."""
+    """Update user's billing plan (admin only)."""
     try:
+        # Check if user is admin
+        if current_user.user_type != UserTypeEnum.ADMIN:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only admins can update billing plans",
+            )
+
         service = BillingService(db)
 
-        user_billing = service.get_user_billing(current_user.id)
+        # Admin updates billing for the specified user
+        user_billing = service.get_user_billing(request.user_id)
         if not user_billing:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -183,7 +261,11 @@ async def update_billing_plan(
             )
 
         # Update billing plan
-        user_billing.billing_plan_id = request.billing_plan_id
+        if user_billing.billing_plan_id != request.billing_plan_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No billing information found",
+            )
         if request.custom_token_quota is not None:
             user_billing.custom_token_quota = request.custom_token_quota
         if request.custom_cost_quota is not None:
