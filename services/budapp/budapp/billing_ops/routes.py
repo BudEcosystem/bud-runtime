@@ -206,6 +206,20 @@ async def setup_user_billing(
 
         service = BillingService(db)
 
+        # Verify the billing plan exists
+        billing_plan = service.get_billing_plan(request.billing_plan_id)
+        if not billing_plan:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Billing plan not found",
+            )
+
+        if not billing_plan.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot assign an inactive billing plan",
+            )
+
         # Check if billing already exists
         existing = service.get_user_billing(request.user_id)
         if existing:
@@ -252,12 +266,26 @@ async def update_billing_plan(
 
         service = BillingService(db)
 
+        # Verify the billing plan exists
+        billing_plan = service.get_billing_plan(request.billing_plan_id)
+        if not billing_plan:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Billing plan not found",
+            )
+
+        if not billing_plan.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot assign an inactive billing plan",
+            )
+
         # Admin updates billing for the specified user
         user_billing = service.get_user_billing(request.user_id)
         if not user_billing:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="No billing information found",
+                detail="No billing information found for this user",
             )
 
         # Update billing plan
