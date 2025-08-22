@@ -67,6 +67,12 @@ mkShell {
   ];
 
   shellHook = ''
+    bud_temp_path="$(mktemp -d)"
+    cleanup_on_exit() {
+        rm -rf "$bud_temp_path"
+    }
+    trap cleanup_on_exit EXIT
+
     # deploy development environment
     bud_pde() {
         if [ "$#" -lt 1 ]; then
@@ -130,12 +136,16 @@ mkShell {
         fi
     }
 
+    # terraform state handling
     export_sops_secret_silent s3 access_key AWS_ACCESS_KEY_ID
     export_sops_secret_silent s3 secret_key AWS_SECRET_ACCESS_KEY
-    if [ -r "$HOME/.kube/config.bud" ]; then
-        export KUBECONFIG="$HOME/.kube/config.bud"
+
+    # budk8s access
+    if sops -d ${./budk8s.kubeconfig.enc.yaml} > "$bud_temp_path/kube.config" 2> /dev/null; then
+        export KUBECONFIG="$bud_temp_path/kube.config"
     fi
 
+    # eye candy
     export PS1="\033[0;35m[bud]\033[0m $PS1"
   '';
 }
