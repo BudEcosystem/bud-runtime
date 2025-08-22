@@ -391,7 +391,7 @@ class AuthService(SessionMixin):
 
             user_model = UserModel(**user_data)
             user_model.auth_id = user_auth_id
-            
+
             # Users who register themselves set their own password, so no reset needed
             # Admin-created users should reset their password on first login
             user_model.is_reset_password = not is_self_registration
