@@ -24,7 +24,7 @@ from pydantic import UUID4, BaseModel, ConfigDict, Field, field_validator, model
 
 from budapp.cluster_ops.schemas import ClusterResponse
 from budapp.commons.constants import AdapterStatusEnum, EndpointStatusEnum, ModelEndpointEnum, ProxyProviderEnum
-from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse
+from budapp.commons.schemas import PaginatedSuccessResponse, ProxyGuardrailConfig, SuccessResponse
 from budapp.model_ops.schemas import ModelDetailResponse, ModelResponse
 
 
@@ -141,7 +141,7 @@ class WorkerData(BaseModel):
 class WorkerInfo(WorkerData):
     """Worker info."""
 
-    model_config = ConfigDict(orm_mode=True, from_attributes=True)
+    model_config = ConfigDict(from_attributes=True)
 
     id: UUID
 
@@ -463,6 +463,7 @@ class ProxyModelConfig(BaseModel):
     providers: dict[ProxyProviderEnum, ProviderConfig]
     endpoints: list[str]
     api_key: Optional[str] = None
+    guardrails: Optional[ProxyGuardrailConfig] = None
 
 
 class RateLimitConfig(BaseModel):
