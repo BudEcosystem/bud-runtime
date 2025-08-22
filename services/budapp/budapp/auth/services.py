@@ -40,6 +40,7 @@ from ..permissions.service import PermissionService
 from ..project_ops.models import Project as ProjectModel
 from ..project_ops.schemas import ProjectUserAdd
 from ..shared.notification_service import BudNotifyHandler
+from ..shared.redis_service import RedisService
 from .schemas import LogoutRequest, RefreshTokenRequest, RefreshTokenResponse, ResourceCreate, UserLogin, UserLoginData
 
 
@@ -220,8 +221,53 @@ class AuthService(SessionMixin):
             logger.error(f"Failed to refresh token: {e}")
             raise ClientException("Failed to refresh token") from e
 
-    async def logout_user(self, logout_data: LogoutRequest) -> None:
-        """Logout a user by invalidating their refresh token."""
+    async def logout_user(self, logout_data: LogoutRequest, access_token: str | None = None) -> None:
+        """Logout a user by invalidating their refresh token and blacklisting access token."""
+        # Blacklist the access token if provided
+        if access_token:
+            try:
+                redis_service = RedisService()
+                import time
+
+                # Try to decode the token to get its expiration
+                ttl = 3600  # Default 1 hour TTL
+
+                try:
+                    # Get default tenant for token validation
+                    default_tenant = await UserDataManager(self.session).retrieve_by_fields(
+                        Tenant, {"realm_name": app_settings.default_realm_name, "is_active": True}, missing_ok=True
+                    )
+                    if default_tenant:
+                        tenant_client = await UserDataManager(self.session).retrieve_by_fields(
+                            TenantClient, {"tenant_id": default_tenant.id}, missing_ok=True
+                        )
+                        if tenant_client:
+                            credentials = TenantClientSchema(
+                                id=tenant_client.id,
+                                client_named_id=tenant_client.client_named_id,
+                                client_id=tenant_client.client_id,
+                                client_secret=tenant_client.client_secret,
+                            )
+                            keycloak_manager = KeycloakManager()
+                            decoded = await keycloak_manager.validate_token(
+                                access_token, default_tenant.realm_name, credentials
+                            )
+                            # Calculate TTL based on token expiration
+                            exp = decoded.get("exp", 0)
+                            current_time = int(time.time())
+                            if exp > current_time:
+                                ttl = exp - current_time
+                except Exception as e:
+                    logger.warning(f"Could not decode access token for TTL calculation: {e}")
+                    # Continue with default TTL
+
+                # Add token to blacklist with TTL
+                blacklist_key = f"token_blacklist:{access_token}"
+                await redis_service.set(blacklist_key, "1", ex=ttl)
+                logger.info(f"Access token blacklisted with TTL {ttl} seconds")
+            except Exception as e:
+                logger.error(f"Failed to blacklist access token: {e}")
+                # Continue with logout even if blacklisting fails
         # Get tenant information
         tenant = None
         if logout_data.tenant_id:
@@ -248,7 +294,10 @@ class AuthService(SessionMixin):
         # Logout from Keycloak
         keycloak_manager = KeycloakManager()
         credentials = TenantClientSchema(
-            id=tenant_client.id, client_id=tenant_client.client_id, client_secret=tenant_client.client_secret
+            id=tenant_client.id,
+            client_id=tenant_client.client_id,
+            client_named_id=tenant_client.client_named_id,
+            client_secret=tenant_client.client_secret,
         )
 
         success = await keycloak_manager.logout_user(
@@ -258,7 +307,7 @@ class AuthService(SessionMixin):
         if not success:
             raise ClientException("Failed to logout user")
 
-    async def register_user(self, user: UserCreate) -> UserModel:
+    async def register_user(self, user: UserCreate, is_self_registration: bool = False) -> UserModel:
         # Check if email is already registered
         email_exists = await UserDataManager(self.session).retrieve_by_fields(
             UserModel, {"email": user.email}, missing_ok=True
@@ -340,13 +389,17 @@ class AuthService(SessionMixin):
             user_data = user.model_dump(exclude={"permissions"})
             user_data["color"] = UserColorEnum.get_random_color()
 
-            user_data["status"] = UserStatusEnum.INVITED
+            # Self-registered users are active immediately, admin-created users are invited
+            user_data["status"] = UserStatusEnum.ACTIVE if is_self_registration else UserStatusEnum.INVITED
 
             user_model = UserModel(**user_data)
             user_model.auth_id = user_auth_id
 
-            # NOTE: is_reset_password, first_login will be set to True by default |  # TODO
-            # NOTE: status wil be invited by default
+            # Users who register themselves set their own password, so no reset needed
+            # Admin-created users should reset their password on first login
+            user_model.is_reset_password = not is_self_registration
+
+            # NOTE: first_login will be set to True by default
             # Create user
             db_user = await UserDataManager(self.session).insert_one(user_model)
 

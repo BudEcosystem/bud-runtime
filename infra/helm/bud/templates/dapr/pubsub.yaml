@@ -28,7 +28,7 @@ spec:
     - match: event.type == "add_observability_metrics"
       path: /observability/add
     default: /notifications
-  pubsubname: kafka-pubsub
+  pubsubname: {{ .Release.Name }}-pubsub
   deadLetterTopic: poisonMessages
   bulkSubscribe:
     enabled: true
@@ -48,7 +48,7 @@ spec:
       - match: event.type == "credential_update"
         path: /credentials/update
     default: /notifications
-  pubsubname: kafka-pubsub
+  pubsubname: {{ .Release.Name }}-pubsub
   deadLetterTopic: poisonMessages
 scopes:
   - budapp
@@ -61,7 +61,7 @@ spec:
   topic: budSimMessages
   routes:
     default: /notifications
-  pubsubname: kafka-pubsub
+  pubsubname: {{ .Release.Name }}-pubsub
   deadLetterTopic: poisonMessages
 scopes:
   - budsim
@@ -74,7 +74,7 @@ spec:
   topic: budClusterMessages
   routes:
     default: /notifications
-  pubsubname: kafka-pubsub
+  pubsubname: {{ .Release.Name }}-pubsub
   deadLetterTopic: poisonMessages
 scopes:
   - budcluster
@@ -87,7 +87,7 @@ spec:
   topic: budModelMessages
   routes:
     default: /notifications
-  pubsubname: kafka-pubsub
+  pubsubname: {{ .Release.Name }}-pubsub
   deadLetterTopic: poisonMessages
 scopes:
   - budmodel
@@ -100,7 +100,7 @@ spec:
   topic: askbud
   routes:
     default: /notifications
-  pubsubname: kafka-pubsub
+  pubsubname: {{ .Release.Name }}-pubsub
   deadLetterTopic: poisonMessages
 scopes:
   - askbud
@@ -113,7 +113,7 @@ spec:
   topic: budEvalMessages
   routes:
     default: /notifications
-  pubsubname: kafka-pubsub
+  pubsubname: {{ .Release.Name }}-pubsub
   deadLetterTopic: poisonMessages
 scopes:
   - budeval

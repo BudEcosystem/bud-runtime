@@ -103,7 +103,7 @@ const addNewCloudProvider: DrawerFlowType = {
 const newProject: DrawerFlowType = {
   title: "New Project",
   description: "Create a new project",
-  totalSteps: 3,
+  totalSteps: 2,
   steps: [
     {
       navigation: () => ["Projects", "New Project"],
@@ -114,31 +114,6 @@ const newProject: DrawerFlowType = {
         {
           status: FormProgressStatus.inProgress,
           title: "New Project",
-        },
-        {
-          status: FormProgressStatus.notCompleted,
-          title: "Invite Members",
-        },
-        {
-          status: FormProgressStatus.notCompleted,
-          title: "Success",
-        },
-      ],
-      confirmClose: false,
-    },
-    {
-      navigation: () => ["Projects", "New Project"],
-      id: "invite-members",
-      step: 2,
-      component: StepComponents["invite-members"],
-      progress: [
-        {
-          status: FormProgressStatus.completed,
-          title: "New Project",
-        },
-        {
-          status: FormProgressStatus.inProgress,
-          title: "Invite Members",
         },
         {
           status: FormProgressStatus.notCompleted,
@@ -153,40 +128,12 @@ const newProject: DrawerFlowType = {
       properties: {
         text: "Project Created Successfully",
       },
-      step: 3,
+      step: 2,
       component: StepComponents["project-success"],
       progress: [
         {
           status: FormProgressStatus.completed,
           title: "New Project",
-        },
-        {
-          status: FormProgressStatus.completed,
-          title: "Invite Members",
-        },
-        {
-          status: FormProgressStatus.inProgress,
-          title: "Success",
-        },
-      ],
-      confirmClose: false,
-    },
-    {
-      navigation: () => ["Projects", "New Project"],
-      id: "invite-success",
-      properties: {
-        text: "Project Created and Invites Sent",
-      },
-      step: 3,
-      component: StepComponents["invite-success"],
-      progress: [
-        {
-          status: FormProgressStatus.completed,
-          title: "New Project",
-        },
-        {
-          status: FormProgressStatus.completed,
-          title: "Invite Members",
         },
         {
           status: FormProgressStatus.inProgress,
@@ -206,7 +153,7 @@ const deployModel: DrawerFlowType = {
     {
       navigation: () => [
         "Projects",
-        `${useProjects.getState().selectedProject?.icon} ${useProjects.getState().selectedProject?.name}`,
+        `${useProjects.getState().selectedProject?.project?.icon} ${useProjects.getState().selectedProject?.project?.name}`,
         "Deploy Model",
       ],
       id: "deploy-model",
@@ -255,7 +202,7 @@ const deployModel: DrawerFlowType = {
     {
       navigation: () => [
         "Projects",
-        `${useProjects.getState().selectedProject?.icon} ${useProjects.getState().selectedProject?.name}`,
+        `${useProjects.getState().selectedProject?.project?.icon} ${useProjects.getState().selectedProject?.project?.name}`,
         "Deploy Model",
       ],
       id: "deploy-model-credential-select",
@@ -304,7 +251,7 @@ const deployModel: DrawerFlowType = {
     {
       navigation: () => [
         "Projects",
-        `${useProjects.getState().selectedProject?.icon} ${useProjects.getState().selectedProject?.name}`,
+        `${useProjects.getState().selectedProject?.project?.icon} ${useProjects.getState().selectedProject?.project?.name}`,
         "Deploy Model",
       ],
       id: "deploy-model-template",
@@ -353,7 +300,7 @@ const deployModel: DrawerFlowType = {
     {
       navigation: () => [
         "Projects",
-        `${useProjects.getState().selectedProject?.icon} ${useProjects.getState().selectedProject?.name}`,
+        `${useProjects.getState().selectedProject?.project?.icon} ${useProjects.getState().selectedProject?.project?.name}`,
         "Deploy Model",
       ],
       id: "deploy-model-specification",
@@ -402,7 +349,7 @@ const deployModel: DrawerFlowType = {
     {
       navigation: () => [
         "Projects",
-        `${useProjects.getState().selectedProject?.icon} ${useProjects.getState().selectedProject?.name}`,
+        `${useProjects.getState().selectedProject?.project?.icon} ${useProjects.getState().selectedProject?.project?.name}`,
         "Deploy Model",
       ],
       id: "deploy-cluster-status",
@@ -451,7 +398,7 @@ const deployModel: DrawerFlowType = {
     {
       navigation: () => [
         "Projects",
-        `${useProjects.getState().selectedProject?.icon} ${useProjects.getState().selectedProject?.name}`,
+        `${useProjects.getState().selectedProject?.project?.icon} ${useProjects.getState().selectedProject?.project?.name}`,
         "Deploy Model",
       ],
       id: "deploy-model-choose-cluster",
@@ -500,7 +447,7 @@ const deployModel: DrawerFlowType = {
     {
       navigation: () => [
         "Projects",
-        `${useProjects.getState().selectedProject?.icon} ${useProjects.getState().selectedProject?.name}`,
+        `${useProjects.getState().selectedProject?.project?.icon} ${useProjects.getState().selectedProject?.project?.name}`,
         "Deploy Model",
       ],
       id: "deploy-model-auto-scaling",
@@ -549,7 +496,7 @@ const deployModel: DrawerFlowType = {
     {
       navigation: () => [
         "Projects",
-        `${useProjects.getState().selectedProject?.icon} ${useProjects.getState().selectedProject?.name}`,
+        `${useProjects.getState().selectedProject?.project?.icon} ${useProjects.getState().selectedProject?.project?.name}`,
         "Deploy Model",
       ],
       id: "deploy-model-status",
@@ -598,7 +545,7 @@ const deployModel: DrawerFlowType = {
     {
       navigation: () => [
         "Projects",
-        `${useProjects.getState().selectedProject?.icon} ${useProjects.getState().selectedProject?.name}`,
+        `${useProjects.getState().selectedProject?.project?.icon} ${useProjects.getState().selectedProject?.project?.name}`,
         "Deploy Model",
       ],
       id: "deploy-model-success",
@@ -1599,7 +1546,7 @@ const editProject: DrawerFlowType = {
     {
       navigation: () => [
         "Projects",
-        `${useProjects.getState().selectedProject?.icon} ${useProjects.getState().selectedProject?.name}`,
+        `${useProjects.getState().selectedProject?.project?.icon} ${useProjects.getState().selectedProject?.project?.name}`,
         "Edit Project",
       ],
       id: "edit-project",
@@ -1624,7 +1571,7 @@ const addMembers: DrawerFlowType = {
     {
       navigation: () => [
         "Project",
-        `${useProjects.getState().selectedProject?.icon} ${useProjects.getState().selectedProject?.name}`,
+        `${useProjects.getState().selectedProject?.project?.icon} ${useProjects.getState().selectedProject?.project?.name}`,
         "Add Members",
       ],
       id: "add-members",
@@ -1649,7 +1596,7 @@ const addWorker: DrawerFlowType = {
     {
       navigation: () => [
         "Projects",
-        `${useProjects.getState().selectedProject?.icon} ${useProjects.getState().selectedProject?.name}`,
+        `${useProjects.getState().selectedProject?.project?.icon} ${useProjects.getState().selectedProject?.project?.name}`,
         `${useDeployModel.getState().currentWorkflow?.workflow_steps?.endpoint?.name || useEndPoints.getState().clusterDetails?.name}`,
         "Add Worker",
       ],
@@ -1683,7 +1630,7 @@ const addWorker: DrawerFlowType = {
     {
       navigation: () => [
         "Projects",
-        `${useProjects.getState().selectedProject?.icon} ${useProjects.getState().selectedProject?.name}`,
+        `${useProjects.getState().selectedProject?.project?.icon} ${useProjects.getState().selectedProject?.project?.name}`,
         `${useDeployModel.getState().currentWorkflow?.workflow_steps?.endpoint?.name || useEndPoints.getState().clusterDetails?.name}`,
 
         "Add Worker",
@@ -1718,7 +1665,7 @@ const addWorker: DrawerFlowType = {
     {
       navigation: () => [
         "Projects",
-        `${useProjects.getState().selectedProject?.icon} ${useProjects.getState().selectedProject?.name}`,
+        `${useProjects.getState().selectedProject?.project?.icon} ${useProjects.getState().selectedProject?.project?.name}`,
         `${useDeployModel.getState().currentWorkflow?.workflow_steps?.endpoint?.name || useEndPoints.getState().clusterDetails?.name}`,
 
         "Add Worker",
@@ -1754,7 +1701,7 @@ const addWorker: DrawerFlowType = {
     {
       navigation: () => [
         "Projects",
-        `${useProjects.getState().selectedProject?.icon} ${useProjects.getState().selectedProject?.name}`,
+        `${useProjects.getState().selectedProject?.project?.icon} ${useProjects.getState().selectedProject?.project?.name}`,
         `${useDeployModel.getState().currentWorkflow?.workflow_steps?.endpoint?.name || useEndPoints.getState().clusterDetails?.name}`,
 
         "Add Worker",
@@ -1789,7 +1736,7 @@ const addWorker: DrawerFlowType = {
     {
       navigation: () => [
         "Projects",
-        `${useProjects.getState().selectedProject?.icon} ${useProjects.getState().selectedProject?.name}`,
+        `${useProjects.getState().selectedProject?.project?.icon} ${useProjects.getState().selectedProject?.project?.name}`,
         `${useDeployModel.getState().currentWorkflow?.workflow_steps?.endpoint?.name || useEndPoints.getState().clusterDetails?.name}`,
         "Add Worker",
       ],
@@ -1831,7 +1778,7 @@ const workerDetails: DrawerFlowType = {
     {
       navigation: () => [
         "Projects",
-        `${useProjects.getState().selectedProject?.icon} ${useProjects.getState().selectedProject?.name}`,
+        `${useProjects.getState().selectedProject?.project?.icon} ${useProjects.getState().selectedProject?.project?.name}`,
         `${useWorkers.getState().selectedWorker?.name}`,
       ],
       id: "worker-details",
@@ -3229,7 +3176,7 @@ const addAdapter: DrawerFlowType = {
     {
       navigation: () => [
         "Projects",
-        `${useProjects.getState().selectedProject?.icon} ${useProjects.getState().selectedProject?.name}`,
+        `${useProjects.getState().selectedProject?.project?.icon} ${useProjects.getState().selectedProject?.project?.name}`,
         `${useDeployModel.getState().currentWorkflow?.workflow_steps?.endpoint?.name || useEndPoints.getState().clusterDetails?.name}`,
         "Add Adapter",
       ],
@@ -3259,7 +3206,7 @@ const addAdapter: DrawerFlowType = {
     {
       navigation: () => [
         "Projects",
-        `${useProjects.getState().selectedProject?.icon} ${useProjects.getState().selectedProject?.name}`,
+        `${useProjects.getState().selectedProject?.project?.icon} ${useProjects.getState().selectedProject?.project?.name}`,
         `${useDeployModel.getState().currentWorkflow?.workflow_steps?.endpoint?.name || useEndPoints.getState().clusterDetails?.name}`,
         "Add Adapter",
       ],
@@ -3289,7 +3236,7 @@ const addAdapter: DrawerFlowType = {
     {
       navigation: () => [
         "Projects",
-        `${useProjects.getState().selectedProject?.icon} ${useProjects.getState().selectedProject?.name}`,
+        `${useProjects.getState().selectedProject?.project?.icon} ${useProjects.getState().selectedProject?.project?.name}`,
         `${useDeployModel.getState().currentWorkflow?.workflow_steps?.endpoint?.name || useEndPoints.getState().clusterDetails?.name}`,
         "Add Adapter",
       ],
@@ -3319,7 +3266,7 @@ const addAdapter: DrawerFlowType = {
     {
       navigation: () => [
         "Projects",
-        `${useProjects.getState().selectedProject?.icon} ${useProjects.getState().selectedProject?.name}`,
+        `${useProjects.getState().selectedProject?.project?.icon} ${useProjects.getState().selectedProject?.project?.name}`,
         `${useDeployModel.getState().currentWorkflow?.workflow_steps?.endpoint?.name || useEndPoints.getState().clusterDetails?.name}`,
         "Add Adapter",
       ],
@@ -3356,7 +3303,7 @@ const deleteAdapter: DrawerFlowType = {
     {
       navigation: () => [
         "Projects",
-        `${useProjects.getState().selectedProject?.icon} ${useProjects.getState().selectedProject?.name}`,
+        `${useProjects.getState().selectedProject?.project?.icon} ${useProjects.getState().selectedProject?.project?.name}`,
         `${useDeployModel.getState().currentWorkflow?.workflow_steps?.endpoint?.name || useEndPoints.getState().clusterDetails?.name}`,
         "Delete Adapter",
       ],
@@ -3370,6 +3317,49 @@ const deleteAdapter: DrawerFlowType = {
           title: "Delete Adapter",
         },
       ],
+    },
+  ],
+};
+
+// Flow for Create Batch Job
+const createBatchJob: DrawerFlowType = {
+  title: "Create Batch Job",
+  description: "Process large volumes of requests asynchronously",
+  totalSteps: 2,
+  steps: [
+    {
+      navigation: () => ["Batch Jobs", "Create Batch Job"],
+      id: "create-batch-job",
+      step: 1,
+      component: StepComponents["create-batch-job"],
+      progress: [
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Configure Job",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Success",
+        },
+      ],
+      confirmClose: true,
+    },
+    {
+      navigation: () => ["Batch Jobs", "Success"],
+      id: "create-batch-job-success",
+      step: 2,
+      component: StepComponents["create-batch-job-success"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Configure Job",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Success",
+        },
+      ],
+      confirmClose: false,
     },
   ],
 };
@@ -3474,6 +3464,7 @@ const flows = {
   model_benchmark: addBenchmark,
   "add-quantization": addQuantizationFlow,
   "add-new-cloud-provider": addNewCloudProvider,
+  "create-batch-job": createBatchJob,
 
   // Cluster Specific
   "add-cluster-select-source": clusterTypeSelector,
