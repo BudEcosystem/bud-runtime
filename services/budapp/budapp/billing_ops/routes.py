@@ -71,6 +71,76 @@ async def get_current_usage(
         )
 
 
+@router.get("/user/{user_id}", response_model=SingleResponse[UserBillingSchema])
+async def get_user_billing_info(
+    user_id: UUID,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_session),
+) -> SingleResponse[UserBillingSchema]:
+    """Get billing information for a specific user (admin only)."""
+    try:
+        # Check if user is admin
+        if current_user.user_type != UserTypeEnum.ADMIN:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only admins can view other users' billing information",
+            )
+
+        service = BillingService(db)
+        user_billing = service.get_user_billing(user_id)
+
+        if not user_billing:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No billing information found for this user",
+            )
+
+        return SingleResponse(
+            result=UserBillingSchema.from_orm(user_billing),
+            message="User billing information retrieved successfully",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching user billing info: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch user billing information",
+        )
+
+
+@router.get("/user/{user_id}/usage", response_model=SingleResponse[CurrentUsageSchema])
+async def get_user_current_usage(
+    user_id: UUID,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_session),
+) -> SingleResponse[CurrentUsageSchema]:
+    """Get current billing period usage for a specific user (admin only)."""
+    try:
+        # Check if user is admin
+        if current_user.user_type != UserTypeEnum.ADMIN:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only admins can view other users' usage",
+            )
+
+        service = BillingService(db)
+        usage = await service.get_current_usage(user_id)
+
+        return SingleResponse(
+            result=CurrentUsageSchema(**usage),
+            message="User usage retrieved successfully",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching user usage: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch user usage",
+        )
+
+
 @router.post("/history", response_model=SingleResponse)
 async def get_usage_history(
     request: UsageHistoryRequest,
