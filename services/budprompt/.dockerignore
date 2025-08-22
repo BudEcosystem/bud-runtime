@@ -1,0 +1,10 @@
+__pycache__/
+../.dapr/
+tests/
+deploy/
+
+README.md
+
+*secrets.json
+dapr-*.yaml
+*.log
