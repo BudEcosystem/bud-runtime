@@ -2767,7 +2767,7 @@ class EndpointService(SessionMixin):
                 )
             except Exception as e:
                 logger.error(f"Failed to create pricing for endpoint {endpoint_id}: {e}")
-                self.session.rolenum_member.namelback()
+                self.session.rollback()
                 raise ClientException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     message="Failed to create pricing for endpoint",
