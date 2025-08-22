@@ -87,6 +87,7 @@ class CurrentUsageSchema(BaseModel):
     billing_period_start: Optional[str]
     billing_period_end: Optional[str]
     plan_name: Optional[str]
+    base_monthly_price: Optional[float]
     usage: Optional[UsageSummarySchema]
     is_suspended: Optional[bool]
     suspension_reason: Optional[str]

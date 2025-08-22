@@ -124,6 +124,7 @@ class BillingService(DataManagerUtils):
             "billing_period_start": user_billing.billing_period_start.isoformat(),
             "billing_period_end": user_billing.billing_period_end.isoformat(),
             "plan_name": billing_plan.name,
+            "base_monthly_price": float(billing_plan.base_monthly_price),
             "usage": {
                 "tokens_used": usage_data["total_tokens"],
                 "tokens_quota": token_quota,
