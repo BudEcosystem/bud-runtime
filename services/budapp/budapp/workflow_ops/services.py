@@ -194,6 +194,13 @@ class WorkflowService(SessionMixin):
                 if adapter_model_id
                 else None
             )
+            prompt_type = required_data.get("prompt_type")
+            prompt_schema = required_data.get("prompt_schema")
+            auto_scale = required_data.get("auto_scale")
+            caching = required_data.get("caching")
+            concurrency = required_data.get("concurrency")
+            rate_limit_type = required_data.get("rate_limit_type")
+            rate_limit_value = required_data.get("rate_limit_value")
 
             db_provider = (
                 await ProviderDataManager(self.session).retrieve_by_fields(
@@ -324,6 +331,13 @@ class WorkflowService(SessionMixin):
                 endpoint_details=endpoint_details if endpoint_details else None,
                 template=db_template if db_template else None,
                 add_model_modality=add_model_modality if add_model_modality else None,
+                prompt_type=prompt_type if prompt_type else None,
+                prompt_schema=prompt_schema if prompt_schema else None,
+                auto_scale=auto_scale if auto_scale else None,
+                caching=caching if caching else None,
+                concurrency=concurrency if concurrency else None,
+                rate_limit_type=rate_limit_type if rate_limit_type else None,
+                rate_limit_value=rate_limit_value if rate_limit_value else None,
             )
         else:
             workflow_steps = RetrieveWorkflowStepData()
@@ -457,6 +471,22 @@ class WorkflowService(SessionMixin):
                 "credential_id",
                 "endpoint_details",
                 "scaling_specification",
+            ],
+            "prompt_creation": [
+                "model_id",
+                "project_id",
+                "cluster_id",
+                "endpoint_id",
+                "name",
+                "description",
+                "tags",
+                "prompt_type",
+                "auto_scale",
+                "caching",
+                "concurrency",
+                "rate_limit_type",
+                "rate_limit_value",
+                "prompt_schema",
             ],
         }
 
