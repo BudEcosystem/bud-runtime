@@ -585,4 +585,3 @@ export default function ObservabilityPage() {
     </DashboardLayout>
   );
 };
-
