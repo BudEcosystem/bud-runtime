@@ -497,7 +497,7 @@ class DeviceExtractor:
             # Extract core/thread information
             # Note: NFD doesn't directly provide core count, but we can get it from capacity
             # This would need to be passed from the node capacity info
-            if "feature.node.kubernetes.io/cpu-hardware_multithreading" in labels:
+            if labels.get("feature.node.kubernetes.io/cpu-hardware_multithreading") == "true":
                 # If hyperthreading is enabled, we know threads = 2 * cores
                 cpu.threads = None  # Would need node capacity info
 
