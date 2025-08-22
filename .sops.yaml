@@ -17,7 +17,7 @@ creation_rules:
       age1q5sfy74d53n6jxlgsc2zrsz4wcl9d830nxuagc3wfmdkrrp55ckq9ev6nv,
       age18xn7rqxu27kschgqs7u5x7af9evnpcp4sru34th6zhhwlwnwycpsajeeh9,
       age138ut93gvvwkaudl3wxtwn8z9e50ptuhe2yukg6vhwcgncxpplpsqtmhp7t
-  - path_regex: infra/terraform/main/secrets.yaml
+  - path_regex: infra/terraform/.*
     age: >-
       age1q5sfy74d53n6jxlgsc2zrsz4wcl9d830nxuagc3wfmdkrrp55ckq9ev6nv,
       age18xn7rqxu27kschgqs7u5x7af9evnpcp4sru34th6zhhwlwnwycpsajeeh9,

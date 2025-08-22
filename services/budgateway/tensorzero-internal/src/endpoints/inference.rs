@@ -121,6 +121,10 @@ pub struct ObservabilityMetadata {
     pub project_id: String,
     pub endpoint_id: String,
     pub model_id: String,
+    // Authentication metadata
+    pub api_key_id: Option<String>,
+    pub user_id: Option<String>,
+    pub api_key_project_id: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -178,10 +182,27 @@ pub async fn inference_handler(
             .get("x-tensorzero-model-id")
             .and_then(|v| v.to_str().ok()),
     ) {
+        // Extract auth metadata from headers
+        let api_key_id = headers
+            .get("x-tensorzero-api-key-id")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string());
+        let user_id = headers
+            .get("x-tensorzero-user-id")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string());
+        let api_key_project_id = headers
+            .get("x-tensorzero-api-key-project-id")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string());
+
         Some(ObservabilityMetadata {
             project_id: project_id.to_string(),
             endpoint_id: endpoint_id.to_string(),
             model_id: model_id.to_string(),
+            api_key_id,
+            user_id,
+            api_key_project_id,
         })
     } else {
         None
@@ -204,6 +225,30 @@ pub async fn inference_handler(
             result,
             write_info,
         } => {
+            // Extract model latency from the result (using the first model inference result) before moving result
+            let model_latency_ms = match &result {
+                InferenceResult::Chat(chat_result) => {
+                    chat_result.model_inference_results.first()
+                        .and_then(|r| match &r.latency {
+                            crate::inference::types::Latency::NonStreaming { response_time } => Some(response_time.as_millis() as u32),
+                            crate::inference::types::Latency::Streaming { response_time, .. } => Some(response_time.as_millis() as u32),
+                            crate::inference::types::Latency::Batch => None,
+                        })
+                        .unwrap_or(0)
+                },
+                InferenceResult::Json(json_result) => {
+                    json_result.model_inference_results.first()
+                        .and_then(|r| match &r.latency {
+                            crate::inference::types::Latency::NonStreaming { response_time } => Some(response_time.as_millis() as u32),
+                            crate::inference::types::Latency::Streaming { response_time, .. } => Some(response_time.as_millis() as u32),
+                            crate::inference::types::Latency::Batch => None,
+                        })
+                        .unwrap_or(0)
+                },
+                // For other result types, we don't have model_inference_results, so default to 0
+                _ => 0,
+            };
+
             // Serialize the response to capture what we're sending back to the client (without null values)
             let gateway_response =
                 super::openai_compatible::serialize_without_nulls(&response).ok();
@@ -239,8 +284,28 @@ pub async fn inference_handler(
                 }
             }
 
+            // Extract inference_id from the response
+            let inference_id = match &response {
+                InferenceResponse::Chat(chat_response) => chat_response.inference_id,
+                InferenceResponse::Json(json_response) => json_response.inference_id,
+            };
+
             let response_json = Json(response);
-            Ok(response_json.into_response())
+            let mut http_response = response_json.into_response();
+
+            // Add inference_id to response headers for analytics middleware
+            http_response.headers_mut().insert(
+                "x-tensorzero-inference-id",
+                inference_id.to_string().parse().unwrap(),
+            );
+
+            // Add model latency to response headers for analytics middleware
+            http_response.headers_mut().insert(
+                "x-tensorzero-model-latency-ms",
+                model_latency_ms.to_string().parse().unwrap(),
+            );
+
+            Ok(http_response)
         }
         InferenceOutput::Streaming(stream) => {
             let event_stream = prepare_serialized_events(stream);
@@ -1177,18 +1242,24 @@ pub async fn write_inference(
         };
 
         // Use observability metadata if available, otherwise fall back to function/variant names
-        let (project_id, endpoint_id, obs_model_id) =
+        let (project_id, endpoint_id, obs_model_id, api_key_id, user_id, api_key_project_id) =
             if let Some(obs_metadata) = observability_metadata {
                 (
                     obs_metadata.project_id.clone(),
                     obs_metadata.endpoint_id.clone(),
                     obs_metadata.model_id.clone(),
+                    obs_metadata.api_key_id.clone(),
+                    obs_metadata.user_id.clone(),
+                    obs_metadata.api_key_project_id.clone(),
                 )
             } else {
                 (
                     metadata_clone.function_name.clone(),
                     metadata_clone.variant_name.clone(),
                     model_id.to_string(),
+                    None,
+                    None,
+                    None,
                 )
             };
 
@@ -1203,6 +1274,9 @@ pub async fn write_inference(
             request_ip: None, // Would need to extract from request context
             cost,
             response_analysis: None,
+            api_key_id,
+            user_id,
+            api_key_project_id,
         };
 
         // Send to Kafka observability topic

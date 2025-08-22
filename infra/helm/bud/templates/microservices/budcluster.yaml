@@ -17,7 +17,7 @@ spec:
         app: {{ .Release.Name }}-budcluster
       annotations:
         dapr.io/enabled: "true"
-        dapr.io/app-id: "budcluster"
+        dapr.io/app-id: {{ .Values.microservices.budcluster.daprid }}
         dapr.io/app-port: "3003"
         dapr.io/volume-mounts: "crypto-keys:/mnt/crypto-keys"
     spec:

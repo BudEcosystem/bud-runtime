@@ -17,7 +17,7 @@ spec:
         app: {{ .Release.Name }}-budnotify
       annotations:
         dapr.io/enabled: "true"
-        dapr.io/app-id: "budnotify"
+        dapr.io/app-id: {{ .Values.microservices.budnotify.daprid }}
         dapr.io/app-port: "3000"
     spec:
       containers:

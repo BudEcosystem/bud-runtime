@@ -175,9 +175,9 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
           rowHoverBg: getCSSVarValue("--bg-hover"),
         },
         Modal: {
-          contentBg: getCSSVarValue("--bg-modal"),
-          headerBg: getCSSVarValue("--bg-modal"),
-          footerBg: getCSSVarValue("--bg-modal"),
+          contentBg: "var(--bg-modal)",
+          headerBg: "var(--bg-modal)",
+          footerBg: "var(--bg-modal)",
         },
         Input: {
           colorBgContainer: getCSSVarValue("--bg-tertiary"),
@@ -199,6 +199,43 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
         Popover: {
           colorBgElevated: getCSSVarValue("--bg-card"),
           colorText: getCSSVarValue("--text-primary"),
+        },
+        DatePicker: {
+          colorBgContainer: "var(--bg-tertiary)",
+          colorBorder: "var(--border-secondary)",
+          colorText: "var(--text-primary)",
+          colorTextPlaceholder: "var(--text-disabled)",
+          colorBgElevated: "var(--bg-tertiary)",
+          colorTextHeading: "var(--text-secondary)",
+          colorTextDisabled: "var(--text-disabled)",
+          cellActiveWithRangeBg: "var(--bg-hover)",
+          cellHoverBg: "var(--bg-hover)",
+          cellSelectedBg: "var(--color-purple)",
+          cellSelectedWithHoverBg: "var(--bg-hover)",
+          cellActiveWithRangeColor: "var(--text-primary)",
+          cellSelectedColor: "var(--text-primary)",
+          cellHoverColor: "var(--text-hover)",
+        },
+        Pagination: {
+          colorText: "var(--text-primary)",
+          colorTextDisabled: "var(--text-disabled)",
+          colorBgContainer: "var(--bg-tertiary)",
+          colorBorder: "var(--border-secondary)",
+          itemBg: "var(--color-purple)",
+          itemActiveBg: "var(--color-purple)",
+          itemActiveColor: "var(--text-primary)",
+          itemLinkBg: "var(--bg-tertiary)",
+          itemLinkColor: "var(--text-primary)",
+          itemHoverBg: "var(--bg-hover)",
+          itemHoverColor: "var(--text-primary)",
+          colorTextDescription: "var(--text-secondary)",
+        },
+        Notification: {
+          colorBgElevated: "var(--bg-tertiary)",   // background
+          colorText: "var(--text-primary)",        // main text
+          colorTextHeading: "var(--text-primary)", // title
+          colorTextDescription: "var(--text-primary)", // description
+          boxShadow: "0 4px 12px rgba(0,0,0,0.2)", // custom shadow
         },
       },
     }),

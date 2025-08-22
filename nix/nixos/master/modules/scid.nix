@@ -1,4 +1,4 @@
-{ config, ... }:
+{ config, pkgs, ... }:
 let
   sops_key_path = "/var/secrets/master.sops";
 in {
@@ -6,7 +6,17 @@ in {
 
   services.scid = {
     enable = true;
-    environment.SOPS_AGE_KEY_FILE = sops_key_path;
+
+    environment = {
+      SOPS_AGE_KEY_FILE = sops_key_path;
+      KUBECONFIG = "/etc/rancher/k3s/k3s.yaml";
+      HOME = "/var/lib/scid";
+    };
+    path = with pkgs; [
+      kubernetes-helm
+      nixos-rebuild
+      nix
+    ];
 
     settings = {
       repo_url = "https://github.com/BudEcosystem/bud-runtime.git";
@@ -14,7 +24,7 @@ in {
       helm_charts_path = "infra/helm";
 
       slack = {
-        channel = "infratest";
+        channel = "infra";
         token = "%file%:${config.sops.secrets."misc/slack_token".path}";
       };
 

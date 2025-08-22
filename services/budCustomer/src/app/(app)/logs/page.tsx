@@ -19,7 +19,7 @@ import { MixerHorizontalIcon } from "@radix-ui/react-icons";
 import { PrimaryButton, SecondaryButton } from "@/components/ui/button";
 import NoDataFount from "@/components/ui/noChartData";
 import dayjs from "dayjs";
-
+import { errorToast, successToast } from "@/components/toast";
 const { RangePicker } = DatePicker;
 
 interface APIKey {
@@ -273,6 +273,7 @@ export default function APIKeysPage() {
             onClick={(e) => {
               e.stopPropagation();
               navigator.clipboard.writeText(key);
+              successToast("API key copied to clipboard.");
             }}
           >
             Copy
@@ -490,9 +491,9 @@ export default function APIKeysPage() {
               open={filterOpen}
               onOpenChange={handleOpenChange}
               content={
-                <div className="bg-bud-bg-card shadow-none border border-bud-border rounded-[6px] width-348">
+                <div className="bg-[var(--bg-card)] shadow-none border border-[var(--border-color)] rounded-[6px] width-348">
                   <div className="p-[1.5rem] flex items-start justify-start flex-col">
-                    <Text className="text-bud-text-primary text-[14px] font-normal">
+                    <Text className="text-[var(--text-primary)] text-[14px] font-normal">
                       Filter
                     </Text>
                     <Text className="text-[12px] font-normal text-bud-text-disabled">
@@ -505,7 +506,7 @@ export default function APIKeysPage() {
                       className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[1rem]`}
                     >
                       <div className="w-full">
-                        <Text className="absolute bg-bud-bg-primary -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap text-bud-text-primary text-[12px] font-light">
+                        <Text className="absolute bg-[var(--bg-primary)] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap text-[var(--text-primary)] text-[12px] font-light">
                           Status
                         </Text>
                       </div>
@@ -513,7 +514,7 @@ export default function APIKeysPage() {
                         <ConfigProvider
                           theme={{
                             token: {
-                              colorTextPlaceholder: "var(--bud-text-disabled)",
+                              colorTextPlaceholder: "var(--text-disabled)",
                               boxShadowSecondary: "none",
                             },
                           }}
@@ -523,8 +524,8 @@ export default function APIKeysPage() {
                             placeholder="Select Status"
                             style={{
                               backgroundColor: "transparent",
-                              color: "var(--bud-text-primary)",
-                              border: "0.5px solid var(--bud-text-disabled)",
+                              color: "var(--text-primary)",
+                              border: "0.5px solid var(--border-color)",
                               width: "100%",
                             }}
                             size="large"
@@ -548,7 +549,7 @@ export default function APIKeysPage() {
                       className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[1rem]`}
                     >
                       <div className="w-full">
-                        <Text className="absolute bg-bud-bg-primary -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap text-bud-text-primary text-[12px] font-light">
+                        <Text className="absolute bg-[var(--bg-primary)] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap text-[var(--text-primary)] text-[12px] font-light">
                           Date Range
                         </Text>
                       </div>

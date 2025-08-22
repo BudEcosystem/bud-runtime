@@ -15,6 +15,66 @@ import { endpointStatusMapping } from '@/lib/colorMapping';
 
 const { Title, Text, Paragraph } = Typography;
 
+interface GatewayMetadata {
+  // Network & Request Info
+  client_ip?: string | null;
+  proxy_chain?: string | null;
+  protocol_version?: string | null;
+  method?: string | null;
+  path?: string | null;
+  query_params?: string | null;
+  request_headers?: Record<string, string> | null;
+  body_size?: number | null;
+
+  // Authentication
+  api_key_id?: string | null;
+  auth_method?: string | null;
+  user_id?: string | null;
+
+  // Client Information
+  user_agent?: string | null;
+  device_type?: string | null;
+  browser_name?: string | null;
+  browser_version?: string | null;
+  os_name?: string | null;
+  os_version?: string | null;
+  is_bot?: boolean;
+
+  // Geographic Information
+  country_code?: string | null;
+  country_name?: string | null;
+  region?: string | null;
+  city?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  timezone?: string | null;
+  asn?: number | null;
+  isp?: string | null;
+
+  // Performance Metrics
+  gateway_processing_ms?: number;
+  total_duration_ms?: number;
+  status_code?: number;
+  response_size?: number | null;
+  response_headers?: Record<string, string> | null;
+
+  // Model & Routing
+  routing_decision?: string | null;
+  model_version?: string | null;
+
+  // Error Information
+  error_type?: string | null;
+  error_message?: string | null;
+
+  // Blocking Information
+  is_blocked?: boolean;
+  block_reason?: string | null;
+  block_rule_id?: string | null;
+
+  // Additional
+  tags?: Record<string, string> | null;
+}
+
 interface InferenceDetail {
   inference_id: string;
   timestamp: string;
@@ -47,6 +107,7 @@ interface InferenceDetail {
   cost?: number;
   gateway_request?: any;
   gateway_response?: any;
+  gateway_metadata?: GatewayMetadata;
   feedback_count: number;
   average_rating?: number;
 }
@@ -147,13 +208,7 @@ const ObservabilityDetailPage: React.FC = () => {
   };
 
   if (loading) {
-    return (
-      <DashBoardLayout>
-        <div className="flex justify-center items-center h-96">
-          <Spin size="large" />
-        </div>
-      </DashBoardLayout>
-    );
+    return <DashBoardLayout><div>Loading...</div></DashBoardLayout>;
   }
 
   if (error || !inferenceData) {
@@ -243,19 +298,6 @@ const ObservabilityDetailPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <Text_12_400_B3B3B3 className="mb-1">Endpoint URL</Text_12_400_B3B3B3>
-                  <Text_12_600_EEEEEE>
-                    {inferenceData.endpoint_type === 'embedding' ? '/v1/embeddings' :
-                     inferenceData.endpoint_type === 'audio_transcription' ? '/v1/audio/transcriptions' :
-                     inferenceData.endpoint_type === 'audio_translation' ? '/v1/audio/translations' :
-                     inferenceData.endpoint_type === 'text_to_speech' ? '/v1/audio/speech' :
-                     inferenceData.endpoint_type === 'image_generation' ? '/v1/images/generations' :
-                     inferenceData.endpoint_type === 'moderation' ? '/v1/moderations' :
-                     '/v1/chat/completions'}
-                  </Text_12_600_EEEEEE>
-                </div>
-
-                <div>
                   <Text_12_400_B3B3B3 className="mb-1">Type</Text_12_400_B3B3B3>
                   <Tag color={inferenceData.endpoint_type === 'embedding' ? 'purple' : 'blue'}>
                     {inferenceData.endpoint_type || 'chat'}
@@ -302,6 +344,151 @@ const ObservabilityDetailPage: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {/* Gateway Metadata */}
+          {inferenceData.gateway_metadata && (
+            <div className="flex items-center flex-col border border-[#1F1F1F] rounded-[.4rem] px-[1.4rem] py-[1.3rem] pb-[1.1rem] w-full bg-[#101010] mb-[1.6rem]">
+              <div className="w-full">
+                <Text_14_600_EEEEEE className="text-[#EEEEEE] mb-4">Request Metadata</Text_14_600_EEEEEE>
+
+                <div className="grid grid-cols-3 gap-4">
+                  {/* Network Information */}
+                  {inferenceData.gateway_metadata.client_ip && (
+                    <div>
+                      <Text_12_400_B3B3B3 className="mb-1">Client IP</Text_12_400_B3B3B3>
+                      <Text_12_600_EEEEEE>{inferenceData.gateway_metadata.client_ip}</Text_12_600_EEEEEE>
+                    </div>
+                  )}
+                  {inferenceData.gateway_metadata.method && (
+                    <div>
+                      <Text_12_400_B3B3B3 className="mb-1">Method</Text_12_400_B3B3B3>
+                      <Tag color={inferenceData.gateway_metadata.method === 'POST' ? 'blue' : 'green'}>
+                        {inferenceData.gateway_metadata.method}
+                      </Tag>
+                    </div>
+                  )}
+                  {inferenceData.gateway_metadata.path && (
+                    <div>
+                      <Text_12_400_B3B3B3 className="mb-1">Path</Text_12_400_B3B3B3>
+                      <Text_12_600_EEEEEE className="font-mono text-xs">{inferenceData.gateway_metadata.path}</Text_12_600_EEEEEE>
+                    </div>
+                  )}
+                  {inferenceData.gateway_metadata.protocol_version && (
+                    <div>
+                      <Text_12_400_B3B3B3 className="mb-1">Protocol</Text_12_400_B3B3B3>
+                      <Text_12_600_EEEEEE>{inferenceData.gateway_metadata.protocol_version}</Text_12_600_EEEEEE>
+                    </div>
+                  )}
+                  {inferenceData.gateway_metadata.status_code && (
+                    <div>
+                      <Text_12_400_B3B3B3 className="mb-1">Status Code</Text_12_400_B3B3B3>
+                      <Tag color={inferenceData.gateway_metadata.status_code >= 200 && inferenceData.gateway_metadata.status_code < 300 ? 'success' : 'error'}>
+                        {inferenceData.gateway_metadata.status_code}
+                      </Tag>
+                    </div>
+                  )}
+
+                  {/* Client Information */}
+                  {inferenceData.gateway_metadata.device_type && (
+                    <div>
+                      <Text_12_400_B3B3B3 className="mb-1">Device Type</Text_12_400_B3B3B3>
+                      <Tag color={
+                        inferenceData.gateway_metadata.device_type === 'mobile' ? 'green' :
+                        inferenceData.gateway_metadata.device_type === 'tablet' ? 'blue' :
+                        inferenceData.gateway_metadata.device_type === 'desktop' ? 'purple' : 'default'
+                      }>
+                        {inferenceData.gateway_metadata.device_type}
+                        {inferenceData.gateway_metadata.is_bot && ' (Bot)'}
+                      </Tag>
+                    </div>
+                  )}
+                  {inferenceData.gateway_metadata.browser_name && (
+                    <div>
+                      <Text_12_400_B3B3B3 className="mb-1">Browser</Text_12_400_B3B3B3>
+                      <Text_12_600_EEEEEE>
+                        {inferenceData.gateway_metadata.browser_name}
+                        {inferenceData.gateway_metadata.browser_version && ` v${inferenceData.gateway_metadata.browser_version}`}
+                      </Text_12_600_EEEEEE>
+                    </div>
+                  )}
+                  {inferenceData.gateway_metadata.os_name && (
+                    <div>
+                      <Text_12_400_B3B3B3 className="mb-1">Operating System</Text_12_400_B3B3B3>
+                      <Text_12_600_EEEEEE>
+                        {inferenceData.gateway_metadata.os_name}
+                        {inferenceData.gateway_metadata.os_version && ` v${inferenceData.gateway_metadata.os_version}`}
+                      </Text_12_600_EEEEEE>
+                    </div>
+                  )}
+
+                  {/* Geographic Information */}
+                  {(inferenceData.gateway_metadata.city || inferenceData.gateway_metadata.region || inferenceData.gateway_metadata.country_name) && (
+                    <div>
+                      <Text_12_400_B3B3B3 className="mb-1">Location</Text_12_400_B3B3B3>
+                      <Text_12_600_EEEEEE>
+                        {[
+                          inferenceData.gateway_metadata.city,
+                          inferenceData.gateway_metadata.region,
+                          inferenceData.gateway_metadata.country_name
+                        ].filter(Boolean).join(', ')}
+                        {inferenceData.gateway_metadata.country_code && ` (${inferenceData.gateway_metadata.country_code.toUpperCase()})`}
+                      </Text_12_600_EEEEEE>
+                    </div>
+                  )}
+                  {inferenceData.gateway_metadata.timezone && (
+                    <div>
+                      <Text_12_400_B3B3B3 className="mb-1">Timezone</Text_12_400_B3B3B3>
+                      <Text_12_600_EEEEEE>{inferenceData.gateway_metadata.timezone}</Text_12_600_EEEEEE>
+                    </div>
+                  )}
+                  {inferenceData.gateway_metadata.isp && (
+                    <div>
+                      <Text_12_400_B3B3B3 className="mb-1">ISP</Text_12_400_B3B3B3>
+                      <Text_12_600_EEEEEE>{inferenceData.gateway_metadata.isp}</Text_12_600_EEEEEE>
+                    </div>
+                  )}
+                  {inferenceData.gateway_metadata.asn && (
+                    <div>
+                      <Text_12_400_B3B3B3 className="mb-1">AS Number</Text_12_400_B3B3B3>
+                      <Text_12_600_EEEEEE>AS{inferenceData.gateway_metadata.asn}</Text_12_600_EEEEEE>
+                    </div>
+                  )}
+
+                  {/* Authentication Information */}
+                  {inferenceData.gateway_metadata.auth_method && (
+                    <div>
+                      <Text_12_400_B3B3B3 className="mb-1">Auth Method</Text_12_400_B3B3B3>
+                      <Text_12_600_EEEEEE>{inferenceData.gateway_metadata.auth_method}</Text_12_600_EEEEEE>
+                    </div>
+                  )}
+                  {inferenceData.gateway_metadata.api_key_id && (
+                    <div>
+                      <Text_12_400_B3B3B3 className="mb-1">API Key ID</Text_12_400_B3B3B3>
+                      <Text_12_600_EEEEEE className="font-mono text-xs">{inferenceData.gateway_metadata.api_key_id}</Text_12_600_EEEEEE>
+                    </div>
+                  )}
+                  {inferenceData.gateway_metadata.user_id && (
+                    <div>
+                      <Text_12_400_B3B3B3 className="mb-1">User ID</Text_12_400_B3B3B3>
+                      <Text_12_600_EEEEEE className="font-mono text-xs">{inferenceData.gateway_metadata.user_id}</Text_12_600_EEEEEE>
+                    </div>
+                  )}
+                </div>
+
+                {/* User Agent - full width at the bottom if exists */}
+                {inferenceData.gateway_metadata.user_agent && (
+                  <div className="mt-4">
+                    <Text_12_400_B3B3B3 className="mb-1">User Agent</Text_12_400_B3B3B3>
+                    <div className="bg-[#1A1A1A] p-2 rounded">
+                      <Text_12_400_B3B3B3 className="font-mono text-xs break-all">
+                        {inferenceData.gateway_metadata.user_agent}
+                      </Text_12_400_B3B3B3>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Performance Metrics */}
           <div className="flex items-center flex-col border border-[#1F1F1F] rounded-[.4rem] px-[1.4rem] py-[1.3rem] pb-[1.1rem] w-full bg-[#101010] mb-[1.6rem]">

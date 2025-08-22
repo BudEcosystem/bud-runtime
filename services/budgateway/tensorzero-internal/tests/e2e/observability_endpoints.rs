@@ -193,10 +193,14 @@ async fn test_dummy_only_moderation_observability_clickhouse_write() {
     let moderation_record = moderation_inference.unwrap();
     assert_eq!(moderation_record["id"], inference_id_str);
     assert_eq!(moderation_record["function_name"], "tensorzero::moderation");
-    assert!(moderation_record["input"]
-        .as_str()
-        .unwrap()
-        .contains("test message"));
+    // Debug print the actual input value to see what's stored
+    let actual_input = moderation_record["input"].as_str().unwrap();
+    println!("DEBUG: Actual input stored: '{}'", actual_input);
+    assert!(
+        actual_input.contains("test message"),
+        "Input '{}' does not contain 'test message'",
+        actual_input
+    );
     assert!(moderation_record["flagged"].is_boolean());
 
     println!("✅ Moderation observability test passed - data written to ClickHouse");

@@ -252,6 +252,22 @@ html.dark {
   background-color: var(--bg-hover) !important;
 }
 
+input:-webkit-autofill,
+textarea:-webkit-autofill,
+select:-webkit-autofill {
+  background-color: var(--bg-primary) !important;
+  -webkit-box-shadow: 0 0 0 1000px var(--bg-primary) inset !important;
+  -webkit-text-fill-color: var(--text-primary) !important;
+  transition: background-color 5000s ease-in-out 0s; /* prevents flashing */
+}
+
+/* also handle focus state */
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill:focus,
+select:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px var(--bg-primary) inset !important;
+  -webkit-text-fill-color: var(--text-primary) !important;
+}
 /* Chart card styles */
 .cardSetTwo {
   height: 425px;
@@ -538,7 +554,7 @@ html.dark {
 /* Custom Scrollbar Styles */
 .scrollbar-thin {
   scrollbar-width: thin;
-  scrollbar-color: var(--bud-border) transparent;
+  scrollbar-color: var(--text-disabled) transparent;
 }
 
 .scrollbar-thin::-webkit-scrollbar {
@@ -550,11 +566,10 @@ html.dark {
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  background-color: var(--bud-border);
+  background-color: var(--text-disabled);
   border-radius: 3px;
   transition: background-color 0.2s ease;
 }
-
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
   background-color: var(--bud-border-secondary);
 }
@@ -562,7 +577,7 @@ html.dark {
 /* Sidebar scrolling area */
 .sidebar-scroll {
   scrollbar-width: thin;
-  scrollbar-color: var(--bud-border) transparent;
+  scrollbar-color: var(--text-disabled) transparent;
 }
 
 .sidebar-scroll::-webkit-scrollbar {
@@ -573,8 +588,11 @@ html.dark {
   background: transparent;
 }
 
+.ant-popover-inner {
+  padding: 0 !important;
+}
 .sidebar-scroll::-webkit-scrollbar-thumb {
-  background-color: var(--bud-border);
+  background-color: var(--text-disabled);
   border-radius: 2px;
   transition: all 0.2s ease;
 }

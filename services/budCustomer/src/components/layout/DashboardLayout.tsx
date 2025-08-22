@@ -17,8 +17,6 @@ import styles from "./DashboardLayout.module.scss";
 import { useShortCut } from "@/hooks/useShortCut";
 import ThemeSwitcher from "@/components/ui/ThemeSwitcher";
 import { useTheme } from "@/context/themeContext";
-import ProjectSelector from "@/components/project/ProjectSelector";
-import { useProject } from "@/context/projectContext";
 import { useUser } from "@/stores/useUser";
 
 const { Text } = Typography;
@@ -78,9 +76,6 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
   const { effectiveTheme } = useTheme();
   const [isHovered, setIsHovered] = useState<string | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
-
-  // Project context
-  const { currentProject } = useProject();
 
   // User context
   const { user, logout } = useUser();
@@ -200,89 +195,44 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
               </div>
             )}
           </div>
-          {isCollapsed && (
+          {/* {isCollapsed && (
             <div className="flex justify-center mb-4">
               <ThemeSwitcher />
             </div>
-          )}
+          )} */}
 
           {/* Notifications */}
-          {!isCollapsed && (
+
             <div className="bg-bud-bg-secondary rounded-lg p-3 mb-1 cursor-pointer hover:bg-bud-bg-tertiary transition-colors">
               <Badge
                 count={88}
-                offset={[50, -10]}
+                offset={isCollapsed ? [0, -10] : [50, -10]}
                 style={{ backgroundColor: "#965CDE" }}
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-bud-purple rounded flex items-center justify-center">
+                  <div className={`${
+                      isCollapsed ? "w-6 h-6" : "w-8 h-8"
+                    } bg-bud-purple rounded flex items-center justify-center`}>
                     <Icon
                       icon="heroicons-outline:bell"
                       className="text-white text-lg"
                     />
                   </div>
-                  <div>
+                  {!isCollapsed && (<div>
                     <Text className="text-bud-text-disabled text-xs block">
                       88 New
                     </Text>
                     <Text className="text-bud-text-primary text-sm">
                       Notifications
                     </Text>
-                  </div>
+                  </div>)}
                 </div>
               </Badge>
             </div>
-          )}
         </div>
 
         {/* Scrollable Content Area */}
         <div className="flex-1 overflow-hidden flex flex-col">
-          {/* Project Selector */}
-          <div
-            className={`${isCollapsed ? "px-4" : "px-6"} mb-4 flex-shrink-0`}
-          >
-            {!isCollapsed ? (
-              <>
-                <div className="mb-2">
-                  <Text className="text-bud-text-disabled text-xs uppercase tracking-wider">
-                    Current Project
-                  </Text>
-                </div>
-                <ProjectSelector
-                  onCreateProject={() => router.push("/projects")}
-                  size="small"
-                  className="w-full"
-                />
-              </>
-            ) : (
-              <div className="flex justify-center">
-                <button
-                  onClick={() => router.push("/projects")}
-                  className="w-10 h-auto rounded-lg bg-bud-bg-secondary border border-bud-border hover:bg-bud-bg-tertiary hover:border-bud-purple transition-all flex items-center justify-center"
-                  title={
-                    currentProject
-                      ? `Current: ${currentProject.name}`
-                      : "Select Project"
-                  }
-                >
-                  {currentProject ? (
-                    <div
-                      className="w-6 h-6 rounded flex items-center justify-center"
-                      style={{ backgroundColor: currentProject.color }}
-                    >
-                      <Icon icon="ph:folder" className="text-white text-sm" />
-                    </div>
-                  ) : (
-                    <Icon
-                      icon="ph:folder-plus"
-                      className="text-bud-text-disabled text-lg"
-                    />
-                  )}
-                </button>
-              </div>
-            )}
-          </div>
-
           {/* Navigation */}
           <nav className="flex-1 px-3 overflow-y-auto sidebar-scroll">
             {tabs.map((tab) => {

@@ -190,6 +190,12 @@ export type Model = {
   website_url?: string;
   model_type?: string;
   created_at?: string;
+  pricing?: {
+    input_cost: number;
+    output_cost: number;
+    currency: string;
+    per_tokens: number;
+  };
 };
 
 export interface IModel {
@@ -201,16 +207,14 @@ type GetModelParams = {
   page: number;
   limit: number;
   order_by?: string;
-  name?: string;
+  name?: string; // This will be converted to 'search' parameter internally
   description?: string;
-  tag?: string;
   tasks?: string[];
   modality?: string[];
   author?: string[];
   model_size_min?: number;
   model_size_max?: number;
   table_source?: "model" | "cloud_model";
-  search?: string;
   source?: string;
   base_model?: string;
   base_model_relation?: string;
@@ -240,7 +244,7 @@ export const useModels = create<{
   deleteModel: (modelId: string) => Promise<any>;
   getLeaderBoard: (modelId: string) => Promise<LeaderBoardItem[]>;
   getModelsCatalog: (params: GetModelParams) => Promise<void>;
-}>((set, get) => ({
+}>((set: any, get: any) => ({
   tasks: [],
   models: [],
   authors: [],
@@ -379,12 +383,20 @@ export const useModels = create<{
 
     set({ loading: true });
     try {
+      // Build request params with search instead of name
+      const requestParams: any = {
+        ...params,
+        order_by: "-created_at",
+      };
+
+      // Replace name with search parameter
+      if (requestParams.name) {
+        requestParams.search = requestParams.name;
+        delete requestParams.name;
+      }
+
       const response: any = await AppRequest.Get(`/models`, {
-        params: {
-          ...params,
-          search: Boolean(params.name),
-          order_by: "-created_at",
-        },
+        params: requestParams,
       });
       set({
         totalPages: response.data.total_pages,
@@ -480,38 +492,79 @@ export const useModels = create<{
   getModelsCatalog: async (params: GetModelParams) => {
     set({ loading: true });
     try {
+      // Build params object with only non-empty values
+      const requestParams: any = {
+        page: params.page,
+        limit: params.limit,
+      };
+
+      // Only add search parameter if name has a value
+      if (params.name && params.name.trim()) {
+        requestParams.search = params.name;
+      }
+
+      if (params.modality && params.modality.length > 0) {
+        requestParams.modality = params.modality;
+      }
+
+      if (params.tasks && params.tasks.length > 0) {
+        requestParams.tasks = params.tasks;
+      }
+
+      if (params.author && params.author.length > 0) {
+        requestParams.author = params.author;
+      }
+
+      if (
+        params.model_size_min !== undefined &&
+        params.model_size_min !== null
+      ) {
+        requestParams.model_size_min = params.model_size_min;
+      }
+
+      if (
+        params.model_size_max !== undefined &&
+        params.model_size_max !== null
+      ) {
+        requestParams.model_size_max = params.model_size_max;
+      }
+
+      if (params.table_source) {
+        requestParams.table_source = params.table_source;
+      } else {
+        requestParams.table_source = "model"; // Default value
+      }
+
+      if (params.order_by) {
+        requestParams.order_by = params.order_by;
+      } else {
+        requestParams.order_by = "-created_at"; // Default value
+      }
+
       const response: any = await AppRequest.Get(`/models/catalog`, {
-        params: {
-          page: params.page,
-          limit: params.limit,
-          name: params.name,
-          tag: params.tag,
-          modality:
-            params.modality && params.modality.length > 0
-              ? params.modality
-              : undefined,
-          tasks:
-            params.tasks && params.tasks.length > 0 ? params.tasks : undefined,
-          author:
-            params.author && params.author.length > 0
-              ? params.author
-              : undefined,
-          model_size_min: params.model_size_min,
-          model_size_max: params.model_size_max,
-          table_source: params.table_source || "model",
-          search: Boolean(params.name),
-          order_by: params.order_by || "-created_at",
-        },
+      // const response: any = await AppRequest.Get(`/models/`, {
+        params: requestParams,
       });
 
       const listData = response.data.models || [];
       const updatedListData = listData.map((item: any) => {
         // Handle both formats: direct model object or nested structure
-        const model = item.model || item;
-        return {
-          ...model,
-          endpoints_count: item.endpoints_count || 0,
-        };
+        if (item.model) {
+          // If data is nested, preserve the model structure properly
+          return {
+            ...item.model,
+            endpoints_count: item.endpoints_count || 0,
+            model_cluster_recommended:
+              item.model_cluster_recommended ||
+              item.model?.model_cluster_recommended,
+          };
+        } else {
+          // Direct model object
+          return {
+            ...item,
+            endpoints_count: item.endpoints_count || 0,
+          };
+        }
       });
 
       if (params.page && params.page > 1) {

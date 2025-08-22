@@ -15,6 +15,7 @@ import {
   Typography,
   Badge,
   Empty,
+  ConfigProvider,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
@@ -191,6 +192,19 @@ export default function AuditPage() {
   >(null);
   const [searchText, setSearchText] = useState("");
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
+  const themeConfig = {
+    components: {
+      Select: {
+        colorBgContainer: "var(--bg-tertiary)",
+        colorBorder: "var(--border-secondary)",
+        optionSelectedBg: "var(--bg-hover)",
+        colorBgElevated: "var(--bg-hover)",
+        colorText: "var(--text-primary)",
+        optionSelectedColor: "var(--text-primary)",
+        optionActiveBg: "var(--bg-hover)",
+      }
+    }
+  }
 
   // Get action icon and color
   const getActionDisplay = (action: AuditAction) => {
@@ -573,30 +587,34 @@ export default function AuditPage() {
               className="w-80 bg-bud-bg-tertiary border-bud-border-secondary"
               allowClear
             />
-
-            <Select
-              placeholder="Filter by action"
-              value={selectedAction}
-              onChange={setSelectedAction}
-              className="w-48"
-              allowClear
-              options={Object.values(AuditAction).map((action) => ({
-                label: getActionDisplay(action).label,
-                value: action,
-              }))}
-            />
-
-            <Select
-              placeholder="Filter by resource"
-              value={selectedResource}
-              onChange={setSelectedResource}
-              className="w-48"
-              allowClear
-              options={Object.values(ResourceType).map((type) => ({
-                label: type.replace("_", " ").toUpperCase(),
-                value: type,
-              }))}
-            />
+            <ConfigProvider
+              theme={themeConfig}>
+              <Select
+                placeholder="Filter by action"
+                value={selectedAction}
+                onChange={setSelectedAction}
+                className="w-48"
+                allowClear
+                options={Object.values(AuditAction).map((action) => ({
+                  label: getActionDisplay(action).label,
+                  value: action,
+                }))}
+              />
+            </ConfigProvider>
+            <ConfigProvider
+              theme={themeConfig}>
+              <Select
+                placeholder="Filter by resource"
+                value={selectedResource}
+                onChange={setSelectedResource}
+                className="w-48"
+                allowClear
+                options={Object.values(ResourceType).map((type) => ({
+                  label: type.replace("_", " ").toUpperCase(),
+                  value: type,
+                }))}
+              />
+            </ConfigProvider>
 
             <RangePicker
               value={dateRange}

@@ -63,6 +63,9 @@ def mock_model():
     model.max_input_tokens = 4096
     model.use_cases = ["chatbot", "code generation", "content creation"]
     model.supported_endpoints = ["text-generation", "chat-completion"]
+    model.uri = "openai/gpt-4"
+    model.source = "openai"
+    model.icon = None  # Model's own icon
     return model
 
 
@@ -308,7 +311,8 @@ class TestModelCatalog:
             Decimal("0.03"),  # input_cost
             Decimal("0.06"),  # output_cost
             "USD",            # currency
-            1000             # per_tokens
+            1000,             # per_tokens
+            "provider_icon.png"  # provider_icon
         )]
 
         with patch.object(RedisService, 'get', new_callable=AsyncMock) as mock_get:
@@ -349,7 +353,8 @@ class TestModelCatalog:
             Decimal("0.03"),
             Decimal("0.06"),
             "USD",
-            1000
+            1000,
+            "provider_icon.png"  # provider_icon
         )
 
         with patch.object(RedisService, 'get', new_callable=AsyncMock) as mock_get:
@@ -400,7 +405,8 @@ class TestModelCatalog:
             Decimal("0.03"),
             Decimal("0.06"),
             "USD",
-            1000
+            1000,
+            "provider_icon.png"  # provider_icon
         )]
 
         with patch.object(RedisService, 'get', new_callable=AsyncMock) as mock_get:

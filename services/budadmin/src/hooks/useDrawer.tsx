@@ -109,7 +109,7 @@ export const useDrawer = create<{
       expandedDrawerProps: null,
     });
   },
-  openDrawerWithExpandedStep: (step: StepComponentsType, props: any) => {
+  openDrawerWithExpandedStep: (step: string, props: any) => {
     const foundFlow = Object.keys(drawerFlows).find((flow) => {
       return drawerFlows[flow as Flow].steps.find((s) => s.id === step);
     }) as Flow;
@@ -136,7 +136,7 @@ export const useDrawer = create<{
       expandedDrawerProps: props,
     });
   },
-  openDrawerWithStep: (step: StepComponentsType, props: any) => {
+  openDrawerWithStep: (step: string, props: any) => {
     const foundFlow = Object.keys(drawerFlows).find((flow) => {
       return drawerFlows[flow as Flow].steps.find((s) => s.id === step);
     }) as Flow;

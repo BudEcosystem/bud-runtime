@@ -3,3 +3,9 @@
 .DS_Store
 # nix
 result
+
+# GeoIP databases (should be downloaded separately)
+*.mmdb
+GeoLite2-*.tar.gz
+services/budapp/vr/app.yaml
+services/budapp/vr/*

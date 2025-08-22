@@ -36,10 +36,15 @@ microservices:
         image: budstudio/budproxy:nightly
     askbud:
         image: budstudio/askbud:nightly
+        daprid: askbud
         env:
             INFERENCE_MODEL: qwen3-32b
     budapp:
         image: budstudio/budapp:nightly
+        daprid: budapp
+        corsOrigins:
+            - "http://localhost:3000"
+            - "http://localhost:3001"
         env:
             APP_CONFIG: '{}'
             STATIC_DIR: /data/static-dir
@@ -66,6 +71,7 @@ microservices:
     # backend internal services
     budcluster:
         image: budstudio/budcluster:nightly
+        daprid: budcluster
         env:
             APP_CONFIG: '{}'
             LOG_LEVEL: DEBUG
@@ -98,6 +104,7 @@ microservices:
             MINIO_ENDPOINT: '{{ .Release.Name }}-minio:{{ .Values.minio.service.ports.api }}'
             MINIO_SECURE: "false"
     budmetrics:
+        daprid: budmetrics
         image: budstudio/budmetrics:nightly
         env:
             #deadlink
@@ -116,6 +123,7 @@ microservices:
             SECRETS_CLICKHOUSE_PASSWORD: '{{ .Values.clickhouse.auth.password }}'
     budmodel:
         image: budstudio/budmodel:nightly
+        daprid: budmodel
         env:
             LOG_LEVEL: DEBUG
 
@@ -124,8 +132,18 @@ microservices:
             PSQL_USER: budmodel
             PSQL_PASSWORD: budmodel
             PSQL_DB_NAME: budmodel
+    budeval:
+        image: budstudio/budeval:nightly
+        daprid: budeval
+        env:
+            PSQL_HOST: '{{ $.Release.Name }}-postgresql'
+            PSQL_PORT: "5432"
+            PSQL_USER: budeval
+            PSQL_PASSWORD: budeval
+            PSQL_DB_NAME: budeval
     budsim:
         image: budstudio/budsim:nightly
+        daprid: budsim
         env:
             LOG_LEVEL: INFO
 
@@ -136,6 +154,7 @@ microservices:
             PSQL_DB_NAME: budsim
     budnotify:
         image: budstudio/budnotify:nightly
+        daprid: budnotify
     global:
         env:
             PROMETHEUS_URL: https://metric.bud.studio
@@ -164,13 +183,8 @@ microservices:
             APP_PORT_BUDPROXY: "3000"
             AWS_ACCESS_KEY_ID: test
             AWS_SECRET_ACCESS_KEY: test
-            BUD_CLUSTER_APP_ID: budcluster
             BUD_CONNECT_URL: https://budconnect.bud.studio
             BUD_LLM_MODEL: qwen3-32b
-            BUD_METRICS_APP_ID: budmetrics
-            BUD_MODEL_APP_ID: budmodel
-            BUD_NOTIFY_APP_ID: budnotify
-            BUD_SIMULATOR_APP_ID: budsim
             CI: "true"
             CLICKHOUSE_USER: '{{ .Values.clickhouse.auth.username }}'
             CLICKHOUSE_PASSWORD: '{{ .Values.clickhouse.auth.password }}'
@@ -257,6 +271,7 @@ clickhouse:
 clickhouseExtra:
     autoCreateDB:
         - budproxy
+        - budeval
 postgresql:
     enabled: true
     architecture: standalone
@@ -273,6 +288,7 @@ postgresqlExtra:
         - budmetrics
         - budmodel
         - budsim
+        - budeval
 
 keycloak:
     proxy: edge

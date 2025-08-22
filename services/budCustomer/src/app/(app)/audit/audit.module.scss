@@ -1,13 +1,13 @@
 // Using CSS variables for theme support
-$bg-main: var(--bud-bg-primary);
-$bg-card: var(--bud-bg-secondary);
-$bg-tertiary: var(--bud-bg-tertiary);
-$border-color: var(--bud-border);
-$border-secondary: var(--bud-border-secondary);
-$text-primary: var(--bud-text-primary);
-$text-muted: var(--bud-text-muted);
-$text-disabled: var(--bud-text-disabled);
-$primary-color: var(--bud-purple);
+$bg-main: var(--bg-primary);
+$bg-card: var(--bg-secondary);
+$bg-tertiary: var(--bg-tertiary);
+$border-color: var(--border);
+$border-secondary: var(--border-secondary);
+$text-primary: var(--text-primary);
+$text-muted: var(--text-muted);
+$text-disabled: var(--text-disabled);
+$primary-color: var(--color-purple);
 
 .auditTable {
   :global {
@@ -53,6 +53,9 @@ $primary-color: var(--bud-purple);
 
           &:hover {
             border-color: $primary-color;
+          }
+          .ant-checkbox-inner {
+            background-color: $bg-card;
           }
         }
 

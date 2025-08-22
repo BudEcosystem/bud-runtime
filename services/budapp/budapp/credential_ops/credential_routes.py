@@ -209,6 +209,8 @@ async def update_credential(
         max_budget=db_credential.max_budget,
         model_budgets=db_credential.model_budgets,
         id=db_credential.id,
+        credential_type=db_credential.credential_type,
+        ip_whitelist=db_credential.ip_whitelist,
     )
 
     return SingleResponse(message="Credential updated successfully", result=credential_response)
