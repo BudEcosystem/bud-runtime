@@ -305,7 +305,7 @@ class AuthService(SessionMixin):
         if not success:
             raise ClientException("Failed to logout user")
 
-    async def register_user(self, user: UserCreate) -> UserModel:
+    async def register_user(self, user: UserCreate, is_self_registration: bool = False) -> UserModel:
         # Check if email is already registered
         email_exists = await UserDataManager(self.session).retrieve_by_fields(
             UserModel, {"email": user.email}, missing_ok=True
@@ -391,8 +391,12 @@ class AuthService(SessionMixin):
 
             user_model = UserModel(**user_data)
             user_model.auth_id = user_auth_id
+            
+            # Users who register themselves set their own password, so no reset needed
+            # Admin-created users should reset their password on first login
+            user_model.is_reset_password = not is_self_registration
 
-            # NOTE: is_reset_password, first_login will be set to True by default |  # TODO
+            # NOTE: first_login will be set to True by default
             # NOTE: status wil be invited by default
             # Create user
             db_user = await UserDataManager(self.session).insert_one(user_model)
