@@ -20,4 +20,3 @@ from budmicroframe.shared.psql_service import PSQLBase as PSQLBase
 
 # Import specific models instead of using wildcard import to avoid F403 error
 # Import models here
-

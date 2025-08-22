@@ -11,6 +11,11 @@ pydantic-settings >= 2.3.4
 # Utils
 structlog >= 24.4.0
 cachetools >= 5.4.0
+jinja2 >= 3.1.0
+
+# AI & Schema Generation
+pydantic-ai == 0.4.4
+datamodel-code-generator == 0.32.0
 
 # Database
 SQLAlchemy>=2.0.36
