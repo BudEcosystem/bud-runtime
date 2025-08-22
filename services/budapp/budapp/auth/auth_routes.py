@@ -79,7 +79,7 @@ async def register_user(
     try:
         # Force user_type to CLIENT for public registration to prevent privilege escalation
         user.user_type = UserTypeEnum.CLIENT
-        await AuthService(session).register_user(user)
+        await AuthService(session).register_user(user, is_self_registration=True)
         return UserRegisterResponse(
             code=status.HTTP_200_OK,
             message="User registered successfully",

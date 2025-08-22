@@ -305,7 +305,7 @@ class AuthService(SessionMixin):
         if not success:
             raise ClientException("Failed to logout user")
 
-    async def register_user(self, user: UserCreate) -> UserModel:
+    async def register_user(self, user: UserCreate, is_self_registration: bool = False) -> UserModel:
         # Check if email is already registered
         email_exists = await UserDataManager(self.session).retrieve_by_fields(
             UserModel, {"email": user.email}, missing_ok=True
@@ -387,13 +387,17 @@ class AuthService(SessionMixin):
             user_data = user.model_dump(exclude={"permissions"})
             user_data["color"] = UserColorEnum.get_random_color()
 
-            user_data["status"] = UserStatusEnum.INVITED
+            # Self-registered users are active immediately, admin-created users are invited
+            user_data["status"] = UserStatusEnum.ACTIVE if is_self_registration else UserStatusEnum.INVITED
 
             user_model = UserModel(**user_data)
             user_model.auth_id = user_auth_id
 
-            # NOTE: is_reset_password, first_login will be set to True by default |  # TODO
-            # NOTE: status wil be invited by default
+            # Users who register themselves set their own password, so no reset needed
+            # Admin-created users should reset their password on first login
+            user_model.is_reset_password = not is_self_registration
+
+            # NOTE: first_login will be set to True by default
             # Create user
             db_user = await UserDataManager(self.session).insert_one(user_model)
 
