@@ -257,7 +257,7 @@ class EndpointService(SessionMixin):
         await EndpointDataManager(self.session).update_by_fields(db_endpoint, {"status": EndpointStatusEnum.DELETING})
         logger.debug(f"Endpoint {db_endpoint.id} status updated to {EndpointStatusEnum.DELETING.value}")
 
-        # Delete endpoint details with pattern "router_config:*:<endpoint_name>",
+        # Delete endpoint details from cache
         try:
             await self.delete_model_from_proxy_cache(db_endpoint.id)
             await CredentialService(self.session).update_proxy_cache(db_endpoint.project_id)
@@ -355,16 +355,6 @@ class EndpointService(SessionMixin):
             db_endpoint, {"status": EndpointStatusEnum.DELETED}
         )
         logger.debug(f"Endpoint {db_endpoint.id} marked as deleted")
-
-        # Delete endpoint details with pattern “router_config:*:<endpoint_name>“,
-        try:
-            redis_service = RedisService()
-            endpoint_redis_keys = await redis_service.keys(f"router_config:*:{db_endpoint.name}")
-            logger.debug(f"Endpoint redis keys: {endpoint_redis_keys}")
-            endpoint_redis_keys_count = await redis_service.delete(*endpoint_redis_keys)
-            logger.debug(f"Deleted endpoint data from redis: {endpoint_redis_keys_count} keys")
-        except (RedisException, Exception) as e:
-            logger.error(f"Failed to delete endpoint details from redis: {e}")
 
         # Mark workflow as completed
         await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"status": WorkflowStatusEnum.COMPLETED})
