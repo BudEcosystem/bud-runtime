@@ -76,14 +76,20 @@ export function BudForm(props: BudFormProps) {
   useEffect(() => {
     // Only set form values if we have actual data (not empty object)
     if (props.data && Object.keys(props.data).length > 0) {
-      form.setFieldsValue(props.data);
+      // Get current form values
+      const currentValues = form.getFieldsValue();
 
-      // Also set after a delay in case fields aren't rendered yet
-      setTimeout(() => {
+      // Check if values are actually different
+      const hasChanges = Object.keys(props.data).some(key => {
+        return props.data[key] !== currentValues[key];
+      });
+
+      // Only update if there are actual changes
+      if (hasChanges) {
         form.setFieldsValue(props.data);
-      }, 100);
+      }
     }
-  }, [props.data]);
+  }, [props.data, form]);
 
   useEffect(() => {
     return () => {
