@@ -387,7 +387,8 @@ class AuthService(SessionMixin):
             user_data = user.model_dump(exclude={"permissions"})
             user_data["color"] = UserColorEnum.get_random_color()
 
-            user_data["status"] = UserStatusEnum.INVITED
+            # Self-registered users are active immediately, admin-created users are invited
+            user_data["status"] = UserStatusEnum.ACTIVE if is_self_registration else UserStatusEnum.INVITED
 
             user_model = UserModel(**user_data)
             user_model.auth_id = user_auth_id
@@ -397,7 +398,6 @@ class AuthService(SessionMixin):
             user_model.is_reset_password = not is_self_registration
 
             # NOTE: first_login will be set to True by default
-            # NOTE: status wil be invited by default
             # Create user
             db_user = await UserDataManager(self.session).insert_one(user_model)
 
