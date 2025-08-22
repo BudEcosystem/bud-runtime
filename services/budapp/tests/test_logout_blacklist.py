@@ -103,8 +103,25 @@ async def test_logout_without_access_token():
 
                 # Mock tenant retrieval
                 mock_tenant = MagicMock(spec=Tenant)
+                mock_tenant.id = "523e4567-e89b-12d3-a456-426614174000"  # Valid UUID
                 mock_tenant.realm_name = "test-realm"
-                mock_data_manager.retrieve_by_fields.return_value = mock_tenant
+
+                # Mock tenant client
+                mock_tenant_client = MagicMock(spec=TenantClient)
+                mock_tenant_client.id = "623e4567-e89b-12d3-a456-426614174000"  # Valid UUID
+                mock_tenant_client.client_id = "test-client"
+                mock_tenant_client.client_named_id = "test-client-named"
+                mock_tenant_client.client_secret = "secret"
+
+                # Configure retrieve_by_fields to return different values based on the model
+                async def retrieve_by_fields_side_effect(model, *args, **kwargs):
+                    if model == Tenant:
+                        return mock_tenant
+                    elif model == TenantClient:
+                        return mock_tenant_client
+                    return None
+
+                mock_data_manager.retrieve_by_fields.side_effect = retrieve_by_fields_side_effect
 
                 # Mock Keycloak logout
                 mock_keycloak_instance = AsyncMock()
@@ -214,8 +231,25 @@ async def test_logout_continues_on_blacklist_failure():
                 mock_user_manager.return_value = mock_data_manager
 
                 mock_tenant = MagicMock(spec=Tenant)
+                mock_tenant.id = "723e4567-e89b-12d3-a456-426614174000"  # Valid UUID
                 mock_tenant.realm_name = "test-realm"
-                mock_data_manager.retrieve_by_fields.return_value = mock_tenant
+
+                # Mock tenant client
+                mock_tenant_client = MagicMock(spec=TenantClient)
+                mock_tenant_client.id = "823e4567-e89b-12d3-a456-426614174000"  # Valid UUID
+                mock_tenant_client.client_id = "test-client"
+                mock_tenant_client.client_named_id = "test-client-named"
+                mock_tenant_client.client_secret = "secret"
+
+                # Configure retrieve_by_fields to return different values based on the model
+                async def retrieve_by_fields_side_effect(model, *args, **kwargs):
+                    if model == Tenant:
+                        return mock_tenant
+                    elif model == TenantClient:
+                        return mock_tenant_client
+                    return None
+
+                mock_data_manager.retrieve_by_fields.side_effect = retrieve_by_fields_side_effect
 
                 mock_keycloak_instance = AsyncMock()
                 mock_keycloak.return_value = mock_keycloak_instance
