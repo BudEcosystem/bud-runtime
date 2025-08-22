@@ -20,19 +20,28 @@ import ProjectNameInput from "@/components/ui/bud/dataEntry/ProjectNameInput";
 
 export default function AddCluster() {
   const { submittable, values } = useContext(BudFormContext);
-  const [formData, setFormData] = React.useState<FormData>(new FormData());
+  const [formData, setFormData] = React.useState<FormData>(() => {
+    const fd = new FormData();
+    fd.set("step_number", "1");
+    fd.set("workflow_total_steps", "3");
+    fd.set("trigger_workflow", "true");
+    return fd;
+  });
   const { getWorkflow } = useDeployModel();
   const { createClusterWorkflow, clusterValues, setClusterValues } = useCluster();
   const { openDrawerWithStep } = useDrawer();
 
   useEffect(() => {
-    formData.set("step_number", "1");
-    formData.set("workflow_total_steps", "3");
-    formData.set("trigger_workflow", "true");
-    formData.set("name", values.name);
-    formData.set("ingress_url", values.ingress_url);
-    formData.set("icon", values.icon);
-  }, [values]);
+    if (values.name && formData.get("name") !== values.name) {
+      formData.set("name", values.name);
+    }
+    if (values.ingress_url && formData.get("ingress_url") !== values.ingress_url) {
+      formData.set("ingress_url", values.ingress_url);
+    }
+    if (values.icon && formData.get("icon") !== values.icon) {
+      formData.set("icon", values.icon);
+    }
+  }, [values.name, values.ingress_url, values.icon, formData]);
 
   return (
     <BudForm
@@ -65,8 +74,16 @@ export default function AddCluster() {
             <div className="pt-[.87rem]">
               <ProjectNameInput
                 placeholder="Enter Cluster Name"
-                onChangeName={(name) => setClusterValues({ ...clusterValues, name })}
-                onChangeIcon={(icon) => setClusterValues({ ...clusterValues, icon })}
+                onChangeName={(name) => {
+                  if (name !== clusterValues.name) {
+                    setClusterValues({ ...clusterValues, name });
+                  }
+                }}
+                onChangeIcon={(icon) => {
+                  if (icon !== clusterValues.icon) {
+                    setClusterValues({ ...clusterValues, icon });
+                  }
+                }}
                 isEdit={true}
               />
 
@@ -85,7 +102,11 @@ export default function AddCluster() {
                 ClassNames="mt-[.1rem] mb-[0rem]"
                 InputClasses="py-[.5rem]"
                 formItemClassnames="mb-[1rem]"
-                onChange={(value) => { setClusterValues({ ...clusterValues, ingress_url: value }) }}
+                onChange={(value) => {
+                  if (value !== clusterValues.ingress_url) {
+                    setClusterValues({ ...clusterValues, ingress_url: value });
+                  }
+                }}
               />
               <div className="mb-[1.7rem]">
                 <Text_14_400_EEEEEE className="p-0 pt-[.3rem] m-0">
@@ -133,14 +154,16 @@ export default function AddCluster() {
                   </>}
                   rules={[{ required: true, message: "Please upload a file" }]}
                   onChange={(value) => {
-                    setClusterValues({
-                      ...clusterValues,
-                      configuration_file: value,
-                    });
-                    setFormData((prev) => {
-                      prev.set("configuration_file", value);
-                      return prev;
-                    });
+                    if (value !== clusterValues.configuration_file) {
+                      setClusterValues({
+                        ...clusterValues,
+                        configuration_file: value,
+                      });
+                      setFormData((prev) => {
+                        prev.set("configuration_file", value);
+                        return prev;
+                      });
+                    }
                   }}
                 />}
             </div>
