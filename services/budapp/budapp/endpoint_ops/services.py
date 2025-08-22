@@ -2366,7 +2366,6 @@ class EndpointService(SessionMixin):
             api_key=encrypted_model_api_key,
             pricing=pricing,
         )
-        logger.debug(f"pric2ing: {pricing}")
         redis_service = RedisService()
         await redis_service.set(
             f"model_table:{endpoint_id}", json.dumps({str(endpoint_id): model_config.model_dump(exclude_none=True)})
