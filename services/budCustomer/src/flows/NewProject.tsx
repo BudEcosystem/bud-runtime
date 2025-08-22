@@ -6,10 +6,10 @@ import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
 import ProjectNameInput from "@/components/ui/bud/dataEntry/ProjectNameInput";
 import TextAreaInput from "@/components/ui/bud/dataEntry/TextArea";
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext, useEffect, useState, useCallback } from "react";
 import { useDrawer } from "@/hooks/useDrawer";
 import { useProjects } from "@/hooks/useProjects";
-import { Image } from "antd";
+import { Icon } from "@iconify/react/dist/iconify.js";
 import { Text_12_400_B3B3B3, Text_12_400_EEEEEE } from "@/components/ui/text";
 import dayjs from "dayjs";
 import { BudFormContext } from "@/components/ui/bud/context/BudFormContext";
@@ -32,28 +32,29 @@ export default function NewProject() {
     createProject: apiCreateProject,
     getGlobalProjects,
     getProjectTags,
-    projectTags
+    projectTags,
   } = useProjects();
   const { closeDrawer } = useDrawer();
   const { form, submittable } = useContext(BudFormContext);
   const [options, setOptions] = useState<{ name: string; color: string }[]>([]);
 
-  async function fetchList() {
-    const data = projectTags?.map((result) => ({
-      ...result,
-      name: result.name,
-      color: result.color,
-    })) || [];
+  const fetchList = useCallback(() => {
+    const data =
+      projectTags?.map((result) => ({
+        ...result,
+        name: result.name,
+        color: result.color,
+      })) || [];
     setOptions(data);
-  }
+  }, [projectTags]);
 
   useEffect(() => {
     getProjectTags();
-  }, []);
+  }, [getProjectTags]);
 
   useEffect(() => {
     fetchList();
-  }, [projectTags]);
+  }, [fetchList]);
 
   return (
     <BudForm
@@ -61,7 +62,7 @@ export default function NewProject() {
         name: "",
         description: "",
         tags: [],
-        icon: "😍"
+        icon: "😍",
       }}
       onNext={(values) => {
         if (!submittable) {
@@ -70,24 +71,32 @@ export default function NewProject() {
         }
 
         // Ensure tags are in the correct format (array of objects with name and color)
-        const formattedTags = values.tags ?
-          (Array.isArray(values.tags) ? values.tags : []).map((tag: any) => {
-            // If tag is already in correct format, use it
-            if (tag && typeof tag === 'object' && 'name' in tag && 'color' in tag) {
-              return {
-                name: tag.name,
-                color: tag.color
-              };
-            }
-            // If tag is a string, convert it
-            if (typeof tag === 'string') {
-              return {
-                name: tag,
-                color: '#89C0F2' // Default color
-              };
-            }
-            return null;
-          }).filter(Boolean) : [];
+        const formattedTags = values.tags
+          ? (Array.isArray(values.tags) ? values.tags : [])
+              .map((tag: any) => {
+                // If tag is already in correct format, use it
+                if (
+                  tag &&
+                  typeof tag === "object" &&
+                  "name" in tag &&
+                  "color" in tag
+                ) {
+                  return {
+                    name: tag.name,
+                    color: tag.color,
+                  };
+                }
+                // If tag is a string, convert it
+                if (typeof tag === "string") {
+                  return {
+                    name: tag,
+                    color: "#89C0F2", // Default color
+                  };
+                }
+                return null;
+              })
+              .filter(Boolean)
+          : [];
 
         const projectData: ProjectData = {
           name: values.name,
@@ -95,7 +104,7 @@ export default function NewProject() {
           tags: formattedTags,
           icon: values.icon || "😍",
           project_type: "client_app",
-          benchmark: false
+          benchmark: false,
         };
 
         apiCreateProject(projectData)
@@ -125,16 +134,13 @@ export default function NewProject() {
               onChangeName={(name) => form.setFieldsValue({ name })}
               onChangeIcon={(icon) => form.setFieldsValue({ icon })}
               isEdit={true}
+              showIcon={false}
             />
             <div className="flex justify-start items-center px-[.65rem] mb-[1.65rem]">
-              <div className="h-[0.875rem] flex justify-start items-center grow-0 shrink-0">
-                <Image
-                  preview={false}
-                  src="/images/drawer/calendar.png"
-                  alt="info"
-                  style={{ height: '0.875rem', width: '0.875rem', marginRight: ".5rem" }}
-                />
-              </div>
+              <Icon
+                icon="ph:calendar"
+                className="text-bud-text-disabled mr-2 text-[0.875rem]"
+              />
               <Text_12_400_B3B3B3>Created on&nbsp;&nbsp;</Text_12_400_B3B3B3>
               <Text_12_400_EEEEEE>
                 {dayjs().format("DD MMM, YYYY")}
@@ -144,11 +150,14 @@ export default function NewProject() {
               label="Tags"
               required
               options={options}
-              info='Add keywords to help organize and find your project later.'
+              info="Add keywords to help organize and find your project later."
               name="tags"
               placeholder="Add Tags (e.g. Data Science, Banking) "
               rules={[
-                { required: true, message: "Please add tags to categorize the project." }
+                {
+                  required: true,
+                  message: "Please add tags to categorize the project.",
+                },
               ]}
             />
             <div className="h-[1rem] w-full" />
@@ -158,7 +167,12 @@ export default function NewProject() {
               required
               info="This is the project's elevator pitch, use clear and concise words to summarize the project in few sentences"
               placeholder="Provide a brief description about the project."
-              rules={[{ required: true, message: "Provide a brief description about the project." }]}
+              rules={[
+                {
+                  required: true,
+                  message: "Provide a brief description about the project.",
+                },
+              ]}
             />
           </DrawerCard>
         </BudDrawerLayout>
