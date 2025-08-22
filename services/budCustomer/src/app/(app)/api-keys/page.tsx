@@ -1,15 +1,17 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Flex, Table, Button, Modal, Input } from "antd";
+import { Flex, Table, Button } from "antd";
+import { useDrawer } from "@/hooks/useDrawer";
+import { AppRequest } from "@/services/api/requests";
+import { errorToast, successToast } from "@/components/toast";
+import BudDrawer from "@/components/ui/bud/drawer/BudDrawer";
 import {
   Text_12_400_757575,
   Text_12_400_B3B3B3,
   Text_13_400_EEEEEE,
   Text_14_400_B3B3B3,
   Text_14_500_EEEEEE,
-  Text_15_600_EEEEEE,
-  Text_19_600_EEEEEE,
   Text_24_500_EEEEEE,
 } from "@/components/ui/text";
 import { Icon } from "@iconify/react/dist/iconify.js";
@@ -26,11 +28,10 @@ interface ApiKey {
 }
 
 export default function ApiKeysPage() {
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showKeyModal, setShowKeyModal] = useState(false);
-  const [newKeyLabel, setNewKeyLabel] = useState("");
-  const [newKey, setNewKey] = useState("");
+  const { openDrawer, isDrawerOpen } = useDrawer();
   const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [prevDrawerOpen, setPrevDrawerOpen] = useState(false);
 
   // Mock data
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([
@@ -63,34 +64,58 @@ export default function ApiKeysPage() {
     },
   ]);
 
-  const handleCreateKey = () => {
-    if (!newKeyLabel.trim()) return;
-
-    const mockKey = `sk-proj-${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}`;
-
-    const newApiKey: ApiKey = {
-      id: Date.now().toString(),
-      label: newKeyLabel,
-      key: mockKey,
-      createdAt: new Date().toISOString().split("T")[0],
-      lastUsedAt: "-",
-      usage: 0,
-      status: "active",
-    };
-
-    setApiKeys([newApiKey, ...apiKeys]);
-    setNewKey(mockKey);
-    setNewKeyLabel("");
-    setShowCreateModal(false);
-    setShowKeyModal(true);
+  // Fetch API keys from the backend
+  const fetchApiKeys = async () => {
+    try {
+      setLoading(true);
+      const response = await AppRequest.Get("/credentials/", {
+        params: {
+          credential_type: "client_app",
+          page: 1,
+          limit: 100,
+        },
+      });
+      if (response?.data?.credentials) {
+        const keys = response.data.credentials.map((cred: any) => ({
+          id: cred.id,
+          label: cred.name,
+          key: cred.key || `sk-...${cred.id.slice(-4)}`,
+          createdAt: new Date(cred.created_at).toLocaleDateString(),
+          lastUsedAt: cred.last_used_at
+            ? new Date(cred.last_used_at).toLocaleDateString()
+            : "-",
+          usage: 0,
+          status: cred.is_active ? "active" : "revoked",
+        }));
+        setApiKeys(keys);
+      }
+    } catch (error) {
+      console.error("Failed to fetch API keys:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleRevokeKey = (id: string) => {
-    setApiKeys(
-      apiKeys.map((key) =>
-        key.id === id ? { ...key, status: "revoked" as const } : key,
-      ),
-    );
+  useEffect(() => {
+    fetchApiKeys();
+  }, []);
+
+  // Refresh when drawer closes
+  useEffect(() => {
+    if (prevDrawerOpen && !isDrawerOpen) {
+      fetchApiKeys();
+    }
+    setPrevDrawerOpen(isDrawerOpen);
+  }, [isDrawerOpen, prevDrawerOpen]);
+
+  const handleRevokeKey = async (id: string) => {
+    try {
+      await AppRequest.Delete(`/credentials/${id}`);
+      successToast("API key revoked successfully");
+      fetchApiKeys();
+    } catch (error) {
+      errorToast("Failed to revoke API key");
+    }
   };
 
   const handleCopyKey = (key: string, id: string) => {
@@ -203,7 +228,7 @@ export default function ApiKeysPage() {
               type="primary"
               icon={<Icon icon="ph:key" />}
               className="bg-[#965CDE] border-[#965CDE] h-[2.5rem] px-[1.5rem]"
-              onClick={() => setShowCreateModal(true)}
+              onClick={() => openDrawer("add-new-key")}
             >
               Create New Key
             </Button>
@@ -232,102 +257,15 @@ export default function ApiKeysPage() {
               dataSource={apiKeys}
               columns={columns}
               rowKey="id"
+              loading={loading}
               pagination={false}
               className={styles.apiKeysTable}
               style={{ background: "transparent" }}
             />
           </div>
-          {/* Create Key Modal */}
-          <Modal
-            title={<Text_19_600_EEEEEE>Create New API Key</Text_19_600_EEEEEE>}
-            open={showCreateModal}
-            onCancel={() => {
-              setShowCreateModal(false);
-              setNewKeyLabel("");
-            }}
-            footer={[
-              <Button
-                key="cancel"
-                onClick={() => {
-                  setShowCreateModal(false);
-                  setNewKeyLabel("");
-                }}
-              >
-                Cancel
-              </Button>,
-              <Button
-                key="create"
-                type="primary"
-                disabled={!newKeyLabel.trim()}
-                onClick={handleCreateKey}
-                className="bg-[#965CDE] border-[#965CDE]"
-              >
-                Create Key
-              </Button>,
-            ]}
-            className={styles.modal}
-          >
-            <Text_14_400_B3B3B3 className="mb-[1rem]">
-              Enter a label for your new API key
-            </Text_14_400_B3B3B3>
-            <Input
-              placeholder="e.g., Production API"
-              value={newKeyLabel}
-              onChange={(e) => setNewKeyLabel(e.target.value)}
-              className="bg-[#1F1F1F] border-[#2F2F2F]"
-            />
-          </Modal>
-
-          {/* Show New Key Modal */}
-          <Modal
-            title={<Text_19_600_EEEEEE>API Key Created</Text_19_600_EEEEEE>}
-            open={showKeyModal}
-            onCancel={() => {
-              setShowKeyModal(false);
-              setNewKey("");
-            }}
-            footer={[
-              <Button
-                key="done"
-                type="primary"
-                onClick={() => {
-                  setShowKeyModal(false);
-                  setNewKey("");
-                }}
-                className="bg-[#965CDE] border-[#965CDE]"
-              >
-                I&apos;ve saved this key
-              </Button>,
-            ]}
-            className={styles.modal}
-          >
-            <div className="bg-[#DE9C5C1A] border border-[#DE9C5C33] rounded-[8px] p-[1rem] mb-[1.5rem] flex gap-[0.75rem]">
-              <Icon
-                icon="ph:warning"
-                className="text-[#DE9C5C] text-[1.25rem]"
-              />
-              <Text_13_400_EEEEEE>
-                Save this key now. You won&apos;t be able to see it again!
-              </Text_13_400_EEEEEE>
-            </div>
-
-            <div className="bg-[#1F1F1F] border border-[#2F2F2F] rounded-[8px] p-[1rem] flex items-center justify-between">
-              <code className="text-[#EEEEEE] text-[0.875rem] break-all">
-                {newKey}
-              </code>
-              <Button
-                type="text"
-                icon={<Icon icon="ph:copy" />}
-                onClick={() => {
-                  navigator.clipboard.writeText(newKey);
-                  alert("Key copied to clipboard!");
-                }}
-                className="text-[#757575] hover:text-[#EEEEEE] ml-[1rem]"
-              />
-            </div>
-          </Modal>
         </div>
       </div>
+      <BudDrawer />
     </DashboardLayout>
   );
 }

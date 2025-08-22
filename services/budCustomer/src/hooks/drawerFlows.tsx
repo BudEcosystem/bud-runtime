@@ -2037,12 +2037,12 @@ const viewProjectCredentials: DrawerFlowType = {
 };
 
 const addNewKey: DrawerFlowType = {
-  title: "New Key",
-  description: "Create new key",
+  title: "New API Key",
+  description: "Create new API key",
   totalSteps: 2,
   steps: [
     {
-      navigation: () => ["Credentials", "New Key"],
+      navigation: () => ["API Keys", "New Key"],
       id: "add-new-key",
       step: 1,
       component: StepComponents["add-new-key"],
@@ -2052,20 +2052,17 @@ const addNewKey: DrawerFlowType = {
           title: "New Key",
         },
         {
-          status: FormProgressStatus.inProgress,
+          status: FormProgressStatus.notCompleted,
           title: "Success",
         },
       ],
-      confirmClose: false,
+      confirmClose: true,
     },
     {
-      navigation: () => ["Credentials", "Add Credentials"],
-      id: "credentials-success",
-      properties: {
-        text: "Credentials added Successfully",
-      },
-      step: 3,
-      component: StepComponents["credentials-success"],
+      navigation: () => ["API Keys", "Success"],
+      id: "api-key-success",
+      step: 2,
+      component: StepComponents["api-key-success"],
       progress: [
         {
           status: FormProgressStatus.completed,
