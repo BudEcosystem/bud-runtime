@@ -27,6 +27,7 @@ async def test_user_registration_hashes_password():
 
     # Mock dependencies
     mock_session = Mock()
+    mock_session.commit = AsyncMock()  # session.commit() is async
     mock_keycloak = Mock()
     mock_keycloak.create_user_with_permissions = AsyncMock(return_value=str(uuid4()))
 
@@ -37,12 +38,14 @@ async def test_user_registration_hashes_password():
             mock_data_manager.return_value.insert_one = AsyncMock()
             mock_data_manager.return_value.update_subscriber_status = AsyncMock()
 
-            # Track what gets inserted
+            # Track what gets inserted - only capture User objects
             inserted_user = None
-            def capture_insert(user):
+            def capture_insert(obj):
                 nonlocal inserted_user
-                inserted_user = user
-                return user
+                # Only capture User objects, not TenantUserMapping, UserBilling, or Project
+                if obj.__class__.__name__ == 'User':
+                    inserted_user = obj
+                return obj
 
             mock_data_manager.return_value.insert_one.side_effect = capture_insert
 
@@ -64,8 +67,18 @@ async def test_user_registration_hashes_password():
             auth_service = AuthService(mock_session)
 
             # Patch BudNotifyHandler and PermissionService to avoid external calls
-            with patch('budapp.auth.services.BudNotifyHandler'):
-                with patch('budapp.auth.services.PermissionService'):
+            with patch('budapp.auth.services.BudNotifyHandler') as mock_notify_handler:
+                # Mock BudNotifyHandler instance methods
+                mock_notify_instance = Mock()
+                mock_notify_instance.create_subscriber = AsyncMock()
+                mock_notify_handler.return_value = mock_notify_instance
+
+                with patch('budapp.auth.services.PermissionService') as mock_perm_service:
+                    # Mock PermissionService instance methods
+                    mock_perm_instance = Mock()
+                    mock_perm_instance.create_resource_permission_by_user = AsyncMock()
+                    mock_perm_service.return_value = mock_perm_instance
+
                     await auth_service.register_user(user_create, is_self_registration=True)
 
             # Verify password was hashed
