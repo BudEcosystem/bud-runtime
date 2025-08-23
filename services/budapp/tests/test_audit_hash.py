@@ -3,10 +3,11 @@
 This module contains tests for the audit record hashing and integrity verification features.
 """
 
-import pytest
 from datetime import datetime, timezone
+from unittest.mock import MagicMock, Mock
 from uuid import uuid4
-from unittest.mock import Mock, MagicMock
+
+import pytest
 
 from budapp.audit_ops.hash_utils import (
     generate_audit_hash,
@@ -39,7 +40,7 @@ class TestHashUtilities:
         """Test serialization of dictionary with consistent ordering."""
         test_dict = {"b": 2, "a": 1, "c": 3}
         result = serialize_for_hash(test_dict)
-        assert result == '{"a": 1, "b": 2, "c": 3}'
+        assert result == '{"a":1,"b":2,"c":3}'  # Compact JSON format
 
     def test_generate_audit_hash_consistency(self):
         """Test that the same inputs always generate the same hash."""
