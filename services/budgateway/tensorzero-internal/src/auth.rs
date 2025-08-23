@@ -29,9 +29,9 @@ pub type PublishedModelInfo = HashMap<String, ApiKeyMetadata>;
 
 // Hash API key using SHA256 with "bud-" prefix (matching Python implementation)
 fn hash_api_key(api_key: &str) -> String {
-    let prefixed_key = format!("bud-{}", api_key);
     let mut hasher = Sha256::new();
-    hasher.update(prefixed_key.as_bytes());
+    hasher.update(b"bud-");
+    hasher.update(api_key.as_bytes());
     format!("{:x}", hasher.finalize())
 }
 
