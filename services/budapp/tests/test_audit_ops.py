@@ -105,11 +105,13 @@ class TestAuditSchemas:
             "resource_id": str(uuid4()),
             "timestamp": datetime.now(timezone.utc),
             "created_at": datetime.now(timezone.utc),
+            "record_hash": "a" * 64,  # SHA256 hash is 64 characters
         }
 
         schema = AuditRecordEntry(**data)
         assert schema.action == "update"
         assert schema.resource_type == "cluster"
+        assert schema.record_hash == "a" * 64
 
     def test_ip_address_validation(self):
         """Test IP address validation in schemas."""
