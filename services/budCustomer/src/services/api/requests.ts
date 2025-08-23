@@ -150,9 +150,7 @@ const refreshToken = async () => {
     }
 
     const payload = {
-      token: {
-        refresh_token: refreshTokenValue,
-      },
+      refresh_token: refreshTokenValue,
     };
 
     const response = await axios.post(

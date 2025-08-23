@@ -25,6 +25,7 @@ from starlette_compress import CompressMiddleware
 from .commons.config import app_settings, secrets_settings
 from .commons.profiling_utils import performance_logger
 from .observability.routes import observability_router
+from .observability.usage_routes import usage_router
 
 
 @asynccontextmanager
@@ -49,3 +50,4 @@ app = configure_app(app_settings, secrets_settings, lifespan=lifespan)
 app.add_middleware(CompressMiddleware, minimum_size=1000, zstd_level=4, brotli_quality=4, gzip_level=4)
 
 app.include_router(observability_router)
+app.include_router(usage_router, prefix="/observability")

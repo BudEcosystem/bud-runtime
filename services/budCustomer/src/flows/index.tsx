@@ -1,4 +1,12 @@
 import React from "react";
+import CreateBatchJob from "./BatchJob/CreateBatchJob";
+import CreateBatchJobSuccess from "./BatchJob/CreateBatchJobSuccess";
+import NewProject from "./NewProject";
+import EditProject from "./EditProject";
+import DeleteProject from "./DeleteProject";
+import AddNewKey from "./ApiKeys/AddNewKey";
+import ApiKeySuccess from "./ApiKeys/ApiKeySuccess";
+import ViewApiKey from "./ApiKeys/ViewApiKey";
 
 // Placeholder component factory
 const createPlaceholderComponent = (name: string) => {
@@ -126,6 +134,9 @@ const stepComponentNames = [
   "select-traits",
   "select-evaluation",
   "evaluation-summary",
+  "create-batch-job",
+  "create-batch-job-success",
+  "api-key-success",
 ];
 
 // Create StepComponents object with placeholder components
@@ -136,5 +147,15 @@ export const StepComponents = stepComponentNames.reduce(
   },
   {} as Record<string, React.FC>,
 );
+
+// Override with actual components
+StepComponents["create-batch-job"] = CreateBatchJob;
+StepComponents["create-batch-job-success"] = CreateBatchJobSuccess;
+StepComponents["new-project"] = NewProject;
+StepComponents["edit-project"] = EditProject;
+StepComponents["delete-project"] = DeleteProject;
+StepComponents["add-new-key"] = AddNewKey;
+StepComponents["api-key-success"] = ApiKeySuccess;
+StepComponents["view-api-key"] = ViewApiKey;
 
 export type StepComponentsType = keyof typeof StepComponents;

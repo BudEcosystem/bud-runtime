@@ -1,189 +1,217 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Flex, Table, Button, Modal, Input } from "antd";
+import { Table, Button, Flex } from "antd";
+import { useDrawer } from "@/hooks/useDrawer";
+import { AppRequest } from "@/services/api/requests";
+import { errorToast, successToast } from "@/components/toast";
+import BudDrawer from "@/components/ui/bud/drawer/BudDrawer";
 import {
-  Text_12_400_757575,
   Text_12_400_B3B3B3,
-  Text_13_400_EEEEEE,
+  Text_12_400_EEEEEE,
   Text_14_400_B3B3B3,
   Text_14_500_EEEEEE,
-  Text_15_600_EEEEEE,
-  Text_19_600_EEEEEE,
   Text_24_500_EEEEEE,
 } from "@/components/ui/text";
 import { Icon } from "@iconify/react/dist/iconify.js";
+import { formatDate } from "@/utils/formatDate";
 import styles from "./api-keys.module.scss";
 
 interface ApiKey {
   id: string;
-  label: string;
-  key: string;
-  createdAt: string;
-  lastUsedAt: string;
-  usage: number;
-  status: "active" | "revoked";
+  name: string;
+  project: {
+    id: string;
+    name: string;
+  };
+  expiry: string;
+  created_at: string;
+  last_used_at: string;
+  is_active: boolean;
+  status: "active" | "revoked" | "expired";
+}
+
+function SortIcon({ sortOrder }: { sortOrder: any }) {
+  return sortOrder ? sortOrder === 'descend' ?
+    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="13" viewBox="0 0 12 13" fill="none">
+      <path fillRule="evenodd" clipRule="evenodd" d="M6.00078 2.10938C6.27692 2.10938 6.50078 2.33324 6.50078 2.60938L6.50078 9.40223L8.84723 7.05578C9.04249 6.86052 9.35907 6.86052 9.55433 7.05578C9.7496 7.25104 9.7496 7.56763 9.55433 7.76289L6.35433 10.9629C6.15907 11.1582 5.84249 11.1582 5.64723 10.9629L2.44723 7.76289C2.25197 7.56763 2.25197 7.25104 2.44723 7.05578C2.64249 6.86052 2.95907 6.86052 3.15433 7.05578L5.50078 9.40223L5.50078 2.60938C5.50078 2.33324 5.72464 2.10938 6.00078 2.10938Z" fill="#B3B3B3" />
+    </svg>
+    : <svg xmlns="http://www.w3.org/2000/svg" width="12" height="13" viewBox="0 0 12 13" fill="none">
+      <path fillRule="evenodd" clipRule="evenodd" d="M6.00078 10.8906C6.27692 10.8906 6.50078 10.6668 6.50078 10.3906L6.50078 3.59773L8.84723 5.94418C9.04249 6.13944 9.35907 6.13944 9.55433 5.94418C9.7496 5.74892 9.7496 5.43233 9.55433 5.23707L6.35433 2.03707C6.15907 1.84181 5.84249 1.84181 5.64723 2.03707L2.44723 5.23707C2.25197 5.43233 2.25197 5.74892 2.44723 5.94418C2.64249 6.13944 2.95907 6.13944 3.15433 5.94418L5.50078 3.59773L5.50078 10.3906C5.50078 10.6668 5.72464 10.8906 6.00078 10.8906Z" fill="#B3B3B3" />
+    </svg>
+    : null;
 }
 
 export default function ApiKeysPage() {
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showKeyModal, setShowKeyModal] = useState(false);
-  const [newKeyLabel, setNewKeyLabel] = useState("");
-  const [newKey, setNewKey] = useState("");
-  const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
+  const { openDrawer, isDrawerOpen } = useDrawer();
+  const [loading, setLoading] = useState(false);
+  const [prevDrawerOpen, setPrevDrawerOpen] = useState(false);
+  const [order, setOrder] = useState<'-' | ''>('-');
+  const [orderBy, setOrderBy] = useState<string>('last_used_at');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalKeys, setTotalKeys] = useState(0);
 
-  // Mock data
-  const [apiKeys, setApiKeys] = useState<ApiKey[]>([
-    {
-      id: "1",
-      label: "Production API",
-      key: "sk-...AbCd",
-      createdAt: "2024-01-15",
-      lastUsedAt: "2024-01-20",
-      usage: 15420,
-      status: "active",
-    },
-    {
-      id: "2",
-      label: "Development API",
-      key: "sk-...XyZw",
-      createdAt: "2024-01-10",
-      lastUsedAt: "2024-01-19",
-      usage: 8350,
-      status: "active",
-    },
-    {
-      id: "3",
-      label: "Testing Environment",
-      key: "sk-...9876",
-      createdAt: "2023-12-20",
-      lastUsedAt: "2024-01-05",
-      usage: 2100,
-      status: "revoked",
-    },
-  ]);
+  const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
 
-  const handleCreateKey = () => {
-    if (!newKeyLabel.trim()) return;
 
-    const mockKey = `sk-proj-${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}`;
+  // Fetch API keys from the backend
+  const fetchApiKeys = useCallback(async () => {
+    try {
+      setLoading(true);
+      const params: any = {
+        credential_type: "client_app",
+        page: currentPage,
+        limit: pageSize,
+        order_by: `${order}${orderBy}`,
+      };
 
-    const newApiKey: ApiKey = {
-      id: Date.now().toString(),
-      label: newKeyLabel,
-      key: mockKey,
-      createdAt: new Date().toISOString().split("T")[0],
-      lastUsedAt: "-",
-      usage: 0,
-      status: "active",
-    };
 
-    setApiKeys([newApiKey, ...apiKeys]);
-    setNewKey(mockKey);
-    setNewKeyLabel("");
-    setShowCreateModal(false);
-    setShowKeyModal(true);
+      const response = await AppRequest.Get("/credentials/", { params });
+
+      if (response?.data) {
+        setTotalKeys(response.data.total || 0);
+        const keys = (response.data.credentials || []).map((cred: any) => ({
+          id: cred.id,
+          name: cred.name,
+          project: cred.project || { id: '', name: 'N/A' },
+          expiry: cred.expiry,
+          created_at: cred.created_at,
+          last_used_at: cred.last_used_at,
+          is_active: cred.is_active,
+          status: !cred.is_active ? "revoked" :
+                  (cred.expiry && new Date(cred.expiry) < new Date() ? "expired" : "active"),
+        }));
+        setApiKeys(keys);
+      }
+    } catch (error) {
+      console.error("Failed to fetch API keys:", error);
+      errorToast("Failed to fetch API keys");
+    } finally {
+      setLoading(false);
+    }
+  }, [currentPage, pageSize, order, orderBy]);
+
+  // Fetch data with debounce
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchApiKeys();
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [fetchApiKeys]);
+
+  // Refresh when drawer closes
+  useEffect(() => {
+    if (prevDrawerOpen && !isDrawerOpen) {
+      fetchApiKeys();
+    }
+    setPrevDrawerOpen(isDrawerOpen);
+  }, [isDrawerOpen, prevDrawerOpen, fetchApiKeys]);
+
+  const handlePageChange = (page: number, size: number) => {
+    setCurrentPage(page);
+    setPageSize(size);
   };
 
-  const handleRevokeKey = (id: string) => {
-    setApiKeys(
-      apiKeys.map((key) =>
-        key.id === id ? { ...key, status: "revoked" as const } : key,
-      ),
-    );
+  const handleRevokeKey = async (id: string) => {
+    try {
+      await AppRequest.Delete(`/credentials/${id}`);
+      successToast("API key revoked successfully");
+      fetchApiKeys();
+    } catch (error) {
+      errorToast("Failed to revoke API key");
+    }
   };
 
-  const handleCopyKey = (key: string, id: string) => {
-    navigator.clipboard.writeText(key);
-    setCopiedKeyId(id);
-    setTimeout(() => setCopiedKeyId(null), 2000);
-  };
-
-  const maskKey = (key: string) => {
-    return `${key.substring(0, 7)}...${key.substring(key.length - 4)}`;
-  };
 
   const columns = [
     {
-      title: <Text_12_400_757575>NAME</Text_12_400_757575>,
-      dataIndex: "label",
-      key: "label",
-      render: (text: string) => <Text_14_500_EEEEEE>{text}</Text_14_500_EEEEEE>,
+      title: 'Credential name',
+      dataIndex: 'name',
+      key: 'name',
+      width: 200,
+      render: (text: string) => <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>,
+      sorter: (a: ApiKey, b: ApiKey) => a.name.localeCompare(b.name),
+      sortIcon: SortIcon,
     },
     {
-      title: <Text_12_400_757575>KEY</Text_12_400_757575>,
-      dataIndex: "key",
-      key: "key",
-      render: (text: string, record: ApiKey) => (
-        <Flex align="center" gap={12}>
-          <code className="bg-[var(--border-color)] px-[0.75rem] py-[0.25rem] rounded text-[var(--text-primary)] text-[0.813rem]">
-            {maskKey(text)}
-          </code>
-          <Button
-            type="text"
-            icon={
-              <Icon icon={copiedKeyId === record.id ? "ph:check" : "ph:copy"} />
-            }
-            onClick={() => handleCopyKey(text, record.id)}
-            className="text-[#757575] hover:text-[#EEEEEE]"
-            style={{ background: "transparent", border: "none" }}
-          />
-        </Flex>
-      ),
+      title: 'Project Name',
+      dataIndex: 'project',
+      key: 'project',
+      width: 200,
+      render: (project: any) => <Text_12_400_EEEEEE>{project?.name || 'N/A'}</Text_12_400_EEEEEE>,
+      sorter: (a: ApiKey, b: ApiKey) => (a.project?.name || '').localeCompare(b.project?.name || ''),
+      sortIcon: SortIcon,
     },
     {
-      title: <Text_12_400_757575>CREATED</Text_12_400_757575>,
-      dataIndex: "createdAt",
-      key: "createdAt",
-      render: (text: string) => <Text_13_400_EEEEEE>{text}</Text_13_400_EEEEEE>,
+      title: 'Date of Expiry',
+      dataIndex: 'expiry',
+      key: 'expiry',
+      width: 150,
+      render: (text: string) => <Text_12_400_EEEEEE>{text ? formatDate(text) : 'Never'}</Text_12_400_EEEEEE>,
+      sorter: (a: ApiKey, b: ApiKey) => {
+        if (!a.expiry) return 1;
+        if (!b.expiry) return -1;
+        return new Date(a.expiry).getTime() - new Date(b.expiry).getTime();
+      },
+      sortIcon: SortIcon,
     },
     {
-      title: <Text_12_400_757575>LAST USED</Text_12_400_757575>,
-      dataIndex: "lastUsedAt",
-      key: "lastUsedAt",
-      render: (text: string) => <Text_13_400_EEEEEE>{text}</Text_13_400_EEEEEE>,
+      title: 'Created',
+      dataIndex: 'created_at',
+      key: 'created_at',
+      width: 150,
+      render: (text: string) => <Text_12_400_EEEEEE>{formatDate(text)}</Text_12_400_EEEEEE>,
+      sorter: (a: ApiKey, b: ApiKey) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+      sortIcon: SortIcon,
     },
     {
-      title: <Text_12_400_757575>USAGE</Text_12_400_757575>,
-      dataIndex: "usage",
-      key: "usage",
-      render: (text: number) => (
-        <Text_13_400_EEEEEE>
-          {text.toLocaleString()} requests
-        </Text_13_400_EEEEEE>
-      ),
+      title: 'Last Used',
+      dataIndex: 'last_used_at',
+      key: 'last_used_at',
+      width: 150,
+      render: (text: string) => <Text_12_400_EEEEEE>{text ? formatDate(text) : '-'}</Text_12_400_EEEEEE>,
+      sorter: (a: ApiKey, b: ApiKey) => {
+        if (!a.last_used_at) return 1;
+        if (!b.last_used_at) return -1;
+        return new Date(a.last_used_at).getTime() - new Date(b.last_used_at).getTime();
+      },
+      sortIcon: SortIcon,
+      defaultSortOrder: 'descend' as const
     },
     {
-      title: <Text_12_400_757575>STATUS</Text_12_400_757575>,
-      dataIndex: "status",
-      key: "status",
+      title: 'Status',
+      dataIndex: 'status',
+      key: 'status',
+      width: 100,
       render: (status: string) => (
-        <Text_13_400_EEEEEE
+        <Text_12_400_EEEEEE
           style={{
-            color: status === "active" ? "#479D5F" : "#EC7575",
+            color: status === 'active' ? '#479D5F' : status === 'expired' ? '#D1B854' : '#EC7575',
           }}
         >
           {status.charAt(0).toUpperCase() + status.slice(1)}
-        </Text_13_400_EEEEEE>
+        </Text_12_400_EEEEEE>
       ),
+      sorter: (a: ApiKey, b: ApiKey) => a.status.localeCompare(b.status),
+      sortIcon: SortIcon,
     },
     {
-      title: "",
-      key: "actions",
-      width: 100,
+      title: '',
+      key: 'actions',
+      width: 80,
       render: (_: any, record: ApiKey) =>
-        record.status === "active" ? (
-          <Button
-            type="text"
-            onClick={() => handleRevokeKey(record.id)}
-            className="text-[#EC7575] hover:text-[#FF6B6B] hover:bg-[#EC757510]"
-            style={{ background: "transparent", border: "none" }}
+        record.status === 'active' ? (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleRevokeKey(record.id);
+            }}
+            className="text-[#EC7575] hover:text-[#FF6B6B] text-[12px] font-normal"
           >
             Revoke
-          </Button>
-        ) : (
-          <Text_12_400_757575>Revoked</Text_12_400_757575>
-        ),
+          </button>
+        ) : null,
     },
   ];
 
@@ -203,14 +231,14 @@ export default function ApiKeysPage() {
               type="primary"
               icon={<Icon icon="ph:key" />}
               className="bg-[#965CDE] border-[#965CDE] h-[2.5rem] px-[1.5rem]"
-              onClick={() => setShowCreateModal(true)}
+              onClick={() => openDrawer("add-new-key")}
             >
               Create New Key
             </Button>
           </Flex>
 
           {/* Security Notice */}
-          <div className="bg-[#5C9CDE1A] border border-[#5C9CDE33] rounded-[8px] p-[1rem] mb-[2rem] flex gap-[1rem]">
+          <div className="bg-[#5C9CDE1A] border border-[#5C9CDE33] rounded-[8px] p-[1rem]  flex gap-[1rem]">
             <Icon
               icon="ph:info"
               className="text-[#5C9CDE] text-[1.25rem] flex-shrink-0"
@@ -227,107 +255,46 @@ export default function ApiKeysPage() {
           </div>
 
           {/* API Keys Table */}
-          <div>
-            <Table
-              dataSource={apiKeys}
+          <div className='pb-[60px] pt-[.4rem] CommonCustomPagination'>
+            <Table<ApiKey>
+              onChange={(_pagination, _filters, sorter: any) => {
+                if (sorter && sorter.field) {
+                  setOrder(sorter.order === 'ascend' ? '' : '-');
+                  setOrderBy(sorter.field);
+                }
+              }}
               columns={columns}
+              pagination={{
+                className: 'small-pagination',
+                current: currentPage,
+                pageSize: pageSize,
+                total: totalKeys,
+                onChange: handlePageChange,
+                showSizeChanger: true,
+                pageSizeOptions: ['5', '10', '20', '50'],
+              }}
+              dataSource={apiKeys}
+              bordered={false}
+              loading={loading}
               rowKey="id"
-              pagination={false}
+              showSorterTooltip={false}
               className={styles.apiKeysTable}
-              style={{ background: "transparent" }}
+              style={{
+                background: "transparent"
+              }}
+              onRow={(record) => ({
+                onClick: () => {
+                  // Store the selected API key in localStorage for the drawer to access
+                  localStorage.setItem('selected_api_key', JSON.stringify(record));
+                  openDrawer("view-api-key");
+                },
+                style: { cursor: 'pointer' }
+              })}
             />
           </div>
-          {/* Create Key Modal */}
-          <Modal
-            title={<Text_19_600_EEEEEE>Create New API Key</Text_19_600_EEEEEE>}
-            open={showCreateModal}
-            onCancel={() => {
-              setShowCreateModal(false);
-              setNewKeyLabel("");
-            }}
-            footer={[
-              <Button
-                key="cancel"
-                onClick={() => {
-                  setShowCreateModal(false);
-                  setNewKeyLabel("");
-                }}
-              >
-                Cancel
-              </Button>,
-              <Button
-                key="create"
-                type="primary"
-                disabled={!newKeyLabel.trim()}
-                onClick={handleCreateKey}
-                className="bg-[#965CDE] border-[#965CDE]"
-              >
-                Create Key
-              </Button>,
-            ]}
-            className={styles.modal}
-          >
-            <Text_14_400_B3B3B3 className="mb-[1rem]">
-              Enter a label for your new API key
-            </Text_14_400_B3B3B3>
-            <Input
-              placeholder="e.g., Production API"
-              value={newKeyLabel}
-              onChange={(e) => setNewKeyLabel(e.target.value)}
-              className="bg-[#1F1F1F] border-[#2F2F2F]"
-            />
-          </Modal>
-
-          {/* Show New Key Modal */}
-          <Modal
-            title={<Text_19_600_EEEEEE>API Key Created</Text_19_600_EEEEEE>}
-            open={showKeyModal}
-            onCancel={() => {
-              setShowKeyModal(false);
-              setNewKey("");
-            }}
-            footer={[
-              <Button
-                key="done"
-                type="primary"
-                onClick={() => {
-                  setShowKeyModal(false);
-                  setNewKey("");
-                }}
-                className="bg-[#965CDE] border-[#965CDE]"
-              >
-                I&apos;ve saved this key
-              </Button>,
-            ]}
-            className={styles.modal}
-          >
-            <div className="bg-[#DE9C5C1A] border border-[#DE9C5C33] rounded-[8px] p-[1rem] mb-[1.5rem] flex gap-[0.75rem]">
-              <Icon
-                icon="ph:warning"
-                className="text-[#DE9C5C] text-[1.25rem]"
-              />
-              <Text_13_400_EEEEEE>
-                Save this key now. You won&apos;t be able to see it again!
-              </Text_13_400_EEEEEE>
-            </div>
-
-            <div className="bg-[#1F1F1F] border border-[#2F2F2F] rounded-[8px] p-[1rem] flex items-center justify-between">
-              <code className="text-[#EEEEEE] text-[0.875rem] break-all">
-                {newKey}
-              </code>
-              <Button
-                type="text"
-                icon={<Icon icon="ph:copy" />}
-                onClick={() => {
-                  navigator.clipboard.writeText(newKey);
-                  alert("Key copied to clipboard!");
-                }}
-                className="text-[#757575] hover:text-[#EEEEEE] ml-[1rem]"
-              />
-            </div>
-          </Modal>
         </div>
       </div>
+      <BudDrawer />
     </DashboardLayout>
   );
 }
