@@ -81,6 +81,7 @@ export default function ApiKeysPage() {
           is_active: cred.is_active,
           status: !cred.is_active ? "revoked" :
                   (cred.expiry && new Date(cred.expiry) < new Date() ? "expired" : "active"),
+          key: cred.key,
         }));
         setApiKeys(keys);
       }
@@ -180,28 +181,11 @@ export default function ApiKeysPage() {
       defaultSortOrder: 'descend' as const
     },
     {
-      title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
-      width: 100,
-      render: (status: string) => (
-        <Text_12_400_EEEEEE
-          style={{
-            color: status === 'active' ? '#479D5F' : status === 'expired' ? '#D1B854' : '#EC7575',
-          }}
-        >
-          {status.charAt(0).toUpperCase() + status.slice(1)}
-        </Text_12_400_EEEEEE>
-      ),
-      sorter: (a: ApiKey, b: ApiKey) => a.status.localeCompare(b.status),
-      sortIcon: SortIcon,
-    },
-    {
       title: '',
       key: 'actions',
       width: 80,
       render: (_: any, record: ApiKey) =>
-        record.status === 'active' ? (
+        record.is_active ? (
           <button
             onClick={(e) => {
               e.stopPropagation();

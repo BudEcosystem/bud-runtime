@@ -296,7 +296,7 @@ class AdapterPaginatedResponse(PaginatedSuccessResponse):
 class VLLMConfig(BaseModel):
     """VLLM config."""
 
-    type: str
+    type: str = "vllm"
     model_name: str
     api_base: str
     api_key_location: str

@@ -5,6 +5,7 @@ use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
@@ -25,6 +26,14 @@ pub struct AuthMetadata {
 
 pub type APIConfig = HashMap<String, ApiKeyMetadata>;
 pub type PublishedModelInfo = HashMap<String, ApiKeyMetadata>;
+
+// Hash API key using SHA256 with "bud-" prefix (matching Python implementation)
+fn hash_api_key(api_key: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"bud-");
+    hasher.update(api_key.as_bytes());
+    format!("{:x}", hasher.finalize())
+}
 
 // Common error response helper
 fn auth_error_response(status: StatusCode, message: &str) -> Response {
@@ -80,15 +89,21 @@ impl Auth {
     }
 
     pub fn get_auth_metadata(&self, api_key: &str) -> Option<AuthMetadata> {
+        // Hash the API key before lookup (consistent with storage)
+        let hashed_key = hash_api_key(api_key);
+
         #[expect(clippy::expect_used)]
         let auth_metadata = self.auth_metadata.read().expect("RwLock poisoned");
-        auth_metadata.get(api_key).cloned()
+        auth_metadata.get(&hashed_key).cloned()
     }
 
     pub fn validate_api_key(&self, api_key: &str) -> Result<APIConfig, StatusCode> {
+        // Hash the API key before lookup (consistent with Redis storage)
+        let hashed_key = hash_api_key(api_key);
+
         #[expect(clippy::expect_used)]
         let api_keys = self.api_keys.read().expect("RwLock poisoned");
-        if let Some(api_config) = api_keys.get(api_key) {
+        if let Some(api_config) = api_keys.get(&hashed_key) {
             return Ok(api_config.clone());
         }
         Err(StatusCode::UNAUTHORIZED)

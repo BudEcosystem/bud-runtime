@@ -40,8 +40,9 @@ type = "chat_completion"
 model = "gpt-3.5-turbo"
 max_tokens = 100
 
-[api_keys."PLACEHOLDER_API_KEY"]
-[api_keys."PLACEHOLDER_API_KEY"."gpt-3.5-turbo"]
+# Using hashed version of PLACEHOLDER_API_KEY (with bud- prefix)
+[api_keys."4533fd960e58da25369f6033f90fe44c8b69361d5ff9f21d1dd52e83364411e2"]
+[api_keys."4533fd960e58da25369f6033f90fe44c8b69361d5ff9f21d1dd52e83364411e2"."gpt-3.5-turbo"]
 endpoint_id = "gpt-3.5-turbo"
 model_id = "019787c1-3de1-7b50-969b-e0a58514b6a2"
 project_id = "019787c1-3de1-7b50-969b-e0a58514b6a1"
