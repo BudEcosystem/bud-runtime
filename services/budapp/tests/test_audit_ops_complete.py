@@ -374,18 +374,23 @@ class TestAuditService:
         # We need to patch the entire find_tampered_records method
         # because it internally calls get_audit_records which tries to validate with Pydantic
 
-        # Create expected tampered records result
+        # Create expected tampered records result matching actual return structure
         tampered_record = {
-            "audit_id": str(uuid4()),
-            "reason": "Hash mismatch detected",
+            "id": str(uuid4()),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "action": "UPDATE",
+            "resource_type": "ENDPOINT",
+            "resource_id": str(uuid4()),
+            "user_id": str(uuid4()),
+            "verification_message": "Hash mismatch detected",
         }
 
         with patch.object(service, 'find_tampered_records', return_value=[tampered_record]):
             result = service.find_tampered_records(limit=10)
 
             assert len(result) == 1
-            assert "audit_id" in result[0]
-            assert "reason" in result[0]
+            assert "id" in result[0]
+            assert "verification_message" in result[0]
 
         # Alternative: Test the actual logic by mocking at a lower level
         # Create properly formatted mock records that won't break Pydantic
@@ -446,8 +451,8 @@ class TestAuditService:
                 tampered = service.find_tampered_records(limit=10)
 
                 assert len(tampered) == 1
-                assert tampered[0]["audit_id"] == str(record2_id)
-                assert "tampering detected" in tampered[0]["reason"]
+                assert tampered[0]["id"] == str(record2_id)
+                assert "tampering detected" in tampered[0]["verification_message"]
 
     def test_sanitize_sensitive_data(self, service):
         """Test sensitive data sanitization."""
