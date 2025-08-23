@@ -38,7 +38,7 @@
       fail:
         msg: |
           Node Feature Discovery (NFD) is not installed on this cluster.
-          Please run deploy_nfd.yaml to install NFD first.
+          Please run setup_cluster.yaml to install NFD and other required components.
           NFD is required for hardware detection and node information gathering.
       when: not nfd_available
 

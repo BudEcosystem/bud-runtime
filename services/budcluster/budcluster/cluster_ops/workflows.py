@@ -548,12 +548,13 @@ class RegisterClusterWorkflow:
             target_name=add_cluster_request_json.source,
         )
 
-        # Set initial ETA
+        # Set initial ETA (in minutes for notification)
         notification_req.payload.event = "eta"
-        eta_minutes = 10 if add_cluster_request_json.cluster_type == "CLOUD" else 5
+        # Cloud clusters: ~10 minutes, On-premises: ~3 minutes
+        eta_minutes = 10 if add_cluster_request_json.cluster_type == "CLOUD" else 3
         notification_req.payload.content = NotificationContent(
             title="Estimated time to completion",
-            message=f"{eta_minutes * 10}",
+            message=f"{eta_minutes}",
             status=WorkflowStatus.RUNNING,
         )
         dapr_workflows.publish_notification(
@@ -605,11 +606,11 @@ class RegisterClusterWorkflow:
                 )
                 return
 
-            # Update ETA
+            # Update ETA - Credentials validated, ~9 minutes remaining
             notification_req.payload.event = "eta"
             notification_req.payload.content = NotificationContent(
                 title="Estimated time to completion",
-                message=f"{9 * 10}",
+                message=f"{9}",
                 status=WorkflowStatus.RUNNING,
             )
             dapr_workflows.publish_notification(
@@ -735,11 +736,11 @@ class RegisterClusterWorkflow:
                 },
             )
 
-            # Update ETA
+            # Update ETA - Cloud cluster created, ~5 minutes for configuration
             notification_req.payload.event = "eta"
             notification_req.payload.content = NotificationContent(
                 title="Estimated time to completion",
-                message=f"{5 * 10}",
+                message=f"{5}",
                 status=WorkflowStatus.RUNNING,
             )
             dapr_workflows.publish_notification(
@@ -797,11 +798,11 @@ class RegisterClusterWorkflow:
                 target_name=add_cluster_request_json.source,
             )
 
-            # Update ETA
+            # Update ETA - Platform determined, ~3 minutes remaining
             notification_req.payload.event = "eta"
             notification_req.payload.content = NotificationContent(
                 title="Estimated time to completion",
-                message=f"{4 * 10}",
+                message=f"{3}",
                 status=WorkflowStatus.RUNNING,
             )
             dapr_workflows.publish_notification(
@@ -850,11 +851,11 @@ class RegisterClusterWorkflow:
                 target_name=add_cluster_request_json.source,
             )
 
-            # Update ETA
+            # Update ETA - Duplicate check done, ~2 minutes remaining
             notification_req.payload.event = "eta"
             notification_req.payload.content = NotificationContent(
                 title="Estimated time to completion",
-                message=f"{3 * 10}",
+                message=f"{2}",
                 status=WorkflowStatus.RUNNING,
             )
             dapr_workflows.publish_notification(
@@ -909,11 +910,11 @@ class RegisterClusterWorkflow:
             target_name=add_cluster_request_json.source,
         )
 
-        # notify activity ETA
+        # notify activity ETA - Cluster verified, ~2 minutes for configuration
         notification_req.payload.event = "eta"
         notification_req.payload.content = NotificationContent(
             title="Estimated time to completion",
-            message=f"{2 * 10}",
+            message=f"{2}",
             status=WorkflowStatus.RUNNING,
         )
         dapr_workflows.publish_notification(
@@ -968,11 +969,11 @@ class RegisterClusterWorkflow:
             target_name=add_cluster_request_json.source,
         )
 
-        # notify activity ETA
+        # notify activity ETA - Configuration done, ~1 minute for fetching info
         notification_req.payload.event = "eta"
         notification_req.payload.content = NotificationContent(
             title="Estimated time to completion",
-            message=f"{1 * 10}",
+            message=f"{1}",
             status=WorkflowStatus.RUNNING,
         )
         dapr_workflows.publish_notification(
@@ -1013,6 +1014,31 @@ class RegisterClusterWorkflow:
                 target_topic_name=add_cluster_request_json.source_topic,
                 target_name=add_cluster_request_json.source,
             )
+
+            # Mark cluster as failed in DB since registration failed
+            try:
+                from ..commons.constants import ClusterStatusEnum
+                from ..db.crud import ClusterDataManager
+                from ..db.session import DBSession
+
+                with DBSession() as session:
+                    db_cluster = asyncio.run(
+                        ClusterDataManager(session).retrieve_cluster_by_fields(
+                            {"id": fetch_cluster_info_request.cluster_id}
+                        )
+                    )
+                    if db_cluster:
+                        asyncio.run(
+                            ClusterDataManager(session).update_cluster_by_fields(
+                                db_cluster, {"status": ClusterStatusEnum.NOT_AVAILABLE}
+                            )
+                        )
+                        logger.info(
+                            f"Marked cluster {fetch_cluster_info_request.cluster_id} as NOT_AVAILABLE due to fetch_cluster_info failure"
+                        )
+            except Exception as e:
+                logger.error(f"Failed to update cluster status on fetch_cluster_info failure: {e}")
+
             # yield ctx.call_activity(notify_activity, input=notification_activity_request.model_dump_json())
             return
 
@@ -1205,8 +1231,8 @@ class RegisterClusterWorkflow:
                 ),
             ]
 
-            # Set longer ETA for cloud deployments
-            eta = 30 * 5  # 5 minutes
+            # Set longer ETA for cloud deployments (10 minutes)
+            eta = 600  # 600 seconds = 10 minutes
 
         else:
             logger.info(f"Setting up workflow for on-prem cluster: {request.name}")
@@ -1241,8 +1267,8 @@ class RegisterClusterWorkflow:
                 ),
             ]
 
-            # Set standard ETA for on-prem deployments
-            eta = 30 * 5  # 5 minutes
+            # Set standard ETA for on-prem deployments (3 minutes)
+            eta = 600  # 60 seconds = 1 minute
         # Schedule the workflow
         response = await dapr_workflows.schedule_workflow(
             workflow_name="register_cluster",
@@ -1374,11 +1400,11 @@ class DeleteClusterWorkflow:
             target_name=delete_cluster_request_json.source,
         )
 
-        # notify activity ETA
+        # notify activity ETA - Final deletion steps
         notification_req.payload.event = "eta"
         notification_req.payload.content = NotificationContent(
             title="Estimated time to completion",
-            message=f"{1 * 10}",
+            message=f"{1}",
             status=WorkflowStatus.RUNNING,
         )
         dapr_workflows.publish_notification(

@@ -1,23 +1,24 @@
-# NFD Deployment and Configuration Guide
+# Cluster Setup and NFD Configuration Guide
 
 ## Installation
 
 ### Automatic Deployment (Recommended)
 
-NFD deployment is integrated into the cluster setup process. When you provision a new cluster or run the node collector deployment, NFD will be automatically deployed.
+Cluster setup is integrated into the provisioning process. When you provision a new cluster or run the setup playbook, NFD, GPU operators, and Aibrix components will be automatically deployed.
 
 ```bash
-# NFD is automatically deployed when running deploy_nfd playbook
-ansible-playbook budcluster/playbooks/deploy_nfd.yaml \
+# Cluster setup with NFD, GPU operators, and Aibrix components
+ansible-playbook budcluster/playbooks/setup_cluster.yaml \
   -e cluster_id=<cluster-uuid> \
   -e namespace=bud-runtime
 ```
 
 This playbook will:
-1. Install Node Feature Discovery
+1. Install Node Feature Discovery (NFD)
 2. Detect and install GPU Operator if NVIDIA GPUs are present
 3. Detect and install Intel Device Plugin if HPUs are present
 4. Configure NFD to extract CPU model names
+5. Install Aibrix dependencies and core components for model autoscaling
 
 ### Manual Deployment
 
@@ -149,10 +150,10 @@ charts/nfd/
 If you see this error:
 ```
 Node Feature Discovery (NFD) is not installed on this cluster.
-Please run deploy_nfd.yaml to install NFD first.
+Please run setup_cluster.yaml to install NFD and required components.
 ```
 
-Solution: Run `ansible-playbook deploy_nfd.yaml` to install NFD.
+Solution: Run `ansible-playbook setup_cluster.yaml` to setup the cluster.
 
 ### Missing CPU Model
 
@@ -169,7 +170,7 @@ kubectl rollout restart daemonset/nfd-worker -n node-feature-discovery
 
 If GPUs are not detected:
 1. Check if GPU drivers are installed on nodes
-2. Verify GPU Operator is deployed (automatic with deploy_nfd.yaml)
+2. Verify GPU Operator is deployed (automatic with setup_cluster.yaml)
 3. Check node labels: `kubectl get node <node-name> -o yaml | grep nvidia`
 
 ### Detection Timeouts
@@ -199,7 +200,7 @@ docker logs budcluster-app 2>&1 | grep -i "fallback\|nfd"
 
 If upgrading from a version that used node-info-collector:
 
-1. **Install NFD**: Run `deploy_nfd.yaml`
+1. **Setup Cluster**: Run `setup_cluster.yaml`
 2. **Clean up ConfigMaps**: Remove old node-info-collector ConfigMaps
    ```bash
    kubectl delete configmap -n <namespace> -l app=node-info-collector

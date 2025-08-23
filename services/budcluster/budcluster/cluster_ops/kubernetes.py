@@ -100,8 +100,8 @@ class KubernetesHandler(BaseClusterHandler):
     def initial_setup(self, cluster_id: UUID) -> None:
         """Execute the initial setup for the Kubernetes cluster using Ansible playbook.
 
-        This method runs the 'NODE_INFO_COLLECTOR' playbook to gather node information
-        and apply necessary configurations.
+        This method runs the 'SETUP_CLUSTER' playbook to deploy NFD, GPU operators,
+        Aibrix components, and gather node information.
 
         Raises:
             Exception: If the setup fails on any node.
@@ -109,9 +109,9 @@ class KubernetesHandler(BaseClusterHandler):
         Returns:
             str: The status of the setup process.
         """
-        # Deploy NFD (Node Feature Discovery) for hardware detection
+        # Setup cluster with NFD, GPU operators, and Aibrix components
         result = self.ansible_executor.run_playbook(
-            playbook="DEPLOY_NFD",  # Updated to use NFD-only approach
+            playbook="SETUP_CLUSTER",  # Uses comprehensive cluster setup
             extra_vars={
                 "kubeconfig_content": self.config,
                 "image_pull_secrets": self.get_image_pull_secret(),

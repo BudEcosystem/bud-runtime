@@ -1,5 +1,5 @@
 ---
-- name: Deploy Node Feature Discovery (NFD) and GPU/HPU Operators
+- name: Setup Cluster with NFD, GPU/HPU Operators, and Aibrix Components
   hosts: localhost
   connection: local
   gather_facts: false
@@ -340,6 +340,81 @@
             gaudiEnabled: true
       when: has_intel_hpus | default(false)
 
+    # Aibrix Components Deployment Section
+    - name: Check if Aibrix CRDs are installed
+      kubernetes.core.k8s_info:
+        api_version: apiextensions.k8s.io/v1
+        kind: CustomResourceDefinition
+        name: modeladapters.model.aibrix.ai
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: aibrix_crd_check
+      ignore_errors: true
+
+    - name: Check if Aibrix controller is deployed
+      kubernetes.core.k8s_info:
+        kind: Deployment
+        namespace: aibrix-system
+        name: aibrix-controller-manager
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: aibrix_controller_check
+      ignore_errors: true
+
+    - name: Determine Aibrix deployment action
+      set_fact:
+        aibrix_needs_deployment: >-
+          {{ aibrix_crd_check.failed or
+             not aibrix_crd_check.resources or
+             aibrix_crd_check.resources | length == 0 or
+             aibrix_controller_check.failed or
+             not aibrix_controller_check.resources or
+             aibrix_controller_check.resources | length == 0 or
+             (aibrix_controller_check.resources[0].status.availableReplicas | default(0)) == 0 or
+             force_reinstall_components or
+             update_existing_components }}
+
+    - name: Skip Aibrix if already deployed and healthy
+      debug:
+        msg: "Aibrix components are already deployed and healthy. Skipping deployment."
+      when:
+        - not aibrix_needs_deployment
+        - skip_healthy_components
+
+    - name: Install Aibrix dependencies
+      kubernetes.core.k8s:
+        state: present
+        src: https://github.com/BudEcosystem/aibrix/releases/download/0.2.0/aibrix-dependency-v0.2.0.yaml
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      when: aibrix_needs_deployment | default(true)
+
+    - name: Install Aibrix core components
+      kubernetes.core.k8s:
+        state: present
+        src: https://github.com/BudEcosystem/aibrix/releases/download/0.2.0/aibrix-core-v0.2.0.yaml
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      when: aibrix_needs_deployment | default(true)
+
+    - name: Wait for Aibrix controller to be ready
+      kubernetes.core.k8s_info:
+        kind: Deployment
+        namespace: aibrix-system
+        name: aibrix-controller-manager
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: aibrix_controller
+      retries: 6
+      delay: 10
+      until: >
+        aibrix_controller.resources is defined and
+        aibrix_controller.resources | length > 0 and
+        aibrix_controller.resources[0].status.availableReplicas is defined and
+        aibrix_controller.resources[0].status.availableReplicas > 0
+      when: aibrix_needs_deployment | default(true)
+      ignore_errors: true
+
     # Wait for NFD to label nodes
     - name: Wait for NFD to label nodes
       kubernetes.core.k8s_info:
@@ -363,16 +438,18 @@
     - name: Display deployment summary
       debug:
         msg: |
-          NFD Deployment Complete:
+          Cluster Setup Complete:
           - NFD Status: {{ 'Deployed' if nfd_needs_deployment | default(true) else 'Already exists' }}
           - NVIDIA GPUs Detected: {{ has_nvidia_gpus | default(false) }}
           - Intel HPUs Detected: {{ has_intel_hpus | default(false) }}
           - GPU Operator: {{ 'Deployed' if has_nvidia_gpus | default(false) else 'Not needed' }}
           - Intel Device Plugin: {{ 'Deployed' if has_intel_hpus | default(false) else 'Not needed' }}
+          - Aibrix Components: {{ 'Deployed' if aibrix_needs_deployment | default(true) else 'Already exists' }}
 
           Next Steps:
           - Use get_node_info.yaml to retrieve hardware information
           - NFD labels will be automatically updated every 60 seconds
+          - Aibrix autoscaler and model adapters are ready for use
 
   post_tasks:
     - name: Cleanup kubeconfig file

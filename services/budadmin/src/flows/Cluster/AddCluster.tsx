@@ -41,7 +41,9 @@ export default function AddCluster() {
     if (values.icon && formData.get("icon") !== values.icon) {
       formData.set("icon", values.icon);
     }
-  }, [values.name, values.ingress_url, values.icon, formData]);
+    // Note: formData is intentionally not in the dependency array
+    // because we're mutating it directly, not replacing it
+  }, [values.name, values.ingress_url, values.icon]);
 
   return (
     <BudForm
