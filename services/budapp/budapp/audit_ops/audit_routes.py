@@ -5,8 +5,8 @@ Note: These routes are primarily for internal use and admin access.
 Creating audit records should be done through the service layer, not via API.
 """
 
-from datetime import datetime
-from typing import Annotated, Optional
+from datetime import datetime, timezone
+from typing import Annotated, List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -22,7 +22,6 @@ from budapp.audit_ops.services import AuditService
 from budapp.commons.constants import AuditActionEnum, AuditResourceTypeEnum, PermissionEnum
 from budapp.commons.dependencies import get_current_active_user, get_session
 from budapp.commons.permission_handler import require_permissions
-from budapp.commons.schemas.pagination import PaginationQuery
 from budapp.user_ops.models import User
 
 
@@ -39,7 +38,8 @@ audit_router = APIRouter(prefix="/audit", tags=["Audit"])
 async def get_audit_records(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
-    pagination: Annotated[PaginationQuery, Depends()],
+    page: Annotated[int, Query(ge=1, description="Page number")] = 1,
+    limit: Annotated[int, Query(ge=1, le=100, description="Items per page")] = 10,
     user_id: Optional[UUID] = Query(None, description="Filter by user ID"),
     actioned_by: Optional[UUID] = Query(None, description="Filter by admin/user who performed action on behalf"),
     action: Optional[AuditActionEnum] = Query(None, description="Filter by action type"),
@@ -68,11 +68,14 @@ async def get_audit_records(
             ip_address=ip_address,
         )
 
+        # Calculate offset from page and limit
+        offset = (page - 1) * limit
+
         # Get audit records
         records, total = service.get_audit_records(
             filter_params=filter_params,
-            offset=pagination.offset,
-            limit=pagination.limit,
+            offset=offset,
+            limit=limit,
         )
 
         return AuditRecordListResponse(
@@ -80,8 +83,8 @@ async def get_audit_records(
             message="Audit records retrieved successfully",
             data=records,
             total=total,
-            offset=pagination.offset,
-            limit=pagination.limit,
+            offset=offset,
+            limit=limit,
         )
     except Exception as e:
         raise HTTPException(
@@ -151,7 +154,8 @@ async def get_user_audit_records(
     user_id: UUID,
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
-    pagination: Annotated[PaginationQuery, Depends()],
+    page: Annotated[int, Query(ge=1, description="Page number")] = 1,
+    limit: Annotated[int, Query(ge=1, le=100, description="Items per page")] = 10,
     action: Optional[AuditActionEnum] = Query(None, description="Filter by action type"),
     resource_type: Optional[AuditResourceTypeEnum] = Query(None, description="Filter by resource type"),
     start_date: Optional[datetime] = Query(None, description="Filter by start date"),
@@ -168,11 +172,14 @@ async def get_user_audit_records(
     try:
         service = AuditService(session)
 
+        # Calculate offset from page and limit
+        offset = (page - 1) * limit
+
         # Get user's audit records
         records, total = service.data_manager.get_audit_records(
             user_id=user_id,
-            offset=pagination.offset,
-            limit=pagination.limit,
+            offset=offset,
+            limit=limit,
             start_date=start_date,
             end_date=end_date,
             action=action,
@@ -198,8 +205,8 @@ async def get_user_audit_records(
             message=f"Audit records for user {user_id} retrieved successfully",
             data=entries,
             total=total,
-            offset=pagination.offset,
-            limit=pagination.limit,
+            offset=offset,
+            limit=limit,
         )
     except Exception as e:
         raise HTTPException(
@@ -220,7 +227,8 @@ async def get_resource_audit_records(
     resource_id: UUID,
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
-    pagination: Annotated[PaginationQuery, Depends()],
+    page: Annotated[int, Query(ge=1, description="Page number")] = 1,
+    limit: Annotated[int, Query(ge=1, le=100, description="Items per page")] = 10,
 ):
     """Get audit records for a specific resource.
 
@@ -229,12 +237,15 @@ async def get_resource_audit_records(
     try:
         service = AuditService(session)
 
+        # Calculate offset from page and limit
+        offset = (page - 1) * limit
+
         # Get resource's audit records
         records, total = service.data_manager.get_audit_records(
             resource_type=resource_type,
             resource_id=resource_id,
-            offset=pagination.offset,
-            limit=pagination.limit,
+            offset=offset,
+            limit=limit,
             include_user=True,
         )
 
@@ -257,8 +268,8 @@ async def get_resource_audit_records(
             message=f"Audit records for {resource_type} {resource_id} retrieved successfully",
             data=entries,
             total=total,
-            offset=pagination.offset,
-            limit=pagination.limit,
+            offset=offset,
+            limit=limit,
         )
     except Exception as e:
         raise HTTPException(
