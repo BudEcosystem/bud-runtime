@@ -235,6 +235,10 @@ async def setup_user_billing(
             custom_cost_quota=request.custom_cost_quota,
         )
 
+        # Refresh cache after creating user billing
+        await service.refresh_user_cache(request.user_id)
+        logger.info(f"Cache refreshed for user {request.user_id} after billing setup")
+
         return SingleResponse(
             result=UserBillingSchema.from_orm(user_billing),
             message="User billing set up successfully",
@@ -297,6 +301,10 @@ async def update_billing_plan(
 
         db.commit()
         db.refresh(user_billing)
+
+        # Invalidate and refresh cache after billing plan update
+        await service.refresh_user_cache(request.user_id)
+        logger.info(f"Cache refreshed for user {request.user_id} after billing plan update")
 
         return SingleResponse(
             result=UserBillingSchema.from_orm(user_billing),
