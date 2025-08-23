@@ -66,7 +66,7 @@ const BudStepAlert: React.FC<BudStepAlertProps> = ({
         </div>
       </div>
     </div>
-    
+
   );
 };
 
