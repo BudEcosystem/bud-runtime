@@ -49,6 +49,11 @@ from ..benchmark_ops.models import BenchmarkRequestMetricsSchema as BenchmarkReq
 from ..benchmark_ops.models import BenchmarkSchema as BenchmarkSchema
 from ..cluster_ops.models import ModelClusterRecommended as ModelClusterRecommended
 from ..dataset_ops.models import DatasetSchema as DatasetSchema
+from ..guardrails.models import GuardrailDeployment as GuardrailDeployment
+from ..guardrails.models import GuardrailDeploymentProbe as GuardrailDeploymentProbe
+from ..guardrails.models import GuardrailDeploymentRule as GuardrailDeploymentRule
+from ..guardrails.models import GuardrailProbe as GuardrailProbe
+from ..guardrails.models import GuardrailRule as GuardrailRule
 from ..playground_ops.models import ChatSession as ChatSession
 from ..playground_ops.models import Message as Message
 from ..playground_ops.models import Note as Note

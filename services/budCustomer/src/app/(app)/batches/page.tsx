@@ -6,11 +6,12 @@ import {
   Table,
   Button,
   Modal,
-  Input,
   Tag,
   Progress,
   Tooltip,
 } from "antd";
+import { useDrawer } from "@/hooks/useDrawer";
+import BudDrawer from "@/components/ui/bud/drawer/BudDrawer";
 import { Typography } from "antd";
 
 const { Text, Title } = Typography;
@@ -34,9 +35,9 @@ interface BatchJob {
 }
 
 export default function BatchesPage() {
-  const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedBatch, setSelectedBatch] = useState<BatchJob | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const { openDrawerWithStep } = useDrawer();
 
   // Mock data
   const batches: BatchJob[] = [
@@ -114,7 +115,7 @@ export default function BatchesPage() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "queued":
-        return "var(--bud-text-disabled)";
+        return "#E6C240";
       case "processing":
         return "#4077E6";
       case "completed":
@@ -368,7 +369,7 @@ export default function BatchesPage() {
               type="primary"
               icon={<Icon icon="ph:plus" />}
               className="bg-bud-purple border-bud-purple hover:bg-bud-purple-hover h-[2.5rem] px-[1.5rem]"
-              onClick={() => setShowCreateModal(true)}
+              onClick={() => openDrawerWithStep("create-batch-job")}
             >
               Create Batch Job
             </Button>
@@ -445,77 +446,6 @@ export default function BatchesPage() {
             />
           </div>
 
-          {/* Create Batch Modal */}
-          <Modal
-            title={
-              <Text className="text-bud-text-primary font-semibold text-[19px]">
-                Create Batch Job
-              </Text>
-            }
-            open={showCreateModal}
-            onCancel={() => setShowCreateModal(false)}
-            footer={[
-              <Button key="cancel" onClick={() => setShowCreateModal(false)}>
-                Cancel
-              </Button>,
-              <Button
-                key="create"
-                type="primary"
-                className="bg-bud-purple border-bud-purple hover:bg-bud-purple-hover"
-                onClick={() => setShowCreateModal(false)}
-              >
-                Create Job
-              </Button>,
-            ]}
-            className={styles.modal}
-            width={600}
-          >
-            <Text className="text-bud-text-muted text-[14px] mb-[1.5rem] block">
-              Upload a JSONL file containing your batch requests
-            </Text>
-
-            <div className="space-y-[1rem]">
-              <div>
-                <Text className="text-bud-text-muted text-[12px] mb-[0.5rem] block">
-                  Job Name
-                </Text>
-                <Input
-                  placeholder="e.g., Product Descriptions Generation"
-                  className="bg-bud-bg-tertiary border-bud-border-secondary"
-                />
-              </div>
-
-              <div>
-                <Text className="text-bud-text-muted text-[12px] mb-[0.5rem] block">
-                  Select Model
-                </Text>
-                <select className="w-full bg-bud-bg-tertiary border border-bud-border-secondary text-bud-text-primary px-[0.75rem] py-[0.5rem] rounded-[6px]">
-                  <option>GPT-4</option>
-                  <option>GPT-3.5 Turbo</option>
-                  <option>Claude 3 Opus</option>
-                  <option>Claude 3 Sonnet</option>
-                </select>
-              </div>
-
-              <div>
-                <Text className="text-bud-text-muted text-[12px] mb-[0.5rem] block">
-                  Upload JSONL File
-                </Text>
-                <div className="border-2 border-dashed border-bud-border-secondary rounded-[8px] p-[2rem] text-center cursor-pointer hover:border-bud-purple transition-colors">
-                  <Icon
-                    icon="ph:upload-simple"
-                    className="text-[2rem] text-bud-text-disabled mb-[0.5rem]"
-                  />
-                  <Text className="text-bud-text-muted text-[14px]">
-                    Drag and drop your JSONL file here, or click to browse
-                  </Text>
-                  <Text className="mt-[0.25rem] text-bud-text-disabled text-[12px] block">
-                    Maximum file size: 100MB
-                  </Text>
-                </div>
-              </div>
-            </div>
-          </Modal>
 
           {/* Details Modal */}
           <Modal
@@ -651,6 +581,7 @@ export default function BatchesPage() {
           </Modal>
         </div>
       </div>
+      <BudDrawer />
     </DashboardLayout>
   );
 }

@@ -2,7 +2,7 @@ use backon::{ExponentialBuilder, Retryable};
 use futures::StreamExt;
 use reqwest::Client;
 use secrecy::SecretString;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, OnceLock};
@@ -87,6 +87,15 @@ impl RetryConfig {
     }
 }
 
+/// Pricing information for a model
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ModelPricing {
+    pub input_cost: f64,  // Cost per input tokens
+    pub output_cost: f64, // Cost per output tokens
+    pub currency: String, // Currency code (e.g., "USD")
+    pub per_tokens: u32,  // Number of tokens for the pricing unit (e.g., 1000)
+}
+
 #[derive(Debug)]
 pub struct ModelConfig {
     pub routing: Vec<Arc<str>>, // [provider name A, provider name B, ...]
@@ -95,6 +104,7 @@ pub struct ModelConfig {
     pub fallback_models: Option<Vec<Arc<str>>>, // Optional fallback to other models
     pub retry_config: Option<RetryConfig>, // Optional model-level retry configuration
     pub rate_limits: Option<crate::rate_limit::RateLimitConfig>, // rate limiting configuration
+    pub pricing: Option<ModelPricing>, // Optional pricing information
 }
 
 #[derive(Debug, Deserialize)]
@@ -108,6 +118,8 @@ pub(crate) struct UninitializedModelConfig {
     pub retry_config: Option<RetryConfig>,      // Optional model-level retry configuration
     #[serde(default)]
     pub rate_limits: Option<crate::rate_limit::RateLimitConfig>, // rate limiting configuration
+    #[serde(default)]
+    pub pricing: Option<ModelPricing>, // Optional pricing information
 }
 
 /// Determine endpoint capabilities based on model name patterns
@@ -605,6 +617,7 @@ impl UninitializedModelConfig {
             fallback_models: self.fallback_models,
             retry_config: self.retry_config,
             rate_limits: self.rate_limits,
+            pricing: self.pricing,
         })
     }
 }
@@ -3268,6 +3281,7 @@ impl ShorthandModelConfig for ModelConfig {
             fallback_models: None, // Shorthand models don't support fallback
             retry_config: None,    // Shorthand models don't have retry config
             rate_limits: None,     // Shorthand models don't have rate limits
+            pricing: None,         // Shorthand models don't have pricing
         })
     }
 
@@ -3381,6 +3395,7 @@ mod tests {
             fallback_models: None,
             retry_config: None,
             rate_limits: None,
+            pricing: None,
         };
         let tool_config = ToolCallConfig {
             tools_available: vec![],
@@ -3451,6 +3466,7 @@ mod tests {
             fallback_models: None,
             retry_config: None,
             rate_limits: None,
+            pricing: None,
         };
         let response = model_config
             .infer(&request, &clients, model_name)
@@ -3550,6 +3566,7 @@ mod tests {
             fallback_models: None,
             retry_config: None,
             rate_limits: None,
+            pricing: None,
         };
 
         let model_name = "test model";
@@ -3619,6 +3636,7 @@ mod tests {
             fallback_models: None,
             retry_config: None,
             rate_limits: None,
+            pricing: None,
         };
         let (
             StreamResponse {
@@ -3692,6 +3710,7 @@ mod tests {
             fallback_models: None,
             retry_config: None,
             rate_limits: None,
+            pricing: None,
         };
         let response = model_config
             .infer_stream(
@@ -3793,6 +3812,7 @@ mod tests {
             fallback_models: None,
             retry_config: None,
             rate_limits: None,
+            pricing: None,
         };
         let (
             StreamResponse {
@@ -3874,6 +3894,7 @@ mod tests {
             fallback_models: None,
             retry_config: None,
             rate_limits: None,
+            pricing: None,
         };
         let tool_config = ToolCallConfig {
             tools_available: vec![],
@@ -3984,6 +4005,7 @@ mod tests {
             fallback_models: None,
             retry_config: None,
             rate_limits: None,
+            pricing: None,
         };
         let tool_config = ToolCallConfig {
             tools_available: vec![],
@@ -4110,6 +4132,7 @@ mod tests {
             fallback_models: None,
             retry_config: None,
             rate_limits: None,
+            pricing: None,
         };
         let model_table: ModelTable = HashMap::from([("claude".into(), anthropic_model_config)])
             .try_into()
@@ -4221,6 +4244,7 @@ mod tests {
             fallback_models: None,
             retry_config: None,
             rate_limits: None,
+            pricing: None,
         };
 
         assert!(model.supports_endpoint(EndpointCapability::Chat));
@@ -4248,6 +4272,7 @@ mod tests {
             fallback_models: None,
             retry_config: None,
             rate_limits: None,
+            pricing: None,
         };
 
         let result = model.validate("test_model");
@@ -4288,6 +4313,7 @@ mod tests {
                 fallback_models: None,
                 retry_config: None,
                 rate_limits: None,
+            pricing: None,
             },
         );
         models.insert(
@@ -4299,6 +4325,7 @@ mod tests {
                 fallback_models: None,
                 retry_config: None,
                 rate_limits: None,
+            pricing: None,
             },
         );
         models.insert(
@@ -4310,6 +4337,7 @@ mod tests {
                 fallback_models: None,
                 retry_config: None,
                 rate_limits: None,
+            pricing: None,
             },
         );
 
@@ -4362,6 +4390,7 @@ mod tests {
                         fallback_models: None,
                         retry_config: None,
                         rate_limits: None,
+            pricing: None,
                     },
                 );
 
@@ -4406,6 +4435,7 @@ mod tests {
             fallback_models: None,
             retry_config: None,
             rate_limits: None,
+            pricing: None,
         };
 
         let request = crate::embeddings::EmbeddingRequest {

@@ -271,6 +271,7 @@ pub async fn inference_handler(
                         write_info.observability_metadata,
                         write_info.gateway_request,
                         gateway_response,
+                        write_info.model_pricing,
                     )
                     .await;
                 });
@@ -334,6 +335,7 @@ pub struct WriteInfo {
     pub metadata: InferenceDatabaseInsertMetadata,
     pub observability_metadata: Option<ObservabilityMetadata>,
     pub gateway_request: Option<String>,
+    pub model_pricing: Option<crate::model::ModelPricing>,
 }
 
 impl std::fmt::Debug for InferenceOutput {
@@ -655,11 +657,24 @@ pub async fn inference(
                     extra_body,
                     extra_headers,
                 };
+
+                // Get model pricing from the result
+                let model_pricing = if let Some(first_result) = result.model_inference_results().first() {
+                    // Look up the model config to get pricing
+                    match models.get(&first_result.model_name).await {
+                        Ok(Some(model)) => model.pricing.clone(),
+                        _ => None,
+                    }
+                } else {
+                    None
+                };
+
                 Some(WriteInfo {
                     resolved_input: resolved_input.clone(),
                     metadata: write_metadata,
                     observability_metadata: params.observability_metadata.clone(),
                     gateway_request: params.gateway_request.clone(),
+                    model_pricing,
                 })
             } else {
                 None
@@ -817,6 +832,7 @@ fn create_stream(
             let async_write = config.gateway.observability.async_writes;
             let write_future = async move {
                 let templates = &config.templates;
+                let model_name_for_pricing = model_name.clone(); // Clone model_name before moving into CollectChunksArgs
                 let collect_chunks_args = CollectChunksArgs {
                     value: buffer,
                     inference_id,
@@ -866,6 +882,13 @@ fn create_stream(
                             Some(gateway_response_chunks.join(""))
                         };
 
+                        // Get model pricing from the model config
+                        let models = config.models.read().await;
+                        let model_pricing = match models.get(&model_name_for_pricing).await {
+                            Ok(Some(model)) => model.pricing.clone(),
+                            _ => None,
+                        };
+
                         write_inference(
                             &clickhouse_connection_info,
                             &kafka_connection_info,
@@ -876,6 +899,7 @@ fn create_stream(
                             observability_metadata,
                             gateway_request,
                             gateway_response,
+                            model_pricing,
                         ).await;
 
                 }
@@ -999,6 +1023,7 @@ pub async fn write_inference(
     observability_metadata: Option<ObservabilityMetadata>,
     gateway_request: Option<String>,
     gateway_response: Option<String>,
+    model_pricing: Option<crate::model::ModelPricing>,
 ) {
     let mut futures: Vec<Pin<Box<dyn Future<Output = ()> + Send>>> = Vec::new();
     if config.gateway.observability.enabled.unwrap_or(true) {
@@ -1157,6 +1182,7 @@ pub async fn write_inference(
     }));
 
     // Kafka observability metrics
+    let model_pricing = model_pricing.clone();
 
     futures.push(Box::pin(async move {
         // Create observability event from inference result
@@ -1235,8 +1261,21 @@ pub async fn write_inference(
             InferenceResult::ImageGeneration(result) => &result.usage,
             InferenceResult::Moderation(result) => &result.usage,
         };
+        // Calculate cost using actual pricing if available, otherwise use defaults
         let cost = if usage.input_tokens > 0 || usage.output_tokens > 0 {
-            Some((usage.input_tokens as f64 * 0.00001) + (usage.output_tokens as f64 * 0.00003))
+            if let Some(pricing) = &model_pricing {
+                // Convert tokens to the pricing unit (e.g., if per_tokens is 1000, divide by 1000)
+                let input_multiplier = usage.input_tokens as f64 / pricing.per_tokens as f64;
+                let output_multiplier = usage.output_tokens as f64 / pricing.per_tokens as f64;
+
+                let total_cost = (input_multiplier * pricing.input_cost) +
+                                (output_multiplier * pricing.output_cost);
+                Some(total_cost)
+            } else {
+                // Fallback to default pricing if not configured
+                // Using reasonable defaults: $0.01 per 1K input tokens, $0.03 per 1K output tokens
+                Some((usage.input_tokens as f64 * 0.00001) + (usage.output_tokens as f64 * 0.00003))
+            }
         } else {
             None
         };

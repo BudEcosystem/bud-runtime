@@ -3284,37 +3284,41 @@ class ModelService(SessionMixin):
                 Model, {"id": model_id, "status": ModelStatusEnum.ACTIVE}
             )
 
-            # Create next step from backend
-            # Increment workflow_current_step with 1
-            current_step_number = current_step_number + 1
-            workflow_current_step = current_step_number
+            # Skip cluster simulation for cloud models
+            if db_model.provider_type != ModelProviderTypeEnum.CLOUD_MODEL:
+                # Create next step from backend
+                # Increment workflow_current_step with 1
+                current_step_number = current_step_number + 1
+                workflow_current_step = current_step_number
 
-            bud_simulator_events = await self._perform_cluster_simulation(
-                db_workflow.id,
-                deploy_config,
-                current_user_id,
-                db_model.uri,
-                db_model.provider_type,
-                db_model.local_path,
-            )
-            simulator_id = bud_simulator_events.pop("workflow_id")
-            recommended_cluster_events = {
-                "simulator_id": simulator_id,
-                "bud_simulator_events": bud_simulator_events,
-            }
+                bud_simulator_events = await self._perform_cluster_simulation(
+                    db_workflow.id,
+                    deploy_config,
+                    current_user_id,
+                    db_model.uri,
+                    db_model.provider_type,
+                    db_model.local_path,
+                )
+                simulator_id = bud_simulator_events.pop("workflow_id")
+                recommended_cluster_events = {
+                    "simulator_id": simulator_id,
+                    "bud_simulator_events": bud_simulator_events,
+                }
 
-            # Update or create next workflow step
-            db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
-                db_workflow.id, current_step_number, recommended_cluster_events
-            )
-            logger.debug(f"Workflow step updated {db_workflow_step.id}")
+                # Update or create next workflow step
+                db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+                    db_workflow.id, current_step_number, recommended_cluster_events
+                )
+                logger.debug(f"Workflow step updated {db_workflow_step.id}")
 
-            # Update workflow progress
-            bud_simulator_events["progress_type"] = "bud_simulator_events"
-            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
-                db_workflow,
-                {"progress": bud_simulator_events, "current_step": workflow_current_step},
-            )
+                # Update workflow progress
+                bud_simulator_events["progress_type"] = "bud_simulator_events"
+                db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                    db_workflow,
+                    {"progress": bud_simulator_events, "current_step": workflow_current_step},
+                )
+            else:
+                logger.info(f"Skipping cluster simulation for cloud model: {db_model.id}")
 
         # Execute workflow
         if trigger_workflow:
@@ -3872,7 +3876,7 @@ class ModelCatalogService(SessionMixin):
         # Transform results to catalog items
         catalog_items = []
         for row in results:
-            model, endpoint, input_cost, output_cost, currency, per_tokens = row
+            model, endpoint, input_cost, output_cost, currency, per_tokens, provider_icon = row
 
             # Build capabilities from strengths and tags
             capabilities = []
@@ -3925,6 +3929,9 @@ class ModelCatalogService(SessionMixin):
                 "author": model.author,
                 "model_size": model.model_size,
                 "provider_type": provider_type_value,
+                "uri": model.uri,
+                "source": model.source,
+                "provider_icon": provider_icon if provider_icon else model.icon,
                 "published_date": endpoint.published_date.isoformat() if endpoint.published_date else None,
                 "endpoint_id": str(endpoint.id),
                 "supported_endpoints": supported_endpoints_values,
@@ -3981,7 +3988,7 @@ class ModelCatalogService(SessionMixin):
                 message=f"Published model not found for endpoint {endpoint_id}",
             )
 
-        model, endpoint, input_cost, output_cost, currency, per_tokens = result
+        model, endpoint, input_cost, output_cost, currency, per_tokens, provider_icon = result
 
         # Build capabilities
         capabilities = []
@@ -4033,6 +4040,9 @@ class ModelCatalogService(SessionMixin):
             "author": model.author,
             "model_size": model.model_size,
             "provider_type": provider_type_value,
+            "uri": model.uri,
+            "source": model.source,
+            "provider_icon": provider_icon if provider_icon else model.icon,
             "published_date": endpoint.published_date.isoformat() if endpoint.published_date else None,
             "endpoint_id": str(endpoint.id),
             "supported_endpoints": supported_endpoints_values,
@@ -4080,7 +4090,7 @@ class ModelCatalogService(SessionMixin):
                 message=f"Published model not found for endpoint {endpoint_id}",
             )
 
-        model, endpoint, input_cost, output_cost, currency, per_tokens = result
+        model, endpoint, input_cost, output_cost, currency, per_tokens, provider_icon = result
 
         # Get base model relation count
         model_tree_count = await ModelDataManager(self.session).get_model_tree_count(model.uri)

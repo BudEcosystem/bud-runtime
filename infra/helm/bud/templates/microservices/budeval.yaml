@@ -17,7 +17,7 @@ spec:
         app: {{ .Release.Name }}-budeval
       annotations:
         dapr.io/enabled: "true"
-        dapr.io/app-id: "budeval"
+        dapr.io/app-id: {{ .Values.microservices.budeval.daprid }}
         dapr.io/app-port: "3003"
     spec:
       containers:
