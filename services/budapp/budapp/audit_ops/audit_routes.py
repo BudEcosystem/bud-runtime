@@ -19,11 +19,11 @@ from budapp.audit_ops.schemas import (
     AuditSummaryResponse,
 )
 from budapp.audit_ops.services import AuditService
-from budapp.auth.dependencies import get_current_active_user, require_permissions
-from budapp.auth.models import User
 from budapp.commons.constants import AuditActionEnum, AuditResourceTypeEnum, PermissionEnum
-from budapp.commons.dependencies import get_session
+from budapp.commons.dependencies import get_current_active_user, get_session
+from budapp.commons.permission_handler import require_permissions
 from budapp.commons.schemas.pagination import PaginationQuery
+from budapp.user_ops.models import User
 
 
 audit_router = APIRouter(prefix="/audit", tags=["Audit"])
