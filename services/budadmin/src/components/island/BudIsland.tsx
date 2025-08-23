@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import { Modal, Tooltip } from "antd";
 import { useIsland } from "src/hooks/useIsland";
 import { Image } from "antd";
@@ -53,6 +53,7 @@ const BudIsland: React.FC = () => {
     const allNotifications = useMemo(() => data?.pages?.flatMap((page) => page?.data), [data]);
 
     const { isOpen, close, open } = useIsland();
+    const timeoutRef = useRef<NodeJS.Timeout | null>(null);
     const { x } = useSpring({
         from: { x: 0 },
         x: lastNotification ? 1 : 0,
@@ -99,26 +100,30 @@ const BudIsland: React.FC = () => {
                 setLastNotification(data.message);
             });
         }
-    }, [socket]);
+    }, [socket, loadNotifications]);
 
     useEffect(() => {
         if (!user) return;
         refetch();
         getWorkflowList();
-    }, [isOpen, user]);
+    }, [isOpen, user, refetch, getWorkflowList]);
 
-    let timeout: any;
     // Hide the minimized item after 5 seconds
     useEffect(() => {
-
         if (lastNotification) {
-            if (timeout) {
-                clearTimeout(timeout);
+            if (timeoutRef.current) {
+                clearTimeout(timeoutRef.current);
             }
-            timeout = setTimeout(() => {
+            timeoutRef.current = setTimeout(() => {
                 setLastNotification(undefined);
             }, 3000);
         }
+
+        return () => {
+            if (timeoutRef.current) {
+                clearTimeout(timeoutRef.current);
+            }
+        };
     }, [lastNotification])
 
 
