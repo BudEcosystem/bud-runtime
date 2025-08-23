@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button, Card, Row, Col, Flex, Input, Dropdown } from "antd";
 import { Typography } from "antd";
@@ -12,6 +12,107 @@ import { useDrawer } from "@/hooks/useDrawer";
 import BudDrawer from "@/components/ui/bud/drawer/BudDrawer";
 
 const { Text, Title } = Typography;
+
+// Separate component for project card to prevent re-renders
+const ProjectCard = React.memo(({
+  project,
+  onDelete
+}: {
+  project: ContextProject;
+  onDelete: (project: ContextProject) => void;
+}) => {
+  // Handle menu item clicks
+  const handleMenuClick = useCallback((e: any) => {
+    e.domEvent?.stopPropagation?.();
+
+    switch (e.key) {
+      case 'delete':
+        onDelete(project);
+        break;
+    }
+  }, [project, onDelete]);
+
+  // Static menu items without onClick handlers - Edit removed temporarily
+  const menuItems = useMemo(() => [
+    {
+      key: "delete",
+      label: "Delete",
+      icon: <Icon icon="ph:trash" className="text-bud-error" />,
+      danger: true,
+      className: "hover:!bg-bud-bg-tertiary text-bud-error",
+    },
+  ], []);
+
+  return (
+    <Card
+      className="h-full bg-bud-bg-secondary border-bud-border hover:border-bud-purple hover:shadow-lg transition-all duration-300 cursor-pointer overflow-hidden"
+      styles={{ body: { padding: 0 } }}
+    >
+      <div className="p-6 mb-20">
+        {/* Header with Icon and Actions */}
+        <div className="flex items-start justify-between mb-6">
+          <div
+            className="w-12 h-12 rounded-lg flex items-center justify-center"
+            style={{ backgroundColor: project.color }}
+          >
+            <Icon
+              icon="ph:folder"
+              className="text-white text-[1.5rem]"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Text className="text-bud-text-disabled text-[12px]">
+              {dayjs(project.updated_at).format("DD MMM")}
+            </Text>
+            <Dropdown
+              menu={{
+                items: menuItems,
+                onClick: handleMenuClick,
+                className: "!bg-bud-bg-secondary !border-bud-border",
+              }}
+              trigger={["click"]}
+              placement="bottomRight"
+              overlayClassName="bud-dropdown-menu"
+            >
+              <Button
+                type="text"
+                icon={<MoreOutlined />}
+                className="!text-bud-text-disabled hover:!text-bud-text-primary hover:!bg-bud-bg-tertiary transition-all"
+                size="small"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </Dropdown>
+          </div>
+        </div>
+
+        {/* Project Title */}
+        <Text className="text-bud-text-primary text-[19px] font-semibold mb-3 line-clamp-1 block">
+          {project.name}
+        </Text>
+
+        {/* Description */}
+        <Text className="text-bud-text-muted text-[13px] mb-6 line-clamp-2 leading-relaxed block">
+          {project.description}
+        </Text>
+      </div>
+
+      {/* Footer Section */}
+      <div className="bg-bud-bg-tertiary px-6 py-4 border-t border-bud-border absolute bottom-0 left-0 w-full">
+        <div className="flex items-center gap-2">
+          <Icon
+            icon="ph:key"
+            className="text-bud-text-disabled text-sm"
+          />
+          <Text className="text-bud-text-primary text-[13px]">
+            {project.resources?.api_keys || 0} API Keys
+          </Text>
+        </div>
+      </div>
+    </Card>
+  );
+});
+
+ProjectCard.displayName = "ProjectCard";
 
 export default function ProjectsPage() {
   const { globalProjects, getGlobalProjects, loading, getGlobalProject } =
@@ -65,24 +166,27 @@ export default function ProjectsPage() {
     openDrawer("new-project", {});
   };
 
-  const handleEditProject = (project: ContextProject) => {
-    try {
-      // Fetch the full project data from API
-      const projectData = globalProjects.find(
-        (p) => p.project.id === project.id,
-      );
-      if (projectData) {
-        // Set the selected project for editing
-        getGlobalProject(project.id);
-        // Open the edit drawer
-        openDrawer("edit-project", {});
-      }
-    } catch (error) {
-      console.error("Failed to open edit project:", error);
-    }
-  };
+  // Edit project functionality temporarily disabled due to infinite loop issue
+  // const handleEditProject = useCallback(async (project: ContextProject) => {
+  //   try {
+  //     // Fetch the full project data from API
+  //     const projectData = globalProjects.find(
+  //       (p) => p.project.id === project.id,
+  //     );
+  //     if (projectData) {
+  //       // Set the selected project for editing
+  //       await getGlobalProject(project.id);
+  //       // Open the edit drawer after project is fetched
+  //       setTimeout(() => {
+  //         openDrawer("edit-project", {});
+  //       }, 100);
+  //     }
+  //   } catch (error) {
+  //     console.error("Failed to open edit project:", error);
+  //   }
+  // }, [globalProjects, getGlobalProject, openDrawer]);
 
-  const handleDeleteProject = (project: ContextProject) => {
+  const handleDeleteProject = useCallback(async (project: ContextProject) => {
     try {
       // Fetch the full project data from API
       const projectData = globalProjects.find(
@@ -90,32 +194,16 @@ export default function ProjectsPage() {
       );
       if (projectData) {
         // Set the selected project for deletion
-        getGlobalProject(project.id);
-        // Open the delete drawer
-        openDrawer("delete-project", {});
+        await getGlobalProject(project.id);
+        // Open the delete drawer after project is fetched
+        setTimeout(() => {
+          openDrawer("delete-project", {});
+        }, 100);
       }
     } catch (error) {
       console.error("Failed to open delete project:", error);
     }
-  };
-
-  const getProjectMenuItems = (project: ContextProject) => [
-    {
-      key: "edit",
-      label: <span className="text-bud-text-primary">Edit Project</span>,
-      icon: <Icon icon="ph:pencil" className="text-bud-text-primary" />,
-      onClick: () => handleEditProject(project),
-      className: "hover:!bg-bud-bg-tertiary",
-    },
-    {
-      key: "delete",
-      label: <span className="text-bud-error">Delete</span>,
-      icon: <Icon icon="ph:trash" className="text-bud-error" />,
-      danger: true,
-      onClick: () => handleDeleteProject(project),
-      className: "hover:!bg-bud-bg-tertiary",
-    },
-  ];
+  }, [globalProjects, getGlobalProject, openDrawer]);
 
   // Filter to only show active projects or all if status is not available
   const activeProjects = projects.filter(
@@ -183,71 +271,10 @@ export default function ProjectsPage() {
               <Row gutter={[24, 24]}>
                 {activeProjects.map((project) => (
                   <Col key={project.id} xs={24} sm={12} lg={8}>
-                    <Card
-                      className="h-full bg-bud-bg-secondary border-bud-border hover:border-bud-purple hover:shadow-lg transition-all duration-300 cursor-pointer overflow-hidden"
-                      styles={{ body: { padding: 0 } }}
-                    >
-                      <div className="p-6 mb-20">
-                        {/* Header with Icon and Actions */}
-                        <div className="flex items-start justify-between mb-6">
-                          <div
-                            className="w-12 h-12 rounded-lg flex items-center justify-center"
-                            style={{ backgroundColor: project.color }}
-                          >
-                            <Icon
-                              icon="ph:folder"
-                              className="text-white text-[1.5rem]"
-                            />
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Text className="text-bud-text-disabled text-[12px]">
-                              {dayjs(project.updated_at).format("DD MMM")}
-                            </Text>
-                            <Dropdown
-                              menu={{
-                                items: getProjectMenuItems(project),
-                                className:
-                                  "!bg-bud-bg-secondary !border-bud-border",
-                              }}
-                              trigger={["click"]}
-                              placement="bottomRight"
-                              overlayClassName="bud-dropdown-menu"
-                            >
-                              <Button
-                                type="text"
-                                icon={<MoreOutlined />}
-                                className="!text-bud-text-disabled hover:!text-bud-text-primary hover:!bg-bud-bg-tertiary transition-all"
-                                size="small"
-                                onClick={(e) => e.stopPropagation()}
-                              />
-                            </Dropdown>
-                          </div>
-                        </div>
-
-                        {/* Project Title */}
-                        <Text className="text-bud-text-primary text-[19px] font-semibold mb-3 line-clamp-1 block">
-                          {project.name}
-                        </Text>
-
-                        {/* Description */}
-                        <Text className="text-bud-text-muted text-[13px] mb-6 line-clamp-2 leading-relaxed block">
-                          {project.description}
-                        </Text>
-                      </div>
-
-                      {/* Footer Section */}
-                      <div className="bg-bud-bg-tertiary px-6 py-4 border-t border-bud-border absolute bottom-0 left-0 w-full">
-                        <div className="flex items-center gap-2">
-                          <Icon
-                            icon="ph:key"
-                            className="text-bud-text-disabled text-sm"
-                          />
-                          <Text className="text-bud-text-primary text-[13px]">
-                            {project.resources?.api_keys || 0} API Keys
-                          </Text>
-                        </div>
-                      </div>
-                    </Card>
+                    <ProjectCard
+                      project={project}
+                      onDelete={handleDeleteProject}
+                    />
                   </Col>
                 ))}
               </Row>
