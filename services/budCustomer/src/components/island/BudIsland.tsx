@@ -5,9 +5,10 @@ import { Image } from "antd";
 import { Text_10_400_B3B3B3 } from "../ui/text";
 import ComingSoon from "../ui/comingSoon";
 import { IMessage, useFetchNotifications, useSocket } from "@novu/notification-center";
-import { useUser } from "src/stores/useUser";
+import { useUser } from "@/stores/useUser";
 import { useWorkflow } from "src/stores/useWorkflow";
 import { useDrawer } from "src/hooks/useDrawer";
+import { useTheme } from "../../context/themeContext";
 import IslandIcon from "./IslandIcon";
 import { BudWidget } from "./BudWidget";
 import { NotificationsWidget } from "./BudNotification";
@@ -15,7 +16,8 @@ import { NotificationsWidget } from "./BudNotification";
 import { inProgressSteps } from "src/hooks/drawerFlows";
 import { formdateDateTime } from "@/lib/utils";
 import { FormProgressStatus } from "../ui/bud/progress/FormProgress";
-import { useSpring, animated } from '@react-spring/web'
+import { useSpring, animated } from '@react-spring/web';
+import "./island-themes.css";
 
 type NotificationPayload = {
     category: 'inapp' | 'internal',
@@ -37,6 +39,7 @@ type NotificationPayload = {
 
 const BudIsland: React.FC = () => {
     const { user } = useUser();
+    const { effectiveTheme } = useTheme();
     const { isDrawerOpen, minmizedProcessList, openDrawerWithStep, showMinimizedItem } = useDrawer();
     const { socket } = useSocket();
     const { workflowList, getWorkflowList } = useWorkflow();
@@ -127,7 +130,7 @@ const BudIsland: React.FC = () => {
     const totalSteps = recentlyMinimized?.step?.progress?.length;
     const currentStep = recentlyMinimized?.step?.progress?.findIndex((step) => step?.status === FormProgressStatus.inProgress) + 1;
 
-    let title = "Task Island";
+    let title = "Notifications";
     let statusRender = <></>
 
     if (lastNotification && inAppNotifications?.[0]) {
@@ -146,7 +149,7 @@ const BudIsland: React.FC = () => {
     } else if (inAppNotifications && inAppNotifications?.length > 0) {
         title = `${inAppNotifications.length} Notifications`;
     } else {
-        title = "Task Island";
+        title = "Notifications";
     }
 
     // if (inProgressSteps?.includes(recentlyMinimized?.id)) {
@@ -194,7 +197,7 @@ const BudIsland: React.FC = () => {
     return (
         <>
             <animated.button
-                className="flex justify-start items-center rounded-[6.4px] mt-[0rem]  bg-[#FFFFFF08] cursor-pointer w-full hover:bg-[#FFFFFF1A] hover:border-[#FFFFFF1A]  hover:shadow-md  p-[.35rem]"
+                className="flex justify-start items-center rounded-[6.4px] mt-[0rem] cursor-pointer w-full hover:shadow-md p-[.35rem] island-theme-aware island-trigger-button"
                 type="button"
                 onMouseEnter={onMouseEnter}
                 onClick={() => {
@@ -229,23 +232,30 @@ const BudIsland: React.FC = () => {
                     />
                 </div>
                 <div className="flex flex-row items-center justify-between w-full">
-                    <Tooltip title={title} color="#161616" placement="topLeft">
-                        <Text_10_400_B3B3B3 className="pl-[1rem] text-nowrap max-w-[70%] overflow-hidden overflow-ellipsis">
+                    <Tooltip
+                        title={title}
+                        color={effectiveTheme === 'dark' ? "#161616" : "#ffffff"}
+                        placement="topLeft"
+                    >
+                        <span
+                            className="pl-[1rem] text-sm text-nowrap max-w-[70%] overflow-hidden overflow-ellipsis"
+                            style={{ color: 'var(--island-text-muted)' }}
+                        >
                             {title}
-                        </Text_10_400_B3B3B3>
+                        </span>
                     </Tooltip>
                     {statusRender}
                 </div>
             </animated.button >
             <Modal
-                className=" bg-transparent flex  flex-col shadow-none w-full border relative"
+                className="bg-transparent flex flex-col shadow-none w-full border relative island-theme-aware"
                 closeIcon={null}
                 // transitionName="ant-modal-zoom"
                 classNames={{
-                    wrapper: 'isLandWrapper overflow-hidden transition-all duration-500 ease-in-out',
-                    mask: `${!isDrawerOpen ? 'bg-[#060607] opacity-90' : 'bg-transparent'} transition-all duration-500 ease-in-out`,
-                    body: 'islandBody rounded-[1rem] flex justify-end items-start relative w-full h-[100vh] gap-[1rem] pl-[2.25rem] pr-[2.45rem] pt-[4.6rem] pb-[.7rem]',
-                    content: 'p-0 h-full bg-transparent border-none',
+                    wrapper: 'isLandWrapper overflow-hidden transition-all duration-500 ease-in-out island-theme-aware',
+                    mask: `island-modal-mask ${!isDrawerOpen ? '' : 'bg-transparent'} transition-all duration-500 ease-in-out`,
+                    body: 'islandBody rounded-[1rem] flex justify-end items-start relative w-full h-[100vh] gap-[1rem] pl-[2.25rem] pr-[2.45rem] pt-[4.6rem] pb-[.7rem] island-theme-aware',
+                    content: 'p-0 h-full bg-transparent border-none island-modal-content',
                 }}
                 open={isOpen && !isDrawerOpen}
                 style={{
@@ -277,9 +287,9 @@ const BudIsland: React.FC = () => {
                         style={{ height: '.0.8rem' }}
                     />
                 </div>
-                <div className="flex justify-end items-top gap-[1rem] w-full h-[100%]">
+                <div className="flex justify-end items-top gap-[1rem] w-full h-[100%] island-theme-aware">
                     <div className="w-[50%] overflow-y-auto">
-                        <div className={`grid grid-cols-2 gap-x-[1rem] gap-y-[1rem] `}>
+                        <div className="grid grid-cols-2 gap-x-[1rem] gap-y-[1rem] island-theme-aware">
                             <NotificationsWidget
                                 notifications={inAppNotifications}
                                 loadNotifications={loadNotifications}

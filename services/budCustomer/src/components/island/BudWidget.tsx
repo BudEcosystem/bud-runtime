@@ -14,6 +14,8 @@ import { errorToast } from "../toast";
 import { FormProgressStatus } from "../ui/bud/progress/FormProgress";
 import { calculateEta } from "src/flows/utils/calculateETA";
 import IconRender from "src/flows/components/BudIconRender";
+import { useTheme } from "../../context/themeContext";
+import "./island-themes.css";
 
 export function getFailedStep(data: WorkflowListItem) {
     return data?.progress?.steps?.find((step) => step.payload?.content?.status === 'FAILED');
@@ -49,6 +51,7 @@ export function BudWidget({ data, index }: { data?: WorkflowListItem | any , ind
     const { getWorkflow, setProviderType, setSelectedTemplate, setSelectedProvider, setSelectedModel, getWorkflowCloud, setDeploymentSpecification, setLocalModelDetails, setCloudModelDetails, setDeploymentCluster, setSelectedCredentials } = useDeployModel();
     const { openDrawerWithStep } = useDrawer();
     const { close } = useIsland();
+    const { effectiveTheme } = useTheme();
     const [loading, setLoading] = useState(false);
 
     const flowId = flowMapping[data.workflow_type];
@@ -142,7 +145,7 @@ export function BudWidget({ data, index }: { data?: WorkflowListItem | any , ind
     }
 
     return <div
-        className="item rounded-[1rem] px-[1.45rem] py-[1.45rem] box-border	bg-[#101010] width-full cursor-pointer hover:bg-[#161616] transition-all duration-300 overflow-hidden item"
+        className="item rounded-[1rem] px-[1.45rem] py-[1.45rem] box-border width-full cursor-pointer transition-all duration-300 overflow-hidden item island-widget island-theme-aware"
         onClick={openWidget}>
         {<Spin
             className="z-[999999]"
@@ -153,11 +156,12 @@ export function BudWidget({ data, index }: { data?: WorkflowListItem | any , ind
             <div className="flex justify-start items-center">
                 <IconRender icon={data?.icon} size={38} imageSize={24} />
                 <div className="pt-[.3rem] ml-[.55rem]">
-                    <Text_12_400_A4A4A9 className="tracking-[-.01rem]">
-                        {/* #{index + 1}  */}
-                        {data?.title || flow?.title}</Text_12_400_A4A4A9>
-                    {/* <Text_14_600_EEEEEE className="tracking-[-.01rem]">{currentStep?.description || `${flow?.title} In Progress`}</Text_14_600_EEEEEE> */}
-                    <Text_14_600_EEEEEE className="tracking-[-.01rem]">{`${flow?.title} ${faiedStep ? 'Failed' : 'In Progress'}`}</Text_14_600_EEEEEE>
+                    <div className="tracking-[-.01rem] text-xs" style={{ color: 'var(--island-text-muted)' }}>
+                        {data?.title || flow?.title}
+                    </div>
+                    <div className="tracking-[-.01rem] text-sm font-semibold" style={{ color: 'var(--island-text-primary)' }}>
+                        {`${flow?.title} ${faiedStep ? 'Failed' : 'In Progress'}`}
+                    </div>
                 </div>
             </div>
             <div className="flex flex-col items-end justify-start">
