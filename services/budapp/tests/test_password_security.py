@@ -35,6 +35,7 @@ async def test_user_registration_hashes_password():
             # Mock the data manager methods
             mock_data_manager.return_value.retrieve_by_fields = AsyncMock()
             mock_data_manager.return_value.insert_one = AsyncMock()
+            mock_data_manager.return_value.update_subscriber_status = AsyncMock()
 
             # Track what gets inserted
             inserted_user = None
@@ -62,9 +63,10 @@ async def test_user_registration_hashes_password():
             # Create auth service and register user
             auth_service = AuthService(mock_session)
 
-            # Patch BudNotifyHandler to avoid external calls
+            # Patch BudNotifyHandler and PermissionService to avoid external calls
             with patch('budapp.auth.services.BudNotifyHandler'):
-                await auth_service.register_user(user_create, is_self_registration=True)
+                with patch('budapp.auth.services.PermissionService'):
+                    await auth_service.register_user(user_create, is_self_registration=True)
 
             # Verify password was hashed
             assert inserted_user is not None, "User should have been inserted"
