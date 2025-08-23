@@ -109,7 +109,7 @@ class ClusterOpsService:
             platform=platform,
             configuration=configuration_encrypted,
             host=hostname,
-            status=ClusterStatusEnum.NOT_AVAILABLE,
+            status=ClusterStatusEnum.REGISTERING,
             enable_master_node=enable_master_node,
             ingress_url=ingress_url,
             server_url=server_url,
@@ -121,11 +121,14 @@ class ClusterOpsService:
         # Pass The Cluster ID to the next step
         status = await initial_setup(configure_cluster_request.config_dict, cluster_id, platform)
         with DBSession() as session:
+            db_cluster = await ClusterDataManager(session).retrieve_cluster_by_fields({"id": cluster_id})
             if status != "successful":
-                await ClusterDataManager(session).delete_cluster(cluster_id)
+                # Mark as failed instead of deleting, so duplicate check can clean it up
+                await ClusterDataManager(session).update_cluster_by_fields(
+                    db_cluster, {"status": ClusterStatusEnum.NOT_AVAILABLE}
+                )
                 cluster_id = None
             else:
-                db_cluster = await ClusterDataManager(session).retrieve_cluster_by_fields({"id": cluster_id})
                 await ClusterDataManager(session).update_cluster_by_fields(
                     db_cluster, {"status": ClusterStatusEnum.AVAILABLE}
                 )
@@ -1556,7 +1559,8 @@ class ClusterService(SessionMixin):
             response = await RegisterClusterWorkflow().__call__(cluster)
         except Exception as e:
             logger.error(f"Error registering cluster: {e}")
-            raise ErrorResponse(message=f"Error registering cluster: {e}") from e
+            # Return ErrorResponse instead of raising it since it's not an Exception
+            return ErrorResponse(message=f"Error registering cluster: {e}")
         return response
 
     async def update_cluster_registration_status(self, cluster_id: UUID, data: ClusterStatusUpdate) -> None:
@@ -1585,7 +1589,8 @@ class ClusterService(SessionMixin):
             logger.error(f"Error deleting cluster: {e}")
             if isinstance(e, HTTPException):
                 raise e
-            raise ErrorResponse(message=f"Error deleting cluster: {e}") from None
+            # Return ErrorResponse instead of raising it since it's not an Exception
+            return ErrorResponse(message=f"Error deleting cluster: {e}")
         return response
 
     def cancel_cluster_registration(
