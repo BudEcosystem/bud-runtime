@@ -101,9 +101,9 @@ export default function UsagePage() {
         colorText: "var(--text-primary)",
         optionSelectedColor: "var(--text-primary)",
         optionActiveBg: "var(--bg-hover)",
-      }
-    }
-  }
+      },
+    },
+  };
 
   // const getUsagePercentage = () =>
   //   (billingPlan.usage.tokens_used / billingPlan.quotaLimit) * 100;
@@ -480,6 +480,39 @@ export default function UsagePage() {
               </Text>
             </div>
           </div>
+
+          {/* Filters */}
+          <Flex gap={16} className="mb-[2rem]" wrap="wrap">
+            <ConfigProvider theme={themeConfig}>
+              <Select
+                value={timeRange}
+                onChange={setTimeRange}
+                style={{ width: 150 }}
+                className={styles.selectFilter}
+                options={[
+                  { value: "1d", label: "Last 24h" },
+                  { value: "7d", label: "Last 7 days" },
+                  { value: "30d", label: "Last 30 days" },
+                  { value: "90d", label: "Last 90 days" },
+                ]}
+              />
+            </ConfigProvider>
+            <ConfigProvider theme={themeConfig}>
+              <Select
+                value={selectedModel}
+                onChange={setSelectedModel}
+                style={{ width: 200 }}
+                className={styles.selectFilter}
+                options={[
+                  { value: "all", label: "All Models" },
+                  { value: "gpt-4", label: "GPT-4" },
+                  { value: "gpt-3.5-turbo", label: "GPT-3.5 Turbo" },
+                  { value: "claude-3-opus", label: "Claude 3 Opus" },
+                  { value: "claude-3-sonnet", label: "Claude 3 Sonnet" },
+                ]}
+              />
+            </ConfigProvider>
+          </Flex>
 
           {/* Billing Alerts */}
           <Card className="bg-bud-bg-secondary border-bud-border rounded-[12px] mb-[2rem] hidden">
