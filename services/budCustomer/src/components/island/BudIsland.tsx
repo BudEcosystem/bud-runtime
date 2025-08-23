@@ -232,12 +232,12 @@ const BudIsland: React.FC = () => {
                     />
                 </div>
                 <div className="flex flex-row items-center justify-between w-full">
-                    <Tooltip 
-                        title={title} 
-                        color={effectiveTheme === 'dark' ? "#161616" : "#ffffff"} 
+                    <Tooltip
+                        title={title}
+                        color={effectiveTheme === 'dark' ? "#161616" : "#ffffff"}
                         placement="topLeft"
                     >
-                        <span 
+                        <span
                             className="pl-[1rem] text-sm text-nowrap max-w-[70%] overflow-hidden overflow-ellipsis"
                             style={{ color: 'var(--island-text-muted)' }}
                         >

@@ -146,7 +146,7 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
     logout();
   };
 
-  
+
   const getUser = async () => {
     // showLoader();
     try {
