@@ -339,15 +339,16 @@ export default function AddCustomGuardRail() {
               ))}
 
               {/* Add New Field Button */}
-              <Button
-                icon={<PlusOutlined />}
-                onClick={addRule}
-                className="!bg-transparent text-[#965CDE] border-[#965CDE] hover:!bg-[#965CDE10]"
-                style={{ backgroundColor: "transparent" }}
-                type="dashed"
-              >
-                New Field
-              </Button>
+              <div className="flex justify-end">
+                <Button
+                  icon={<PlusOutlined />}
+                  onClick={addRule}
+                  className="!bg-transparent text-[#965CDE] !border-[#965CDE] !border-solid hover:!bg-[#965CDE10]"
+                  style={{ backgroundColor: "transparent", borderStyle: "solid" }}
+                >
+                  New Field
+                </Button>
+              </div>
             </div>
 
             {/* Caution Message */}

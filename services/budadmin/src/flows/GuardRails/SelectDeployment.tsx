@@ -161,7 +161,7 @@ export default function SelectDeployment() {
     <div
       key={deployment.id}
       onClick={() => handleDeploymentSelect(deployment.id)}
-      className={`pt-[1.05rem] pb-[.8rem] cursor-pointer hover:shadow-lg px-[1.5rem] border-y-[0.5px] flex-row flex hover:bg-[#FFFFFF08] transition-all ${
+      className={`pt-[1.05rem] px-[1.35rem] pb-[.8rem] cursor-pointer hover:shadow-lg border-y-[0.5px] flex-row flex hover:bg-[#FFFFFF08] transition-all ${
         selectedDeployment === deployment.id
           ? "border-y-[#965CDE] bg-[#965CDE10]"
           : "border-y-[#1F1F1F] hover:border-[#757575]"
@@ -234,9 +234,9 @@ export default function SelectDeployment() {
             descriptionClass="pt-[.3rem] text-[#B3B3B3]"
           />
 
-          <div className="px-[1.35rem] pb-[1.35rem]">
+          <div className="pb-[1.35rem]">
             {/* Search Bar */}
-            <div className="mb-[1.5rem]">
+            <div className="mb-[1.5rem] px-[1.35rem]">
               <Input
                 placeholder="Search"
                 prefix={<SearchOutlined className="text-[#757575]" />}
@@ -255,7 +255,7 @@ export default function SelectDeployment() {
               defaultActiveKey={expandedSections}
               onChange={(keys) => setExpandedSections(keys as string[])}
               expandIcon={customExpandIcon}
-              className="bg-transparent border-none [&_.ant-collapse-item]:!bg-transparent [&_.ant-collapse-header]:!bg-transparent [&_.ant-collapse-header]:!border-none [&_.ant-collapse-content]:!bg-transparent [&_.ant-collapse-content-box]:!bg-transparent [&_.ant-collapse-item]:!border-none [&_.ant-collapse-content]:!border-none"
+              className="bg-transparent border-none [&_.ant-collapse-item]:!bg-transparent [&_.ant-collapse-header]:!bg-transparent [&_.ant-collapse-header]:!border-none [&_.ant-collapse-content]:!bg-transparent [&_.ant-collapse-content-box]:!bg-transparent [&_.ant-collapse-content-box]:!px-0 [&_.ant-collapse-item]:!border-none [&_.ant-collapse-content]:!border-none"
               style={{ backgroundColor: "transparent" }}
               bordered={false}
             >
@@ -263,7 +263,7 @@ export default function SelectDeployment() {
               {groupedDeployments.models && groupedDeployments.models.length > 0 && (
                 <Panel
                   header={
-                    <div className="flex items-center gap-[0.5rem]">
+                    <div className="flex items-center gap-[0.5rem] px-0">
                       <Text_14_600_FFFFFF>Models</Text_14_600_FFFFFF>
                       <Text_12_400_757575>({groupedDeployments.models.length})</Text_12_400_757575>
                     </div>

@@ -821,76 +821,83 @@ export default function GuardRails() {
             >
               {/* Category Filter Tags */}
               <div className="flex items-center gap-[0.75rem] mb-[2rem] px-[1.5rem]">
-                <Tag
-                  className={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
+                <Tags
+                  name="All"
+                  color={selectedCategory === "all" ? "#FFFFFF" : "#B3B3B3"}
+                  textClass={selectedCategory === "all" ? "!text-white" : ""}
+                  classNames={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
                     selectedCategory === "all"
-                      ? "bg-[#965CDE] text-white border-[#965CDE]"
-                      : "bg-transparent text-[#B3B3B3] border-[#757575] hover:border-[#965CDE] hover:text-[#965CDE]"
+                      ? "!bg-[#965CDE]"
+                      : "!bg-transparent border-[0.5px] border-[#757575] hover:border-[#965CDE]"
                   }`}
-                  onClick={() => setSelectedCategory("all")}
-                >
-                  All
-                </Tag>
-                <Tag
-                  className={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
+                  onTagClick={() => setSelectedCategory("all")}
+                />
+                <Tags
+                  name="Harm"
+                  color={selectedCategory === "harm" ? "#FFFFFF" : "#B3B3B3"}
+                  textClass={selectedCategory === "harm" ? "!text-white" : ""}
+                  classNames={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
                     selectedCategory === "harm"
-                      ? "bg-[#965CDE] text-white border-[#965CDE]"
-                      : "bg-transparent text-[#B3B3B3] border-[#757575] hover:border-[#965CDE] hover:text-[#965CDE]"
+                      ? "!bg-[#965CDE]"
+                      : "!bg-transparent border-[0.5px] border-[#757575] hover:border-[#965CDE]"
                   }`}
-                  onClick={() => setSelectedCategory("harm")}
-                >
-                  Harm
-                </Tag>
-                <Tag
-                  className={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
+                  onTagClick={() => setSelectedCategory("harm")}
+                />
+                <Tags
+                  name="Jailbreak"
+                  color={selectedCategory === "jailbreak" ? "#FFFFFF" : "#B3B3B3"}
+                  textClass={selectedCategory === "jailbreak" ? "!text-white" : ""}
+                  classNames={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
                     selectedCategory === "jailbreak"
-                      ? "bg-[#965CDE] text-white border-[#965CDE]"
-                      : "bg-transparent text-[#B3B3B3] border-[#757575] hover:border-[#965CDE] hover:text-[#965CDE]"
+                      ? "!bg-[#965CDE]"
+                      : "!bg-transparent border-[0.5px] border-[#757575] hover:border-[#965CDE]"
                   }`}
-                  onClick={() => setSelectedCategory("jailbreak")}
-                >
-                  Jailbreak
-                </Tag>
-                <Tag
-                  className={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
+                  onTagClick={() => setSelectedCategory("jailbreak")}
+                />
+                <Tags
+                  name="Toxic"
+                  color={selectedCategory === "toxic" ? "#FFFFFF" : "#B3B3B3"}
+                  textClass={selectedCategory === "toxic" ? "!text-white" : ""}
+                  classNames={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
                     selectedCategory === "toxic"
-                      ? "bg-[#965CDE] text-white border-[#965CDE]"
-                      : "bg-transparent text-[#B3B3B3] border-[#757575] hover:border-[#965CDE] hover:text-[#965CDE]"
+                      ? "!bg-[#965CDE]"
+                      : "!bg-transparent border-[0.5px] border-[#757575] hover:border-[#965CDE]"
                   }`}
-                  onClick={() => setSelectedCategory("toxic")}
-                >
-                  Toxic
-                </Tag>
-                <Tag
-                  className={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
+                  onTagClick={() => setSelectedCategory("toxic")}
+                />
+                <Tags
+                  name="Bias"
+                  color={selectedCategory === "bias" ? "#FFFFFF" : "#B3B3B3"}
+                  textClass={selectedCategory === "bias" ? "!text-white" : ""}
+                  classNames={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
                     selectedCategory === "bias"
-                      ? "bg-[#965CDE] text-white border-[#965CDE]"
-                      : "bg-transparent text-[#B3B3B3] border-[#757575] hover:border-[#965CDE] hover:text-[#965CDE]"
+                      ? "!bg-[#965CDE]"
+                      : "!bg-transparent border-[0.5px] border-[#757575] hover:border-[#965CDE]"
                   }`}
-                  onClick={() => setSelectedCategory("bias")}
-                >
-                  Bias
-                </Tag>
-                <Tag
-                  className={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
+                  onTagClick={() => setSelectedCategory("bias")}
+                />
+                <Tags
+                  name="Compliance"
+                  color={selectedCategory === "compliance" ? "#FFFFFF" : "#B3B3B3"}
+                  textClass={selectedCategory === "compliance" ? "!text-white" : ""}
+                  classNames={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
                     selectedCategory === "compliance"
-                      ? "bg-[#965CDE] text-white border-[#965CDE]"
-                      : "bg-transparent text-[#B3B3B3] border-[#757575] hover:border-[#965CDE] hover:text-[#965CDE]"
+                      ? "!bg-[#965CDE]"
+                      : "!bg-transparent border-[0.5px] border-[#757575] hover:border-[#965CDE]"
                   }`}
-                  onClick={() => setSelectedCategory("compliance")}
-                >
-                  Compliance
-                </Tag>
-                <Tag
-                  className={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
+                  onTagClick={() => setSelectedCategory("compliance")}
+                />
+                <Tags
+                  name="Custom"
+                  color={selectedCategory === "custom" ? "#FFFFFF" : "#B3B3B3"}
+                  textClass={selectedCategory === "custom" ? "!text-white" : ""}
+                  classNames={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
                     selectedCategory === "custom"
-                      ? "bg-[#965CDE] text-white border-[#965CDE]"
-                      : "bg-transparent text-[#B3B3B3] border-[#757575] hover:border-[#965CDE] hover:text-[#965CDE]"
+                      ? "!bg-[#965CDE]"
+                      : "!bg-transparent border-[0.5px] border-[#757575] hover:border-[#965CDE]"
                   }`}
-                  onClick={() => setSelectedCategory("custom")}
-                >
-                  Custom
-                </Tag>
+                  onTagClick={() => setSelectedCategory("custom")}
+                />
               </div>
 
               {/* GuardRails Grid */}

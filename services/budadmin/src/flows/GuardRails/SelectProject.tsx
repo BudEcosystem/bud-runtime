@@ -110,9 +110,9 @@ export default function SelectProject() {
             descriptionClass="pt-[.3rem] text-[#B3B3B3]"
           />
 
-          <div className="px-[1.35rem] pb-[1.35rem]">
+          <div className="pb-[1.35rem]">
             {/* Search Bar */}
-            <div className="mb-[1.5rem]">
+            <div className="mb-[1.5rem] px-[1.35rem]">
               <Input
                 placeholder="Search"
                 prefix={<SearchOutlined className="text-[#757575]" />}

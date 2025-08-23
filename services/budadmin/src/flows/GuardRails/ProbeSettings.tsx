@@ -65,7 +65,7 @@ export default function ProbeSettings() {
           <div className="px-[1.35rem] pb-[1.35rem]">
             {/* Add To Section */}
             <div className="mb-[2rem]">
-              <div className="bg-[#1F1F1F] border border-[#757575] rounded-[8px] p-[1.5rem]">
+              <div className="bg-[#ffffff07] border border-[#757575] rounded-[8px] p-[1.5rem]">
                 <Text_14_600_FFFFFF className="mb-[0.5rem]">
                   Add To:
                 </Text_14_600_FFFFFF>
@@ -90,7 +90,7 @@ export default function ProbeSettings() {
 
             {/* Strictness Level Section */}
             <div>
-              <div className="bg-[#1F1F1F] border border-[#757575] rounded-[8px] p-[1.5rem]">
+              <div className="bg-[#ffffff07] border border-[#757575] rounded-[8px] p-[1.5rem]">
                 <Text_14_600_FFFFFF className="mb-[0.5rem]">
                   Strictness Level:
                 </Text_14_600_FFFFFF>
@@ -101,7 +101,7 @@ export default function ProbeSettings() {
                 <div className="relative px-[1rem]">
                   {/* Slider Value Display */}
                   <div
-                    className="absolute -top-[2rem] bg-[#757575] text-white px-[0.5rem] py-[0.25rem] rounded-[4px] text-[12px]"
+                    className="absolute -top-[2rem] bg-[#965CDE] text-white px-[0.5rem] py-[0.25rem] rounded-[4px] text-[12px] font-medium"
                     style={{
                       left: `calc(${strictnessLevel * 100}% - 1.5rem)`,
                       transition: 'left 0.2s'
@@ -117,16 +117,7 @@ export default function ProbeSettings() {
                     step={0.01}
                     value={strictnessLevel}
                     onChange={(value) => setStrictnessLevel(value)}
-                    className="mb-[0.5rem]"
-                    trackStyle={{ backgroundColor: "#965CDE" }}
-                    handleStyle={{
-                      backgroundColor: "#757575",
-                      borderColor: "#757575",
-                      width: "16px",
-                      height: "16px",
-                      marginTop: "-6px"
-                    }}
-                    railStyle={{ backgroundColor: "#3F3F3F" }}
+                    className="mb-[0.5rem] [&_.ant-slider-handle]:!w-[16px] [&_.ant-slider-handle]:!h-[16px] [&_.ant-slider-handle]:!bg-transparent [&_.ant-slider-handle]:!border-transparent [&_.ant-slider-handle]:!shadow-md [&_.ant-slider-handle]:!top-[50%] [&_.ant-slider-handle]:!transform [&_.ant-slider-handle]:!-translate-y-1/2 [&_.ant-slider-track]:!bg-[#965CDE] [&_.ant-slider-rail]:!bg-[#3F3F3F] [&_.ant-slider-track]:!h-[4px] [&_.ant-slider-rail]:!h-[4px]"
                     tooltip={{ open: false }}
                   />
 

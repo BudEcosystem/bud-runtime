@@ -6,6 +6,7 @@ import { Input, Checkbox, Tag } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
 import React, { useState } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
+import CustomPopover from "src/flows/components/customPopover";
 import { successToast } from "@/components/toast";
 import {
   Text_10_400_757575,
@@ -26,6 +27,27 @@ export default function PIIDetectionConfig() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedRules, setSelectedRules] = useState<string[]>([]);
   const [selectAll, setSelectAll] = useState(false);
+  const [hoveredRule, setHoveredRule] = useState<string | null>(null);
+
+  const getRuleIcon = (ruleId: string) => {
+    const iconMap: Record<string, string> = {
+      'email': '📧',
+      'phone': '📱',
+      'ssn': '🔢',
+      'credit-card': '💳',
+      'passport': '📘',
+      'driver-license': '🚗',
+      'ip-address': '🌐',
+      'mac-address': '🖥️',
+      'iban': '🏦',
+      'swift': '💸',
+      'date-of-birth': '📅',
+      'address': '🏠',
+      'medical-record': '🏥',
+      'tax-id': '📋',
+    };
+    return iconMap[ruleId] || '🔒';
+  };
 
   // Configuration data - would typically come from previous selection
   const probeTypes = ["Semantic", "Text", "RegEx"];
@@ -106,9 +128,9 @@ export default function PIIDetectionConfig() {
             descriptionClass="pt-[.3rem] text-[#B3B3B3]"
           />
 
-          <div className="px-[1.35rem] pb-[1.35rem]">
+          <div className="pb-[1.35rem]">
             {/* Probe Type and Guard Type */}
-            <div className="mb-[2rem] grid grid-cols-2 gap-[1rem]">
+            <div className="mb-[2rem] grid grid-cols-2 gap-[1rem] px-[1.35rem]">
               <div>
                 <Text_12_400_757575 className="mb-[0.5rem]">Probe type:</Text_12_400_757575>
                 <div className="flex gap-[5px]">
@@ -133,10 +155,10 @@ export default function PIIDetectionConfig() {
 
             {/* Supported Rules Section */}
             <div>
-              <Text_14_600_FFFFFF className="mb-[1rem]">Supported Rules</Text_14_600_FFFFFF>
+              <Text_14_600_FFFFFF className="mb-[1rem] px-[1.35rem]">Supported Rules</Text_14_600_FFFFFF>
 
               {/* Search Bar */}
-              <div className="mb-[1rem]">
+              <div className="mb-[1rem] px-[1.35rem]">
                 <Input
                   placeholder="Search"
                   prefix={<SearchOutlined className="text-[#757575]" />}
@@ -151,7 +173,7 @@ export default function PIIDetectionConfig() {
               </div>
 
               {/* Select All Checkbox */}
-              <div className="mb-[1rem] p-[0.75rem] border-b border-[#2A2A2A]">
+              <div className="p-[0.75rem] border-b border-[#2A2A2A] px-[1.35rem]">
                 <Checkbox
                   checked={selectAll}
                   onChange={(e) => handleSelectAll(e.target.checked)}
@@ -161,34 +183,76 @@ export default function PIIDetectionConfig() {
                 </Checkbox>
               </div>
 
-              {/* Rules List */}
-              <div className="space-y-[0.5rem] max-h-[400px] overflow-y-auto">
-                {filteredRules.map((rule) => (
-                  <div
-                    key={rule.id}
-                    onClick={() => toggleRuleSelection(rule.id)}
-                    className={`p-[1rem] border rounded-[6px] cursor-pointer transition-all ${
-                      selectedRules.includes(rule.id)
-                        ? "border-[#965CDE] bg-[#965CDE10]"
-                        : "border-[#2A2A2A] hover:border-[#757575] bg-[#1A1A1A]"
-                    }`}
-                  >
-                    <div className="flex items-start gap-[0.75rem]">
-                      <Checkbox
-                        checked={selectedRules.includes(rule.id)}
-                        className="AntCheckbox mt-[2px] pointer-events-none"
-                      />
-                      <div className="flex-1">
-                        <Text_14_400_EEEEEE className="mb-[0.25rem]">
-                          {rule.name}
-                        </Text_14_400_EEEEEE>
-                        <Text_12_400_757575>
-                          {rule.description}
-                        </Text_12_400_757575>
+              {/* Rules List - ModelListCard Style */}
+              <div className="max-h-[400px] overflow-y-auto">
+                {filteredRules.map((rule) => {
+                  const isHovered = hoveredRule === rule.id;
+                  const isSelected = selectedRules.includes(rule.id);
+
+                  return (
+                    <div
+                      key={rule.id}
+                      onMouseEnter={() => setHoveredRule(rule.id)}
+                      onMouseLeave={() => setHoveredRule(null)}
+                      onClick={() => toggleRuleSelection(rule.id)}
+                      className={`pt-[1.05rem] pb-[0.8rem] cursor-pointer hover:shadow-lg px-[1.5rem] border-y-[0.5px] border-y-[#1F1F1F] hover:border-[#757575] flex-row flex border-box hover:bg-[#FFFFFF08] transition-all ${
+                        isSelected ? "bg-[#FFFFFF08] border-[#965CDE]" : ""
+                      }`}
+                    >
+                      {/* Icon Section */}
+                      <div className="bg-[#1F1F1F] rounded-[0.515625rem] w-[2.6875rem] h-[2.6875rem] flex justify-center items-center mr-[1.3rem] shrink-0 grow-0">
+                        <span className="text-[1.5rem]">{getRuleIcon(rule.id)}</span>
+                      </div>
+
+                      {/* Content Section */}
+                      <div className="flex justify-between flex-col w-full max-w-[85%]">
+                        <div className="flex items-center justify-between">
+                          <div className="flex flex-grow max-w-[90%]"
+                            style={{
+                              width: isHovered || isSelected ? "12rem" : "90%",
+                            }}
+                          >
+                            <CustomPopover title={rule.name}>
+                              <div className="text-[#EEEEEE] mr-2 pb-[0.3em] text-[0.875rem] truncate overflow-hidden whitespace-nowrap">
+                                {rule.name}
+                              </div>
+                            </CustomPopover>
+                          </div>
+
+                          {/* Actions Section */}
+                          <div
+                            style={{
+                              display: (isHovered || isSelected) ? "flex" : "none",
+                            }}
+                            className="justify-end items-center"
+                          >
+                            <CustomPopover
+                              Placement="topRight"
+                              title={isSelected ? "Deselect rule" : "Select rule"}
+                            >
+                              <Checkbox
+                                checked={isSelected}
+                                className="AntCheckbox text-[#757575] w-[0.875rem] h-[0.875rem] text-[0.875rem] flex justify-center items-center"
+                                onClick={(e) => e.stopPropagation()}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  toggleRuleSelection(rule.id);
+                                }}
+                              />
+                            </CustomPopover>
+                          </div>
+                        </div>
+
+                        {/* Description */}
+                        <CustomPopover title={rule.description}>
+                          <div className="text-[#757575] w-full overflow-hidden text-ellipsis text-xs line-clamp-2 leading-[150%]">
+                            {rule.description || "-"}
+                          </div>
+                        </CustomPopover>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
 
                 {filteredRules.length === 0 && (
                   <div className="text-center py-[2rem]">
