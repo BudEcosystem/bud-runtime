@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic.types import UUID4
 
 from budapp.commons.constants import AuditActionEnum, AuditResourceTypeEnum
-from budapp.commons.schemas.api_response import PaginatedSuccessResponse, SuccessResponse
+from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse
 
 
 class AuditRecordBase(BaseModel):
@@ -37,6 +37,7 @@ class AuditRecordBase(BaseModel):
             return v
         try:
             import ipaddress
+
             ipaddress.ip_address(v)
         except ValueError:
             raise ValueError(f"'{v}' is not a valid IP address.")
