@@ -144,7 +144,6 @@
 .island-modal-mask {
   background-color: var(--island-bg-modal-mask) !important;
 }
-
 /* Progress bar trail colors */
 .island-theme-aware .ant-progress-inner {
   background-color: var(--island-bg-hover) !important;
@@ -195,6 +194,6 @@
 }
 
 .island-theme-aware .island-modal-content {
-  background-color: var(--island-bg-primary) !important;
+  background-color: transparent !important;
   color: var(--island-text-primary) !important;
 }
