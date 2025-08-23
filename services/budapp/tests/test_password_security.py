@@ -46,11 +46,17 @@ async def test_user_registration_hashes_password():
             mock_data_manager.return_value.insert_one.side_effect = capture_insert
 
             # Mock tenant and client data
-            mock_tenant = Mock(id=uuid4(), name="Default")
-            mock_client = Mock(id=uuid4(), client_id="test-client")
+            mock_tenant = Mock(id=uuid4(), name="Default", realm_name="default")
+            mock_client = Mock(id=uuid4(), client_id="test-client", client_secret="secret", client_named_id="test")
+
+            # Mock the retrieve_by_fields calls in order:
+            # 1. Check if email exists (should return None)
+            # 2. Get tenant
+            # 3. Get tenant client
             mock_data_manager.return_value.retrieve_by_fields.side_effect = [
-                mock_tenant,  # First call for tenant
-                mock_client,  # Second call for client
+                None,         # Email doesn't exist
+                mock_tenant,  # Tenant exists
+                mock_client,  # Client exists
             ]
 
             # Create auth service and register user
