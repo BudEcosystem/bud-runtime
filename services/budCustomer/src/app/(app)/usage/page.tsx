@@ -129,7 +129,7 @@ export default function UsagePage() {
       ),
     );
   };
-  
+
   const fetchUsageData = async() => {
     try {
       const response = await AppRequest.Get("/billing/current");
@@ -149,7 +149,7 @@ export default function UsagePage() {
     } finally {
     }
   }
-  
+
   useEffect(()=> {
     const projectsList: any = globalProjects.map((item)=> ({value: item.project.id, label: item.project.name}))
     setAvailableProjects([
@@ -231,7 +231,7 @@ export default function UsagePage() {
     setFilterParams(params)
     fetchBillingHistoryData(params);
   }, [timeRange, selectedProject])
-  
+
   const columns = [
     {
       title: (
