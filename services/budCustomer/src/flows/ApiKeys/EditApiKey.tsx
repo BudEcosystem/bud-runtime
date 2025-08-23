@@ -65,7 +65,7 @@ function EditApiKeyForm({ setDisableNext, form }: { setDisableNext: (value: bool
         project_id: keyData.project?.id || '',
         expiry: keyData.expiry || ''
       });
-      
+
       // Set form values
       form.setFieldsValue({
         name: keyData.name,
@@ -241,7 +241,7 @@ export default function EditApiKey() {
         try {
           const values = await context.form?.validateFields();
           setLoading(true);
-          
+
           const payload = {
             name: values.name,
             project_id: values.project_id,
