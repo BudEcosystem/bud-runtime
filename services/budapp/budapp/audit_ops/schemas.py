@@ -32,12 +32,14 @@ class AuditRecordBase(BaseModel):
     @field_validator("ip_address")
     @classmethod
     def validate_ip_address(cls, v: Optional[str]) -> Optional[str]:
-        """Validate IP address format (basic validation)."""
+        """Validate IP address format."""
         if v is None:
             return v
-        # Basic length check for IPv4 and IPv6
-        if len(v) > 45:
-            raise ValueError("IP address too long")
+        try:
+            import ipaddress
+            ipaddress.ip_address(v)
+        except ValueError:
+            raise ValueError(f"'{v}' is not a valid IP address.")
         return v
 
 
