@@ -159,7 +159,7 @@ class BillingService(DataManagerUtils):
         user = await UserDataManager(self.session).retrieve_by_fields(UserModel, {"id": user_id}, missing_ok=True)
 
         # Admin users always bypass limits
-        if user and user.is_superuser:
+        if user and user.user_type == UserTypeEnum.ADMIN:
             logger.info(f"Admin user {user_id} bypasses all usage limits")
             status = UsageLimitStatus.ALLOWED
 
