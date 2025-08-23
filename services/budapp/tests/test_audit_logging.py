@@ -29,8 +29,8 @@ class TestAuditLogging:
         resource_id = uuid4()
         request = Mock(spec=Request)
         request.headers = {
-            "x-forwarded-for": "192.168.1.1",
-            "user-agent": "TestAgent/1.0"
+            "X-Forwarded-For": "192.168.1.1",
+            "User-Agent": "TestAgent/1.0"
         }
         request.client = Mock(host="127.0.0.1")
 
@@ -142,17 +142,15 @@ class TestAuditLogging:
         assert call_args["resource_id"] == resource_id
         assert call_args["user_id"] == user_id
         assert call_args["previous_state"] == previous_state
-        # new_state should be details when not explicitly provided
-        expected_new_state = new_state.copy()
-        expected_new_state["success"] = True
-        assert call_args["new_state"] == expected_new_state
+        # new_state is passed as-is from the call (new_state parameter)
+        assert call_args["new_state"] == new_state
 
     @patch("budapp.audit_ops.audit_logger.AuditService")
     def test_log_audit_handles_exceptions_gracefully(self, mock_audit_service_class):
         """Test that audit logging exceptions don't break the application."""
         # Setup
         mock_audit_service = Mock()
-        mock_audit_service.create_audit_record.side_effect = Exception("Database error")
+        mock_audit_service.audit_create.side_effect = Exception("Database error")
         mock_audit_service_class.return_value = mock_audit_service
 
         session = Mock(spec=Session)
@@ -175,7 +173,7 @@ class TestAuditLogging:
         # Setup
         mock_audit_service = Mock()
         error = Exception("Database connection failed")
-        mock_audit_service.create_audit_record.side_effect = error
+        mock_audit_service.audit_delete.side_effect = error
         mock_audit_service_class.return_value = mock_audit_service
 
         session = Mock(spec=Session)
@@ -249,7 +247,10 @@ class TestIntegrationScenarios:
 
         session = Mock(spec=Session)
         request = Mock(spec=Request)
-        request.headers = {"x-forwarded-for": "192.168.1.100"}
+        request.headers = {
+            "X-Forwarded-For": "192.168.1.100",
+            "User-Agent": "TestBrowser/1.0"
+        }
         request.client = Mock(host="192.168.1.100")
 
         # Execute
@@ -274,6 +275,7 @@ class TestIntegrationScenarios:
         expected_details = {
             "email": "user@example.com",
             "reason": "Invalid password",
+            "user_agent": "TestBrowser/1.0",
             "success": False,
         }
         assert call_args["details"] == expected_details
