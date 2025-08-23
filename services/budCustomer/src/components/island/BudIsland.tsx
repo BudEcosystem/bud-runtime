@@ -5,7 +5,7 @@ import { Image } from "antd";
 import { Text_10_400_B3B3B3 } from "../ui/text";
 import ComingSoon from "../ui/comingSoon";
 import { IMessage, useFetchNotifications, useSocket } from "@novu/notification-center";
-import { useUser } from "src/stores/useUser";
+import { useUser } from "@/stores/useUser";
 import { useWorkflow } from "src/stores/useWorkflow";
 import { useDrawer } from "src/hooks/useDrawer";
 import IslandIcon from "./IslandIcon";

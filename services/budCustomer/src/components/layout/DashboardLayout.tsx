@@ -1,5 +1,5 @@
 "use client";
-import React, { ReactNode, useState } from "react";
+import React, { ReactNode, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Image, Badge, Avatar, Typography } from "antd";
@@ -79,7 +79,7 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   // User context
-  const { user, logout } = useUser();
+  const { user, logout, getUser: fetchUser } = useUser();
 
   const tabs: TabItem[] = [
     {
@@ -145,6 +145,25 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
   const handleLogout = () => {
     logout();
   };
+
+  
+  const getUser = async () => {
+    // showLoader();
+    try {
+      const userData: any = await fetchUser();
+      console.log(userData)
+    } catch (error) {
+      console.error("Error  fetching user", error);
+      return router.push("/login");
+    } finally {
+      // hideLoader();
+    }
+  };
+  useEffect(()=> {
+    if(!user?.id) {
+      getUser();
+    }
+  }, [user])
 
   return (
     <div className="flex h-screen bg-bud-bg-primary">
