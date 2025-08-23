@@ -20,7 +20,7 @@ async def test_user_registration_hashes_password():
         email="test@example.com",
         name="Test User",
         password=test_password,
-        role=UserRoleEnum.VIEWER,
+        role=UserRoleEnum.DEVELOPER,
         user_type=UserTypeEnum.CLIENT,
         permissions=[]
     )
@@ -80,7 +80,7 @@ async def test_password_is_excluded_from_model_dump():
         email="another@example.com",
         name="Another User",
         password=test_password,
-        role=UserRoleEnum.VIEWER,
+        role=UserRoleEnum.DEVELOPER,
         user_type=UserTypeEnum.CLIENT,
         permissions=[]
     )
