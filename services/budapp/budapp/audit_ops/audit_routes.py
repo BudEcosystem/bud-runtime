@@ -34,7 +34,7 @@ audit_router = APIRouter(prefix="/audit", tags=["Audit"])
     summary="Get audit records",
     description="Retrieve paginated audit records with optional filtering",
 )
-@require_permissions(permissions=[PermissionEnum.ADMIN_ACCESS])
+@require_permissions(permissions=[PermissionEnum.USER_MANAGE])
 async def get_audit_records(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
@@ -98,7 +98,7 @@ async def get_audit_records(
     summary="Get audit record by ID",
     description="Retrieve a specific audit record by its ID",
 )
-@require_permissions(permissions=[PermissionEnum.ADMIN_ACCESS])
+@require_permissions(permissions=[PermissionEnum.USER_MANAGE])
 async def get_audit_record(
     audit_id: UUID,
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -149,7 +149,7 @@ async def get_audit_record(
     summary="Get audit records for a user",
     description="Retrieve audit records for a specific user",
 )
-@require_permissions(permissions=[PermissionEnum.ADMIN_ACCESS])
+@require_permissions(permissions=[PermissionEnum.USER_MANAGE])
 async def get_user_audit_records(
     user_id: UUID,
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -166,7 +166,7 @@ async def get_user_audit_records(
     This endpoint requires admin access unless the user is querying their own audit records.
     """
     # Allow users to view their own audit records
-    if user_id != current_user.id and PermissionEnum.ADMIN_ACCESS not in current_user.permissions:
+    if user_id != current_user.id and PermissionEnum.USER_MANAGE not in current_user.permissions:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only view your own audit records")
 
     try:
@@ -221,7 +221,7 @@ async def get_user_audit_records(
     summary="Get audit records for a resource",
     description="Retrieve audit records for a specific resource",
 )
-@require_permissions(permissions=[PermissionEnum.ADMIN_ACCESS])
+@require_permissions(permissions=[PermissionEnum.USER_MANAGE])
 async def get_resource_audit_records(
     resource_type: AuditResourceTypeEnum,
     resource_id: UUID,
@@ -284,7 +284,7 @@ async def get_resource_audit_records(
     summary="Get audit summary",
     description="Retrieve summary statistics for audit records",
 )
-@require_permissions(permissions=[PermissionEnum.ADMIN_ACCESS])
+@require_permissions(permissions=[PermissionEnum.USER_MANAGE])
 async def get_audit_summary(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
@@ -320,7 +320,7 @@ async def get_audit_summary(
     summary="Verify audit record integrity",
     description="Verify the integrity of a specific audit record using its hash",
 )
-@require_permissions(permissions=[PermissionEnum.ADMIN_ACCESS])
+@require_permissions(permissions=[PermissionEnum.USER_MANAGE])
 async def verify_audit_record(
     audit_id: UUID,
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -355,7 +355,7 @@ async def verify_audit_record(
     summary="Verify multiple audit records",
     description="Verify the integrity of multiple audit records",
 )
-@require_permissions(permissions=[PermissionEnum.ADMIN_ACCESS])
+@require_permissions(permissions=[PermissionEnum.USER_MANAGE])
 async def verify_audit_batch(
     audit_ids: List[UUID],
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -409,7 +409,7 @@ async def verify_audit_batch(
     summary="Find potentially tampered audit records",
     description="Search for audit records that may have been tampered with",
 )
-@require_permissions(permissions=[PermissionEnum.ADMIN_ACCESS])
+@require_permissions(permissions=[PermissionEnum.USER_MANAGE])
 async def find_tampered_records(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
