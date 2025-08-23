@@ -1,0 +1,200 @@
+/* Island Components Theme Variables for BudCustomer */
+:root {
+  /* Light Theme (Default) */
+  --island-bg-primary: #ffffff;
+  --island-bg-secondary: #f8f9fa;
+  --island-bg-tertiary: #f1f3f4;
+  --island-bg-card: #ffffff;
+  --island-bg-hover: #f5f5f5;
+  --island-bg-button: #f0f0f0;
+  --island-bg-button-hover: #e0e0e0;
+  --island-bg-modal-mask: rgba(0, 0, 0, 0.45);
+  --island-bg-notification: #ffffff;
+  --island-bg-widget: #ffffff;
+
+  --island-text-primary: #000000;
+  --island-text-secondary: #1a1a1a;
+  --island-text-muted: #4a4a4a;
+  --island-text-disabled: #999999;
+  --island-text-light: #ffffff;
+  --island-text-heading: #000000;
+
+  --island-border-color: #e0e0e0;
+  --island-border-secondary: #d0d0d0;
+  --island-border-dark: #c0c0c0;
+  --island-border-notification: #e5e5e5;
+
+  /* Status colors (same for both themes) */
+  --island-success: #22c55e;
+  --island-warning: #f59e0b;
+  --island-error: #ef4444;
+  --island-purple: #965cde;
+  --island-purple-hover: #a76fe8;
+
+  /* Shadows */
+  --island-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --island-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --island-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+/* Dark Theme */
+[data-theme="dark"],
+.dark {
+  --island-bg-primary: #0a0a0a;
+  --island-bg-secondary: #161616;
+  --island-bg-tertiary: #1f1f1f;
+  --island-bg-card: #161616;
+  --island-bg-hover: #2f2f2f;
+  --island-bg-button: rgba(255, 255, 255, 0.08);
+  --island-bg-button-hover: rgba(255, 255, 255, 0.1);
+  --island-bg-modal-mask: rgba(6, 6, 7, 0.9);
+  --island-bg-notification: #161616;
+  --island-bg-widget: #101010;
+
+  --island-text-primary: #ffffff;
+  --island-text-secondary: #eeeeee;
+  --island-text-muted: #b3b3b3;
+  --island-text-disabled: #757575;
+  --island-text-light: #ffffff;
+  --island-text-heading: #ffffff;
+
+  --island-border-color: #1f1f1f;
+  --island-border-secondary: #2f2f2f;
+  --island-border-dark: #1f1f1f;
+  --island-border-notification: #1f1f1f;
+
+  /* Shadows for dark theme */
+  --island-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --island-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+  --island-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+}
+
+/* Theme-aware island components */
+.island-theme-aware {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+/* Island button styling */
+.island-button {
+  background-color: var(--island-bg-button) !important;
+  border-color: var(--island-border-color) !important;
+  color: var(--island-text-primary) !important;
+}
+
+.island-button:hover {
+  background-color: var(--island-bg-button-hover) !important;
+  border-color: var(--island-border-secondary) !important;
+}
+
+/* Island card styling */
+.island-card {
+  background-color: var(--island-bg-card) !important;
+  border-color: var(--island-border-color) !important;
+  color: var(--island-text-primary) !important;
+}
+
+.island-card:hover {
+  background-color: var(--island-bg-hover) !important;
+}
+
+/* Island notification styling */
+.island-notification {
+  background-color: var(--island-bg-notification) !important;
+  border-color: var(--island-border-notification) !important;
+  color: var(--island-text-primary) !important;
+}
+
+/* Island widget styling */
+.island-widget {
+  background-color: var(--island-bg-widget) !important;
+  border-color: var(--island-border-color) !important;
+  color: var(--island-text-primary) !important;
+}
+
+.island-widget:hover {
+  background-color: var(--island-bg-hover) !important;
+}
+
+/* Override hardcoded text colors in island components */
+.island-theme-aware .text-[#EEEEEE],
+.island-theme-aware .text-[#FFFFFF] {
+  color: var(--island-text-primary) !important;
+}
+
+.island-theme-aware .text-[#B3B3B3],
+.island-theme-aware .text-[#757575],
+.island-theme-aware .text-[#A4A4A9] {
+  color: var(--island-text-muted) !important;
+}
+
+/* Background color overrides */
+.island-theme-aware .bg-[#101010],
+.island-theme-aware .bg-[#161616],
+.island-theme-aware .bg-[#1A1A1A],
+.island-theme-aware .bg-[#FFFFFF08] {
+  background-color: var(--island-bg-card) !important;
+}
+
+.island-theme-aware .border-[#1F1F1F],
+.island-theme-aware .border-[#2F2F2F] {
+  border-color: var(--island-border-color) !important;
+}
+
+/* Modal and overlay styles */
+.island-modal-mask {
+  background-color: var(--island-bg-modal-mask) !important;
+}
+
+/* Progress bar trail colors */
+.island-theme-aware .ant-progress-inner {
+  background-color: var(--island-bg-hover) !important;
+}
+
+/* Tooltip styles */
+.island-theme-aware .ant-tooltip-inner {
+  background-color: var(--island-bg-card) !important;
+  color: var(--island-text-primary) !important;
+  border: 1px solid var(--island-border-color) !important;
+}
+
+/* Notification sidebar menu specific styles */
+.notification-menu-item {
+  transition: all 0.2s ease;
+}
+
+.notification-menu-item .notification-badge {
+  background-color: var(--island-purple) !important;
+}
+
+.notification-menu-item .notification-count {
+  color: var(--island-text-muted) !important;
+}
+
+.notification-menu-item .notification-label {
+  color: var(--island-text-primary) !important;
+}
+
+.notification-menu-item:hover .notification-label {
+  color: var(--island-text-primary) !important;
+}
+
+/* BudIsland button styles */
+.island-theme-aware .island-trigger-button {
+  background-color: var(--island-bg-button) !important;
+  border-color: var(--island-border-color) !important;
+}
+
+.island-theme-aware .island-trigger-button:hover {
+  background-color: var(--island-bg-button-hover) !important;
+  border-color: var(--island-border-secondary) !important;
+}
+
+/* Modal content styles */
+.island-theme-aware .islandBody {
+  background-color: transparent !important;
+}
+
+.island-theme-aware .island-modal-content {
+  background-color: var(--island-bg-primary) !important;
+  color: var(--island-text-primary) !important;
+}
