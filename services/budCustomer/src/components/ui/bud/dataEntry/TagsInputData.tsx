@@ -53,19 +53,21 @@ export const colourOptions = [
 
 export const colourStyles = (
   overrides: any = {},
+  isLight: boolean = false,
 ): StylesConfig<ColourOption, true> => {
   return {
     control: (styles) => ({
       ...styles,
       backgroundColor: "transparent",
       borderWidth: 1,
-      borderColor: "#757575",
+      borderColor: isLight ? "#d0d0d0" : "#757575",
       boxShadow: "none",
       padding: ".75rem 0",
       "&:hover": {
-        borderColor: "#CFCFCF",
+        borderColor: isLight ? "#999999" : "#CFCFCF",
       },
       borderRadius: "6px",
+      color: isLight ? "#1a1a1a" : "#EEEEEE",
       ...overrides.control,
     }),
     indicatorSeparator: (styles) => ({
@@ -80,15 +82,16 @@ export const colourStyles = (
     }),
     container: (state) => ({
       ...state,
-      backgroundColor: "#1F1F1F",
+      backgroundColor: isLight ? "#ffffff" : "#1F1F1F",
       ...overrides.container,
     }),
     menu: (styles) => ({
       ...styles,
-      backgroundColor: "#161616",
+      backgroundColor: isLight ? "#ffffff" : "#161616",
       marginTop: ".4rem",
       backdropFilter: "blur(4px)",
-      border: "1px solid #1F1F1F",
+      border: isLight ? "1px solid #e0e0e0" : "1px solid #1F1F1F",
+      color: isLight ? "#1a1a1a" : "#EEEEEE",
       ...overrides.menu,
       zIndex: 9999,
     }),
@@ -165,6 +168,21 @@ export const colourStyles = (
       ...styles,
       display: "none",
       ...overrides.dropdownIndicator,
+    }),
+    input: (styles) => ({
+      ...styles,
+      color: isLight ? "#1a1a1a" : "#EEEEEE",
+      ...overrides.input,
+    }),
+    placeholder: (styles) => ({
+      ...styles,
+      color: isLight ? "#999999" : "#808080",
+      ...overrides.placeholder,
+    }),
+    singleValue: (styles) => ({
+      ...styles,
+      color: isLight ? "#1a1a1a" : "#EEEEEE",
+      ...overrides.singleValue,
     }),
   };
 };

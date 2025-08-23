@@ -1,6 +1,7 @@
 import React from "react";
 import { Image } from "antd";
 import CustomPopover from "@/flows/components/customPopover";
+import { useTheme } from "@/context/themeContext";
 
 interface InfoLabelProps {
   text: string;
@@ -15,13 +16,15 @@ const InfoLabel: React.FC<InfoLabelProps> = ({
   required,
   classNames,
 }) => {
-  return (
-    // <span className={`flex items-center gap-1 text-[.75rem] font-[400] text-[#EEEEEE] h-[2px] bg-[#0d0d0d] ${classNames}`}>
+  const { effectiveTheme } = useTheme();
+  const isLight = effectiveTheme === "light";
 
+  return (
     <div
-      className={`flex items-center gap-1 text-[.75rem] font-[400] text-[#EEEEEE] h-[3px] pl-[.35rem] pr-[.55rem] ${classNames}`}
+      className={`flex items-center gap-1 text-[.75rem] font-[400] h-[3px] pl-[.35rem] pr-[.55rem] ${classNames}`}
       style={{
-        background: "#0d0d0d",
+        background: isLight ? "#ffffff" : "#0d0d0d",
+        color: isLight ? "#1a1a1a" : "#EEEEEE",
       }}
     >
       {text} {required && <b className="text-[#FF4D4F]">*</b>}
