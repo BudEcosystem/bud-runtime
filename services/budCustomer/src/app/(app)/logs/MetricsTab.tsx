@@ -40,13 +40,21 @@ import GroupedBarChart from '@/components/charts/GroupedBarChart';
 import GeoMapChart from '@/components/charts/GeoMapChart';
 import { Flex } from '@radix-ui/themes';
 import { useAggregatedMetrics } from '@/hooks/useAggregatedMetrics';
+import { useTheme } from '@/context/themeContext';
 
 const { Text } = Typography;
 
 // Custom chart component wrapper for consistent styling
 function ChartCard({ title, subtitle, children, height = '23.664375rem' }: { title: string; subtitle?: string; children: React.ReactNode; height?: string }) {
   return (
-    <div className={`bg-[#101010] p-[1.55rem] py-[2rem] rounded-[6.403px] border-[1.067px] border-[#1F1F1F] w-full h-[${height}] flex items-center justify-between flex-col`}>
+    <div 
+      className={`p-[1.55rem] py-[2rem] rounded-[6.403px] border-[1.067px] w-full h-[${height}] flex items-center justify-between flex-col`}
+      style={{
+        backgroundColor: 'var(--bg-card)',
+        borderColor: 'var(--border-color)',
+        boxShadow: 'var(--shadow-sm)',
+      }}
+    >
       <div className="flex items-center w-full flex-col">
         <Text_19_600_EEEEEE className="mb-[1.3rem] w-full">
           {title}
@@ -67,7 +75,14 @@ function ChartCard({ title, subtitle, children, height = '23.664375rem' }: { tit
 // Metric card component for key metrics
 function MetricCard({ icon, title, value, subtitle, valueColor = '#EEEEEE', showProgress = false, progressValue = 0, progressColor = '#3F8EF7' }: any) {
   return (
-    <div className="bg-[#101010] p-[1.45rem] pb-[1.2rem] rounded-[6.403px] border-[1.067px] border-[#1F1F1F] min-h-[7.8125rem] flex flex-col items-start justify-between">
+    <div 
+      className="p-[1.45rem] pb-[1.2rem] rounded-[6.403px] border-[1.067px] min-h-[7.8125rem] flex flex-col items-start justify-between"
+      style={{
+        backgroundColor: 'var(--bg-card)',
+        borderColor: 'var(--border-color)',
+        boxShadow: 'var(--shadow-sm)',
+      }}
+    >
       <div className="flex items-center gap-2 mb-3">
         {icon}
         <Text_12_500_FFFFFF>{title}</Text_12_500_FFFFFF>
@@ -84,7 +99,7 @@ function MetricCard({ icon, title, value, subtitle, valueColor = '#EEEEEE', show
             percent={progressValue}
             showInfo={false}
             strokeColor={progressColor}
-            trailColor="#212225"
+            trailColor="var(--bg-hover)"
             className="mt-2"
           />
         )}
@@ -139,6 +154,7 @@ interface MetricStats {
 
 
 const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoading, viewBy, isActive, filters }) => {
+  const { effectiveTheme } = useTheme();
   const { fetchMetricsTabData, isLoading: metricsLoading, error: metricsError } = useAggregatedMetrics();
   const [serverMetrics, setServerMetrics] = useState<any>(null);
   const [geographicData, setGeographicData] = useState<any>(null);
@@ -1244,7 +1260,55 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
   const metricsKey = `${timeRange[0].unix()}-${timeRange[1].unix()}-${viewBy}`;
 
   return (
-    <div className="metrics-container" key={metricsKey}>
+    <div className="metrics-container theme-aware-metrics" key={metricsKey}>
+      <style jsx global>{`
+        .theme-aware-metrics *,
+        .theme-aware-metrics div,
+        .theme-aware-metrics span,
+        .theme-aware-metrics p,
+        .theme-aware-metrics h1,
+        .theme-aware-metrics h2,
+        .theme-aware-metrics h3,
+        .theme-aware-metrics h4,
+        .theme-aware-metrics h5,
+        .theme-aware-metrics h6 {
+          color: var(--text-primary) !important;
+        }
+        
+        /* Override specific hardcoded text components */
+        .theme-aware-metrics [class*="Text_"][class*="_FFFFFF"],
+        .theme-aware-metrics [class*="Text_"][class*="_EEEEEE"],
+        .theme-aware-metrics [class*="Text_"][class*="_26_400_EEEEEE"],
+        .theme-aware-metrics [class*="Text_"][class*="_22_700_EEEEEE"],
+        .theme-aware-metrics [class*="Text_"][class*="_19_600_EEEEEE"],
+        .theme-aware-metrics [class*="Text_"][class*="_16_600_FFFFFF"],
+        .theme-aware-metrics [class*="Text_"][class*="_14_600_EEEEEE"],
+        .theme-aware-metrics [class*="Text_"][class*="_14_400_EEEEEE"],
+        .theme-aware-metrics [class*="Text_"][class*="_12_500_FFFFFF"],
+        .theme-aware-metrics [class*="Text_"][class*="_12_400_EEEEEE"] {
+          color: var(--text-primary) !important;
+        }
+        
+        .theme-aware-metrics [class*="Text_"][class*="_B3B3B3"],
+        .theme-aware-metrics [class*="Text_"][class*="_12_400_B3B3B3"],
+        .theme-aware-metrics [class*="Text_"][class*="_13_400_757575"] {
+          color: var(--text-muted) !important;
+        }
+        
+        /* Ant Design components */
+        .theme-aware-metrics .ant-list-item {
+          color: var(--text-primary) !important;
+        }
+        .theme-aware-metrics .ant-progress-text {
+          color: var(--text-primary) !important;
+        }
+        .theme-aware-metrics .ant-empty-description {
+          color: var(--text-muted) !important;
+        }
+        .theme-aware-metrics .ant-row {
+          color: var(--text-primary) !important;
+        }
+      `}</style>
       {/* Key Metrics Cards */}
       <Row gutter={[16, 16]} className="mb-6">
         <Col xs={24} sm={12} md={6}>
@@ -1360,7 +1424,14 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
       {/* Geographic Distribution Row */}
       <Row gutter={[16, 16]} className="mb-6">
         <Col xs={24}>
-          <div className="bg-[#101010] p-[2.55rem] py-[2rem] rounded-[6.403px] border-[1.067px] border-[#1F1F1F] w-full">
+          <div 
+            className="p-[2.55rem] py-[2rem] rounded-[6.403px] border-[1.067px] w-full"
+            style={{
+              backgroundColor: 'var(--bg-card)',
+              borderColor: 'var(--border-color)',
+              boxShadow: 'var(--shadow-sm)',
+            }}
+          >
             <div className="flex items-center w-full flex-col mb-4">
               <Text_19_600_EEEEEE className="w-full">
                 Geographic Distribution
@@ -1575,12 +1646,24 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
       <Row gutter={[16, 16]} className="mb-6">
         {viewBy === 'model' && (
           <Col xs={24} md={12}>
-            <div className="bg-[#101010] p-[1.55rem] py-[2rem] rounded-[6.403px] border-[1.067px] border-[#1F1F1F] h-[22rem]">
+            <div 
+              className="p-[1.55rem] py-[2rem] rounded-[6.403px] border-[1.067px] h-[22rem]"
+              style={{
+                backgroundColor: 'var(--bg-card)',
+                borderColor: 'var(--border-color)',
+                boxShadow: 'var(--shadow-sm)',
+              }}
+            >
               <Text_19_600_EEEEEE className="mb-4">Top Models</Text_19_600_EEEEEE>
               <List
                 dataSource={metrics.topModels}
                 renderItem={(item, index) => (
-                  <List.Item className="border-[#212225] py-2">
+                  <List.Item 
+                    className="py-2"
+                    style={{
+                      borderColor: 'var(--border-color)',
+                    }}
+                  >
                     <div className="w-full">
                       <div className="flex justify-between mb-1">
                         <Text_12_400_EEEEEE className="truncate max-w-[60%]">{item.model}</Text_12_400_EEEEEE>
@@ -1590,7 +1673,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
                         percent={item.percentage}
                         showInfo={false}
                         strokeColor={getEntityColor(item.model)}
-                        trailColor="#212225"
+                        trailColor="var(--bg-hover)"
                         size="small"
                       />
                     </div>
@@ -1603,12 +1686,24 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
 
         {viewBy === 'deployment' && (
           <Col xs={24} md={12}>
-            <div className="bg-[#101010] p-[1.55rem] py-[2rem] rounded-[6.403px] border-[1.067px] border-[#1F1F1F] h-[22rem]">
+            <div 
+              className="p-[1.55rem] py-[2rem] rounded-[6.403px] border-[1.067px] h-[22rem]"
+              style={{
+                backgroundColor: 'var(--bg-card)',
+                borderColor: 'var(--border-color)',
+                boxShadow: 'var(--shadow-sm)',
+              }}
+            >
               <Text_19_600_EEEEEE className="mb-4">Top Deployments</Text_19_600_EEEEEE>
               <List
                 dataSource={metrics.topEndpoints}
                 renderItem={(item, index) => (
-                  <List.Item className="border-[#212225] py-2">
+                  <List.Item 
+                    className="py-2"
+                    style={{
+                      borderColor: 'var(--border-color)',
+                    }}
+                  >
                     <div className="w-full">
                       <div className="flex justify-between mb-1">
                         <Text_12_400_EEEEEE className="truncate max-w-[60%]">{item.endpoint}</Text_12_400_EEEEEE>
@@ -1618,7 +1713,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
                         percent={item.percentage}
                         showInfo={false}
                         strokeColor={getEntityColor(item.endpoint)}
-                        trailColor="#212225"
+                        trailColor="var(--bg-hover)"
                         size="small"
                       />
                     </div>
@@ -1631,14 +1726,26 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
 
         {(viewBy === 'project' || viewBy === 'user') && (
           <Col xs={24} md={12}>
-            <div className="bg-[#101010] p-[1.55rem] py-[2rem] rounded-[6.403px] border-[1.067px] border-[#1F1F1F] h-[22rem]">
+            <div 
+              className="p-[1.55rem] py-[2rem] rounded-[6.403px] border-[1.067px] h-[22rem]"
+              style={{
+                backgroundColor: 'var(--bg-card)',
+                borderColor: 'var(--border-color)',
+                boxShadow: 'var(--shadow-sm)',
+              }}
+            >
               <Text_19_600_EEEEEE className="mb-4">
                 {viewBy === 'user' ? 'Top Users' : 'Top Projects'}
               </Text_19_600_EEEEEE>
               <List
                 dataSource={metrics.topProjects}
                 renderItem={(item, index) => (
-                  <List.Item className="border-[#212225] py-2">
+                  <List.Item 
+                    className="py-2"
+                    style={{
+                      borderColor: 'var(--border-color)',
+                    }}
+                  >
                     <div className="w-full">
                       <div className="flex justify-between mb-1">
                         <Text_12_400_EEEEEE className="truncate max-w-[60%]">{item.project}</Text_12_400_EEEEEE>
@@ -1648,7 +1755,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
                         percent={item.percentage}
                         showInfo={false}
                         strokeColor={getEntityColor(item.project)}
-                        trailColor="#212225"
+                        trailColor="var(--bg-hover)"
                         size="small"
                       />
                     </div>
@@ -1662,12 +1769,24 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
         {/* Secondary stats - show complementary data */}
         {viewBy !== 'model' && metrics.topModels.length > 0 && (
           <Col xs={24} md={12}>
-            <div className="bg-[#101010] p-[1.55rem] py-[2rem] rounded-[6.403px] border-[1.067px] border-[#1F1F1F] h-[22rem]">
+            <div 
+              className="p-[1.55rem] py-[2rem] rounded-[6.403px] border-[1.067px] h-[22rem]"
+              style={{
+                backgroundColor: 'var(--bg-card)',
+                borderColor: 'var(--border-color)',
+                boxShadow: 'var(--shadow-sm)',
+              }}
+            >
               <Text_19_600_EEEEEE className="mb-4">Models Used</Text_19_600_EEEEEE>
               <List
                 dataSource={metrics.topModels}
                 renderItem={(item, index) => (
-                  <List.Item className="border-[#212225] py-2">
+                  <List.Item 
+                    className="py-2"
+                    style={{
+                      borderColor: 'var(--border-color)',
+                    }}
+                  >
                     <div className="w-full">
                       <div className="flex justify-between mb-1">
                         <Text_12_400_EEEEEE className="truncate max-w-[60%]">{item.model}</Text_12_400_EEEEEE>
@@ -1677,7 +1796,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
                         percent={item.percentage}
                         showInfo={false}
                         strokeColor={getEntityColor(item.model)}
-                        trailColor="#212225"
+                        trailColor="var(--bg-hover)"
                         size="small"
                       />
                     </div>
@@ -1690,12 +1809,24 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
 
         {viewBy !== 'deployment' && metrics.topEndpoints.length > 0 && (
           <Col xs={24} md={12}>
-            <div className="bg-[#101010] p-[1.55rem] py-[2rem] rounded-[6.403px] border-[1.067px] border-[#1F1F1F] h-[22rem]">
+            <div 
+              className="p-[1.55rem] py-[2rem] rounded-[6.403px] border-[1.067px] h-[22rem]"
+              style={{
+                backgroundColor: 'var(--bg-card)',
+                borderColor: 'var(--border-color)',
+                boxShadow: 'var(--shadow-sm)',
+              }}
+            >
               <Text_19_600_EEEEEE className="mb-4">Active Deployments</Text_19_600_EEEEEE>
               <List
                 dataSource={metrics.topEndpoints}
                 renderItem={(item, index) => (
-                  <List.Item className="border-[#212225] py-2">
+                  <List.Item 
+                    className="py-2"
+                    style={{
+                      borderColor: 'var(--border-color)',
+                    }}
+                  >
                     <div className="w-full">
                       <div className="flex justify-between mb-1">
                         <Text_12_400_EEEEEE className="truncate max-w-[60%]">{item.endpoint}</Text_12_400_EEEEEE>
@@ -1705,7 +1836,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
                         percent={item.percentage}
                         showInfo={false}
                         strokeColor={getEntityColor(item.endpoint)}
-                        trailColor="#212225"
+                        trailColor="var(--bg-hover)"
                         size="small"
                       />
                     </div>
@@ -1728,7 +1859,12 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
                 </div>
                 <Text_12_400_B3B3B3>Success</Text_12_400_B3B3B3>
               </div>
-              <div className="w-px h-32 bg-[#212225]"></div>
+              <div 
+                className="w-px h-32"
+                style={{
+                  backgroundColor: 'var(--border-color)',
+                }}
+              ></div>
               <div className="text-center">
                 <CloseCircleOutlined style={{ color: '#ef4444', fontSize: '48px' }} />
                 <div className="mt-4">
