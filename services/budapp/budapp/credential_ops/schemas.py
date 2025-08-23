@@ -116,7 +116,7 @@ class CredentialResponse(BaseModel):
     max_budget: float | None
     model_budgets: Optional[model_budget_type] = None
     id: UUID
-    created_at: datetime | None
+    created_at: datetime
     last_used_at: datetime | None
     credential_type: ApiCredentialTypeEnum
     ip_whitelist: Optional[List[str]] = None
