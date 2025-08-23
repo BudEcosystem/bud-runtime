@@ -16,13 +16,15 @@
 
 """The project ops services. Contains business logic for project ops."""
 
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 from uuid import UUID
 
-from fastapi import HTTPException, status
+from fastapi import HTTPException, Request, status
 
+from budapp.audit_ops import log_audit
 from budapp.auth.schemas import DeletePermissionRequest, ResourceCreate
 from budapp.commons import logging
+from budapp.commons.constants import AuditActionEnum, AuditResourceTypeEnum
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
 from budapp.permissions.service import PermissionService
@@ -76,7 +78,9 @@ logger = logging.get_logger(__name__)
 class ProjectService(SessionMixin):
     """Project service."""
 
-    async def create_project(self, project_data: Dict[str, Any], current_user_id: UUID) -> ProjectModel:
+    async def create_project(
+        self, project_data: Dict[str, Any], current_user_id: UUID, request: Optional[Request] = None
+    ) -> ProjectModel:
         """Create a project."""
         # Permission check
         permission_service = PermissionService(self.session)
@@ -111,19 +115,60 @@ class ProjectService(SessionMixin):
             default_project_level_scopes = PermissionEnum.get_project_level_scopes()
             add_users_data = ProjectUserAdd(user_id=current_user_id, scopes=default_project_level_scopes)
             db_project = await self.add_users_to_project(db_project.id, [add_users_data])
+
+            # Log successful project creation
+            log_audit(
+                session=self.session,
+                action=AuditActionEnum.CREATE,
+                resource_type=AuditResourceTypeEnum.PROJECT,
+                resource_id=db_project.id,
+                user_id=current_user_id,
+                details={
+                    "project_name": db_project.name,
+                    "description": db_project.description,
+                },
+                request=request,
+                success=True,
+            )
         except Exception as e:
             logger.error(f"Failed to update permission in Keycloak: {e}")
+            # Log failed project creation attempt
+            log_audit(
+                session=self.session,
+                action=AuditActionEnum.CREATE,
+                resource_type=AuditResourceTypeEnum.PROJECT,
+                resource_id=db_project.id,
+                user_id=current_user_id,
+                details={
+                    "project_name": project_data.get("name"),
+                    "description": project_data.get("description"),
+                },
+                request=request,
+                success=False,
+            )
             raise ClientException("Failed to update permission in Keycloak")
 
         return db_project
 
-    async def edit_project(self, project_id: UUID, data: Dict[str, Any]) -> ProjectResponse:
+    async def edit_project(
+        self,
+        project_id: UUID,
+        data: Dict[str, Any],
+        current_user_id: Optional[UUID] = None,
+        request: Optional[Request] = None,
+    ) -> ProjectResponse:
         """Edit project by validating and updating specific fields."""
         # Retrieve existing model
         db_project = await ProjectDataManager(self.session).retrieve_by_fields(
             model=ProjectModel,
             fields={"id": project_id, "status": ProjectStatusEnum.ACTIVE},
         )
+
+        # Capture previous state for audit
+        previous_state = {
+            "project_name": db_project.name,
+            "description": db_project.description,
+        }
 
         # Explicitly prevent project_type updates
         if "project_type" in data:
@@ -141,6 +186,21 @@ class ProjectService(SessionMixin):
                 raise ClientException("Project name already exists")
 
         db_project = await ProjectDataManager(self.session).update_by_fields(db_project, data)
+
+        # Log project update
+        log_audit(
+            session=self.session,
+            action=AuditActionEnum.UPDATE,
+            resource_type=AuditResourceTypeEnum.PROJECT,
+            resource_id=project_id,
+            user_id=current_user_id,
+            previous_state=previous_state,
+            new_state={
+                "project_name": db_project.name,
+                "description": db_project.description,
+            },
+            request=request,
+        )
 
         return db_project
 
@@ -522,11 +582,19 @@ class ProjectService(SessionMixin):
         project_id: UUID,
         remove_credential: bool = False,
         is_benchmark: bool = False,
+        current_user_id: Optional[UUID] = None,
+        request: Optional[Request] = None,
     ) -> ProjectModel:
         """Delete a project from the database."""
         db_project = await ProjectDataManager(self.session).retrieve_by_fields(
             ProjectModel, {"id": project_id, "status": ProjectStatusEnum.ACTIVE}
         )
+
+        # Capture project details for audit
+        project_details = {
+            "project_name": db_project.name,
+            "description": db_project.description,
+        }
 
         # Check active endpoint exists
         db_endpoints = await EndpointDataManager(self.session).get_all_by_fields(
@@ -536,6 +604,17 @@ class ProjectService(SessionMixin):
         )
 
         if db_endpoints:
+            # Log failed deletion attempt
+            log_audit(
+                session=self.session,
+                action=AuditActionEnum.DELETE,
+                resource_type=AuditResourceTypeEnum.PROJECT,
+                resource_id=project_id,
+                user_id=current_user_id,
+                details=project_details,
+                request=request,
+                success=False,
+            )
             raise ClientException("Cannot delete the project because it has an active endpoint.")
 
         db_credentials = await CredentialDataManager(self.session).get_all_by_fields(
@@ -544,11 +623,23 @@ class ProjectService(SessionMixin):
 
         if db_credentials and not remove_credential:
             logger.info("Found user created credentials related to project")
+            # Log failed deletion attempt
+            log_audit(
+                session=self.session,
+                action=AuditActionEnum.DELETE,
+                resource_type=AuditResourceTypeEnum.PROJECT,
+                resource_id=project_id,
+                user_id=current_user_id,
+                details=project_details,
+                request=request,
+                success=False,
+            )
             raise ClientException("Credentials need to be removed")
         else:
             # Delete all credentials related to the project
-            await CredentialDataManager(self.session).delete_by_fields(CredentialModel, {"project_id": project_id})
-            logger.info("Deleted all credentials related to project")
+            if db_credentials:
+                await CredentialDataManager(self.session).delete_by_fields(CredentialModel, {"project_id": project_id})
+                logger.info("Deleted all credentials related to project")
 
         # NOTE: keep project level permissions instead of deleting it on project deletion
         # Remove project permissions on benchmark
@@ -574,10 +665,24 @@ class ProjectService(SessionMixin):
             # Continue with project deletion even if Keycloak deletion fails
 
         if db_project.benchmark:
-            return await ProjectDataManager(self.session).delete_one(db_project)
+            result = await ProjectDataManager(self.session).delete_one(db_project)
+        else:
+            data = {"status": ProjectStatusEnum.DELETED}
+            result = await ProjectDataManager(self.session).update_by_fields(db_project, data)
 
-        data = {"status": ProjectStatusEnum.DELETED}
-        return await ProjectDataManager(self.session).update_by_fields(db_project, data)
+        # Log successful project deletion
+        log_audit(
+            session=self.session,
+            action=AuditActionEnum.DELETE,
+            resource_type=AuditResourceTypeEnum.PROJECT,
+            resource_id=project_id,
+            user_id=current_user_id,
+            details=project_details,
+            request=request,
+            success=True,
+        )
+
+        return result
 
     async def remove_users_from_project(
         self, project_id: UUID, user_ids: List[UUID], remove_credential: bool

@@ -21,9 +21,16 @@ from uuid import UUID
 
 from fastapi import status
 
+from budapp.audit_ops import log_audit
 from budapp.commons import logging
 from budapp.commons.config import app_settings
-from budapp.commons.constants import UserColorEnum, UserStatusEnum, UserTypeEnum
+from budapp.commons.constants import (
+    AuditActionEnum,
+    AuditResourceTypeEnum,
+    UserColorEnum,
+    UserStatusEnum,
+    UserTypeEnum,
+)
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
 from budapp.commons.keycloak import KeycloakManager
@@ -48,7 +55,7 @@ logger = logging.get_logger(__name__)
 
 
 class AuthService(SessionMixin):
-    async def login_user(self, user: UserLogin) -> UserLoginData:
+    async def login_user(self, user: UserLogin, request=None) -> UserLoginData:
         """Login a user with email and password."""
         logger.debug(f"::USER:: User: {user}")
 
@@ -60,6 +67,15 @@ class AuthService(SessionMixin):
         # Check if user exists
         if not db_user:
             logger.debug(f"User not found in database: {user.email}")
+            # Log failed login attempt - email not registered
+            log_audit(
+                session=self.session,
+                action=AuditActionEnum.LOGIN_FAILED,
+                resource_type=AuditResourceTypeEnum.USER,
+                details={"email": user.email, "reason": "Email not registered"},
+                request=request,
+                success=False,
+            )
             raise ClientException("This email is not registered")
 
         # Get tenant information
@@ -135,6 +151,18 @@ class AuthService(SessionMixin):
             raise ClientException("User account is not active")
 
         logger.debug(f"User Retrieved: {user.email}")
+
+        # Log successful login
+        log_audit(
+            session=self.session,
+            action=AuditActionEnum.LOGIN,
+            resource_type=AuditResourceTypeEnum.USER,
+            resource_id=db_user.id,
+            user_id=db_user.id,
+            details={"email": user.email, "tenant": tenant.realm_name if tenant else None},
+            request=request,
+            success=True,
+        )
 
         # Create auth token
         # token = await TokenService(self.session).create_auth_token(str(db_user.auth_id))

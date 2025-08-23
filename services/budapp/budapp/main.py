@@ -28,6 +28,7 @@ from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from .audit_ops import audit_routes
 from .auth import auth_routes
 from .benchmark_ops import benchmark_routes
 from .billing_ops import billing_router
@@ -240,6 +241,7 @@ if app_settings.cors_origins:
     )
 
 internal_router = APIRouter()
+internal_router.include_router(audit_routes.router)
 internal_router.include_router(auth_routes.auth_router)
 internal_router.include_router(benchmark_routes.benchmark_router)
 internal_router.include_router(cluster_routes.cluster_router)

@@ -4,13 +4,16 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, Dict, List, Optional, Union
 from uuid import UUID
 
-from fastapi import HTTPException, status
+from fastapi import HTTPException, Request, status
 from fastapi.exceptions import HTTPException
 
+from budapp.audit_ops import log_audit
 from budapp.commons import logging
 from budapp.commons.config import app_settings
 from budapp.commons.constants import (
     ApiCredentialTypeEnum,
+    AuditActionEnum,
+    AuditResourceTypeEnum,
     EndpointStatusEnum,
     ModelProviderTypeEnum,
     PermissionEnum,
@@ -65,7 +68,9 @@ class CredentialService(SessionMixin):
         )
         return db_credential is not None
 
-    async def add_credential(self, current_user_id: UUID, credential: CredentialRequest) -> CredentialResponse:
+    async def add_credential(
+        self, current_user_id: UUID, credential: CredentialRequest, request: Optional[Request] = None
+    ) -> CredentialResponse:
         # Validate project id
         db_project = await ProjectDataManager(self.session).retrieve_project_by_fields(
             {"id": credential.project_id, "status": ProjectStatusEnum.ACTIVE}
@@ -93,6 +98,26 @@ class CredentialService(SessionMixin):
         # Decrypt the key for cache update
         decrypted_key = await RSAHandler().decrypt(db_credential.encrypted_key)
         await self.update_proxy_cache(db_credential.project_id, decrypted_key, db_credential.expiry)
+
+        # Log successful credential creation
+        audit_details = {
+            "credential_name": db_credential.name,
+            "project_name": db_project.name,
+            "expiry": str(db_credential.expiry) if db_credential.expiry else None,
+        }
+        if db_credential.max_budget is not None:
+            audit_details["max_budget"] = db_credential.max_budget
+
+        log_audit(
+            session=self.session,
+            action=AuditActionEnum.CREATE,
+            resource_type=AuditResourceTypeEnum.API_KEY,
+            resource_id=db_credential.id,
+            user_id=current_user_id,
+            details=audit_details,
+            request=request,
+            success=True,
+        )
 
         # Use the encrypted key directly
         credential_response = CredentialResponse(
@@ -332,7 +357,7 @@ class CredentialService(SessionMixin):
             )
         return bud_serve_credentials
 
-    async def delete_credential(self, credential_id: UUID, user_id: UUID) -> None:
+    async def delete_credential(self, credential_id: UUID, user_id: UUID, request: Optional[Request] = None) -> None:
         """Delete the credential from the database."""
         # Retrieve the credential from the database
         db_credential = await CredentialDataManager(self.session).retrieve_credential_by_fields(
@@ -344,6 +369,12 @@ class CredentialService(SessionMixin):
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="User does not have permission to update this credential",
             )
+
+        # Get project name for audit log
+        db_project = await ProjectDataManager(self.session).retrieve_project_by_fields(
+            {"id": db_credential.project_id}, missing_ok=True
+        )
+        project_name = db_project.name if db_project else None
 
         # project_id = db_credential.project_id
         # # Check user permissions for viewing credentials
@@ -362,12 +393,39 @@ class CredentialService(SessionMixin):
 
         redis_service = RedisService()
         await redis_service.delete_keys_by_pattern(f"api_key:{hashed_key}*")
+
+        # Store credential details before deletion
+        credential_name = db_credential.name
+        credential_expiry = str(db_credential.expiry) if db_credential.expiry else None
+
         # Delete the credential from the database
         await CredentialDataManager(self.session).delete_credential(db_credential)
 
+        # Log successful credential deletion
+        audit_details = {
+            "credential_name": credential_name,
+            "project_name": project_name,
+            "expiry": credential_expiry,
+        }
+        if db_credential.max_budget is not None:
+            audit_details["max_budget"] = db_credential.max_budget
+
+        log_audit(
+            session=self.session,
+            action=AuditActionEnum.DELETE,
+            resource_type=AuditResourceTypeEnum.API_KEY,
+            resource_id=credential_id,
+            user_id=user_id,
+            details=audit_details,
+            request=request,
+            success=True,
+        )
+
         return
 
-    async def update_credential(self, data: CredentialUpdate, credential_id: UUID, user_id: UUID) -> CredentialModel:
+    async def update_credential(
+        self, data: CredentialUpdate, credential_id: UUID, user_id: UUID, request: Optional[Request] = None
+    ) -> CredentialModel:
         """Update the OpenAI or HuggingFace credential in the database."""
         # Check if credential exists
         db_credential = await CredentialDataManager(self.session).retrieve_credential_by_fields({"id": credential_id})
@@ -436,9 +494,47 @@ class CredentialService(SessionMixin):
             except ValueError as e:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
+        # Capture previous state for audit
+        previous_state = {
+            "credential_name": db_credential.name,
+            "expiry": str(db_credential.expiry) if db_credential.expiry else None,
+        }
+        if db_credential.max_budget is not None:
+            previous_state["max_budget"] = db_credential.max_budget
+
         # Update the credential in the database
         db_credential = await CredentialDataManager(self.session).update_credential_by_fields(
             db_credential, credential_update_data
+        )
+
+        # Get project name for audit log
+        db_project = await ProjectDataManager(self.session).retrieve_project_by_fields(
+            {"id": db_credential.project_id}, missing_ok=True
+        )
+        project_name = db_project.name if db_project else None
+
+        # Build new state for audit
+        new_state = {
+            "credential_name": db_credential.name,
+            "expiry": str(db_credential.expiry) if db_credential.expiry else None,
+        }
+        if db_credential.max_budget is not None:
+            new_state["max_budget"] = db_credential.max_budget
+
+        # Log credential update
+        log_audit(
+            session=self.session,
+            action=AuditActionEnum.UPDATE,
+            resource_type=AuditResourceTypeEnum.API_KEY,
+            resource_id=credential_id,
+            user_id=user_id,
+            previous_state=previous_state,
+            new_state=new_state,
+            details={
+                "project_name": project_name,
+            },
+            request=request,
+            success=True,
         )
 
         return db_credential
@@ -525,7 +621,7 @@ class CredentialService(SessionMixin):
 
 class ProprietaryCredentialService(SessionMixin):
     async def add_credential(
-        self, current_user_id: UUID, credential: ProprietaryCredentialRequest
+        self, current_user_id: UUID, credential: ProprietaryCredentialRequest, request: Optional[Request] = None
     ) -> ProprietaryCredentialResponse:
         # Check duplicate credential exists with same name and type for user_id
         db_credential = await ProprietaryCredentialDataManager(self.session).retrieve_credential_by_fields(
@@ -543,6 +639,21 @@ class ProprietaryCredentialService(SessionMixin):
 
         # Encrypt credential and add in db
         db_credential = await self.add_encrypted_credential(credential, current_user_id)
+
+        # Log successful proprietary credential creation
+        log_audit(
+            session=self.session,
+            action=AuditActionEnum.CREATE,
+            resource_type=AuditResourceTypeEnum.API_KEY,
+            resource_id=db_credential.id,
+            user_id=current_user_id,
+            details={
+                "credential_name": db_credential.name,
+                "credential_type": db_credential.type,
+            },
+            request=request,
+            success=True,
+        )
 
         credential_response = ProprietaryCredentialResponse(
             name=db_credential.name,
@@ -639,6 +750,7 @@ class ProprietaryCredentialService(SessionMixin):
         credential_id: UUID,
         data: ProprietaryCredentialUpdate,
         current_user_id: UUID,
+        request: Optional[Request] = None,
     ) -> ProprietaryCredentialResponse:
         # Check if credential exists
         db_credential = await ProprietaryCredentialDataManager(self.session).retrieve_credential_by_fields(
@@ -718,14 +830,37 @@ class ProprietaryCredentialService(SessionMixin):
                         )
                 db_credential.endpoints.append(db_endpoint)
 
+        # Capture previous state for audit
+        previous_state = {
+            "credential_name": db_credential.name,
+        }
+
         # Update the credential in the database
         db_credential = await ProprietaryCredentialDataManager(self.session).update_credential_by_fields(
             db_credential, proprietary_update_data
         )
 
+        # Log credential update
+        log_audit(
+            session=self.session,
+            action=AuditActionEnum.UPDATE,
+            resource_type=AuditResourceTypeEnum.API_KEY,
+            resource_id=credential_id,
+            user_id=current_user_id,
+            previous_state=previous_state,
+            new_state={
+                "credential_name": db_credential.name,
+            },
+            details={
+                "credential_type": db_credential.type,
+            },
+            request=request,
+            success=True,
+        )
+
         return db_credential
 
-    async def delete_credential(self, credential_id: UUID, current_user_id: UUID):
+    async def delete_credential(self, credential_id: UUID, current_user_id: UUID, request: Optional[Request] = None):
         """Delete the proprietary credential from the database."""
         # Retrieve the credential from the database
         db_credential = await ProprietaryCredentialDataManager(self.session).retrieve_credential_by_fields(
@@ -748,8 +883,27 @@ class ProprietaryCredentialService(SessionMixin):
                 Please delete the deployed models first or link other credentials to those models for deleting this credential""",
             )
 
+        # Store credential details before deletion
+        credential_name = db_credential.name
+        credential_type = db_credential.type
+
         # Delete the credential from the database
         await ProprietaryCredentialDataManager(self.session).delete_credential(db_credential)
+
+        # Log successful credential deletion
+        log_audit(
+            session=self.session,
+            action=AuditActionEnum.DELETE,
+            resource_type=AuditResourceTypeEnum.API_KEY,
+            resource_id=credential_id,
+            user_id=current_user_id,
+            details={
+                "credential_name": credential_name,
+                "credential_type": credential_type,
+            },
+            request=request,
+            success=True,
+        )
 
     async def get_credential_details(
         self, credential_id: UUID, detailed_view: bool = False
