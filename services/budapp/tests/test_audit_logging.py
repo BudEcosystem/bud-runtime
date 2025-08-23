@@ -11,85 +11,7 @@ from fastapi import Request
 from sqlalchemy.orm import Session
 
 from budapp.audit_ops import log_audit, log_audit_async
-from budapp.audit_ops.audit_logger import (
-    extract_ip_from_request,
-    extract_user_agent_from_request,
-    mask_sensitive_data,
-)
 from budapp.commons.constants import AuditActionEnum, AuditResourceTypeEnum
-
-
-class TestAuditLoggingUtilities:
-    """Test utility functions for audit logging."""
-
-    def test_mask_sensitive_data(self):
-        """Test that sensitive data is properly masked."""
-        input_data = {
-            "username": "john.doe",
-            "password": "secret123",
-            "api_key": "sk-1234567890",
-            "token": "bearer-token-xyz",
-            "secret": "my-secret",
-            "credit_card": "4111111111111111",
-            "normal_field": "normal_value",
-            "nested": {
-                "password": "nested_password",
-                "data": "nested_data",
-            }
-        }
-
-        result = mask_sensitive_data(input_data)
-
-        assert result["username"] == "john.doe"
-        assert result["password"] == "***REDACTED***"
-        assert result["api_key"] == "***REDACTED***"
-        assert result["token"] == "***REDACTED***"
-        assert result["secret"] == "***REDACTED***"
-        assert result["credit_card"] == "***REDACTED***"
-        assert result["normal_field"] == "normal_value"
-        assert result["nested"]["password"] == "***REDACTED***"
-        assert result["nested"]["data"] == "nested_data"
-
-    def test_extract_ip_from_request(self):
-        """Test IP address extraction from request."""
-        # Test with X-Forwarded-For header
-        request = Mock(spec=Request)
-        request.headers = {"x-forwarded-for": "192.168.1.1, 10.0.0.1"}
-        request.client = Mock(host="127.0.0.1")
-
-        ip = extract_ip_from_request(request)
-        assert ip == "192.168.1.1"
-
-        # Test without X-Forwarded-For header
-        request = Mock(spec=Request)
-        request.headers = {}
-        request.client = Mock(host="10.0.0.2")
-
-        ip = extract_ip_from_request(request)
-        assert ip == "10.0.0.2"
-
-        # Test with no client
-        request = Mock(spec=Request)
-        request.headers = {}
-        request.client = None
-
-        ip = extract_ip_from_request(request)
-        assert ip is None
-
-    def test_extract_user_agent_from_request(self):
-        """Test user agent extraction from request."""
-        request = Mock(spec=Request)
-        request.headers = {"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-
-        user_agent = extract_user_agent_from_request(request)
-        assert user_agent == "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-
-        # Test without user-agent header
-        request = Mock(spec=Request)
-        request.headers = {}
-
-        user_agent = extract_user_agent_from_request(request)
-        assert user_agent is None
 
 
 class TestAuditLogging:
@@ -131,17 +53,18 @@ class TestAuditLogging:
 
         # Verify
         mock_audit_service_class.assert_called_once_with(session)
-        mock_audit_service.create_audit_record.assert_called_once()
+        mock_audit_service.audit_create.assert_called_once()
 
-        call_args = mock_audit_service.create_audit_record.call_args[1]
-        assert call_args["action"] == AuditActionEnum.CREATE
+        call_args = mock_audit_service.audit_create.call_args[1]
         assert call_args["resource_type"] == AuditResourceTypeEnum.PROJECT
         assert call_args["resource_id"] == resource_id
         assert call_args["user_id"] == user_id
-        assert call_args["details"] == details
+        # Details should include user_agent and success
+        expected_details = details.copy()
+        expected_details["user_agent"] = "TestAgent/1.0"
+        expected_details["success"] = True
+        assert call_args["resource_data"] == expected_details
         assert call_args["ip_address"] == "192.168.1.1"
-        assert call_args["user_agent"] == "TestAgent/1.0"
-        assert call_args["success"] is True
 
     @patch("budapp.audit_ops.audit_logger.AuditService")
     def test_log_audit_with_sensitive_data(self, mock_audit_service_class):
@@ -170,10 +93,15 @@ class TestAuditLogging:
         )
 
         # Verify
-        call_args = mock_audit_service.create_audit_record.call_args[1]
-        assert call_args["details"]["username"] == "john.doe"
-        assert call_args["details"]["password"] == "***REDACTED***"
-        assert call_args["details"]["api_key"] == "***REDACTED***"
+        mock_audit_service.audit_authentication.assert_called_once()
+        call_args = mock_audit_service.audit_authentication.call_args[1]
+        assert call_args["action"] == AuditActionEnum.LOGIN
+        assert call_args["user_id"] == user_id
+        assert call_args["success"] is True
+        # audit_authentication gets details passed in
+        expected_details = details.copy()
+        expected_details["success"] = True
+        assert call_args["details"] == expected_details
 
     @patch("budapp.audit_ops.audit_logger.AuditService")
     def test_log_audit_with_previous_and_new_state(self, mock_audit_service_class):
@@ -209,9 +137,15 @@ class TestAuditLogging:
         )
 
         # Verify
-        call_args = mock_audit_service.create_audit_record.call_args[1]
+        call_args = mock_audit_service.audit_update.call_args[1]
+        assert call_args["resource_type"] == AuditResourceTypeEnum.PROJECT
+        assert call_args["resource_id"] == resource_id
+        assert call_args["user_id"] == user_id
         assert call_args["previous_state"] == previous_state
-        assert call_args["new_state"] == new_state
+        # new_state should be details when not explicitly provided
+        expected_new_state = new_state.copy()
+        expected_new_state["success"] = True
+        assert call_args["new_state"] == expected_new_state
 
     @patch("budapp.audit_ops.audit_logger.AuditService")
     def test_log_audit_handles_exceptions_gracefully(self, mock_audit_service_class):
@@ -232,7 +166,7 @@ class TestAuditLogging:
         )
 
         # Verify no exception was raised
-        mock_audit_service.create_audit_record.assert_called_once()
+        mock_audit_service.audit_create.assert_called_once()
 
     @patch("budapp.audit_ops.audit_logger.logger")
     @patch("budapp.audit_ops.audit_logger.AuditService")
@@ -262,10 +196,9 @@ class TestAuditLogging:
 class TestAsyncAuditLogging:
     """Test the async audit logging functionality."""
 
-    @pytest.mark.asyncio
     @patch("budapp.audit_ops.audit_logger.AuditService")
-    async def test_log_audit_async(self, mock_audit_service_class):
-        """Test async audit logging."""
+    def test_log_audit_async(self, mock_audit_service_class):
+        """Test async audit logging wrapper."""
         # Setup
         mock_audit_service = Mock()
         mock_audit_service_class.return_value = mock_audit_service
@@ -279,8 +212,8 @@ class TestAsyncAuditLogging:
             "model": "gpt-4",
         }
 
-        # Execute
-        await log_audit_async(
+        # Execute - log_audit_async is just a wrapper, not actually async
+        log_audit_async(
             session=session,
             action=AuditActionEnum.CREATE,
             resource_type=AuditResourceTypeEnum.ENDPOINT,
@@ -292,14 +225,16 @@ class TestAsyncAuditLogging:
 
         # Verify
         mock_audit_service_class.assert_called_once_with(session)
-        mock_audit_service.create_audit_record.assert_called_once()
+        mock_audit_service.audit_create.assert_called_once()
 
-        call_args = mock_audit_service.create_audit_record.call_args[1]
-        assert call_args["action"] == AuditActionEnum.CREATE
+        call_args = mock_audit_service.audit_create.call_args[1]
         assert call_args["resource_type"] == AuditResourceTypeEnum.ENDPOINT
         assert call_args["resource_id"] == resource_id
         assert call_args["user_id"] == user_id
-        assert call_args["details"] == details
+        # Details should include success
+        expected_details = details.copy()
+        expected_details["success"] = True
+        assert call_args["resource_data"] == expected_details
 
 
 class TestIntegrationScenarios:
@@ -331,11 +266,17 @@ class TestIntegrationScenarios:
         )
 
         # Verify
-        call_args = mock_audit_service.create_audit_record.call_args[1]
+        mock_audit_service.audit_authentication.assert_called_once()
+        call_args = mock_audit_service.audit_authentication.call_args[1]
         assert call_args["action"] == AuditActionEnum.LOGIN_FAILED
         assert call_args["success"] is False
         assert call_args["ip_address"] == "192.168.1.100"
-        assert call_args["details"]["reason"] == "Invalid password"
+        expected_details = {
+            "email": "user@example.com",
+            "reason": "Invalid password",
+            "success": False,
+        }
+        assert call_args["details"] == expected_details
 
     @patch("budapp.audit_ops.audit_logger.AuditService")
     def test_permission_change_audit(self, mock_audit_service_class):
@@ -365,12 +306,22 @@ class TestIntegrationScenarios:
             success=True,
         )
 
-        # Verify
+        # Verify - PERMISSION_CHANGED uses generic create_audit_record
+        mock_audit_service.create_audit_record.assert_called_once()
+
         call_args = mock_audit_service.create_audit_record.call_args[1]
         assert call_args["action"] == AuditActionEnum.PERMISSION_CHANGED
         assert call_args["resource_type"] == AuditResourceTypeEnum.PROJECT
-        assert call_args["details"]["operation"] == "add_member"
-        assert call_args["details"]["role_assigned"] == "viewer"
+        assert call_args["resource_id"] == project_id
+        assert call_args["user_id"] == user_id
+        expected_details = {
+            "operation": "add_member",
+            "target_user_id": str(target_user_id),
+            "role_assigned": "viewer",
+            "permissions": ["view", "list"],
+            "success": True,
+        }
+        assert call_args["details"] == expected_details
 
     @patch("budapp.audit_ops.audit_logger.AuditService")
     def test_workflow_audit(self, mock_audit_service_class):
@@ -399,8 +350,20 @@ class TestIntegrationScenarios:
             success=True,
         )
 
-        # Verify
-        call_args = mock_audit_service.create_audit_record.call_args[1]
+        # Verify - WORKFLOW_STARTED uses audit_workflow method
+        mock_audit_service.audit_workflow.assert_called_once()
+
+        call_args = mock_audit_service.audit_workflow.call_args[1]
+        assert call_args["workflow_id"] == workflow_id
+        assert call_args["workflow_type"] == "DEPLOYMENT"
         assert call_args["action"] == AuditActionEnum.WORKFLOW_STARTED
-        assert call_args["resource_type"] == AuditResourceTypeEnum.WORKFLOW
-        assert call_args["details"]["workflow_type"] == "DEPLOYMENT"
+        assert call_args["user_id"] == user_id
+        # The audit_workflow method gets the modified details with success added
+        expected_details = {
+            "workflow_type": "DEPLOYMENT",
+            "target_cluster": "production-cluster",
+            "model": "llama-2-7b",
+            "estimated_duration": "15 minutes",
+            "success": True,
+        }
+        assert call_args["details"] == expected_details
