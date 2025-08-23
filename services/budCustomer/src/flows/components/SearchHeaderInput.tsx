@@ -23,12 +23,12 @@ const SearchHeaderInput: React.FC<SearchHeaderInputProps> = ({
       value={value}
       onChange={(e) => onChange?.(e.target.value)}
       onPressEnter={(e) => onSearch?.((e.target as HTMLInputElement).value)}
-      prefix={<Icon icon="material-symbols:search" className="text-gray-400" />}
-      className={`bg-[#1A1A1A] border-[#2A2A2A] text-white ${className}`}
+      prefix={<Icon icon="material-symbols:search" className="text-[var(--text-muted)]" />}
+      className={`bg-[var(--bg-tertiary)] border-[var(--border-secondary)] text-[var(--text-primary)] ${className}`}
       style={{
-        backgroundColor: "#1A1A1A",
-        borderColor: "#2A2A2A",
-        color: "white",
+        backgroundColor: "var(--bg-tertiary)",
+        borderColor: "var(--border-secondary)",
+        color: "var(--text-primary)",
       }}
     />
   );
