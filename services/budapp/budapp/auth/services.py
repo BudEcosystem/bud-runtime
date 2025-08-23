@@ -22,11 +22,12 @@ from uuid import UUID
 from fastapi import status
 
 from budapp.commons import logging
-from budapp.commons.config import app_settings
+from budapp.commons.config import app_settings, secrets_settings
 from budapp.commons.constants import UserColorEnum, UserStatusEnum, UserTypeEnum
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
 from budapp.commons.keycloak import KeycloakManager
+from budapp.commons.security import HashManager
 from budapp.user_ops.crud import UserDataManager
 from budapp.user_ops.models import Tenant, TenantClient, TenantUserMapping
 from budapp.user_ops.models import User as UserModel
@@ -381,12 +382,17 @@ class AuthService(SessionMixin):
                 user, app_settings.default_realm_name, tenant_client.client_id
             )
 
-            # Hash password
-            # salted_password = user.password + secrets_settings.password_salt
-            # user.password = await HashManager().get_hash(salted_password)
-            # logger.info(f"Password hashed for {user.email}")
+            # Hash password - CRITICAL: Never store plain text passwords!
+            if hasattr(user, "password") and user.password:
+                salted_password = user.password + secrets_settings.password_salt
+                hashed_password = await HashManager().get_hash(salted_password)
+                logger.info(f"Password hashed for {user.email}")
+            else:
+                hashed_password = None
 
-            user_data = user.model_dump(exclude={"permissions"})
+            user_data = user.model_dump(exclude={"permissions", "password"})
+            if hashed_password:
+                user_data["password"] = hashed_password
             user_data["color"] = UserColorEnum.get_random_color()
 
             # Self-registered users are active immediately, admin-created users are invited
