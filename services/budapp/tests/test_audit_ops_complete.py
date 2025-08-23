@@ -202,22 +202,28 @@ class TestAuditTrailCRUD:
     def test_create_audit_record(self, data_manager, mock_session):
         """Test creating an audit record."""
         # Prepare test data
-        audit_data = AuditRecordCreate(
-            user_id=uuid4(),
-            action=AuditActionEnum.CREATE,
-            resource_type=AuditResourceTypeEnum.PROJECT,
-            resource_id=uuid4(),
-            details={"project_name": "Test Project"},
-            ip_address="192.168.1.1",
-        )
+        user_id = uuid4()
+        resource_id = uuid4()
 
-        # Mock the session behavior
+        # Mock the AuditTrail instance that will be created
+        mock_audit_record = Mock(spec=AuditTrail)
+        mock_audit_record.id = uuid4()
+
+        # Mock the session behavior to return our mock record
         mock_session.add = Mock()
         mock_session.commit = Mock()
-        mock_session.refresh = Mock()
+        mock_session.refresh = Mock(side_effect=lambda x: setattr(x, 'id', mock_audit_record.id))
 
-        # Create the record
-        result = data_manager.create_audit_record(audit_data)
+        # Create the record using individual parameters
+        with patch('budapp.audit_ops.crud.AuditTrail', return_value=mock_audit_record):
+            result = data_manager.create_audit_record(
+                action=AuditActionEnum.CREATE,
+                resource_type=AuditResourceTypeEnum.PROJECT,
+                resource_id=resource_id,
+                user_id=user_id,
+                details={"project_name": "Test Project"},
+                ip_address="192.168.1.1",
+            )
 
         # Verify session methods were called
         mock_session.add.assert_called_once()
@@ -225,7 +231,7 @@ class TestAuditTrailCRUD:
         mock_session.refresh.assert_called_once()
 
         # Verify the record was created
-        assert isinstance(result, AuditTrail)
+        assert result == mock_audit_record
 
     def test_get_audit_records_with_filters(self, data_manager, mock_session):
         """Test getting audit records with various filters."""
