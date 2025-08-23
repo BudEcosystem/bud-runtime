@@ -1,28 +1,20 @@
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
-import DrawerCard from "@/components/ui/bud/card/DrawerCard";
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
-import { Text_12_400_757575, Text_14_400_EEEEEE } from "@/components/ui/text";
+import { Text_12_300_EEEEEE } from "@/components/ui/text";
 import React, { useContext, useEffect, useState } from "react";
 import { useDrawer } from "@/hooks/useDrawer";
-import { TextInput, SelectInput } from "@/components/ui/input";
+import { Input, Image, Form, Select, ConfigProvider } from "antd";
+import CustomPopover from "@/flows/components/customPopover";
 import { AppRequest } from "@/services/api/requests";
 import { BudFormContext } from "@/components/ui/bud/context/BudFormContext";
 import { useProjects } from "@/hooks/useProjects";
 import { errorToast } from "@/components/toast";
 
-interface AddKeyFormProps {
-  formData: {
-    name: string;
-    project_id: string;
-    expiry: string;
-  };
-  setFormData: (data: any) => void;
-}
-
-function AddKeyForm({ formData, setFormData }: AddKeyFormProps) {
-  const [projectOptions, setProjectOptions] = useState<any>([]);
+function AddKeyForm({ setApiKeyData }: { setApiKeyData: (data: any) => void }) {
+  const { form } = useContext(BudFormContext);
+  const [projectData, setProjectData] = useState<any>([]);
   const { projects, getProjects } = useProjects();
 
   useEffect(() => {
@@ -30,138 +22,212 @@ function AddKeyForm({ formData, setFormData }: AddKeyFormProps) {
   }, [getProjects]);
 
   useEffect(() => {
-    // Map projects for SelectCustomInput - it needs the full object as value
     const data = projects.map((item) => ({
+      ...item,
       label: item?.["project"].name,
       value: item?.["project"].id,
     }));
-    setProjectOptions(data);
+    setProjectData(data);
   }, [projects]);
 
-  // Find the selected project object for display
-  const selectedProject = projectOptions.find(
-    (p: any) => p.value === formData.project_id,
-  );
-
-  // Expiry options
-  const expiryOptions = [
-    { label: "30 days", value: "30" },
-    { label: "60 days", value: "60" },
-    { label: "90 days", value: "90" },
-    { label: "Never", value: "0" },
-  ];
-
   return (
-    <DrawerCard classNames="pb-0">
-      <div className="pt-[.87rem]">
-        {/* API Key Name Input */}
-        <div className="mb-[1.7rem]">
-          <Text_14_400_EEEEEE className="p-0 pt-[.3rem] m-0">
-            API Key Name
-          </Text_14_400_EEEEEE>
-          <Text_12_400_757575 className="pt-[.35rem] leading-[1.05rem] mb-[0.5rem]">
-            Enter a descriptive name for your API key
-          </Text_12_400_757575>
-          <TextInput
-            placeholder="e.g., Production API Key"
-            value={formData.name}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-              setFormData({ ...formData, name: e.target.value })
-            }
-            className="!max-w-full"
-          />
+    <div className="px-[1.4rem] py-[2.1rem] flex flex-col gap-[1.6rem]">
+      <Form.Item
+        hasFeedback
+        name={"name"}
+        rules={[{ required: true, message: "Please input name!" }]}
+        className={`flex items-center rounded-[6px] relative !bg-[transparent] w-[100%] mb-[0]`}
+      >
+        <div className="w-full">
+          <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap">
+            Credential Name
+            <CustomPopover title="This is the name">
+              <Image
+                src="/images/info.png"
+                preview={false}
+                alt="info"
+                style={{ width: ".75rem", height: ".75rem" }}
+              />
+            </CustomPopover>
+          </Text_12_300_EEEEEE>
         </div>
-
-        {/* Project Selection */}
-        <div className="mb-[1.7rem]">
-          <Text_14_400_EEEEEE className="p-0 pt-[.3rem] m-0">
-            Select Project
-          </Text_14_400_EEEEEE>
-          <Text_12_400_757575 className="pt-[.35rem] leading-[1.05rem] mb-[0.5rem]">
-            Choose the project to associate with this API key
-          </Text_12_400_757575>
-          <SelectInput
-            placeholder="Select a project"
-            value={selectedProject}
-            onValueChange={(item: any) =>
-              setFormData({ ...formData, project_id: item.value })
-            }
-            selectItems={projectOptions}
-            renderItem={(item: any) => item.label}
-            className="!max-w-full"
-            showSearch={true}
-          />
+        <Input
+          placeholder="Enter name"
+          style={{
+            backgroundColor: "transparent",
+            color: "#EEEEEE",
+            border: "0.5px solid #757575",
+          }}
+          size="large"
+          onChange={(e) => {
+            form.setFieldsValue({ name: e.target.value });
+            form.validateFields(["name"]);
+            setApiKeyData((prev: any) => ({
+              ...prev,
+              name: e.target.value,
+            }));
+          }}
+          className="drawerInp py-[.65rem] pt-[.8rem] pb-[.45rem] bg-transparent text-[#EEEEEE] font-[300] border-[0.5px] border-[#757575] rounded-[6px] hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] text-[.75rem] shadow-none w-full indent-[.4rem]"
+        />
+      </Form.Item>
+      <Form.Item
+        hasFeedback
+        rules={[{ required: true, message: "Please select project!" }]}
+        name={"project"}
+        className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]`}
+      >
+        <div className="w-full">
+          <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap">
+            Project
+            <CustomPopover title="This is the project ">
+              <Image
+                src="/images/info.png"
+                preview={false}
+                alt="info"
+                style={{ width: ".75rem", height: ".75rem" }}
+              />
+            </CustomPopover>
+          </Text_12_300_EEEEEE>
         </div>
+        <div className="custom-select-two w-full rounded-[6px] relative">
+          <ConfigProvider
+            theme={{
+              token: {
+                colorTextPlaceholder: "#808080",
+                boxShadowSecondary: "none",
+              },
+            }}
+          >
+            <Select
+              variant="borderless"
+              placeholder="Select project"
+              style={{
+                backgroundColor: "transparent",
+                color: "#EEEEEE",
+                border: "0.5px solid #757575",
+                width: "100%",
+              }}
+              size="large"
+              className="drawerInp !bg-[transparent] text-[#EEEEEE] font-[300] text-[.75rem] shadow-none w-full border-0 outline-0 hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] h-[2.5rem] outline-none"
+              options={projectData}
+              onChange={(value) => {
+                form.setFieldsValue({ project: value });
+                form.validateFields(["project"]);
+                setApiKeyData((prev: any) => ({
+                  ...prev,
+                  project_id: value,
+                }));
+              }}
+            />
+          </ConfigProvider>
+        </div>
+      </Form.Item>
 
-        {/* Expiry Selection */}
-        <div className="mb-[1.7rem]">
-          <Text_14_400_EEEEEE className="p-0 pt-[.3rem] m-0">
+      <Form.Item
+        hasFeedback
+        rules={[{ required: true, message: "Please select Set Expiry!" }]}
+        name={"SetExpiry"}
+        className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]`}
+      >
+        <div className="w-full">
+          <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap">
             Set Expiry
-          </Text_14_400_EEEEEE>
-          <Text_12_400_757575 className="pt-[.35rem] leading-[1.05rem] mb-[0.5rem]">
-            Choose when this API key should expire
-          </Text_12_400_757575>
-          <SelectInput
-            placeholder="Select expiry period"
-            value={expiryOptions.find((e: any) => e.value === formData.expiry)}
-            onValueChange={(item: any) =>
-              setFormData({ ...formData, expiry: item.value })
-            }
-            selectItems={expiryOptions}
-            renderItem={(item: any) => item.label}
-            className="!max-w-full"
-            showSearch={false}
-          />
+            <CustomPopover title="This is the Set Expiry ">
+              <Image
+                src="/images/info.png"
+                preview={false}
+                alt="info"
+                style={{ width: ".75rem", height: ".75rem" }}
+              />
+            </CustomPopover>
+          </Text_12_300_EEEEEE>
         </div>
-      </div>
-    </DrawerCard>
+        <div className="custom-select-two w-full rounded-[6px] relative">
+          <ConfigProvider
+            theme={{
+              token: {
+                colorTextPlaceholder: "#808080",
+                boxShadowSecondary: "none",
+              },
+            }}
+          >
+            <Select
+              variant="borderless"
+              placeholder="Select Expiry"
+              style={{
+                backgroundColor: "transparent",
+                color: "#EEEEEE",
+                border: "0.5px solid #757575",
+                width: "100%",
+              }}
+              size="large"
+              className="drawerInp !bg-[transparent] text-[#EEEEEE] font-[300] text-[.75rem] shadow-none w-full border-0 outline-0 hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] h-[2.5rem] outline-none"
+              options={[
+                { label: "30 days", value: "30" },
+                { label: "60 days", value: "60" },
+                { label: "90 days", value: "90" },
+                { label: "Never", value: "0" },
+              ]}
+              onChange={(value) => {
+                form.setFieldsValue({ SetExpiry: value });
+                form.validateFields(["SetExpiry"]);
+                setApiKeyData((prev: any) => ({
+                  ...prev,
+                  expiry: value,
+                }));
+              }}
+            />
+          </ConfigProvider>
+        </div>
+      </Form.Item>
+    </div>
   );
 }
 
 export default function AddNewKey() {
   const { openDrawerWithStep, closeDrawer } = useDrawer();
-  const [formData, setFormData] = useState<any>({
+  const [apiKeyData, setApiKeyData] = useState<any>({
     name: "",
     project_id: "",
     expiry: "",
   });
 
-  const isFormValid = formData.name && formData.project_id && formData.expiry;
+  const handleSubmit = async (values: any) => {
+    try {
+      const payload = {
+        name: apiKeyData.name || values.name,
+        project_id: apiKeyData.project_id || values.project,
+        expiry: apiKeyData.expiry || values.SetExpiry,
+        credential_type: "client_app",
+      };
+
+      const response = await AppRequest.Post("/credentials/", payload);
+
+      if (response?.data) {
+        // Store the API key for display in success screen
+        localStorage.setItem(
+          "temp_api_key",
+          response.data.key || response.data.api_key || "",
+        );
+        openDrawerWithStep("api-key-success");
+      } else {
+        errorToast("Failed to create API key");
+      }
+    } catch (error: any) {
+      console.error("Error during form submission:", error);
+      errorToast(
+        error?.response?.data?.message || "Failed to create API key",
+      );
+    } finally {
+      // Handle loading state if needed
+    }
+  };
 
   return (
     <BudForm
-      data={formData}
-      disableNext={!isFormValid}
-      onNext={async () => {
-        try {
-          const payload = {
-            name: formData.name,
-            project_id: formData.project_id,
-            expiry: formData.expiry,
-            credential_type: "client_app",
-          };
-
-          const response = await AppRequest.Post("/credentials/", payload);
-
-          if (response?.data) {
-            // Store the API key for display in success screen
-            localStorage.setItem(
-              "temp_api_key",
-              response.data.key || response.data.api_key || "",
-            );
-            openDrawerWithStep("api-key-success");
-          } else {
-            errorToast("Failed to create API key");
-          }
-        } catch (error: any) {
-          console.error("Error during form submission:", error);
-          errorToast(
-            error?.response?.data?.message || "Failed to create API key",
-          );
-        } finally {
-          // Handle loading state if needed
-        }
-      }}
+      data={{}}
+      disableNext={!apiKeyData.name || !apiKeyData.project_id || !apiKeyData.expiry}
+      onNext={handleSubmit}
       nextText="Create"
       backText="Cancel"
       onBack={() => {
@@ -171,10 +237,12 @@ export default function AddNewKey() {
       <BudWraperBox>
         <BudDrawerLayout>
           <DrawerTitleCard
-            title="New API Key"
-            description="Create a new API key for programmatic access"
+            title="New Key"
+            description="Create New key here"
           />
-          <AddKeyForm formData={formData} setFormData={setFormData} />
+          <div>
+            <AddKeyForm setApiKeyData={setApiKeyData} />
+          </div>
         </BudDrawerLayout>
       </BudWraperBox>
     </BudForm>
