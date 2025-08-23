@@ -1,5 +1,9 @@
 #!/bin/sh
 
+set -x
+git branch
+git log -1
+
 commit_message="chore(budcustomer): bump nix hash"
 commit_author="auto walle"
 commit_email="auto@sinanmohd.com"
@@ -28,6 +32,11 @@ if [ ! -e "$nix_hash_path" ] || [ ! -e "$npm_lock_path" ]; then
 	exit 1
 fi
 
+if ! git diff-index --quiet --cached HEAD; then
+	echo "commit staged changes first"
+	exit 1
+fi
+
 if early_escape_possible; then
 	echo "early escape success, nix bump commit is newer"
 	exit 0
@@ -42,9 +51,7 @@ if [ "$cur_hash" != "$new_hash" ]; then
 	echo "$new_hash" >"$nix_hash_path"
 
 	git add "$nix_hash_path"
-	git config --global user.name "$commit_author"
-	git config --global user.email "$commit_email"
-	git commit -m "$commit_message"
+	git commit --author="$commit_author <$commit_email>" -m "$commit_message"
 	git push
 else
 	echo "hash did not change: waiting for your next commit"
