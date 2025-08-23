@@ -125,7 +125,8 @@ def log_audit(
                 resource_type=resource_type,
                 resource_id=resource_id,
                 previous_state=previous_state or {},
-                new_state=new_state or details or {},
+                new_state=new_state or {},
+
                 user_id=user_id,
                 ip_address=ip_address,
             )
