@@ -103,6 +103,8 @@ class CredentialService(SessionMixin):
             max_budget=db_credential.max_budget,
             model_budgets=db_credential.model_budgets,
             id=db_credential.id,
+            created_at=db_credential.created_at,
+            last_used_at=db_credential.last_used_at,
             credential_type=db_credential.credential_type,
             ip_whitelist=db_credential.ip_whitelist,
         )
@@ -319,6 +321,7 @@ class CredentialService(SessionMixin):
                     max_budget=db_credential.max_budget,
                     model_budgets=db_credential.model_budgets,
                     id=db_credential.id,
+                    created_at=db_credential.created_at,
                     last_used_at=db_credential.last_used_at,
                     credential_type=db_credential.credential_type,
                     ip_whitelist=db_credential.ip_whitelist,
