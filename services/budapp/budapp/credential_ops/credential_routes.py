@@ -8,7 +8,6 @@ from sqlalchemy.orm import Session
 from typing_extensions import Union
 
 from budapp.commons import logging
-from budapp.commons.api_utils import pubsub_api_endpoint
 from budapp.commons.constants import ApiCredentialTypeEnum, CredentialTypeEnum
 from budapp.commons.dependencies import get_current_active_user, get_session, parse_ordering_fields
 from budapp.commons.exceptions import ClientException
@@ -31,19 +30,16 @@ from .schemas import (
     CloudProvidersCreateRequest,
     CloudProvidersListResponse,
     CloudProvidersSchema,
-    CredentialDetails,
     CredentialFilter,
     CredentialRequest,
     CredentialResponse,
     CredentialUpdate,
-    CredentialUpdateRequest,
     PaginatedCredentialResponse,
     ProprietaryCredentialDetailedView,
     ProprietaryCredentialFilter,
     ProprietaryCredentialRequest,
     ProprietaryCredentialResponse,
     ProprietaryCredentialUpdate,
-    RouterConfig,
 )
 from .services import ClusterProviderService, CredentialService, ProprietaryCredentialService
 
@@ -56,72 +52,6 @@ error_responses = {
     401: {"model": ErrorResponse},
     422: {"model": ErrorResponse},
 }
-
-
-@credential_router.post("/update")
-@pubsub_api_endpoint(request_model=CredentialUpdateRequest)
-async def update_credential(
-    credential_update_request: CredentialUpdateRequest,
-    session: Annotated[Session, Depends(get_session)],
-):
-    """Update the credential last used at time."""
-    logger.debug("Received request to subscribe to bud-serve-app credential update")
-    try:
-        payload = credential_update_request.payload
-        logger.debug(f"Update CredentialReceived payload: {payload}")
-        db_credential = await CredentialDataManager(session).retrieve_by_fields(
-            Credential, {"hashed_key": payload.hashed_key}
-        )
-        db_last_used_at = db_credential.last_used_at
-        if db_last_used_at is None or db_last_used_at < payload.last_used_at:
-            await CredentialDataManager(session).update_by_fields(
-                db_credential, {"last_used_at": payload.last_used_at}
-            )
-        return SuccessResponse(message="Credential updated successfully").to_http_response()
-    except ClientException as e:
-        logger.exception(f"Failed to execute credential update: {e}")
-        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
-    except Exception as e:
-        logger.exception(f"Failed to update credential: {e}")
-        return ErrorResponse(
-            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to update credential"
-        ).to_http_response()
-
-
-@credential_router.get(
-    "/router-config",
-    response_model=SingleResponse[RouterConfig],
-    responses=error_responses,
-    description="Get router config for the given API key and endpoint name",
-)
-async def get_router_config(
-    endpoint_name: Annotated[str, Query()],
-    session: Annotated[Session, Depends(get_session)],
-    api_key: Optional[str] = Query(None),
-    project_id: Optional[UUID] = Query(None),
-    authorization: Annotated[
-        str | None, Header()
-    ] = None,  # NOTE: Can't use in Openapi docs https://github.com/fastapi/fastapi/issues/612#issuecomment-547886504
-):
-    # Check if either api_key exists OR both project_id and authorization exist
-    if not api_key and (not authorization or not project_id):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="API key or authorization header with project_id is required",
-        )
-
-    current_user_id = None
-    if authorization:
-        try:
-            current_user = await get_user_from_auth_header(authorization, session)
-            current_user_id = current_user.id
-        except ClientException as e:
-            raise HTTPException(status_code=e.status_code, detail=e.message) from e
-
-    router_config = await CredentialService(session).get_router_config(
-        api_key, endpoint_name, current_user_id, project_id
-    )
-    return SingleResponse(message="Router config retrieved successfully", result=router_config)
 
 
 @credential_router.post(
@@ -235,38 +165,6 @@ async def delete_credential(
     logger.info("Credential deleted")
 
     return SuccessResponse(message="Credential deleted successfully")
-
-
-@credential_router.get(
-    "/details/{api_key}",
-    response_model=SingleResponse[CredentialDetails],
-    responses=error_responses,
-    description="Get credential details for the given API key",
-)
-async def retrieve_credential_details(
-    api_key: str,
-    session: Annotated[Session, Depends(get_session)],
-):
-    credential_detail = await CredentialService(session).retrieve_credential_details(api_key)
-    logger.info("Credentials fetched successfully")
-
-    return SingleResponse(message="Credentials retrieved successfully", result=credential_detail)
-
-
-@credential_router.get(
-    "/decrypt/{api_key}",
-    response_model=SingleResponse[str],
-    responses=error_responses,
-    description="Get credential details for the given API key",
-)
-async def decrypt_credential(
-    api_key: str,
-    session: Annotated[Session, Depends(get_session)],
-):
-    decrypted_key = await CredentialService(session).decrypt_credential(api_key)
-    logger.info("Credentials decrypted successfully")
-
-    return SingleResponse(message="Credentials decrypted successfully", result=decrypted_key)
 
 
 @proprietary_credential_router.post(
@@ -422,12 +320,30 @@ async def get_proprietary_credential_details(credential_id: UUID, session: Annot
     return SingleResponse(message="Credential details fetched successfully", result=credential_details)
 
 
-@credential_router.get("/cloud-providers")
+@credential_router.get(
+    "/cloud-providers",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_401_UNAUTHORIZED: {
+            "model": ErrorResponse,
+            "description": "User is not authenticated",
+        },
+        status.HTTP_200_OK: {
+            "model": CloudProvidersListResponse,
+            "description": "Successfully retrieved cloud providers",
+        },
+    },
+    description="Get all available cloud providers",
+)
 async def get_cloud_providers(
+    current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
 ) -> Union[CloudProvidersListResponse, ErrorResponse]:
-    """Get all cloud providers."""
-    logger.debug("Getting all the cloud providers")
+    """Get all cloud providers - requires authentication."""
+    logger.debug(f"User {current_user.id} getting all the cloud providers")
     try:
         # Use CloudProviderDataManager to get all providers
         providers = await CloudProviderDataManager(session).get_all_providers()
