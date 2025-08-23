@@ -12,6 +12,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from budapp.audit_ops.crud import AuditTrailDataManager
+from budapp.audit_ops.hash_utils import verify_audit_hash, verify_audit_integrity
 from budapp.audit_ops.models import AuditTrail
 from budapp.audit_ops.schemas import (
     AuditRecordCreate,
@@ -37,7 +38,7 @@ class AuditService:
         self.session = session
         self.data_manager = AuditTrailDataManager(session)
 
-    async def create_audit_record(
+    def create_audit_record(
         self,
         audit_data: AuditRecordCreate,
     ) -> AuditTrail:
@@ -49,7 +50,7 @@ class AuditService:
         Returns:
             Created audit trail record
         """
-        return await self.data_manager.create_audit_record(
+        return self.data_manager.create_audit_record(
             action=audit_data.action,
             resource_type=audit_data.resource_type,
             resource_id=audit_data.resource_id,
@@ -62,7 +63,7 @@ class AuditService:
             new_state=audit_data.new_state,
         )
 
-    async def audit_create(
+    def audit_create(
         self,
         resource_type: AuditResourceTypeEnum,
         resource_id: UUID,
@@ -90,7 +91,7 @@ class AuditService:
         if additional_details:
             details.update(additional_details)
 
-        return await self.data_manager.create_audit_record(
+        return self.data_manager.create_audit_record(
             action=AuditActionEnum.CREATE,
             resource_type=resource_type,
             resource_id=resource_id,
@@ -101,7 +102,7 @@ class AuditService:
             new_state=resource_data,
         )
 
-    async def audit_update(
+    def audit_update(
         self,
         resource_type: AuditResourceTypeEnum,
         resource_id: UUID,
@@ -138,7 +139,7 @@ class AuditService:
         if additional_details:
             details.update(additional_details)
 
-        return await self.data_manager.create_audit_record(
+        return self.data_manager.create_audit_record(
             action=AuditActionEnum.UPDATE,
             resource_type=resource_type,
             resource_id=resource_id,
@@ -150,7 +151,7 @@ class AuditService:
             new_state=new_data,
         )
 
-    async def audit_delete(
+    def audit_delete(
         self,
         resource_type: AuditResourceTypeEnum,
         resource_id: UUID,
@@ -178,7 +179,7 @@ class AuditService:
         if additional_details:
             details.update(additional_details)
 
-        return await self.data_manager.create_audit_record(
+        return self.data_manager.create_audit_record(
             action=AuditActionEnum.DELETE,
             resource_type=resource_type,
             resource_id=resource_id,
@@ -189,7 +190,7 @@ class AuditService:
             previous_state=resource_data,
         )
 
-    async def audit_access(
+    def audit_access(
         self,
         resource_type: AuditResourceTypeEnum,
         resource_id: UUID,
@@ -222,7 +223,7 @@ class AuditService:
         if reason:
             details["reason"] = reason
 
-        return await self.data_manager.create_audit_record(
+        return self.data_manager.create_audit_record(
             action=action,
             resource_type=resource_type,
             resource_id=resource_id,
@@ -231,7 +232,7 @@ class AuditService:
             ip_address=ip_address,
         )
 
-    async def audit_authentication(
+    def audit_authentication(
         self,
         action: AuditActionEnum,
         user_id: Optional[UUID] = None,
@@ -261,7 +262,7 @@ class AuditService:
         if reason:
             details["reason"] = reason
 
-        return await self.data_manager.create_audit_record(
+        return self.data_manager.create_audit_record(
             action=action,
             resource_type=AuditResourceTypeEnum.SESSION,
             user_id=user_id,
@@ -269,7 +270,7 @@ class AuditService:
             ip_address=ip_address,
         )
 
-    async def audit_workflow(
+    def audit_workflow(
         self,
         workflow_id: UUID,
         workflow_type: str,
@@ -301,7 +302,7 @@ class AuditService:
         if error:
             details["error"] = error
 
-        return await self.data_manager.create_audit_record(
+        return self.data_manager.create_audit_record(
             action=action,
             resource_type=AuditResourceTypeEnum.WORKFLOW,
             resource_id=workflow_id,
@@ -310,7 +311,7 @@ class AuditService:
             ip_address=ip_address,
         )
 
-    async def get_audit_records(
+    def get_audit_records(
         self,
         filter_params: AuditRecordFilter,
         offset: int = 0,
@@ -326,42 +327,20 @@ class AuditService:
         Returns:
             Tuple of (list of audit record entries, total count)
         """
-        # Use appropriate data manager method based on filters
-        if filter_params.user_id:
-            records, total = await self.data_manager.get_audit_records_by_user(
-                user_id=filter_params.user_id,
-                offset=offset,
-                limit=limit,
-                start_date=filter_params.start_date,
-                end_date=filter_params.end_date,
-                action=filter_params.action,
-                resource_type=filter_params.resource_type,
-            )
-        elif filter_params.resource_id and filter_params.resource_type:
-            records, total = await self.data_manager.get_audit_records_by_resource(
-                resource_type=filter_params.resource_type,
-                resource_id=filter_params.resource_id,
-                offset=offset,
-                limit=limit,
-            )
-        elif filter_params.start_date and filter_params.end_date:
-            records, total = await self.data_manager.get_audit_records_by_date_range(
-                start_date=filter_params.start_date,
-                end_date=filter_params.end_date,
-                action=filter_params.action,
-                resource_type=filter_params.resource_type,
-                user_id=filter_params.user_id,
-                offset=offset,
-                limit=limit,
-            )
-        else:
-            # Get recent records if no specific filters
-            records = await self.data_manager.get_recent_audit_records(
-                limit=limit,
-                action=filter_params.action,
-                resource_type=filter_params.resource_type,
-            )
-            total = len(records)
+        # Use the consolidated get_audit_records method with all filters
+        records, total = self.data_manager.get_audit_records(
+            user_id=filter_params.user_id,
+            actioned_by=filter_params.actioned_by,
+            action=filter_params.action,
+            resource_type=filter_params.resource_type,
+            resource_id=filter_params.resource_id,
+            start_date=filter_params.start_date,
+            end_date=filter_params.end_date,
+            ip_address=filter_params.ip_address,
+            offset=offset,
+            limit=limit,
+            include_user=True,
+        )
 
         # Convert to response schemas
         entries = []
@@ -379,7 +358,7 @@ class AuditService:
 
         return entries, total
 
-    async def get_audit_summary(
+    def get_audit_summary(
         self,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
@@ -393,7 +372,7 @@ class AuditService:
         Returns:
             Dictionary containing summary statistics
         """
-        return await self.data_manager.get_audit_summary(
+        return self.data_manager.get_audit_summary(
             start_date=start_date,
             end_date=end_date,
         )
@@ -459,3 +438,85 @@ class AuditService:
                 sanitized[key] = value
 
         return sanitized
+
+    def verify_audit_record_integrity(self, audit_id: UUID) -> Tuple[bool, str]:
+        """Verify the integrity of an audit record using its hash.
+
+        Args:
+            audit_id: ID of the audit record to verify
+
+        Returns:
+            Tuple of (is_valid, message) indicating verification status
+        """
+        record = self.data_manager.get_audit_record_by_id(audit_id)
+        if not record:
+            return False, f"Audit record with ID {audit_id} not found"
+
+        return verify_audit_integrity(record)
+
+    def verify_batch_integrity(
+        self,
+        audit_ids: List[UUID],
+    ) -> Dict[UUID, Tuple[bool, str]]:
+        """Verify the integrity of multiple audit records.
+
+        Args:
+            audit_ids: List of audit record IDs to verify
+
+        Returns:
+            Dictionary mapping audit IDs to verification results
+        """
+        results = {}
+        for audit_id in audit_ids:
+            is_valid, message = self.verify_audit_record_integrity(audit_id)
+            results[audit_id] = (is_valid, message)
+
+        return results
+
+    def find_tampered_records(
+        self,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+        limit: int = 100,
+    ) -> List[Dict[str, Any]]:
+        """Find audit records that may have been tampered with.
+
+        Args:
+            start_date: Start date for search range
+            end_date: End date for search range
+            limit: Maximum number of records to check
+
+        Returns:
+            List of potentially tampered records with details
+        """
+        # Get records to check
+        filter_params = AuditRecordFilter(
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+        records, _ = self.get_audit_records(
+            filter_params=filter_params,
+            offset=0,
+            limit=limit,
+        )
+
+        tampered = []
+        for record in records:
+            audit_record = self.data_manager.get_audit_record_by_id(record.id)
+            is_valid, message = verify_audit_integrity(audit_record)
+
+            if not is_valid:
+                tampered.append(
+                    {
+                        "id": str(record.id),
+                        "timestamp": record.timestamp.isoformat(),
+                        "action": record.action,
+                        "resource_type": record.resource_type,
+                        "resource_id": str(record.resource_id) if record.resource_id else None,
+                        "user_id": str(record.user_id) if record.user_id else None,
+                        "verification_message": message,
+                    }
+                )
+
+        return tampered

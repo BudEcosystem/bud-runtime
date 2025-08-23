@@ -34,6 +34,7 @@ class AuditTrail(Base, TimestampMixin):
         ip_address: IP address from which the action was performed
         previous_state: State of the resource before the action (for updates)
         new_state: State of the resource after the action (for creates/updates)
+        record_hash: SHA256 hash of record data for integrity verification
         created_at: When the audit record was created (from TimestampMixin)
         modified_at: When the audit record was last modified (from TimestampMixin)
     """
@@ -103,6 +104,14 @@ class AuditTrail(Base, TimestampMixin):
 
     new_state: Mapped[Optional[dict]] = mapped_column(
         JSONB, nullable=True, comment="State of the resource after the action (for creates/updates)"
+    )
+
+    # Data integrity hash - SHA256 hash of record fields for tamper detection
+    record_hash: Mapped[str] = mapped_column(
+        String(64),  # SHA256 produces 64 character hex string
+        nullable=False,
+        index=True,
+        comment="SHA256 hash of record data for integrity verification",
     )
 
     # Relationships

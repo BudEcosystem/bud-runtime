@@ -11,9 +11,10 @@ from uuid import UUID
 from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session, selectinload
 
+from budapp.audit_ops.hash_utils import generate_audit_hash
 from budapp.audit_ops.models import AuditTrail
 from budapp.commons.constants import AuditActionEnum, AuditResourceTypeEnum
-from budapp.commons.database_utils import DataManagerUtils
+from budapp.commons.db_utils import DataManagerUtils
 
 
 class AuditTrailDataManager(DataManagerUtils):
@@ -31,7 +32,7 @@ class AuditTrailDataManager(DataManagerUtils):
         """
         super().__init__(session)
 
-    async def create_audit_record(
+    def create_audit_record(
         self,
         action: AuditActionEnum,
         resource_type: AuditResourceTypeEnum,
@@ -64,6 +65,20 @@ class AuditTrailDataManager(DataManagerUtils):
         if timestamp is None:
             timestamp = datetime.now(timezone.utc)
 
+        # Generate hash for the audit record
+        record_hash = generate_audit_hash(
+            action=action,
+            resource_type=resource_type,
+            resource_id=resource_id,
+            user_id=user_id,
+            actioned_by=actioned_by,
+            timestamp=timestamp,
+            details=details,
+            ip_address=ip_address,
+            previous_state=previous_state,
+            new_state=new_state,
+        )
+
         audit_record = AuditTrail(
             action=action,
             resource_type=resource_type,
@@ -75,6 +90,7 @@ class AuditTrailDataManager(DataManagerUtils):
             timestamp=timestamp,
             previous_state=previous_state,
             new_state=new_state,
+            record_hash=record_hash,
         )
 
         self.session.add(audit_record)
@@ -83,7 +99,7 @@ class AuditTrailDataManager(DataManagerUtils):
 
         return audit_record
 
-    async def get_audit_record_by_id(self, audit_id: UUID, include_user: bool = False) -> Optional[AuditTrail]:
+    def get_audit_record_by_id(self, audit_id: UUID, include_user: bool = False) -> Optional[AuditTrail]:
         """Get a single audit record by ID.
 
         Args:
@@ -100,187 +116,80 @@ class AuditTrailDataManager(DataManagerUtils):
 
         return self.scalar_one_or_none(stmt)
 
-    async def get_audit_records_by_user(
+    def get_audit_records(
         self,
-        user_id: UUID,
-        offset: int = 0,
-        limit: int = 20,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
+        user_id: Optional[UUID] = None,
+        actioned_by: Optional[UUID] = None,
         action: Optional[AuditActionEnum] = None,
         resource_type: Optional[AuditResourceTypeEnum] = None,
-    ) -> Tuple[List[AuditTrail], int]:
-        """Get audit records for a specific user with pagination.
-
-        Args:
-            user_id: ID of the user
-            offset: Number of records to skip
-            limit: Maximum number of records to return
-            start_date: Filter by start date (inclusive)
-            end_date: Filter by end date (inclusive)
-            action: Filter by action type
-            resource_type: Filter by resource type
-
-        Returns:
-            Tuple of (list of audit records, total count)
-        """
-        # Build the base query
-        conditions = [AuditTrail.user_id == user_id]
-
-        if start_date:
-            conditions.append(AuditTrail.timestamp >= start_date)
-        if end_date:
-            conditions.append(AuditTrail.timestamp <= end_date)
-        if action:
-            conditions.append(AuditTrail.action == action)
-        if resource_type:
-            conditions.append(AuditTrail.resource_type == resource_type)
-
-        where_clause = and_(*conditions)
-
-        # Count query
-        count_stmt = select(func.count()).select_from(AuditTrail).where(where_clause)
-        total_count = self.execute_scalar(count_stmt) or 0
-
-        # Main query with pagination and ordering
-        stmt = (
-            select(AuditTrail)
-            .where(where_clause)
-            .order_by(AuditTrail.timestamp.desc())
-            .offset(offset)
-            .limit(limit)
-            .options(selectinload(AuditTrail.user), selectinload(AuditTrail.actioned_by_user))
-        )
-
-        records = self.scalars_all(stmt)
-
-        return records, total_count
-
-    async def get_audit_records_by_resource(
-        self,
-        resource_type: AuditResourceTypeEnum,
-        resource_id: UUID,
+        resource_id: Optional[UUID] = None,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+        ip_address: Optional[str] = None,
         offset: int = 0,
         limit: int = 20,
         include_user: bool = True,
     ) -> Tuple[List[AuditTrail], int]:
-        """Get audit records for a specific resource with pagination.
+        """Get audit records with flexible filtering options.
 
         Args:
-            resource_type: Type of resource
-            resource_id: ID of the resource
-            offset: Number of records to skip
+            user_id: Filter by user who performed the action
+            actioned_by: Filter by admin/user who performed action on behalf
+            action: Filter by action type
+            resource_type: Filter by resource type
+            resource_id: Filter by specific resource ID
+            start_date: Filter by start date (inclusive)
+            end_date: Filter by end date (inclusive)
+            ip_address: Filter by IP address
+            offset: Number of records to skip for pagination
             limit: Maximum number of records to return
-            include_user: Whether to include user relationship
+            include_user: Whether to include user relationships
 
         Returns:
             Tuple of (list of audit records, total count)
         """
-        where_clause = and_(AuditTrail.resource_type == resource_type, AuditTrail.resource_id == resource_id)
+        # Build conditions based on provided filters
+        conditions = []
+
+        if user_id is not None:
+            conditions.append(AuditTrail.user_id == user_id)
+        if actioned_by is not None:
+            conditions.append(AuditTrail.actioned_by == actioned_by)
+        if action is not None:
+            conditions.append(AuditTrail.action == action)
+        if resource_type is not None:
+            conditions.append(AuditTrail.resource_type == resource_type)
+        if resource_id is not None:
+            conditions.append(AuditTrail.resource_id == resource_id)
+        if start_date is not None:
+            conditions.append(AuditTrail.timestamp >= start_date)
+        if end_date is not None:
+            conditions.append(AuditTrail.timestamp <= end_date)
+        if ip_address is not None:
+            conditions.append(AuditTrail.ip_address == ip_address)
+
+        # Build where clause
+        where_clause = and_(*conditions) if conditions else None
 
         # Count query
-        count_stmt = select(func.count()).select_from(AuditTrail).where(where_clause)
+        count_stmt = select(func.count()).select_from(AuditTrail)
+        if where_clause is not None:
+            count_stmt = count_stmt.where(where_clause)
         total_count = self.execute_scalar(count_stmt) or 0
 
         # Main query with pagination and ordering
-        stmt = select(AuditTrail).where(where_clause).order_by(AuditTrail.timestamp.desc()).offset(offset).limit(limit)
+        stmt = select(AuditTrail).order_by(AuditTrail.timestamp.desc()).offset(offset).limit(limit)
+
+        if where_clause is not None:
+            stmt = stmt.where(where_clause)
 
         if include_user:
             stmt = stmt.options(selectinload(AuditTrail.user), selectinload(AuditTrail.actioned_by_user))
 
         records = self.scalars_all(stmt)
-
         return records, total_count
 
-    async def get_audit_records_by_date_range(
-        self,
-        start_date: datetime,
-        end_date: datetime,
-        action: Optional[AuditActionEnum] = None,
-        resource_type: Optional[AuditResourceTypeEnum] = None,
-        user_id: Optional[UUID] = None,
-        offset: int = 0,
-        limit: int = 20,
-    ) -> Tuple[List[AuditTrail], int]:
-        """Get audit records within a date range with pagination.
-
-        Args:
-            start_date: Start date (inclusive)
-            end_date: End date (inclusive)
-            action: Filter by action type
-            resource_type: Filter by resource type
-            user_id: Filter by user ID
-            offset: Number of records to skip
-            limit: Maximum number of records to return
-
-        Returns:
-            Tuple of (list of audit records, total count)
-        """
-        conditions = [AuditTrail.timestamp >= start_date, AuditTrail.timestamp <= end_date]
-
-        if action:
-            conditions.append(AuditTrail.action == action)
-        if resource_type:
-            conditions.append(AuditTrail.resource_type == resource_type)
-        if user_id:
-            conditions.append(AuditTrail.user_id == user_id)
-
-        where_clause = and_(*conditions)
-
-        # Count query
-        count_stmt = select(func.count()).select_from(AuditTrail).where(where_clause)
-        total_count = self.execute_scalar(count_stmt) or 0
-
-        # Main query with pagination and ordering
-        stmt = (
-            select(AuditTrail)
-            .where(where_clause)
-            .order_by(AuditTrail.timestamp.desc())
-            .offset(offset)
-            .limit(limit)
-            .options(selectinload(AuditTrail.user), selectinload(AuditTrail.actioned_by_user))
-        )
-
-        records = self.scalars_all(stmt)
-
-        return records, total_count
-
-    async def get_recent_audit_records(
-        self,
-        limit: int = 20,
-        action: Optional[AuditActionEnum] = None,
-        resource_type: Optional[AuditResourceTypeEnum] = None,
-    ) -> List[AuditTrail]:
-        """Get the most recent audit records.
-
-        Args:
-            limit: Maximum number of records to return
-            action: Filter by action type
-            resource_type: Filter by resource type
-
-        Returns:
-            List of recent audit records
-        """
-        conditions = []
-
-        if action:
-            conditions.append(AuditTrail.action == action)
-        if resource_type:
-            conditions.append(AuditTrail.resource_type == resource_type)
-
-        stmt = (
-            select(AuditTrail)
-            .order_by(AuditTrail.timestamp.desc())
-            .limit(limit)
-            .options(selectinload(AuditTrail.user), selectinload(AuditTrail.actioned_by_user))
-        )
-
-        if conditions:
-            stmt = stmt.where(and_(*conditions))
-
-        return self.scalars_all(stmt)
-
-    async def get_audit_summary(
+    def get_audit_summary(
         self,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,

@@ -30,7 +30,8 @@ The `audit_ops` module provides comprehensive audit trail functionality for trac
 
 3. **CRUD Operations** (`crud.py`)
    - `AuditTrailDataManager`: Database operations
-   - Methods for creating and querying audit records
+   - Consolidated `get_audit_records` method with flexible filtering
+   - Methods for creating records and getting summaries
    - No update/delete methods (immutability)
 
 4. **Service Layer** (`services.py`)
@@ -88,7 +89,7 @@ from budapp.commons.constants import AuditActionEnum, AuditResourceTypeEnum
 service = AuditService(session)
 
 # Audit a resource creation
-await service.audit_create(
+service.audit_create(
     resource_type=AuditResourceTypeEnum.PROJECT,
     resource_id=project_id,
     resource_data=project_data,
@@ -98,7 +99,7 @@ await service.audit_create(
 )
 
 # Audit an update
-await service.audit_update(
+service.audit_update(
     resource_type=AuditResourceTypeEnum.ENDPOINT,
     resource_id=endpoint_id,
     previous_data=old_endpoint_data,
@@ -108,7 +109,7 @@ await service.audit_update(
 )
 
 # Audit a deletion
-await service.audit_delete(
+service.audit_delete(
     resource_type=AuditResourceTypeEnum.MODEL,
     resource_id=model_id,
     resource_data=model_data,
@@ -117,7 +118,7 @@ await service.audit_delete(
 )
 
 # Audit authentication events
-await service.audit_authentication(
+service.audit_authentication(
     action=AuditActionEnum.LOGIN,
     user_id=user.id,
     ip_address=request.client.host,
@@ -130,23 +131,41 @@ await service.audit_authentication(
 ```python
 from budapp.audit_ops.schemas import AuditRecordFilter
 
-# Query with filters
+# Query with filters using the consolidated method
 filter_params = AuditRecordFilter(
     user_id=user_id,
+    actioned_by=admin_id,  # Filter by who performed the action on behalf
     action=AuditActionEnum.UPDATE,
     resource_type=AuditResourceTypeEnum.CLUSTER,
+    resource_id=cluster_id,
     start_date=start_date,
-    end_date=end_date
+    end_date=end_date,
+    ip_address=ip_address
 )
 
-records, total = await service.get_audit_records(
+records, total = service.get_audit_records(
     filter_params=filter_params,
     offset=0,
     limit=20
 )
 
+# Or use the data manager directly for more control
+records, total = data_manager.get_audit_records(
+    user_id=user_id,
+    actioned_by=admin_id,
+    action=AuditActionEnum.CREATE,
+    resource_type=AuditResourceTypeEnum.PROJECT,
+    resource_id=project_id,
+    start_date=start_date,
+    end_date=end_date,
+    ip_address=ip_address,
+    offset=0,
+    limit=50,
+    include_user=True
+)
+
 # Get audit summary
-summary = await service.get_audit_summary(
+summary = service.get_audit_summary(
     start_date=start_date,
     end_date=end_date
 )

@@ -41,6 +41,7 @@ async def get_audit_records(
     session: Annotated[Session, Depends(get_session)],
     pagination: Annotated[PaginationQuery, Depends()],
     user_id: Optional[UUID] = Query(None, description="Filter by user ID"),
+    actioned_by: Optional[UUID] = Query(None, description="Filter by admin/user who performed action on behalf"),
     action: Optional[AuditActionEnum] = Query(None, description="Filter by action type"),
     resource_type: Optional[AuditResourceTypeEnum] = Query(None, description="Filter by resource type"),
     resource_id: Optional[UUID] = Query(None, description="Filter by resource ID"),
@@ -58,6 +59,7 @@ async def get_audit_records(
         # Build filter parameters
         filter_params = AuditRecordFilter(
             user_id=user_id,
+            actioned_by=actioned_by,
             action=action,
             resource_type=resource_type,
             resource_id=resource_id,
@@ -67,7 +69,7 @@ async def get_audit_records(
         )
 
         # Get audit records
-        records, total = await service.get_audit_records(
+        records, total = service.get_audit_records(
             filter_params=filter_params,
             offset=pagination.offset,
             limit=pagination.limit,
@@ -107,7 +109,7 @@ async def get_audit_record(
         service = AuditService(session)
 
         # Get the audit record
-        record = await service.data_manager.get_audit_record_by_id(audit_id=audit_id, include_user=True)
+        record = service.data_manager.get_audit_record_by_id(audit_id=audit_id, include_user=True)
 
         if not record:
             raise HTTPException(
@@ -167,7 +169,7 @@ async def get_user_audit_records(
         service = AuditService(session)
 
         # Get user's audit records
-        records, total = await service.data_manager.get_audit_records_by_user(
+        records, total = service.data_manager.get_audit_records(
             user_id=user_id,
             offset=pagination.offset,
             limit=pagination.limit,
@@ -228,7 +230,7 @@ async def get_resource_audit_records(
         service = AuditService(session)
 
         # Get resource's audit records
-        records, total = await service.data_manager.get_audit_records_by_resource(
+        records, total = service.data_manager.get_audit_records(
             resource_type=resource_type,
             resource_id=resource_id,
             offset=pagination.offset,
@@ -286,7 +288,7 @@ async def get_audit_summary(
         service = AuditService(session)
 
         # Get audit summary
-        summary = await service.get_audit_summary(
+        summary = service.get_audit_summary(
             start_date=start_date,
             end_date=end_date,
         )
@@ -299,4 +301,135 @@ async def get_audit_summary(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to retrieve audit summary: {str(e)}"
+        )
+
+
+@audit_router.get(
+    "/records/{audit_id}/verify",
+    summary="Verify audit record integrity",
+    description="Verify the integrity of a specific audit record using its hash",
+)
+@require_permissions(permissions=[PermissionEnum.ADMIN_ACCESS])
+async def verify_audit_record(
+    audit_id: UUID,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+):
+    """Verify the integrity of an audit record.
+
+    This endpoint requires admin access and checks if the audit record
+    has been tampered with by verifying its hash.
+    """
+    try:
+        service = AuditService(session)
+
+        # Verify the audit record
+        is_valid, message = service.verify_audit_record_integrity(audit_id)
+
+        return {
+            "success": True,
+            "audit_id": str(audit_id),
+            "is_valid": is_valid,
+            "message": message,
+            "verified_at": datetime.now(timezone.utc).isoformat(),
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to verify audit record: {str(e)}"
+        )
+
+
+@audit_router.post(
+    "/verify-batch",
+    summary="Verify multiple audit records",
+    description="Verify the integrity of multiple audit records",
+)
+@require_permissions(permissions=[PermissionEnum.ADMIN_ACCESS])
+async def verify_audit_batch(
+    audit_ids: List[UUID],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+):
+    """Verify the integrity of multiple audit records.
+
+    This endpoint requires admin access and checks multiple audit records
+    for tampering.
+    """
+    try:
+        service = AuditService(session)
+
+        # Verify the batch
+        results = service.verify_batch_integrity(audit_ids)
+
+        # Format results
+        verification_results = []
+        for audit_id, (is_valid, message) in results.items():
+            verification_results.append(
+                {
+                    "audit_id": str(audit_id),
+                    "is_valid": is_valid,
+                    "message": message,
+                }
+            )
+
+        # Calculate summary statistics
+        total_checked = len(results)
+        valid_count = sum(1 for _, (is_valid, _) in results.items() if is_valid)
+        invalid_count = total_checked - valid_count
+
+        return {
+            "success": True,
+            "summary": {
+                "total_checked": total_checked,
+                "valid_count": valid_count,
+                "invalid_count": invalid_count,
+            },
+            "results": verification_results,
+            "verified_at": datetime.now(timezone.utc).isoformat(),
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to verify audit records: {str(e)}"
+        )
+
+
+@audit_router.get(
+    "/find-tampered",
+    summary="Find potentially tampered audit records",
+    description="Search for audit records that may have been tampered with",
+)
+@require_permissions(permissions=[PermissionEnum.ADMIN_ACCESS])
+async def find_tampered_records(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    start_date: Optional[datetime] = Query(None, description="Start date for search"),
+    end_date: Optional[datetime] = Query(None, description="End date for search"),
+    limit: int = Query(100, description="Maximum number of records to check", le=1000),
+):
+    """Find audit records that may have been tampered with.
+
+    This endpoint requires admin access and searches for audit records
+    with hash mismatches, indicating potential tampering.
+    """
+    try:
+        service = AuditService(session)
+
+        # Find tampered records
+        tampered = service.find_tampered_records(
+            start_date=start_date,
+            end_date=end_date,
+            limit=limit,
+        )
+
+        return {
+            "success": True,
+            "message": f"Checked {limit} records for tampering",
+            "tampered_count": len(tampered),
+            "tampered_records": tampered,
+            "checked_at": datetime.now(timezone.utc).isoformat(),
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to search for tampered records: {str(e)}",
         )

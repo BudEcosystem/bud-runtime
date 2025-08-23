@@ -77,6 +77,7 @@ class AuditRecordEntry(BaseModel):
     ip_address: Optional[str] = Field(None, description="IP address from which the action was performed")
     previous_state: Optional[Dict[str, Any]] = Field(None, description="State of the resource before the action")
     new_state: Optional[Dict[str, Any]] = Field(None, description="State of the resource after the action")
+    record_hash: str = Field(..., description="SHA256 hash of record data for integrity verification")
     created_at: datetime = Field(..., description="When the audit record was created")
 
     # Optional user information if expanded
@@ -94,6 +95,7 @@ class AuditRecordFilter(BaseModel):
     """Schema for filtering audit records in queries."""
 
     user_id: Optional[UUID4] = Field(None, description="Filter by user ID")
+    actioned_by: Optional[UUID4] = Field(None, description="Filter by admin/user who performed action on behalf")
     action: Optional[AuditActionEnum] = Field(None, description="Filter by action type")
     resource_type: Optional[AuditResourceTypeEnum] = Field(None, description="Filter by resource type")
     resource_id: Optional[UUID4] = Field(None, description="Filter by resource ID")
