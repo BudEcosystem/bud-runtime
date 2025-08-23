@@ -125,7 +125,7 @@ export default function TagsInput(props: SelectProps) {
       className={`flex items-center !rounded-[6px] relative !bg-[transparent] w-full mb-[.35rem] ${props.ClassNames}`}
       rules={props.rules}
     >
-      <div className="w-full">
+      <div className="w-full relative">
         <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-[.75rem] text-[#EEEEEE] font-[400]">
           {props.label || "Tags"}{" "}
           {required && <b className="text-[#FF4D4F]">*</b>}
@@ -138,8 +138,7 @@ export default function TagsInput(props: SelectProps) {
             />
           </CustomPopover>
         </Text_12_300_EEEEEE>
-      </div>
-      <CreatableSelect
+        <CreatableSelect
         menuPlacement={props.menuplacement || "auto"}
         ref={ref}
         className={`drawerSelect w-full placeholder:text-xs text-xs  text-[#EEEEEE] indent-[.5rem]  placeholder:text-[#808080] font-light outline-none !bg-[transparent] rounded-[6px] hover:!bg-[#FFFFFF08] ${props.SelectClassNames}`}
@@ -286,7 +285,8 @@ export default function TagsInput(props: SelectProps) {
             );
           },
         }}
-      />
+        />
+      </div>
     </Form.Item>
   );
 }

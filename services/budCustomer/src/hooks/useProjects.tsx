@@ -94,7 +94,7 @@ export const useProjects = create<{
   globalProjects: Project[];
   globalSelectedProject: Project | null;
   getGlobalProjects: (page: any, limit: any, search?: string) => void;
-  getGlobalProject: (projectId: string) => void;
+  getGlobalProject: (projectId: string) => Promise<any>;
 }>((set, get) => ({
   globalProjects: [],
   globalSelectedProject: null,
