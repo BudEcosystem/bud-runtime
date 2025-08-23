@@ -22,15 +22,18 @@ def serialize_for_hash(value: Any) -> str:
     """
     if value is None:
         return "null"
+    elif isinstance(value, bool):
+        # Handle boolean before other types since bool is a subclass of int
+        return "true" if value else "false"
     elif isinstance(value, UUID):
         return str(value)
     elif isinstance(value, datetime):
         return value.isoformat()
     elif isinstance(value, dict):
         # Sort keys for consistent ordering
-        return json.dumps(value, sort_keys=True, default=str)
+        return json.dumps(value, sort_keys=True, default=str, separators=(",", ":"))
     elif isinstance(value, (list, tuple)):
-        return json.dumps(value, default=str)
+        return json.dumps(value, default=str, separators=(",", ":"))
     else:
         return str(value)
 

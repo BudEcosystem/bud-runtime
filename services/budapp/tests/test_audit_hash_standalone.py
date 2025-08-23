@@ -17,6 +17,7 @@ def serialize_for_hash(value: Any) -> str:
     if value is None:
         return "null"
     elif isinstance(value, bool):
+        # Handle boolean before other types since bool is a subclass of int
         return "true" if value else "false"
     elif isinstance(value, (UUID, str, int, float)):
         return str(value)
