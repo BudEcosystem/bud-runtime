@@ -87,7 +87,7 @@ class Credential(Base, TimestampMixin):
 
     @staticmethod
     def set_hashed_key(key: str):
-        hashed_key = hash_token(f"sk-{key}")
+        hashed_key = hash_token(f"bud-{key}")
         return hashed_key
 
 

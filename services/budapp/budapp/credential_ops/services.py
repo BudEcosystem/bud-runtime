@@ -269,8 +269,11 @@ class CredentialService(SessionMixin):
             ttl = None
             if key_info["expiry"]:
                 ttl = int((key_info["expiry"] - datetime.now()).total_seconds())
-            # Store with flat structure including metadata
-            await redis_service.set(f"api_key:{key_info['api_key']}", json.dumps(cache_data), ex=ttl)
+
+            # Hash the API key before storing in Redis (consistent with database storage)
+            hashed_key = CredentialModel.set_hashed_key(key_info["api_key"])
+            # Store with flat structure including metadata using hashed key
+            await redis_service.set(f"api_key:{hashed_key}", json.dumps(cache_data), ex=ttl)
 
         logger.info(f"Updated {len(keys_to_update)} api keys in proxy cache with metadata")
 
@@ -354,8 +357,11 @@ class CredentialService(SessionMixin):
         # Decrypt API key from encrypted storage
         api_key = await RSAHandler().decrypt(db_credential.encrypted_key)
 
+        # Hash the API key before deleting from Redis (consistent with storage)
+        hashed_key = CredentialModel.set_hashed_key(api_key)
+
         redis_service = RedisService()
-        await redis_service.delete_keys_by_pattern(f"api_key:{api_key}*")
+        await redis_service.delete_keys_by_pattern(f"api_key:{hashed_key}*")
         # Delete the credential from the database
         await CredentialDataManager(self.session).delete_credential(db_credential)
 
