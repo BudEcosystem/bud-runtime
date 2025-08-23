@@ -81,7 +81,9 @@ export function BudForm(props: BudFormProps) {
 
       // Check if values are actually different
       const hasChanges = Object.keys(props.data).some(key => {
-        return props.data[key] !== currentValues[key];
+        // Using JSON.stringify for a simple deep comparison. This is safer than reference equality for objects/arrays.
+        // For complex cases, a library like `lodash.isEqual` would be more robust.
+        return JSON.stringify(props.data[key]) !== JSON.stringify(currentValues[key]);
       });
 
       // Only update if there are actual changes
