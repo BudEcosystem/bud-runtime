@@ -1,6 +1,6 @@
 """Billing API routes."""
 
-from typing import List
+from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -396,4 +396,80 @@ async def check_and_trigger_alerts(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to check alerts",
+        )
+
+
+@router.post("/usage-webhook", response_model=SingleResponse)
+async def handle_usage_webhook(
+    user_id: UUID,
+    tokens_used: int,
+    cost_incurred: float,
+    endpoint_id: Optional[str] = None,
+    db: Session = Depends(get_session),
+) -> SingleResponse:
+    """Handle real-time usage update webhook from budmetrics.
+
+    This endpoint is called by budmetrics after recording usage to update
+    the cache and check usage limits in real-time.
+    """
+    try:
+        service = BillingService(db)
+        result = await service.handle_usage_update(
+            user_id=user_id,
+            tokens_used=tokens_used,
+            cost_incurred=cost_incurred,
+            endpoint_id=endpoint_id,
+        )
+
+        return SingleResponse(
+            result=result,
+            message="Usage update processed successfully",
+        )
+    except Exception as e:
+        logger.error(f"Error processing usage webhook: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to process usage update",
+        )
+
+
+@router.post("/refresh-cache/{user_id}", response_model=SingleResponse)
+async def refresh_user_cache(
+    user_id: UUID,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_session),
+) -> SingleResponse:
+    """Refresh all cached data for a user (admin only).
+
+    This forces a cache refresh for the specified user, useful after
+    billing plan changes or manual adjustments.
+    """
+    try:
+        # Check if user is admin
+        if current_user.user_type != UserTypeEnum.ADMIN:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only admins can refresh user cache",
+            )
+
+        service = BillingService(db)
+        success = await service.refresh_user_cache(user_id)
+
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to refresh user cache",
+            )
+
+        return SingleResponse(
+            result={"user_id": str(user_id), "cache_refreshed": True},
+            message="User cache refreshed successfully",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error refreshing user cache: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to refresh user cache",
         )

@@ -11,7 +11,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from budapp.billing_ops.models import BillingAlert, BillingPlan, UserBilling
+from budapp.billing_ops.usage_cache import UsageCacheManager, UsageLimitStatus
 from budapp.commons.config import app_settings
+from budapp.commons.constants import UserTypeEnum
 from budapp.commons.db_utils import DataManagerUtils
 from budapp.commons.logging import get_logger
 from budapp.user_ops.models import User
@@ -28,6 +30,7 @@ class BillingService(DataManagerUtils):
         super().__init__(db)
         # Use Dapr invocation to communicate with budmetrics
         self.budmetrics_base_url = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/method"
+        self.usage_cache = UsageCacheManager()
 
     async def get_usage_from_clickhouse(
         self,
@@ -139,29 +142,120 @@ class BillingService(DataManagerUtils):
             "suspension_reason": user_billing.suspension_reason,
         }
 
-    async def check_usage_limits(self, user_id: UUID) -> Dict[str, Any]:
-        """Check if user has exceeded usage limits."""
+    async def check_usage_limits(self, user_id: UUID, use_cache: bool = True) -> Dict[str, Any]:
+        """Check if user has exceeded usage limits.
+
+        Args:
+            user_id: The user ID to check
+            use_cache: Whether to use cached data (default: True)
+
+        Returns:
+            Dict with allowed status and related information
+        """
+        # First check if user is admin/superuser - they bypass all limits
+        from budapp.user_ops.crud import UserDataManager
+        from budapp.user_ops.models import User as UserModel
+
+        user = await UserDataManager(self.session).retrieve_by_fields(UserModel, {"id": user_id}, missing_ok=True)
+
+        # Admin users always bypass limits
+        if user and user.is_superuser:
+            logger.info(f"Admin user {user_id} bypasses all usage limits")
+            status = UsageLimitStatus.ALLOWED
+
+            # Cache and publish the allowed status for admin
+            await self.usage_cache.set_usage_limit_status(
+                user_id=user_id,
+                status=status,
+                remaining_tokens=None,  # Unlimited for admin
+                remaining_cost=None,  # Unlimited for admin
+                reset_at=None,
+                reason="Admin user - no limits",
+            )
+
+            await self.usage_cache.publish_usage_update(
+                user_id=user_id,
+                status=status,
+                remaining_tokens=None,
+                remaining_cost=None,
+                reset_at=None,
+                reason="Admin user - no limits",
+            )
+
+            return {
+                "allowed": True,
+                "reason": "Admin user - no limits",
+                "remaining_tokens": None,
+                "remaining_cost": None,
+                "status": status.value,
+            }
+
+        # For non-admin users, check cache first
+        if use_cache:
+            cached_status = await self.usage_cache.get_usage_limit_status(user_id)
+            if cached_status:
+                logger.debug(f"Using cached usage limit status for user {user_id}")
+                return cached_status
+
+        # Get fresh usage data for non-admin users
         usage = await self.get_current_usage(user_id)
 
+        # Determine status and cache it
+        status = UsageLimitStatus.ALLOWED
+        reason = None
+        remaining_tokens = None
+        remaining_cost = None
+
         if not usage.get("has_billing"):
-            return {"allowed": False, "reason": "No billing plan configured"}
+            status = UsageLimitStatus.NO_BILLING_PLAN
+            reason = "No billing plan configured"
+        elif usage.get("is_suspended"):
+            status = UsageLimitStatus.ACCOUNT_SUSPENDED
+            reason = usage.get("suspension_reason", "Account suspended")
+        elif usage["usage"]["tokens_quota"] and usage["usage"]["tokens_used"] >= usage["usage"]["tokens_quota"]:
+            status = UsageLimitStatus.TOKEN_LIMIT_EXCEEDED
+            reason = "Monthly token quota exceeded"
+        elif usage["usage"]["cost_quota"] and usage["usage"]["cost_used"] >= usage["usage"]["cost_quota"]:
+            status = UsageLimitStatus.COST_LIMIT_EXCEEDED
+            reason = "Monthly cost quota exceeded"
+        else:
+            # Calculate remaining quotas
+            if usage["usage"]["tokens_quota"]:
+                remaining_tokens = usage["usage"]["tokens_quota"] - usage["usage"]["tokens_used"]
+            if usage["usage"]["cost_quota"]:
+                remaining_cost = usage["usage"]["cost_quota"] - usage["usage"]["cost_used"]
 
-        if usage.get("is_suspended"):
-            return {"allowed": False, "reason": usage.get("suspension_reason", "Account suspended")}
+        # Get billing period end for reset time
+        reset_at = None
+        if usage.get("billing_period_end"):
+            reset_at = datetime.fromisoformat(usage["billing_period_end"])
 
-        # Check token limit
-        if usage["usage"]["tokens_quota"] and usage["usage"]["tokens_used"] >= usage["usage"]["tokens_quota"]:
-            return {"allowed": False, "reason": "Monthly token quota exceeded"}
+        # Cache the status
+        await self.usage_cache.set_usage_limit_status(
+            user_id=user_id,
+            status=status,
+            remaining_tokens=remaining_tokens,
+            remaining_cost=remaining_cost,
+            reset_at=reset_at,
+            reason=reason,
+        )
 
-        # Check cost limit
-        if usage["usage"]["cost_quota"] and usage["usage"]["cost_used"] >= usage["usage"]["cost_quota"]:
-            return {"allowed": False, "reason": "Monthly cost quota exceeded"}
+        # Always publish update to keep gateway cache synchronized
+        await self.usage_cache.publish_usage_update(
+            user_id=user_id,
+            status=status,
+            remaining_tokens=remaining_tokens,
+            remaining_cost=remaining_cost,
+            reset_at=reset_at,
+            reason=reason,
+        )
 
         return {
-            "allowed": True,
-            "remaining_tokens": usage["usage"]["tokens_quota"] - usage["usage"]["tokens_used"]
-            if usage["usage"]["tokens_quota"]
-            else None,
+            "allowed": status == UsageLimitStatus.ALLOWED,
+            "reason": reason,
+            "remaining_tokens": remaining_tokens,
+            "remaining_cost": remaining_cost,
+            "status": status.value,
         }
 
     async def get_usage_history(
@@ -305,3 +399,192 @@ class BillingService(DataManagerUtils):
             )
 
         self.session.commit()
+
+    async def handle_usage_update(
+        self, user_id: UUID, tokens_used: int, cost_incurred: float, endpoint_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Handle real-time usage update from budmetrics.
+
+        Args:
+            user_id: The user ID
+            tokens_used: Number of tokens used in the request
+            cost_incurred: Cost incurred in the request
+            endpoint_id: Optional endpoint/model ID that was used
+
+        Returns:
+            Dict with updated usage status
+        """
+        # Check if user is admin first - they always get allowed status
+        from budapp.user_ops.crud import UserDataManager
+        from budapp.user_ops.models import User as UserModel
+
+        user = await UserDataManager(self.session).retrieve_by_fields(UserModel, {"id": user_id}, missing_ok=True)
+
+        if user and user.user_type == UserTypeEnum.ADMIN:
+            logger.debug(f"Admin user {user_id} in usage update - always allowed")
+            status = UsageLimitStatus.ALLOWED
+
+            # Still track usage for admin users (for analytics)
+            counters = await self.usage_cache.increment_usage_counter(user_id, tokens_used, cost_incurred)
+
+            # Publish allowed status for admin
+            await self.usage_cache.publish_usage_update(
+                user_id=user_id,
+                status=status,
+                remaining_tokens=None,
+                remaining_cost=None,
+                reset_at=None,
+                reason="Admin user - no limits",
+                metadata={
+                    "endpoint_id": endpoint_id,
+                    "tokens_used": tokens_used,
+                    "cost_incurred": cost_incurred,
+                },
+            )
+
+            return {
+                "status": status.value,
+                "allowed": True,
+                "reason": "Admin user - no limits",
+                "remaining_tokens": None,
+                "remaining_cost": None,
+                "usage_today": {
+                    "tokens": counters["tokens_today"],
+                    "cost": counters["cost_today_cents"] / 100.0,
+                },
+            }
+
+        # For non-admin users, proceed with normal usage tracking
+        counters = await self.usage_cache.increment_usage_counter(user_id, tokens_used, cost_incurred)
+
+        # Get current billing info (from cache if available)
+        cached_billing = await self.usage_cache.get_cached_billing_info(user_id)
+
+        if not cached_billing:
+            # Fetch and cache billing info
+            user_billing = self.get_user_billing(user_id)
+            if user_billing:
+                billing_plan = self.get_billing_plan(user_billing.billing_plan_id)
+                token_quota = user_billing.custom_token_quota or billing_plan.monthly_token_quota
+                cost_quota = user_billing.custom_cost_quota or billing_plan.monthly_cost_quota
+
+                await self.usage_cache.cache_user_billing_info(
+                    user_id=user_id,
+                    billing_plan_id=user_billing.billing_plan_id,
+                    token_quota=token_quota,
+                    cost_quota=cost_quota,
+                    billing_period_end=user_billing.billing_period_end,
+                    is_suspended=user_billing.is_suspended,
+                )
+
+                cached_billing = {
+                    "token_quota": token_quota,
+                    "cost_quota": float(cost_quota) if cost_quota else None,
+                    "billing_period_end": user_billing.billing_period_end.isoformat(),
+                    "is_suspended": user_billing.is_suspended,
+                }
+
+        # Check if limits are exceeded
+        status = UsageLimitStatus.ALLOWED
+        reason = None
+
+        if cached_billing:
+            if cached_billing.get("is_suspended"):
+                status = UsageLimitStatus.ACCOUNT_SUSPENDED
+                reason = "Account suspended"
+            elif cached_billing.get("token_quota") and counters["tokens_today"] >= cached_billing["token_quota"]:
+                status = UsageLimitStatus.TOKEN_LIMIT_EXCEEDED
+                reason = "Daily token quota exceeded"
+            elif cached_billing.get("cost_quota"):
+                cost_today = counters["cost_today_cents"] / 100.0
+                if cost_today >= cached_billing["cost_quota"]:
+                    status = UsageLimitStatus.COST_LIMIT_EXCEEDED
+                    reason = "Daily cost quota exceeded"
+
+        # Update cache with new status
+        remaining_tokens = None
+        remaining_cost = None
+
+        if cached_billing and status == UsageLimitStatus.ALLOWED:
+            if cached_billing.get("token_quota"):
+                remaining_tokens = cached_billing["token_quota"] - counters["tokens_today"]
+            if cached_billing.get("cost_quota"):
+                remaining_cost = cached_billing["cost_quota"] - (counters["cost_today_cents"] / 100.0)
+
+        reset_at = datetime.fromisoformat(cached_billing["billing_period_end"]) if cached_billing else None
+
+        await self.usage_cache.set_usage_limit_status(
+            user_id=user_id,
+            status=status,
+            remaining_tokens=remaining_tokens,
+            remaining_cost=remaining_cost,
+            reset_at=reset_at,
+            reason=reason,
+        )
+
+        # Always publish update to keep gateway cache synchronized
+        await self.usage_cache.publish_usage_update(
+            user_id=user_id,
+            status=status,
+            remaining_tokens=remaining_tokens,
+            remaining_cost=remaining_cost,
+            reset_at=reset_at,
+            reason=reason,
+            metadata={
+                "endpoint_id": endpoint_id,
+                "tokens_used": tokens_used,
+                "cost_incurred": cost_incurred,
+            },
+        )
+
+        return {
+            "status": status.value,
+            "allowed": status == UsageLimitStatus.ALLOWED,
+            "reason": reason,
+            "remaining_tokens": remaining_tokens,
+            "remaining_cost": remaining_cost,
+            "usage_today": {
+                "tokens": counters["tokens_today"],
+                "cost": counters["cost_today_cents"] / 100.0,
+            },
+        }
+
+    async def refresh_user_cache(self, user_id: UUID) -> bool:
+        """Refresh all cached data for a user.
+
+        Args:
+            user_id: The user ID
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Invalidate existing cache
+            await self.usage_cache.invalidate_user_cache(user_id)
+
+            # Re-check usage limits to populate cache
+            await self.check_usage_limits(user_id, use_cache=False)
+
+            # Cache billing info
+            user_billing = self.get_user_billing(user_id)
+            if user_billing:
+                billing_plan = self.get_billing_plan(user_billing.billing_plan_id)
+                token_quota = user_billing.custom_token_quota or billing_plan.monthly_token_quota
+                cost_quota = user_billing.custom_cost_quota or billing_plan.monthly_cost_quota
+
+                await self.usage_cache.cache_user_billing_info(
+                    user_id=user_id,
+                    billing_plan_id=user_billing.billing_plan_id,
+                    token_quota=token_quota,
+                    cost_quota=cost_quota,
+                    billing_period_end=user_billing.billing_period_end,
+                    is_suspended=user_billing.is_suspended,
+                )
+
+                # The check_usage_limits call above already publishes the update
+                # No need for separate billing update since we removed that channel
+
+            return True
+        except Exception as e:
+            logger.error(f"Failed to refresh user cache: {e}")
+            return False

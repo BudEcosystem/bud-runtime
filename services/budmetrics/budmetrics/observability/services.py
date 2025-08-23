@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Optional, Union
 from uuid import UUID
 
+import httpx
 from budmicroframe.commons import logging
 
 from budmetrics.commons.config import app_settings, secrets_settings
@@ -625,6 +626,9 @@ class ObservabilityMetricsService:
 
         await self.clickhouse_client.execute_query(query)
         logger.info(f"Successfully inserted {len(new_records)} new records")
+
+        # Send webhook to budapp for usage tracking (fire and forget)
+        asyncio.create_task(self._send_usage_webhook(new_records))
 
         return {
             "total_records": len(batch_data),
@@ -2946,3 +2950,70 @@ class ObservabilityMetricsService:
         except Exception as e:
             logger.error(f"Failed to get block count for rule {rule_id}: {e}")
             return 0
+
+    async def _send_usage_webhook(self, records: list) -> None:
+        """Send usage update webhook to budapp for billing tracking.
+
+        This method aggregates usage by user and sends updates to budapp's
+        billing webhook endpoint for real-time usage limit enforcement.
+
+        Args:
+            records: List of newly inserted inference records
+        """
+        try:
+            # Use Dapr service invocation if available
+            if hasattr(app_settings, "dapr_base_url") and hasattr(app_settings, "bud_app_app_id"):
+                webhook_url = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_app_app_id}/method/billing/usage-webhook"
+            else:
+                # Fallback to direct URL if available
+                webhook_url = getattr(app_settings, "budapp_webhook_url", None)
+                if not webhook_url:
+                    logger.debug("No webhook URL configured, skipping usage notification")
+                    return
+
+            # Aggregate usage by user
+            user_usage = {}
+            for record in records:
+                # Extract fields based on record length
+                if len(record) >= 13:
+                    # New format with auth metadata
+                    user_id = record[11]  # user_id field
+                    cost = record[5] if record[5] else 0  # cost field
+
+                    # Skip if no user_id
+                    if not user_id:
+                        continue
+
+                    # Aggregate by user
+                    if user_id not in user_usage:
+                        user_usage[user_id] = {"tokens_used": 0, "cost_incurred": 0, "request_count": 0}
+
+                    # Estimate tokens from cost (rough estimate: $0.01 per 1000 tokens)
+                    estimated_tokens = int(cost * 100000) if cost else 100  # Default 100 tokens if no cost
+
+                    user_usage[user_id]["tokens_used"] += estimated_tokens
+                    user_usage[user_id]["cost_incurred"] += cost
+                    user_usage[user_id]["request_count"] += 1
+
+            # Send webhook for each user
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                for user_id, usage in user_usage.items():
+                    try:
+                        payload = {
+                            "user_id": user_id,
+                            "tokens_used": usage["tokens_used"],
+                            "cost_incurred": usage["cost_incurred"],
+                            "endpoint_id": None,  # Could extract from records if needed
+                        }
+
+                        # Fire and forget - don't wait for response
+                        await client.post(webhook_url, json=payload)
+                        logger.debug(f"Sent usage webhook for user {user_id}: {usage['request_count']} requests")
+
+                    except Exception as e:
+                        # Log but don't fail the main operation
+                        logger.warning(f"Failed to send usage webhook for user {user_id}: {e}")
+
+        except Exception as e:
+            # Log but don't fail the main operation
+            logger.warning(f"Failed to send usage webhooks: {e}")

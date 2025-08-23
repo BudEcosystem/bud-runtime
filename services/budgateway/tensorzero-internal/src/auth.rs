@@ -23,8 +23,20 @@ pub struct AuthMetadata {
     pub api_key_project_id: Option<String>,
 }
 
+// Usage limit information cached locally
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UsageLimitInfo {
+    pub allowed: bool,
+    pub status: String,
+    pub remaining_tokens: Option<i64>,
+    pub remaining_cost: Option<f64>,
+    pub reason: Option<String>,
+    pub reset_at: Option<String>,
+}
+
 pub type APIConfig = HashMap<String, ApiKeyMetadata>;
 pub type PublishedModelInfo = HashMap<String, ApiKeyMetadata>;
+pub type UsageLimitsCache = HashMap<String, UsageLimitInfo>;
 
 // Common error response helper
 fn auth_error_response(status: StatusCode, message: &str) -> Response {
@@ -43,6 +55,7 @@ pub struct Auth {
     api_keys: Arc<RwLock<HashMap<String, APIConfig>>>,
     published_model_info: Arc<RwLock<PublishedModelInfo>>,
     auth_metadata: Arc<RwLock<HashMap<String, AuthMetadata>>>,
+    usage_limits: Arc<RwLock<UsageLimitsCache>>,
 }
 
 impl Auth {
@@ -51,6 +64,7 @@ impl Auth {
             api_keys: Arc::new(RwLock::new(api_keys)),
             published_model_info: Arc::new(RwLock::new(HashMap::new())),
             auth_metadata: Arc::new(RwLock::new(HashMap::new())),
+            usage_limits: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -110,6 +124,49 @@ impl Auth {
         #[expect(clippy::expect_used)]
         let published_model_info = self.published_model_info.read().expect("RwLock poisoned");
         published_model_info.clone()
+    }
+
+    pub fn update_usage_limit(&self, user_id: &str, limit_info: UsageLimitInfo) {
+        #[expect(clippy::expect_used)]
+        let mut usage_limits = self.usage_limits.write().expect("RwLock poisoned");
+        usage_limits.insert(user_id.to_string(), limit_info);
+    }
+
+    pub fn remove_usage_limit(&self, user_id: &str) {
+        #[expect(clippy::expect_used)]
+        let mut usage_limits = self.usage_limits.write().expect("RwLock poisoned");
+        usage_limits.remove(user_id);
+    }
+
+    pub fn get_usage_limit(&self, user_id: &str) -> Option<UsageLimitInfo> {
+        #[expect(clippy::expect_used)]
+        let usage_limits = self.usage_limits.read().expect("RwLock poisoned");
+        usage_limits.get(user_id).cloned()
+    }
+
+    pub fn clear_usage_limits(&self) {
+        #[expect(clippy::expect_used)]
+        let mut usage_limits = self.usage_limits.write().expect("RwLock poisoned");
+        usage_limits.clear();
+    }
+
+    pub fn check_usage_limits(&self, api_key: &str) -> Result<bool, StatusCode> {
+        // Get user_id from auth metadata
+        if let Some(metadata) = self.get_auth_metadata(api_key) {
+            if let Some(user_id) = metadata.user_id {
+                // Check local cache for usage limits
+                if let Some(limit_info) = self.get_usage_limit(&user_id) {
+                    // Simply return the allowed flag - budapp handles all logic
+                    tracing::debug!("Found usage limit for user {}: allowed={}, status={}",
+                        user_id, limit_info.allowed, limit_info.status);
+                    return Ok(limit_info.allowed);
+                }
+                // No cached limit info - allow by default (fail-open)
+                tracing::debug!("No usage limit cached for user {}, allowing request", user_id);
+            }
+        }
+        // No user metadata or no limits configured - allow by default
+        Ok(true)
     }
 }
 
@@ -201,6 +258,22 @@ pub async fn require_api_key(
                 ))
             }
         };
+
+        // Check usage limits for the user
+        match auth.check_usage_limits(&key) {
+            Ok(allowed) => {
+                if !allowed {
+                    return Err(auth_error_response(
+                        StatusCode::PAYMENT_REQUIRED,
+                        "Usage quota exceeded. Please upgrade your plan or wait for the next billing period.",
+                    ))
+                }
+            }
+            Err(_) => {
+                // Log the error but allow the request (fail open)
+                tracing::warn!("Failed to check usage limits, allowing request");
+            }
+        }
 
         // Add the model name as a custom header for downstream handlers
         if let Ok(header_value) = model.parse() {

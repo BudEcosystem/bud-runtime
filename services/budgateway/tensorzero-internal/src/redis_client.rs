@@ -7,7 +7,7 @@ use redis::AsyncCommands;
 use secrecy::SecretString;
 use tracing::instrument;
 
-use crate::auth::{APIConfig, ApiKeyMetadata, Auth, PublishedModelInfo};
+use crate::auth::{APIConfig, ApiKeyMetadata, Auth, PublishedModelInfo, UsageLimitInfo};
 use crate::config_parser::ProviderTypesConfig;
 use crate::encryption::{decrypt_api_key, is_decryption_enabled, load_private_key};
 use crate::error::{Error, ErrorDetails};
@@ -17,6 +17,7 @@ use crate::model::{ModelTable, UninitializedModelConfig};
 const MODEL_TABLE_KEY_PREFIX: &str = "model_table:";
 const API_KEY_KEY_PREFIX: &str = "api_key:";
 const PUBLISHED_MODEL_INFO_KEY: &str = "published_model_info";
+const USAGE_LIMIT_UPDATES_CHANNEL: &str = "usage_limit_updates";
 
 pub struct RedisClient {
     pub(crate) client: redis::Client,
@@ -319,6 +320,59 @@ impl RedisClient {
         self.client.get_multiplexed_async_connection().await
     }
 
+    /// Handle usage limit update from pub/sub
+    async fn handle_usage_limit_update(
+        payload: &str,
+        auth: &Auth,
+    ) -> Result<(), Error> {
+        // Parse the update message
+        let update: serde_json::Value = serde_json::from_str(payload).map_err(|e| {
+            Error::new(ErrorDetails::Config {
+                message: format!("Failed to parse usage limit update: {}", e),
+            })
+        })?;
+
+        // Extract user_id and status
+        if let (Some(user_id), Some(status)) = (
+            update.get("user_id").and_then(|v| v.as_str()),
+            update.get("status").and_then(|v| v.as_str()),
+        ) {
+            // Create UsageLimitInfo from the update
+            let limit_info = UsageLimitInfo {
+                // Allow users without billing plans (freemium model)
+                // This ensures consistent behavior with fail-open design
+                allowed: status == "allowed" || status == "no_billing_plan",
+                status: status.to_string(),
+                remaining_tokens: update.get("metadata")
+                    .and_then(|m| m.get("remaining_tokens"))
+                    .and_then(|v| v.as_i64()),
+                remaining_cost: update.get("metadata")
+                    .and_then(|m| m.get("remaining_cost"))
+                    .and_then(|v| v.as_f64()),
+                reason: update.get("metadata")
+                    .and_then(|m| m.get("reason"))
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string()),
+                reset_at: update.get("metadata")
+                    .and_then(|m| m.get("reset_at"))
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string()),
+            };
+
+            // Update the local Auth cache
+            auth.update_usage_limit(user_id, limit_info.clone());
+
+            tracing::info!(
+                "Updated local usage limit cache for user {}: status={}, allowed={}",
+                user_id,
+                status,
+                limit_info.allowed
+            );
+        }
+
+        Ok(())
+    }
+
     /// Publish rate limit configuration updates for models with rate limits
     async fn publish_rate_limit_updates(models: &ModelTable, app_state: &AppStateData) {
         // Only publish if rate limiting is enabled
@@ -455,6 +509,17 @@ impl RedisClient {
                 })
             })?;
 
+        // Subscribe to usage limit update channels
+        pubsub_conn
+            .subscribe(USAGE_LIMIT_UPDATES_CHANNEL)
+            .await
+            .map_err(|e| {
+                Error::new(ErrorDetails::Config {
+                    message: format!("Failed to subscribe to usage limit updates: {e}"),
+                })
+            })?;
+
+
         let app_state = self.app_state.clone();
         let auth = self.auth.clone();
         let mut conn = self.conn.clone();
@@ -499,7 +564,12 @@ impl RedisClient {
                             tracing::error!("Failed to handle expired key event: {e}");
                         }
                     }
-
+                    USAGE_LIMIT_UPDATES_CHANNEL => {
+                        // Handle usage limit updates
+                        if let Err(e) = Self::handle_usage_limit_update(&payload, &auth).await {
+                            tracing::error!("Failed to handle usage limit update: {e}");
+                        }
+                    }
                     _ => {
                         tracing::warn!("Received message from unknown channel: {channel}");
                     }
