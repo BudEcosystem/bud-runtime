@@ -188,7 +188,7 @@ class TestAuditLogging:
 
         # Verify error was logged
         mock_logger.error.assert_called_once()
-        assert "Failed to create audit record" in str(mock_logger.error.call_args)
+        assert "Failed to log audit event" in str(mock_logger.error.call_args)
 
 
 class TestAsyncAuditLogging:
