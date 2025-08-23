@@ -362,12 +362,14 @@ class AuditService:
         self,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
+        user_id: Optional[UUID] = None,
     ) -> Dict[str, Any]:
         """Get summary statistics for audit records.
 
         Args:
             start_date: Start date for filtering
             end_date: End date for filtering
+            user_id: User ID for filtering (optional, for CLIENT users)
 
         Returns:
             Dictionary containing summary statistics
@@ -375,6 +377,7 @@ class AuditService:
         return self.data_manager.get_audit_summary(
             start_date=start_date,
             end_date=end_date,
+            user_id=user_id,
         )
 
     def _calculate_changes(

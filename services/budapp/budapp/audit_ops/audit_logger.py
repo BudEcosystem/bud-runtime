@@ -16,6 +16,7 @@
 
 """Simple audit logging utility for direct, synchronous audit trail creation."""
 
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 from uuid import UUID
 
@@ -124,8 +125,8 @@ def log_audit(
             audit_service.audit_update(
                 resource_type=resource_type,
                 resource_id=resource_id,
-                previous_state=previous_state or {},
-                new_state=new_state or {},
+                previous_data=previous_state or {},
+                new_data=new_state or {},
                 user_id=user_id,
                 ip_address=ip_address,
             )
@@ -143,12 +144,14 @@ def log_audit(
             AuditActionEnum.LOGIN_FAILED,
             AuditActionEnum.TOKEN_REFRESH,
         ]:
+            # Extract reason from details if present
+            reason = details.get("reason") if details else None
             audit_service.audit_authentication(
                 action=action,
                 user_id=user_id,
                 ip_address=ip_address,
                 success=success,
-                details=details,
+                reason=reason,
             )
         elif action in [AuditActionEnum.ACCESS_GRANTED, AuditActionEnum.ACCESS_DENIED]:
             audit_service.audit_access(
@@ -166,21 +169,29 @@ def log_audit(
         ]:
             audit_service.audit_workflow(
                 workflow_id=resource_id,
-                workflow_type=details.get("workflow_type", "UNKNOWN"),
+                workflow_type=details.get("workflow_type", "UNKNOWN") if details else "UNKNOWN",
                 action=action,
                 user_id=user_id,
-                details=details,
+                status=details.get("status") if details else None,
+                error=details.get("error") if details else None,
+                ip_address=ip_address,
             )
         else:
             # Generic audit for any other action
-            audit_service.create_audit_record(
+            from budapp.audit_ops.schemas import AuditRecordCreate
+
+            audit_data = AuditRecordCreate(
                 action=action,
                 resource_type=resource_type,
                 resource_id=resource_id,
                 user_id=user_id,
                 ip_address=ip_address,
                 details=details,
+                previous_state=previous_state,
+                new_state=new_state,
+                timestamp=datetime.now(timezone.utc),
             )
+            audit_service.create_audit_record(audit_data)
 
         logger.debug(
             f"Audit logged: action={action}, resource_type={resource_type}, "

@@ -34,7 +34,6 @@ audit_router = APIRouter(prefix="/audit", tags=["Audit"])
     summary="Get audit records",
     description="Retrieve paginated audit records with optional filtering",
 )
-@require_permissions(permissions=[PermissionEnum.USER_MANAGE])
 async def get_audit_records(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
@@ -51,10 +50,17 @@ async def get_audit_records(
 ):
     """Get audit records with optional filtering and pagination.
 
-    This endpoint requires admin access and returns audit records based on the provided filters.
+    For CLIENT users, only their own audit records are returned.
+    For ADMIN users, all audit records are accessible based on the provided filters.
     """
     try:
         service = AuditService(session)
+
+        # For CLIENT users, force filter by their user_id
+        from budapp.commons.constants import UserTypeEnum
+
+        if current_user.user_type == UserTypeEnum.CLIENT.value:
+            user_id = current_user.id
 
         # Build filter parameters
         filter_params = AuditRecordFilter(
@@ -79,12 +85,11 @@ async def get_audit_records(
         )
 
         return AuditRecordListResponse(
-            success=True,
             message="Audit records retrieved successfully",
             data=records,
-            total=total,
-            offset=offset,
+            page=page,
             limit=limit,
+            total_record=total,
         )
     except Exception as e:
         raise HTTPException(
@@ -98,7 +103,6 @@ async def get_audit_records(
     summary="Get audit record by ID",
     description="Retrieve a specific audit record by its ID",
 )
-@require_permissions(permissions=[PermissionEnum.USER_MANAGE])
 async def get_audit_record(
     audit_id: UUID,
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -106,7 +110,8 @@ async def get_audit_record(
 ):
     """Get a specific audit record by ID.
 
-    This endpoint requires admin access and returns detailed information about a single audit record.
+    For CLIENT users, only their own audit records can be accessed.
+    For ADMIN users, all audit records are accessible.
     """
     try:
         service = AuditService(session)
@@ -117,6 +122,14 @@ async def get_audit_record(
         if not record:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail=f"Audit record with ID {audit_id} not found"
+            )
+
+        # Check if CLIENT user is trying to access another user's audit record
+        from budapp.commons.constants import UserTypeEnum
+
+        if current_user.user_type == UserTypeEnum.CLIENT.value and record.user_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="You can only access your own audit records"
             )
 
         # Convert to response schema
@@ -131,7 +144,6 @@ async def get_audit_record(
             entry.actioned_by_name = record.actioned_by_user.name
 
         return AuditRecordResponse(
-            success=True,
             message="Audit record retrieved successfully",
             data=entry,
         )
@@ -144,147 +156,11 @@ async def get_audit_record(
 
 
 @audit_router.get(
-    "/user/{user_id}",
-    response_model=AuditRecordListResponse,
-    summary="Get audit records for a user",
-    description="Retrieve audit records for a specific user",
-)
-@require_permissions(permissions=[PermissionEnum.USER_MANAGE])
-async def get_user_audit_records(
-    user_id: UUID,
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    session: Annotated[Session, Depends(get_session)],
-    page: Annotated[int, Query(ge=1, description="Page number")] = 1,
-    limit: Annotated[int, Query(ge=1, le=100, description="Items per page")] = 10,
-    action: Optional[AuditActionEnum] = Query(None, description="Filter by action type"),
-    resource_type: Optional[AuditResourceTypeEnum] = Query(None, description="Filter by resource type"),
-    start_date: Optional[datetime] = Query(None, description="Filter by start date"),
-    end_date: Optional[datetime] = Query(None, description="Filter by end date"),
-):
-    """Get audit records for a specific user.
-
-    This endpoint requires admin access unless the user is querying their own audit records.
-    """
-    # Allow users to view their own audit records
-    if user_id != current_user.id and PermissionEnum.USER_MANAGE not in current_user.permissions:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only view your own audit records")
-
-    try:
-        service = AuditService(session)
-
-        # Calculate offset from page and limit
-        offset = (page - 1) * limit
-
-        # Get user's audit records
-        records, total = service.data_manager.get_audit_records(
-            user_id=user_id,
-            offset=offset,
-            limit=limit,
-            start_date=start_date,
-            end_date=end_date,
-            action=action,
-            resource_type=resource_type,
-        )
-
-        # Convert to response schemas
-        from budapp.audit_ops.schemas import AuditRecordEntry
-
-        entries = []
-        for record in records:
-            entry = AuditRecordEntry.model_validate(record)
-            if record.user:
-                entry.user_email = record.user.email
-                entry.user_name = record.user.name
-            if record.actioned_by_user:
-                entry.actioned_by_email = record.actioned_by_user.email
-                entry.actioned_by_name = record.actioned_by_user.name
-            entries.append(entry)
-
-        return AuditRecordListResponse(
-            success=True,
-            message=f"Audit records for user {user_id} retrieved successfully",
-            data=entries,
-            total=total,
-            offset=offset,
-            limit=limit,
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to retrieve user audit records: {str(e)}",
-        )
-
-
-@audit_router.get(
-    "/resource/{resource_type}/{resource_id}",
-    response_model=AuditRecordListResponse,
-    summary="Get audit records for a resource",
-    description="Retrieve audit records for a specific resource",
-)
-@require_permissions(permissions=[PermissionEnum.USER_MANAGE])
-async def get_resource_audit_records(
-    resource_type: AuditResourceTypeEnum,
-    resource_id: UUID,
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    session: Annotated[Session, Depends(get_session)],
-    page: Annotated[int, Query(ge=1, description="Page number")] = 1,
-    limit: Annotated[int, Query(ge=1, le=100, description="Items per page")] = 10,
-):
-    """Get audit records for a specific resource.
-
-    This endpoint requires admin access and returns all audit records related to a specific resource.
-    """
-    try:
-        service = AuditService(session)
-
-        # Calculate offset from page and limit
-        offset = (page - 1) * limit
-
-        # Get resource's audit records
-        records, total = service.data_manager.get_audit_records(
-            resource_type=resource_type,
-            resource_id=resource_id,
-            offset=offset,
-            limit=limit,
-            include_user=True,
-        )
-
-        # Convert to response schemas
-        from budapp.audit_ops.schemas import AuditRecordEntry
-
-        entries = []
-        for record in records:
-            entry = AuditRecordEntry.model_validate(record)
-            if record.user:
-                entry.user_email = record.user.email
-                entry.user_name = record.user.name
-            if record.actioned_by_user:
-                entry.actioned_by_email = record.actioned_by_user.email
-                entry.actioned_by_name = record.actioned_by_user.name
-            entries.append(entry)
-
-        return AuditRecordListResponse(
-            success=True,
-            message=f"Audit records for {resource_type} {resource_id} retrieved successfully",
-            data=entries,
-            total=total,
-            offset=offset,
-            limit=limit,
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to retrieve resource audit records: {str(e)}",
-        )
-
-
-@audit_router.get(
     "/summary",
     response_model=AuditSummaryResponse,
     summary="Get audit summary",
     description="Retrieve summary statistics for audit records",
 )
-@require_permissions(permissions=[PermissionEnum.USER_MANAGE])
 async def get_audit_summary(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
@@ -293,19 +169,27 @@ async def get_audit_summary(
 ):
     """Get summary statistics for audit records.
 
-    This endpoint requires admin access and returns aggregated statistics about audit records.
+    For CLIENT users, only their own audit records are included in the summary.
+    For ADMIN users, all audit records are included in the summary.
     """
     try:
         service = AuditService(session)
+
+        # For CLIENT users, filter by their user_id
+        from budapp.commons.constants import UserTypeEnum
+
+        user_id = None
+        if current_user.user_type == UserTypeEnum.CLIENT.value:
+            user_id = current_user.id
 
         # Get audit summary
         summary = service.get_audit_summary(
             start_date=start_date,
             end_date=end_date,
+            user_id=user_id,
         )
 
         return AuditSummaryResponse(
-            success=True,
             message="Audit summary retrieved successfully",
             data=summary,
         )

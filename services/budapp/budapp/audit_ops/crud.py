@@ -193,18 +193,22 @@ class AuditTrailDataManager(DataManagerUtils):
         self,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
+        user_id: Optional[UUID] = None,
     ) -> dict:
         """Get summary statistics for audit records.
 
         Args:
             start_date: Start date for filtering (optional)
             end_date: End date for filtering (optional)
+            user_id: User ID for filtering (optional, for CLIENT users)
 
         Returns:
             Dictionary containing summary statistics
         """
         conditions = []
 
+        if user_id:
+            conditions.append(AuditTrail.user_id == user_id)
         if start_date:
             conditions.append(AuditTrail.timestamp >= start_date)
         if end_date:
