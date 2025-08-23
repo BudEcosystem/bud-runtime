@@ -212,17 +212,20 @@ class BillingService(DataManagerUtils):
         elif usage.get("is_suspended"):
             status = UsageLimitStatus.ACCOUNT_SUSPENDED
             reason = usage.get("suspension_reason", "Account suspended")
-        elif usage["usage"]["tokens_quota"] and usage["usage"]["tokens_used"] >= usage["usage"]["tokens_quota"]:
+        elif (
+            usage["usage"]["tokens_quota"] is not None
+            and usage["usage"]["tokens_used"] >= usage["usage"]["tokens_quota"]
+        ):
             status = UsageLimitStatus.TOKEN_LIMIT_EXCEEDED
             reason = "Monthly token quota exceeded"
-        elif usage["usage"]["cost_quota"] and usage["usage"]["cost_used"] >= usage["usage"]["cost_quota"]:
+        elif usage["usage"]["cost_quota"] is not None and usage["usage"]["cost_used"] >= usage["usage"]["cost_quota"]:
             status = UsageLimitStatus.COST_LIMIT_EXCEEDED
             reason = "Monthly cost quota exceeded"
         else:
             # Calculate remaining quotas
-            if usage["usage"]["tokens_quota"]:
+            if usage["usage"]["tokens_quota"] is not None:
                 remaining_tokens = usage["usage"]["tokens_quota"] - usage["usage"]["tokens_used"]
-            if usage["usage"]["cost_quota"]:
+            if usage["usage"]["cost_quota"] is not None:
                 remaining_cost = usage["usage"]["cost_quota"] - usage["usage"]["cost_used"]
 
         # Get billing period end for reset time
@@ -492,10 +495,13 @@ class BillingService(DataManagerUtils):
             if cached_billing.get("is_suspended"):
                 status = UsageLimitStatus.ACCOUNT_SUSPENDED
                 reason = "Account suspended"
-            elif cached_billing.get("token_quota") and counters["tokens_today"] >= cached_billing["token_quota"]:
+            elif (
+                cached_billing.get("token_quota") is not None
+                and counters["tokens_today"] >= cached_billing["token_quota"]
+            ):
                 status = UsageLimitStatus.TOKEN_LIMIT_EXCEEDED
                 reason = "Daily token quota exceeded"
-            elif cached_billing.get("cost_quota"):
+            elif cached_billing.get("cost_quota") is not None:
                 cost_today = counters["cost_today_cents"] / 100.0
                 if cost_today >= cached_billing["cost_quota"]:
                     status = UsageLimitStatus.COST_LIMIT_EXCEEDED
@@ -506,9 +512,9 @@ class BillingService(DataManagerUtils):
         remaining_cost = None
 
         if cached_billing and status == UsageLimitStatus.ALLOWED:
-            if cached_billing.get("token_quota"):
+            if cached_billing.get("token_quota") is not None:
                 remaining_tokens = cached_billing["token_quota"] - counters["tokens_today"]
-            if cached_billing.get("cost_quota"):
+            if cached_billing.get("cost_quota") is not None:
                 remaining_cost = cached_billing["cost_quota"] - (counters["cost_today_cents"] / 100.0)
 
         reset_at = datetime.fromisoformat(cached_billing["billing_period_end"]) if cached_billing else None
