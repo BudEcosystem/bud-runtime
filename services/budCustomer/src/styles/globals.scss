@@ -753,6 +753,79 @@ input.ant-input:-webkit-autofill {
   }
 }
 
+// Custom select styles
+.custom-select-two {
+  .ant-select-multiple.ant-select-lg .ant-select-selector {
+    align-items: start;
+  }
+
+  .ant-select {
+    border: 0.5px solid #757575 !important;
+    border-radius: 6px !important;
+
+    :hover {
+      .ant-select-selector {
+        border: 0.5px solid #EEEEEE !important;
+      }
+    }
+
+    :active {
+      .ant-select-selector {
+        border: 0.5px solid #EEEEEE !important;
+      }
+    }
+  }
+
+  .ant-select-selector {
+    background: transparent !important;
+    font-size: .75rem !important;
+    font-weight: 400 !important;
+    color: #EEEEEE !important;
+    border: transparent !important;
+    padding-top: 0.65rem !important;
+    padding-bottom: 0.45rem !important;
+    padding-left: 0.75rem !important;
+    min-height: 2.5rem !important;
+    height: auto !important;
+    display: flex !important;
+    align-items: center !important;
+  }
+
+  .ant-select-single .ant-select-selector {
+    height: 2.5rem !important;
+
+    .ant-select-selection-search {
+      display: flex !important;
+      align-items: center !important;
+      height: 100% !important;
+    }
+
+    .ant-select-selection-item,
+    .ant-select-selection-placeholder {
+      display: flex !important;
+      align-items: center !important;
+      height: 100% !important;
+      padding-top: 0 !important;
+      padding-bottom: 0 !important;
+    }
+  }
+
+  .ant-select-selection-item {
+    color: #EEEEEE !important;
+    font-weight: 300 !important;
+  }
+
+  .ant-select-selection-placeholder {
+    color: #808080 !important;
+    font-weight: 300 !important;
+  }
+
+  .ant-select-arrow {
+    color: #757575 !important;
+    right: 0.75rem !important;
+  }
+}
+
 // Chart card styles
 .cardSetTwo {
   height: 425px;
