@@ -127,7 +127,7 @@ const BudIsland: React.FC = () => {
     const totalSteps = recentlyMinimized?.step?.progress?.length;
     const currentStep = recentlyMinimized?.step?.progress?.findIndex((step) => step?.status === FormProgressStatus.inProgress) + 1;
 
-    let title = "Task Island";
+    let title = "Notifications";
     let statusRender = <></>
 
     if (lastNotification && inAppNotifications?.[0]) {
@@ -146,7 +146,7 @@ const BudIsland: React.FC = () => {
     } else if (inAppNotifications && inAppNotifications?.length > 0) {
         title = `${inAppNotifications.length} Notifications`;
     } else {
-        title = "Task Island";
+        title = "Notifications";
     }
 
     // if (inProgressSteps?.includes(recentlyMinimized?.id)) {
@@ -230,7 +230,7 @@ const BudIsland: React.FC = () => {
                 </div>
                 <div className="flex flex-row items-center justify-between w-full">
                     <Tooltip title={title} color="#161616" placement="topLeft">
-                        <Text_10_400_B3B3B3 className="pl-[1rem] text-nowrap max-w-[70%] overflow-hidden overflow-ellipsis">
+                        <Text_10_400_B3B3B3 className="pl-[1rem] text-sm text-nowrap max-w-[70%] overflow-hidden overflow-ellipsis">
                             {title}
                         </Text_10_400_B3B3B3>
                     </Tooltip>

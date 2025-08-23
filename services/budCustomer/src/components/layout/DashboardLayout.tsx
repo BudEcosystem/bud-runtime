@@ -224,7 +224,7 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
           {/* Notifications */}
         <BudIsland />
 
-            <div className="bg-bud-bg-secondary rounded-lg p-3 mb-1 cursor-pointer hover:bg-bud-bg-tertiary transition-colors">
+            <div className="bg-bud-bg-secondary rounded-lg p-3 mb-1 cursor-pointer hover:bg-bud-bg-tertiary transition-colors hidden">
               <Badge
                 count={88}
                 offset={isCollapsed ? [0, -10] : [50, -10]}
