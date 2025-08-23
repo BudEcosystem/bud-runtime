@@ -235,18 +235,15 @@ class TestAuditTrailCRUD:
 
     def test_get_audit_records_with_filters(self, data_manager, mock_session):
         """Test getting audit records with various filters."""
-        # Mock query chain
-        mock_query = Mock()
-        mock_query.join = Mock(return_value=mock_query)
-        mock_query.outerjoin = Mock(return_value=mock_query)
-        mock_query.filter = Mock(return_value=mock_query)
-        mock_query.order_by = Mock(return_value=mock_query)
-        mock_query.offset = Mock(return_value=mock_query)
-        mock_query.limit = Mock(return_value=mock_query)
-        mock_query.all = Mock(return_value=[])
-        mock_query.count = Mock(return_value=0)
+        # Mock the methods that DataManagerUtils provides
+        # The new implementation uses select() statements, not session.query()
 
-        mock_session.query = Mock(return_value=mock_query)
+        # Mock execute_scalar for count query
+        data_manager.execute_scalar = Mock(return_value=5)
+
+        # Mock scalars_all for main query
+        mock_records = []
+        data_manager.scalars_all = Mock(return_value=mock_records)
 
         # Test with various filters
         user_id = uuid4()
@@ -267,13 +264,13 @@ class TestAuditTrailCRUD:
             limit=20,
         )
 
-        # Verify query was called
-        mock_session.query.assert_called()
-        mock_query.filter.assert_called()
+        # Verify the methods were called
+        data_manager.execute_scalar.assert_called_once()
+        data_manager.scalars_all.assert_called_once()
 
         # Verify results
         assert records == []
-        assert total == 0
+        assert total == 5  # The mocked count
 
     def test_get_audit_record_by_id(self, data_manager, mock_session):
         """Test getting a single audit record by ID."""
@@ -282,20 +279,15 @@ class TestAuditTrailCRUD:
         mock_record = Mock(spec=AuditTrail)
         mock_record.id = audit_id
 
-        # Mock query chain
-        mock_query = Mock()
-        mock_query.outerjoin = Mock(return_value=mock_query)
-        mock_query.filter = Mock(return_value=mock_query)
-        mock_query.first = Mock(return_value=mock_record)
-
-        mock_session.query = Mock(return_value=mock_query)
+        # Mock scalar_one_or_none method from DataManagerUtils
+        data_manager.scalar_one_or_none = Mock(return_value=mock_record)
 
         # Get the record
         result = data_manager.get_audit_record_by_id(audit_id)
 
         # Verify
         assert result == mock_record
-        mock_query.filter.assert_called()
+        data_manager.scalar_one_or_none.assert_called_once()
 
 
 class TestAuditService:
@@ -557,39 +549,47 @@ class TestIntegration:
         mock_session = Mock(spec=Session)
         data_manager = AuditTrailDataManager(mock_session)
 
-        # Mock query chain
-        mock_query = Mock()
-        mock_query.join = Mock(return_value=mock_query)
-        mock_query.outerjoin = Mock(return_value=mock_query)
-        mock_query.filter = Mock(return_value=mock_query)
-        mock_query.order_by = Mock(return_value=mock_query)
-        mock_query.offset = Mock(return_value=mock_query)
-        mock_query.limit = Mock(return_value=mock_query)
-        mock_query.all = Mock(return_value=[])
-        mock_query.count = Mock(return_value=0)
-
-        mock_session.query = Mock(return_value=mock_query)
+        # Mock the methods from DataManagerUtils
+        data_manager.execute_scalar = Mock(return_value=10)
+        data_manager.scalars_all = Mock(return_value=[])
 
         # Test 1: Filter by user only
-        data_manager.get_audit_records(user_id=uuid4())
-        assert mock_query.filter.called
+        records, total = data_manager.get_audit_records(user_id=uuid4())
+        assert data_manager.execute_scalar.called
+        assert data_manager.scalars_all.called
+        assert total == 10
+        assert records == []
+
+        # Reset mocks
+        data_manager.execute_scalar.reset_mock()
+        data_manager.scalars_all.reset_mock()
 
         # Test 2: Filter by resource
-        data_manager.get_audit_records(
+        records, total = data_manager.get_audit_records(
             resource_type=AuditResourceTypeEnum.CLUSTER,
             resource_id=uuid4()
         )
-        assert mock_query.filter.called
+        assert data_manager.execute_scalar.called
+        assert data_manager.scalars_all.called
+
+        # Reset mocks
+        data_manager.execute_scalar.reset_mock()
+        data_manager.scalars_all.reset_mock()
 
         # Test 3: Filter by date range
-        data_manager.get_audit_records(
+        records, total = data_manager.get_audit_records(
             start_date=datetime.now(timezone.utc) - timedelta(days=7),
             end_date=datetime.now(timezone.utc)
         )
-        assert mock_query.filter.called
+        assert data_manager.execute_scalar.called
+        assert data_manager.scalars_all.called
+
+        # Reset mocks
+        data_manager.execute_scalar.reset_mock()
+        data_manager.scalars_all.reset_mock()
 
         # Test 4: All filters combined
-        data_manager.get_audit_records(
+        records, total = data_manager.get_audit_records(
             user_id=uuid4(),
             actioned_by=uuid4(),
             action=AuditActionEnum.UPDATE,
@@ -601,9 +601,10 @@ class TestIntegration:
             offset=10,
             limit=50,
         )
-        assert mock_query.filter.called
-        assert mock_query.offset.called
-        assert mock_query.limit.called
+        assert data_manager.execute_scalar.called
+        assert data_manager.scalars_all.called
+        assert total == 10
+        assert records == []
 
 
 if __name__ == "__main__":
