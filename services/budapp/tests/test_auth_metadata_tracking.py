@@ -89,6 +89,7 @@ async def test_update_proxy_cache_with_metadata_all_keys():
         mock_credential.id = uuid.uuid4()
         mock_credential.user_id = uuid.uuid4()
         mock_credential.key = f"api-key-{i}"
+        mock_credential.encrypted_key = "48656c6c6f20576f726c64"  # Hex encoded string
         mock_credential.expiry = datetime.now() + timedelta(days=30)
         credentials.append(mock_credential)
 
@@ -109,8 +110,16 @@ async def test_update_proxy_cache_with_metadata_all_keys():
                     mock_redis.return_value = mock_redis_instance
                     mock_redis_instance.set = AsyncMock()
 
-                    # Call the method without specific API key
-                    await service.update_proxy_cache(project_id)
+                    # Mock RSAHandler to avoid encryption/decryption
+                    with patch('budapp.credential_ops.services.RSAHandler') as mock_rsa:
+                        mock_rsa_instance = MagicMock()
+                        mock_rsa.return_value = mock_rsa_instance
+                        # Make decrypt return the mocked key for each credential
+                        decrypted_keys = [f"api-key-{i}" for i in range(len(credentials))]
+                        mock_rsa_instance.decrypt = AsyncMock(side_effect=decrypted_keys)
+
+                        # Call the method without specific API key
+                        await service.update_proxy_cache(project_id)
 
                     # Verify Redis was called for each credential
                     assert mock_redis_instance.set.call_count == len(credentials)

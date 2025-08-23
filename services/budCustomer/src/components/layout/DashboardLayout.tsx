@@ -18,6 +18,7 @@ import { useShortCut } from "@/hooks/useShortCut";
 import ThemeSwitcher from "@/components/ui/ThemeSwitcher";
 import { useTheme } from "@/context/themeContext";
 import { useUser } from "@/stores/useUser";
+import BudIsland from "@/components/island/BudIsland";
 
 const { Text } = Typography;
 
@@ -202,6 +203,7 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
           )} */}
 
           {/* Notifications */}
+        <BudIsland />
 
             <div className="bg-bud-bg-secondary rounded-lg p-3 mb-1 cursor-pointer hover:bg-bud-bg-tertiary transition-colors">
               <Badge

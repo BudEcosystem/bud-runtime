@@ -3876,7 +3876,7 @@ class ModelCatalogService(SessionMixin):
         # Transform results to catalog items
         catalog_items = []
         for row in results:
-            model, endpoint, input_cost, output_cost, currency, per_tokens = row
+            model, endpoint, input_cost, output_cost, currency, per_tokens, provider_icon = row
 
             # Build capabilities from strengths and tags
             capabilities = []
@@ -3929,6 +3929,9 @@ class ModelCatalogService(SessionMixin):
                 "author": model.author,
                 "model_size": model.model_size,
                 "provider_type": provider_type_value,
+                "uri": model.uri,
+                "source": model.source,
+                "provider_icon": provider_icon if provider_icon else model.icon,
                 "published_date": endpoint.published_date.isoformat() if endpoint.published_date else None,
                 "endpoint_id": str(endpoint.id),
                 "supported_endpoints": supported_endpoints_values,
@@ -3985,7 +3988,7 @@ class ModelCatalogService(SessionMixin):
                 message=f"Published model not found for endpoint {endpoint_id}",
             )
 
-        model, endpoint, input_cost, output_cost, currency, per_tokens = result
+        model, endpoint, input_cost, output_cost, currency, per_tokens, provider_icon = result
 
         # Build capabilities
         capabilities = []
@@ -4037,6 +4040,9 @@ class ModelCatalogService(SessionMixin):
             "author": model.author,
             "model_size": model.model_size,
             "provider_type": provider_type_value,
+            "uri": model.uri,
+            "source": model.source,
+            "provider_icon": provider_icon if provider_icon else model.icon,
             "published_date": endpoint.published_date.isoformat() if endpoint.published_date else None,
             "endpoint_id": str(endpoint.id),
             "supported_endpoints": supported_endpoints_values,
@@ -4084,7 +4090,7 @@ class ModelCatalogService(SessionMixin):
                 message=f"Published model not found for endpoint {endpoint_id}",
             )
 
-        model, endpoint, input_cost, output_cost, currency, per_tokens = result
+        model, endpoint, input_cost, output_cost, currency, per_tokens, provider_icon = result
 
         # Get base model relation count
         model_tree_count = await ModelDataManager(self.session).get_model_tree_count(model.uri)

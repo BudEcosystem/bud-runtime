@@ -42,20 +42,16 @@ from .models import Credential as CredentialModel
 from .models import ProprietaryCredential as ProprietaryCredentialModel
 from .schemas import (
     BudCredentialCreate,
-    CacheConfig,
     CloudProvidersCreateRequest,
     CredentialDetails,
     CredentialRequest,
     CredentialResponse,
     CredentialUpdate,
-    ModelConfig,
     ProprietaryCredentialDetailedView,
     ProprietaryCredentialRequest,
     ProprietaryCredentialResponse,
     ProprietaryCredentialResponseList,
     ProprietaryCredentialUpdate,
-    RouterConfig,
-    RoutingPolicy,
 )
 
 
@@ -94,16 +90,21 @@ class CredentialService(SessionMixin):
         # Add or generate credential
         db_credential = await self.add_or_generate_credential(credential, current_user_id)
 
-        await self.update_proxy_cache(db_credential.project_id, db_credential.key, db_credential.expiry)
+        # Decrypt the key for cache update
+        decrypted_key = await RSAHandler().decrypt(db_credential.encrypted_key)
+        await self.update_proxy_cache(db_credential.project_id, decrypted_key, db_credential.expiry)
 
+        # Use the encrypted key directly
         credential_response = CredentialResponse(
             name=db_credential.name,
             project_id=db_credential.project_id,
-            key=await RSAHandler().encrypt(db_credential.key),
+            key=db_credential.encrypted_key,  # Already encrypted
             expiry=db_credential.expiry,
             max_budget=db_credential.max_budget,
             model_budgets=db_credential.model_budgets,
             id=db_credential.id,
+            created_at=db_credential.created_at,
+            last_used_at=db_credential.last_used_at,
             credential_type=db_credential.credential_type,
             ip_whitelist=db_credential.ip_whitelist,
         )
@@ -159,12 +160,16 @@ class CredentialService(SessionMixin):
         api_key = generate_secure_api_key(credential_type.value)
 
         expiry = datetime.now(UTC) + timedelta(days=request.expiry) if request.expiry else None
+
+        # Encrypt the API key for storage
+        encrypted_api_key = await RSAHandler().encrypt(api_key)
+
         credential_data = BudCredentialCreate(
             name=request.name,
             user_id=user_id,
             project_id=request.project_id,
             expiry=expiry,
-            key=api_key,
+            encrypted_key=encrypted_api_key,
             max_budget=request.max_budget,
             model_budgets=request.model_budgets,
             credential_type=credential_type,
@@ -173,7 +178,7 @@ class CredentialService(SessionMixin):
 
         # Insert credential in to database
         credential_model = CredentialModel(**credential_data.model_dump())
-        credential_model.hashed_key = CredentialModel.set_hashed_key(credential_model.key)
+        credential_model.hashed_key = CredentialModel.set_hashed_key(api_key)
         db_credential = await CredentialDataManager(self.session).create_credential(credential_model)
         logger.info(f"Credential inserted to database: {db_credential.id}")
 
@@ -201,18 +206,22 @@ class CredentialService(SessionMixin):
                 filters={"project_id": project_id}
             )
             for credential in db_credentials:
+                # Decrypt API key from encrypted storage
+                decrypted_key = await RSAHandler().decrypt(credential.encrypted_key)
+
                 keys_to_update.append(
                     {
-                        "api_key": credential.key,
+                        "api_key": decrypted_key,
                         "expiry": credential.expiry,
                         "credential_id": credential.id,
                         "user_id": credential.user_id,  # Using existing user_id field
                     }
                 )
         else:
-            # Fetch credential details for single key update
+            # Fetch credential details for single key update using hashed key
+            hashed_key = CredentialModel.set_hashed_key(api_key)
             credential = await CredentialDataManager(self.session).retrieve_credential_by_fields(
-                {"key": api_key, "project_id": project_id}, missing_ok=True
+                {"hashed_key": hashed_key, "project_id": project_id}, missing_ok=True
             )
             keys_to_update.append(
                 {
@@ -289,10 +298,6 @@ class CredentialService(SessionMixin):
         )
         return await self.parse_credentials(db_credentials), count
 
-    async def retrieve_credential_details(self, api_key: str) -> CredentialModel:
-        db_credential = await CredentialDataManager(self.session).retrieve_credential_by_fields({"key": api_key})
-        return db_credential
-
     async def parse_credentials(
         self,
         db_credentials: List[CredentialModel],
@@ -304,15 +309,19 @@ class CredentialService(SessionMixin):
         for db_credential in db_credentials:
             if db_credential.project and db_credential.project.benchmark:
                 continue
+            # Use encrypted key directly
+            encrypted_key = db_credential.encrypted_key
+
             bud_serve_credentials.append(
                 CredentialDetails(
                     name=db_credential.name,
                     project=db_credential.project,
-                    key=await RSAHandler().encrypt(db_credential.key),
+                    key=encrypted_key,  # Already encrypted
                     expiry=db_credential.expiry,
                     max_budget=db_credential.max_budget,
                     model_budgets=db_credential.model_budgets,
                     id=db_credential.id,
+                    created_at=db_credential.created_at,
                     last_used_at=db_credential.last_used_at,
                     credential_type=db_credential.credential_type,
                     ip_whitelist=db_credential.ip_whitelist,
@@ -342,7 +351,9 @@ class CredentialService(SessionMixin):
         #     await ProjectService(self.session).check_project_membership(project_id, user_id)
 
         # delete proxy cache related to this credential
-        api_key = db_credential.key
+        # Decrypt API key from encrypted storage
+        api_key = await RSAHandler().decrypt(db_credential.encrypted_key)
+
         redis_service = RedisService()
         await redis_service.delete_keys_by_pattern(f"api_key:{api_key}*")
         # Delete the credential from the database
@@ -504,272 +515,6 @@ class CredentialService(SessionMixin):
         except Exception as e:
             logger.error(f"Error validating credential: {e}")
             return False
-
-    # @cache(
-    #     key_func=lambda s, api_key, endpoint_name: f"router_config:{api_key}:{endpoint_name}",
-    #     ttl=3600,
-    #     serializer=lambda x: x.model_dump_json(),
-    #     deserializer=lambda x: RouterConfig.model_validate_json(x),
-    # )
-    async def get_router_config(
-        self, api_key: Optional[str], endpoint_name: str, current_user_id: Optional[UUID], project_id: Optional[UUID]
-    ) -> RouterConfig:
-        router_config = None
-        db_project = None
-
-        # Project can be identified by either api_key or current_user_id and project_id
-        if api_key:
-            db_credential = await self.retrieve_credential_details(api_key)
-            db_project = db_credential.project
-        elif current_user_id and project_id:
-            db_project = await ProjectDataManager(self.session).retrieve_by_fields(
-                ProjectModel, {"id": project_id, "status": ProjectStatusEnum.ACTIVE}
-            )
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Api-key or User accessible project id required.",
-            )
-
-        endpoints = db_project.endpoints
-        db_endpoint = None
-        adapters, _ = await AdapterDataManager(self.session).get_all_adapters_in_project(db_project.id)
-        logger.info("adapters: %s", adapters)
-        db_router = None
-        db_adapter = None
-        for endpoint in endpoints:
-            if endpoint.name == endpoint_name and endpoint.status == EndpointStatusEnum.RUNNING.value:
-                db_endpoint = endpoint
-                break
-        if not db_endpoint and adapters:
-            for adapter in adapters:
-                if adapter.name == endpoint_name:
-                    db_adapter = adapter
-                    break
-        if not db_endpoint and not db_adapter:
-            for router in db_project.routers:
-                if router.name == endpoint_name:
-                    db_router = router
-                    break
-        if not db_endpoint and not db_adapter and not db_router:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Endpoint or Route not found")
-
-        if db_router:
-            router_config = await self.generate_route_config_from_router(db_router)
-        elif db_adapter:
-            db_model = db_adapter.model
-            router_config = await self.generate_route_config_from_adapter(db_adapter, db_model)
-        else:
-            db_model = db_endpoint.model
-            router_config = await self.generate_route_config_from_endpoint(db_endpoint, db_model)
-
-        return router_config
-
-    async def generate_route_config_from_endpoint(self, db_endpoint: EndpointModel, db_model: Model) -> RouterConfig:
-        db_project = db_endpoint.project
-        db_model = db_endpoint.model
-        # For cloud model, the model name is the endpoint name
-        # because cloud model deployment is done using endpoint name and proprietary credentials
-        # For other models, the model name is the uri
-        # because central litellm proxy uses openai client to forward request to actual bud runtime deployment
-        # which accepts model uri as model parameter
-        actual_model_name = f"openai/{db_endpoint.name}"
-        api_base = db_endpoint.url
-        if db_model.provider_type != ModelProviderTypeEnum.CLOUD_MODEL:
-            api_base = f"{db_endpoint.url}/v1"
-            deploy_model_uri = f"{db_endpoint.namespace}"
-            actual_model_name = f"openai/{deploy_model_uri}"
-        else:
-            model_uri = db_model.uri
-            model_source = db_model.source
-            if model_uri.startswith(f"{model_source}/"):
-                model_uri = model_uri.removeprefix(f"{model_source}/")
-            deploy_model_uri = f"{model_source}/{model_uri}"
-            actual_model_name = f"openai/{db_endpoint.namespace}"
-
-        model_config = ModelConfig(
-            model_name=db_endpoint.namespace,
-            litellm_params={
-                "model": actual_model_name,
-                "api_base": api_base,
-                "api_key": app_settings.litellm_proxy_master_key,
-            },
-            model_info={
-                "id": db_model.id,
-                "metadata": {
-                    "name": db_model.name,
-                    "provider": db_model.provider.name,
-                    "modality": [modality.value for modality in db_model.modality],
-                    "endpoint_id": db_endpoint.id,
-                    "cloud": db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL,
-                    "deploy_model_uri": deploy_model_uri,
-                },
-            },
-            input_cost_per_token=None,
-            output_cost_per_token=None,
-            tpm=None,
-            rpm=None,
-            complexity_threshold=None,
-            weight=None,
-            cool_down_period=None,
-            fallback_endpoint_ids=None,
-        )
-
-        router_config = RouterConfig(
-            project_id=db_project.id,
-            project_name=db_project.name,
-            endpoint_name=db_endpoint.name,
-            routing_policy=None,
-            cache_configuration=CacheConfig(**json.loads(db_endpoint.cache_config))
-            if db_endpoint.cache_enabled
-            else None,
-            model_configuration=[model_config],
-        )
-
-        return router_config
-
-    async def generate_route_config_from_adapter(self, db_adapter, db_model) -> RouterConfig:
-        """Generate a RouterConfig from the given adapter and model.
-
-        Args:
-            db_adapter: The database adapter instance.
-            db_model: The database model instance.
-
-        Returns:
-            RouterConfig: The generated router configuration.
-        """
-        db_endpoint = db_adapter.endpoint
-        db_model = db_adapter.model
-
-        actual_model_name = f"openai/{db_adapter.name}"
-
-        api_base = f"{db_endpoint.url}/v1"
-        deploy_model_uri = f"{db_adapter.deployment_name}"
-        actual_model_name = f"openai/{deploy_model_uri}"
-
-        model_config = ModelConfig(
-            model_name=db_adapter.deployment_name,
-            litellm_params={
-                "model": actual_model_name,
-                "api_base": api_base,
-                "api_key": app_settings.litellm_proxy_master_key,
-            },
-            model_info={
-                "id": db_model.id,
-                "metadata": {
-                    "name": db_model.name,
-                    "provider": db_model.provider.name,
-                    "modality": [modality.value for modality in db_model.modality],
-                    "endpoint_id": db_endpoint.id,
-                    "adapter_id": db_adapter.id,
-                    "cloud": db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL,
-                    "deploy_model_uri": deploy_model_uri,
-                },
-            },
-            input_cost_per_token=None,
-            output_cost_per_token=None,
-            tpm=None,
-            rpm=None,
-            complexity_threshold=None,
-            weight=None,
-            cool_down_period=None,
-            fallback_endpoint_ids=None,
-        )
-
-        router_config = RouterConfig(
-            project_id=db_endpoint.project_id,
-            project_name=db_endpoint.project.name,
-            endpoint_name=db_adapter.name,
-            routing_policy=None,
-            cache_configuration=CacheConfig(**json.loads(db_endpoint.cache_config))
-            if db_endpoint.cache_enabled
-            else None,
-            model_configuration=[model_config],
-        )
-
-        return router_config
-
-    async def generate_route_config_from_router(self, db_router) -> RouterConfig:
-        db_project = db_router.project
-        model_configs = []
-
-        for db_router_endpoint in db_router.endpoints:
-            db_endpoint = db_router_endpoint.endpoint
-            db_model = db_endpoint.model
-            actual_model_name = f"openai/{db_endpoint.name}"
-            api_base = db_endpoint.url
-            if db_model.provider_type != ModelProviderTypeEnum.CLOUD_MODEL:
-                api_base = f"{db_endpoint.url}/v1"
-                deploy_model_uri = f"{app_settings.add_model_dir}/{db_model.local_path}"
-                actual_model_name = f"openai/{deploy_model_uri}"
-            else:
-                model_uri = db_model.uri
-                model_source = db_model.source
-                if model_uri.startswith(f"{model_source}/"):
-                    model_uri = model_uri.removeprefix(f"{model_source}/")
-                deploy_model_uri = f"{model_source}/{model_uri}"
-
-            # TODO: Take fallback endpoint ids from router
-            model_configs.append(
-                ModelConfig(
-                    model_name=db_endpoint.name,
-                    litellm_params={
-                        "model": actual_model_name,
-                        "api_base": api_base,
-                        "api_key": app_settings.litellm_proxy_master_key,
-                    },
-                    model_info={
-                        "id": db_model.id,
-                        "metadata": {
-                            "name": db_model.name,
-                            "provider": db_model.provider.name,
-                            "modality": [modality.value for modality in db_model.modality],
-                            "endpoint_id": db_endpoint.id,
-                            "cloud": db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL,
-                            "deploy_model_uri": deploy_model_uri,
-                        },
-                        # "sequence_length": 4096,
-                        "tasks": db_model.tasks,
-                        "domains": db_model.tags,
-                        "languages": db_model.languages,
-                        "use_cases": db_model.use_cases,
-                        "evals": {},
-                    },
-                    input_cost_per_token=None,
-                    output_cost_per_token=None,
-                    tpm=db_router_endpoint.tpm,
-                    rpm=db_router_endpoint.rpm,
-                    complexity_threshold=None,
-                    weight=db_router_endpoint.weight,
-                    cool_down_period=db_router_endpoint.cool_down_period,
-                    fallback_endpoint_ids=db_router_endpoint.fallback_endpoint_ids,
-                )
-            )
-
-        router_config = RouterConfig(
-            project_id=db_project.id,
-            project_name=db_project.name,
-            endpoint_name=db_router.name,
-            routing_policy=RoutingPolicy(
-                name=db_router.name,
-                strategies=db_router.routing_strategy,
-                fallback_policies=[],
-                decision_mode="intersection",
-            ),
-            cache_configuration=None,  # TODO: add cache configuration per endpoint
-            model_configuration=model_configs,
-        )
-
-        return router_config
-
-    @cache(
-        key_func=lambda s, api_key: f"decrypted_key:{api_key}",
-        ttl=3600,
-        serializer=lambda x: x,
-        deserializer=lambda x: x,
-    )
-    async def decrypt_credential(self, api_key: str) -> str:
-        return await RSAHandler().decrypt(api_key)
 
 
 class ProprietaryCredentialService(SessionMixin):
@@ -1095,11 +840,17 @@ class ClusterProviderService(SessionMixin):
                         detail=f"Required field '{field}' is missing in the credential values",
                     )
 
+            # Encrypt credential values before saving
+            encrypted_credential_values = {}
+            for key, value in req.credential_values.items():
+                # Encrypt each credential value
+                encrypted_credential_values[key] = await RSAHandler().encrypt(str(value))
+
             # Save the credential values
             cloud_credential = CloudCredentials(
                 user_id=current_user_id,
                 provider_id=provider_id,
-                credential=req.credential_values,
+                encrypted_credential=encrypted_credential_values,  # Store encrypted version only
                 credential_name=req.credential_name,
             )
             await CloudProviderDataManager(self.session).insert_one(cloud_credential)

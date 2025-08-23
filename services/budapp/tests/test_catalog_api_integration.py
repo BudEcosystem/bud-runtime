@@ -12,7 +12,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from budapp.commons.constants import ModalityEnum, PermissionEnum
-from budapp.endpoint_ops.models import DeploymentPricing, Endpoint as EndpointModel
+from budapp.endpoint_ops.models import DeploymentPricing
+from budapp.endpoint_ops.models import Endpoint as EndpointModel
 from budapp.model_ops.models import Model as ModelModel
 from budapp.model_ops.schemas import ModelCatalogFilter, ModelCatalogItem, ModelCatalogResponse
 from budapp.model_ops.services import ModelCatalogService
@@ -48,6 +49,9 @@ def mock_catalog_items():
             "author": "OpenAI",
             "model_size": 1760,
             "provider_type": "CLOUD",
+            "uri": "openai/gpt-4",
+            "source": "openai",
+            "provider_icon": "openai_icon.png",
             "published_date": datetime.utcnow().isoformat(),
             "endpoint_id": str(uuid4()),
             "supported_endpoints": ["text-generation", "chat-completion"],
@@ -71,6 +75,9 @@ def mock_catalog_items():
             "author": "Anthropic",
             "model_size": 2000,
             "provider_type": "CLOUD",
+            "uri": "anthropic/claude-3",
+            "source": "anthropic",
+            "provider_icon": "anthropic_icon.png",
             "published_date": datetime.utcnow().isoformat(),
             "endpoint_id": str(uuid4()),
             "supported_endpoints": ["text-generation", "chat-completion"],

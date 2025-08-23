@@ -29,5 +29,9 @@ in
     rahulvr = [
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOd5CIRbQBil1OzqCyqWnvgMlNlopFi5v1Pu1X4Ab4wE rahulvramesh@Rahuls-MacBook-Pro-m1.local"
     ];
+
+    adarsh = [
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKlSwGgzpOLbtfk4LB9OMRZ4sXZW6BbradeqoQvaKX/8 adarsh"
+    ];
   };
 }

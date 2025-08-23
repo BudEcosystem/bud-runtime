@@ -522,7 +522,7 @@ class ModelDataManager(DataManagerUtils):
         search_term: Optional[str] = None,
     ) -> Tuple[List[Any], int]:
         """Get published models for catalog with pricing information."""
-        # Base query joining Model, Endpoint, and DeploymentPricing
+        # Base query joining Model, Endpoint, DeploymentPricing, and Provider
         base_query = (
             select(
                 Model,
@@ -531,12 +531,14 @@ class ModelDataManager(DataManagerUtils):
                 DeploymentPricing.output_cost,
                 DeploymentPricing.currency,
                 DeploymentPricing.per_tokens,
+                ProviderModel.icon,
             )
             .join(Endpoint, Endpoint.model_id == Model.id)
             .outerjoin(
                 DeploymentPricing,
                 and_(DeploymentPricing.endpoint_id == Endpoint.id, DeploymentPricing.is_current),
             )
+            .outerjoin(ProviderModel, ProviderModel.id == Model.provider_id)
             .filter(
                 Endpoint.is_published,
                 Endpoint.status != EndpointStatusEnum.DELETED,
@@ -602,12 +604,14 @@ class ModelDataManager(DataManagerUtils):
                 DeploymentPricing.output_cost,
                 DeploymentPricing.currency,
                 DeploymentPricing.per_tokens,
+                ProviderModel.icon,
             )
             .join(Endpoint, Endpoint.model_id == Model.id)
             .outerjoin(
                 DeploymentPricing,
                 and_(DeploymentPricing.endpoint_id == Endpoint.id, DeploymentPricing.is_current),
             )
+            .outerjoin(ProviderModel, ProviderModel.id == Model.provider_id)
             .filter(
                 Endpoint.id == endpoint_id,
                 Endpoint.is_published,

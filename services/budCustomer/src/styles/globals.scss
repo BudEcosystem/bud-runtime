@@ -135,6 +135,608 @@ body {
   }
 }
 
+// Drawer styles
+.visible-drawer {
+  transition: all 0.4s ease-in-out;
+}
+
+.bud-drawer-mask {
+  background: transparent !important;
+}
+
+.drawerRoot {
+  margin: 0 !important;
+  border-radius: 17px;
+  justify-content: space-between;
+  flex-direction: column;
+  overflow: hidden !important;
+
+  .drawerBackground {
+    background-image: url(/images/drawerMask.png);
+    background-repeat: no-repeat;
+    background-size: cover;
+    display: flex;
+    max-width: 100%;
+  }
+
+  .BudWraper {
+    margin-top: -20px;
+  }
+
+  .ant-form {
+    justify-content: space-between;
+    width: 100%;
+
+    .form-layout {
+      height: auto !important;
+      border-radius: 6px;
+      margin: 0 2.6rem !important;
+      margin-bottom: 1.1rem !important;
+      background: rgba(255, 255, 255, 0.027);
+      backdrop-filter: blur(10px) !important;
+      border: 1px solid #1f1f1f !important;
+    }
+  }
+
+  .ant-header-breadcrumb {
+    border-bottom: 1px solid #1f1f1f;
+    padding: 1.3rem 2.45rem 1rem;
+    background: rgba(255, 255, 255, 0.027);
+    backdrop-filter: blur(10px);
+    display: flex;
+  }
+
+  .drawerFooter {
+    background: rgba(255, 255, 255, 0.027);
+    backdrop-filter: blur(10px);
+  }
+}
+
+// Tag styles
+.customTags {
+  &.closableTag {
+    .ant-tag-close-icon {
+      color: inherit;
+      margin-left: 0.5rem;
+    }
+  }
+}
+
+// Select styles for drawer
+.custom-select {
+  .ant-select-selector {
+    background: #161616 !important;
+    border: 1px solid #1F1F1F !important;
+    color: #EEEEEE !important;
+    height: 40px !important;
+    align-items: center;
+
+    &:hover {
+      border-color: #965CDE !important;
+    }
+  }
+
+  &.ant-select-focused .ant-select-selector {
+    border-color: #965CDE !important;
+    box-shadow: none !important;
+  }
+
+  .ant-select-arrow {
+    color: #757575;
+  }
+}
+
+.ant-select-dropdown {
+  background: #1F1F1F !important;
+  border: 1px solid #2A2A2A !important;
+
+  .ant-select-item {
+    color: #B3B3B3 !important;
+
+    &:hover {
+      background: #2A2A2A !important;
+    }
+
+    &.ant-select-item-option-selected {
+      background: rgba(150, 92, 222, 0.2) !important;
+      color: #EEEEEE !important;
+    }
+  }
+}
+
+
+// styles for ant
+
+.custom-form {
+  width: 100%;
+  padding: 20px;
+  border-radius: 10px;
+}
+
+.custom-form-item {
+  margin-bottom: 24px;
+}
+
+.custom-form-item .ant-form-item-label>label {
+  color: #eeeeee !important;
+}
+
+.custom-form-item .ant-input {
+  border-color: #3f8ef7;
+  /* Custom input border color */
+}
+
+.custom-submit-button {
+  background-color: #d45453;
+  color: white;
+  border-radius: 5px;
+  width: 100%;
+}
+
+.custom-submit-button:hover {
+  background-color: #bf3f3f;
+}
+
+.ant-drawer-header {
+  padding: 0px !important;
+}
+
+.ant-drawer-body {
+  padding: 0px !important;
+  display: flex;
+  flex-flow: column;
+}
+
+.ant-drawer-body {
+  // display: none !important;
+  border: 1px solid #1f1f1f;
+  margin: 0 !important;
+  // margin: 0.7rem 0.6rem .7rem 0 !important;
+  border-radius: 17px;
+  justify-content: space-between;
+  flex-direction: column;
+  overflow: hidden !important;
+
+  .drawerBackground {
+    background-image: url(./../../public/images/drawerMask.png);
+    background-repeat: no-repeat;
+    background-size: cover;
+    display: flex;
+    max-width: 100%;
+  }
+
+  .BudWraper {
+    margin-top: -20px;
+    // padding-top: 52px;
+
+  }
+
+  .tagsInput {
+    input {
+      color: white !important;
+    }
+  }
+
+  .custom-search::placeholder {
+    color: #757575;
+    /* Placeholder color */
+    opacity: 1;
+  }
+
+  .custom-search:focus,
+  .custom-search:hover,
+  .custom-search:active {
+    outline: none;
+    box-shadow: none;
+    /* Remove the default outline and shadow */
+  }
+
+  .ant-row {
+    width: 100%;
+  }
+
+  .ant-form {
+    justify-content: space-between;
+    width: 100%;
+
+    // justify-content: flex-start;
+    .form-layout {
+      height: auto !important;
+      border-radius: 6px;
+      margin: 0 2.6rem !important;
+      margin-bottom: 1.1rem !important;
+      // background: #ffffff08;
+      background: rgba(255, 255, 255, 0.027);
+      backdrop-filter: blur(10px) !important;
+      border: 1px solid #1f1f1f !important;
+      // temp
+    }
+  }
+
+  .ant-header-breadcrumb {
+    border-bottom: 1px solid #1f1f1f;
+    padding: 1.3rem 2.45rem 1rem;
+    // background: #ffffff08;
+    background: rgba(255, 255, 255, 0.027);
+    backdrop-filter: blur(10px);
+    display: flex;
+  }
+
+  .ant-breadcrumb-separator {
+    margin-inline: 0;
+    display: flex;
+    align-items: center;
+  }
+
+  .drawerFooter {
+    // background: #ffffff08;
+    background: rgba(255, 255, 255, 0.027);
+    backdrop-filter: blur(10px);
+  }
+
+
+
+  .drawerNameInput {
+    .ant-input-outlined {
+      background: transparent !important;
+      border: none !important;
+      color: white;
+
+      &:focus {
+        border: none !important;
+        box-shadow: none !important;
+      }
+    }
+
+    .ant-input {
+      background: transparent !important;
+      border: none !important;
+      // font-size: 1.125rem !important;
+      font-size: 1rem !important;
+      font-weight: 400 !important;
+      letter-spacing: .03rem !important;
+    }
+
+    #projectName_help {
+      text-indent: 0.5rem;
+    }
+
+    .nameBorder .ant-form-item-control-input {
+      border: 1px solid #757575 !important;
+      border-radius: 6px !important;
+    }
+  }
+
+  .ant-popover {
+    --antd-arrow-background-color: #1f1f1f !important;
+
+    aside {
+      div {
+        &:nth-last-child(1) {
+          border-top: 1px solid #1f1f1f !important;
+        }
+      }
+    }
+  }
+
+  .drawerSelect {
+    &:active {
+      border-color: white !important;
+    }
+
+    input {
+      color: white !important;
+    }
+
+
+    .menuList {
+      background: #161616;
+      backdrop-filter: blur(4px);
+      border: 1px solid #1f1f1f;
+      max-height: 150px;
+      overflow-y: auto;
+    }
+
+    .css-1orarbf-menu {
+      margin-top: 5px !important;
+      border-radius: 6px !important;
+      backdrop-filter: blur(4px);
+      background: #161616 !important;
+      width: 100.4%;
+      margin-left: -.2%;
+
+      >div>div {
+        padding: .5rem;
+        border-radius: 6px !important;
+
+        &:hover {
+          background: #1f1f1f !important;
+        }
+
+        >div {
+          border-radius: 6px !important;
+          text-transform: capitalize;
+        }
+      }
+    }
+  }
+}
+
+.ant-drawer-body {
+  // display: none !important;
+  border: 1px solid #1f1f1f;
+  margin: 0 !important;
+  // margin: 0.7rem 0.6rem .7rem 0 !important;
+  border-radius: 17px;
+  justify-content: space-between;
+  flex-direction: column;
+  overflow: hidden !important;
+
+  .drawerBackground {
+    background-image: url(/images/drawerMask.png);
+    background-repeat: no-repeat;
+    background-size: cover;
+    display: flex;
+    max-width: 100%;
+  }
+
+  .BudWraper {
+    margin-top: -20px;
+    // padding-top: 52px;
+
+  }
+
+  .tagsInput {
+    input {
+      color: white !important;
+    }
+  }
+
+  .custom-search::placeholder {
+    color: #757575;
+    /* Placeholder color */
+    opacity: 1;
+  }
+
+  .custom-search:focus,
+  .custom-search:hover,
+  .custom-search:active {
+    outline: none;
+    box-shadow: none;
+    /* Remove the default outline and shadow */
+  }
+
+  .ant-row {
+    width: 100%;
+  }
+
+  .ant-form {
+    justify-content: space-between;
+    width: 100%;
+
+    // justify-content: flex-start;
+    .form-layout {
+      height: auto !important;
+      border-radius: 6px;
+      margin: 0 2.6rem !important;
+      margin-bottom: 1.1rem !important;
+      // background: #ffffff08;
+      background: rgba(255, 255, 255, 0.027);
+      backdrop-filter: blur(10px) !important;
+      border: 1px solid #1f1f1f !important;
+      // temp
+    }
+  }
+
+  .ant-header-breadcrumb {
+    border-bottom: 1px solid #1f1f1f;
+    padding: 1.3rem 2.45rem 1rem;
+    // background: #ffffff08;
+    background: rgba(255, 255, 255, 0.027);
+    backdrop-filter: blur(10px);
+    display: flex;
+  }
+
+  .ant-breadcrumb-separator {
+    margin-inline: 0;
+    display: flex;
+    align-items: center;
+  }
+
+  .drawerFooter {
+    // background: #ffffff08;
+    background: rgba(255, 255, 255, 0.027);
+    backdrop-filter: blur(10px);
+  }
+
+
+
+  .drawerNameInput {
+    .ant-input-outlined {
+      background: transparent !important;
+      border: none !important;
+      color: white;
+
+      &:focus {
+        border: none !important;
+        box-shadow: none !important;
+      }
+    }
+
+    .ant-input {
+      background: transparent !important;
+      border: none !important;
+      // font-size: 1.125rem !important;
+      font-size: 1rem !important;
+      font-weight: 400 !important;
+      letter-spacing: .03rem !important;
+    }
+
+    #projectName_help {
+      text-indent: 0.5rem;
+    }
+
+    .nameBorder .ant-form-item-control-input {
+      border: 1px solid #757575 !important;
+      border-radius: 6px !important;
+    }
+  }
+
+  .ant-popover {
+    --antd-arrow-background-color: #1f1f1f !important;
+
+    aside {
+      div {
+        &:nth-last-child(1) {
+          border-top: 1px solid #1f1f1f !important;
+        }
+      }
+    }
+  }
+
+  .drawerSelect {
+    &:active {
+      border-color: white !important;
+    }
+
+    input {
+      color: white !important;
+    }
+
+
+    .menuList {
+      background: #161616;
+      backdrop-filter: blur(4px);
+      border: 1px solid #1f1f1f;
+      max-height: 150px;
+      overflow-y: auto;
+    }
+
+    .css-1orarbf-menu {
+      margin-top: 5px !important;
+      border-radius: 6px !important;
+      backdrop-filter: blur(4px);
+      background: #161616 !important;
+      width: 100.4%;
+      margin-left: -.2%;
+
+      >div>div {
+        padding: .5rem;
+        border-radius: 6px !important;
+
+        &:hover {
+          background: #1f1f1f !important;
+        }
+
+        >div {
+          border-radius: 6px !important;
+          text-transform: capitalize;
+        }
+      }
+    }
+  }
+}
+
+.floating-textarea {
+  .float-label {
+    position: relative;
+  }
+
+  .label {
+    top: 0;
+    display: block;
+    font-weight: 300;
+    position: absolute;
+    left: .75rem;
+    // top: -0.5rem;
+    transition: 0.2s ease all;
+    color: white;
+    padding: 0 0.025rem;
+    font-size: .75rem;
+    z-index: 1111;
+  }
+
+  .ant-input {
+    padding: 1.3rem 1rem;
+    background: transparent !important;
+    font-size: 0.75rem;
+    border: 0px solid #757575 !important;
+  }
+
+  .ant-input::placeholder {
+    color: #808080;
+  }
+}
+
+.ant-input,
+.ant-input-outlined {
+  background: transparent !important;
+  // background: black !important;
+  border: 0.5px solid #757575 !important;
+  color: white;
+  border-radius: 6px !important;
+
+  &.drawerInp {
+    background: transparent !important;
+
+    &::placeholder {
+      color: #808080 !important;
+      font-weight: 300 !important;
+    }
+  }
+
+  &:focus {
+    border: 0.5px solid #EEEEEE !important;
+  }
+}
+
+.ant-input::placeholder {
+  color: #808080;
+  font-size: .75rem;
+}
+
+.ant-select-selection-placeholder {
+  color: #808080 !important;
+  font-weight: 300 !important;
+}
+
+
+.ant-input-affix-wrapper>input.ant-input {
+  background: transparent !important;
+  // background: black !important;
+  border: none !important;
+  color: white;
+}
+
+.ant-input-affix-wrapper>input.ant-input {
+  background: transparent !important;
+}
+
+.ant-input-affix-wrapper>input.ant-input::placeholder {
+  color: #808080;
+  font-weight: 300 !important;
+  text-indent: .5rem;
+  font-size: .75rem;
+}
+
+.ant-input-affix-wrapper>textarea.ant-input::placeholder {
+  color: #808080;
+  font-weight: 300 !important;
+  font-size: .75rem;
+}
+
+input.ant-input:-webkit-autofill {
+  background-color: transparent !important;
+  color: inherit !important;
+  box-shadow: 0 0 0px 1000px transparent inset !important;
+}
+
+.ant-select-single.ant-select-lg {
+  // min-height: 44px;
+  min-height: 2.5rem;
+  // min-height: 55px;
+}
+
 // Utility classes
 @layer utilities {
   .text-balance {
@@ -148,6 +750,79 @@ body {
 
   .no-scrollbar::-webkit-scrollbar {
     display: none; /* Chrome, Safari and Opera */
+  }
+}
+
+// Custom select styles
+.custom-select-two {
+  .ant-select-multiple.ant-select-lg .ant-select-selector {
+    align-items: start;
+  }
+
+  .ant-select {
+    border: 0.5px solid #757575 !important;
+    border-radius: 6px !important;
+
+    :hover {
+      .ant-select-selector {
+        border: 0.5px solid #EEEEEE !important;
+      }
+    }
+
+    :active {
+      .ant-select-selector {
+        border: 0.5px solid #EEEEEE !important;
+      }
+    }
+  }
+
+  .ant-select-selector {
+    background: transparent !important;
+    font-size: .75rem !important;
+    font-weight: 400 !important;
+    color: #EEEEEE !important;
+    border: transparent !important;
+    padding-top: 0.65rem !important;
+    padding-bottom: 0.45rem !important;
+    padding-left: 0.75rem !important;
+    min-height: 2.5rem !important;
+    height: auto !important;
+    display: flex !important;
+    align-items: center !important;
+  }
+
+  .ant-select-single .ant-select-selector {
+    height: 2.5rem !important;
+
+    .ant-select-selection-search {
+      display: flex !important;
+      align-items: center !important;
+      height: 100% !important;
+    }
+
+    .ant-select-selection-item,
+    .ant-select-selection-placeholder {
+      display: flex !important;
+      align-items: center !important;
+      height: 100% !important;
+      padding-top: 0 !important;
+      padding-bottom: 0 !important;
+    }
+  }
+
+  .ant-select-selection-item {
+    color: #EEEEEE !important;
+    font-weight: 300 !important;
+  }
+
+  .ant-select-selection-placeholder {
+    color: #808080 !important;
+    font-weight: 300 !important;
+  }
+
+  .ant-select-arrow {
+    color: #757575 !important;
+    right: 0.75rem !important;
   }
 }
 

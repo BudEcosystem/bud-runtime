@@ -46,6 +46,7 @@ in {
           watch_paths = [
             "flake.nix"
             "flake.lock"
+            "infra/terraform"
             "nix/workflows/tofu_apply"
           ];
         }
