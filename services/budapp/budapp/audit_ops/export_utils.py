@@ -127,5 +127,5 @@ def generate_export_filename(prefix: str = "audit_export", extension: str = "csv
     Returns:
         Formatted filename with timestamp
     """
-    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
     return f"{prefix}_{timestamp}.{extension}"
