@@ -47,8 +47,8 @@ from ..permissions.schemas import PermissionList
 from ..permissions.service import PermissionService
 from ..project_ops.models import Project as ProjectModel
 from ..project_ops.schemas import ProjectUserAdd
+from ..shared.jwt_blacklist_service import JWTBlacklistService
 from ..shared.notification_service import BudNotifyHandler
-from ..shared.redis_service import RedisService
 from .schemas import LogoutRequest, RefreshTokenRequest, RefreshTokenResponse, ResourceCreate, UserLogin, UserLoginData
 
 
@@ -354,7 +354,7 @@ class AuthService(SessionMixin):
         # Blacklist the access token if provided
         if access_token:
             try:
-                redis_service = RedisService()
+                jwt_blacklist_service = JWTBlacklistService()
                 import time
 
                 # Try to decode the token to get its expiration
@@ -391,9 +391,8 @@ class AuthService(SessionMixin):
                     logger.warning(f"Could not decode access token for TTL calculation: {e}")
                     # Continue with default TTL
 
-                # Add token to blacklist with TTL
-                blacklist_key = f"token_blacklist:{access_token}"
-                await redis_service.set(blacklist_key, "1", ex=ttl)
+                # Add token to blacklist with TTL using Dapr state store
+                await jwt_blacklist_service.blacklist_token(access_token, ttl=ttl)
                 logger.info(f"Access token blacklisted with TTL {ttl} seconds")
             except Exception as e:
                 logger.error(f"Failed to blacklist access token: {e}")
