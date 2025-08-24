@@ -328,7 +328,7 @@ export default function ObservabilityPage() {
 
   return (
     <DashboardLayout>
-      <style jsx global>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         /* Override Ant Design hardcoded colors for theme support */
         .ant-card.bg-\\[\\#101010\\] {
           background-color: var(--bg-secondary) !important;
@@ -641,7 +641,7 @@ export default function ObservabilityPage() {
         [data-theme="light"] .filter-section-bg .ant-switch-checked {
           background: #1890ff !important;
         }
-      `}</style>
+      ` }} />
       <div className="h-full flex flex-col p-8 logs-page">
         <div className="boardPageTop">
           <div className="logs-header-override">
@@ -650,16 +650,16 @@ export default function ObservabilityPage() {
             />
           </div>
         </div>
-        <style jsx>{`
-          .logs-header-override :global(.pageHeader h1),
-          .logs-header-override :global(.pageHeader h2),
-          .logs-header-override :global(.pageHeader h3),
-          .logs-header-override :global(.pageHeader div[class*="Heading"]),
-          .logs-header-override :global(.pageHeader *) {
+        <style dangerouslySetInnerHTML={{ __html: `
+          .logs-header-override .pageHeader h1,
+          .logs-header-override .pageHeader h2,
+          .logs-header-override .pageHeader h3,
+          .logs-header-override .pageHeader div[class*="Heading"],
+          .logs-header-override .pageHeader * {
             color: var(--text-primary) !important;
           }
-        `}</style>
-        <style jsx global>{`
+        ` }} />
+        <style dangerouslySetInnerHTML={{ __html: `
           .theme-aware-logs *,
           .theme-aware-logs div,
           .theme-aware-logs span,
@@ -975,7 +975,7 @@ export default function ObservabilityPage() {
             border-color: var(--border-color) !important;
             color: var(--text-primary) !important;
           }
-        `}</style>
+        ` }} />
 
         <div className="projectDetailsDiv antTabWrap mt-4">
           <Tabs
