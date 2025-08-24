@@ -403,8 +403,8 @@ export default function AuditPage() {
       const {data} = await AppRequest.Get("/audit/summary");
       setStatistics({
         totalEvents: data.data.total_records || 0,
-        failedActions: data.data.failed_actions || 0,
-        resourcesModified: data.resources_modified || 0,
+        failedActions: data.data.failure_events_count || 0,
+        resourcesModified: data.data.unique_resources_updated || 0,
       })
     } catch (error) {
       console.error("Failed to fetch usage data:", error);
