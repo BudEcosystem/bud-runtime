@@ -260,7 +260,7 @@ class TestEncryptionConsistency:
             "secret-with-spaces and special chars!@#$%^&*()",
             "unicode-secret-с-кириллицей-🔐",
             "newline\nsecret\ttab",
-            "very" * 100  # Long secret
+            "very" * 40  # Long secret (160 bytes - safely within RSA 2048-bit limit)
         ]
 
         for plaintext in special_secrets:
