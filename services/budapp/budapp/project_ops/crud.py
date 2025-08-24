@@ -31,6 +31,7 @@ from budapp.commons.db_utils import DataManagerUtils
 
 from ..commons.constants import EndpointStatusEnum, ProjectStatusEnum, UserStatusEnum
 from ..commons.exceptions import ClientException
+from ..credential_ops.models import Credential
 from ..endpoint_ops.models import Endpoint
 from ..permissions.models import Permission, ProjectPermission
 from ..user_ops.models import User
@@ -204,12 +205,22 @@ class ProjectDataManager(DataManagerUtils):
                 .group_by(Endpoint.project_id)
                 .alias("ecount")
             )
+            # Subquery to calculate credential count
+            credential_count_subquery = (
+                select(
+                    Credential.project_id,
+                    func.count(Credential.id.distinct()).label("credential_count"),
+                )
+                .group_by(Credential.project_id)
+                .alias("ccount")
+            )
             stmt = (
                 select(
                     Project,
                     func.count(u.id).label("user_count"),
                     func.aggregate_strings(u.color, ",").label("profile_colors"),
                     endpoint_count_subquery.c.endpoint_count.label("endpoint_count"),
+                    credential_count_subquery.c.credential_count.label("credential_count"),
                 )
                 .filter(and_(*search_conditions))
                 .select_from(Project)
@@ -223,7 +234,13 @@ class ProjectDataManager(DataManagerUtils):
                     endpoint_count_subquery,
                     Project.id == endpoint_count_subquery.c.project_id,
                 )
-                .group_by(Project.id, endpoint_count_subquery.c.endpoint_count)
+                .outerjoin(
+                    credential_count_subquery,
+                    Project.id == credential_count_subquery.c.project_id,
+                )
+                .group_by(
+                    Project.id, endpoint_count_subquery.c.endpoint_count, credential_count_subquery.c.credential_count
+                )
             )
             count_stmt = select(func.count()).select_from(Project).filter(and_(*search_conditions))
         else:
@@ -238,12 +255,22 @@ class ProjectDataManager(DataManagerUtils):
                 .group_by(Endpoint.project_id)
                 .alias("ecount")
             )
+            # Subquery to calculate credential count
+            credential_count_subquery = (
+                select(
+                    Credential.project_id,
+                    func.count(Credential.id.distinct()).label("credential_count"),
+                )
+                .group_by(Credential.project_id)
+                .alias("ccount")
+            )
             stmt = (
                 select(
                     Project,
                     func.count(u.id).label("user_count"),
                     func.aggregate_strings(u.color, ",").label("profile_colors"),
                     endpoint_count_subquery.c.endpoint_count.label("endpoint_count"),
+                    credential_count_subquery.c.credential_count.label("credential_count"),
                 )
                 .filter_by(**filters)
                 .select_from(Project)
@@ -257,7 +284,13 @@ class ProjectDataManager(DataManagerUtils):
                     endpoint_count_subquery,
                     Project.id == endpoint_count_subquery.c.project_id,
                 )
-                .group_by(Project.id, endpoint_count_subquery.c.endpoint_count)
+                .outerjoin(
+                    credential_count_subquery,
+                    Project.id == credential_count_subquery.c.project_id,
+                )
+                .group_by(
+                    Project.id, endpoint_count_subquery.c.endpoint_count, credential_count_subquery.c.credential_count
+                )
             )
             count_stmt = select(func.count()).select_from(Project).filter_by(**filters)
 
@@ -302,12 +335,22 @@ class ProjectDataManager(DataManagerUtils):
                 .group_by(Endpoint.project_id)
                 .alias("ecount")
             )
+            # Subquery to calculate credential count
+            credential_count_subquery = (
+                select(
+                    Credential.project_id,
+                    func.count(Credential.id.distinct()).label("credential_count"),
+                )
+                .group_by(Credential.project_id)
+                .alias("ccount")
+            )
             stmt = (
                 select(
                     Project,
                     func.count(User.id).label("user_count"),
                     func.aggregate_strings(u.color, ",").label("profile_colors"),
                     endpoint_count_subquery.c.endpoint_count.label("endpoint_count"),
+                    credential_count_subquery.c.credential_count.label("credential_count"),
                 )
                 .filter(and_(*search_conditions))
                 .select_from(Project)
@@ -321,9 +364,15 @@ class ProjectDataManager(DataManagerUtils):
                     endpoint_count_subquery,
                     Project.id == endpoint_count_subquery.c.project_id,
                 )
+                .outerjoin(
+                    credential_count_subquery,
+                    Project.id == credential_count_subquery.c.project_id,
+                )
                 .join(Project.users)
                 .filter_by(id=user_id)
-                .group_by(Project.id, endpoint_count_subquery.c.endpoint_count)
+                .group_by(
+                    Project.id, endpoint_count_subquery.c.endpoint_count, credential_count_subquery.c.credential_count
+                )
             )
             count_stmt = (
                 select(func.count())
@@ -344,12 +393,22 @@ class ProjectDataManager(DataManagerUtils):
                 .group_by(Endpoint.project_id)
                 .alias("ecount")
             )
+            # Subquery to calculate credential count
+            credential_count_subquery = (
+                select(
+                    Credential.project_id,
+                    func.count(Credential.id.distinct()).label("credential_count"),
+                )
+                .group_by(Credential.project_id)
+                .alias("ccount")
+            )
             stmt = (
                 select(
                     Project,
                     func.count(User.id).label("user_count"),
                     func.aggregate_strings(u.color, ",").label("profile_colors"),
                     endpoint_count_subquery.c.endpoint_count.label("endpoint_count"),
+                    credential_count_subquery.c.credential_count.label("credential_count"),
                 )
                 .filter_by(**filters)
                 .select_from(Project)
@@ -363,9 +422,15 @@ class ProjectDataManager(DataManagerUtils):
                     endpoint_count_subquery,
                     Project.id == endpoint_count_subquery.c.project_id,
                 )
+                .outerjoin(
+                    credential_count_subquery,
+                    Project.id == credential_count_subquery.c.project_id,
+                )
                 .join(Project.users)
                 .filter_by(id=user_id)
-                .group_by(Project.id, endpoint_count_subquery.c.endpoint_count)
+                .group_by(
+                    Project.id, endpoint_count_subquery.c.endpoint_count, credential_count_subquery.c.credential_count
+                )
             )
             count_stmt = (
                 select(func.count())

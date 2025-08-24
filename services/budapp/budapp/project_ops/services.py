@@ -591,13 +591,14 @@ class ProjectService(SessionMixin):
         result = []
 
         for db_result in db_results:
-            db_project, users_count, profile_colors, endpoints_count = db_result
+            db_project, users_count, profile_colors, endpoints_count, credentials_count = db_result
             profile_colors = profile_colors.split(",") if profile_colors else []
             result.append(
                 ProjectListResponse(
                     project=db_project,
                     endpoints_count=endpoints_count,
                     users_count=users_count,
+                    credentials_count=credentials_count,
                     profile_colors=profile_colors[:3],
                 )
             )

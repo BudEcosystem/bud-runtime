@@ -199,10 +199,11 @@ class ProjectListResponse(BaseModel):
     project: Project
     users_count: int
     endpoints_count: int
+    credentials_count: int
     profile_colors: list
 
-    # Convert users_count and endpoints_count to int if they are None
-    @field_validator("users_count", "endpoints_count", mode="before")
+    # Convert counts to int if they are None
+    @field_validator("users_count", "endpoints_count", "credentials_count", mode="before")
     @classmethod
     def convert_none_to_zero(cls, v):
         if not isinstance(v, int):
