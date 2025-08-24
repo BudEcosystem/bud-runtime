@@ -554,7 +554,7 @@ class EndpointService(SessionMixin):
             namespace: The namespace of the cluster to update.
             current_user_id: The ID of the current user.
         """
-        update_cluster_endpoint = f"{app_settings.dapr_base_url}v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment/update-deployment-status"
+        update_cluster_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment/update-deployment-status"
 
         try:
             payload = {
@@ -948,7 +948,7 @@ class EndpointService(SessionMixin):
             current_user_id: The ID of the current user.
         """
         delete_worker_endpoint = (
-            f"{app_settings.dapr_base_url}v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment/worker-info"
+            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment/worker-info"
         )
 
         try:
@@ -2147,9 +2147,7 @@ class EndpointService(SessionMixin):
 
         # Provider-specific configurations
         if provider_enum == ProxyProviderEnum.VLLM:
-            return VLLMConfig(
-                type=model_name, model_name=model_name, api_base=api_base + "/v1", api_key_location="none"
-            ), None
+            return VLLMConfig(model_name=model_name, api_base=api_base + "/v1", api_key_location="none"), None
 
         elif provider_enum == ProxyProviderEnum.OPENAI:
             if encrypted_credential_data:
@@ -2269,9 +2267,7 @@ class EndpointService(SessionMixin):
 
         else:
             # Default fallback to VLLM
-            return VLLMConfig(
-                type=model_name, model_name=model_name, api_base=api_base + "/v1", api_key_location="none"
-            ), None
+            return VLLMConfig(model_name=model_name, api_base=api_base + "/v1", api_key_location="none"), None
 
     # Provider mapping constant
     PROVIDER_MAPPING = {

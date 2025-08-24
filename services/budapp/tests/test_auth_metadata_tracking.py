@@ -1,5 +1,6 @@
 """Tests for authentication metadata tracking in Redis cache."""
 
+import hashlib
 import json
 import uuid
 from datetime import datetime, timedelta
@@ -9,6 +10,11 @@ import pytest
 from fastapi import HTTPException
 
 from budapp.credential_ops.services import CredentialService
+
+
+def hash_api_key(api_key: str) -> str:
+    """Helper function to hash API key in the same way as the application."""
+    return hashlib.sha256(f"bud-{api_key}".encode()).hexdigest()
 
 
 @pytest.mark.asyncio
@@ -60,8 +66,9 @@ async def test_update_proxy_cache_with_metadata_single_key():
                     cache_data_json = call_args[0][1]
                     cache_data = json.loads(cache_data_json)
 
-                    # Verify Redis key format
-                    assert redis_key == f"api_key:{api_key}"
+                    # Verify Redis key format - should be hashed now
+                    expected_hashed_key = hash_api_key(api_key)
+                    assert redis_key == f"api_key:{expected_hashed_key}"
 
                     # Verify metadata is present
                     assert "__metadata__" in cache_data

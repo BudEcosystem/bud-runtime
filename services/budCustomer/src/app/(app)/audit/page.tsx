@@ -204,9 +204,9 @@ export default function AuditPage() {
         colorText: "var(--text-primary)",
         optionSelectedColor: "var(--text-primary)",
         optionActiveBg: "var(--bg-hover)",
-      }
-    }
-  }
+      },
+    },
+  };
 
   const [dayFilter, setDayFilter] = useState([
     {
@@ -680,8 +680,7 @@ export default function AuditPage() {
               className="w-80 bg-bud-bg-tertiary border-bud-border-secondary"
               allowClear
             />
-            <ConfigProvider
-              theme={themeConfig}>
+            <ConfigProvider theme={themeConfig}>
               <Select
                 placeholder="Filter by action"
                 value={selectedAction}
@@ -694,8 +693,7 @@ export default function AuditPage() {
                 }))}
               />
             </ConfigProvider>
-            <ConfigProvider
-              theme={themeConfig}>
+            <ConfigProvider theme={themeConfig}>
               <Select
                 placeholder="Filter by resource"
                 value={selectedResource}

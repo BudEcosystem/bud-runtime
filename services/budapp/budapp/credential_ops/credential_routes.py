@@ -3,7 +3,7 @@ import uuid
 from typing import Annotated, List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query, Request, status
 from sqlalchemy.orm import Session
 from typing_extensions import Union
 
@@ -67,11 +67,12 @@ error_responses = {
     Project_id and expiry(None or 30, 60) are required.""",
 )
 async def add_credential(
+    request: Request,
     credential: CredentialRequest,
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
 ):
-    credential_response = await CredentialService(session).add_credential(current_user.id, credential)
+    credential_response = await CredentialService(session).add_credential(current_user.id, credential, request)
     logger.info(f"API-Key credential added: {credential_response.id}")
 
     return SingleResponse(message="Credential added successfully", result=credential_response)
@@ -123,22 +124,27 @@ async def retrieve_credentials(
     description="Update saved credential of user.",
 )
 async def update_credential(
+    request: Request,
     credential_id: UUID,
     credential_data: CredentialUpdate,
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
 ):
-    db_credential = await CredentialService(session).update_credential(credential_data, credential_id, current_user.id)
+    db_credential = await CredentialService(session).update_credential(
+        credential_data, credential_id, current_user.id, request
+    )
     logger.info(f"Credential updated: {db_credential.id}")
 
     credential_response = CredentialResponse(
         name=db_credential.name,
         project_id=db_credential.project_id,
-        key=await RSAHandler().encrypt(db_credential.key),
+        key=db_credential.encrypted_key,  # Already encrypted, no need to encrypt again
         expiry=db_credential.expiry,
         max_budget=db_credential.max_budget,
         model_budgets=db_credential.model_budgets,
         id=db_credential.id,
+        created_at=db_credential.created_at,
+        last_used_at=db_credential.last_used_at,
         credential_type=db_credential.credential_type,
         ip_whitelist=db_credential.ip_whitelist,
     )
@@ -157,11 +163,12 @@ async def update_credential(
     description="Delete saved credential of user",
 )
 async def delete_credential(
+    request: Request,
     credential_id: UUID,
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
 ):
-    await CredentialService(session).delete_credential(credential_id, current_user.id)
+    await CredentialService(session).delete_credential(credential_id, current_user.id, request)
     logger.info("Credential deleted")
 
     return SuccessResponse(message="Credential deleted successfully")
@@ -180,11 +187,14 @@ async def delete_credential(
     For budserve credential type, project_id, expiry(None or 30, 60) are required.""",
 )
 async def add_proprietary_credential(
+    request: Request,
     credential: ProprietaryCredentialRequest,
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
 ):
-    credential_response = await ProprietaryCredentialService(session).add_credential(current_user.id, credential)
+    credential_response = await ProprietaryCredentialService(session).add_credential(
+        current_user.id, credential, request
+    )
     logger.info(f"{credential.type.value} credential added: {credential_response}")
 
     return SingleResponse(message="Credential added successfully", result=credential_response)
@@ -236,13 +246,14 @@ async def retrieve_proprietary_credentials(
     description="Update saved proprietary credential of user.",
 )
 async def update_proprietary_credential(
+    request: Request,
     credential_id: UUID,
     credential_data: ProprietaryCredentialUpdate,
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
 ):
     db_credential = await ProprietaryCredentialService(session).update_credential(
-        credential_id, credential_data, current_user.id
+        credential_id, credential_data, current_user.id, request
     )
     logger.info(f"Credential updated: {db_credential.id}")
 
@@ -260,11 +271,12 @@ async def update_proprietary_credential(
     description="Delete saved proprietary credential of user",
 )
 async def delete_proprietary_credential(
+    request: Request,
     credential_id: UUID,
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
 ):
-    await ProprietaryCredentialService(session).delete_credential(credential_id, current_user.id)
+    await ProprietaryCredentialService(session).delete_credential(credential_id, current_user.id, request)
     logger.info("Credential deleted")
 
     return SuccessResponse(message="Credential deleted successfully")

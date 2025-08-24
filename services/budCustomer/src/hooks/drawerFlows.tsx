@@ -3424,6 +3424,48 @@ const createRoute: DrawerFlowType = {
   ],
 };
 
+const viewApiKey: DrawerFlowType = {
+  title: "API Key Details",
+  description: "View API key information",
+  totalSteps: 1,
+  steps: [
+    {
+      navigation: () => ["API Keys", "View Key"],
+      id: "view-api-key",
+      step: 1,
+      component: StepComponents["view-api-key"],
+      progress: [
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Key Details",
+        },
+      ],
+      confirmClose: false,
+    },
+  ],
+};
+
+const editApiKey: DrawerFlowType = {
+  title: "Edit API Key",
+  description: "Update API key details",
+  totalSteps: 1,
+  steps: [
+    {
+      navigation: () => ["API Keys", "Edit Key"],
+      id: "edit-api-key",
+      step: 1,
+      component: StepComponents["edit-api-key"],
+      progress: [
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Edit Key",
+        },
+      ],
+      confirmClose: true,
+    },
+  ],
+};
+
 const flows = {
   "new-project": newProject,
   "deploy-model": deployModel,
@@ -3449,6 +3491,8 @@ const flows = {
   "view-credentials": viewCredentials,
   "view-project-credentials": viewProjectCredentials,
   "add-new-key": addNewKey,
+  "view-api-key": viewApiKey,
+  "edit-api-key": editApiKey,
   "edit-project-credential": editprojectCredential,
   "license-Details": licenseDetails,
   "derived-model-list": derivedModelList,

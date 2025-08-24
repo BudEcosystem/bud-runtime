@@ -112,11 +112,13 @@ async def get_current_user(
         if not tenant_client:
             raise credentials_exception
 
+        # Decrypt client secret for validation
+        decrypted_secret = await tenant_client.get_decrypted_client_secret()
         credentials = TenantClientSchema(
             id=tenant_client.id,
             client_named_id=tenant_client.client_named_id,
             client_id=tenant_client.client_id,
-            client_secret=tenant_client.client_secret,
+            client_secret=decrypted_secret,
         )
 
         manager = KeycloakManager()

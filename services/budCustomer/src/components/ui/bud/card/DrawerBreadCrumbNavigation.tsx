@@ -83,7 +83,7 @@ export function DeawerCustomBreadcrumb({
       separator={<Text_12_400_5B6168 className="mx-2">/</Text_12_400_5B6168>}
       items={
         data?.map((item, index) => ({
-          href: "#",
+          // Remove href to prevent nested <a> tags
           title:
             index === 0 ? (
               <Link href={urls ? urls[index] : "#"}>

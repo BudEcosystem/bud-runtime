@@ -25,6 +25,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from budapp.cluster_ops.models import Cluster
 from budapp.commons.constants import UserRoleEnum, UserStatusEnum, UserTypeEnum
 from budapp.commons.database import Base, TimestampMixin
+from budapp.commons.security import RSAHandler
 from budapp.endpoint_ops.models import Endpoint
 from budapp.model_ops.models import Model
 from budapp.permissions.models import ProjectPermission
@@ -114,14 +115,14 @@ class Tenant(Base, TimestampMixin):
 
 
 class TenantClient(Base, TimestampMixin):
-    """Tenant client model."""
+    """Tenant client model with encrypted client secret storage."""
 
     __tablename__ = "tenant_clients"
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     tenant_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("tenant.id"), nullable=False)
     client_id: Mapped[str] = mapped_column(String, nullable=False)
-    client_secret: Mapped[str] = mapped_column(String, nullable=False)
+    client_secret: Mapped[str] = mapped_column(String, nullable=False)  # Stores encrypted value
     client_named_id: Mapped[str] = mapped_column(String, nullable=False)
     redirect_uris: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
@@ -129,6 +130,59 @@ class TenantClient(Base, TimestampMixin):
 
     # Add relationship
     tenant: Mapped["Tenant"] = relationship(back_populates="clients")
+
+    @staticmethod
+    def _is_encrypted(value: str) -> bool:
+        """Check if a value appears to be encrypted.
+
+        Args:
+            value: The value to check
+
+        Returns:
+            True if the value appears to be encrypted (hex string), False otherwise
+        """
+        if not value:
+            return False
+
+        # Check if it's a valid hex string and has reasonable length for encrypted data
+        try:
+            bytes.fromhex(value)
+            # Encrypted values are typically much longer than plain secrets
+            return len(value) > 100
+        except (ValueError, TypeError):
+            return False
+
+    async def set_client_secret(self, plaintext_secret: str):
+        """Set the client secret, encrypting it before storage.
+
+        Args:
+            plaintext_secret: The plaintext client secret to encrypt and store
+        """
+        if not plaintext_secret:
+            raise ValueError("Client secret cannot be empty")
+
+        # Check if the value is already encrypted to avoid double encryption
+        if not self._is_encrypted(plaintext_secret):
+            self.client_secret = await RSAHandler.encrypt(plaintext_secret)
+        else:
+            # Already encrypted, store as-is
+            self.client_secret = plaintext_secret
+
+    async def get_decrypted_client_secret(self) -> str:
+        """Get the decrypted client secret.
+
+        Returns:
+            The decrypted plaintext client secret
+        """
+        if not self.client_secret:
+            raise ValueError("No client secret stored")
+
+        # Check if the value is encrypted
+        if self._is_encrypted(self.client_secret):
+            return await RSAHandler.decrypt(self.client_secret)
+        else:
+            # Legacy plaintext value - will be encrypted on next save
+            return self.client_secret
 
 
 class TenantUserMapping(Base, TimestampMixin):
