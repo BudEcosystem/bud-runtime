@@ -76,12 +76,25 @@ def generate_csv_from_audit_records(
 
         # Add user information if available and requested
         if include_user_info:
-            if hasattr(record, "user") and record.user:
+            # Check if we have user info as attributes (AuditRecordEntry) or relationships (AuditTrail)
+            if hasattr(record, "user_email"):
+                row["User Email"] = record.user_email if record.user_email else ""
+            elif hasattr(record, "user") and record.user:
                 row["User Email"] = record.user.email if record.user.email else ""
+
+            if hasattr(record, "user_name"):
+                row["User Name"] = record.user_name if record.user_name else ""
+            elif hasattr(record, "user") and record.user:
                 row["User Name"] = record.user.name if record.user.name else ""
 
-            if hasattr(record, "actioned_by_user") and record.actioned_by_user:
+            if hasattr(record, "actioned_by_email"):
+                row["Actioned By Email"] = record.actioned_by_email if record.actioned_by_email else ""
+            elif hasattr(record, "actioned_by_user") and record.actioned_by_user:
                 row["Actioned By Email"] = record.actioned_by_user.email if record.actioned_by_user.email else ""
+
+            if hasattr(record, "actioned_by_name"):
+                row["Actioned By Name"] = record.actioned_by_name if record.actioned_by_name else ""
+            elif hasattr(record, "actioned_by_user") and record.actioned_by_user:
                 row["Actioned By Name"] = record.actioned_by_user.name if record.actioned_by_user.name else ""
 
         writer.writerow(row)

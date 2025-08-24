@@ -191,30 +191,32 @@ class TestAuditExportEndpoint:
     @pytest.fixture
     def mock_records(self):
         """Create mock audit records."""
+        from budapp.audit_ops.schemas import AuditRecordEntry
+
         records = []
         for i in range(3):
-            record = Mock(spec=AuditTrail)
-            record.id = uuid4()
-            record.timestamp = datetime.now(timezone.utc)
-            record.user_id = uuid4()
-            record.actioned_by = None
-            record.action = AuditActionEnum.CREATE.value
-            record.resource_type = AuditResourceTypeEnum.PROJECT.value
-            record.resource_id = uuid4()
-            record.resource_name = f"Project {i}"
-            record.ip_address = f"192.168.1.{i+1}"
-            record.details = {"index": i}
-            record.previous_state = None
-            record.new_state = {"status": "active"}
-            record.record_hash = f"{'a' * 63}{i}"
-
-            # Add user info
-            record.user = Mock()
-            record.user.email = f"user{i}@example.com"
-            record.user.name = f"User {i}"
-            record.actioned_by_user = None
-
-            records.append(record)
+            # Create AuditRecordEntry objects that the endpoint expects
+            record_entry = AuditRecordEntry(
+                id=uuid4(),
+                timestamp=datetime.now(timezone.utc),
+                user_id=uuid4(),
+                actioned_by=None,
+                action=AuditActionEnum.CREATE.value,
+                resource_type=AuditResourceTypeEnum.PROJECT.value,
+                resource_id=uuid4(),
+                resource_name=f"Project {i}",
+                ip_address=f"192.168.1.{i+1}",
+                details={"index": i},
+                previous_state=None,
+                new_state={"status": "active"},
+                record_hash=f"{'a' * 63}{i}",
+                created_at=datetime.now(timezone.utc),
+                user_email=f"user{i}@example.com",
+                user_name=f"User {i}",
+                actioned_by_email=None,
+                actioned_by_name=None
+            )
+            records.append(record_entry)
 
         return records
 
@@ -327,21 +329,26 @@ class TestAuditExportEndpoint:
         # Clean up the override
         app.dependency_overrides.clear()
 
-    def test_csv_export_client_user(self, mock_audit_service, mock_user, mock_records):
+    def test_csv_export_client_user(self, mock_audit_service, mock_records):
         """Test CSV export for CLIENT users only shows their records."""
         from budapp.main import app
         from budapp.commons.dependencies import get_current_active_user
 
-        # Make user a CLIENT
-        mock_user.user_type = "CLIENT"
+        # Create a CLIENT user
+        client_user = Mock()
+        client_user.id = uuid4()
+        client_user.email = "client@example.com"
+        client_user.name = "Client User"
+        client_user.user_type = "CLIENT"
+        client_user.permissions = []
 
         # Mock the service
         mock_service_instance = Mock()
         mock_service_instance.get_audit_records.return_value = ([mock_records[0]], 1)
         mock_audit_service.return_value = mock_service_instance
 
-        # Override the authentication dependency
-        app.dependency_overrides[get_current_active_user] = lambda: mock_user
+        # Override the authentication dependency with CLIENT user
+        app.dependency_overrides[get_current_active_user] = lambda: client_user
 
         with patch("budapp.audit_ops.audit_routes.get_session"):
             client = TestClient(app)
@@ -355,8 +362,9 @@ class TestAuditExportEndpoint:
 
             # Verify the service was called with user_id filter
             call_args = mock_service_instance.get_audit_records.call_args
+            assert call_args is not None, "Service was not called"
             filter_params = call_args[1]["filter_params"]
-            assert filter_params.user_id == mock_user.id
+            assert filter_params.user_id == client_user.id, f"Expected user_id {client_user.id}, got {filter_params.user_id}"
 
         # Clean up the override
         app.dependency_overrides.clear()
