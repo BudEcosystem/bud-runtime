@@ -2,15 +2,14 @@ import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
-import { Text_12_300_EEEEEE } from "@/components/ui/text";
 import React, { useContext, useEffect, useState } from "react";
 import { useDrawer } from "@/hooks/useDrawer";
-import { Input, Image, Form, Select, ConfigProvider } from "antd";
-import CustomPopover from "@/flows/components/customPopover";
+import { Input, Form, Select, ConfigProvider } from "antd";
 import { AppRequest } from "@/services/api/requests";
 import { BudFormContext } from "@/components/ui/bud/context/BudFormContext";
 import { useProjects } from "@/hooks/useProjects";
 import { errorToast } from "@/components/toast";
+import ThemedLabel from "@/components/ui/bud/dataEntry/ThemedLabel";
 
 function AddKeyForm({ setApiKeyData }: { setApiKeyData: (data: any) => void }) {
   const { form } = useContext(BudFormContext);
@@ -39,17 +38,7 @@ function AddKeyForm({ setApiKeyData }: { setApiKeyData: (data: any) => void }) {
         className={`flex items-center rounded-[6px] relative !bg-[transparent] w-[100%] mb-[0]`}
       >
         <div className="w-full">
-          <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap">
-            Credential Name
-            <CustomPopover title="This is the name">
-              <Image
-                src="/images/info.png"
-                preview={false}
-                alt="info"
-                style={{ width: ".75rem", height: ".75rem" }}
-              />
-            </CustomPopover>
-          </Text_12_300_EEEEEE>
+          <ThemedLabel text="Credential Name" info="This is the name" />
         </div>
         <Input
           placeholder="Enter name"
@@ -77,17 +66,7 @@ function AddKeyForm({ setApiKeyData }: { setApiKeyData: (data: any) => void }) {
         className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]`}
       >
         <div className="w-full">
-          <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap">
-            Project
-            <CustomPopover title="This is the project ">
-              <Image
-                src="/images/info.png"
-                preview={false}
-                alt="info"
-                style={{ width: ".75rem", height: ".75rem" }}
-              />
-            </CustomPopover>
-          </Text_12_300_EEEEEE>
+          <ThemedLabel text="Project" info="This is the project" />
         </div>
         <div className="custom-select-two w-full rounded-[6px] relative">
           <ConfigProvider
@@ -130,17 +109,7 @@ function AddKeyForm({ setApiKeyData }: { setApiKeyData: (data: any) => void }) {
         className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]`}
       >
         <div className="w-full">
-          <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap">
-            Set Expiry
-            <CustomPopover title="This is the Set Expiry ">
-              <Image
-                src="/images/info.png"
-                preview={false}
-                alt="info"
-                style={{ width: ".75rem", height: ".75rem" }}
-              />
-            </CustomPopover>
-          </Text_12_300_EEEEEE>
+          <ThemedLabel text="Set Expiry" info="This is the Set Expiry" />
         </div>
         <div className="custom-select-two w-full rounded-[6px] relative">
           <ConfigProvider

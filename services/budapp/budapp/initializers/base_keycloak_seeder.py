@@ -127,21 +127,23 @@ class BaseKeycloakSeeder(BaseSeeder):
             new_client_id, client_secret = await keycloak_manager.create_client(default_client_id, default_realm_name)
 
             if not tenant_client:
-                # Create new client record in DB
+                # Create new client record in DB with encrypted secret
                 tenant_client = TenantClient(
                     tenant_id=tenant.id,
                     client_named_id=default_client_id,
                     client_id=new_client_id,
-                    client_secret=client_secret,
                 )
+                # Encrypt the client secret before storage
+                await tenant_client.set_client_secret(client_secret)
                 await UserDataManager(session).insert_one(tenant_client)
-                logger.info(f"::KEYCLOAK::Client created in DB with ID {tenant_client.id}")
+                logger.info(f"::KEYCLOAK::Client created in DB with ID {tenant_client.id} and encrypted secret")
             else:
                 # Update existing client record with new Keycloak credentials
                 tenant_client.client_id = new_client_id
-                tenant_client.client_secret = client_secret
+                # Encrypt the client secret before storage
+                await tenant_client.set_client_secret(client_secret)
                 UserDataManager(session).update_one(tenant_client)
-                logger.info(f"::KEYCLOAK::Client updated in DB with ID {tenant_client.id}")
+                logger.info(f"::KEYCLOAK::Client updated in DB with ID {tenant_client.id} and encrypted secret")
         else:
             # If we get here, realm exists but user doesn't, we need to fetch client info
             if not tenant_client:
@@ -156,13 +158,15 @@ class BaseKeycloakSeeder(BaseSeeder):
                 )
 
             # Create user in Keycloak
+            # Decrypt client secret for Keycloak API call
+            decrypted_secret = await tenant_client.get_decrypted_client_secret()
             keycloak_user_id = await keycloak_manager.create_realm_admin(
                 username=app_settings.superuser_email,
                 email=app_settings.superuser_email,
                 password=app_settings.superuser_password,
                 realm_name=default_realm_name,
                 client_id=tenant_client.client_id,
-                client_secret=tenant_client.client_secret,
+                client_secret=decrypted_secret,
             )
 
             if not db_user:

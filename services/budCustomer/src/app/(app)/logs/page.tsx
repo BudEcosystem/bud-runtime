@@ -211,9 +211,7 @@ export default function ObservabilityPage() {
       key: 'timestamp',
       width: 180,
       render: (timestamp: string) => (
-        <span style={{ fontSize: '12px', color: 'var(--text-primary)' }}>
-          <ClientTimestamp timestamp={timestamp} />
-        </span>
+        <Text_12_400_EEEEEE className="!text-[var(--text-primary)]"><ClientTimestamp timestamp={timestamp} /></Text_12_400_EEEEEE>
       ),
       sorter: true,
       sortIcon: SortIcon,
@@ -225,12 +223,9 @@ export default function ObservabilityPage() {
       width: 150,
       render: (project_name: string) => (
         <Tooltip title={project_name || 'N/A'}>
-          <span 
-            className="truncate max-w-[130px]"
-            style={{ fontSize: '12px', color: 'var(--text-primary)' }}
-          >
+          <Text_12_400_EEEEEE className="truncate max-w-[130px] !text-[var(--text-primary)]">
             {project_name || '-'}
-          </span>
+          </Text_12_400_EEEEEE>
         </Tooltip>
       ),
     },
@@ -241,12 +236,9 @@ export default function ObservabilityPage() {
       width: 200,
       render: (endpoint_name: string) => (
         <Tooltip title={endpoint_name || 'N/A'}>
-          <span 
-            className="truncate max-w-[180px]"
-            style={{ fontSize: '12px', color: 'var(--text-primary)' }}
-          >
+          <Text_12_400_EEEEEE className="truncate max-w-[180px] !text-[var(--text-primary)]">
             {endpoint_name || '-'}
-          </span>
+          </Text_12_400_EEEEEE>
         </Tooltip>
       ),
     },
@@ -257,12 +249,9 @@ export default function ObservabilityPage() {
       width: 350,
       render: (prompt: string) => (
         <Tooltip title={prompt}>
-          <span 
-            className="truncate max-w-[330px]"
-            style={{ fontSize: '12px', fontWeight: '300', color: 'var(--text-primary)' }}
-          >
+          <Text_12_300_EEEEEE className="truncate max-w-[330px] !text-[var(--text-muted)]">
             {prompt}
-          </span>
+          </Text_12_300_EEEEEE>
         </Tooltip>
       ),
     },
@@ -272,9 +261,9 @@ export default function ObservabilityPage() {
       key: 'response_time_ms',
       width: 120,
       render: (response_time_ms: number) => (
-        <span style={{ fontSize: '12px', color: 'var(--text-primary)' }}>
+        <Text_12_400_EEEEEE className="!text-[var(--text-primary)]">
           {response_time_ms ? `${response_time_ms.toLocaleString()} ms` : '-'}
-        </span>
+        </Text_12_400_EEEEEE>
       ),
       sorter: true,
       sortIcon: SortIcon,
@@ -284,9 +273,9 @@ export default function ObservabilityPage() {
       key: 'tokens',
       width: 120,
       render: (_, record) => (
-        <span style={{ fontSize: '12px', color: 'var(--text-primary)' }}>
+        <Text_12_400_EEEEEE className="!text-[var(--text-primary)]">
           {record.input_tokens + record.output_tokens || '-'}
-        </span>
+        </Text_12_400_EEEEEE>
       ),
     },
     {
@@ -339,7 +328,321 @@ export default function ObservabilityPage() {
 
   return (
     <DashboardLayout>
-      <div className="h-full flex flex-col p-8 theme-aware-logs">
+      <style jsx global>{`
+        /* Override Ant Design hardcoded colors for theme support */
+        .ant-card.bg-\\[\\#101010\\] {
+          background-color: var(--bg-secondary) !important;
+        }
+        .ant-card.border-\\[\\#1F1F1F\\] {
+          border-color: var(--border-color) !important;
+        }
+        /* Specific fix for the Requests tab card */
+        .ant-card-small.bg-\\[\\#101010\\] {
+          background-color: var(--bg-secondary) !important;
+        }
+        [data-theme="light"] .ant-card-small.bg-\\[\\#101010\\] {
+          background-color: #f5f5f5 !important;
+        }
+        [data-theme="dark"] .ant-card-small.bg-\\[\\#101010\\] {
+          background-color: #161616 !important;
+        }
+        /* Fallback for any ant-card with dark backgrounds */
+        .ant-card[class*="bg-\\[\\#101010\\]"],
+        .ant-card[class*="bg-\\[\\#1A1A1A\\]"],
+        .ant-card[class*="bg-\\[\\#0A0A0A\\]"] {
+          background-color: var(--bg-secondary) !important;
+        }
+        [data-theme="light"] .ant-card[class*="bg-\\[\\#101010\\]"],
+        [data-theme="light"] .ant-card[class*="bg-\\[\\#1A1A1A\\]"],
+        [data-theme="light"] .ant-card[class*="bg-\\[\\#0A0A0A\\]"] {
+          background-color: #f5f5f5 !important;
+        }
+        .ant-table-wrapper .ant-table {
+          background: var(--bg-card) !important;
+        }
+        .ant-table-wrapper .ant-table-thead > tr > th {
+          background: var(--bg-tertiary) !important;
+          color: var(--text-primary) !important;
+          border-bottom: 1px solid var(--border-color) !important;
+        }
+        .ant-table-wrapper .ant-table-tbody > tr > td {
+          border-bottom: 1px solid var(--border-color) !important;
+          background: var(--bg-card) !important;
+        }
+        .ant-table-wrapper .ant-table-tbody > tr:hover > td {
+          background: var(--bg-hover) !important;
+        }
+        .ant-table-title {
+          background: var(--bg-secondary) !important;
+          border-bottom: 1px solid var(--border-color) !important;
+        }
+        /* Light theme specific table styling */
+        [data-theme="light"] .ant-table-title {
+          background: #f5f5f5 !important;
+        }
+        [data-theme="light"] .ant-table-wrapper .ant-table-thead > tr > th {
+          background: #fafafa !important;
+        }
+        /* Fix button colors */
+        .ant-btn {
+          color: var(--text-primary) !important;
+          border-color: var(--border-color) !important;
+        }
+        .ant-btn:not(.ant-btn-primary):not(.ant-btn-dangerous) {
+          background: var(--bg-secondary) !important;
+        }
+        .ant-btn:hover:not(.ant-btn-primary):not(.ant-btn-dangerous) {
+          background: var(--bg-hover) !important;
+          border-color: var(--border-secondary) !important;
+        }
+        /* Fix Primary Button */
+        button[class*="bg-\\[\\#1E0C34\\]"] {
+          background: var(--color-purple) !important;
+          opacity: 0.9;
+        }
+        button[class*="bg-\\[\\#1E0C34\\]"]:hover {
+          background: var(--color-purple-hover) !important;
+          opacity: 1;
+        }
+        /* Button text - dark theme */
+        [data-theme="dark"] button[class*="bg-\\[\\#1E0C34\\]"] div,
+        [data-theme="dark"] button[class*="bg-\\[\\#1E0C34\\]"] span,
+        [data-theme="dark"] button[class*="bg-\\[\\#1E0C34\\]"] .anticon {
+          color: white !important;
+        }
+        /* Button text - light theme */
+        [data-theme="light"] button[class*="bg-\\[\\#1E0C34\\]"] div,
+        [data-theme="light"] button[class*="bg-\\[\\#1E0C34\\]"] span,
+        [data-theme="light"] button[class*="bg-\\[\\#1E0C34\\]"] .anticon {
+          color: #000000 !important;
+        }
+        /* Specific fix for refresh and export buttons */
+        [data-theme="dark"] .ant-btn span.ml-2 {
+          color: white !important;
+          margin-left: 0.5rem !important;
+        }
+        [data-theme="light"] .ant-btn span.ml-2 {
+          color: #000000 !important;
+          margin-left: 0.5rem !important;
+        }
+        [data-theme="dark"] .ant-btn[class*="bg-\\[\\#1E0C34\\]"] * {
+          color: white !important;
+        }
+        [data-theme="light"] .ant-btn[class*="bg-\\[\\#1E0C34\\]"] * {
+          color: #000000 !important;
+        }
+        /* Fix Secondary Button */
+        button[class*="bg-\\[\\#1F1F1F\\]"] {
+          background: var(--bg-secondary) !important;
+          border-color: var(--border-secondary) !important;
+        }
+        button[class*="bg-\\[\\#1F1F1F\\]"]:hover {
+          background: var(--bg-hover) !important;
+          border-color: var(--border-color) !important;
+        }
+        [data-theme="dark"] button[class*="bg-\\[\\#1F1F1F\\]"] span,
+        [data-theme="dark"] button[class*="bg-\\[\\#1F1F1F\\]"] .anticon {
+          color: #EEEEEE !important;
+        }
+        [data-theme="light"] button[class*="bg-\\[\\#1F1F1F\\]"] span,
+        [data-theme="light"] button[class*="bg-\\[\\#1F1F1F\\]"] .anticon {
+          color: #000000 !important;
+        }
+        /* Ensure all Ant Design icons in buttons are visible */
+        .ant-btn .anticon {
+          color: inherit !important;
+        }
+        /* Fix segmented control */
+        .antSegmented {
+          background: var(--bg-secondary) !important;
+        }
+        .antSegmented .ant-segmented-item {
+          color: var(--text-muted) !important;
+        }
+        .antSegmented .ant-segmented-item-selected {
+          background: var(--bg-hover) !important;
+          color: var(--text-primary) !important;
+        }
+        /* Fix date picker */
+        .ant-picker {
+          background: var(--bg-tertiary) !important;
+          border-color: var(--border-secondary) !important;
+        }
+        .ant-picker-input > input {
+          color: var(--text-primary) !important;
+        }
+        .ant-picker-suffix {
+          color: var(--text-muted) !important;
+        }
+        /* Fix Input fields */
+        .ant-input {
+          background: var(--bg-tertiary) !important;
+          border-color: var(--border-secondary) !important;
+          color: var(--text-primary) !important;
+        }
+        .ant-input::placeholder {
+          color: var(--text-disabled) !important;
+        }
+        .ant-input:hover {
+          border-color: var(--border-color) !important;
+        }
+        .ant-input:focus {
+          border-color: var(--color-purple) !important;
+          box-shadow: 0 0 0 2px rgba(150, 92, 222, 0.2) !important;
+        }
+        .ant-input-prefix {
+          color: var(--text-muted) !important;
+        }
+        /* Fix tabs */
+        .ant-tabs-tab {
+          color: var(--text-muted) !important;
+        }
+        .ant-tabs-tab.ant-tabs-tab-active {
+          color: var(--text-primary) !important;
+        }
+        .ant-tabs-ink-bar {
+          background: var(--color-purple) !important;
+        }
+        /* Ensure key text elements are dark black in light theme */
+        [data-theme="light"] .logs-page h1,
+        [data-theme="light"] .logs-page h2,
+        [data-theme="light"] .logs-page h3,
+        [data-theme="light"] .logs-page .ant-table-tbody > tr > td,
+        [data-theme="light"] .logs-page .ant-table-thead > tr > th,
+        [data-theme="light"] .logs-page .ant-table-title,
+        [data-theme="light"] .logs-page [class*="Text_"] {
+          color: #000000 !important;
+        }
+        [data-theme="light"] .logs-page .ant-tabs-tab {
+          color: #666666 !important;
+        }
+        [data-theme="light"] .logs-page .ant-tabs-tab.ant-tabs-tab-active {
+          color: #000000 !important;
+        }
+        /* Fix input placeholder in light theme */
+        [data-theme="light"] .logs-page .ant-input::placeholder {
+          color: #999999 !important;
+        }
+        /* Filter section background to match Inference Requests section */
+        .filter-section-bg {
+          background: var(--bg-secondary) !important;
+          border: 1px solid var(--border-color) !important;
+        }
+        [data-theme="light"] .filter-section-bg {
+          background: #f5f5f5 !important;
+          border: 1px solid #e0e0e0 !important;
+        }
+        [data-theme="dark"] .filter-section-bg {
+          background: #161616 !important;
+          border: 1px solid #1f1f1f !important;
+        }
+        /* Comprehensive fix for InferenceFilters component hardcoded colors */
+        [data-theme="light"] .filter-section-bg .ant-card {
+          background: #ffffff !important;
+          border-color: #d9d9d9 !important;
+        }
+        [data-theme="light"] .filter-section-bg .ant-card-head {
+          background: #fafafa !important;
+          border-bottom: 1px solid #d9d9d9 !important;
+        }
+        [data-theme="light"] .filter-section-bg .ant-card-body {
+          background: #ffffff !important;
+        }
+        [data-theme="light"] .filter-section-bg [class*="bg-\\[\\#1A1A1A\\]"],
+        [data-theme="light"] .filter-section-bg [class*="bg-\\[\\#101010\\]"],
+        [data-theme="light"] .filter-section-bg [class*="bg-\\[\\#1F1F1F\\]"],
+        [data-theme="light"] .filter-section-bg [class*="bg-\\[\\#2F2F2F\\]"] {
+          background: #ffffff !important;
+        }
+        [data-theme="light"] .filter-section-bg [class*="border-\\[\\#1F1F1F\\]"],
+        [data-theme="light"] .filter-section-bg [class*="border-\\[\\#2F2F2F\\]"],
+        [data-theme="light"] .filter-section-bg [class*="border-\\[\\#3F3F3F\\]"] {
+          border-color: #d9d9d9 !important;
+        }
+        [data-theme="light"] .filter-section-bg [class*="text-\\[\\#EEEEEE\\]"],
+        [data-theme="light"] .filter-section-bg [class*="text-\\[\\#B3B3B3\\]"] {
+          color: #000000 !important;
+        }
+        /* Make ALL text dark black in light theme filter section */
+        [data-theme="light"] .filter-section-bg * {
+          color: #000000 !important;
+        }
+        [data-theme="light"] .filter-section-bg .ant-card-head-title {
+          color: #000000 !important;
+        }
+        [data-theme="light"] .filter-section-bg .ant-card-head-title span {
+          color: #000000 !important;
+        }
+        [data-theme="light"] .filter-section-bg input {
+          color: #000000 !important;
+        }
+        [data-theme="light"] .filter-section-bg input::placeholder {
+          color: #666666 !important;
+        }
+        /* Fix all input elements in filter section */
+        [data-theme="light"] .filter-section-bg .ant-input,
+        [data-theme="light"] .filter-section-bg .ant-select-selector,
+        [data-theme="light"] .filter-section-bg .ant-picker,
+        [data-theme="light"] .filter-section-bg .ant-input-number,
+        [data-theme="light"] .filter-section-bg .ant-switch {
+          background: #ffffff !important;
+          border-color: #d9d9d9 !important;
+          color: #000000 !important;
+        }
+        [data-theme="light"] .filter-section-bg .ant-input-number-input {
+          color: #000000 !important;
+        }
+        [data-theme="light"] .filter-section-bg .ant-btn {
+          background: #ffffff !important;
+          border-color: #d9d9d9 !important;
+          color: #000000 !important;
+        }
+        [data-theme="light"] .filter-section-bg .ant-btn:hover {
+          background: #f5f5f5 !important;
+          border-color: #40a9ff !important;
+          color: #000000 !important;
+        }
+        [data-theme="light"] .filter-section-bg .ant-btn span {
+          color: #000000 !important;
+        }
+        [data-theme="light"] .filter-section-bg .ant-btn:hover span {
+          color: #000000 !important;
+        }
+        /* Fix form labels */
+        [data-theme="light"] .filter-section-bg .ant-form-item-label > label {
+          color: #000000 !important;
+        }
+        [data-theme="light"] .filter-section-bg .ant-form-item-label > label > span {
+          color: #000000 !important;
+        }
+        /* Fix select dropdown text */
+        [data-theme="light"] .filter-section-bg .ant-select-selection-placeholder {
+          color: #999999 !important;
+        }
+        [data-theme="light"] .filter-section-bg .ant-select-selection-item {
+          color: #000000 !important;
+        }
+        /* Fix picker text */
+        [data-theme="light"] .filter-section-bg .ant-picker-input input {
+          color: #000000 !important;
+        }
+        /* Additional text in filter components */
+        [data-theme="light"] .filter-section-bg .ant-space-item span {
+          color: #000000 !important;
+        }
+        /* Fix antd icons in filter section */
+        [data-theme="light"] .filter-section-bg .anticon {
+          color: #666666 !important;
+        }
+        /* Fix switch component */
+        [data-theme="light"] .filter-section-bg .ant-switch {
+          background: #ffffff !important;
+        }
+        [data-theme="light"] .filter-section-bg .ant-switch-checked {
+          background: #1890ff !important;
+        }
+      `}</style>
+      <div className="h-full flex flex-col p-8 logs-page">
         <div className="boardPageTop">
           <div className="logs-header-override">
             <PageHeader
@@ -369,20 +672,20 @@ export default function ObservabilityPage() {
           .theme-aware-logs h6 {
             color: var(--text-primary) !important;
           }
-          
+
           /* Override specific hardcoded text components */
           .theme-aware-logs [class*="Text_"][class*="_FFFFFF"],
           .theme-aware-logs [class*="Text_"][class*="_EEEEEE"],
           .theme-aware-logs [class*="Heading_"][class*="_FFFFFF"] {
             color: var(--text-primary) !important;
           }
-          
+
           .theme-aware-logs [class*="Text_"][class*="_B3B3B3"],
           .theme-aware-logs [class*="Text_"][class*="_808080"],
           .theme-aware-logs [class*="Text_"][class*="_757575"] {
             color: var(--text-muted) !important;
           }
-          
+
           /* Ant Design components */
           .theme-aware-logs .ant-tabs-tab {
             color: var(--text-muted) !important;
@@ -408,7 +711,7 @@ export default function ObservabilityPage() {
           .theme-aware-logs .ant-segmented-item-selected {
             color: var(--text-primary) !important;
           }
-          
+
           /* Input components and form elements */
           .theme-aware-logs .ant-input,
           .theme-aware-logs .ant-input:focus,
@@ -420,51 +723,51 @@ export default function ObservabilityPage() {
             background-color: var(--bg-tertiary) !important;
             border-color: var(--border-secondary) !important;
           }
-          
+
           .theme-aware-logs .ant-input::placeholder,
           .theme-aware-logs .ant-input-affix-wrapper input::placeholder {
             color: var(--text-disabled) !important;
           }
-          
+
           /* Button components */
           .theme-aware-logs .ant-btn,
           .theme-aware-logs .ant-btn span {
             color: var(--text-primary) !important;
           }
-          
+
           .theme-aware-logs .ant-btn-default {
             background-color: var(--bg-tertiary) !important;
             border-color: var(--border-secondary) !important;
             color: var(--text-primary) !important;
           }
-          
+
           .theme-aware-logs .ant-btn-default:hover {
             background-color: var(--bg-hover) !important;
             border-color: var(--border-color) !important;
             color: var(--text-primary) !important;
           }
-          
+
           /* Dropdown and Select components */
           .theme-aware-logs .ant-select,
           .theme-aware-logs .ant-select:hover,
           .theme-aware-logs .ant-select:focus {
             color: var(--text-primary) !important;
           }
-          
+
           .theme-aware-logs .ant-select-selector {
             background-color: var(--bg-tertiary) !important;
             border-color: var(--border-secondary) !important;
             color: var(--text-primary) !important;
           }
-          
+
           .theme-aware-logs .ant-select-selection-placeholder {
             color: var(--text-disabled) !important;
           }
-          
+
           .theme-aware-logs .ant-select-selection-item {
             color: var(--text-primary) !important;
           }
-          
+
           /* Date picker components */
           .theme-aware-logs .ant-picker,
           .theme-aware-logs .ant-picker:hover,
@@ -473,41 +776,41 @@ export default function ObservabilityPage() {
             border-color: var(--border-secondary) !important;
             color: var(--text-primary) !important;
           }
-          
+
           .theme-aware-logs .ant-picker input {
             color: var(--text-primary) !important;
           }
-          
+
           .theme-aware-logs .ant-picker-input > input::placeholder {
             color: var(--text-disabled) !important;
           }
-          
+
           /* Filter components specific */
           .theme-aware-logs .ant-form-item-label > label {
             color: var(--text-primary) !important;
           }
-          
+
           .theme-aware-logs .ant-checkbox-wrapper {
             color: var(--text-primary) !important;
           }
-          
+
           .theme-aware-logs .ant-radio-wrapper {
             color: var(--text-primary) !important;
           }
-          
+
           /* Search header specific */
           .theme-aware-logs .ant-input-search .ant-input {
             color: var(--text-primary) !important;
             background-color: var(--bg-tertiary) !important;
           }
-          
+
           /* Any remaining text elements */
           .theme-aware-logs label,
           .theme-aware-logs .ant-form-item-label,
           .theme-aware-logs .ant-form-item-control {
             color: var(--text-primary) !important;
           }
-          
+
           /* SearchHeaderInput component override */
           .theme-aware-logs .ant-input[style*="#1A1A1A"],
           .theme-aware-logs .ant-input[class*="bg-[#1A1A1A]"] {
@@ -515,19 +818,19 @@ export default function ObservabilityPage() {
             border-color: var(--border-secondary) !important;
             color: var(--text-primary) !important;
           }
-          
+
           /* Icon color override */
           .theme-aware-logs .ant-input-prefix,
           .theme-aware-logs .ant-input-prefix * {
             color: var(--text-muted) !important;
           }
-          
+
           /* Button text specific overrides */
           .theme-aware-logs .ant-btn .ml-2,
           .theme-aware-logs button span {
             color: var(--text-primary) !important;
           }
-          
+
           /* Ensure all divs and spans in buttons are visible */
           .theme-aware-logs .ant-btn div,
           .theme-aware-logs .ant-btn span,
@@ -535,7 +838,7 @@ export default function ObservabilityPage() {
           .theme-aware-logs button span {
             color: inherit !important;
           }
-          
+
           /* Custom button components override */
           .theme-aware-logs button[class*="bg-[#"],
           .theme-aware-logs .ant-btn[class*="bg-[#"] {
@@ -543,13 +846,13 @@ export default function ObservabilityPage() {
             border-color: var(--border-secondary) !important;
             color: var(--text-primary) !important;
           }
-          
+
           .theme-aware-logs button[class*="bg-[#1E0C34"] {
             background-color: var(--color-purple) !important;
             border-color: var(--color-purple) !important;
             color: white !important;
           }
-          
+
           /* Override hardcoded text colors in buttons */
           .theme-aware-logs button div[class*="text-[#EEEEEE]"],
           .theme-aware-logs button span[class*="text-[#EEEEEE]"],
@@ -557,7 +860,7 @@ export default function ObservabilityPage() {
           .theme-aware-logs .ant-btn span[class*="text-[#EEEEEE]"] {
             color: var(--text-primary) !important;
           }
-          
+
           /* Force visibility for all interactive elements */
           .theme-aware-logs input,
           .theme-aware-logs textarea,
@@ -569,13 +872,13 @@ export default function ObservabilityPage() {
           .theme-aware-logs .ant-picker {
             color: var(--text-primary) !important;
           }
-          
+
           /* InferenceFilters component specific */
           .theme-aware-logs [class*="InferenceFilters"] *,
           .theme-aware-logs [class*="filters"] * {
             color: var(--text-primary) !important;
           }
-          
+
           /* SearchHeaderInput specific override */
           .theme-aware-logs .theme-search-override,
           .theme-aware-logs .theme-search-override input,
@@ -584,11 +887,11 @@ export default function ObservabilityPage() {
             border-color: var(--border-secondary) !important;
             color: var(--text-primary) !important;
           }
-          
+
           .theme-aware-logs .theme-search-override input::placeholder {
             color: var(--text-disabled) !important;
           }
-          
+
           /* Ant Design Card components with hardcoded dark colors */
           .theme-aware-logs .ant-card,
           .theme-aware-logs .ant-card.ant-card-bordered,
@@ -603,7 +906,7 @@ export default function ObservabilityPage() {
             border-color: var(--border-color) !important;
             color: var(--text-primary) !important;
           }
-          
+
           /* Card borders with hardcoded dark colors */
           .theme-aware-logs .ant-card[class*="border-[#1F1F1F]"],
           .theme-aware-logs .ant-card[class*="border-[#2F2F2F]"],
@@ -611,7 +914,7 @@ export default function ObservabilityPage() {
           .theme-aware-logs div[class*="border-[#2F2F2F]"] {
             border-color: var(--border-color) !important;
           }
-          
+
           /* Card headers and content */
           .theme-aware-logs .ant-card-head,
           .theme-aware-logs .ant-card-body,
@@ -620,7 +923,7 @@ export default function ObservabilityPage() {
             border-color: var(--border-color) !important;
             color: var(--text-primary) !important;
           }
-          
+
           /* All nested elements in cards */
           .theme-aware-logs .ant-card *,
           .theme-aware-logs .ant-card .ant-card-body *,
@@ -628,14 +931,14 @@ export default function ObservabilityPage() {
           .theme-aware-logs div[class*="bg-[#1A1A1A]"] * {
             color: var(--text-primary) !important;
           }
-          
+
           /* Specific override for the problematic div class */
           .theme-aware-logs .ant-card.bg-\[\#101010\],
           .theme-aware-logs .ant-card.border-\[\#1F1F1F\] {
             background-color: var(--bg-card) !important;
             border-color: var(--border-color) !important;
           }
-          
+
           /* Global override for ANY element with hardcoded dark backgrounds */
           .theme-aware-logs *[style*="background-color: rgb(16, 16, 16)"],
           .theme-aware-logs *[style*="background-color: #101010"],
@@ -648,14 +951,14 @@ export default function ObservabilityPage() {
             border-color: var(--border-color) !important;
             color: var(--text-primary) !important;
           }
-          
+
           /* Catch-all for any missed dark backgrounds */
           .theme-aware-logs [class*="bg-black"],
           .theme-aware-logs [class*="bg-gray-900"],
           .theme-aware-logs [class*="bg-slate-900"] {
             background-color: var(--bg-card) !important;
           }
-          
+
           /* Specific fixes for inference filters */
           .theme-aware-logs .inference-filters-container *,
           .theme-aware-logs .filters-wrapper *,
@@ -665,7 +968,7 @@ export default function ObservabilityPage() {
             border-color: var(--border-color) !important;
             color: var(--text-primary) !important;
           }
-          
+
           /* Force override for any stubborn components */
           .theme-aware-logs .ant-card.css-dev-only-do-not-override-nvrefq {
             background-color: var(--bg-card) !important;
@@ -685,29 +988,21 @@ export default function ObservabilityPage() {
                     <svg xmlns="http://www.w3.org/2000/svg" width=".875rem" height=".875rem" viewBox="0 0 14 14" fill="none">
                       <path d="M12.6875 12.3672C12.6842 12.6073 12.4901 12.8014 12.25 12.8047H2.33352C1.77079 12.8014 1.31579 12.3464 1.3125 11.7837V1.86719C1.3125 1.62546 1.50828 1.42969 1.75 1.42969C1.99172 1.42969 2.1875 1.62546 2.1875 1.86719V7.40867L3.08602 6.73765V6.73819C3.07672 6.67038 3.07672 6.60148 3.08602 6.53367C3.08602 5.96985 3.54266 5.5132 4.10649 5.5132C4.67032 5.5132 5.12751 5.96983 5.12751 6.53367C5.12751 6.61843 5.11603 6.7032 5.09251 6.78469L7.18103 8.53469C7.31447 8.47344 7.45994 8.44172 7.60651 8.44117C7.69565 8.44281 7.78424 8.45649 7.86901 8.48219L10.15 5.78117C10.0942 5.65047 10.0647 5.50937 10.0625 5.36719C10.0625 4.9543 10.3114 4.58187 10.6925 4.42383C11.0743 4.26633 11.5134 4.35328 11.8054 4.64531C12.0969 4.93733 12.1844 5.37648 12.0264 5.75765C11.8683 6.13937 11.4964 6.3882 11.0835 6.3882C10.9944 6.38655 10.9058 6.37288 10.821 6.34718L8.48751 9.03616C8.5433 9.16741 8.57283 9.30796 8.57501 9.45069C8.57501 10.0145 8.11783 10.4712 7.55399 10.4712C6.99017 10.4712 6.53352 10.0145 6.53352 9.45069C6.53297 9.36592 6.545 9.28116 6.56852 9.19967L4.48 7.44967C4.34656 7.51092 4.20109 7.54263 4.05398 7.54318C3.88882 7.54099 3.72695 7.49943 3.58148 7.42068L2.1875 8.50568V11.7836C2.1875 11.8225 2.20281 11.8597 2.23016 11.887C2.2575 11.9143 2.29469 11.9297 2.33352 11.9297H12.25C12.4901 11.9329 12.6842 12.1271 12.6875 12.3672Z" fill={activeTab === "metrics" ? (effectiveTheme === 'dark' ? "#EEEEEE" : "#1a1a1a") : (effectiveTheme === 'dark' ? "#B3B3B3" : "#666666")} />
                     </svg>
-                    <span style={{
-                      fontSize: '14px',
-                      fontWeight: '600',
-                      color: activeTab === "metrics" ? 'var(--text-primary)' : 'var(--text-muted)'
-                    }}>
-                      Metrics
-                    </span>
+                    {activeTab === "metrics" ? (
+                      <Text_14_600_EEEEEE className="!text-[var(--text-primary)]">Metrics</Text_14_600_EEEEEE>
+                    ) : (
+                      <Text_14_600_B3B3B3 className="!text-[var(--text-muted)]">Metrics</Text_14_600_B3B3B3>
+                    )}
                   </div>
                 ),
                 key: 'metrics',
                 children: (
                   <>
               {/* Enhanced Filters Section - Single Row */}
-              <div 
-                className="mb-8 mt-2 flex justify-between items-end gap-6 p-4 rounded-lg"
-                style={{
-                  backgroundColor: 'var(--bg-secondary)',
-                  border: '1px solid var(--border-color)',
-                }}
-              >
+              <div className="mb-8 mt-2 flex justify-between items-end gap-6 p-6 rounded-lg filter-section-bg">
                 {/* View By Section */}
                 <div className="flex flex-col gap-2">
-                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>View by</span>
+                  <Text_12_400_808080 className="!text-[var(--text-muted)]">View by</Text_12_400_808080>
                   <Segmented
                     options={viewByOptions.map(opt => ({
                       label: (
@@ -726,7 +1021,7 @@ export default function ObservabilityPage() {
 
                 {/* Time Range Section */}
                 <div className="flex flex-col gap-2 flex-1">
-                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Time Range</span>
+                  <Text_12_400_808080 className="!text-[var(--text-muted)]">Time Range</Text_12_400_808080>
                   <div className="flex items-center gap-3">
                     <ConfigProvider
                       theme={{
@@ -742,14 +1037,14 @@ export default function ObservabilityPage() {
                             colorText: 'var(--text-primary)',
                             colorTextPlaceholder: 'var(--text-disabled)',
                             colorBgElevated: 'var(--bg-tertiary)',
-                            colorPrimary: '#965CDE',
+                            colorPrimary: 'var(--color-purple)',
                             colorPrimaryBg: 'var(--bg-hover)',
                             colorPrimaryBgHover: 'var(--bg-hover)',
-                            colorTextLightSolid: '#FFFFFF',
-                            controlItemBgActive: '#965CDE',
-                            colorLink: '#965CDE',
-                            colorLinkHover: '#a873e5',
-                            colorLinkActive: '#8348c7',
+                            colorTextLightSolid: 'var(--text-primary)',
+                            controlItemBgActive: 'var(--color-purple)',
+                            colorLink: 'var(--color-purple)',
+                            colorLinkHover: 'var(--color-purple-hover)',
+                            colorLinkActive: 'var(--color-purple-active)',
                           },
                         },
                       }}
@@ -760,11 +1055,7 @@ export default function ObservabilityPage() {
                         presets={timeRangePresets}
                         showTime
                         format="YYYY-MM-DD HH:mm"
-                        className="flex-1 h-7"
-                        style={{
-                          backgroundColor: 'var(--bg-tertiary)',
-                          borderColor: 'var(--border-secondary)',
-                        }}
+                        className="bg-[var(--bg-tertiary)] border-[var(--border-secondary)] hover:border-[var(--border-color)] flex-1 h-7"
                         placeholder={['Start Date', 'End Date']}
                       />
                     </ConfigProvider>
@@ -778,7 +1069,7 @@ export default function ObservabilityPage() {
                             style={{
                               height: '34px',
                               backgroundColor: isSelected ? 'var(--bg-hover)' : 'transparent',
-                              borderColor: isSelected ? '#965CDE' : 'var(--border-color)',
+                              borderColor: isSelected ? 'var(--color-purple)' : 'var(--border-color)',
                               color: isSelected ? 'var(--text-primary)' : 'var(--text-muted)'
                             }}
                             onClick={() => {
@@ -802,17 +1093,7 @@ export default function ObservabilityPage() {
                               // Fetch with the same filters to ensure consistency
                               fetchInferences(undefined, newFilters);
                             }}
-                            className="text-xs"
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.color = 'var(--text-primary)';
-                              e.currentTarget.style.borderColor = 'var(--border-secondary)';
-                            }}
-                            onMouseLeave={(e) => {
-                              if (!isSelected) {
-                                e.currentTarget.style.color = 'var(--text-muted)';
-                                e.currentTarget.style.borderColor = 'var(--border-color)';
-                              }
-                            }}
+                            className="text-xs hover:text-[var(--text-primary)] hover:border-[var(--border-secondary)]"
                           >
                             {preset.label}
                           </Button>
@@ -824,7 +1105,7 @@ export default function ObservabilityPage() {
 
                 {/* Refresh Button */}
                 <div style={{ color: 'var(--text-primary)' }}>
-                  <PrimaryButton 
+                  <PrimaryButton
                     onClick={() => fetchInferences()}
                     style={{ color: 'var(--text-primary)' }}
                   >
@@ -851,31 +1132,21 @@ export default function ObservabilityPage() {
                     <svg xmlns="http://www.w3.org/2000/svg" width=".875rem" height=".875rem" viewBox="0 0 14 14" fill="none">
                       <path fillRule="evenodd" clipRule="evenodd" d="M1.75 2.11719C1.50828 2.11719 1.3125 2.31296 1.3125 2.55469V12.4922C1.3125 12.7339 1.50828 12.9297 1.75 12.9297H12.25C12.4917 12.9297 12.6875 12.7339 12.6875 12.4922V4.74219C12.6875 4.50046 12.4917 4.30469 12.25 4.30469H7.875C7.71148 4.30469 7.56147 4.21718 7.48353 4.07718L6.39147 2.11719H1.75ZM0.4375 2.55469C0.4375 1.82951 1.02483 1.24219 1.75 1.24219H6.625C6.78852 1.24219 6.93853 1.3297 7.01647 1.4697L8.10853 3.42969H12.25C12.9752 3.42969 13.5625 4.01701 13.5625 4.74219V12.4922C13.5625 13.2174 12.9752 13.8047 12.25 13.8047H1.75C1.02483 13.8047 0.4375 13.2174 0.4375 12.4922V2.55469Z" fill={activeTab === "requests" ? (effectiveTheme === 'dark' ? "#EEEEEE" : "#1a1a1a") : (effectiveTheme === 'dark' ? "#B3B3B3" : "#666666")}/>
                     </svg>
-                    <span style={{
-                      fontSize: '14px',
-                      fontWeight: '600',
-                      color: activeTab === "requests" ? 'var(--text-primary)' : 'var(--text-muted)'
-                    }}>
-                      Requests
-                    </span>
+                    {activeTab === "requests" ? (
+                      <Text_14_600_EEEEEE className="!text-[var(--text-primary)]">Requests</Text_14_600_EEEEEE>
+                    ) : (
+                      <Text_14_600_B3B3B3 className="!text-[var(--text-muted)]">Requests</Text_14_600_B3B3B3>
+                    )}
                   </div>
                 ),
                 key: 'requests',
                 children: (
               <div className="listingContainer">
-                <div 
-                  className="mb-4 p-4 rounded-lg inference-filters-container"
-                  style={{
-                    backgroundColor: 'var(--bg-secondary)',
-                    border: '1px solid var(--border-color)',
-                  }}
-                >
-                  <div className="filters-wrapper">
-                    <InferenceFilters
-                      projectId={'all'} // Pass a dummy ID for global view
-                      onFiltersChange={() => fetchInferences()}
-                    />
-                  </div>
+                <div className="mb-4 p-6 rounded-lg filter-section-bg">
+                  <InferenceFilters
+                    projectId={'all'} // Pass a dummy ID for global view
+                    onFiltersChange={() => fetchInferences()}
+                  />
                 </div>
 
                 <Table<InferenceListItem>
@@ -895,26 +1166,13 @@ export default function ObservabilityPage() {
                       e.preventDefault();
                       router.push(`/observability/${record.inference_id}`);
                     },
-                    className: 'cursor-pointer',
-                    style: {
-                      transition: 'background-color 0.2s ease',
-                    },
-                    onMouseEnter: (e) => {
-                      e.currentTarget.style.backgroundColor = 'var(--bg-hover)';
-                    },
-                    onMouseLeave: (e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                    },
+                    className: 'cursor-pointer hover:bg-[var(--bg-hover)]',
                   })}
                   title={() => (
                     <div className="flex justify-between items-center px-[0.75rem] py-[1rem]">
-                      <span style={{
-                        fontSize: '16px',
-                        fontWeight: '600',
-                        color: 'var(--text-primary)',
-                      }}>
+                      <Text_16_600_FFFFFF className="!text-[var(--text-primary)]">
                         Inference Requests
-                      </span>
+                      </Text_16_600_FFFFFF>
                       <div className="flex items-center justify-between gap-x-[.8rem]">
                         <div style={{ color: 'var(--text-primary)' }}>
                           <SearchHeaderInput

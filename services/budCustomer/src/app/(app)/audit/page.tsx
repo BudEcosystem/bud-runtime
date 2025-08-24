@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import {
   Table,
@@ -42,6 +42,7 @@ import relativeTime from "dayjs/plugin/relativeTime";
 import isToday from "dayjs/plugin/isToday";
 import isYesterday from "dayjs/plugin/isYesterday";
 import styles from "./audit.module.scss";
+import { AppRequest } from "@/services/api/requests";
 
 dayjs.extend(relativeTime);
 dayjs.extend(isToday);
@@ -60,6 +61,7 @@ enum AuditAction {
   LOGIN = "login",
   LOGOUT = "logout",
   REGENERATE = "regenerate",
+  LOGIN_FAILED = 'login_failed'
 }
 
 enum ResourceType {
@@ -180,7 +182,7 @@ const generateMockAuditLogs = (): AuditLog[] => {
 };
 
 export default function AuditPage() {
-  const [auditLogs] = useState<AuditLog[]>(generateMockAuditLogs());
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [selectedAction, setSelectedAction] = useState<string | undefined>(
     undefined,
   );
@@ -206,6 +208,24 @@ export default function AuditPage() {
     },
   };
 
+  const [dayFilter, setDayFilter] = useState([
+    {
+      label: 'Today', value: 'today', active: true
+    },
+    {
+      label: 'Yesterday', value: 'yesterday'
+    },
+    {
+      label: 'This week', value: 'week'
+    },
+  ])
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalNumber, setTotalNumber] = useState(0);
+
+  const setCurrentDayFilter = (val: any) => {
+    setDayFilter(dayFilter.map(item => ({...item, active: item.value == val})))
+  }
   // Get action icon and color
   const getActionDisplay = (action: AuditAction) => {
     const config = {
@@ -248,6 +268,11 @@ export default function AuditPage() {
         icon: <Icon icon="ph:arrows-clockwise" />,
         color: "blue",
         label: "Regenerated",
+      },
+       [AuditAction.LOGIN_FAILED]: {
+        icon: <LoginOutlined />,
+        color: "red",
+        label: "Login Failed",
       },
     };
     return config[action] || { icon: null, color: "default", label: action };
@@ -328,6 +353,64 @@ export default function AuditPage() {
     return groups;
   }, [filteredLogs]);
 
+  const pad = (n: number) => {
+    return n < 10 ? "0" + n : n;
+  }
+
+  const formatDateString = (date: Date | null, endOfDay = false) => {
+    if (!date) return undefined;
+    const y = date.getFullYear();
+    const m = pad(date.getMonth() + 1);
+    const d = pad(date.getDate());
+
+    if (endOfDay) {
+      return `${y}-${m}-${d} 23:59:59`;
+    } else {
+      return `${y}-${m}-${d} 00:00:00`;
+    }
+  }
+
+  const getAuditList = async() => {
+    try {
+      const params = {
+        page: currentPage,
+        limit: pageSize,
+        action: selectedAction,
+        resource_type: selectedResource,
+        start_date: dateRange?.[0] ? formatDateString(dateRange[0]?.toDate(), false) : undefined,
+        end_date: dateRange?.[1] ? formatDateString(dateRange[1]?.toDate(), true) : undefined
+      }
+      const response = await AppRequest.Get("/audit/records", {params});
+      setAuditLogs(response.data.data.map((item: any)=> ({...item, status: item.details.success ? 'success' : 'failed'})));
+      setTotalNumber(response.data.total_record);
+    } catch (error) {
+      console.error("Failed to fetch usage data:", error);
+    } finally {
+    }
+  }
+
+  const [statistics, setStatistics] = useState({
+    totalEvents: 0,
+    failedActions: 0,
+    resourcesModified: 0
+  });
+  const getAuditSummary = async() => {
+    try {
+      // const params = {
+      //   start_date: dateRange?.[0] ? formatDateString(dateRange[0]?.toDate(), false) : undefined,
+      //   end_date: dateRange?.[1] ? formatDateString(dateRange[1]?.toDate(), true) : undefined
+      // }
+      const {data} = await AppRequest.Get("/audit/summary");
+      setStatistics({
+        totalEvents: data.data.total_records || 0,
+        failedActions: data.data.failure_events_count || 0,
+        resourcesModified: data.data.unique_resources_updated || 0,
+      })
+    } catch (error) {
+      console.error("Failed to fetch usage data:", error);
+    } finally {
+    }
+  }
   // Table columns
   const columns: ColumnsType<AuditLog> = [
     {
@@ -435,13 +518,18 @@ export default function AuditPage() {
                 status === "success" ? "text-green-500" : "text-red-500"
               }
             >
-              {status.charAt(0).toUpperCase() + status.slice(1)}
+              {status?.charAt(0).toUpperCase() + status?.slice(1)}
             </Text>
           }
         />
       ),
     },
   ];
+
+  const handlePageChange = (currentPage: any, pageSize: any) => {
+    setCurrentPage(currentPage);
+    setPageSize(pageSize);
+  };
 
   // Export to CSV
   const exportToCSV = () => {
@@ -492,6 +580,11 @@ export default function AuditPage() {
   const hasActiveFilters =
     selectedAction || selectedResource || dateRange || searchText;
 
+  useEffect(()=> {
+    getAuditList();
+    getAuditSummary();
+  }, [selectedAction,selectedResource, dateRange, currentPage, pageSize])
+
   return (
     <DashboardLayout>
       <div className="p-8 bg-bud-bg-primary min-h-full">
@@ -515,7 +608,7 @@ export default function AuditPage() {
                   Today&apos;s Events
                 </Text>
                 <Text className="text-bud-text-primary text-2xl font-semibold">
-                  {groupedLogs.today.length}
+                  {statistics.totalEvents}
                 </Text>
               </div>
               <CalendarOutlined className="text-2xl text-bud-purple" />
@@ -529,7 +622,7 @@ export default function AuditPage() {
                   Failed Actions
                 </Text>
                 <Text className="text-bud-text-primary text-2xl font-semibold">
-                  {filteredLogs.filter((log) => log.status === "failed").length}
+                  {statistics.failedActions}
                 </Text>
               </div>
               <Icon
@@ -539,14 +632,14 @@ export default function AuditPage() {
             </div>
           </Card>
 
-          <Card className="bg-bud-bg-secondary border-bud-border">
+          <Card className="bg-bud-bg-secondary border-bud-border hidden">
             <div className="flex items-center justify-between">
               <div>
                 <Text className="text-bud-text-disabled text-xs block mb-1">
                   Active Users
                 </Text>
                 <Text className="text-bud-text-primary text-2xl font-semibold">
-                  {new Set(filteredLogs.map((log) => log.user_id)).size}
+                  {statistics.resourcesModified}
                 </Text>
               </div>
               <UserOutlined className="text-2xl text-blue-500" />
@@ -645,7 +738,7 @@ export default function AuditPage() {
         {/* Audit Table */}
         <Card className="bg-bud-bg-secondary border-bud-border">
           <div className="space-y-6">
-            {Object.entries(groupedLogs).map(([group, logs]) => {
+            {/* {Object.entries(groupedLogs).map(([group, logs]) => {
               if (logs.length === 0) return null;
 
               const groupLabels = {
@@ -655,21 +748,36 @@ export default function AuditPage() {
                 older: "Older",
               };
 
-              return (
-                <div key={group}>
-                  <div className="flex items-center gap-2 mb-3">
+              return ( */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3 hidden">
                     <ClockCircleOutlined className="text-bud-text-disabled" />
-                    <Text className="text-bud-text-primary font-medium">
+                    {dayFilter.map((item: any) => <Tag key={item.value}
+                      onClick={() => setCurrentDayFilter(item.value)}
+                      color={item.active ? "green-inverse": "red"}
+                      className="flex items-center gap-1 w-fit"
+                    >
+                      {item.label}
+                    </Tag>)}
+                    {/* <Text className="text-bud-text-primary font-medium">
                       {groupLabels[group as keyof typeof groupLabels]}
                     </Text>
-                    <Badge count={logs.length} className="bg-bud-bg-tertiary" />
+                    <Badge count={logs.length} className="bg-bud-bg-tertiary" /> */}
                   </div>
 
                   <Table
                     columns={columns}
-                    dataSource={logs}
+                    dataSource={auditLogs}
                     rowKey="id"
-                    pagination={false}
+                    pagination={{
+                      className: 'small-pagination',
+                      current: currentPage,
+                      pageSize: pageSize,
+                      total: totalNumber,
+                      onChange: handlePageChange,
+                      showSizeChanger: true,
+                      pageSizeOptions: ['5', '10', '20', '50'],
+                    }}
                     size="small"
                     className={styles.auditTable}
                     rowSelection={{
@@ -681,10 +789,8 @@ export default function AuditPage() {
                     }
                   />
                 </div>
-              );
-            })}
 
-            {filteredLogs.length === 0 && (
+            {/* {filteredLogs.length === 0 && (
               <Empty
                 description={
                   <Text className="text-bud-text-disabled">
@@ -692,7 +798,7 @@ export default function AuditPage() {
                   </Text>
                 }
               />
-            )}
+            )} */}
           </div>
         </Card>
       </div>

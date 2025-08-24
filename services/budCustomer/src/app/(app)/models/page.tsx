@@ -17,7 +17,8 @@ import {
 } from "antd";
 import { FilterOutlined } from "@ant-design/icons";
 import { Icon } from "@iconify/react/dist/iconify.js";
-import ModelDetailDrawer from "@/components/ModelDetailDrawer";
+import { useDrawer } from "@/hooks/useDrawer";
+import BudDrawer from "@/components/ui/bud/drawer/BudDrawer";
 const assetBaseUrl = process.env.NEXT_PUBLIC_BASE_URL;
 import {
   Text_13_400_EEEEEE,
@@ -92,8 +93,9 @@ const SelectedFilters = ({
 };
 
 export default function ModelsPage() {
-  const { models, loading, getModelsCatalog, totalModels, totalPages } =
+  const { models, loading, getModelsCatalog, totalModels, totalPages, setSelectedModel } =
     useModels();
+  const { openDrawer } = useDrawer();
 
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(12);
@@ -101,8 +103,6 @@ export default function ModelsPage() {
   const [filter, setFilter] = useState<Filters>(defaultFilter);
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterReset, setFilterReset] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<any>(null);
-  const [drawerVisible, setDrawerVisible] = useState(false);
 
   // Load models with filters
   const load = useCallback(
@@ -223,11 +223,7 @@ export default function ModelsPage() {
 
   const handleModelClick = (model: any) => {
     setSelectedModel(model);
-    setDrawerVisible(true);
-  };
-
-  const handleCloseDrawer = () => {
-    setDrawerVisible(false);
+    openDrawer("view-model", {});
   };
 
   return (
@@ -552,11 +548,7 @@ export default function ModelsPage() {
       </div>
 
       {/* Model Detail Drawer */}
-      <ModelDetailDrawer
-        visible={drawerVisible}
-        onClose={handleCloseDrawer}
-        model={selectedModel}
-      />
+      <BudDrawer />
     </DashboardLayout>
   );
 }

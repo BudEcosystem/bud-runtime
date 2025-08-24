@@ -129,6 +129,58 @@ class CredentialDataManager(DataManagerUtils):
             logger.error(f"Query execution failed. Error: {str(e)}")
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)) from None
 
+    async def batch_update_last_used(self, credential_usage: Dict[UUID, "datetime"]) -> Dict:
+        """Batch update last_used_at timestamps for multiple credentials.
+
+        Args:
+            credential_usage: Dictionary mapping credential IDs to last used timestamps
+
+        Returns:
+            Dictionary with update statistics (updated_count, failed_count, errors)
+        """
+        from datetime import datetime
+
+        from sqlalchemy import update
+
+        updated_count = 0
+        failed_count = 0
+        errors = []
+
+        try:
+            # Use a single bulk update for efficiency
+            for credential_id, last_used_at in credential_usage.items():
+                try:
+                    stmt = (
+                        update(CredentialModel)
+                        .where(CredentialModel.id == credential_id)
+                        .values(last_used_at=last_used_at)
+                    )
+                    result = self.session.execute(stmt)
+                    if result.rowcount > 0:
+                        updated_count += 1
+                    else:
+                        failed_count += 1
+                        errors.append(f"Credential {credential_id} not found")
+
+                except Exception as e:
+                    failed_count += 1
+                    errors.append(f"Failed to update credential {credential_id}: {str(e)}")
+                    logger.error(f"Failed to update credential {credential_id}: {e}")
+
+            # Commit all changes
+            self.session.commit()
+
+            logger.info(f"Batch update complete: {updated_count} updated, {failed_count} failed")
+
+        except Exception as e:
+            self.session.rollback()
+            logger.error(f"Batch update failed: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Batch update failed: {str(e)}"
+            )
+
+        return {"updated_count": updated_count, "failed_count": failed_count, "errors": errors}
+
 
 class ProprietaryCredentialDataManager(DataManagerUtils):
     """Proprietary credential data manager class responsible for operations over database."""

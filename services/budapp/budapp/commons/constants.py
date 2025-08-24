@@ -3083,3 +3083,109 @@ class GuardrailProviderTypeEnum(Enum):
 
     CLOUD_PROVIDER = "cloud_provider"
     BUD_SENTINEL = "bud_sentinel"
+
+
+class AuditActionEnum(StrEnum):
+    """Enumeration of audit action types.
+
+    This enum represents different types of actions that can be audited
+    in the system for compliance and security tracking.
+    """
+
+    # Resource CRUD operations
+    CREATE = "create"
+    READ = "read"
+    UPDATE = "update"
+    DELETE = "delete"
+
+    # Authentication and authorization
+    LOGIN = "login"
+    LOGOUT = "logout"
+    LOGIN_FAILED = "login_failed"
+    TOKEN_REFRESH = "token_refresh"
+    PASSWORD_CHANGE = "password_change"
+    PASSWORD_RESET = "password_reset"
+
+    # Access control
+    ACCESS_GRANTED = "access_granted"
+    ACCESS_DENIED = "access_denied"
+    PERMISSION_CHANGED = "permission_changed"
+    ROLE_ASSIGNED = "role_assigned"
+    ROLE_REMOVED = "role_removed"
+
+    # Model and endpoint operations
+    MODEL_DEPLOYED = "model_deployed"
+    MODEL_UNDEPLOYED = "model_undeployed"
+    ENDPOINT_PUBLISHED = "endpoint_published"
+    ENDPOINT_UNPUBLISHED = "endpoint_unpublished"
+    INFERENCE_REQUEST = "inference_request"
+
+    # Cluster operations
+    CLUSTER_REGISTERED = "cluster_registered"
+    CLUSTER_UPDATED = "cluster_updated"
+    CLUSTER_DELETED = "cluster_deleted"
+    CLUSTER_HEALTH_CHECK = "cluster_health_check"
+
+    # Data operations
+    DATA_EXPORT = "data_export"
+    DATA_IMPORT = "data_import"
+    DATA_DOWNLOAD = "data_download"
+    DATA_UPLOAD = "data_upload"
+
+    # System operations
+    CONFIG_CHANGED = "config_changed"
+    SYSTEM_ERROR = "system_error"
+    WORKFLOW_STARTED = "workflow_started"
+    WORKFLOW_COMPLETED = "workflow_completed"
+    WORKFLOW_FAILED = "workflow_failed"
+
+
+class AuditResourceTypeEnum(StrEnum):
+    """Enumeration of resource types that can be audited.
+
+    This enum represents different types of resources in the system
+    that can be tracked in audit logs.
+    """
+
+    # Core entities
+    USER = "user"
+    PROJECT = "project"
+    MODEL = "model"
+    ENDPOINT = "endpoint"
+    DEPLOYMENT = "deployment"
+    DATASET = "dataset"
+    CLUSTER = "cluster"
+
+    # Authentication and authorization
+    SESSION = "session"
+    TOKEN = "token"
+    ROLE = "role"
+    PERMISSION = "permission"
+    API_KEY = "api_key"
+
+    # Workflows and operations
+    WORKFLOW = "workflow"
+    JOB = "job"
+    TASK = "task"
+    EXPERIMENT = "experiment"
+
+    # Configuration and settings
+    CONFIG = "config"
+    SETTING = "setting"
+    SECRET = "secret"
+
+    # Storage and data
+    FILE = "file"
+    BUCKET = "bucket"
+    DATABASE = "database"
+
+    # Monitoring and metrics
+    METRIC = "metric"
+    LOG = "log"
+    ALERT = "alert"
+    NOTIFICATION = "notification"
+
+    # System
+    SYSTEM = "system"
+    SERVICE = "service"
+    GUARDRAIL = "guardrail"

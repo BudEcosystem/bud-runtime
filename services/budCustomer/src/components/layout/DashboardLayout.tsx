@@ -1,5 +1,5 @@
 "use client";
-import React, { ReactNode, useState } from "react";
+import React, { ReactNode, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Image, Badge, Avatar, Typography } from "antd";
@@ -79,7 +79,7 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   // User context
-  const { user, logout } = useUser();
+  const { user, logout, getUser: fetchUser } = useUser();
 
   const tabs: TabItem[] = [
     {
@@ -146,6 +146,25 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
     logout();
   };
 
+
+  const getUser = async () => {
+    // showLoader();
+    try {
+      const userData: any = await fetchUser();
+      console.log(userData)
+    } catch (error) {
+      console.error("Error  fetching user", error);
+      return router.push("/login");
+    } finally {
+      // hideLoader();
+    }
+  };
+  useEffect(()=> {
+    if(!user?.id) {
+      getUser();
+    }
+  }, [user])
+
   return (
     <div className="flex h-screen bg-bud-bg-primary">
       {/* Sidebar */}
@@ -205,7 +224,7 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
           {/* Notifications */}
         <BudIsland />
 
-            <div className="bg-bud-bg-secondary rounded-lg p-3 mb-1 cursor-pointer hover:bg-bud-bg-tertiary transition-colors">
+            <div className="bg-bud-bg-secondary rounded-lg p-3 mb-1 cursor-pointer hover:bg-bud-bg-tertiary transition-colors hidden">
               <Badge
                 count={88}
                 offset={isCollapsed ? [0, -10] : [50, -10]}

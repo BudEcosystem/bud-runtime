@@ -46,7 +46,7 @@ async def test_logout_blacklists_access_token():
                 mock_tenant_client.id = "8be3c315-1964-4db9-9957-8c62d4ce4559"  # Valid UUID v4
                 mock_tenant_client.client_id = "test-client"
                 mock_tenant_client.client_named_id = "test-client-named"
-                mock_tenant_client.client_secret = "secret"
+                mock_tenant_client.get_decrypted_client_secret = AsyncMock(return_value="secret")
 
                 # Configure retrieve_by_fields to return different values based on the model
                 async def retrieve_by_fields_side_effect(model, *args, **kwargs):
@@ -111,7 +111,7 @@ async def test_logout_without_access_token():
                 mock_tenant_client.id = "6f959769-f619-427d-b7d8-c2fe78ba9fad"  # Valid UUID v4
                 mock_tenant_client.client_id = "test-client"
                 mock_tenant_client.client_named_id = "test-client-named"
-                mock_tenant_client.client_secret = "secret"
+                mock_tenant_client.get_decrypted_client_secret = AsyncMock(return_value="secret")
 
                 # Configure retrieve_by_fields to return different values based on the model
                 async def retrieve_by_fields_side_effect(model, *args, **kwargs):
@@ -178,7 +178,7 @@ async def test_get_current_user_checks_blacklist():
                 mock_tenant_client.id = "326a0d45-8cc0-49aa-9613-636026e04697"  # Valid UUID v4
                 mock_tenant_client.client_id = "test-client"
                 mock_tenant_client.client_named_id = "test-client-named"
-                mock_tenant_client.client_secret = "secret"
+                mock_tenant_client.get_decrypted_client_secret = AsyncMock(return_value="secret")
 
                 mock_user = MagicMock(spec=User)
                 mock_user.auth_id = "user-auth-id"  # This is not a UUID, just an auth ID
@@ -239,7 +239,7 @@ async def test_logout_continues_on_blacklist_failure():
                 mock_tenant_client.id = "31a52d0d-c623-49c7-a9b4-03d5ef939f8d"  # Valid UUID v4
                 mock_tenant_client.client_id = "test-client"
                 mock_tenant_client.client_named_id = "test-client-named"
-                mock_tenant_client.client_secret = "secret"
+                mock_tenant_client.get_decrypted_client_secret = AsyncMock(return_value="secret")
 
                 # Configure retrieve_by_fields to return different values based on the model
                 async def retrieve_by_fields_side_effect(model, *args, **kwargs):

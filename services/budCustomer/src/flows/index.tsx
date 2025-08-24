@@ -8,6 +8,7 @@ import AddNewKey from "./ApiKeys/AddNewKey";
 import ApiKeySuccess from "./ApiKeys/ApiKeySuccess";
 import ViewApiKey from "./ApiKeys/ViewApiKey";
 import EditApiKey from "./ApiKeys/EditApiKey";
+import ViewModelDetails from "./ViewModelDetails";
 
 // Placeholder component factory
 const createPlaceholderComponent = (name: string) => {
@@ -160,5 +161,6 @@ StepComponents["add-new-key"] = AddNewKey;
 StepComponents["api-key-success"] = ApiKeySuccess;
 StepComponents["view-api-key"] = ViewApiKey;
 StepComponents["edit-api-key"] = EditApiKey;
+StepComponents["view-model-details"] = ViewModelDetails;
 
 export type StepComponentsType = keyof typeof StepComponents;

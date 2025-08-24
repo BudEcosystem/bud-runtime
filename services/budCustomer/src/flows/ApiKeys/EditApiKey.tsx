@@ -1,15 +1,14 @@
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
-import { Text_12_300_EEEEEE } from "@/components/ui/text";
 import React, { useContext, useEffect, useState } from "react";
 import { useDrawer } from "@/hooks/useDrawer";
 import { Input, Form, Select, ConfigProvider } from "antd";
-import CustomPopover from "@/flows/components/customPopover";
 import { AppRequest } from "@/services/api/requests";
 import { BudFormContext } from "@/components/ui/bud/context/BudFormContext";
 import { successToast, errorToast } from "@/components/toast";
-import { Image } from "antd";
+import ThemedLabel from "@/components/ui/bud/dataEntry/ThemedLabel";
+import { useTheme } from "@/context/themeContext";
 
 interface ApiKey {
   id: string;
@@ -90,10 +89,7 @@ function EditApiKeyForm({ setDisableNext, form }: { setDisableNext: (value: bool
         className="flex items-center rounded-[6px] relative !bg-[transparent] w-[100%] mb-[0]"
       >
         <div className="w-full">
-          <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap">
-            API Key Name
-            <span className="text-[red] text-[1rem]">*</span>
-          </Text_12_300_EEEEEE>
+          <ThemedLabel text="API Key Name" required />
         </div>
         <Input
           placeholder="Enter API key name"
@@ -121,10 +117,7 @@ function EditApiKeyForm({ setDisableNext, form }: { setDisableNext: (value: bool
         className="rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]"
       >
         <div className="w-full">
-          <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap">
-            Project
-            <span className="text-[red] text-[1rem]">*</span>
-          </Text_12_300_EEEEEE>
+          <ThemedLabel text="Project" required />
         </div>
         <div className="custom-select-two w-full rounded-[6px] relative">
           <ConfigProvider
@@ -167,17 +160,7 @@ function EditApiKeyForm({ setDisableNext, form }: { setDisableNext: (value: bool
         className="rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]"
       >
         <div className="w-full">
-          <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap">
-            Set Expiry
-            <CustomPopover title="Set when this API key should expire">
-              <Image
-                src="/images/info.png"
-                preview={false}
-                alt="info"
-                style={{ width: '.75rem', height: '.75rem' }}
-              />
-            </CustomPopover>
-          </Text_12_300_EEEEEE>
+          <ThemedLabel text="Set Expiry" info="Set when this API key should expire" />
         </div>
         <div className="custom-select-two w-full rounded-[6px] relative">
           <ConfigProvider
@@ -222,9 +205,12 @@ function EditApiKeyForm({ setDisableNext, form }: { setDisableNext: (value: bool
 export default function EditApiKey() {
   const { closeDrawer } = useDrawer();
   const context = useContext(BudFormContext);
+  const { effectiveTheme } = useTheme();
   const [selectedApiKey, setSelectedApiKey] = useState<ApiKey | null>(null);
   const [disableNext, setDisableNext] = useState(true);
   const [loading, setLoading] = useState(false);
+
+  const isLight = effectiveTheme === "light";
 
   useEffect(() => {
     const storedKey = localStorage.getItem("selected_api_key");
@@ -274,13 +260,13 @@ export default function EditApiKey() {
         <BudDrawerLayout>
           <div className="px-[1.4rem] pb-[.9rem] rounded-ss-lg rounded-se-lg pt-[1.1rem] border-b-[.5px] border-b-[#1F1F1F]">
             <div className="flex justify-between align-center">
-              <Text_12_300_EEEEEE className="p-0 pt-[.4rem] m-0 text-[1rem] font-medium text-[#EEEEEE]">
+              <div className={`p-0 pt-[.4rem] m-0 text-[1rem] font-medium ${isLight ? "text-[#1a1a1a]" : "text-[#EEEEEE]"}`}>
                 Edit API Key
-              </Text_12_300_EEEEEE>
+              </div>
             </div>
-            <Text_12_300_EEEEEE className="pt-[.55rem] leading-[1.05rem] text-[#757575]">
+            <div className={`pt-[.55rem] leading-[1.05rem] ${isLight ? "text-[#666666]" : "text-[#757575]"}`}>
               Update API key details
-            </Text_12_300_EEEEEE>
+            </div>
           </div>
           <div>
             <EditApiKeyForm setDisableNext={setDisableNext} form={context.form} />

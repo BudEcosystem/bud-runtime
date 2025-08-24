@@ -7,6 +7,7 @@ import {
 import { ChevronRight } from "lucide-react";
 import { ReactNode } from "react";
 import CustomPopover from "@/flows/components/customPopover";
+import { useTheme } from "@/context/themeContext";
 
 interface PrimaryButtonProps {
   classNames?: string;
@@ -112,21 +113,36 @@ export function PrimaryButton({
 }
 
 export function SecondaryButton({ classNames = "", ...props }: any) {
+  const { effectiveTheme } = useTheme();
+  const isLight = effectiveTheme === "light";
+
   return (
     <Button
       {...props}
-      className={`text-[0.75rem] h-[1.75rem] border-[.5px] border-[#757575] min-w-[4rem] font-normal bg-[#1F1F1F]
-    hover:bg-[#1F1F1F] hover:border-[#B3B3B3] ${classNames}
-    ${props.text == "Skip" && "hover:bg-[#38260B] hover:border-[#896814]"}
-    ${props.text == "Close" && "hover:bg-[#290E0E] hover:border-[#6F0E0E]"}
-    ${props.disabled ? "bg-[#1F1F1F]  text-[#757575]! cursor-not-allowed" : "bg-[#1F1F1F] "}
+      className={`text-[0.75rem] h-[1.75rem] border-[.5px] min-w-[4rem] font-normal
+    ${isLight
+      ? "bg-white border-[#d0d0d0] hover:bg-[#f5f5f5] hover:border-[#999999]"
+      : "bg-[#1F1F1F] border-[#757575] hover:bg-[#1F1F1F] hover:border-[#B3B3B3]"
+    } ${classNames}
+    ${props.text == "Skip" && !isLight && "hover:bg-[#38260B] hover:border-[#896814]"}
+    ${props.text == "Close" && !isLight && "hover:bg-[#290E0E] hover:border-[#6F0E0E]"}
+    ${props.disabled
+      ? isLight
+        ? "bg-[#f5f5f5] text-[#999999] cursor-not-allowed"
+        : "bg-[#1F1F1F] text-[#757575] cursor-not-allowed"
+      : ""
+    }
     `}
     >
-      <Text_12_400_EEEEEE
-        className={`${props.disabled ? "!text-[#757575] font-600" : "text-[#EEEEEE]"}`}
+      <div
+        className={`text-[0.75rem] font-[400] ${
+          props.disabled
+            ? isLight ? "text-[#999999]" : "text-[#757575]"
+            : isLight ? "text-[#1a1a1a]" : "text-[#EEEEEE]"
+        }`}
       >
         {props.children || props.text || "Back"}{" "}
-      </Text_12_400_EEEEEE>
+      </div>
     </Button>
   );
 }

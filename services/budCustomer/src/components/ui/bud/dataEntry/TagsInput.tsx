@@ -12,6 +12,7 @@ import {
 } from "./TagsInputData";
 import { Cross1Icon } from "@radix-ui/react-icons";
 import CustomPopover from "../../../../flows/components/customPopover";
+import { useTheme } from "@/context/themeContext";
 
 export type Tag = {
   name: string;
@@ -42,6 +43,8 @@ export default function TagsInput(props: SelectProps) {
   const [selected, setSelected] = useState<Tag[]>(props.defaultValue || []);
   const [inputValue, setInputValue] = useState("");
   const ref = React.useRef(null);
+  const { effectiveTheme } = useTheme();
+  const isLight = effectiveTheme === "light";
 
   useEffect(() => {
     const element = document.getElementById("next-button");
@@ -125,8 +128,14 @@ export default function TagsInput(props: SelectProps) {
       className={`flex items-center !rounded-[6px] relative !bg-[transparent] w-full mb-[.35rem] ${props.ClassNames}`}
       rules={props.rules}
     >
-      <div className="w-full">
-        <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-[.75rem] text-[#EEEEEE] font-[400]">
+      <div className="w-full relative">
+        <div
+          className="absolute -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-[.75rem] font-[400] px-1"
+          style={{
+            backgroundColor: isLight ? "#ffffff" : "#101010",
+            color: isLight ? "#1a1a1a" : "#EEEEEE",
+          }}
+        >
           {props.label || "Tags"}{" "}
           {required && <b className="text-[#FF4D4F]">*</b>}
           <CustomPopover title={props.info}>
@@ -137,15 +146,14 @@ export default function TagsInput(props: SelectProps) {
               style={{ width: ".75rem" }}
             />
           </CustomPopover>
-        </Text_12_300_EEEEEE>
-      </div>
-      <CreatableSelect
+        </div>
+        <CreatableSelect
         menuPlacement={props.menuplacement || "auto"}
         ref={ref}
-        className={`drawerSelect w-full placeholder:text-xs text-xs  text-[#EEEEEE] indent-[.5rem]  placeholder:text-[#808080] font-light outline-none !bg-[transparent] rounded-[6px] hover:!bg-[#FFFFFF08] ${props.SelectClassNames}`}
+        className={`drawerSelect w-full placeholder:text-xs text-xs indent-[.5rem] font-light outline-none !bg-[transparent] rounded-[6px] ${props.SelectClassNames}`}
         closeMenuOnSelect={false}
         isMulti
-        styles={colourStyles(props.overrides)}
+        styles={colourStyles(props.overrides, isLight)}
         // menuIsOpen={true}
         options={options?.map((tag) => ({
           label: tag.name,
@@ -233,9 +241,11 @@ export default function TagsInput(props: SelectProps) {
               <div
                 {...innerProps}
                 ref={innerRef}
-                className="flex items-center justify-between cursor-pointer mb-1 py-[.3rem] px-[.3rem] hover:bg-[#1F1F1F] rounded-[8px]"
+                className={`flex items-center justify-between cursor-pointer mb-1 py-[.3rem] px-[.3rem] rounded-[8px] ${isLight ? "hover:bg-[#f0f0f0]" : "hover:bg-[#1F1F1F]"}`}
                 style={{
-                  backgroundColor: props.isFocused ? "#1F1F1F" : "transparent",
+                  backgroundColor: props.isFocused
+                    ? (isLight ? "#f0f0f0" : "#1F1F1F")
+                    : "transparent",
                 }}
               >
                 <div
@@ -286,7 +296,8 @@ export default function TagsInput(props: SelectProps) {
             );
           },
         }}
-      />
+        />
+      </div>
     </Form.Item>
   );
 }
