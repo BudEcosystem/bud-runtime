@@ -53,12 +53,12 @@ new_hash_get() {
 ## MAIN ##
 ##########
 
-# if early_escape_possible; then
-# 	echo "early escape success, nix bump commit is newer"
-# 	exit 0
-# else
-# 	echo "early escape not possible, npm bump commit is newer"
-# fi
+if early_escape_possible; then
+	echo "early escape success, nix bump commit is newer"
+	exit 0
+else
+	echo "early escape not possible, npm bump commit is newer"
+fi
 
 cur_hash="$(cat "$nix_hash_path")"
 new_hash="$(new_hash_get)"

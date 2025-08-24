@@ -10,6 +10,26 @@ env:
   NODE_VERSION: "20"
 
 jobs:
+  budcustomer-bumper:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+      - name: Setup Nix Cache
+        uses: DeterminateSystems/magic-nix-cache-action@main
+
+      - name: Run BudCustomer Bumper
+        run: nix run .#workflow_budcustomer_bumper
+
   lint:
     name: Lint and TypeScript Check
     runs-on: ubuntu-latest
@@ -47,6 +67,7 @@ jobs:
           echo "::endgroup::"
 
   build:
+    needs: [budcustomer-bumper]
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repository
