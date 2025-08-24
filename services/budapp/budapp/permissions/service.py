@@ -85,8 +85,6 @@ class PermissionService(SessionMixin):
 
     async def check_resource_permission_by_user(self, user: UserModel, payload: CheckUserResourceScope) -> bool:
         """Check if a user has a resource permission."""
-        logger.debug(f"::PERMISSION::Checking permissions for user: {user.raw_token}")
-
         # if user.is_superuser:
         #     return True
 
@@ -102,12 +100,13 @@ class PermissionService(SessionMixin):
             TenantClient, {"tenant_id": tenant.id}, missing_ok=True
         )
 
-        # Credentials
+        # Credentials - decrypt client secret for use
+        decrypted_secret = await tenant_client.get_decrypted_client_secret()
         credentials = TenantClientSchema(
             id=tenant_client.id,
             client_named_id=tenant_client.client_named_id,
             client_id=tenant_client.client_id,
-            client_secret=tenant_client.client_secret,
+            client_secret=decrypted_secret,
         )
 
         try:
@@ -118,8 +117,6 @@ class PermissionService(SessionMixin):
                 credentials,
                 user.raw_token,
             )
-
-            logger.debug(f"::KEYCLOAK::User {user.auth_id} roles and permissions: {result}")
 
             if payload.entity_id is None:
                 # Global Permission

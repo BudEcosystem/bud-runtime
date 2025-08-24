@@ -2498,7 +2498,7 @@ class ModelService(SessionMixin):
         Args:
             workflow_id: The ID of the workflow to cancel.
         """
-        cancel_model_deployment_endpoint = f"{app_settings.dapr_base_url}v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment/cancel/{workflow_id}"
+        cancel_model_deployment_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment/cancel/{workflow_id}"
 
         logger.debug(f"Performing cancel model deployment request to budcluster {cancel_model_deployment_endpoint}")
         try:
@@ -3536,9 +3536,9 @@ class ModelService(SessionMixin):
 
         # Get recommended cluster info from Bud Simulator
         recommended_cluster_endpoint = (
-            f"{app_settings.dapr_base_url}v1.0/invoke/{app_settings.bud_simulator_app_id}/method/simulator/run"
+            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_simulator_app_id}/method/simulator/run"
         )
-
+        logger.debug(f"simulator url: {recommended_cluster_endpoint}")
         # Perform recommended cluster simulation
         try:
             async with aiohttp.ClientSession() as session:
@@ -3625,7 +3625,7 @@ class ModelService(SessionMixin):
             provider=db_model.source,
         )
         model_deployment_endpoint = (
-            f"{app_settings.dapr_base_url}v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment"
+            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment"
         )
         model_deployment_payload = model_deployment_request.model_dump(mode="json", exclude_none=True)
         logger.debug("model_deployment_payload: %s", model_deployment_payload)

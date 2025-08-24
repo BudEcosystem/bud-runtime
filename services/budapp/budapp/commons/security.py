@@ -159,6 +159,7 @@ class AESHandler:
             decrypted_message = self.fernet.decrypt(encrypted_message_bytes)
         except Exception as e:
             logger.error(f"Could not decrypt message: {e}")
+            raise
 
         # Convert the decrypted message back to a string
         return decrypted_message.decode("utf-8")
