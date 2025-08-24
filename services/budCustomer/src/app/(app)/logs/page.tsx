@@ -644,6 +644,7 @@ export default function ObservabilityPage() {
         <div className="boardPageTop">
           <PageHeader
             headding="Logs"
+            hClass="!text-[#000000] dark:!text-[#FFFFFF]"
           />
         </div>
 
