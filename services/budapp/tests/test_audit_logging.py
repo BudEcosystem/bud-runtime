@@ -310,11 +310,13 @@ class TestIntegrationScenarios:
         assert audit_data.resource_type == AuditResourceTypeEnum.PROJECT
         assert audit_data.resource_id == project_id
         assert audit_data.user_id == user_id
+        # Details should include success flag added by audit_logger
         expected_details = {
             "operation": "add_member",
             "target_user_id": str(target_user_id),
             "role_assigned": "viewer",
             "permissions": ["view", "list"],
+            "success": True,
         }
         assert audit_data.details == expected_details
 
@@ -353,6 +355,7 @@ class TestIntegrationScenarios:
         assert call_args["workflow_type"] == "DEPLOYMENT"
         assert call_args["action"] == AuditActionEnum.WORKFLOW_STARTED
         assert call_args["user_id"] == user_id
-        # audit_workflow now extracts status and error from details
-        assert call_args.get("status") is None  # No status in the details
-        assert call_args.get("error") is None  # No error in the details
+        # audit_workflow extracts status and error from details if present
+        # Since we didn't include status/error in details, they should be None
+        assert call_args.get("status") is None
+        assert call_args.get("error") is None

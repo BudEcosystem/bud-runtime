@@ -103,21 +103,22 @@ def log_audit(
         # Create audit service instance
         audit_service = AuditService(session)
 
-        # Add user agent to details if captured
-        if details is None:
-            details = {}
-        if user_agent and "user_agent" not in details:
-            details["user_agent"] = user_agent[:200]  # Limit length
+        # Create a copy of details to avoid modifying the original
+        audit_details = details.copy() if details else {}
 
-        # Add success status to details
-        details["success"] = success
+        # Add user agent to details if captured
+        if user_agent and "user_agent" not in audit_details:
+            audit_details["user_agent"] = user_agent[:200]  # Limit length
+
+        # Add success status to details for internal use
+        audit_details["success"] = success
 
         # Choose the appropriate audit method based on action
         if action == AuditActionEnum.CREATE:
             audit_service.audit_create(
                 resource_type=resource_type,
                 resource_id=resource_id,
-                resource_data=details,
+                resource_data=audit_details,
                 user_id=user_id,
                 ip_address=ip_address,
             )
@@ -134,7 +135,7 @@ def log_audit(
             audit_service.audit_delete(
                 resource_type=resource_type,
                 resource_id=resource_id,
-                resource_data=details,
+                resource_data=audit_details,
                 user_id=user_id,
                 ip_address=ip_address,
             )
@@ -144,8 +145,8 @@ def log_audit(
             AuditActionEnum.LOGIN_FAILED,
             AuditActionEnum.TOKEN_REFRESH,
         ]:
-            # Extract reason from details if present
-            reason = details.get("reason") if details else None
+            # Extract reason from audit_details if present
+            reason = audit_details.get("reason") if audit_details else None
             audit_service.audit_authentication(
                 action=action,
                 user_id=user_id,
@@ -155,8 +156,8 @@ def log_audit(
             )
         elif action in [AuditActionEnum.ACCESS_GRANTED, AuditActionEnum.ACCESS_DENIED]:
             # Extract access details
-            access_type = details.get("access_type", "unknown") if details else "unknown"
-            reason = details.get("reason") if details else None
+            access_type = audit_details.get("access_type", "unknown") if audit_details else "unknown"
+            reason = audit_details.get("reason") if audit_details else None
             granted = action == AuditActionEnum.ACCESS_GRANTED
 
             audit_service.audit_access(
@@ -175,11 +176,11 @@ def log_audit(
         ]:
             audit_service.audit_workflow(
                 workflow_id=resource_id,
-                workflow_type=details.get("workflow_type", "UNKNOWN") if details else "UNKNOWN",
+                workflow_type=audit_details.get("workflow_type", "UNKNOWN") if audit_details else "UNKNOWN",
                 action=action,
                 user_id=user_id,
-                status=details.get("status") if details else None,
-                error=details.get("error") if details else None,
+                status=audit_details.get("status") if audit_details else None,
+                error=audit_details.get("error") if audit_details else None,
                 ip_address=ip_address,
             )
         else:
@@ -192,7 +193,7 @@ def log_audit(
                 resource_id=resource_id,
                 user_id=user_id,
                 ip_address=ip_address,
-                details=details,
+                details=audit_details,
                 previous_state=previous_state,
                 new_state=new_state,
                 timestamp=datetime.now(timezone.utc),
