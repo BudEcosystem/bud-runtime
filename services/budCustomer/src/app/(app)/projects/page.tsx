@@ -154,7 +154,7 @@ export default function ProjectsPage() {
       project_type: projectData.project_type,
       status: "active" as const,
       resources: {
-        api_keys: p.endpoints_count || 0,
+        api_keys: p.credentials_count || 0,
         batches: 0,
         logs: 0,
         models: 0,
