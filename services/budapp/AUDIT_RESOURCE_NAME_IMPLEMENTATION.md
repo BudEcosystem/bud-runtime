@@ -11,25 +11,25 @@ This document outlines the changes made to support storing and searching by reso
 
 ### 2. Model and Schema Updates
 - **Models** (`audit_ops/models.py`): Added `resource_name` field to AuditTrail model
-- **Schemas** (`audit_ops/schemas.py`): 
+- **Schemas** (`audit_ops/schemas.py`):
   - Added `resource_name` to `AuditRecordBase`, `AuditRecordEntry`, and `AuditRecordFilter`
   - Filter supports partial match search using ILIKE
 
 ### 3. CRUD and Service Layer
-- **CRUD** (`audit_ops/crud.py`): 
+- **CRUD** (`audit_ops/crud.py`):
   - Updated `create_audit_record` to accept and store `resource_name`
   - Updated `get_audit_records` to filter by `resource_name` with partial match
-- **Services** (`audit_ops/services.py`): 
+- **Services** (`audit_ops/services.py`):
   - Updated `get_audit_records` to pass through `resource_name` filter
-- **Hash Utils** (`audit_ops/hash_utils.py`): 
+- **Hash Utils** (`audit_ops/hash_utils.py`):
   - Updated hash generation to include `resource_name` for integrity
 
 ### 4. API and Export Updates
-- **Routes** (`audit_ops/audit_routes.py`): 
+- **Routes** (`audit_ops/audit_routes.py`):
   - Added `resource_name` query parameter for filtering
-- **Export** (`audit_ops/export_utils.py`): 
+- **Export** (`audit_ops/export_utils.py`):
   - Added "Resource Name" column to CSV exports
-- **Logger** (`audit_ops/audit_logger.py`): 
+- **Logger** (`audit_ops/audit_logger.py`):
   - Updated `log_audit` function to accept `resource_name` parameter
 
 ## How to Update Existing Audit Calls
@@ -131,7 +131,7 @@ GET /audit/records?export_csv=true&resource_name=Production
 When testing the new functionality:
 
 1. Create audit records with resource_name
-2. Search/filter by resource_name 
+2. Search/filter by resource_name
 3. Export to CSV and verify the Resource Name column
 4. Verify that old audit records (without resource_name) still work correctly
 
@@ -143,7 +143,7 @@ Here's a complete example of updating a service method:
 def create_project(self, project_data, current_user_id, request):
     # Create the project
     db_project = self.crud.create_project(project_data)
-    
+
     # Log audit with resource_name
     log_audit(
         session=self.session,
@@ -159,7 +159,7 @@ def create_project(self, project_data, current_user_id, request):
         request=request,
         success=True,
     )
-    
+
     return db_project
 ```
 

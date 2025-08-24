@@ -356,14 +356,14 @@ class TestAuditExportEndpoint:
                 )
 
                 assert response.status_code == status.HTTP_200_OK
-                
+
                 # Parse CSV and verify resource_name column exists
                 csv_content = response.text
                 reader = csv.DictReader(io.StringIO(csv_content))
                 headers = reader.fieldnames
-                
+
                 assert "Resource Name" in headers
-                
+
                 # Verify resource_name values are populated
                 rows = list(reader)
                 for i, row in enumerate(rows):
@@ -388,22 +388,22 @@ class TestAuditExportEndpoint:
             record.previous_state = None
             record.new_state = None
             record.record_hash = f"{'a' * 63}{i}"
-            
+
             record.user = Mock()
             record.user.email = f"user{i}@example.com"
             record.user.name = f"User {i}"
             record.actioned_by_user = None
-            
+
             records.append(record)
 
         # Generate CSV
         csv_content = generate_csv_from_audit_records(records, include_user_info=True)
-        
+
         # Parse and verify
         reader = csv.DictReader(io.StringIO(csv_content))
         rows = list(reader)
-        
+
         assert len(rows) == 3
         assert rows[0]["Resource Name"] == "Alpha Project"
-        assert rows[1]["Resource Name"] == "Beta Project" 
+        assert rows[1]["Resource Name"] == "Beta Project"
         assert rows[2]["Resource Name"] == "Alpha Model"

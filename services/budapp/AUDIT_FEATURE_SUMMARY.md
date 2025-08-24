@@ -28,17 +28,17 @@ This document summarizes the comprehensive audit trail enhancements implemented 
 1. **Models & Schema**:
    - `audit_ops/models.py` - Added resource_name field
    - `audit_ops/schemas.py` - Updated all schemas with resource_name
-   
+
 2. **Business Logic**:
    - `audit_ops/crud.py` - Added resource_name to CRUD operations
    - `audit_ops/services.py` - Updated service layer for resource_name
    - `audit_ops/hash_utils.py` - Included resource_name in hash generation
-   
+
 3. **API & Export**:
    - `audit_ops/audit_routes.py` - Added export_csv parameter and resource_name filter
    - `audit_ops/export_utils.py` - Created CSV generation utilities
    - `audit_ops/audit_logger.py` - Updated log_audit signature
-   
+
 4. **Database Migration**:
    - `migrations/versions/7c028d42c0df_add_resource_name_to_audit_trail.py`
 
@@ -113,11 +113,11 @@ log_audit(
    alembic upgrade head
    ```
 
-2. **Update Existing Code**: 
+2. **Update Existing Code**:
    - Follow patterns in `AUDIT_RESOURCE_NAME_IMPLEMENTATION.md`
    - Add `resource_name` parameter after `resource_id` in log_audit calls
 
-3. **Optional Backfill**: 
+3. **Optional Backfill**:
    - Can write script to populate resource_name for existing records
 
 ## Testing
@@ -142,7 +142,7 @@ pytest tests/test_audit_export.py -v
 
 ## Benefits
 
-1. **Enhanced Searchability**: 
+1. **Enhanced Searchability**:
    - Users can search by meaningful names instead of UUIDs
    - Partial match support for flexible searching
 

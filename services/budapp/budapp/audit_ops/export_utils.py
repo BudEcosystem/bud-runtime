@@ -66,7 +66,7 @@ def generate_csv_from_audit_records(
             "Action": record.action if record.action else "",
             "Resource Type": record.resource_type if record.resource_type else "",
             "Resource ID": str(record.resource_id) if record.resource_id else "",
-            "Resource Name": record.resource_name if hasattr(record, 'resource_name') and record.resource_name else "",
+            "Resource Name": record.resource_name if hasattr(record, "resource_name") and record.resource_name else "",
             "IP Address": record.ip_address if record.ip_address else "",
             "Details": str(record.details) if record.details else "",
             "Previous State": str(record.previous_state) if record.previous_state else "",
@@ -111,8 +111,8 @@ def sanitize_for_csv(value: str) -> str:
     value_str = str(value)
 
     # CSV libraries handle escaping internally, but we can do basic cleaning
-    # Remove any null bytes which can cause issues
-    value_str = value_str.replace("\x00", "")
+    # Replace null bytes with spaces to preserve readability
+    value_str = value_str.replace("\x00", " ")
 
     return value_str
 

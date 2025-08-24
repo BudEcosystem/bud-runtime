@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 from uuid import UUID
 
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from budapp.audit_ops.hash_utils import generate_audit_hash
@@ -266,9 +266,40 @@ class AuditTrailDataManager(DataManagerUtils):
         user_results = self.session.execute(users_activity_stmt).all()
         most_active_users = [{"user_id": str(user_id), "count": count} for user_id, count in user_results]
 
+        # Count of unique resources that were updated
+        unique_updated_resources_stmt = (
+            select(func.count(func.distinct(AuditTrail.resource_id)))
+            .select_from(AuditTrail)
+            .where(AuditTrail.action == AuditActionEnum.UPDATE)
+            .where(AuditTrail.resource_id.isnot(None))
+        )
+        if where_clause is not None:
+            unique_updated_resources_stmt = unique_updated_resources_stmt.where(where_clause)
+        unique_resources_updated = self.execute_scalar(unique_updated_resources_stmt) or 0
+
+        # Count of failure events
+        # Failure events are those with action ending in _FAILED or details containing success=false
+        failure_actions = [
+            AuditActionEnum.LOGIN_FAILED,
+            AuditActionEnum.WORKFLOW_FAILED,
+            AuditActionEnum.ACCESS_DENIED,
+        ]
+
+        failure_conditions = [
+            AuditTrail.action.in_(failure_actions),
+            AuditTrail.details.op("->>")("success") == "false",
+        ]
+
+        failure_stmt = select(func.count()).select_from(AuditTrail).where(or_(*failure_conditions))
+        if where_clause is not None:
+            failure_stmt = failure_stmt.where(where_clause)
+        failure_events_count = self.execute_scalar(failure_stmt) or 0
+
         return {
             "total_records": total_records,
             "unique_users": unique_users,
+            "unique_resources_updated": unique_resources_updated,
+            "failure_events_count": failure_events_count,
             "most_common_actions": most_common_actions,
             "most_active_users": most_active_users,
             "date_range": {
