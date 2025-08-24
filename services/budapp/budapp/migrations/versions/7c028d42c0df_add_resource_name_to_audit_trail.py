@@ -1,7 +1,7 @@
 """add resource_name to audit_trail
 
-Revision ID: add_resource_name_001
-Revises: ffb55b8f01fc
+Revision ID: 7c028d42c0df
+Revises: 1235cf2dae2
 Create Date: 2025-08-24 08:00:00.000000
 
 """
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = 'add_resource_name_001'
-down_revision = 'ffb55b8f01fc'
+revision = '7c028d42c0df'
+down_revision = '1235cf2dae2'
 branch_labels = None
 depends_on = None
 
