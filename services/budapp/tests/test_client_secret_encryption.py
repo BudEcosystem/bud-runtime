@@ -178,7 +178,7 @@ class TestServiceIntegration:
     async def test_auth_service_decrypts_secret_for_keycloak(self):
         """Test that auth service decrypts client secret before using it with Keycloak."""
         from budapp.auth.services import AuthService
-        from budapp.user_ops.schemas import UserLogin
+        from budapp.auth.schemas import UserLogin
 
         # Create mock tenant client with encrypted secret
         mock_tenant_client = Mock(spec=TenantClient)
