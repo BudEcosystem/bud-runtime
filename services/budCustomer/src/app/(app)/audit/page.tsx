@@ -404,7 +404,7 @@ export default function AuditPage() {
       setStatistics({
         totalEvents: data.data.total_records || 0,
         failedActions: data.data.failure_events_count || 0,
-        resourcesModified: data.unique_resources_updated || 0,
+        resourcesModified: data.data.unique_resources_updated || 0,
       })
     } catch (error) {
       console.error("Failed to fetch usage data:", error);
