@@ -187,7 +187,7 @@ const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }> = ({
         const element = descriptionRef.current;
         setIsOverflowing(element.scrollHeight > 50);
       }
-    }, [model?.description]);
+    }, []);
 
     return (
       <div className="pt-[.25rem]">
@@ -548,7 +548,7 @@ const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }> = ({
         children: <GeneralTab />,
       },
     ],
-    [model],
+    [model, GeneralTab],
   );
 
   useEffect(() => {
