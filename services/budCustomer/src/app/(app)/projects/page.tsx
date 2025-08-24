@@ -195,8 +195,12 @@ export default function ProjectsPage() {
           openDrawer("edit-project", {});
         }, 100);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to open edit project:", error);
+      // Check if it's an authentication error
+      if (error?.response?.status === 401) {
+        console.error("Authentication expired. Please login again.");
+      }
     }
   }, [globalProjects, getGlobalProject, openDrawer]);
 
