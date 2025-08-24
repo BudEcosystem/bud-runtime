@@ -24,6 +24,7 @@ class AuditRecordBase(BaseModel):
     action: AuditActionEnum = Field(..., description="Type of action performed")
     resource_type: AuditResourceTypeEnum = Field(..., description="Type of resource affected")
     resource_id: Optional[UUID4] = Field(None, description="ID of the affected resource")
+    resource_name: Optional[str] = Field(None, description="Name of the affected resource for display and search", max_length=255)
     details: Optional[Dict[str, Any]] = Field(None, description="Additional context about the action")
     ip_address: Optional[str] = Field(
         None, description="IP address from which the action was performed", max_length=45
@@ -75,6 +76,7 @@ class AuditRecordEntry(BaseModel):
     action: str = Field(..., description="Type of action performed")
     resource_type: str = Field(..., description="Type of resource affected")
     resource_id: Optional[UUID4] = Field(None, description="ID of the affected resource")
+    resource_name: Optional[str] = Field(None, description="Name of the affected resource for display and search")
     timestamp: datetime = Field(..., description="When the action occurred")
     details: Optional[Dict[str, Any]] = Field(None, description="Additional context about the action")
     ip_address: Optional[str] = Field(None, description="IP address from which the action was performed")
@@ -102,6 +104,7 @@ class AuditRecordFilter(BaseModel):
     action: Optional[AuditActionEnum] = Field(None, description="Filter by action type")
     resource_type: Optional[AuditResourceTypeEnum] = Field(None, description="Filter by resource type")
     resource_id: Optional[UUID4] = Field(None, description="Filter by resource ID")
+    resource_name: Optional[str] = Field(None, description="Filter by resource name (partial match)")
     start_date: Optional[datetime] = Field(None, description="Filter by start date (inclusive)")
     end_date: Optional[datetime] = Field(None, description="Filter by end date (inclusive)")
     ip_address: Optional[str] = Field(None, description="Filter by IP address")

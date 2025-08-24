@@ -29,6 +29,7 @@ class AuditTrail(Base, TimestampMixin):
         action: Type of action performed (from AuditActionEnum)
         resource_type: Type of resource affected (from AuditResourceTypeEnum)
         resource_id: ID of the affected resource
+        resource_name: Name of the affected resource for display and search
         timestamp: When the action occurred
         details: Additional context about the action in JSON format
         ip_address: IP address from which the action was performed
@@ -74,6 +75,10 @@ class AuditTrail(Base, TimestampMixin):
 
     resource_id: Mapped[Optional[UUID]] = mapped_column(
         Uuid, nullable=True, index=True, comment="ID of the affected resource"
+    )
+
+    resource_name: Mapped[Optional[str]] = mapped_column(
+        String(255), nullable=True, index=True, comment="Name of the affected resource for display and search"
     )
 
     # Timestamp when the action occurred
@@ -124,8 +129,8 @@ class AuditTrail(Base, TimestampMixin):
         return (
             f"<AuditTrail(id={self.id}, action={self.action}, "
             f"resource_type={self.resource_type}, resource_id={self.resource_id}, "
-            f"user_id={self.user_id}, actioned_by={self.actioned_by}, "
-            f"timestamp={self.timestamp})>"
+            f"resource_name={self.resource_name}, user_id={self.user_id}, "
+            f"actioned_by={self.actioned_by}, timestamp={self.timestamp})>"
         )
 
 

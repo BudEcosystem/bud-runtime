@@ -36,6 +36,7 @@ def log_audit(
     action: AuditActionEnum,
     resource_type: AuditResourceTypeEnum,
     resource_id: Optional[UUID] = None,
+    resource_name: Optional[str] = None,
     user_id: Optional[UUID] = None,
     details: Optional[Dict[str, Any]] = None,
     request: Optional[Request] = None,
@@ -54,6 +55,7 @@ def log_audit(
         action: The action being performed (CREATE, UPDATE, DELETE, etc.)
         resource_type: The type of resource being acted upon
         resource_id: Optional ID of the resource
+        resource_name: Optional name of the resource for display and search
         user_id: Optional ID of the user performing the action
         details: Optional dictionary with additional context/details
         request: Optional FastAPI request object for extracting IP and user agent

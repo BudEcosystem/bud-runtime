@@ -334,6 +334,7 @@ class AuditService:
             action=filter_params.action,
             resource_type=filter_params.resource_type,
             resource_id=filter_params.resource_id,
+            resource_name=filter_params.resource_name,
             start_date=filter_params.start_date,
             end_date=filter_params.end_date,
             ip_address=filter_params.ip_address,
