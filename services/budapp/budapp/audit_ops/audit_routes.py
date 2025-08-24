@@ -85,13 +85,13 @@ async def get_audit_records(
                 offset=0,
                 limit=export_limit,
             )
-            
+
             # Generate CSV content
             csv_content = generate_csv_from_audit_records(records, include_user_info=True)
-            
+
             # Generate filename with timestamp
             filename = generate_export_filename(prefix="audit_export", extension="csv")
-            
+
             # Return CSV response
             return Response(
                 content=csv_content,
@@ -99,9 +99,9 @@ async def get_audit_records(
                 headers={
                     "Content-Disposition": f'attachment; filename="{filename}"',
                     "Content-Type": "text/csv; charset=utf-8",
-                }
+                },
             )
-        
+
         # Regular JSON response
         else:
             # Calculate offset from page and limit
