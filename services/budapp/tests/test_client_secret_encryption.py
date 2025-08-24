@@ -97,10 +97,9 @@ class TestTenantClientModel:
             client_named_id="test"
         )
 
-        # Create an already encrypted value
-        aes = AESHandler()
+        # Create an already encrypted value using RSA
         plaintext = "original-secret"
-        encrypted = await aes.encrypt(plaintext)
+        encrypted = await RSAHandler.encrypt(plaintext)
 
         # Set the already encrypted value
         await client.set_client_secret(encrypted)
@@ -206,28 +205,25 @@ class TestMigrationScript:
         # In a real test, you'd set up a test database with plaintext secrets
         # and verify they get encrypted
 
-        aes = AESHandler()
 
         # Simulate a plaintext secret
         plaintext = "plaintext-secret"
         assert not TenantClient._is_encrypted(plaintext)
 
         # Encrypt it (as the migration would)
-        encrypted = await aes.encrypt(plaintext)
+        encrypted = await RSAHandler.encrypt(plaintext)
         assert TenantClient._is_encrypted(encrypted)
 
         # Verify we can decrypt it back
-        decrypted = await aes.decrypt(encrypted)
+        decrypted = await RSAHandler.decrypt(encrypted)
         assert decrypted == plaintext
 
     @pytest.mark.asyncio
     async def test_migration_skips_already_encrypted_secrets(self):
         """Test that the migration script skips already encrypted secrets."""
-        aes = AESHandler()
-
         # Create an already encrypted secret
         plaintext = "already-encrypted"
-        encrypted = await aes.encrypt(plaintext)
+        encrypted = await RSAHandler.encrypt(plaintext)
 
         # Verify it's detected as already encrypted
         assert TenantClient._is_encrypted(encrypted)
@@ -242,25 +238,23 @@ class TestEncryptionConsistency:
     @pytest.mark.asyncio
     async def test_same_input_different_output(self):
         """Test that encrypting the same value twice gives different outputs (due to IV)."""
-        aes = AESHandler()
         plaintext = "consistent-secret"
 
-        encrypted1 = await aes.encrypt(plaintext)
-        encrypted2 = await aes.encrypt(plaintext)
+        encrypted1 = await RSAHandler.encrypt(plaintext)
+        encrypted2 = await RSAHandler.encrypt(plaintext)
 
         # Due to random IV, encrypted values should be different
         assert encrypted1 != encrypted2
 
         # But both should decrypt to the same value
-        decrypted1 = await aes.decrypt(encrypted1)
-        decrypted2 = await aes.decrypt(encrypted2)
+        decrypted1 = await RSAHandler.decrypt(encrypted1)
+        decrypted2 = await RSAHandler.decrypt(encrypted2)
         assert decrypted1 == plaintext
         assert decrypted2 == plaintext
 
     @pytest.mark.asyncio
     async def test_special_characters_in_secret(self):
         """Test that secrets with special characters are handled correctly."""
-        aes = AESHandler()
 
         special_secrets = [
             "secret-with-spaces and special chars!@#$%^&*()",
@@ -270,25 +264,23 @@ class TestEncryptionConsistency:
         ]
 
         for plaintext in special_secrets:
-            encrypted = await aes.encrypt(plaintext)
-            decrypted = await aes.decrypt(encrypted)
+            encrypted = await RSAHandler.encrypt(plaintext)
+            decrypted = await RSAHandler.decrypt(encrypted)
             assert decrypted == plaintext, f"Failed for secret: {plaintext}"
 
 
 @pytest.mark.asyncio
 async def test_concurrent_encryption_operations():
     """Test that concurrent encryption operations work correctly."""
-    aes = AESHandler()
-
     # Create multiple secrets to encrypt concurrently
     secrets = [f"secret-{i}" for i in range(10)]
 
     # Encrypt all concurrently
-    encrypted_tasks = [aes.encrypt(s) for s in secrets]
+    encrypted_tasks = [RSAHandler.encrypt(s) for s in secrets]
     encrypted_values = await asyncio.gather(*encrypted_tasks)
 
     # Decrypt all concurrently
-    decrypt_tasks = [aes.decrypt(e) for e in encrypted_values]
+    decrypt_tasks = [RSAHandler.decrypt(e) for e in encrypted_values]
     decrypted_values = await asyncio.gather(*decrypt_tasks)
 
     # Verify all match
