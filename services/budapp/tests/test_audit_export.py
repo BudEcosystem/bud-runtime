@@ -221,97 +221,116 @@ class TestAuditExportEndpoint:
     def test_export_csv_parameter(self, mock_audit_service, mock_user, mock_records):
         """Test that export_csv parameter triggers CSV download."""
         from budapp.main import app
+        from budapp.commons.dependencies import get_current_active_user
 
         # Mock the service to return records
         mock_service_instance = Mock()
         mock_service_instance.get_audit_records.return_value = (mock_records, len(mock_records))
         mock_audit_service.return_value = mock_service_instance
 
-        with patch("budapp.audit_ops.audit_routes.get_current_active_user", return_value=mock_user):
-            with patch("budapp.audit_ops.audit_routes.get_session"):
-                client = TestClient(app)
+        # Override the authentication dependency
+        app.dependency_overrides[get_current_active_user] = lambda: mock_user
 
-                # Request with export_csv=true
-                response = client.get(
-                    "/audit/records?export_csv=true",
-                    headers={"Authorization": "Bearer fake-token"}
-                )
+        with patch("budapp.audit_ops.audit_routes.get_session"):
+            client = TestClient(app)
 
-                assert response.status_code == status.HTTP_200_OK
-                assert response.headers["content-type"] == "text/csv; charset=utf-8"
-                assert "attachment" in response.headers.get("content-disposition", "")
-                assert "audit_export" in response.headers.get("content-disposition", "")
+            # Request with export_csv=true
+            response = client.get(
+                "/audit/records?export_csv=true",
+                headers={"Authorization": "Bearer fake-token"}
+            )
 
-                # Verify CSV content
-                csv_content = response.text
-                reader = csv.DictReader(io.StringIO(csv_content))
-                rows = list(reader)
+            assert response.status_code == status.HTTP_200_OK
+            assert response.headers["content-type"] == "text/csv; charset=utf-8"
+            assert "attachment" in response.headers.get("content-disposition", "")
+            assert "audit_export" in response.headers.get("content-disposition", "")
 
-                assert len(rows) == 3
-                for i, row in enumerate(rows):
-                    assert row["User Email"] == f"user{i}@example.com"
-                    assert row["Resource Name"] == f"Project {i}"
-                    assert row["IP Address"] == f"192.168.1.{i+1}"
+            # Verify CSV content
+            csv_content = response.text
+            reader = csv.DictReader(io.StringIO(csv_content))
+            rows = list(reader)
+
+            assert len(rows) == 3
+            for i, row in enumerate(rows):
+                assert row["User Email"] == f"user{i}@example.com"
+                assert row["Resource Name"] == f"Project {i}"
+                assert row["IP Address"] == f"192.168.1.{i+1}"
+
+        # Clean up the override
+        app.dependency_overrides.clear()
 
     def test_regular_json_response(self, mock_audit_service, mock_user, mock_records):
         """Test that without export_csv, JSON is returned."""
         from budapp.main import app
+        from budapp.commons.dependencies import get_current_active_user
 
         # Mock the service
         mock_service_instance = Mock()
         mock_service_instance.get_audit_records.return_value = (mock_records, len(mock_records))
         mock_audit_service.return_value = mock_service_instance
 
-        with patch("budapp.audit_ops.audit_routes.get_current_active_user", return_value=mock_user):
-            with patch("budapp.audit_ops.audit_routes.get_session"):
-                client = TestClient(app)
+        # Override the authentication dependency
+        app.dependency_overrides[get_current_active_user] = lambda: mock_user
 
-                # Request without export_csv
-                response = client.get(
-                    "/audit/records",
-                    headers={"Authorization": "Bearer fake-token"}
-                )
+        with patch("budapp.audit_ops.audit_routes.get_session"):
+            client = TestClient(app)
 
-                assert response.status_code == status.HTTP_200_OK
-                assert "application/json" in response.headers["content-type"]
+            # Request without export_csv
+            response = client.get(
+                "/audit/records",
+                headers={"Authorization": "Bearer fake-token"}
+            )
 
-                # Should return JSON response
-                data = response.json()
-                assert "data" in data
-                assert "message" in data
+            assert response.status_code == status.HTTP_200_OK
+            assert "application/json" in response.headers["content-type"]
+
+            # Should return JSON response
+            data = response.json()
+            assert "data" in data
+            assert "message" in data
+
+        # Clean up the override
+        app.dependency_overrides.clear()
 
     def test_csv_export_with_filters(self, mock_audit_service, mock_user, mock_records):
         """Test CSV export with filters applied."""
         from budapp.main import app
+        from budapp.commons.dependencies import get_current_active_user
 
         # Mock the service
         mock_service_instance = Mock()
         mock_service_instance.get_audit_records.return_value = ([mock_records[0]], 1)
         mock_audit_service.return_value = mock_service_instance
 
-        with patch("budapp.audit_ops.audit_routes.get_current_active_user", return_value=mock_user):
-            with patch("budapp.audit_ops.audit_routes.get_session"):
-                client = TestClient(app)
+        # Override the authentication dependency
+        app.dependency_overrides[get_current_active_user] = lambda: mock_user
 
-                # Request with filters and export
-                response = client.get(
-                    f"/audit/records?export_csv=true&action={AuditActionEnum.CREATE.value}",
-                    headers={"Authorization": "Bearer fake-token"}
-                )
+        with patch("budapp.audit_ops.audit_routes.get_session"):
+            client = TestClient(app)
 
-                assert response.status_code == status.HTTP_200_OK
-                assert response.headers["content-type"] == "text/csv; charset=utf-8"
+            # Request with filters and export
+            response = client.get(
+                f"/audit/records?export_csv=true&action={AuditActionEnum.CREATE.value}",
+                headers={"Authorization": "Bearer fake-token"}
+            )
 
-                # Verify filtered content
-                csv_content = response.text
-                reader = csv.DictReader(io.StringIO(csv_content))
-                rows = list(reader)
+            assert response.status_code == status.HTTP_200_OK
+            assert response.headers["content-type"] == "text/csv; charset=utf-8"
 
-                assert len(rows) == 1
+            # Verify filtered content
+            csv_content = response.text
+            reader = csv.DictReader(io.StringIO(csv_content))
+            rows = list(reader)
+
+            assert len(rows) == 1
+
+        # Clean up the override
+        app.dependency_overrides.clear()
 
     def test_csv_export_client_user(self, mock_audit_service, mock_user, mock_records):
         """Test CSV export for CLIENT users only shows their records."""
         from budapp.main import app
+        from budapp.commons.dependencies import get_current_active_user
 
         # Make user a CLIENT
         mock_user.user_type = "CLIENT"
@@ -321,53 +340,64 @@ class TestAuditExportEndpoint:
         mock_service_instance.get_audit_records.return_value = ([mock_records[0]], 1)
         mock_audit_service.return_value = mock_service_instance
 
-        with patch("budapp.audit_ops.audit_routes.get_current_active_user", return_value=mock_user):
-            with patch("budapp.audit_ops.audit_routes.get_session"):
-                client = TestClient(app)
+        # Override the authentication dependency
+        app.dependency_overrides[get_current_active_user] = lambda: mock_user
 
-                response = client.get(
-                    "/audit/records?export_csv=true",
-                    headers={"Authorization": "Bearer fake-token"}
-                )
+        with patch("budapp.audit_ops.audit_routes.get_session"):
+            client = TestClient(app)
 
-                assert response.status_code == status.HTTP_200_OK
+            response = client.get(
+                "/audit/records?export_csv=true",
+                headers={"Authorization": "Bearer fake-token"}
+            )
 
-                # Verify the service was called with user_id filter
-                call_args = mock_service_instance.get_audit_records.call_args
-                filter_params = call_args[1]["filter_params"]
-                assert filter_params.user_id == mock_user.id
+            assert response.status_code == status.HTTP_200_OK
+
+            # Verify the service was called with user_id filter
+            call_args = mock_service_instance.get_audit_records.call_args
+            filter_params = call_args[1]["filter_params"]
+            assert filter_params.user_id == mock_user.id
+
+        # Clean up the override
+        app.dependency_overrides.clear()
 
     def test_csv_export_includes_resource_name_column(self, mock_audit_service, mock_user, mock_records):
         """Test that CSV export includes resource_name column."""
         from budapp.main import app
+        from budapp.commons.dependencies import get_current_active_user
 
         # Mock the service
         mock_service_instance = Mock()
         mock_service_instance.get_audit_records.return_value = (mock_records, len(mock_records))
         mock_audit_service.return_value = mock_service_instance
 
-        with patch("budapp.audit_ops.audit_routes.get_current_active_user", return_value=mock_user):
-            with patch("budapp.audit_ops.audit_routes.get_session"):
-                client = TestClient(app)
+        # Override the authentication dependency
+        app.dependency_overrides[get_current_active_user] = lambda: mock_user
 
-                response = client.get(
-                    "/audit/records?export_csv=true",
-                    headers={"Authorization": "Bearer fake-token"}
-                )
+        with patch("budapp.audit_ops.audit_routes.get_session"):
+            client = TestClient(app)
 
-                assert response.status_code == status.HTTP_200_OK
+            response = client.get(
+                "/audit/records?export_csv=true",
+                headers={"Authorization": "Bearer fake-token"}
+            )
 
-                # Parse CSV and verify resource_name column exists
-                csv_content = response.text
-                reader = csv.DictReader(io.StringIO(csv_content))
-                headers = reader.fieldnames
+            assert response.status_code == status.HTTP_200_OK
 
-                assert "Resource Name" in headers
+            # Parse CSV and verify resource_name column exists
+            csv_content = response.text
+            reader = csv.DictReader(io.StringIO(csv_content))
+            headers = reader.fieldnames
 
-                # Verify resource_name values are populated
-                rows = list(reader)
-                for i, row in enumerate(rows):
-                    assert row["Resource Name"] == f"Project {i}"
+            assert "Resource Name" in headers
+
+            # Verify resource_name values are populated
+            rows = list(reader)
+            for i, row in enumerate(rows):
+                assert row["Resource Name"] == f"Project {i}"
+
+        # Clean up the override
+        app.dependency_overrides.clear()
 
     def test_generate_csv_with_resource_name_filtering(self):
         """Test CSV generation when filtering by resource_name."""
