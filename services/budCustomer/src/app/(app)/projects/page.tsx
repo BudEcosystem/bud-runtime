@@ -17,10 +17,12 @@ const { Text, Title } = Typography;
 // Separate component for project card to prevent re-renders
 const ProjectCard = React.memo(({
   project,
-  onDelete
+  onDelete,
+  onClick
 }: {
   project: ContextProject;
   onDelete: (project: ContextProject) => void;
+  onClick: (project: ContextProject) => void;
 }) => {
   // Handle menu item clicks
   const handleMenuClick = useCallback((e: any) => {
@@ -48,6 +50,7 @@ const ProjectCard = React.memo(({
     <Card
       className="h-full bg-bud-bg-secondary border-bud-border hover:border-bud-purple hover:shadow-lg transition-all duration-300 cursor-pointer overflow-hidden"
       styles={{ body: { padding: 0 } }}
+      onClick={() => onClick(project)}
     >
       <div className="p-6 mb-20">
         {/* Header with Icon and Actions */}
@@ -187,6 +190,19 @@ export default function ProjectsPage() {
   //   }
   // }, [globalProjects, getGlobalProject, openDrawer]);
 
+  const handleProjectClick = useCallback(async (project: ContextProject) => {
+    try {
+      // Set the selected project for viewing details
+      await getGlobalProject(project.id);
+      // Open the view drawer after project is fetched
+      setTimeout(() => {
+        openDrawer("view-project-details", {});
+      }, 100);
+    } catch (error) {
+      console.error("Failed to open project details:", error);
+    }
+  }, [getGlobalProject, openDrawer]);
+
   const handleDeleteProject = useCallback(async (project: ContextProject) => {
     try {
       // Fetch the full project data from API
@@ -271,6 +287,7 @@ export default function ProjectsPage() {
                     <ProjectCard
                       project={project}
                       onDelete={handleDeleteProject}
+                      onClick={handleProjectClick}
                     />
                   </Col>
                 ))}
