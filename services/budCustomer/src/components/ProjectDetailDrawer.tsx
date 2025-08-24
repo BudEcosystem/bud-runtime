@@ -286,25 +286,6 @@ export const ProjectDetailContent: React.FC<{ projectId: string; onClose: () => 
                   </Col>
                 </Row>
               </Card>
-
-              {/* Additional Details */}
-              <Card className="bg-[#1a1a2e]/50 border-[#2a2a3e]">
-                <Title level={5} className="!mb-4 text-white">
-                  Configuration
-                </Title>
-                <pre className="bg-[#0f0f1e] p-3 rounded text-white overflow-auto">
-                  {JSON.stringify(
-                    {
-                      id: project.id,
-                      name: project.name,
-                      type: project.project_type,
-                      tags: project.tags,
-                    },
-                    null,
-                    2
-                  )}
-                </pre>
-              </Card>
             </div>
           </DrawerCard>
         </BudDrawerLayout>
