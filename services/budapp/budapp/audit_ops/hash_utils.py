@@ -112,7 +112,7 @@ def verify_audit_hash(audit_record: Any, expected_hash: str) -> bool:
         action=audit_record.action,
         resource_type=audit_record.resource_type,
         resource_id=audit_record.resource_id,
-        resource_name=getattr(audit_record, 'resource_name', None),
+        resource_name=getattr(audit_record, "resource_name", None),
         user_id=audit_record.user_id,
         actioned_by=audit_record.actioned_by,
         timestamp=audit_record.timestamp,
