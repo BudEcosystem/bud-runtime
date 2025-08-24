@@ -62,18 +62,28 @@ export default function EditProject() {
   useEffect(() => {
     if (currentProject && form) {
       const existingTags = currentProject.tags
-        ? currentProject.tags.map((tag: any) => ({
-            name: tag.name || tag,
-            color: tag.color || "#89C0F2",
-          }))
+        ? currentProject.tags.map((tag: any) => {
+            // Handle both string and object tag formats
+            if (typeof tag === 'string') {
+              return { name: tag, color: "#89C0F2" };
+            }
+            return {
+              name: tag.name || tag,
+              color: tag.color || "#89C0F2",
+            };
+          })
         : [];
 
-      form.setFieldsValue({
-        name: currentProject.name || "",
-        description: currentProject.description || "",
-        tags: existingTags,
-        icon: currentProject.icon || "😍",
-      });
+      // Small delay to ensure form is ready
+      setTimeout(() => {
+        console.log("Setting form values with tags:", existingTags);
+        form.setFieldsValue({
+          name: currentProject.name || "",
+          description: currentProject.description || "",
+          tags: existingTags,
+          icon: currentProject.icon || "😍",
+        });
+      }, 100);
     }
   }, [currentProject, form]);
 
@@ -103,20 +113,26 @@ export default function EditProject() {
   }
 
   // Format existing tags to ensure they have the correct structure
-  const existingTags = currentProject.tags
-    ? currentProject.tags.map((tag: any) => ({
-        name: tag.name || tag,
-        color: tag.color || "#89C0F2",
-      }))
+  const existingTags = currentProject?.tags
+    ? currentProject.tags.map((tag: any) => {
+        // Handle both string and object tag formats
+        if (typeof tag === 'string') {
+          return { name: tag, color: "#89C0F2" };
+        }
+        return {
+          name: tag.name || tag,
+          color: tag.color || "#89C0F2",
+        };
+      })
     : [];
 
   return (
     <BudForm
       data={{
-        name: currentProject.name || "",
-        description: currentProject.description || "",
+        name: currentProject?.name || "",
+        description: currentProject?.description || "",
         tags: existingTags,
-        icon: currentProject.icon || "😍",
+        icon: currentProject?.icon || "😍",
       }}
       onNext={(values) => {
         if (!submittable) {
