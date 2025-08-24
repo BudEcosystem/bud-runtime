@@ -138,7 +138,7 @@ async def update_credential(
     credential_response = CredentialResponse(
         name=db_credential.name,
         project_id=db_credential.project_id,
-        key=await RSAHandler().encrypt(db_credential.key),
+        key=db_credential.encrypted_key,  # Already encrypted, no need to encrypt again
         expiry=db_credential.expiry,
         max_budget=db_credential.max_budget,
         model_budgets=db_credential.model_budgets,

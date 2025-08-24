@@ -1472,7 +1472,7 @@ class ClusterService(SessionMixin):
         Args:
             workflow_id: The ID of the workflow to cancel.
         """
-        cancel_cluster_endpoint = f"{app_settings.dapr_base_url}v1.0/invoke/{app_settings.bud_cluster_app_id}/method/cluster/cancel/{workflow_id}"
+        cancel_cluster_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/cluster/cancel/{workflow_id}"
 
         logger.debug(f"Performing cancel cluster onboarding request to budcluster {cancel_cluster_endpoint}")
         try:
@@ -1499,7 +1499,7 @@ class ClusterService(SessionMixin):
             cluster_id: The ID of the cluster to update.
             current_user_id: The ID of the current user.
         """
-        update_cluster_endpoint = f"{app_settings.dapr_base_url}v1.0/invoke/{app_settings.bud_cluster_app_id}/method/cluster/update-node-status"
+        update_cluster_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/cluster/update-node-status"
 
         try:
             payload = {"cluster_id": str(cluster_id)}
@@ -1645,7 +1645,7 @@ class ClusterService(SessionMixin):
 
         try:
             events_cluster_endpoint = (
-                f"{app_settings.dapr_base_url}v1.0/invoke"
+                f"{app_settings.dapr_base_url}/v1.0/invoke"
                 f"/{app_settings.bud_cluster_app_id}/method"
                 f"/cluster/{db_cluster.cluster_id}/node-wise-events/{node_hostname}"
             )
@@ -1670,7 +1670,7 @@ class ClusterService(SessionMixin):
         Args:
             cluster_id: The ID of the cluster to update.
         """
-        get_cluster_node_endpoint = f"{app_settings.dapr_base_url}v1.0/invoke/{app_settings.bud_cluster_app_id}/method/cluster/{cluster_id}/nodes"
+        get_cluster_node_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/cluster/{cluster_id}/nodes"
 
         try:
             logger.debug(f"Performing get cluster node request. endpoint: {get_cluster_node_endpoint}")
@@ -1770,7 +1770,7 @@ class ClusterService(SessionMixin):
         Args:
             simulator_id: The ID of the simulator to get recommended clusters for
         """
-        get_recommended_clusters_endpoint = f"{app_settings.dapr_base_url}v1.0/invoke/{app_settings.bud_simulator_app_id}/method/simulator/recommendations"
+        get_recommended_clusters_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_simulator_app_id}/method/simulator/recommendations"
         query_params = {
             "workflow_id": str(simulator_id),
             "limit": 20,
