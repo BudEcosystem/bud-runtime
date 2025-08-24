@@ -194,9 +194,6 @@ const Get = (
     headers?: any;
   },
 ) => {
-  console.log(`[API] GET request to: ${endPoint}`);
-  const token = localStorage.getItem("access_token");
-  console.log(`[API] Token status:`, token ? "Token exists" : "No token");
   return axiosInstance.get(endPoint, payload);
 };
 

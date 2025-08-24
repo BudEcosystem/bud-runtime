@@ -210,21 +210,13 @@ export const useProjects = create<{
 
   getGlobalProject: async (projectId: string) => {
     try {
-      console.log("Fetching project with ID:", projectId);
-      const token = localStorage.getItem("access_token");
-      console.log("Current access token:", token ? "Token exists" : "No token");
-
       const response: any = await AppRequest.Get(`/projects/${projectId}`);
       // Check if response has nested structure or direct project
       const projectData = response.data.project?.project ? response.data.project : response.data;
       set({ globalSelectedProject: projectData });
       return projectData;
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error fetching project:", error);
-      if (error?.response?.status === 401) {
-        console.error("401 Unauthorized - Token may be expired or invalid");
-      }
-      throw error;
     }
   },
 

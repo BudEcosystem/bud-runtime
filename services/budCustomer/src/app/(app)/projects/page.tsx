@@ -18,12 +18,10 @@ const { Text, Title } = Typography;
 const ProjectCard = React.memo(({
   project,
   onDelete,
-  onEdit,
   onClick
 }: {
   project: ContextProject;
   onDelete: (project: ContextProject) => void;
-  onEdit: (project: ContextProject) => void;
   onClick: (project: ContextProject) => void;
 }) => {
   // Handle menu item clicks
@@ -31,23 +29,14 @@ const ProjectCard = React.memo(({
     e.domEvent?.stopPropagation?.();
 
     switch (e.key) {
-      case 'edit':
-        onEdit(project);
-        break;
       case 'delete':
         onDelete(project);
         break;
     }
-  }, [project, onEdit, onDelete]);
+  }, [project, onDelete]);
 
-  // Static menu items without onClick handlers
+  // Static menu items without onClick handlers - Edit removed temporarily
   const menuItems = useMemo(() => [
-    {
-      key: "edit",
-      label: "Edit",
-      icon: <Icon icon="ph:pencil-simple" className="text-bud-text-primary" />,
-      className: "hover:!bg-bud-bg-tertiary",
-    },
     {
       key: "delete",
       label: "Delete",
@@ -181,28 +170,25 @@ export default function ProjectsPage() {
     openDrawer("new-project", {});
   };
 
-  const handleEditProject = useCallback(async (project: ContextProject) => {
-    try {
-      // Fetch the full project data from API
-      const projectData = globalProjects.find(
-        (p) => p.project.id === project.id,
-      );
-      if (projectData) {
-        // Set the selected project for editing
-        await getGlobalProject(project.id);
-        // Open the edit drawer after project is fetched
-        setTimeout(() => {
-          openDrawer("edit-project", {});
-        }, 100);
-      }
-    } catch (error: any) {
-      console.error("Failed to open edit project:", error);
-      // Check if it's an authentication error
-      if (error?.response?.status === 401) {
-        console.error("Authentication expired. Please login again.");
-      }
-    }
-  }, [globalProjects, getGlobalProject, openDrawer]);
+  // Edit project functionality temporarily disabled due to infinite loop issue
+  // const handleEditProject = useCallback(async (project: ContextProject) => {
+  //   try {
+  //     // Fetch the full project data from API
+  //     const projectData = globalProjects.find(
+  //       (p) => p.project.id === project.id,
+  //     );
+  //     if (projectData) {
+  //       // Set the selected project for editing
+  //       await getGlobalProject(project.id);
+  //       // Open the edit drawer after project is fetched
+  //       setTimeout(() => {
+  //         openDrawer("edit-project", {});
+  //       }, 100);
+  //     }
+  //   } catch (error) {
+  //     console.error("Failed to open edit project:", error);
+  //   }
+  // }, [globalProjects, getGlobalProject, openDrawer]);
 
   const handleProjectClick = useCallback(async (project: ContextProject) => {
     try {
@@ -301,7 +287,6 @@ export default function ProjectsPage() {
                     <ProjectCard
                       project={project}
                       onDelete={handleDeleteProject}
-                      onEdit={handleEditProject}
                       onClick={handleProjectClick}
                     />
                   </Col>
