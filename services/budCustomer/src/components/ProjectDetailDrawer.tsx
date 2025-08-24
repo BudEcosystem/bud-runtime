@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Drawer, Tag, Spin, Empty, Card, Row, Col, Typography, Divider, Space, Button, Tooltip } from "antd";
+import { Drawer, Tag, Spin, Empty, Card, Row, Col, Typography, Space, Button, Tooltip } from "antd";
 import {
   CopyOutlined,
   TagsOutlined,
@@ -11,7 +11,6 @@ import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
-import DrawerCard from "@/components/ui/bud/card/DrawerCard";
 import { AppRequest } from "@/services/api/requests";
 import dayjs from "dayjs";
 
@@ -155,139 +154,130 @@ export const ProjectDetailContent: React.FC<{ projectId: string; onClose: () => 
             title="Project Details"
             description={`View detailed information about ${project.name}`}
           />
-          <DrawerCard>
-            <div className="p-4 space-y-4">
-              {/* Project Header */}
-              <Card className="bg-[#1a1a2e]/50 border-[#2a2a3e]">
-                <Space direction="vertical" size="large" className="w-full">
-                  <div className="flex items-center gap-4">
-                    <div className="text-4xl">{project.icon || "📁"}</div>
-                    <div className="flex-1">
-                      <Title level={4} className="!mb-1 text-white">
-                        {project.name}
-                      </Title>
-                      <Text className="text-gray-400">{project.description}</Text>
-                    </div>
+          <div>
+            <div>
+              <div className="flex items-center gap-4 px-[1.4rem] py-[1rem]">
+                {/* <div className="text-4xl">{project.icon || "📁"}</div> */}
+                <div className="flex-1">
+                  <Title level={4} className="!mb-1 text-white">
+                    {project.name}
+                  </Title>
+                  <Text className="text-gray-400">{project.description}</Text>
+                </div>
+              </div>
+              <div className="hR w-full bg-[#1F1F1F50] h-[1px]"></div>
+              {/* Project Information */}
+              <Row gutter={[16, 16]} className="px-[1.4rem] mt-[1rem]">
+                <Col span={24}>
+                  <div className="flex items-center justify-between">
+                    <Text className="text-gray-400">Project ID</Text>
+                    <Space>
+                      <Text className="text-white font-mono">{project.id}</Text>
+                      <Tooltip title="Copy ID">
+                        <Button
+                          type="text"
+                          size="small"
+                          icon={<CopyOutlined />}
+                          onClick={() => copyToClipboard(project.id)}
+                        />
+                      </Tooltip>
+                    </Space>
                   </div>
+                </Col>
 
-                  <Divider className="!my-3 border-[#2a2a3e]" />
+                <Col span={24}>
+                  <div className="flex items-center justify-between">
+                    <Text className="text-gray-400">Project Type</Text>
+                    <Tag color="blue" icon={<FolderOutlined />}>
+                      {getProjectTypeLabel(project.project_type)}
+                    </Tag>
+                  </div>
+                </Col>
 
-                  {/* Project Information */}
-                  <Row gutter={[16, 16]}>
-                    <Col span={24}>
-                      <div className="flex items-center justify-between">
-                        <Text className="text-gray-400">Project ID</Text>
-                        <Space>
-                          <Text className="text-white font-mono">{project.id}</Text>
-                          <Tooltip title="Copy ID">
-                            <Button
-                              type="text"
-                              size="small"
-                              icon={<CopyOutlined />}
-                              onClick={() => copyToClipboard(project.id)}
-                            />
-                          </Tooltip>
-                        </Space>
-                      </div>
-                    </Col>
+                <Col span={24}>
+                  <div className="flex items-center justify-between py-[1rem]">
+                    <Text className="text-gray-400">Tags</Text>
+                    <Space wrap>
+                      {project.tags && project.tags.length > 0 ? (
+                        project.tags.map((tag, index) => (
+                          <Tag key={index} color={tag.color} icon={<TagsOutlined />}>
+                            {tag.name}
+                          </Tag>
+                        ))
+                      ) : (
+                        <Text className="text-gray-500">No tags</Text>
+                      )}
+                    </Space>
+                  </div>
+                </Col>
 
-                    <Col span={24}>
-                      <div className="flex items-center justify-between">
-                        <Text className="text-gray-400">Project Type</Text>
-                        <Tag color="blue" icon={<FolderOutlined />}>
-                          {getProjectTypeLabel(project.project_type)}
-                        </Tag>
-                      </div>
-                    </Col>
-
-                    <Col span={24}>
-                      <div className="flex items-center justify-between">
-                        <Text className="text-gray-400">Tags</Text>
-                        <Space wrap>
-                          {project.tags && project.tags.length > 0 ? (
-                            project.tags.map((tag, index) => (
-                              <Tag key={index} color={tag.color} icon={<TagsOutlined />}>
-                                {tag.name}
-                              </Tag>
-                            ))
-                          ) : (
-                            <Text className="text-gray-500">No tags</Text>
-                          )}
-                        </Space>
-                      </div>
-                    </Col>
-
-                    {project.created_at && (
-                      <Col span={24}>
-                        <div className="flex items-center justify-between">
-                          <Text className="text-gray-400">Created</Text>
-                          <Text className="text-white">
-                            {dayjs(project.created_at).format("MMM DD, YYYY")}
-                          </Text>
-                        </div>
-                      </Col>
-                    )}
-
-                    {project.updated_at && (
-                      <Col span={24}>
-                        <div className="flex items-center justify-between">
-                          <Text className="text-gray-400">Last Updated</Text>
-                          <Text className="text-white">
-                            {dayjs(project.updated_at).format("MMM DD, YYYY")}
-                          </Text>
-                        </div>
-                      </Col>
-                    )}
-
-                    {project.owner && (
-                      <Col span={24}>
-                        <div className="flex items-center justify-between">
-                          <Text className="text-gray-400">Owner</Text>
-                          <Space>
-                            <UserOutlined className="text-gray-400" />
-                            <Text className="text-white">{project.owner}</Text>
-                          </Space>
-                        </div>
-                      </Col>
-                    )}
-                  </Row>
-                </Space>
-              </Card>
-
-              {/* Resource Statistics */}
-              <Card className="bg-[#1a1a2e]/50 border-[#2a2a3e]">
-                <Title level={5} className="!mb-4 text-white">
-                  Resources
-                </Title>
-                <Row gutter={[16, 16]}>
-                  <Col span={8}>
-                    <Card className="bg-[#0f0f1e] border-[#2a2a3e] text-center">
-                      <div className="text-2xl font-bold text-[#965CDE]">
-                        {project.endpoints_count || 0}
-                      </div>
-                      <Text className="text-gray-400">Endpoints</Text>
-                    </Card>
+                {project.created_at && (
+                  <Col span={24}>
+                    <div className="flex items-center justify-between">
+                      <Text className="text-gray-400">Created</Text>
+                      <Text className="text-white">
+                        {dayjs(project.created_at).format("MMM DD, YYYY")}
+                      </Text>
+                    </div>
                   </Col>
-                  <Col span={8}>
-                    <Card className="bg-[#0f0f1e] border-[#2a2a3e] text-center">
-                      <div className="text-2xl font-bold text-[#965CDE]">
-                        {project.models_count || 0}
-                      </div>
-                      <Text className="text-gray-400">Models</Text>
-                    </Card>
+                )}
+
+                {project.updated_at && (
+                  <Col span={24}>
+                    <div className="flex items-center justify-between">
+                      <Text className="text-gray-400">Last Updated</Text>
+                      <Text className="text-white">
+                        {dayjs(project.updated_at).format("MMM DD, YYYY")}
+                      </Text>
+                    </div>
                   </Col>
-                  <Col span={8}>
-                    <Card className="bg-[#0f0f1e] border-[#2a2a3e] text-center">
-                      <div className="text-2xl font-bold text-[#965CDE]">
-                        {project.clusters_count || 0}
-                      </div>
-                      <Text className="text-gray-400">Clusters</Text>
-                    </Card>
+                )}
+
+                {project.owner && (
+                  <Col span={24}>
+                    <div className="flex items-center justify-between">
+                      <Text className="text-gray-400">Owner</Text>
+                      <Space>
+                        <UserOutlined className="text-gray-400" />
+                        <Text className="text-white">{project.owner}</Text>
+                      </Space>
+                    </div>
                   </Col>
-                </Row>
-              </Card>
+                )}
+              </Row>
             </div>
-          </DrawerCard>
+
+            {/* Resource Statistics */}
+            <Title level={5} className="!mb-4 text-white px-[1.4rem] mt-[1.4  rem]">
+              Resources
+            </Title>
+            <Row gutter={[16, 16]} className="px-[1.4rem] mb-[1.4rem]">
+              <Col span={8}>
+                <Card className="bg-[transparent] border-[#2a2a3e] text-center">
+                  <div className="text-2xl font-bold text-[#965CDE]">
+                    {project.endpoints_count || 0}
+                  </div>
+                  <Text className="text-gray-400">Endpoints</Text>
+                </Card>
+              </Col>
+              <Col span={8}>
+                <Card className="bg-[transparent] border-[#2a2a3e] text-center">
+                  <div className="text-2xl font-bold text-[#965CDE]">
+                    {project.models_count || 0}
+                  </div>
+                  <Text className="text-gray-400">Models</Text>
+                </Card>
+              </Col>
+              <Col span={8}>
+                <Card className="bg-[transparent] border-[#2a2a3e] text-center">
+                  <div className="text-2xl font-bold text-[#965CDE]">
+                    {project.clusters_count || 0}
+                  </div>
+                  <Text className="text-gray-400">Clusters</Text>
+                </Card>
+              </Col>
+            </Row>
+          </div>
         </BudDrawerLayout>
       </BudWraperBox>
     </BudForm>
