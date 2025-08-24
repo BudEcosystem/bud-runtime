@@ -108,16 +108,21 @@ export default function TagsInput(props: SelectProps) {
   // Watch for form value changes (for edit mode)
   useEffect(() => {
     const formValue = form?.getFieldValue?.(fieldName);
-    if (formValue && Array.isArray(formValue) && formValue.length > 0) {
-      // Ensure the tags have the correct structure
+    if (formValue && Array.isArray(formValue)) {
+      // Only update if different from current selection
       const formattedTags = formValue.map((tag: any) => ({
         name: tag.name || tag,
         color: tag.color || "#89C0F2",
       }));
-      setSelected(formattedTags);
+
+      // Check if tags are different to avoid infinite loops
+      const isDifferent = JSON.stringify(formattedTags) !== JSON.stringify(selected);
+      if (isDifferent) {
+        setSelected(formattedTags);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fieldName, form]);
+  }, [form?.getFieldValue?.(fieldName)]);
 
   return (
     <Form.Item
