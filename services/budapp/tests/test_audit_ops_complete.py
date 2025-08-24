@@ -75,6 +75,7 @@ class TestHashUtils:
             "ip_address": "192.168.1.1",
             "previous_state": None,
             "new_state": {"status": "created"},
+            "resource_name": "Test Project",
         }
 
         hash1 = generate_audit_hash(**params)
@@ -96,6 +97,7 @@ class TestHashUtils:
             "ip_address": "192.168.1.1",
             "previous_state": None,
             "new_state": {"status": "created"},
+            "resource_name": "Test Project",
         }
 
         hash1 = generate_audit_hash(**base_params)
@@ -120,6 +122,7 @@ class TestHashUtils:
         record.ip_address = "10.0.0.1"
         record.previous_state = None
         record.new_state = {"status": "active"}
+        record.resource_name = "Test Model"
 
         # Generate the correct hash
         correct_hash = generate_audit_hash(
@@ -133,6 +136,7 @@ class TestHashUtils:
             ip_address=record.ip_address,
             previous_state=record.previous_state,
             new_state=record.new_state,
+            resource_name=record.resource_name,
         )
 
         # Test with correct hash
@@ -155,6 +159,7 @@ class TestHashUtils:
         record.ip_address = "172.16.0.1"
         record.previous_state = {"status": "active"}
         record.new_state = None
+        record.resource_name = "Production Cluster"
 
         # Set correct hash
         record.record_hash = generate_audit_hash(
@@ -168,6 +173,7 @@ class TestHashUtils:
             ip_address=record.ip_address,
             previous_state=record.previous_state,
             new_state=record.new_state,
+            resource_name=record.resource_name,
         )
 
         is_valid, message = verify_audit_integrity(record)
@@ -221,6 +227,7 @@ class TestAuditTrailCRUD:
                 resource_type=AuditResourceTypeEnum.PROJECT,
                 resource_id=resource_id,
                 user_id=user_id,
+                resource_name="Test Project",
                 details={"project_name": "Test Project"},
                 ip_address="192.168.1.1",
             )
@@ -258,6 +265,7 @@ class TestAuditTrailCRUD:
             action=action,
             resource_type=resource_type,
             resource_id=resource_id,
+            resource_name="Test Endpoint",
             start_date=start_date,
             end_date=end_date,
             offset=0,
@@ -313,6 +321,7 @@ class TestAuditService:
                 resource_id=uuid4(),
                 resource_data={"name": "Test"},
                 user_id=uuid4(),
+                resource_name="Test Project",
                 ip_address="192.168.1.1",
             )
 
@@ -330,6 +339,7 @@ class TestAuditService:
                 previous_data={"status": "active"},
                 new_data={"status": "inactive"},
                 user_id=uuid4(),
+                resource_name="Test Endpoint",
                 ip_address="192.168.1.1",
             )
 
@@ -346,6 +356,7 @@ class TestAuditService:
                 resource_id=uuid4(),
                 resource_data={"name": "Model"},
                 user_id=uuid4(),
+                resource_name="Test Model",
                 ip_address="192.168.1.1",
             )
 
@@ -413,6 +424,7 @@ class TestAuditService:
         record1.ip_address = "192.168.1.1"
         record1.previous_state = None
         record1.new_state = None
+        record1.resource_name = "Test Project"
         record1.record_hash = "a" * 64
         record1.created_at = datetime.now(timezone.utc)
         record1.user = None
@@ -432,6 +444,7 @@ class TestAuditService:
         record2.ip_address = "192.168.1.2"
         record2.previous_state = None
         record2.new_state = None
+        record2.resource_name = "Test Endpoint"
         record2.record_hash = "b" * 64
         record2.created_at = datetime.now(timezone.utc)
         record2.user = None
@@ -490,6 +503,7 @@ class TestAuditSchemas:
             "resource_type": AuditResourceTypeEnum.PROJECT,
             "resource_id": str(uuid4()),
             "user_id": str(uuid4()),
+            "resource_name": "Test Project",
             "details": {"test": "data"},
             "ip_address": "192.168.1.1",
         }
@@ -513,6 +527,7 @@ class TestAuditSchemas:
             "action": "CREATE",
             "resource_type": "PROJECT",
             "resource_id": str(uuid4()),
+            "resource_name": "Test Project",
             "timestamp": datetime.now(timezone.utc),
             "details": {"test": "data"},
             "ip_address": "192.168.1.1",
@@ -534,6 +549,7 @@ class TestAuditSchemas:
             "user_id": str(uuid4()),
             "action": AuditActionEnum.UPDATE,
             "resource_type": AuditResourceTypeEnum.ENDPOINT,
+            "resource_name": "Test Endpoint",
             "start_date": datetime.now(timezone.utc) - timedelta(days=7),
             "end_date": datetime.now(timezone.utc),
         }
@@ -568,6 +584,7 @@ class TestIntegration:
         mock_record.ip_address = "192.168.1.1"
         mock_record.previous_state = None
         mock_record.new_state = {"status": "created"}
+        mock_record.resource_name = "Test Project"
         mock_record.record_hash = generate_audit_hash(
             action=mock_record.action,
             resource_type=mock_record.resource_type,
@@ -579,6 +596,7 @@ class TestIntegration:
             ip_address=mock_record.ip_address,
             previous_state=mock_record.previous_state,
             new_state=mock_record.new_state,
+            resource_name=mock_record.resource_name,
         )
 
         with patch.object(service.data_manager, 'create_audit_record') as mock_create:
@@ -590,6 +608,7 @@ class TestIntegration:
                 resource_id=mock_record.resource_id,
                 resource_data={"status": "created"},
                 user_id=mock_record.user_id,
+                resource_name="Test Project",
                 ip_address="192.168.1.1",
             )
 
@@ -653,6 +672,7 @@ class TestIntegration:
             action=AuditActionEnum.UPDATE,
             resource_type=AuditResourceTypeEnum.ENDPOINT,
             resource_id=uuid4(),
+            resource_name="Test Endpoint",
             start_date=datetime.now(timezone.utc) - timedelta(days=7),
             end_date=datetime.now(timezone.utc),
             ip_address="192.168.1.1",
@@ -663,6 +683,43 @@ class TestIntegration:
         assert data_manager.scalars_all.called
         assert total == 10
         assert records == []
+
+    def test_resource_name_filtering(self):
+        """Test specific resource_name filtering functionality."""
+        mock_session = Mock(spec=Session)
+        data_manager = AuditTrailDataManager(mock_session)
+
+        # Mock the methods from DataManagerUtils
+        data_manager.execute_scalar = Mock(return_value=5)
+        data_manager.scalars_all = Mock(return_value=[])
+
+        # Test resource_name filtering (partial match)
+        records, total = data_manager.get_audit_records(
+            resource_name="Test Project",
+            offset=0,
+            limit=10
+        )
+
+        assert data_manager.execute_scalar.called
+        assert data_manager.scalars_all.called
+        assert total == 5
+        assert records == []
+
+        # Reset mocks
+        data_manager.execute_scalar.reset_mock()
+        data_manager.scalars_all.reset_mock()
+
+        # Test resource_name filtering with other filters combined
+        records, total = data_manager.get_audit_records(
+            user_id=uuid4(),
+            action=AuditActionEnum.CREATE,
+            resource_name="Production",
+            offset=0,
+            limit=20
+        )
+
+        assert data_manager.execute_scalar.called
+        assert data_manager.scalars_all.called
 
 
 if __name__ == "__main__":
