@@ -59,12 +59,12 @@ axiosInstance.interceptors.request.use(
       // Prevent redirect loop
       if (
         typeof window !== "undefined" &&
-        window.location.pathname !== "/login"
+        window.location.pathname !== "/auth/login"
       ) {
         if (!isRedirecting) {
           isRedirecting = true;
           localStorage.clear();
-          window.location.replace("/login");
+          window.location.replace("/auth/login");
         }
       }
       return Promise.reject(new Error("No access token found"));
@@ -194,6 +194,9 @@ const Get = (
     headers?: any;
   },
 ) => {
+  console.log(`[API] GET request to: ${endPoint}`);
+  const token = localStorage.getItem("access_token");
+  console.log(`[API] Token status:`, token ? "Token exists" : "No token");
   return axiosInstance.get(endPoint, payload);
 };
 
