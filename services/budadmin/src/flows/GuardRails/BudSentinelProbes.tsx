@@ -2,13 +2,14 @@ import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
-import { Input, Checkbox } from "antd";
+import { Input, Checkbox, Spin } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
 import { ChevronRight } from "lucide-react";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
 import CustomPopover from "src/flows/components/customPopover";
 import Tags from "src/flows/components/DrawerTags";
+import useGuardrails from "src/hooks/useGuardrails";
 import {
   Text_10_400_757575,
   Text_12_400_757575,
@@ -16,116 +17,159 @@ import {
   Text_14_600_FFFFFF,
 } from "@/components/ui/text";
 
-interface Probe {
-  id: string;
-  name: string;
-  category: string;
-  description?: string;
-}
-
 export default function BudSentinelProbes() {
   const { openDrawerWithStep, openDrawerWithExpandedStep } = useDrawer();
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedProbes, setSelectedProbes] = useState<string[]>([]);
-  const [activeFilter, setActiveFilter] = useState<"all" | "pii" | "bias">("all");
+  const [selectedProbe, setSelectedProbe] = useState<string | null>(null);
+  const [activeFilter, setActiveFilter] = useState<"all" | "pii" | "bias">(
+    "all",
+  );
   const [hoveredProbe, setHoveredProbe] = useState<string | null>(null);
+
+  // Use the guardrails hook
+  const {
+    probes,
+    probesLoading,
+    fetchProbes,
+    totalProbes,
+    fetchProbeById,
+    setSelectedProbe: setSelectedProbeInStore,
+  } = useGuardrails();
+
+  // Fetch probes on component mount and when search changes
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      fetchProbes({
+        search: searchTerm || undefined,
+        page: 1,
+        page_size: 100, // Fetch all probes for now
+      });
+    }, 300); // Debounce search
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchTerm]);
 
   const getCategoryIcon = (category: string) => {
     switch (category.toLowerCase()) {
-      case 'pii':
-        return '🔒';
-      case 'bias':
-        return '⚖️';
-      case 'content':
-        return '🛡️';
+      case "pii":
+      case "personal identifier information":
+      case "data loss prevention (dlp)":
+        return "🔒";
+      case "bias":
+        return "⚖️";
+      case "content":
+      case "secrets & credentials":
+        return "🛡️";
       default:
-        return '📋';
+        return "📋";
     }
   };
-
-  const probes: Probe[] = [
-    // PII Category
-    { id: "pii-1", name: "PII Detection", category: "PII", description: "Detects and masks personal identifiable information in text" },
-    { id: "pii-2", name: "Email Detection", category: "PII", description: "Identifies and redacts email addresses from content" },
-    { id: "pii-3", name: "Phone Number Detection", category: "PII", description: "Finds and masks phone numbers in various formats" },
-    { id: "pii-4", name: "SSN Detection", category: "PII", description: "Detects Social Security Numbers for compliance" },
-    { id: "pii-5", name: "Credit Card Detection", category: "PII", description: "Identifies credit card numbers for PCI compliance" },
-
-    // Bias Category
-    { id: "bias-1", name: "Gender Bias Detection", category: "Bias", description: "Analyzes content for gender-based biases" },
-    { id: "bias-2", name: "Racial Bias Detection", category: "Bias", description: "Identifies potential racial biases in text" },
-    { id: "bias-3", name: "Age Bias Detection", category: "Bias", description: "Detects age-related discriminatory language" },
-    { id: "bias-4", name: "Politeness detection", category: "Bias", description: "Evaluates tone and politeness levels" },
-
-    // Other Categories
-    { id: "prof-1", name: "Profanity Detection", category: "Content", description: "Filters profane and offensive language" },
-    { id: "tox-1", name: "Toxicity Detection", category: "Content", description: "Identifies toxic and harmful content" },
-    { id: "hate-1", name: "Hate Speech Detection", category: "Content", description: "Detects hate speech and discriminatory content" },
-  ];
 
   const handleBack = () => {
     openDrawerWithStep("select-provider");
   };
 
   const handleNext = () => {
-    if (selectedProbes.length === 0) {
+    if (!selectedProbe) {
       return;
     }
 
-    // Navigate to specific configuration page based on selection
-    if (selectedProbes.includes("pii-1")) {
-      // PII Detection selected - go to PII configuration page
-      openDrawerWithStep("pii-detection-config");
-    } else {
-      // For other selections, go directly to details
-      openDrawerWithStep("guardrail-details");
+    // Check if selected probe is a PII probe
+    const selectedProbeObject = probes.find((p) => p.id === selectedProbe);
+
+    if (selectedProbeObject) {
+      // Save the selected probe to the store
+      setSelectedProbeInStore(selectedProbeObject);
+
+      const isPIIProbe =
+        selectedProbeObject.name
+          ?.toLowerCase()
+          .includes("personal identifier") ||
+        selectedProbeObject.name?.toLowerCase().includes("pii") ||
+        selectedProbeObject.tags?.some(
+          (tag) =>
+            tag.name.toLowerCase().includes("dlp") ||
+            tag.name.toLowerCase().includes("personal"),
+        );
+
+      // Navigate to specific configuration page based on selection
+      if (isPIIProbe) {
+        // PII Detection selected - go to PII configuration page
+        openDrawerWithStep("pii-detection-config");
+      } else {
+        // For other selections, go directly to details
+        openDrawerWithStep("guardrail-details");
+      }
     }
   };
 
   const toggleProbeSelection = (probeId: string) => {
-    setSelectedProbes(prev =>
-      prev.includes(probeId)
-        ? prev.filter(id => id !== probeId)
-        : [...prev, probeId]
-    );
+    setSelectedProbe((prev) => (prev === probeId ? null : probeId));
   };
 
-  const handleSeeMore = (probe: Probe, event: React.MouseEvent) => {
+  const handleSeeMore = async (probe: any, event: React.MouseEvent) => {
     event.stopPropagation(); // Prevent probe selection when clicking "See more"
 
-    // Store probe data in a state/store if needed or pass through drawer context
-    // For now, we'll use the drawer step system
+    // Fetch full probe details if needed
+    if (probe.id) {
+      await fetchProbeById(probe.id);
+    }
+
+    // Open the expanded drawer with probe details
     openDrawerWithExpandedStep("probe-details");
   };
 
   const getFilteredProbes = () => {
-    let filtered = probes;
+    let filtered = probes || [];
 
     // Apply search filter
     if (searchTerm) {
-      filtered = filtered.filter(probe =>
-        probe.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        probe.category.toLowerCase().includes(searchTerm.toLowerCase())
+      filtered = filtered.filter(
+        (probe) =>
+          probe.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          probe.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          probe.tags?.some((tag) =>
+            tag.name.toLowerCase().includes(searchTerm.toLowerCase()),
+          ),
       );
     }
 
-    // Apply category filter
+    // Apply category filter based on tags
     if (activeFilter !== "all") {
-      filtered = filtered.filter(probe =>
-        probe.category.toLowerCase() === activeFilter.toLowerCase()
-      );
+      filtered = filtered.filter((probe) => {
+        // Check if probe has tags matching the filter
+        if (activeFilter === "pii") {
+          return probe.tags?.some(
+            (tag) =>
+              tag.name.toLowerCase().includes("pii") ||
+              tag.name.toLowerCase().includes("personal") ||
+              tag.name.toLowerCase().includes("dlp"),
+          );
+        } else if (activeFilter === "bias") {
+          return probe.tags?.some((tag) =>
+            tag.name.toLowerCase().includes("bias"),
+          );
+        }
+        return false;
+      });
     }
 
     return filtered;
   };
 
-  const groupedProbes = getFilteredProbes().reduce((acc, probe) => {
-    if (!acc[probe.category]) {
-      acc[probe.category] = [];
-    }
-    acc[probe.category].push(probe);
-    return acc;
-  }, {} as Record<string, Probe[]>);
+  // Group probes by their first tag or provider type
+  const groupedProbes = getFilteredProbes().reduce(
+    (acc, probe) => {
+      // Use the first tag name as category, or provider_type as fallback
+      const category = probe.tags?.[0]?.name || probe.provider_type || "Other";
+      if (!acc[category]) {
+        acc[category] = [];
+      }
+      acc[category].push(probe);
+      return acc;
+    },
+    {} as Record<string, any[]>,
+  );
 
   return (
     <BudForm
@@ -134,7 +178,7 @@ export default function BudSentinelProbes() {
       onNext={handleNext}
       backText="Back"
       nextText="Next"
-      disableNext={selectedProbes.length === 0}
+      disableNext={!selectedProbe}
     >
       <BudWraperBox>
         <BudDrawerLayout>
@@ -197,107 +241,138 @@ export default function BudSentinelProbes() {
 
             {/* Probes List */}
             <div className="space-y-[1.5rem]">
-              {Object.entries(groupedProbes).map(([category, categoryProbes]) => (
-                <div key={category}>
-                  {/* Category Header */}
-                  <div className="mb-[0.75rem] px-[1.35rem]">
-                    <Text_14_600_FFFFFF>{category}</Text_14_600_FFFFFF>
-                  </div>
+              {probesLoading ? (
+                <div className="flex justify-center py-[3rem]">
+                  <Spin size="large" />
+                </div>
+              ) : (
+                Object.entries(groupedProbes).map(
+                  ([category, categoryProbes]) => (
+                    <div key={category}>
+                      {/* Category Header */}
+                      <div className="mb-[0.75rem] px-[1.35rem]">
+                        <Text_14_600_FFFFFF>{category}</Text_14_600_FFFFFF>
+                      </div>
 
-                  {/* Probe Items - ModelListCard Style */}
-                  <div>
-                    {categoryProbes.map((probe) => {
-                      const isHovered = hoveredProbe === probe.id;
-                      const isSelected = selectedProbes.includes(probe.id);
+                      {/* Probe Items - ModelListCard Style */}
+                      <div>
+                        {categoryProbes.map((probe) => {
+                          const isHovered = hoveredProbe === probe.id;
+                          const isSelected = selectedProbe === probe.id;
 
-                      return (
-                        <div
-                          key={probe.id}
-                          onMouseEnter={() => setHoveredProbe(probe.id)}
-                          onMouseLeave={() => setHoveredProbe(null)}
-                          onClick={() => toggleProbeSelection(probe.id)}
-                          className={`pt-[1.05rem] pb-[0.8rem] cursor-pointer hover:shadow-lg px-[1.5rem] border-y-[0.5px] border-y-[#1F1F1F] hover:border-[#757575] flex-row flex border-box hover:bg-[#FFFFFF08] transition-all ${isSelected ? "bg-[#FFFFFF08] border-[#965CDE]" : ""
-                            }`}
-                        >
-                          {/* Icon Section */}
-                          <div className="bg-[#1F1F1F] rounded-[0.515625rem] w-[2.6875rem] h-[2.6875rem] flex justify-center items-center mr-[1.3rem] shrink-0 grow-0">
-                            <span className="text-[1.5rem]">{getCategoryIcon(probe.category)}</span>
-                          </div>
+                          return (
+                            <div
+                              key={probe.id}
+                              onMouseEnter={() => setHoveredProbe(probe.id)}
+                              onMouseLeave={() => setHoveredProbe(null)}
+                              onClick={(e) => {
+                                // Only toggle selection if not clicking on checkbox or "See More"
+                                const target = e.target as HTMLElement;
+                                if (
+                                  !target.closest(".ant-checkbox-wrapper") &&
+                                  !target.closest("[data-see-more]")
+                                ) {
+                                  toggleProbeSelection(probe.id);
+                                }
+                              }}
+                              className={`pt-[1.05rem] pb-[0.8rem] cursor-pointer hover:shadow-lg px-[1.5rem] border-y-[0.5px] border-y-[#1F1F1F] hover:border-[#757575] flex-row flex border-box hover:bg-[#FFFFFF08] transition-all ${
+                                isSelected
+                                  ? "bg-[#FFFFFF08] border-[#965CDE]"
+                                  : ""
+                              }`}
+                            >
+                              {/* Icon Section */}
+                              <div className="bg-[#1F1F1F] rounded-[0.515625rem] w-[2.6875rem] h-[2.6875rem] flex justify-center items-center mr-[1.3rem] shrink-0 grow-0">
+                                <span className="text-[1.5rem]">
+                                  {getCategoryIcon(
+                                    probe.name ||
+                                      probe.tags?.[0]?.name ||
+                                      category,
+                                  )}
+                                </span>
+                              </div>
 
-                          {/* Content Section */}
-                          <div className="flex justify-between flex-col w-full max-w-[85%]">
-                            <div className="flex items-center justify-between">
-                              <div className="flex flex-grow max-w-[90%]"
-                                style={{
-                                  width: isHovered || isSelected ? "12rem" : "90%",
-                                }}
-                              >
-                                <CustomPopover title={probe.name}>
-                                  <div className="text-[#EEEEEE] mr-2 pb-[0.3em] text-[0.875rem] truncate overflow-hidden whitespace-nowrap">
-                                    {probe.name}
+                              {/* Content Section */}
+                              <div className="flex justify-between flex-col w-full max-w-[85%]">
+                                <div className="flex items-center justify-between">
+                                  <div
+                                    className="flex flex-grow max-w-[90%]"
+                                    style={{
+                                      width:
+                                        isHovered || isSelected
+                                          ? "12rem"
+                                          : "90%",
+                                    }}
+                                  >
+                                    <CustomPopover title={probe.name}>
+                                      <div className="text-[#EEEEEE] mr-2 pb-[0.3em] text-[0.875rem] truncate overflow-hidden whitespace-nowrap">
+                                        {probe.name}
+                                      </div>
+                                    </CustomPopover>
+                                  </div>
+
+                                  {/* Actions Section */}
+                                  <div
+                                    style={{
+                                      display:
+                                        isHovered || isSelected
+                                          ? "flex"
+                                          : "none",
+                                    }}
+                                    className="justify-end items-center"
+                                  >
+                                    <div
+                                      className="items-center text-[0.75rem] cursor-pointer text-[#757575] hover:text-[#EEEEEE] flex mr-[0.6rem] whitespace-nowrap"
+                                      data-see-more="true"
+                                      onClick={(e) => handleSeeMore(probe, e)}
+                                    >
+                                      See More{" "}
+                                      <ChevronRight className="h-[1rem]" />
+                                    </div>
+                                    <CustomPopover
+                                      Placement="topRight"
+                                      title={
+                                        isSelected
+                                          ? "Deselect probe"
+                                          : "Select probe"
+                                      }
+                                    >
+                                      <Checkbox
+                                        checked={isSelected}
+                                        className="AntCheckbox text-[#757575] w-[0.875rem] h-[0.875rem] text-[0.875rem] flex justify-center items-center"
+                                        onClick={(e) => e.stopPropagation()}
+                                        onChange={() => {
+                                          toggleProbeSelection(probe.id);
+                                        }}
+                                      />
+                                    </CustomPopover>
+                                  </div>
+                                </div>
+
+                                {/* Description */}
+                                <CustomPopover title={probe.description}>
+                                  <div className="text-[#757575] w-full overflow-hidden text-ellipsis text-xs line-clamp-2 leading-[150%]">
+                                    {probe.description || "-"}
                                   </div>
                                 </CustomPopover>
                               </div>
-
-                              {/* Actions Section */}
-                              <div
-                                style={{
-                                  display: (isHovered || isSelected) ? "flex" : "none",
-                                }}
-                                className="justify-end items-center"
-                              >
-                                <div
-                                  className="items-center text-[0.75rem] cursor-pointer text-[#757575] hover:text-[#EEEEEE] flex mr-[0.6rem] whitespace-nowrap"
-                                  onClick={(e) => handleSeeMore(probe, e)}
-                                >
-                                  See More <ChevronRight className="h-[1rem]" />
-                                </div>
-                                <CustomPopover
-                                  Placement="topRight"
-                                  title={isSelected ? "Deselect probe" : "Select probe"}
-                                >
-                                  <Checkbox
-                                    checked={isSelected}
-                                    className="AntCheckbox text-[#757575] w-[0.875rem] h-[0.875rem] text-[0.875rem] flex justify-center items-center"
-                                    onClick={(e) => e.stopPropagation()}
-                                    onChange={(e) => {
-                                      e.stopPropagation();
-                                      toggleProbeSelection(probe.id);
-                                    }}
-                                  />
-                                </CustomPopover>
-                              </div>
                             </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ),
+                )
+              )}
 
-                            {/* Description */}
-                            <CustomPopover title={probe.description}>
-                              <div className="text-[#757575] w-full overflow-hidden text-ellipsis text-xs line-clamp-2 leading-[150%]">
-                                {probe.description || "-"}
-                              </div>
-                            </CustomPopover>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-
-              {Object.keys(groupedProbes).length === 0 && (
+              {!probesLoading && Object.keys(groupedProbes).length === 0 && (
                 <div className="text-center py-[2rem]">
-                  <Text_12_400_757575>No probes found matching your search</Text_12_400_757575>
+                  <Text_12_400_757575>
+                    No probes found matching your search
+                  </Text_12_400_757575>
                 </div>
               )}
             </div>
-
-            {/* Selected Count */}
-            {selectedProbes.length > 0 && (
-              <div className="mt-[2rem] p-[0.75rem] bg-[#965CDE10] border border-[#965CDE] rounded-[6px]">
-                <Text_12_400_757575 className="text-[#965CDE]">
-                  {selectedProbes.length} probe{selectedProbes.length > 1 ? 's' : ''} selected
-                </Text_12_400_757575>
-              </div>
-            )}
           </div>
         </BudDrawerLayout>
       </BudWraperBox>

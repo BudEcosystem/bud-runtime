@@ -23,7 +23,7 @@ import { useDrawer } from "src/hooks/useDrawer";
 import { useDeployModel } from "src/stores/useDeployModel";
 import { getChromeColor } from "@/components/ui/bud/dataEntry/TagsInputData";
 import { formatDate } from "src/utils/formatDate";
-import { cloudProviders, Model, useModels } from "src/hooks/useModels";
+import useGuardrails, { Probe } from "src/hooks/useGuardrails";
 import Tags from "src/flows/components/DrawerTags";
 import {
   PrimaryButton,
@@ -38,56 +38,27 @@ import { PermissionEnum, useUser } from "src/stores/useUser";
 import IconRender from "src/flows/components/BudIconRender";
 import router from "next/router";
 import { PlusOutlined } from "@ant-design/icons";
+import { Spin } from "antd";
 
-interface GuardRail {
-  id: string;
-  name: string;
-  type: string;
-  category: string[];
-  description?: string;
-  provider?: string;
-  deployments?: number;
-  status?: "active" | "inactive" | "pending";
-  createdAt?: string;
-  icon?: string;
-}
-
-function GuardRailCard({ item, index }: { item: GuardRail; index: number }) {
+function GuardRailCard({ item, index }: { item: Probe; index: number }) {
   const { openDrawer, openDrawerWithStep } = useDrawer();
+  const { setSelectedProbe } = useGuardrails();
 
-  const getTypeIcon = (type: string) => {
-    switch(type) {
-      case 'pii':
-        return '🔒';
-      case 'regex':
-        return '📝';
-      case 'toxicity':
-        return '⚠️';
-      case 'bias':
-        return '⚖️';
-      case 'jailbreak':
-        return '🚫';
+  const getTypeIcon = (providerType: string) => {
+    switch (providerType?.toLowerCase()) {
+      case 'bud_sentinel':
+      case 'bud-sentinel':
+        return '🛡️';
+      case 'azure':
+      case 'azure_ai':
+        return '☁️';
+      case 'aws':
+      case 'aws_bedrock':
+        return '🔶';
       case 'custom':
         return '⚙️';
-      case 'profanity':
-        return '🤬';
-      case 'semantic':
-        return '🧠';
       default:
         return '🛡️';
-    }
-  };
-
-  const getStatusColor = (status?: string) => {
-    switch(status) {
-      case 'active':
-        return '#52C41A';
-      case 'inactive':
-        return '#757575';
-      case 'pending':
-        return '#FAAD14';
-      default:
-        return '#757575';
     }
   };
 
@@ -96,34 +67,42 @@ function GuardRailCard({ item, index }: { item: GuardRail; index: number }) {
       className="flex flex-col bg-[#101010] border border-[#1F1F1F] rounded-lg p-[1.5rem] min-h-[280px] group cursor-pointer hover:shadow-[1px_1px_6px_-1px_#2e3036] hover:border-[#757575] transition-all"
       key={index}
       onClick={() => {
-        openDrawer("view-guardrail-details", { guardrail: item });
+        setSelectedProbe(item);
+        openDrawerWithStep("probe-details");
       }}
     >
       <div className="flex items-start justify-between mb-[1.25rem]">
         <div className="flex items-center gap-[1rem]">
           <div className="w-[3rem] h-[3rem] bg-[#1F1F1F] rounded-[8px] flex items-center justify-center text-[1.75rem]">
-            {getTypeIcon(item.type)}
+            {getTypeIcon(item.provider_type)}
           </div>
           <div className="flex-1">
             <Text_17_600_FFFFFF className="mb-[0.25rem] line-clamp-1">
               {item.name}
             </Text_17_600_FFFFFF>
-            {item.provider && (
+            {item.provider_name && (
               <Text_12_400_B3B3B3>
-                by {item.provider}
+                by {item.provider_name}
               </Text_12_400_B3B3B3>
             )}
           </div>
         </div>
-        {item.status && (
-          <div
-            className="w-[10px] h-[10px] rounded-full shrink-0"
-            style={{ backgroundColor: getStatusColor(item.status) }}
-            title={item.status}
-          />
-        )}
       </div>
 
+      {item.is_custom !== undefined && (
+        <div className="flex items-center gap-[0.5rem] mb-[1.25rem]">
+          {item.is_custom && (
+            <span className="text-[10px] px-[0.5rem] py-[0.125rem] bg-[#965CDE20] text-[#965CDE] rounded-[4px]">
+              Custom
+            </span>
+          )}
+          {item.rule_count !== undefined && (
+            <span className="text-[10px] px-[0.5rem] py-[0.125rem] bg-[#1F1F1F] text-[#B3B3B3] rounded-[4px]">
+              {item.rule_count} rules
+            </span>
+          )}
+        </div>
+      )}
       {item.description && (
         <Text_13_400_B3B3B3 className="mb-[1.25rem] line-clamp-3 leading-[1.4]">
           {item.description}
@@ -132,20 +111,21 @@ function GuardRailCard({ item, index }: { item: GuardRail; index: number }) {
 
       <div className="flex items-center justify-between mt-auto pt-[1rem] border-t border-[#1F1F1F]">
         <div className="flex items-center gap-[0.5rem] flex-wrap">
-          {item.category.slice(0, 3).map((cat, idx) => (
+          {item.tags && item.tags.slice(0, 3).map((tag, idx) => (
             <Tag
               key={idx}
               className="text-[#B3B3B3] border-[0] rounded-[6px] flex items-center px-[0.75rem] py-[0.375rem]"
               style={{
-                backgroundColor: "#1F1F1F",
+                backgroundColor: tag.color + "20" || "#1F1F1F",
+                color: tag.color || "#B3B3B3"
               }}
             >
-              <span className="text-[0.75rem] font-[400] capitalize">
-                {cat}
+              <span className="text-[0.75rem] font-[400]">
+                {tag.name}
               </span>
             </Tag>
           ))}
-          {item.category.length > 3 && (
+          {item.tags && item.tags.length > 3 && (
             <Tag
               className="text-[#757575] border-[0] rounded-[6px] flex items-center px-[0.75rem] py-[0.375rem]"
               style={{
@@ -153,16 +133,11 @@ function GuardRailCard({ item, index }: { item: GuardRail; index: number }) {
               }}
             >
               <span className="text-[0.75rem] font-[400]">
-                +{item.category.length - 3}
+                +{item.tags.length - 3}
               </span>
             </Tag>
           )}
         </div>
-        {item.deployments !== undefined && (
-          <Text_12_400_B3B3B3 className="shrink-0">
-            {item.deployments} {item.deployments === 1 ? 'deploy' : 'deploys'}
-          </Text_12_400_B3B3B3>
-        )}
       </div>
     </div>
   );
@@ -261,124 +236,36 @@ const SelectedFilters = ({
   );
 };
 
-// Dummy guardrail data
-const dummyGuardRails: GuardRail[] = [
-  {
-    id: "1",
-    name: "PII Detection",
-    type: "pii",
-    category: ["harm", "compliance", "privacy"],
-    description: "Detects and masks personal identifiable information including SSN, credit cards, emails, phone numbers",
-    provider: "Bud Sentinel",
-    deployments: 12,
-    status: "active"
-  },
-  {
-    id: "2",
-    name: "Jailbreak Protection",
-    type: "jailbreak",
-    category: ["jailbreak", "security"],
-    description: "Prevents prompt injection and jailbreak attempts to bypass model safety guidelines",
-    provider: "Bud Sentinel",
-    deployments: 8,
-    status: "active"
-  },
-  {
-    id: "3",
-    name: "Toxicity Filter",
-    type: "toxicity",
-    category: ["toxic", "harm", "content"],
-    description: "Filters out toxic, harmful, and inappropriate content from model responses",
-    provider: "Bud Sentinel",
-    deployments: 15,
-    status: "active"
-  },
-  {
-    id: "4",
-    name: "Bias Detection",
-    type: "bias",
-    category: ["bias", "fairness"],
-    description: "Identifies and mitigates bias in AI model outputs including gender, racial, and age bias",
-    provider: "Bud Sentinel",
-    deployments: 5,
-    status: "pending"
-  },
-  {
-    id: "5",
-    name: "Profanity Blocker",
-    type: "profanity",
-    category: ["content", "harm"],
-    description: "Blocks profane language and offensive terms in both input and output",
-    provider: "Azure AI",
-    deployments: 20,
-    status: "active"
-  },
-  {
-    id: "6",
-    name: "RegEx Pattern Matcher",
-    type: "regex",
-    category: ["custom", "pattern"],
-    description: "Custom regex patterns for detecting specific text patterns or formats",
-    provider: "Custom",
-    deployments: 3,
-    status: "active"
-  },
-  {
-    id: "7",
-    name: "Semantic Similarity",
-    type: "semantic",
-    category: ["custom", "similarity"],
-    description: "Checks semantic similarity between prompts and predefined patterns",
-    provider: "Custom",
-    deployments: 0,
-    status: "inactive"
-  },
-  {
-    id: "8",
-    name: "Medical Info Filter",
-    type: "pii",
-    category: ["harm", "compliance", "healthcare"],
-    description: "Specialized filter for medical and health-related personal information",
-    provider: "Bud Sentinel",
-    deployments: 7,
-    status: "active"
-  },
-  {
-    id: "9",
-    name: "Financial Data Protection",
-    type: "pii",
-    category: ["compliance", "finance"],
-    description: "Protects financial data including account numbers, routing numbers, and transaction details",
-    provider: "AWS Bedrock",
-    deployments: 10,
-    status: "active"
-  }
-];
 
 export default function GuardRails() {
   const [isMounted, setIsMounted] = useState(false);
   const { hasPermission, loadingUser } = useUser();
-  const {
-    models,
-    getGlobalModels,
-    getTasks,
-    getAuthors,
-    authors,
-    tasks,
-    totalModels,
-    totalPages,
-  } = useModels();
   const { showLoader, hideLoader } = useLoader();
   const { openDrawer, openDrawerWithStep } = useDrawer();
   const { reset } = useDeployModel();
 
+  // Use guardrails hook for API integration
+  const {
+    probes,
+    probesLoading,
+    probesError,
+    totalProbes,
+    currentPage,
+    pageSize,
+    totalPages,
+    fetchProbes,
+    setCurrentPage,
+    setPageSize,
+    setSearchTerm,
+    searchTerm,
+    selectedTags,
+    setSelectedTags,
+  } = useGuardrails();
+
   // State for guardrails
-  const [guardRails, setGuardRails] = useState<GuardRail[]>(dummyGuardRails);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
-  // for pagination
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  // for filters
   const [tempFilter, setTempFilter] = useState<GuardRailFilters>({});
   const [filter, setFilter] = useState<GuardRailFilters>(defaultFilter);
   const [filterOpen, setFilterOpen] = React.useState(false);
@@ -387,38 +274,33 @@ export default function GuardRails() {
   const load = useCallback(
     async (filter: GuardRailFilters) => {
       if (hasPermission(PermissionEnum.ModelView)) {
-        // For now, just filter the local dummy data
-        // In real implementation, this would call an API
-        let filteredGuardRails = [...dummyGuardRails];
+        // Build API params from filter
+        const params: any = {
+          page: currentPage,
+          page_size: pageSize,
+        };
 
         if (filter.name) {
-          filteredGuardRails = filteredGuardRails.filter(gr =>
-            gr.name.toLowerCase().includes(filter.name!.toLowerCase())
-          );
+          params.search = filter.name;
         }
 
-        if (filter.provider?.length > 0) {
-          filteredGuardRails = filteredGuardRails.filter(gr =>
-            filter.provider!.includes(gr.provider?.toLowerCase().replace(/\s+/g, '-') || '')
-          );
+        if (filter.provider && filter.provider.length > 0) {
+          // Map frontend provider values to API provider_type values
+          const providerMapping: Record<string, string> = {
+            'bud-sentinel': 'bud_sentinel',
+            'azure-ai': 'azure',
+            'aws-bedrock': 'aws',
+            'custom': 'custom'
+          };
+          const mappedProviders = filter.provider.map(p => providerMapping[p] || p);
+          params.provider_type = mappedProviders.join(',');
         }
 
-        if (filter.guardRailType?.length > 0) {
-          filteredGuardRails = filteredGuardRails.filter(gr =>
-            filter.guardRailType!.includes(gr.type)
-          );
-        }
-
-        if (filter.status?.length > 0) {
-          filteredGuardRails = filteredGuardRails.filter(gr =>
-            filter.status!.includes(gr.status || '')
-          );
-        }
-
-        setGuardRails(filteredGuardRails);
+        // Fetch probes from API
+        await fetchProbes(params);
       }
     },
-    [hasPermission]
+    [hasPermission, currentPage, pageSize, fetchProbes]
   );
 
   const handleOpenChange = (open) => {
@@ -460,41 +342,23 @@ export default function GuardRails() {
   }, [filterReset]);
 
   useEffect(() => {
-    // debounce
+    // debounce search
     const timer = setTimeout(() => {
       load(filter);
-      setCurrentPage(1);
     }, 500);
     return () => clearTimeout(timer);
   }, [filter.name]);
 
   useEffect(() => {
-    getTasks();
-    getAuthors();
-  }, []);
-
-  useEffect(() => {
-    // openDrawer('cluster-event');
-  }, []);
-
-  const handleScroll = (e) => {
-    // is at the bottom
-    const bottom =
-      document.getElementById("model-repo")?.scrollTop > models.length * 30;
-    if (bottom && models.length < totalModels && currentPage < totalPages) {
-      setCurrentPage(currentPage + 1);
-    }
-  };
-  useEffect(() => {
+    // Load initial data
     if (isMounted) {
-      setTimeout(() => {
-        load(filter);
-      }, 1000);
+      load(filter);
     }
-  }, [currentPage, pageSize, getGlobalModels, filter, isMounted]);
-   useEffect(() => {
-      setIsMounted(true)
-    }, []);
+  }, [currentPage, pageSize, filter, isMounted, load]);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
   return (
     <DashBoardLayout>
       <div className="boardPageView" id="model-container">
@@ -825,97 +689,128 @@ export default function GuardRails() {
                   name="All"
                   color={selectedCategory === "all" ? "#FFFFFF" : "#B3B3B3"}
                   textClass={selectedCategory === "all" ? "!text-white" : ""}
-                  classNames={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
-                    selectedCategory === "all"
+                  classNames={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${selectedCategory === "all"
                       ? "!bg-[#965CDE]"
                       : "!bg-transparent border-[0.5px] border-[#757575] hover:border-[#965CDE]"
-                  }`}
+                    }`}
                   onTagClick={() => setSelectedCategory("all")}
                 />
                 <Tags
                   name="Harm"
                   color={selectedCategory === "harm" ? "#FFFFFF" : "#B3B3B3"}
                   textClass={selectedCategory === "harm" ? "!text-white" : ""}
-                  classNames={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
-                    selectedCategory === "harm"
+                  classNames={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${selectedCategory === "harm"
                       ? "!bg-[#965CDE]"
                       : "!bg-transparent border-[0.5px] border-[#757575] hover:border-[#965CDE]"
-                  }`}
+                    }`}
                   onTagClick={() => setSelectedCategory("harm")}
                 />
                 <Tags
                   name="Jailbreak"
                   color={selectedCategory === "jailbreak" ? "#FFFFFF" : "#B3B3B3"}
                   textClass={selectedCategory === "jailbreak" ? "!text-white" : ""}
-                  classNames={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
-                    selectedCategory === "jailbreak"
+                  classNames={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${selectedCategory === "jailbreak"
                       ? "!bg-[#965CDE]"
                       : "!bg-transparent border-[0.5px] border-[#757575] hover:border-[#965CDE]"
-                  }`}
+                    }`}
                   onTagClick={() => setSelectedCategory("jailbreak")}
                 />
                 <Tags
                   name="Toxic"
                   color={selectedCategory === "toxic" ? "#FFFFFF" : "#B3B3B3"}
                   textClass={selectedCategory === "toxic" ? "!text-white" : ""}
-                  classNames={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
-                    selectedCategory === "toxic"
+                  classNames={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${selectedCategory === "toxic"
                       ? "!bg-[#965CDE]"
                       : "!bg-transparent border-[0.5px] border-[#757575] hover:border-[#965CDE]"
-                  }`}
+                    }`}
                   onTagClick={() => setSelectedCategory("toxic")}
                 />
                 <Tags
                   name="Bias"
                   color={selectedCategory === "bias" ? "#FFFFFF" : "#B3B3B3"}
                   textClass={selectedCategory === "bias" ? "!text-white" : ""}
-                  classNames={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
-                    selectedCategory === "bias"
+                  classNames={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${selectedCategory === "bias"
                       ? "!bg-[#965CDE]"
                       : "!bg-transparent border-[0.5px] border-[#757575] hover:border-[#965CDE]"
-                  }`}
+                    }`}
                   onTagClick={() => setSelectedCategory("bias")}
                 />
                 <Tags
                   name="Compliance"
                   color={selectedCategory === "compliance" ? "#FFFFFF" : "#B3B3B3"}
                   textClass={selectedCategory === "compliance" ? "!text-white" : ""}
-                  classNames={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
-                    selectedCategory === "compliance"
+                  classNames={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${selectedCategory === "compliance"
                       ? "!bg-[#965CDE]"
                       : "!bg-transparent border-[0.5px] border-[#757575] hover:border-[#965CDE]"
-                  }`}
+                    }`}
                   onTagClick={() => setSelectedCategory("compliance")}
                 />
                 <Tags
                   name="Custom"
                   color={selectedCategory === "custom" ? "#FFFFFF" : "#B3B3B3"}
                   textClass={selectedCategory === "custom" ? "!text-white" : ""}
-                  classNames={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
-                    selectedCategory === "custom"
+                  classNames={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${selectedCategory === "custom"
                       ? "!bg-[#965CDE]"
                       : "!bg-transparent border-[0.5px] border-[#757575] hover:border-[#965CDE]"
-                  }`}
+                    }`}
                   onTagClick={() => setSelectedCategory("custom")}
                 />
               </div>
 
               {/* GuardRails Grid */}
-              {(() => {
-                const filteredGuardRails = selectedCategory === "all"
-                  ? guardRails
-                  : guardRails.filter(gr => gr.category.includes(selectedCategory));
+              {probesLoading ? (
+                <div className="flex justify-center items-center h-[50vh]">
+                  <Spin size="large" />
+                </div>
+              ) : (() => {
+                // Filter probes by selected category
+                const filteredProbes = selectedCategory === "all"
+                  ? probes
+                  : probes.filter(probe =>
+                    probe.tags?.some(tag =>
+                      tag.name.toLowerCase() === selectedCategory.toLowerCase()
+                    )
+                  );
 
-                return filteredGuardRails.length > 0 ? (
-                  <div className="grid gap-[1.5rem] grid-cols-3 pb-[1.5rem] px-[1.5rem]">
-                    {filteredGuardRails.map((item, index) => (
-                      <GuardRailCard key={item.id} item={item} index={index} />
-                    ))}
-                  </div>
+                return filteredProbes && filteredProbes.length > 0 ? (
+                  <>
+                    <div className="grid gap-[1.5rem] grid-cols-3 pb-[1.5rem] px-[1.5rem]">
+                      {filteredProbes.map((item, index) => (
+                        <GuardRailCard key={item.id} item={item} index={index} />
+                      ))}
+                    </div>
+
+                    {/* Pagination */}
+                    {totalPages > 1 && (
+                      <div className="flex justify-center items-center gap-[1rem] py-[2rem] border-t border-[#1F1F1F]">
+                        <button
+                          onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                          disabled={currentPage === 1}
+                          className="px-[1rem] py-[0.5rem] bg-[#1F1F1F] text-[#EEEEEE] rounded-[6px] hover:bg-[#2A2A2A] disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Previous
+                        </button>
+                        <span className="text-[#B3B3B3]">
+                          Page {currentPage} of {totalPages}
+                        </span>
+                        <button
+                          onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                          disabled={currentPage === totalPages}
+                          className="px-[1rem] py-[0.5rem] bg-[#1F1F1F] text-[#EEEEEE] rounded-[6px] hover:bg-[#2A2A2A] disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <NoDataFount
                     classNames="h-[50vh]"
-                    textMessage={`No guardrails found for the "${selectedCategory}" category`}
+                    textMessage={
+                      selectedCategory === "all"
+                        ? "No guardrails found"
+                        : `No guardrails found for the "${selectedCategory}" category`
+                    }
                   />
                 );
               })()}

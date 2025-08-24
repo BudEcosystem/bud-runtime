@@ -2,16 +2,18 @@ import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
-import { Checkbox } from "antd";
-import React, { useState } from "react";
+import { Checkbox, Spin } from "antd";
+import React, { useState, useEffect } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
 import { errorToast } from "@/components/toast";
+import { useCloudProviders } from "src/hooks/useCloudProviders";
 import {
   Text_12_400_757575,
   Text_14_400_EEEEEE,
   Text_12_400_B3B3B3,
   Text_14_600_FFFFFF,
 } from "@/components/ui/text";
+import IconRender from "../components/BudIconRender";
 
 interface ProviderOption {
   id: string;
@@ -50,9 +52,19 @@ const providers: ProviderOption[] = [
 export default function SelectProvider() {
   const { openDrawerWithStep } = useDrawer();
   const [selectedProvider, setSelectedProvider] = useState<string>("");
+  const [selectedProviderData, setSelectedProviderData] = useState<any>(null);
 
-  const handleProviderSelect = (providerId: string) => {
+  // Use the cloud providers hook to fetch providers from API
+  const { providers: apiProviders, loading, getProviders } = useCloudProviders();
+
+  // Fetch providers on mount
+  useEffect(() => {
+    getProviders(1, 50); // Fetch first 50 providers
+  }, []);
+
+  const handleProviderSelect = (providerId: string, providerData?: any) => {
     setSelectedProvider(providerId);
+    setSelectedProviderData(providerData);
   };
 
   const handleNext = () => {
@@ -62,19 +74,39 @@ export default function SelectProvider() {
     }
 
     // Navigate to the appropriate next step based on provider
-    if (selectedProvider === "bud-sentinel") {
-      openDrawerWithStep("bud-sentinel-probes");
-    } else if (selectedProvider === "custom-probe") {
+    if (selectedProvider === "custom-probe") {
       openDrawerWithStep("select-probe-type");
     } else if (selectedProvider === "azure-ai-foundry") {
       openDrawerWithStep("politeness-detection");
+    } else if (selectedProviderData?.name?.toLowerCase().includes('bud') ||
+               selectedProviderData?.type === 'cloud') {
+      // For Bud or cloud providers from API
+      openDrawerWithStep("bud-sentinel-probes");
     } else {
       // For other providers, we can add different flows later
       openDrawerWithStep("politeness-detection");
     }
   };
 
-  const budProviders = providers.filter(p => p.category === "bud");
+  // Filter API providers for Bud section (cloud providers from API)
+  const budProviders = apiProviders?.filter(p =>
+    p.type?.toLowerCase() === 'cloud' ||
+    p.type?.toLowerCase() === 'cloud_provider' ||
+    p.name?.toLowerCase().includes('bud')
+  ) || [];
+
+  // Add custom probe option to bud providers
+  const customProbeOption = {
+    id: "custom-probe",
+    name: "Create custom probe",
+    description: "Create your custom probe with Bud sentinel for tools, agents, prompts, models or routes.",
+    icon: "⚙️",
+    type: "custom"
+  };
+
+  const allBudProviders = [...budProviders];
+
+  // Keep static third-party providers for now
   const thirdPartyProviders = providers.filter(p => p.category === "third-party");
 
   return (
@@ -98,38 +130,55 @@ export default function SelectProvider() {
             {/* Bud Section */}
             <div className="mb-[1.5rem]">
               <Text_14_600_FFFFFF className="mb-[1rem]">Bud</Text_14_600_FFFFFF>
-              <div className="space-y-[0.75rem]">
-                {budProviders.map((provider) => (
-                  <div
-                    key={provider.id}
-                    className={`p-[1rem] border rounded-[8px] cursor-pointer transition-all ${
-                      selectedProvider === provider.id
-                        ? "border-[#965CDE] bg-[#965CDE10]"
-                        : "border-[#1F1F1F] hover:border-[#757575] bg-[#FFFFFF08]"
-                    }`}
-                    onClick={() => handleProviderSelect(provider.id)}
-                  >
-                    <div className="flex items-start gap-[0.75rem]">
-                      <Checkbox
-                        checked={selectedProvider === provider.id}
-                        className="AntCheckbox mt-[2px]"
-                        onChange={(e) => {
-                          e.stopPropagation();
-                          handleProviderSelect(provider.id);
-                        }}
-                      />
-                      <div className="flex-1">
-                        <Text_14_400_EEEEEE className="mb-[0.25rem]">
-                          {provider.name}
-                        </Text_14_400_EEEEEE>
-                        <Text_12_400_757575 className="leading-[1.4]">
-                          {provider.description}
-                        </Text_12_400_757575>
+              {loading ? (
+                <div className="flex justify-center py-[2rem]">
+                  <Spin size="default" />
+                </div>
+              ) : (
+                <div className="space-y-[0.75rem]">
+                  {allBudProviders.map((provider) => (
+                    <div
+                      key={provider.id}
+                      className={`p-[1rem] border rounded-[8px] cursor-pointer transition-all ${
+                        selectedProvider === provider.id
+                          ? "border-[#965CDE] bg-[#965CDE10]"
+                          : "border-[#1F1F1F] hover:border-[#757575] bg-[#FFFFFF08]"
+                      }`}
+                      onClick={() => handleProviderSelect(provider.id, provider)}
+                    >
+                      <div className="flex items-start gap-[0.75rem]">
+                        {/* Icon for provider */}
+                        <div className="mt-[2px]">
+                          <IconRender
+                            icon={provider.icon}
+                            size={32}
+                            imageSize={20}
+                            type={provider.type}
+                          />
+                        </div>
+
+                        <div className="flex-1">
+                          <Text_14_400_EEEEEE className="mb-[0.25rem]">
+                            {provider.name}
+                          </Text_14_400_EEEEEE>
+                          <Text_12_400_757575 className="leading-[1.4]">
+                            {provider.description || "Cloud provider for model deployments"}
+                          </Text_12_400_757575>
+                        </div>
+
+                        <Checkbox
+                          checked={selectedProvider === provider.id}
+                          className="AntCheckbox mt-[2px]"
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            handleProviderSelect(provider.id, provider);
+                          }}
+                        />
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Third Party Section */}
