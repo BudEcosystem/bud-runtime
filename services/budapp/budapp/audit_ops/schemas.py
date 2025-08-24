@@ -24,7 +24,9 @@ class AuditRecordBase(BaseModel):
     action: AuditActionEnum = Field(..., description="Type of action performed")
     resource_type: AuditResourceTypeEnum = Field(..., description="Type of resource affected")
     resource_id: Optional[UUID4] = Field(None, description="ID of the affected resource")
-    resource_name: Optional[str] = Field(None, description="Name of the affected resource for display and search", max_length=255)
+    resource_name: Optional[str] = Field(
+        None, description="Name of the affected resource for display and search", max_length=255
+    )
     details: Optional[Dict[str, Any]] = Field(None, description="Additional context about the action")
     ip_address: Optional[str] = Field(
         None, description="IP address from which the action was performed", max_length=45
