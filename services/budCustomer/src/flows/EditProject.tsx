@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext, useEffect, useState, useCallback } from "react";
 import DrawerCard from "@/components/ui/bud/card/DrawerCard";
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
@@ -64,6 +64,25 @@ function EditProjectForm() {
     }
   }, [globalSelectedProject, setProjectValues, form]);
 
+  // Use useCallback to prevent infinite loops
+  const handleIconChange = useCallback((icon: string) => {
+    if (projectValues?.icon !== icon) {
+      setProjectValues({
+        ...projectValues,
+        icon: icon,
+      });
+    }
+  }, [projectValues, setProjectValues]);
+
+  const handleNameChange = useCallback((name: string) => {
+    if (projectValues?.name !== name) {
+      setProjectValues({
+        ...projectValues,
+        name: name,
+      });
+    }
+  }, [projectValues, setProjectValues]);
+
   return (
     <BudWraperBox>
       <BudDrawerLayout>
@@ -76,18 +95,8 @@ function EditProjectForm() {
             placeholder="Enter Project Name"
             isEdit={true}
             showIcon={false}
-            onChangeIcon={(icon) =>
-              setProjectValues({
-                ...projectValues,
-                icon: icon,
-              })
-            }
-            onChangeName={(name) =>
-              setProjectValues({
-                ...projectValues,
-                name: name,
-              })
-            }
+            onChangeIcon={handleIconChange}
+            onChangeName={handleNameChange}
           />
           <div className="mt-[.5rem]">
             <div>
@@ -107,12 +116,12 @@ function EditProjectForm() {
                 ]}
                 label="Tags"
                 options={options}
-                onChange={(tags) =>
+                onChange={useCallback((tags: any) => {
                   setProjectValues({
                     ...projectValues,
                     tags: tags,
-                  })
-                }
+                  });
+                }, [projectValues, setProjectValues])}
               />
             </div>
 
@@ -125,14 +134,14 @@ function EditProjectForm() {
                 rules={[
                   { required: true, message: "Please enter description" },
                 ]}
-                onChange={(description) => {
+                onChange={useCallback((description: string) => {
                   setProjectValues({
                     ...projectValues,
                     description: description,
                   });
                   // Also update form values
                   form.setFieldsValue({ description: description });
-                }}
+                }, [projectValues, setProjectValues, form])}
               />
             </div>
           </div>
