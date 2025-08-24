@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, Dict, List, Optional, Union
 from uuid import UUID
 
+import httpx
 from fastapi import HTTPException, Request, status
 from fastapi.exceptions import HTTPException
 
@@ -655,10 +656,6 @@ class CredentialService(SessionMixin):
         Returns:
             Dictionary mapping credential IDs to their last used timestamps
         """
-        from datetime import timedelta
-
-        import httpx
-
         try:
             # Calculate since timestamp
             since = datetime.now(UTC) - timedelta(minutes=since_minutes)
