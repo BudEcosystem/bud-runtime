@@ -29,14 +29,24 @@ const ProjectCard = React.memo(({
     e.domEvent?.stopPropagation?.();
 
     switch (e.key) {
+      case 'edit':
+        // Edit functionality to be implemented
+        console.log('Edit project:', project.name);
+        break;
       case 'delete':
         onDelete(project);
         break;
     }
   }, [project, onDelete]);
 
-  // Static menu items without onClick handlers - Edit removed temporarily
+  // Static menu items without onClick handlers
   const menuItems = useMemo(() => [
+    {
+      key: "edit",
+      label: "Edit",
+      icon: <Icon icon="ph:pencil-simple" className="text-bud-text-primary" />,
+      className: "hover:!bg-bud-bg-tertiary",
+    },
     {
       key: "delete",
       label: "Delete",
