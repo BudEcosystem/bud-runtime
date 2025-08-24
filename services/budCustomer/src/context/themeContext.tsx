@@ -228,11 +228,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
           itemLinkColor: "var(--text-primary)",
           itemHoverBg: "var(--bg-hover)",
           itemHoverColor: "var(--text-primary)",
-          colorTextDescription: "var(--text-secondary)",
-          selectItemBg: "var(--bg-tertiary)",
-          selectItemSelectedBg: "var(--color-purple)",
-          selectItemColor: "var(--text-primary)",
-          selectItemSelectedColor: "var(--text-primary)",
+          colorTextDescription: "var(--text-secondary)"
         },
         Notification: {
           colorBgElevated: "var(--bg-tertiary)",   // background
