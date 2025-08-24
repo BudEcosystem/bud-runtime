@@ -31,6 +31,7 @@ import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 
 // Extend dayjs with UTC and timezone support
+// test comment
 dayjs.extend(utc);
 dayjs.extend(timezone);
 import BarChart from '@/components/charts/barChart';
