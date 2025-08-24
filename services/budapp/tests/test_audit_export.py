@@ -147,7 +147,7 @@ class TestExportUtils:
         """Test CSV value sanitization."""
         assert sanitize_for_csv(None) == ""
         assert sanitize_for_csv("normal text") == "normal text"
-        assert sanitize_for_csv("text\x00with\x00nulls") == "textwith nulls"
+        assert sanitize_for_csv("text\x00with\x00nulls") == "text with nulls"
         assert sanitize_for_csv(123) == "123"
         assert sanitize_for_csv({"key": "value"}) == "{'key': 'value'}"
 
