@@ -43,6 +43,7 @@ def generate_audit_hash(
     ip_address: Optional[str],
     previous_state: Optional[Dict[str, Any]],
     new_state: Optional[Dict[str, Any]],
+    resource_name: Optional[str] = None,
 ) -> str:
     """Generate a SHA256 hash of audit record data."""
     # Create a dictionary of all fields
@@ -57,6 +58,7 @@ def generate_audit_hash(
         "ip_address": ip_address,
         "previous_state": previous_state,
         "new_state": new_state,
+        "resource_name": resource_name,
     }
 
     # Serialize the data
@@ -130,6 +132,7 @@ def test_hash_consistency():
         ip_address="192.168.1.1",
         previous_state=None,
         new_state={"status": "created"},
+        resource_name="Test Project",
     )
 
     hash2 = generate_audit_hash(
@@ -143,6 +146,7 @@ def test_hash_consistency():
         ip_address="192.168.1.1",
         previous_state=None,
         new_state={"status": "created"},
+        resource_name="Test Project",
     )
 
     assert hash1 == hash2
@@ -163,6 +167,7 @@ def test_hash_uniqueness():
         "ip_address": "192.168.1.1",
         "previous_state": None,
         "new_state": {"status": "created"},
+        "resource_name": "Test Project",
     }
 
     # Generate base hash
@@ -183,8 +188,13 @@ def test_hash_uniqueness():
     params4["details"] = {"test": "different_data"}
     hash4 = generate_audit_hash(**params4)
 
+    # Change resource_name and generate new hash
+    params5 = base_params.copy()
+    params5["resource_name"] = "Different Project"
+    hash5 = generate_audit_hash(**params5)
+
     # All hashes should be different
-    hashes = [hash1, hash2, hash3, hash4]
+    hashes = [hash1, hash2, hash3, hash4, hash5]
     assert len(set(hashes)) == len(hashes), "Hashes should be unique for different inputs"
     print("✓ Hash uniqueness test passed")
 
@@ -217,6 +227,7 @@ def test_hash_with_complex_data():
         ip_address="::1",  # IPv6 address
         previous_state={"version": 1, "status": "active"},
         new_state={"version": 2, "status": "updated", "data": complex_details},
+        resource_name="Complex Endpoint 🚀",
     )
 
     assert len(hash_result) == 64
@@ -240,6 +251,7 @@ def test_hash_with_admin_action():
         ip_address="10.0.0.1",
         previous_state={"status": "active", "size": 1024},
         new_state=None,  # Deleted, so no new state
+        resource_name="Deleted Model v2.1",
     )
 
     assert len(hash_result) == 64
@@ -260,6 +272,7 @@ def test_verify_integrity():
         "ip_address": "192.168.100.50",
         "previous_state": None,
         "new_state": {"permissions": ["read", "list"]},
+        "resource_name": "Production Cluster 01",
     }
 
     # Generate original hash
@@ -278,6 +291,42 @@ def test_verify_integrity():
     print("✓ Integrity verification test passed")
 
 
+def test_resource_name_hash_impact():
+    """Test that resource_name affects hash generation."""
+    base_data = {
+        "action": "CREATE",
+        "resource_type": "PROJECT",
+        "resource_id": uuid4(),
+        "user_id": uuid4(),
+        "actioned_by": None,
+        "timestamp": datetime.now(timezone.utc),
+        "details": {"test": "data"},
+        "ip_address": "192.168.1.1",
+        "previous_state": None,
+        "new_state": {"status": "created"},
+    }
+
+    # Hash without resource_name
+    hash_without = generate_audit_hash(**base_data)
+
+    # Hash with resource_name
+    hash_with_name = generate_audit_hash(**base_data, resource_name="Test Project")
+
+    # Hash with different resource_name
+    hash_different_name = generate_audit_hash(**base_data, resource_name="Another Project")
+
+    # Hash with None resource_name (explicit)
+    hash_with_none = generate_audit_hash(**base_data, resource_name=None)
+
+    # Verify all hashes are different where they should be
+    assert hash_without == hash_with_none, "Hash without resource_name should match hash with None"
+    assert hash_with_name != hash_without, "Hash with resource_name should differ from hash without"
+    assert hash_different_name != hash_with_name, "Different resource names should produce different hashes"
+    assert hash_different_name != hash_without, "Different resource name should differ from no resource name"
+
+    print("✓ Resource name hash impact test passed")
+
+
 def main():
     """Run all tests."""
     print("Running Audit Trail Hash Tests")
@@ -292,6 +341,7 @@ def main():
     test_hash_with_complex_data()
     test_hash_with_admin_action()
     test_verify_integrity()
+    test_resource_name_hash_impact()
 
     print("=" * 50)
     print("✅ All tests passed successfully!")

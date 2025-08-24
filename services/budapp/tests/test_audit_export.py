@@ -36,6 +36,7 @@ class TestExportUtils:
         record1.action = AuditActionEnum.CREATE.value
         record1.resource_type = AuditResourceTypeEnum.PROJECT.value
         record1.resource_id = resource_id
+        record1.resource_name = "Test Project"
         record1.ip_address = "192.168.1.1"
         record1.details = {"key": "value"}
         record1.previous_state = None
@@ -66,6 +67,7 @@ class TestExportUtils:
         assert row["Action"] == AuditActionEnum.CREATE.value
         assert row["Resource Type"] == AuditResourceTypeEnum.PROJECT.value
         assert row["Resource ID"] == str(resource_id)
+        assert row["Resource Name"] == "Test Project"
         assert row["IP Address"] == "192.168.1.1"
         assert row["Record Hash"] == "a" * 64
 
@@ -79,6 +81,7 @@ class TestExportUtils:
         record.action = AuditActionEnum.LOGIN.value
         record.resource_type = AuditResourceTypeEnum.USER.value
         record.resource_id = uuid4()
+        record.resource_name = "User Login"
         record.ip_address = "10.0.0.1"
         record.details = {}
         record.previous_state = None
@@ -111,6 +114,7 @@ class TestExportUtils:
         record.action = AuditActionEnum.UPDATE.value
         record.resource_type = AuditResourceTypeEnum.MODEL.value
         record.resource_id = uuid4()
+        record.resource_name = "ML Model v2.1"
         record.ip_address = "172.16.0.1"
         record.details = {"field": "updated"}
         record.previous_state = {"status": "old"}
@@ -197,6 +201,7 @@ class TestAuditExportEndpoint:
             record.action = AuditActionEnum.CREATE.value
             record.resource_type = AuditResourceTypeEnum.PROJECT.value
             record.resource_id = uuid4()
+            record.resource_name = f"Project {i}"
             record.ip_address = f"192.168.1.{i+1}"
             record.details = {"index": i}
             record.previous_state = None
@@ -245,6 +250,7 @@ class TestAuditExportEndpoint:
                 assert len(rows) == 3
                 for i, row in enumerate(rows):
                     assert row["User Email"] == f"user{i}@example.com"
+                    assert row["Resource Name"] == f"Project {i}"
                     assert row["IP Address"] == f"192.168.1.{i+1}"
 
     def test_regular_json_response(self, mock_audit_service, mock_user, mock_records):
@@ -330,3 +336,74 @@ class TestAuditExportEndpoint:
                 call_args = mock_service_instance.get_audit_records.call_args
                 filter_params = call_args[1]["filter_params"]
                 assert filter_params.user_id == mock_user.id
+
+    def test_csv_export_includes_resource_name_column(self, mock_audit_service, mock_user, mock_records):
+        """Test that CSV export includes resource_name column."""
+        from budapp.main import app
+
+        # Mock the service
+        mock_service_instance = Mock()
+        mock_service_instance.get_audit_records.return_value = (mock_records, len(mock_records))
+        mock_audit_service.return_value = mock_service_instance
+
+        with patch("budapp.audit_ops.audit_routes.get_current_active_user", return_value=mock_user):
+            with patch("budapp.audit_ops.audit_routes.get_session"):
+                client = TestClient(app)
+
+                response = client.get(
+                    "/audit/records?export_csv=true",
+                    headers={"Authorization": "Bearer fake-token"}
+                )
+
+                assert response.status_code == status.HTTP_200_OK
+                
+                # Parse CSV and verify resource_name column exists
+                csv_content = response.text
+                reader = csv.DictReader(io.StringIO(csv_content))
+                headers = reader.fieldnames
+                
+                assert "Resource Name" in headers
+                
+                # Verify resource_name values are populated
+                rows = list(reader)
+                for i, row in enumerate(rows):
+                    assert row["Resource Name"] == f"Project {i}"
+
+    def test_generate_csv_with_resource_name_filtering(self):
+        """Test CSV generation when filtering by resource_name."""
+        # Create records with different resource names
+        records = []
+        for i, name in enumerate(["Alpha Project", "Beta Project", "Alpha Model"]):
+            record = Mock(spec=AuditTrail)
+            record.id = uuid4()
+            record.timestamp = datetime.now(timezone.utc)
+            record.user_id = uuid4()
+            record.actioned_by = None
+            record.action = AuditActionEnum.CREATE.value
+            record.resource_type = AuditResourceTypeEnum.PROJECT.value
+            record.resource_id = uuid4()
+            record.resource_name = name
+            record.ip_address = f"192.168.1.{i+1}"
+            record.details = {}
+            record.previous_state = None
+            record.new_state = None
+            record.record_hash = f"{'a' * 63}{i}"
+            
+            record.user = Mock()
+            record.user.email = f"user{i}@example.com"
+            record.user.name = f"User {i}"
+            record.actioned_by_user = None
+            
+            records.append(record)
+
+        # Generate CSV
+        csv_content = generate_csv_from_audit_records(records, include_user_info=True)
+        
+        # Parse and verify
+        reader = csv.DictReader(io.StringIO(csv_content))
+        rows = list(reader)
+        
+        assert len(rows) == 3
+        assert rows[0]["Resource Name"] == "Alpha Project"
+        assert rows[1]["Resource Name"] == "Beta Project" 
+        assert rows[2]["Resource Name"] == "Alpha Model"
