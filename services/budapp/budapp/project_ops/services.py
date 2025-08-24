@@ -638,8 +638,28 @@ class ProjectService(SessionMixin):
         else:
             # Delete all credentials related to the project
             if db_credentials:
+                # Log audit for each credential deletion
+                for credential in db_credentials:
+                    credential_details = {
+                        "credential_name": credential.name if hasattr(credential, "name") else None,
+                        "credential_type": credential.type if hasattr(credential, "type") else None,
+                        "project_id": str(project_id),
+                        "reason": "Deleted as part of project removal",
+                        "project_name": db_project.name,
+                    }
+                    log_audit(
+                        session=self.session,
+                        action=AuditActionEnum.DELETE,
+                        resource_type=AuditResourceTypeEnum.API_KEY,
+                        resource_id=credential.id,
+                        user_id=current_user_id,
+                        details=credential_details,
+                        request=request,
+                        success=True,
+                    )
+
                 await CredentialDataManager(self.session).delete_by_fields(CredentialModel, {"project_id": project_id})
-                logger.info("Deleted all credentials related to project")
+                logger.info(f"Deleted {len(db_credentials)} credentials related to project")
 
         # NOTE: keep project level permissions instead of deleting it on project deletion
         # Remove project permissions on benchmark

@@ -16,6 +16,7 @@
 
 """Simple audit logging utility for direct, synchronous audit trail creation."""
 
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 from uuid import UUID
 
@@ -102,21 +103,22 @@ def log_audit(
         # Create audit service instance
         audit_service = AuditService(session)
 
-        # Add user agent to details if captured
-        if details is None:
-            details = {}
-        if user_agent and "user_agent" not in details:
-            details["user_agent"] = user_agent[:200]  # Limit length
+        # Create a copy of details to avoid modifying the original
+        audit_details = details.copy() if details else {}
 
-        # Add success status to details
-        details["success"] = success
+        # Add user agent to details if captured
+        if user_agent and "user_agent" not in audit_details:
+            audit_details["user_agent"] = user_agent[:200]  # Limit length
+
+        # Add success status to details for internal use
+        audit_details["success"] = success
 
         # Choose the appropriate audit method based on action
         if action == AuditActionEnum.CREATE:
             audit_service.audit_create(
                 resource_type=resource_type,
                 resource_id=resource_id,
-                resource_data=details,
+                resource_data=audit_details,
                 user_id=user_id,
                 ip_address=ip_address,
             )
@@ -124,8 +126,8 @@ def log_audit(
             audit_service.audit_update(
                 resource_type=resource_type,
                 resource_id=resource_id,
-                previous_state=previous_state or {},
-                new_state=new_state or {},
+                previous_data=previous_state or {},
+                new_data=new_state or {},
                 user_id=user_id,
                 ip_address=ip_address,
             )
@@ -133,7 +135,7 @@ def log_audit(
             audit_service.audit_delete(
                 resource_type=resource_type,
                 resource_id=resource_id,
-                resource_data=details,
+                resource_data=audit_details,
                 user_id=user_id,
                 ip_address=ip_address,
             )
@@ -143,21 +145,29 @@ def log_audit(
             AuditActionEnum.LOGIN_FAILED,
             AuditActionEnum.TOKEN_REFRESH,
         ]:
+            # Extract reason from audit_details if present
+            reason = audit_details.get("reason") if audit_details else None
             audit_service.audit_authentication(
                 action=action,
                 user_id=user_id,
                 ip_address=ip_address,
                 success=success,
-                details=details,
+                reason=reason,
             )
         elif action in [AuditActionEnum.ACCESS_GRANTED, AuditActionEnum.ACCESS_DENIED]:
+            # Extract access details
+            access_type = audit_details.get("access_type", "unknown") if audit_details else "unknown"
+            reason = audit_details.get("reason") if audit_details else None
+            granted = action == AuditActionEnum.ACCESS_GRANTED
+
             audit_service.audit_access(
                 resource_type=resource_type,
                 resource_id=resource_id,
-                action=action,
+                access_type=access_type,
+                granted=granted,
                 user_id=user_id,
                 ip_address=ip_address,
-                details=details,
+                reason=reason,
             )
         elif action in [
             AuditActionEnum.WORKFLOW_STARTED,
@@ -166,21 +176,29 @@ def log_audit(
         ]:
             audit_service.audit_workflow(
                 workflow_id=resource_id,
-                workflow_type=details.get("workflow_type", "UNKNOWN"),
+                workflow_type=audit_details.get("workflow_type", "UNKNOWN") if audit_details else "UNKNOWN",
                 action=action,
                 user_id=user_id,
-                details=details,
+                status=audit_details.get("status") if audit_details else None,
+                error=audit_details.get("error") if audit_details else None,
+                ip_address=ip_address,
             )
         else:
             # Generic audit for any other action
-            audit_service.create_audit_record(
+            from budapp.audit_ops.schemas import AuditRecordCreate
+
+            audit_data = AuditRecordCreate(
                 action=action,
                 resource_type=resource_type,
                 resource_id=resource_id,
                 user_id=user_id,
                 ip_address=ip_address,
-                details=details,
+                details=audit_details,
+                previous_state=previous_state,
+                new_state=new_state,
+                timestamp=datetime.now(timezone.utc),
             )
+            audit_service.create_audit_record(audit_data)
 
         logger.debug(
             f"Audit logged: action={action}, resource_type={resource_type}, "

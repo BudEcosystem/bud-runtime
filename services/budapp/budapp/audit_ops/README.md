@@ -175,10 +175,8 @@ summary = service.get_audit_summary(
 
 ### Query Endpoints (Admin Only)
 
-- `GET /audit/records` - Get audit records with filtering
+- `GET /audit/records` - Get audit records with filtering (supports filters for user_id, resource_type, resource_id, etc.)
 - `GET /audit/records/{audit_id}` - Get specific audit record
-- `GET /audit/user/{user_id}` - Get user's audit records
-- `GET /audit/resource/{resource_type}/{resource_id}` - Get resource's audit history
 - `GET /audit/summary` - Get audit statistics
 
 ### Query Parameters

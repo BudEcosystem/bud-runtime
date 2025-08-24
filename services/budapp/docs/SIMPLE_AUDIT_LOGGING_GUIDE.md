@@ -410,10 +410,8 @@ When `request` is provided:
 ### Via API (Admin only)
 
 ```python
-GET /audit/records?user_id=<uuid>&action=CREATE&resource_type=PROJECT
+GET /audit/records?user_id=<uuid>&action=CREATE&resource_type=PROJECT&resource_id=<uuid>
 GET /audit/records/<audit_id>
-GET /audit/users/<user_id>/history
-GET /audit/resources/<resource_type>/<resource_id>/history
 ```
 
 ### Direct Service Access
