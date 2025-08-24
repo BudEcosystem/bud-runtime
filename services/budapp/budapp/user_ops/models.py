@@ -25,7 +25,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from budapp.cluster_ops.models import Cluster
 from budapp.commons.constants import UserRoleEnum, UserStatusEnum, UserTypeEnum
 from budapp.commons.database import Base, TimestampMixin
-from budapp.commons.security import AESHandler
+from budapp.commons.security import RSAHandler
 from budapp.endpoint_ops.models import Endpoint
 from budapp.model_ops.models import Model
 from budapp.permissions.models import ProjectPermission
@@ -131,9 +131,6 @@ class TenantClient(Base, TimestampMixin):
     # Add relationship
     tenant: Mapped["Tenant"] = relationship(back_populates="clients")
 
-    # Encryption handler (class-level to avoid creating multiple instances)
-    _aes_handler = AESHandler()
-
     @staticmethod
     def _is_encrypted(value: str) -> bool:
         """Check if a value appears to be encrypted.
@@ -166,7 +163,7 @@ class TenantClient(Base, TimestampMixin):
 
         # Check if the value is already encrypted to avoid double encryption
         if not self._is_encrypted(plaintext_secret):
-            self.client_secret = await self._aes_handler.encrypt(plaintext_secret)
+            self.client_secret = await RSAHandler.encrypt(plaintext_secret)
         else:
             # Already encrypted, store as-is
             self.client_secret = plaintext_secret
@@ -182,7 +179,7 @@ class TenantClient(Base, TimestampMixin):
 
         # Check if the value is encrypted
         if self._is_encrypted(self.client_secret):
-            return await self._aes_handler.decrypt(self.client_secret)
+            return await RSAHandler.decrypt(self.client_secret)
         else:
             # Legacy plaintext value - will be encrypted on next save
             return self.client_secret

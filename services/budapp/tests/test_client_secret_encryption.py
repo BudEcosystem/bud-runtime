@@ -2,11 +2,11 @@
 Test suite for client secret encryption functionality.
 
 This test suite verifies:
-1. AES encryption and decryption of client secrets works correctly
-2. TenantClient model methods handle encryption properly using AESHandler directly
+1. RSA encryption and decryption of client secrets works correctly
+2. TenantClient model methods handle encryption properly using RSAHandler
 3. Services correctly decrypt secrets when needed
 4. Migration handles both encrypted and plaintext values
-5. The simplified approach without unnecessary wrapper classes works correctly
+5. Consistent encryption approach with other sensitive data
 """
 
 import pytest
@@ -14,23 +14,22 @@ from unittest.mock import Mock, AsyncMock, patch
 from uuid import uuid4
 import asyncio
 
-from budapp.commons.security import AESHandler
+from budapp.commons.security import RSAHandler
 from budapp.user_ops.models import TenantClient
 from budapp.user_ops.schemas import TenantClientSchema
 from budapp.commons.config import secrets_settings
 
 
-class TestAESHandler:
-    """Test the AESHandler class for client secret encryption."""
+class TestRSAHandler:
+    """Test the RSAHandler class for client secret encryption."""
 
     @pytest.mark.asyncio
     async def test_encrypt_client_secret(self):
         """Test that client secrets are encrypted correctly."""
-        aes = AESHandler()
         plaintext = "my-super-secret-client-secret-123"
 
-        # Encrypt the secret
-        encrypted = await aes.encrypt(plaintext)
+        # Encrypt the secret using RSA
+        encrypted = await RSAHandler.encrypt(plaintext)
 
         # Verify it's encrypted (hex string, longer than original)
         assert encrypted != plaintext
@@ -40,12 +39,11 @@ class TestAESHandler:
     @pytest.mark.asyncio
     async def test_decrypt_client_secret(self):
         """Test that encrypted secrets can be decrypted correctly."""
-        aes = AESHandler()
         plaintext = "my-super-secret-client-secret-456"
 
         # Encrypt then decrypt
-        encrypted = await aes.encrypt(plaintext)
-        decrypted = await aes.decrypt(encrypted)
+        encrypted = await RSAHandler.encrypt(plaintext)
+        decrypted = await RSAHandler.decrypt(encrypted)
 
         # Verify we get the original value back
         assert decrypted == plaintext

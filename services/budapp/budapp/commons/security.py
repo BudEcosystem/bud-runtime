@@ -130,8 +130,9 @@ class RSAHandler:
                     label=None,
                 ),
             )
-        except ValueError:
-            logger.error("Could not decrypt message")
+        except ValueError as e:
+            logger.error(f"Could not decrypt message: {e}")
+            raise
 
         # Convert the decrypted message to a string
         message_decrypted = message_decrypted.decode("utf-8")
