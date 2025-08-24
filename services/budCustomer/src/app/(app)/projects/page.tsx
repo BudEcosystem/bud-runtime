@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Card, Row, Col, Flex, Input, Dropdown, Button } from "antd";
+import { Card, Row, Col, Flex, Input, Dropdown, Button, Spin } from "antd";
 import { Typography } from "antd";
 import { PlusOutlined, MoreOutlined } from "@ant-design/icons";
 import { PrimaryButton } from "@/components/ui/button";
@@ -277,19 +277,13 @@ export default function ProjectsPage() {
 
           {/* Loading State */}
           {loading && activeProjects.length === 0 && (
-            <div className="text-center py-16">
-              <Icon
-                icon="ph:spinner"
-                className="text-4xl text-bud-text-disabled mb-4 animate-spin"
-              />
-              <Text className="text-bud-text-muted block">
-                Loading projects...
-              </Text>
+            <div className="flex justify-center items-center h-64">
+              <Spin size="large" />
             </div>
           )}
 
           {/* Projects */}
-          {!loading && activeProjects.length > 0 && (
+          {activeProjects.length > 0 && (
             <div className="mb-[3rem]">
               <Row gutter={[24, 24]}>
                 {activeProjects.map((project) => (
@@ -303,6 +297,13 @@ export default function ProjectsPage() {
                   </Col>
                 ))}
               </Row>
+            </div>
+          )}
+
+          {/* Loading indicator for pagination/search */}
+          {loading && activeProjects.length > 0 && (
+            <div className="flex justify-center items-center py-4">
+              <Spin />
             </div>
           )}
 

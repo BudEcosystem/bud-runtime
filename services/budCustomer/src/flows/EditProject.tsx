@@ -74,16 +74,17 @@ export default function EditProject() {
           })
         : [];
 
-      // Small delay to ensure form is ready
-      setTimeout(() => {
-        console.log("Setting form values with tags:", existingTags);
+      // Use requestAnimationFrame to ensure form is ready and avoid conflicts
+      requestAnimationFrame(() => {
         form.setFieldsValue({
           name: currentProject.name || "",
           description: currentProject.description || "",
           tags: existingTags,
           icon: currentProject.icon || "😍",
         });
-      }, 100);
+        // Trigger form validation to update UI
+        form.validateFields({ validateOnly: true });
+      });
     }
   }, [currentProject, form]);
 
