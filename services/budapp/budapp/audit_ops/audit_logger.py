@@ -154,13 +154,19 @@ def log_audit(
                 reason=reason,
             )
         elif action in [AuditActionEnum.ACCESS_GRANTED, AuditActionEnum.ACCESS_DENIED]:
+            # Extract access details
+            access_type = details.get("access_type", "unknown") if details else "unknown"
+            reason = details.get("reason") if details else None
+            granted = action == AuditActionEnum.ACCESS_GRANTED
+
             audit_service.audit_access(
                 resource_type=resource_type,
                 resource_id=resource_id,
-                action=action,
+                access_type=access_type,
+                granted=granted,
                 user_id=user_id,
                 ip_address=ip_address,
-                details=details,
+                reason=reason,
             )
         elif action in [
             AuditActionEnum.WORKFLOW_STARTED,
