@@ -4,14 +4,17 @@ import { useProjects } from "@/hooks/useProjects";
 import { useDrawer } from "@/hooks/useDrawer";
 
 const ViewProjectDetails: React.FC = () => {
-  const { selectedProject } = useProjects();
+  const { globalSelectedProject } = useProjects();
   const { closeDrawer } = useDrawer();
 
-  if (!selectedProject?.project?.id) {
+  // Handle both nested and direct project structure
+  const projectId = globalSelectedProject?.project?.id || (globalSelectedProject as any)?.id;
+
+  if (!projectId) {
     return <div>No project selected</div>;
   }
 
-  return <ProjectDetailContent projectId={selectedProject.project.id} onClose={closeDrawer} />;
+  return <ProjectDetailContent projectId={projectId} onClose={closeDrawer} />;
 };
 
 export default ViewProjectDetails;
