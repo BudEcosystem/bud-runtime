@@ -17,6 +17,7 @@
 
   yaml-language-server,
   nodejs,
+  pnpm,
 
   terraform-ls,
   opentofu,
@@ -64,6 +65,7 @@ mkShell {
     git
     pyright
     bud_wg
+    pnpm
   ];
 
   shellHook = ''
