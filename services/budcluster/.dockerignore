@@ -1,14 +1,68 @@
-__pycache__/
-../.dapr/
-tests/
-deploy/
-build/
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info
+dist
+build
+eggs
+.eggs
+*.egg
+
+# Testing
+.pytest_cache
+.coverage
+htmlcov
+.tox
+.hypothesis
+
+# Documentation
 docs/
+*.md
+!README.md
 
-requirements-*.txt
-README.md
-
-*secrets.json
-dapr-*.yaml
+# Development
+.env
+.env.*
+!.env.sample
 *.log
-.venv/
+.vscode
+.idea
+*.swp
+*.swo
+
+# Docker
+Dockerfile*
+docker-compose*.yaml
+.dockerignore
+
+# Scripts
+scripts/
+deploy/
+
+# Tests
+tests/
+test_*.py
+
+# Temporary files
+*.tmp
+*.bak
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Crypto keys (should never be in image)
+crypto-keys/
+
+# Cache
+.cache/
+.mypy_cache/
+.ruff_cache/

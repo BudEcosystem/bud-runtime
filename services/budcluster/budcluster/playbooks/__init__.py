@@ -4,7 +4,10 @@ import os
 
 
 _PLAYBOOK_MAP = {
-    "NODE_INFO_COLLECTOR": "deploy_node_info_collector.yaml",
+    # Setup cluster with NFD, GPU operators, and Aibrix components
+    "SETUP_CLUSTER": "setup_cluster.yaml",
+    "DEPLOY_NFD": "setup_cluster.yaml",  # Backward compatibility
+    "NODE_INFO_COLLECTOR": "setup_cluster.yaml",  # Backward compatibility
     "GET_NODE_INFO": "get_node_info.yaml",
     "GET_NODE_STATUS": "get_node_status.yaml",
     "DEPLOY_RUNTIME": "deploy_runtime.yaml",

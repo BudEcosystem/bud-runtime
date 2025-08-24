@@ -6,7 +6,7 @@ from uuid import UUID, uuid4
 # from ..commons.database import Base
 from budmicroframe.shared.dapr_service import DaprServiceCrypto
 from budmicroframe.shared.psql_service import CRUDMixin, PSQLBase, TimestampMixin
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, Uuid
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, UniqueConstraint, Uuid
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -65,6 +65,7 @@ class ClusterNodeInfo(PSQLBase, TimestampMixin):
     """Cluster node info model."""
 
     __tablename__ = "cluster_node_info"
+    __table_args__ = (UniqueConstraint("cluster_id", "name", name="uq_cluster_node_info_cluster_id_name"),)
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     cluster_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("cluster.id", ondelete="CASCADE"), nullable=False)
     name: Mapped[str] = mapped_column(String, nullable=False)
@@ -84,6 +85,22 @@ class ClusterNodeInfo(PSQLBase, TimestampMixin):
     hardware_info: Mapped[list[dict]] = mapped_column(JSONB, nullable=False)
     status: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     status_sync_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    # NFD schedulability fields
+    schedulable: Mapped[bool] = mapped_column(Boolean, default=True, nullable=True)
+    unschedulable: Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)
+    taints: Mapped[list[dict]] = mapped_column(JSONB, nullable=True)
+    conditions: Mapped[list[dict]] = mapped_column(JSONB, nullable=True)
+    pressure_conditions: Mapped[dict] = mapped_column(JSONB, nullable=True)
+
+    # NFD detection fields
+    nfd_detected: Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)
+    nfd_labels: Mapped[dict] = mapped_column(JSONB, nullable=True)
+    detection_method: Mapped[str] = mapped_column(String, default="configmap", nullable=True)
+
+    # Enhanced hardware support info
+    kernel_info: Mapped[dict] = mapped_column(JSONB, nullable=True)
+    driver_info: Mapped[dict] = mapped_column(JSONB, nullable=True)
 
     cluster: Mapped[Cluster] = relationship("Cluster", back_populates="nodes")
 

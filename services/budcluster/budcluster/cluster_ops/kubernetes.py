@@ -1,4 +1,5 @@
 import base64
+import json
 import re
 import time
 from collections import defaultdict
@@ -99,8 +100,8 @@ class KubernetesHandler(BaseClusterHandler):
     def initial_setup(self, cluster_id: UUID) -> None:
         """Execute the initial setup for the Kubernetes cluster using Ansible playbook.
 
-        This method runs the 'NODE_INFO_COLLECTOR' playbook to gather node information
-        and apply necessary configurations.
+        This method runs the 'SETUP_CLUSTER' playbook to deploy NFD, GPU operators,
+        Aibrix components, and gather node information.
 
         Raises:
             Exception: If the setup fails on any node.
@@ -108,19 +109,18 @@ class KubernetesHandler(BaseClusterHandler):
         Returns:
             str: The status of the setup process.
         """
+        # Setup cluster with NFD, GPU operators, and Aibrix components
         result = self.ansible_executor.run_playbook(
-            playbook="NODE_INFO_COLLECTOR",
+            playbook="SETUP_CLUSTER",  # Uses comprehensive cluster setup
             extra_vars={
                 "kubeconfig_content": self.config,
-                "node_info_collector_image_cpu": app_settings.node_info_collector_image_cpu,
-                "node_info_collector_image_cuda": app_settings.node_info_collector_image_cuda,
-                "node_info_collector_image_hpu": app_settings.node_info_collector_image_hpu,
-                "node_labeler_image": app_settings.node_info_labeler_image,
                 "image_pull_secrets": self.get_image_pull_secret(),
                 "platform": self.platform,
                 "prometheus_url": f"{app_settings.prometheus_url}/api/v1/write",
                 "prometheus_namespace": "bud-system",
                 "cluster_name": str(cluster_id),
+                "namespace": "bud-system",  # Changed to bud-system for infrastructure components
+                "enable_nfd": True,  # NFD is now required
             },
         )
         if result["status"] == "failed":
@@ -223,46 +223,170 @@ class KubernetesHandler(BaseClusterHandler):
             url = f"http://{url}"
         return urlparse(url).netloc, urlparse(url).scheme
 
+    def _get_gpu_allocations(self, node_name: str) -> Dict[str, int]:
+        """Calculate GPU allocations for a specific node.
+
+        Returns dict with total_gpus, allocated_gpus, and available_gpus.
+        """
+        try:
+            # Disable SSL warnings for self-signed certs
+            import urllib3
+
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+            v1 = client.CoreV1Api()
+
+            # Get node to find total GPUs
+            node = v1.read_node(node_name)
+            total_gpus = 0
+
+            if node.status and node.status.capacity:
+                # Check for NVIDIA GPUs
+                nvidia_gpus = node.status.capacity.get("nvidia.com/gpu", "0")
+                total_gpus = int(nvidia_gpus) if nvidia_gpus else 0
+
+                # Check for AMD GPUs
+                amd_gpus = node.status.capacity.get("amd.com/gpu", "0")
+                if amd_gpus:
+                    total_gpus += int(amd_gpus)
+
+            # Get pods on this node
+            field_selector = f"spec.nodeName={node_name}"
+            pods = v1.list_pod_for_all_namespaces(field_selector=field_selector)
+
+            allocated_gpus = 0
+            for pod in pods.items:
+                # Only count Running and Pending pods
+                if pod.status.phase in ["Running", "Pending"]:
+                    for container in pod.spec.containers:
+                        if container.resources and container.resources.requests:
+                            # Check NVIDIA GPUs
+                            nvidia_request = container.resources.requests.get("nvidia.com/gpu", "0")
+                            allocated_gpus += int(nvidia_request) if nvidia_request else 0
+
+                            # Check AMD GPUs
+                            amd_request = container.resources.requests.get("amd.com/gpu", "0")
+                            allocated_gpus += int(amd_request) if amd_request else 0
+
+            available_gpus = max(0, total_gpus - allocated_gpus)
+
+            logger.debug(
+                f"Node {node_name}: {available_gpus}/{total_gpus} GPUs available ({allocated_gpus} allocated)"
+            )
+
+            return {"total_gpus": total_gpus, "allocated_gpus": allocated_gpus, "available_gpus": available_gpus}
+
+        except Exception as e:
+            logger.warning(f"Failed to get GPU allocations for {node_name}: {e}")
+            return None
+
     def get_node_info(self) -> List[Dict[str, Any]]:
-        """Get the node information from the Kubernetes cluster.
+        """Get the node information from the Kubernetes cluster using NFD labels.
 
         Returns:
-            Dict[str, Any]: A dictionary containing node information from the Kubernetes cluster.
+            List[Dict[str, Any]]: A list containing node information from the Kubernetes cluster.
 
         Raises:
-            KubernetesException: If there is an error while parsing configmap node info.
+            KubernetesException: If there is an error while extracting node info.
         """
         result = self.ansible_executor.run_playbook(
             playbook="GET_NODE_INFO", extra_vars={"kubeconfig_content": self.config}
         )
-        configmap_data = []
+
+        node_data = []
         if result["status"] == "successful":
             try:
+                # Extract node information from NFD labels
+                # First check for the output fact task
+                node_info_output = None
                 for event in result["events"]:
-                    if (
-                        event["task"] == "Fetch Node Information ConfigMap for each node"
-                        and event["status"] == "runner_on_ok"
-                    ):
-                        node_info = self._parse_configmap_node_info(event)
-                        configmap_data.extend(node_info)
+                    if event["task"] == "Set output fact for node information" and event["status"] == "runner_on_ok":
+                        node_info_output = event["event_data"]["res"]["ansible_facts"].get("node_info_output", [])
+                        break
 
-                # Fetch node status separately
-                node_status_data = self._get_nodes_status(result)
+                # If no output fact task, collect from individual processing tasks
+                if node_info_output is None:
+                    node_info_output = []
+                    for event in result["events"]:
+                        if (
+                            event["task"] == "Process each node and extract NFD information"
+                            and event["status"] == "runner_on_ok"
+                            and "ansible_facts" in event["event_data"]["res"]
+                        ):
+                            node_info = event["event_data"]["res"]["ansible_facts"].get("node_information", [])
+                            if node_info and isinstance(node_info, list) and len(node_info) > 0:
+                                # Get the last item since it's accumulated
+                                node_info_output = node_info
 
-                # Merge node status with configmap data
-                for node in configmap_data:
-                    node_name = node.get("node_name")
-                    if (
-                        node["node_status"] == "True"
-                        and node_name in node_status_data
-                        and node_status_data[node_name] != "Ready"
-                    ):
-                        node["node_status"] = "False"
-                    node["derived_status"] = node_status_data.get(node_name, "Unknown")
+                if node_info_output:
+                    # Process each node's information
+                    from .device_extractor import DeviceExtractor
+
+                    extractor = DeviceExtractor()
+
+                    for node in node_info_output:
+                        # Extract device information from node info (which includes NFD labels)
+                        devices = extractor.extract_from_node_info(node)
+
+                        # Get real GPU allocations for this node
+                        node_name = node.get("node_name")
+                        if node_name and devices.get("gpus"):
+                            gpu_allocations = self._get_gpu_allocations(node_name)
+                            if gpu_allocations:
+                                # Update GPU devices with real available counts
+                                for gpu in devices["gpus"]:
+                                    # The total count from device extractor
+                                    total_count = gpu.get("count", 1)
+                                    # Use real available count from Kubernetes
+                                    gpu["available_count"] = gpu_allocations["available_gpus"]
+                                    gpu["total_count"] = total_count
+                                    logger.debug(
+                                        f"Updated GPU on {node_name}: total={total_count}, available={gpu_allocations['available_gpus']}"
+                                    )
+
+                        # Format node data for compatibility with existing structure
+                        # Determine node status based on both Ready condition and schedulability
+                        schedulability = node.get("schedulability", {})
+
+                        # Convert string booleans to actual booleans (Ansible returns strings)
+                        ready_value = schedulability.get("ready", False)
+                        is_ready = ready_value if isinstance(ready_value, bool) else str(ready_value).lower() == "true"
+
+                        schedulable_value = schedulability.get("schedulable", True)
+                        is_schedulable = (
+                            schedulable_value
+                            if isinstance(schedulable_value, bool)
+                            else str(schedulable_value).lower() == "true"
+                        )
+
+                        # Node is truly available only if it's both Ready and schedulable
+                        node_available = is_ready and is_schedulable
+
+                        logger.debug(
+                            f"Node {node.get('node_name')}: ready={is_ready}, schedulable={is_schedulable}, available={node_available}"
+                        )
+
+                        node_formatted = {
+                            "node_name": node.get("node_name"),
+                            "node_id": node.get("node_id"),
+                            "node_status": node_available,  # Use boolean for consistency
+                            "derived_status": "Ready" if node_available else "NotReady",
+                            "devices": json.dumps(devices),
+                            "cpu_info": node.get("cpu_info", {}),
+                            "memory_info": node.get("memory_info", {}),
+                            "gpu_info": node.get("gpu_info", {}),
+                            "kernel_info": node.get("kernel_info", {}),
+                            "capacity": node.get("capacity", {}),
+                            "allocatable": node.get("allocatable", {}),
+                            "labels": node.get("labels", {}),
+                            "schedulability": schedulability,  # Include full schedulability info
+                        }
+                        node_data.append(node_formatted)
+
             except Exception as err:
-                logger.error(f"Found error while parsing configmap node info. {err}")
-                raise KubernetesException("Found error while parsing configmap node info") from err
-        return configmap_data
+                logger.error(f"Error while extracting node info from NFD labels: {err}")
+                raise KubernetesException("Failed to extract node information from NFD labels") from err
+        return node_data
 
     def _get_nodes_status(self, result: Dict[str, Any]) -> Dict[str, str]:
         """To creates a map of node name to node status."""

@@ -1,0 +1,20 @@
+apiVersion: v2
+name: nfd
+description: Node Feature Discovery wrapper chart for bud-stack
+type: application
+version: 0.1.0
+appVersion: "0.15.4"
+
+# Dependencies are managed separately in the playbook
+# NFD is deployed directly from upstream repository
+# GPU Operator is deployed conditionally if GPUs are detected
+
+maintainers:
+  - name: BudEcosystem
+    email: dev@budecosystem.com
+
+keywords:
+  - nfd
+  - gpu
+  - hardware-detection
+  - kubernetes

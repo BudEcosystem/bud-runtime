@@ -1,0 +1,80 @@
+{{- if .Values.intelDevicePlugin.enabled }}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: intel-device-plugins-system
+  labels:
+    {{- include "nfd.labels" . | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: intel-deviceplugin-operator
+  namespace: intel-device-plugins-system
+  labels:
+    {{- include "nfd.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: intel-deviceplugin-operator
+  template:
+    metadata:
+      labels:
+        name: intel-deviceplugin-operator
+        {{- include "nfd.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: intel-deviceplugin-operator
+      containers:
+      - name: intel-deviceplugin-operator
+        image: intel/intel-deviceplugin-operator:0.28.0
+        command:
+        - intel-deviceplugin-operator
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: WATCH_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: OPERATOR_NAME
+          value: "intel-deviceplugin-operator"
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: intel-deviceplugin-operator
+  namespace: intel-device-plugins-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: intel-deviceplugin-operator
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "endpoints", "persistentvolumeclaims", "events", "configmaps", "secrets", "nodes"]
+  verbs: ["*"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "daemonsets", "replicasets", "statefulsets"]
+  verbs: ["*"]
+- apiGroups: ["deviceplugin.intel.com"]
+  resources: ["*"]
+  verbs: ["*"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: intel-deviceplugin-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: intel-deviceplugin-operator
+subjects:
+- kind: ServiceAccount
+  name: intel-deviceplugin-operator
+  namespace: intel-device-plugins-system
+{{- end }}

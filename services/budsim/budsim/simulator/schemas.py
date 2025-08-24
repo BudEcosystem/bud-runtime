@@ -42,13 +42,14 @@ class Device(BaseModel):
     type: str
     available_count: int
     mem_per_GPU_in_GB: float
-    hbm_bandwidth_in_GB_per_sec: float
-    intra_node_bandwidth_in_GB_per_sec: float
-    intra_node_min_message_latency: float
-    peak_fp16_TFLOPS: float
-    peak_i8_TFLOPS: float
-    peak_i4_TFLOPS: float
-    inter_node_bandwidth_in_GB_per_sec: float
+    # Performance fields with defaults (to be removed in future)
+    hbm_bandwidth_in_GB_per_sec: float = 100.0
+    intra_node_bandwidth_in_GB_per_sec: float = 50.0
+    intra_node_min_message_latency: float = 8e-06
+    peak_fp16_TFLOPS: float = 10.0
+    peak_i8_TFLOPS: float = 20.0
+    peak_i4_TFLOPS: float = 40.0
+    inter_node_bandwidth_in_GB_per_sec: float = 10.0
 
 
 class Node(BaseModel):

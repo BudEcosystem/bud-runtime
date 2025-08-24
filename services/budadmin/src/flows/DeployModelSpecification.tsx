@@ -18,8 +18,8 @@ export default function DeployModelSpecification() {
   return (
     <BudForm
       data={{
-        deployment_name: deploymentSpecifcation.deployment_name || selectedTemplate?.name,
-        concurrent_requests: deploymentSpecifcation.concurrent_requests || 0,
+        deployment_name: deploymentSpecifcation.deployment_name,
+        concurrent_requests: deploymentSpecifcation.concurrent_requests,
         avg_context_length: deploymentSpecifcation.avg_context_length,
         avg_sequence_length: deploymentSpecifcation.avg_sequence_length,
         per_session_tokens_per_sec: deploymentSpecifcation.per_session_tokens_per_sec,
