@@ -621,6 +621,111 @@ class CredentialService(SessionMixin):
             logger.error(f"Error validating credential: {e}")
             return False
 
+    async def update_credential_last_used(self, credential_usage: Dict[UUID, datetime]) -> Dict:
+        """Update last_used_at timestamps for credentials.
+
+        Args:
+            credential_usage: Dictionary mapping credential IDs to last used timestamps
+
+        Returns:
+            Dictionary with update statistics
+        """
+        if not credential_usage:
+            return {"updated_count": 0, "failed_count": 0, "errors": []}
+
+        logger.info(f"Updating last_used_at for {len(credential_usage)} credentials")
+
+        try:
+            credential_dm = CredentialDataManager(self.session)
+            result = await credential_dm.batch_update_last_used(credential_usage)
+
+            logger.info(f"Successfully updated {result['updated_count']} credentials")
+            return result
+
+        except Exception as e:
+            logger.error(f"Failed to update credential usage: {e}")
+            return {"updated_count": 0, "failed_count": len(credential_usage), "errors": [str(e)]}
+
+    async def fetch_recent_credential_usage(self, since_minutes: int = 10) -> Dict[UUID, datetime]:
+        """Fetch recent credential usage data from budmetrics service.
+
+        Args:
+            since_minutes: How many minutes back to query for usage data
+
+        Returns:
+            Dictionary mapping credential IDs to their last used timestamps
+        """
+        from datetime import timedelta
+
+        import httpx
+
+        try:
+            # Calculate since timestamp
+            since = datetime.now(UTC) - timedelta(minutes=since_minutes)
+
+            # Prepare request payload
+            payload = {"since": since.isoformat()}
+
+            # Use Dapr service invocation to call budmetrics
+            dapr_url = f"{app_settings.dapr_base_url}/v1.0/invoke/budmetrics/method/observability/credential-usage"
+
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(dapr_url, json=payload)
+                response.raise_for_status()
+
+                data = response.json()
+
+                # Parse the response into a dictionary
+                credential_usage = {}
+                for item in data.get("credentials", []):
+                    credential_id = UUID(item["credential_id"])
+                    # Handle different datetime formats
+                    last_used_str = item["last_used_at"]
+                    if isinstance(last_used_str, str):
+                        # Handle ISO format with Z or timezone
+                        if last_used_str.endswith("Z"):
+                            last_used_at = datetime.fromisoformat(last_used_str.replace("Z", "+00:00"))
+                        else:
+                            last_used_at = datetime.fromisoformat(last_used_str)
+                    else:
+                        # If it's already a datetime object or something else
+                        last_used_at = last_used_str
+                    credential_usage[credential_id] = last_used_at
+
+                logger.info(f"Retrieved usage data for {len(credential_usage)} credentials")
+                return credential_usage
+
+        except httpx.HTTPError as e:
+            logger.error(f"HTTP error fetching credential usage: {e}")
+            return {}
+        except Exception as e:
+            logger.error(f"Error fetching credential usage: {e}")
+            return {}
+
+    async def sync_credential_usage_from_metrics(self) -> Dict:
+        """Sync credential usage data from budmetrics and update local database.
+
+        Returns:
+            Dictionary with sync statistics
+        """
+        try:
+            # Fetch recent usage data from budmetrics
+            usage_data = await self.fetch_recent_credential_usage(since_minutes=10)
+
+            if not usage_data:
+                return {"total_credentials": 0, "updated_count": 0, "failed_count": 0, "errors": []}
+
+            # Update credentials with usage data
+            result = await self.update_credential_last_used(usage_data)
+            result["total_credentials"] = len(usage_data)
+
+            logger.info(f"Credential usage sync complete: {result}")
+            return result
+
+        except Exception as e:
+            logger.error(f"Failed to sync credential usage: {e}")
+            return {"total_credentials": 0, "updated_count": 0, "failed_count": 0, "errors": [str(e)]}
+
 
 class ProprietaryCredentialService(SessionMixin):
     async def add_credential(

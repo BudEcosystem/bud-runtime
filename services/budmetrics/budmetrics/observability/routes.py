@@ -13,6 +13,8 @@ from budmetrics.commons.schemas import BulkCloudEventBase
 from budmetrics.observability.schemas import (
     AggregatedMetricsRequest,
     AggregatedMetricsResponse,
+    CredentialUsageRequest,
+    CredentialUsageResponse,
     EnhancedInferenceDetailResponse,
     GatewayAnalyticsRequest,
     GeographicDataRequest,
@@ -585,5 +587,35 @@ async def get_latency_distribution(request: LatencyDistributionRequest) -> Respo
     except Exception as e:
         logger.error(f"Error getting latency distribution: {e}")
         response = ErrorResponse(message=f"Error getting latency distribution: {str(e)}")
+
+    return response.to_http_response()
+
+
+@observability_router.post("/credential-usage", tags=["Observability"])
+async def get_credential_usage(request: CredentialUsageRequest) -> Response:
+    """Get credential usage statistics.
+
+    This endpoint retrieves usage statistics for API credentials (API keys) including:
+    - Last used timestamp for each credential
+    - Request count within the specified time window
+
+    Used by budapp to update the last_used_at field for credentials.
+
+    Args:
+        request (CredentialUsageRequest): Request with time window and optional credential IDs.
+
+    Returns:
+        HTTP response containing credential usage statistics.
+    """
+    response: Union[CredentialUsageResponse, ErrorResponse]
+
+    try:
+        response = await service.get_credential_usage(request)
+    except ValidationError as e:
+        logger.error(f"Validation error: {e}")
+        response = ErrorResponse(message=f"Validation error: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error getting credential usage: {e}")
+        response = ErrorResponse(message=f"Error getting credential usage: {str(e)}")
 
     return response.to_http_response()
