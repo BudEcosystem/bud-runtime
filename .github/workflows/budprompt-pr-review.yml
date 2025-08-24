@@ -126,7 +126,7 @@ jobs:
 
       - name: Run database migrations
         run: |
-          alembic -c ./budapp/alembic.ini upgrade head
+          alembic -c ./budprompt/alembic.ini upgrade head
 
       - name: Run tests with coverage
         run: |
