@@ -4,6 +4,7 @@ import { Tabs, Tag, Image, ConfigProvider, Drawer, Form } from "antd";
 import type { TabsProps } from "antd";
 import { CopyOutlined } from "@ant-design/icons";
 import { Icon } from "@iconify/react/dist/iconify.js";
+import { ChevronDown } from "lucide-react";
 import ModelTags from "@/components/ui/ModelTags";
 import dayjs from "dayjs";
 import { Model } from "@/hooks/useModels";
@@ -14,6 +15,10 @@ import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
 import { BudFormContext } from "@/components/ui/bud/context/BudFormContext";
+import CustomDropDown from "@/flows/components/CustomDropDown";
+import CustomPopover from "@/flows/components/customPopover";
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { oneDark } from 'react-syntax-highlighter/dist/cjs/styles/prism';
 import {
   Text_12_400_757575,
   Text_12_400_B3B3B3,
@@ -22,6 +27,7 @@ import {
   Text_14_400_EEEEEE,
   Text_14_500_EEEEEE,
   Text_14_400_757575,
+  Text_20_400_FFFFFF,
 } from "@/components/ui/text";
 
 interface ModelDetailDrawerProps {
@@ -421,6 +427,276 @@ const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }> = ({
     );
   };
 
+  const UseThisModel = () => {
+    type CodeType = 'curl' | 'python' | 'javascript';
+    const [selectedCode, setSelectedCode] = useState<CodeType>("curl");
+    const [copyText, setCopyText] = useState<string>('Copy');
+
+    // Function to get the appropriate endpoint and payload based on model type
+    const getEndpointConfig = useMemo(() => {
+      const modelName = model?.name || 'model';
+
+      // Default to chat endpoint
+      let endpoint = '/v1/chat/completions';
+      let payloadExample: any = {
+        model: modelName,
+        max_tokens: 256,
+        messages: [{"role": "user", "content": "Summarize the given text"}]
+      };
+
+      // Check model supported endpoints
+      if (model?.supported_endpoints) {
+        // Check for embedding endpoint
+        if (model.supported_endpoints.embedding?.enabled) {
+          endpoint = model.supported_endpoints.embedding.path || '/v1/embeddings';
+          payloadExample = {
+            model: modelName,
+            input: "Your text to embed"
+          };
+        }
+        // Check for audio transcription endpoint
+        else if (model.supported_endpoints.audio_transcription?.enabled) {
+          endpoint = model.supported_endpoints.audio_transcription.path || '/v1/audio/transcriptions';
+          payloadExample = {
+            model: modelName,
+            file: "@/path/to/audio.mp3",
+            response_format: "json"
+          };
+        }
+        // Check for text-to-speech endpoint
+        else if (model.supported_endpoints.audio_speech?.enabled) {
+          endpoint = model.supported_endpoints.audio_speech.path || '/v1/audio/speech';
+          payloadExample = {
+            model: modelName,
+            input: "Text to convert to speech",
+            voice: "alloy"
+          };
+        }
+        // Check for image generation endpoint
+        else if (model.supported_endpoints.image_generation?.enabled) {
+          endpoint = model.supported_endpoints.image_generation.path || '/v1/images/generations';
+          payloadExample = {
+            model: modelName,
+            prompt: "A cute baby sea otter",
+            n: 1,
+            size: "1024x1024"
+          };
+        }
+        // Check for completion endpoint
+        else if (model.supported_endpoints.completion?.enabled) {
+          endpoint = model.supported_endpoints.completion.path || '/v1/completions';
+          payloadExample = {
+            model: modelName,
+            prompt: "Once upon a time",
+            max_tokens: 256
+          };
+        }
+        // Default to chat if it's enabled
+        else if (model.supported_endpoints.chat?.enabled) {
+          endpoint = model.supported_endpoints.chat.path || '/v1/chat/completions';
+        }
+      }
+
+      return { endpoint, payloadExample };
+    }, []);
+
+    const { endpoint, payloadExample } = getEndpointConfig;
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://api.example.com';
+    const apiUrl = `${baseUrl}${endpoint}`;
+
+    const generateCurlCommand = useMemo(() => {
+      // Special handling for audio transcription (file upload)
+      if (endpoint.includes('audio/transcriptions')) {
+        return `curl --location '${apiUrl}' \\
+  --header 'Authorization: Bearer {API_KEY_HERE}' \\
+  --form 'file=@"/path/to/audio.mp3"' \\
+  --form 'model="${payloadExample.model}"' \\
+  --form 'response_format="json"'`;
+      }
+
+      // Standard JSON payload
+      return `curl --location '${apiUrl}' \\
+  --header 'Authorization: Bearer {API_KEY_HERE}' \\
+  --header 'Content-Type: application/json' \\
+  --data '${JSON.stringify(payloadExample, null, 2)}'`;
+    }, [apiUrl, endpoint, payloadExample]);
+
+    const generatePythonCode = useMemo(() => {
+      // Special handling for audio transcription (file upload)
+      if (endpoint.includes('audio/transcriptions')) {
+        return `import requests
+
+url = "${apiUrl}"
+files = {'file': open('/path/to/audio.mp3', 'rb')}
+data = {
+  'model': '${payloadExample.model}',
+  'response_format': 'json'
+}
+headers = {
+  'Authorization': 'Bearer {API_KEY_HERE}'
+}
+
+response = requests.post(url, headers=headers, files=files, data=data)
+print(response.text)`;
+      }
+
+      // Standard JSON payload
+      return `import requests
+import json
+
+url = "${apiUrl}"
+payload = json.dumps(${JSON.stringify(payloadExample, null, 2)})
+headers = {
+  'Authorization': 'Bearer {API_KEY_HERE}',
+  'Content-Type': 'application/json'
+}
+
+response = requests.post(url, headers=headers, data=payload)
+print(response.text)`;
+    }, [apiUrl, endpoint, payloadExample]);
+
+    const generateJavaScriptCode = useMemo(() => {
+      // Special handling for audio transcription (file upload)
+      if (endpoint.includes('audio/transcriptions')) {
+        return `const formData = new FormData();
+formData.append('file', fileInput.files[0]); // fileInput is your file input element
+formData.append('model', '${payloadExample.model}');
+formData.append('response_format', 'json');
+
+fetch('${apiUrl}', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer {API_KEY_HERE}'
+  },
+  body: formData
+})
+.then(response => response.json())
+.then(data => console.log(data))
+.catch(error => console.error('Error:', error));`;
+      }
+
+      // Standard JSON payload
+      return `const data = ${JSON.stringify(payloadExample, null, 2)};
+
+fetch('${apiUrl}', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer {API_KEY_HERE}',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify(data)
+})
+.then(response => response.json())
+.then(data => console.log(data))
+.catch(error => console.error('Error:', error));`;
+    }, [apiUrl, endpoint, payloadExample]);
+
+    const codeSnippets = useMemo(() => ({
+      curl: generateCurlCommand,
+      python: generatePythonCode,
+      javascript: generateJavaScriptCode
+    }), [generateCurlCommand, generatePythonCode, generateJavaScriptCode]);
+    const [selectedText, setSelectedText] = useState<string>(codeSnippets[selectedCode]);
+
+    // Update selected text when code type or snippets change
+    useEffect(() => {
+      setSelectedText(codeSnippets[selectedCode]);
+    }, [selectedCode, codeSnippets]);
+    const selectType = (type: CodeType) => {
+      setSelectedCode(type);
+      setSelectedText(codeSnippets[type]);
+    };
+
+    const handleCopy = (text: string) => {
+      navigator.clipboard.writeText(text)
+        .then(() => {
+          setCopyText("Copied!");
+          setTimeout(() => {
+            setCopyText("Copy");
+          }, 2000);
+        })
+        .catch(() => {
+          setCopyText("Failed to copy");
+        });
+    };
+
+    return (
+      <div className="space-y-6">
+        <div>
+          <Text_20_400_FFFFFF className="tracking-[.03rem]">Code Snippet</Text_20_400_FFFFFF>
+          <Text_12_400_757575 className="tracking-[.004rem] mt-[1rem]">
+            Copy the code below and use it for deployment
+          </Text_12_400_757575>
+        </div>
+
+        <div className="flex justify-start">
+          <CustomDropDown
+            Placement="bottomLeft"
+            buttonContent={
+              <div className="border border-[.5px] border-[#965CDE] rounded-[6px] bg-[#1E0C34] min-w-[4rem] min-h-[1.75rem] flex items-center justify-center px-[.6rem]">
+                <Text_12_600_EEEEEE className="flex items-center justify-center">
+                  {selectedCode.charAt(0).toUpperCase() + selectedCode.slice(1)}
+                </Text_12_600_EEEEEE>
+                <ChevronDown className="w-[1rem] text-[#EEEEEE] text-[.75rem] ml-[.15rem]" />
+              </div>
+            }
+            items={[
+              {
+                key: "1",
+                label: "Curl",
+                onClick: () => selectType("curl"),
+              },
+              {
+                key: "2",
+                label: "Python",
+                onClick: () => selectType("python"),
+              },
+              {
+                key: "3",
+                label: "JavaScript",
+                onClick: () => selectType("javascript"),
+              },
+            ]}
+          />
+        </div>
+
+        <div className="custom-code rounded-[8px] relative bg-[#FFFFFF08] w-full overflow-hidden">
+          <CustomPopover
+            title={copyText}
+            contentClassNames="py-[.3rem]"
+          >
+            <div
+              className="w-[1.25rem] h-[1.25rem] rounded-[4px] flex justify-center items-center absolute right-[0.35rem] top-[0.65rem] cursor-pointer hover:bg-[#1F1F1F] z-10"
+              onClick={() => handleCopy(selectedText)}
+            >
+              <Image
+                preview={false}
+                src="/images/drawer/Copy.png"
+                alt="copy"
+                style={{ height: '.75rem' }}
+              />
+            </div>
+          </CustomPopover>
+
+          <div className="markdown-body">
+            <SyntaxHighlighter
+              language={selectedCode === "python" ? "python" : selectedCode === "javascript" ? "javascript" : "bash"}
+              style={oneDark}
+              showLineNumbers
+              customStyle={{
+                margin: 0,
+                borderRadius: '8px',
+                fontSize: '0.75rem',
+              }}
+            >
+              {selectedText}
+            </SyntaxHighlighter>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const items: TabsProps["items"] = useMemo(
     () => [
       {
@@ -428,13 +704,18 @@ const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }> = ({
         label: "General",
         children: <GeneralTab />,
       },
+      {
+        key: "2",
+        label: "Use This Model",
+        children: <UseThisModel />,
+      },
     ],
-    [GeneralTab],
+    [],
   );
 
   useEffect(() => {
     setFilteredItems(items);
-  }, [model, items]);
+  }, [items]);
 
   const onChange = () => {
     // Handle tab change if needed
@@ -449,7 +730,7 @@ const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }> = ({
       nextText="Close"
       showBack={false}
     >
-      <BudWraperBox center>
+      <BudWraperBox>
         <BudDrawerLayout>
           <DrawerTitleCard
             title="Model Details"
