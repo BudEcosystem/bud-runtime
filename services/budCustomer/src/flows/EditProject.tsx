@@ -47,6 +47,9 @@ export default function EditProject() {
     setOptions(data);
   }, [projectTags]);
 
+  // Get the current project data
+  const currentProject: any = globalSelectedProject?.project || globalSelectedProject;
+
   useEffect(() => {
     getProjectTags();
   }, [getProjectTags]);
@@ -55,8 +58,24 @@ export default function EditProject() {
     fetchList();
   }, [fetchList]);
 
-  // Get the current project data
-  const currentProject: any = globalSelectedProject?.project || globalSelectedProject;
+  // Set form values when component mounts or project changes
+  useEffect(() => {
+    if (currentProject && form) {
+      const existingTags = currentProject.tags
+        ? currentProject.tags.map((tag: any) => ({
+            name: tag.name || tag,
+            color: tag.color || "#89C0F2",
+          }))
+        : [];
+
+      form.setFieldsValue({
+        name: currentProject.name || "",
+        description: currentProject.description || "",
+        tags: existingTags,
+        icon: currentProject.icon || "😍",
+      });
+    }
+  }, [currentProject, form]);
 
   // If no project is selected, show error
   if (!currentProject) {
