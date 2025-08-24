@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useMemo } from "react";
-import { Tabs, Tag, Image, ConfigProvider, Drawer, Breadcrumb } from "antd";
+import { Tabs, Tag, Image, ConfigProvider, Drawer, Form } from "antd";
 import type { TabsProps } from "antd";
 import { CopyOutlined } from "@ant-design/icons";
 import { Icon } from "@iconify/react/dist/iconify.js";
@@ -10,6 +10,10 @@ import { Model } from "@/hooks/useModels";
 import { successToast } from "@/components/toast";
 import DrawerCard from "@/components/ui/bud/card/DrawerCard";
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
+import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
+import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
+import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
+import { BudFormContext } from "@/components/ui/bud/context/BudFormContext";
 import {
   Text_12_400_757575,
   Text_12_400_B3B3B3,
@@ -18,8 +22,6 @@ import {
   Text_14_400_EEEEEE,
   Text_14_500_EEEEEE,
   Text_14_400_757575,
-  Text_12_400_5B6168,
-  Text_12_400_787B83
 } from "@/components/ui/text";
 
 interface ModelDetailDrawerProps {
@@ -33,21 +35,10 @@ const ModelDetailDrawer: React.FC<ModelDetailDrawerProps> = ({
   onClose,
   model,
 }) => {
-  const [isMinimized, setIsMinimized] = useState(false);
-
-  const handleMinimize = () => {
-    setIsMinimized(true);
-    // Add animation class for minimize effect
-    const drawer = document.querySelector('.drawerRoot');
-    if (drawer) {
-      drawer.classList.add('hide-drawer');
-    }
-    // Close after animation
-    setTimeout(() => {
-      onClose();
-      setIsMinimized(false);
-    }, 300);
-  };
+  const [form] = Form.useForm();
+  const [loading, setLoading] = useState(false);
+  const [submittable, setSubmittable] = useState(false);
+  const [values, setValues] = useState({});
 
   return (
     <Drawer
@@ -71,16 +62,29 @@ const ModelDetailDrawer: React.FC<ModelDetailDrawerProps> = ({
       maskClassName="bud-drawer-mask"
     >
       <div className="drawerBackground flex flex-col h-full">
-        {model && <ModelDetailContent model={model} onClose={onClose} onMinimize={handleMinimize} />}
+        {model && (
+          <BudFormContext.Provider
+            value={{
+              form,
+              submittable,
+              loading,
+              setLoading,
+              values,
+              isExpandedView: false,
+              isExpandedViewOpen: false,
+            }}
+          >
+            <ModelDetailContent model={model} onClose={onClose} />
+          </BudFormContext.Provider>
+        )}
       </div>
     </Drawer>
   );
 };
 
-const ModelDetailContent: React.FC<{ model: Model; onClose: () => void; onMinimize: () => void }> = ({
+const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }> = ({
   model,
   onClose,
-  onMinimize,
 }) => {
   const [filteredItems, setFilteredItems] = useState<TabsProps["items"]>([]);
   const assetBaseUrl = process.env.NEXT_PUBLIC_BASE_URL;
@@ -124,7 +128,7 @@ const ModelDetailContent: React.FC<{ model: Model; onClose: () => void; onMinimi
         const element = descriptionRef.current;
         setIsOverflowing(element.scrollHeight > 60);
       }
-    }, [model?.description]);
+    }, []);
 
     return (
       <div className="space-y-5">
@@ -425,7 +429,7 @@ const ModelDetailContent: React.FC<{ model: Model; onClose: () => void; onMinimi
         children: <GeneralTab />,
       },
     ],
-    [model],
+    [GeneralTab],
   );
 
   useEffect(() => {
@@ -437,92 +441,23 @@ const ModelDetailContent: React.FC<{ model: Model; onClose: () => void; onMinimi
   };
 
   return (
-    <div className="flex flex-col h-full w-full">
-      {/* Header with close and minimize buttons matching drawer pattern */}
-      <div className="ant-header-breadcrumb">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onClose();
-            }}
-            className="hover:opacity-80 transition-opacity"
-          >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 18 18"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              className="hover:text-[#FFFFFF] mr-.5"
-            >
-              <path
-                fillRule="evenodd"
-                clipRule="evenodd"
-                d="M13.8103 5.09188C14.0601 4.8421 14.0601 4.43712 13.8103 4.18734C13.5606 3.93755 13.1556 3.93755 12.9058 4.18734L8.99884 8.0943L5.09188 4.18734C4.8421 3.93755 4.43712 3.93755 4.18734 4.18734C3.93755 4.43712 3.93755 4.8421 4.18734 5.09188L8.0943 8.99884L4.18734 12.9058C3.93755 13.1556 3.93755 13.5606 4.18734 13.8103C4.43712 14.0601 4.8421 14.0601 5.09188 13.8103L8.99884 9.90338L12.9058 13.8103C13.1556 14.0601 13.5606 14.0601 13.8103 13.8103C14.0601 13.5606 14.0601 13.1556 13.8103 12.9058L9.90338 8.99884L13.8103 5.09188Z"
-                fill="#B3B3B3"
-              />
-            </svg>
-          </button>
-          <button
-            onClick={() => {
-              onMinimize();
-            }}
-            className="hover:opacity-80 transition-opacity"
-          >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 18 18"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              className="hover:text-[#FFFFFF] mr-4"
-            >
-              <path
-                fillRule="evenodd"
-                clipRule="evenodd"
-                d="M15.5654 14.748C16.104 15.2866 15.2856 16.1044 14.747 15.5665L11.1293 11.9481V13.9429C11.1293 14.7044 9.972 14.7044 9.972 13.9429L9.9727 10.5517C9.9727 10.2325 10.2322 9.97302 10.5514 9.97302H13.9433C14.7048 9.97302 14.7048 11.1304 13.9433 11.1304L11.9478 11.1297L15.5654 14.748ZM7.6123 4.79945C7.6123 4.03796 8.76965 4.03796 8.76965 4.79945V8.19137C8.76965 8.51058 8.5102 8.77003 8.19099 8.77003L4.79907 8.76933C4.03758 8.76933 4.03758 7.61198 4.79907 7.61198H6.79383L3.17619 3.99434C2.63759 3.45574 3.45603 2.638 3.99463 3.1759L7.61227 6.79354L7.6123 4.79945Z"
-                fill="#B3B3B3"
-              />
-            </svg>
-          </button>
-        </div>
-        {/* Breadcrumb navigation */}
-        <Breadcrumb
-          separator={<Text_12_400_5B6168 className="mx-2">/</Text_12_400_5B6168>}
-          items={[
-            {
-              title: (
-                <Text_12_400_787B83 className="cursor-default text-[#EEEEEE]">
-                  Models
-                </Text_12_400_787B83>
-              ),
-            },
-            {
-              title: (
-                <Text_12_400_787B83 className="cursor-default text-[#EEEEEE]">
-                  {model?.name || "Model Details"}
-                </Text_12_400_787B83>
-              ),
-            },
-          ]}
-        />
-      </div>
-
-      {/* Content wrapper with scrolling */}
-      <div className="flex-1 overflow-y-auto scrollBox">
-        <div className="form-layout mx-[2.6rem] my-[1.1rem] bg-[rgba(255,255,255,0.027)] backdrop-blur-[10px] border border-[#1F1F1F] rounded-[6px]">
-          {/* Title card with model info */}
+    <BudForm
+      data={{}}
+      onNext={() => {
+        onClose();
+      }}
+      nextText="Close"
+      showBack={false}
+    >
+      <BudWraperBox center>
+        <BudDrawerLayout>
           <DrawerTitleCard
-            title={model?.name || "Model Details"}
-            description=""
-            descriptionClass="hidden"
+            title="Model Details"
+            description={`View detailed information about ${model?.name || 'this model'}`}
           />
-
-          {/* Model icon and tags */}
-          <DrawerCard classNames="pb-4">
-            <div className="flex items-start justify-start gap-4">
+          <DrawerCard classNames="pb-0">
+            {/* Model Header with Icon and Tags */}
+            <div className="flex items-start justify-start gap-4 mb-6">
               <div className="shrink-0 grow-0 flex items-center justify-center">
                 <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-[#89C0F2]/20 to-[#89C0F2]/10 flex items-center justify-center">
                   {(() => {
@@ -546,6 +481,9 @@ const ModelDetailContent: React.FC<{ model: Model; onClose: () => void; onMinimi
                 </div>
               </div>
               <div className="flex-1">
+                <Text_14_400_EEEEEE className="mb-2 font-medium">
+                  {model?.name}
+                </Text_14_400_EEEEEE>
                 <ModelTags model={model} maxTags={3} limit={true} />
                 <div className="flex items-center gap-2 mt-2">
                   <Icon
@@ -559,10 +497,8 @@ const ModelDetailContent: React.FC<{ model: Model; onClose: () => void; onMinimi
                 </div>
               </div>
             </div>
-          </DrawerCard>
 
-          {/* Tabs content */}
-          <DrawerCard classNames="pt-0">
+            {/* Tabs */}
             <ConfigProvider
               theme={{
                 components: {
@@ -584,25 +520,9 @@ const ModelDetailContent: React.FC<{ model: Model; onClose: () => void; onMinimi
               />
             </ConfigProvider>
           </DrawerCard>
-        </div>
-      </div>
-
-      {/* Footer - matching other drawers */}
-      <div className="drawerFooter z-[5000] min-h-[4.1875rem] flex flex-col justify-start">
-        <div
-          style={{ justifyContent: "space-between" }}
-          className="h-[4rem] pt-[.1rem] flex items-center px-[2.7rem]"
-        >
-          <div /> {/* Empty left side */}
-          <button
-            onClick={onClose}
-            className="px-6 py-2 bg-[#89C0F2] text-white rounded-md hover:bg-[#6BA8E0] transition-colors text-sm font-medium"
-          >
-            Close
-          </button>
-        </div>
-      </div>
-    </div>
+        </BudDrawerLayout>
+      </BudWraperBox>
+    </BudForm>
   );
 };
 
