@@ -53,12 +53,12 @@ new_hash_get() {
 ## MAIN ##
 ##########
 
-if early_escape_possible; then
-	echo "early escape success, nix bump commit is newer"
-	exit 0
-else
-	echo "early escape not possible, npm bump commit is newer"
-fi
+# if early_escape_possible; then
+# 	echo "early escape success, nix bump commit is newer"
+# 	exit 0
+# else
+# 	echo "early escape not possible, npm bump commit is newer"
+# fi
 
 cur_hash="$(cat "$nix_hash_path")"
 new_hash="$(new_hash_get)"
@@ -67,7 +67,7 @@ if [ "$cur_hash" != "$new_hash" ]; then
 	echo "$new_hash" >"$nix_hash_path"
 
 	git add "$nix_hash_path"
-	git commit --author="$commit_author <$commit_email>" -m "$commit_message"
+	git -c "user.name=$commit_author" -c "user.email=$commit_email" commit -m "$commit_message"
 	git push
 else
 	echo "hash did not change: waiting for your next commit"

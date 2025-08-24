@@ -26,67 +26,37 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: Cache npm dependencies
-        uses: actions/cache@v4
+      - uses: pnpm/action-setup@v4
+        name: Install pnpm
         with:
-          path: ~/.npm
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
+          version: 10
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install
 
       - name: Run ESLint
         run: |
           echo "::group::Running ESLint"
-          npm run lint
+          pnpm run lint
           echo "::endgroup::"
 
       - name: Run TypeScript type checking
         run: |
           echo "::group::Running TypeScript type check"
-          npm run typecheck
+          pnpm run typecheck
           echo "::endgroup::"
 
   build:
-    name: Build Application
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./services/budCustomer
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Cache npm dependencies
-        uses: actions/cache@v4
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build Next.js application
-        run: |
-          echo "::group::Building Next.js application"
-          npm run build
-          echo "::endgroup::"
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-output
-          path: services/budCustomer/.next
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    - name: Install Nix
+      uses: DeterminateSystems/nix-installer-action@main
+    - name: Setup Nix Cache
+      uses: DeterminateSystems/magic-nix-cache-action@main
+    - name: Run Nix Workflow
+      run: nix build .#budcustomer
 
   dependency-check:
     name: Check Dependencies
@@ -104,27 +74,24 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: Cache npm dependencies
-        uses: actions/cache@v4
+      - uses: pnpm/action-setup@v4
+        name: Install pnpm
         with:
-          path: ~/.npm
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
+          version: 10
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install
 
-      - name: Run npm audit
+      - name: Run pnpm audit
         run: |
           echo "::group::Checking for vulnerable dependencies"
-          npm audit --audit-level=moderate || true
+          pnpm audit --audit-level=moderate
           echo "::endgroup::"
 
       - name: Check for outdated dependencies
         run: |
           echo "::group::Checking for outdated dependencies"
-          npm outdated || true
+          pnpm outdated || true
           echo "::endgroup::"
 
   pr-status:
