@@ -184,7 +184,7 @@ class TestAuditExportEndpoint:
         user.id = uuid4()
         user.email = "test@example.com"
         user.name = "Test User"
-        user.user_type = "ADMIN"
+        user.user_type = "admin"  # UserTypeEnum.ADMIN.value is lowercase
         user.permissions = ["USER_MANAGE"]
         return user
 
@@ -339,12 +339,20 @@ class TestAuditExportEndpoint:
         client_user.id = uuid4()
         client_user.email = "client@example.com"
         client_user.name = "Client User"
-        client_user.user_type = "CLIENT"
+        client_user.user_type = "client"  # UserTypeEnum.CLIENT.value is lowercase
         client_user.permissions = []
 
         # Mock the service
         mock_service_instance = Mock()
-        mock_service_instance.get_audit_records.return_value = ([mock_records[0]], 1)
+
+        # Create a side effect to capture what the service receives
+        def capture_filter_params(**kwargs):
+            # Store the filter_params for later inspection
+            if 'filter_params' in kwargs:
+                mock_service_instance._captured_filter = kwargs['filter_params']
+            return ([mock_records[0]], 1)
+
+        mock_service_instance.get_audit_records = Mock(side_effect=capture_filter_params)
         mock_audit_service.return_value = mock_service_instance
 
         # Override the authentication dependency with CLIENT user
@@ -360,10 +368,23 @@ class TestAuditExportEndpoint:
 
             assert response.status_code == status.HTTP_200_OK
 
-            # Verify the service was called with user_id filter
-            call_args = mock_service_instance.get_audit_records.call_args
-            assert call_args is not None, "Service was not called"
-            filter_params = call_args[1]["filter_params"]
+            # Verify the service was called
+            assert mock_service_instance.get_audit_records.called, "Service was not called"
+
+            # Check if we captured the filter
+            assert hasattr(mock_service_instance, '_captured_filter'), "Filter params were not captured"
+            filter_params = mock_service_instance._captured_filter
+
+            # Debug output if the assertion fails
+            if filter_params.user_id != client_user.id:
+                print(f"Debug: client_user.id = {client_user.id}")
+                print(f"Debug: client_user.user_type = {client_user.user_type}")
+                print(f"Debug: filter_params.user_id = {filter_params.user_id}")
+                # Try to see all filter params
+                for attr in ['user_id', 'action', 'resource_type']:
+                    if hasattr(filter_params, attr):
+                        print(f"Debug: filter_params.{attr} = {getattr(filter_params, attr)}")
+
             assert filter_params.user_id == client_user.id, f"Expected user_id {client_user.id}, got {filter_params.user_id}"
 
         # Clean up the override
