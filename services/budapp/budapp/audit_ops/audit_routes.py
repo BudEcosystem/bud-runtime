@@ -9,9 +9,10 @@ from datetime import datetime, timezone
 from typing import Annotated, List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
+from budapp.audit_ops.export_utils import generate_csv_from_audit_records, generate_export_filename
 from budapp.audit_ops.schemas import (
     AuditRecordFilter,
     AuditRecordListResponse,
@@ -30,9 +31,8 @@ audit_router = APIRouter(prefix="/audit", tags=["Audit"])
 
 @audit_router.get(
     "/records",
-    response_model=AuditRecordListResponse,
     summary="Get audit records",
-    description="Retrieve paginated audit records with optional filtering",
+    description="Retrieve paginated audit records with optional filtering or export as CSV",
 )
 async def get_audit_records(
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -47,11 +47,13 @@ async def get_audit_records(
     start_date: Optional[datetime] = Query(None, description="Filter by start date (inclusive)"),
     end_date: Optional[datetime] = Query(None, description="Filter by end date (inclusive)"),
     ip_address: Optional[str] = Query(None, description="Filter by IP address"),
+    export_csv: bool = Query(False, description="Export results as CSV file"),
 ):
     """Get audit records with optional filtering and pagination.
 
     For CLIENT users, only their own audit records are returned.
     For ADMIN users, all audit records are accessible based on the provided filters.
+    If export_csv is true, returns a CSV file download instead of JSON response.
     """
     try:
         service = AuditService(session)
@@ -74,23 +76,51 @@ async def get_audit_records(
             ip_address=ip_address,
         )
 
-        # Calculate offset from page and limit
-        offset = (page - 1) * limit
+        # For CSV export, fetch all matching records (with a reasonable limit)
+        if export_csv:
+            # Set a higher limit for CSV exports
+            export_limit = 10000  # Reasonable limit to prevent memory issues
+            records, total = service.get_audit_records(
+                filter_params=filter_params,
+                offset=0,
+                limit=export_limit,
+            )
+            
+            # Generate CSV content
+            csv_content = generate_csv_from_audit_records(records, include_user_info=True)
+            
+            # Generate filename with timestamp
+            filename = generate_export_filename(prefix="audit_export", extension="csv")
+            
+            # Return CSV response
+            return Response(
+                content=csv_content,
+                media_type="text/csv",
+                headers={
+                    "Content-Disposition": f'attachment; filename="{filename}"',
+                    "Content-Type": "text/csv; charset=utf-8",
+                }
+            )
+        
+        # Regular JSON response
+        else:
+            # Calculate offset from page and limit
+            offset = (page - 1) * limit
 
-        # Get audit records
-        records, total = service.get_audit_records(
-            filter_params=filter_params,
-            offset=offset,
-            limit=limit,
-        )
+            # Get audit records
+            records, total = service.get_audit_records(
+                filter_params=filter_params,
+                offset=offset,
+                limit=limit,
+            )
 
-        return AuditRecordListResponse(
-            message="Audit records retrieved successfully",
-            data=records,
-            page=page,
-            limit=limit,
-            total_record=total,
-        )
+            return AuditRecordListResponse(
+                message="Audit records retrieved successfully",
+                data=records,
+                page=page,
+                limit=limit,
+                total_record=total,
+            )
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to retrieve audit records: {str(e)}"
