@@ -708,11 +708,11 @@ fetch('${apiUrl}', {
       },
       {
         key: "2",
-        label: "Use This Model",
+        label: "Use Model",
         children: <UseThisModel />,
       },
     ],
-    [GeneralTab, UseThisModel],
+    [], // Remove dependencies as they're component functions defined in the same render
   );
 
   useEffect(() => {
