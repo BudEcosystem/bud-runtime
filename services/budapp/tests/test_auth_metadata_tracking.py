@@ -34,7 +34,7 @@ async def test_update_proxy_cache_with_metadata_single_key():
     mock_credential = MagicMock()
     mock_credential.id = credential_id
     mock_credential.user_id = user_id
-    mock_credential.key = api_key
+    mock_credential.encrypted_key = "encrypted_test_key"  # Use encrypted_key instead of key
     mock_credential.expiry = expiry
 
     # Mock the credential data manager
@@ -95,7 +95,7 @@ async def test_update_proxy_cache_with_metadata_all_keys():
         mock_credential = MagicMock()
         mock_credential.id = uuid.uuid4()
         mock_credential.user_id = uuid.uuid4()
-        mock_credential.key = f"api-key-{i}"
+        # mock_credential.key = f"api-key-{i}"  # Removed as key field doesn't exist
         mock_credential.encrypted_key = "48656c6c6f20576f726c64"  # Hex encoded string
         mock_credential.expiry = datetime.now() + timedelta(days=30)
         credentials.append(mock_credential)
@@ -212,7 +212,7 @@ async def test_update_proxy_cache_backward_compatibility():
     mock_credential = MagicMock()
     mock_credential.id = uuid.uuid4()
     mock_credential.user_id = uuid.uuid4()
-    mock_credential.key = api_key
+    mock_credential.encrypted_key = "encrypted_test_key"  # Use encrypted_key instead of key
     mock_credential.expiry = None
 
     # Mock endpoint
