@@ -25,6 +25,7 @@ from ..commons import logging
 from ..commons.constants import EndpointStatusEnum, ProjectTypeEnum, UserTypeEnum
 from ..commons.db_utils import SessionMixin
 from ..commons.exceptions import ClientException
+from ..commons.security import hash_token
 from ..credential_ops.crud import CredentialDataManager
 from ..credential_ops.models import Credential as CredentialModel
 from ..endpoint_ops.crud import EndpointDataManager
@@ -135,11 +136,11 @@ class PlaygroundService(SessionMixin):
             return project_ids, filter_published_only
         elif api_key:
             # if api_key is present identify the project id and type
-
+            # Hash the API key to compare with stored hashed keys
+            hashed_api_key = hash_token(f"bud-{api_key}")
             db_credential = await CredentialDataManager(self.session).retrieve_by_fields(
-                CredentialModel, fields={"key": api_key}, missing_ok=True
+                CredentialModel, fields={"hashed_key": hashed_api_key}, missing_ok=True
             )
-
             if not db_credential:
                 logger.error("Invalid API key found")
                 raise ClientException(
