@@ -17,6 +17,8 @@ from budapp.commons.constants import (
     AuditResourceTypeEnum,
     EndpointStatusEnum,
     ModelProviderTypeEnum,
+    NotificationCategory,
+    NotificationStatus,
     PermissionEnum,
     ProjectStatusEnum,
     ProjectTypeEnum,
@@ -34,6 +36,7 @@ from budapp.model_ops.models import Provider as ProviderModel
 from budapp.permissions.crud import PermissionDataManager, ProjectPermissionDataManager
 from budapp.project_ops.crud import ProjectDataManager
 from budapp.project_ops.services import ProjectService
+from budapp.shared.notification_service import BudNotifyService, NotificationBuilder
 from budapp.shared.redis_service import RedisService, cache
 from budapp.user_ops.crud import UserDataManager
 from budapp.user_ops.models import User as UserModel
@@ -208,6 +211,37 @@ class CredentialService(SessionMixin):
         credential_model.hashed_key = CredentialModel.set_hashed_key(api_key)
         db_credential = await CredentialDataManager(self.session).create_credential(credential_model)
         logger.info(f"Credential inserted to database: {db_credential.id}")
+
+        # Send notification for CLIENT_APP credential creation
+        if credential_type == ApiCredentialTypeEnum.CLIENT_APP:
+            try:
+                notification = (
+                    NotificationBuilder()
+                    .set_content(
+                        title="Client App API Key Created",
+                        message=f"API key '{db_credential.name}' has been successfully created for your client app project",
+                        status=NotificationStatus.COMPLETED,
+                        icon="key",
+                        result={
+                            "credential_id": str(db_credential.id),
+                            "credential_name": db_credential.name,
+                            "project_id": str(db_credential.project_id),
+                            "project_name": db_project.name,
+                        },
+                    )
+                    .set_payload(
+                        category=NotificationCategory.INAPP,
+                        type="credential_creation",
+                        source=app_settings.source_topic,
+                    )
+                    .set_notification_request(subscriber_ids=str(user_id))
+                    .build()
+                )
+                await BudNotifyService().send_notification(notification)
+                logger.info(f"Notification sent for CLIENT_APP credential creation: {db_credential.id}")
+            except Exception as e:
+                logger.error(f"Failed to send notification for CLIENT_APP credential creation: {e}")
+                # Don't fail the credential creation if notification fails
 
         return db_credential
 

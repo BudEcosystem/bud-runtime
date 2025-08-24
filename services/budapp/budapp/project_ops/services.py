@@ -36,6 +36,7 @@ from ..commons.constants import (
     PROJECT_INVITATION_WORKFLOW,
     EndpointStatusEnum,
     NotificationCategory,
+    NotificationStatus,
     NotificationTypeEnum,
     PermissionEnum,
     ProjectStatusEnum,
@@ -149,6 +150,36 @@ class ProjectService(SessionMixin):
                 success=False,
             )
             raise ClientException("Failed to update permission in Keycloak")
+
+        # Send notification for CLIENT_APP project creation
+        if db_project.project_type == ProjectTypeEnum.CLIENT_APP:
+            try:
+                notification = (
+                    NotificationBuilder()
+                    .set_content(
+                        title="Client App Project Created",
+                        message=f"Your client app project '{db_project.name}' has been successfully created",
+                        status=NotificationStatus.COMPLETED,
+                        icon="project",
+                        result={
+                            "project_id": str(db_project.id),
+                            "project_name": db_project.name,
+                            "project_type": ProjectTypeEnum.CLIENT_APP.value,
+                        },
+                    )
+                    .set_payload(
+                        category=NotificationCategory.INAPP,
+                        type="project_creation",
+                        source=app_settings.source_topic,
+                    )
+                    .set_notification_request(subscriber_ids=str(current_user_id))
+                    .build()
+                )
+                await BudNotifyService().send_notification(notification)
+                logger.info(f"Notification sent for CLIENT_APP project creation: {db_project.id}")
+            except Exception as e:
+                logger.error(f"Failed to send notification for CLIENT_APP project creation: {e}")
+                # Don't fail the project creation if notification fails
 
         return db_project
 
