@@ -28,6 +28,7 @@ from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from .audit_ops import audit_routes
 from .auth import auth_routes
 from .benchmark_ops import benchmark_routes
 from .billing_ops import billing_router
@@ -170,6 +171,31 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             # Sleep for 30 minutes (1800 seconds)
             await asyncio.sleep(1800)
 
+    async def schedule_credential_usage_sync() -> None:
+        """Schedule periodic synchronization of credential usage from budmetrics."""
+        from .commons.database import SessionLocal
+        from .credential_ops.services import CredentialService
+
+        # Wait for services to be ready
+        await asyncio.sleep(20)
+
+        while True:
+            try:
+                logger.debug("Running scheduled credential usage sync")
+                # Create a new session for this sync operation
+                with SessionLocal() as session:
+                    credential_service = CredentialService(session)
+                    result = await credential_service.sync_credential_usage_from_metrics(minutes_back=10)
+                    if result.get("success"):
+                        logger.debug("Credential usage sync completed: %s", result)
+                    else:
+                        logger.warning("Credential usage sync failed: %s", result)
+            except Exception as e:
+                logger.error("Failed to sync credential usage: %s", e)
+
+            # Sleep for 5 minutes (300 seconds)
+            await asyncio.sleep(300)
+
     task = asyncio.create_task(schedule_secrets_and_config_sync())
 
     for seeder_name, seeder in seeders.items():
@@ -188,6 +214,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Start the blocking rule stats sync scheduler
     blocking_stats_task = asyncio.create_task(schedule_blocking_rule_stats_sync())
 
+    # Start the credential usage sync scheduler
+    credential_usage_task = asyncio.create_task(schedule_credential_usage_sync())
+
     yield
 
     try:
@@ -195,6 +224,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         dapr_workflow_task.cancel()
         eval_sync_task.cancel()
         blocking_stats_task.cancel()
+        credential_usage_task.cancel()
     except asyncio.CancelledError:
         logger.exception("Failed to cleanup config & store sync.")
 
@@ -240,6 +270,7 @@ if app_settings.cors_origins:
     )
 
 internal_router = APIRouter()
+internal_router.include_router(audit_routes.audit_router)
 internal_router.include_router(auth_routes.auth_router)
 internal_router.include_router(benchmark_routes.benchmark_router)
 internal_router.include_router(cluster_routes.cluster_router)

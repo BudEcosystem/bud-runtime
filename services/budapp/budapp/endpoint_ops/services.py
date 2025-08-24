@@ -2147,9 +2147,7 @@ class EndpointService(SessionMixin):
 
         # Provider-specific configurations
         if provider_enum == ProxyProviderEnum.VLLM:
-            return VLLMConfig(
-                type=model_name, model_name=model_name, api_base=api_base + "/v1", api_key_location="none"
-            ), None
+            return VLLMConfig(model_name=model_name, api_base=api_base + "/v1", api_key_location="none"), None
 
         elif provider_enum == ProxyProviderEnum.OPENAI:
             if encrypted_credential_data:
@@ -2269,9 +2267,7 @@ class EndpointService(SessionMixin):
 
         else:
             # Default fallback to VLLM
-            return VLLMConfig(
-                type=model_name, model_name=model_name, api_base=api_base + "/v1", api_key_location="none"
-            ), None
+            return VLLMConfig(model_name=model_name, api_base=api_base + "/v1", api_key_location="none"), None
 
     # Provider mapping constant
     PROVIDER_MAPPING = {

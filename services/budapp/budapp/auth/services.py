@@ -21,12 +21,20 @@ from uuid import UUID
 
 from fastapi import status
 
+from budapp.audit_ops import log_audit
 from budapp.commons import logging
-from budapp.commons.config import app_settings
-from budapp.commons.constants import UserColorEnum, UserStatusEnum, UserTypeEnum
+from budapp.commons.config import app_settings, secrets_settings
+from budapp.commons.constants import (
+    AuditActionEnum,
+    AuditResourceTypeEnum,
+    UserColorEnum,
+    UserStatusEnum,
+    UserTypeEnum,
+)
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
 from budapp.commons.keycloak import KeycloakManager
+from budapp.commons.security import HashManager
 from budapp.user_ops.crud import UserDataManager
 from budapp.user_ops.models import Tenant, TenantClient, TenantUserMapping
 from budapp.user_ops.models import User as UserModel
@@ -48,7 +56,7 @@ logger = logging.get_logger(__name__)
 
 
 class AuthService(SessionMixin):
-    async def login_user(self, user: UserLogin) -> UserLoginData:
+    async def login_user(self, user: UserLogin, request=None) -> UserLoginData:
         """Login a user with email and password."""
         logger.debug(f"::USER:: User: {user}")
 
@@ -60,6 +68,15 @@ class AuthService(SessionMixin):
         # Check if user exists
         if not db_user:
             logger.debug(f"User not found in database: {user.email}")
+            # Log failed login attempt - email not registered
+            log_audit(
+                session=self.session,
+                action=AuditActionEnum.LOGIN_FAILED,
+                resource_type=AuditResourceTypeEnum.USER,
+                details={"email": user.email, "reason": "Email not registered"},
+                request=request,
+                success=False,
+            )
             raise ClientException("This email is not registered")
 
         # Get tenant information
@@ -69,6 +86,17 @@ class AuthService(SessionMixin):
                 Tenant, {"id": user.tenant_id}, missing_ok=True
             )
             if not tenant:
+                # Log failed login attempt - invalid tenant
+                log_audit(
+                    session=self.session,
+                    action=AuditActionEnum.LOGIN_FAILED,
+                    resource_type=AuditResourceTypeEnum.USER,
+                    resource_id=db_user.id,
+                    user_id=db_user.id,
+                    details={"email": user.email, "reason": "Invalid tenant ID", "tenant_id": str(user.tenant_id)},
+                    request=request,
+                    success=False,
+                )
                 raise ClientException("Invalid tenant ID")
 
             # Verify user belongs to tenant
@@ -76,6 +104,21 @@ class AuthService(SessionMixin):
                 TenantUserMapping, {"tenant_id": user.tenant_id, "user_id": db_user.id}, missing_ok=True
             )
             if not tenant_mapping:
+                # Log failed login attempt - user not in tenant
+                log_audit(
+                    session=self.session,
+                    action=AuditActionEnum.LOGIN_FAILED,
+                    resource_type=AuditResourceTypeEnum.USER,
+                    resource_id=db_user.id,
+                    user_id=db_user.id,
+                    details={
+                        "email": user.email,
+                        "reason": "User does not belong to this tenant",
+                        "tenant_id": str(user.tenant_id),
+                    },
+                    request=request,
+                    success=False,
+                )
                 raise ClientException("User does not belong to this tenant")
         else:
             # Get the default tenant
@@ -83,6 +126,17 @@ class AuthService(SessionMixin):
                 Tenant, {"realm_name": app_settings.default_realm_name}, missing_ok=True
             )
             if not tenant:
+                # Log failed login attempt - default tenant not found
+                log_audit(
+                    session=self.session,
+                    action=AuditActionEnum.LOGIN_FAILED,
+                    resource_type=AuditResourceTypeEnum.USER,
+                    resource_id=db_user.id,
+                    user_id=db_user.id,
+                    details={"email": user.email, "reason": "Default tenant not found"},
+                    request=request,
+                    success=False,
+                )
                 raise ClientException("Default tenant not found")
 
             # # If no tenant specified, get the first tenant the user belongs to
@@ -94,9 +148,20 @@ class AuthService(SessionMixin):
             #         Tenant, {"id": tenant_mapping.tenant_id}, missing_ok=True
             #  )
 
-        logger.debug(f"::USER:: Tenant: {tenant.realm_name}")
+        logger.debug(f"::USER:: Tenant: {tenant.realm_name if tenant else 'None'}")
 
         if not tenant:
+            # Log failed login attempt - no tenant association
+            log_audit(
+                session=self.session,
+                action=AuditActionEnum.LOGIN_FAILED,
+                resource_type=AuditResourceTypeEnum.USER,
+                resource_id=db_user.id,
+                user_id=db_user.id,
+                details={"email": user.email, "reason": "User does not belong to any tenant"},
+                request=request,
+                success=False,
+            )
             raise ClientException("User does not belong to any tenant")
 
         # Get tenant client credentials
@@ -104,6 +169,21 @@ class AuthService(SessionMixin):
             TenantClient, {"tenant_id": tenant.id}, missing_ok=True
         )
         if not tenant_client:
+            # Log failed login attempt - tenant client config missing
+            log_audit(
+                session=self.session,
+                action=AuditActionEnum.LOGIN_FAILED,
+                resource_type=AuditResourceTypeEnum.USER,
+                resource_id=db_user.id,
+                user_id=db_user.id,
+                details={
+                    "email": user.email,
+                    "reason": "Tenant client configuration not found",
+                    "tenant": tenant.realm_name,
+                },
+                request=request,
+                success=False,
+            )
             raise ClientException("Tenant client configuration not found")
 
         logger.debug(f"::USER:: Tenant client: {tenant_client.id} {tenant_client.client_id}")
@@ -128,13 +208,52 @@ class AuthService(SessionMixin):
 
         if not token_data:
             logger.debug(f"Invalid credentials for user: {user.email}")
+            # Log failed login attempt - wrong password
+            log_audit(
+                session=self.session,
+                action=AuditActionEnum.LOGIN_FAILED,
+                resource_type=AuditResourceTypeEnum.USER,
+                resource_id=db_user.id,
+                user_id=db_user.id,
+                details={"email": user.email, "reason": "Incorrect password", "tenant": tenant.realm_name},
+                request=request,
+                success=False,
+            )
             raise ClientException("Incorrect email or password")
 
         if db_user.status == UserStatusEnum.DELETED:
             logger.debug(f"User account is not active: {user.email}")
+            # Log failed login attempt - account deleted/inactive
+            log_audit(
+                session=self.session,
+                action=AuditActionEnum.LOGIN_FAILED,
+                resource_type=AuditResourceTypeEnum.USER,
+                resource_id=db_user.id,
+                user_id=db_user.id,
+                details={
+                    "email": user.email,
+                    "reason": "User account is not active",
+                    "status": db_user.status,
+                    "tenant": tenant.realm_name,
+                },
+                request=request,
+                success=False,
+            )
             raise ClientException("User account is not active")
 
         logger.debug(f"User Retrieved: {user.email}")
+
+        # Log successful login
+        log_audit(
+            session=self.session,
+            action=AuditActionEnum.LOGIN,
+            resource_type=AuditResourceTypeEnum.USER,
+            resource_id=db_user.id,
+            user_id=db_user.id,
+            details={"email": user.email, "tenant": tenant.realm_name if tenant else None},
+            request=request,
+            success=True,
+        )
 
         # Create auth token
         # token = await TokenService(self.session).create_auth_token(str(db_user.auth_id))
@@ -381,12 +500,17 @@ class AuthService(SessionMixin):
                 user, app_settings.default_realm_name, tenant_client.client_id
             )
 
-            # Hash password
-            # salted_password = user.password + secrets_settings.password_salt
-            # user.password = await HashManager().get_hash(salted_password)
-            # logger.info(f"Password hashed for {user.email}")
+            # Hash password - CRITICAL: Never store plain text passwords!
+            if hasattr(user, "password") and user.password:
+                salted_password = user.password + secrets_settings.password_salt
+                hashed_password = await HashManager().get_hash(salted_password)
+                logger.info(f"Password hashed for {user.email}")
+            else:
+                hashed_password = None
 
-            user_data = user.model_dump(exclude={"permissions"})
+            user_data = user.model_dump(exclude={"permissions", "password"})
+            if hashed_password:
+                user_data["password"] = hashed_password
             user_data["color"] = UserColorEnum.get_random_color()
 
             # Self-registered users are active immediately, admin-created users are invited

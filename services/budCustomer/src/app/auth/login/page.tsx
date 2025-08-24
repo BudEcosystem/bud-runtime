@@ -90,7 +90,7 @@ export default function Login() {
         });
 
         // Handle different login scenarios
-        if (response.data.is_reset_password || response.data.first_login) {
+        if (response.data.is_reset_password) {
           router.push("/auth/resetPassword");
         } else {
           router.push("/models");

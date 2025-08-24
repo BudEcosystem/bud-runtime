@@ -14,6 +14,9 @@ $primary-color: var(--purple);
     .ant-table {
       background: transparent;
       color: $text-white;
+      border: 1px solid #1f1f1f;
+      border-radius: 8px;
+      overflow: hidden;
     }
 
     .ant-table-fixed {
@@ -29,8 +32,8 @@ $primary-color: var(--purple);
     }
 
     .ant-table-thead > tr > th {
-      background: transparent;
-      border-bottom: none;
+      background: #121212;
+      border-bottom: 1px solid #1f1f1f;
       color: $text-dark-gray;
       font-weight: 400;
       font-size: 0.75rem;
@@ -43,8 +46,12 @@ $primary-color: var(--purple);
       }
     }
 
+    .ant-table .ant-table-thead .ant-table-cell {
+      background: #121212;
+    }
+
     .ant-table-tbody > tr > td {
-      border-bottom: 1px solid rgba($border-color, 0.2);
+      border-bottom: 1px solid #1f1f1f;
       padding: 1.25rem 1.5rem;
       background: transparent;
       font-size: 0.875rem;

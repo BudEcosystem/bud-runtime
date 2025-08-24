@@ -282,7 +282,10 @@ const LoginForm = ({ onSubmit }: LoginPageModalProps) => {
 
       <div className="mt-[1rem] flex justify-center items-center gap-1">
         <Text_12_400_EEEEEE>Don&apos;t have an account?</Text_12_400_EEEEEE>
-        <Link href="/register" className="text-bud-purple cursor-pointer hover:underline">
+        <Link
+          href="/register"
+          className="text-bud-purple cursor-pointer hover:underline"
+        >
           Sign up
         </Link>
       </div>
