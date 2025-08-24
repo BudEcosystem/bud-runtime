@@ -28,10 +28,13 @@ stdenv.mkDerivation (finalAttrs: {
       --add-flags "start"
   '';
 
+  buildInputs = [
+    nodejs
+  ];
+
   nativeBuildInputs = [
     pnpm
     pnpm.configHook
-    nodejs
     makeWrapper
   ];
 

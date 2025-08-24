@@ -36,6 +36,7 @@ def log_audit(
     action: AuditActionEnum,
     resource_type: AuditResourceTypeEnum,
     resource_id: Optional[UUID] = None,
+    resource_name: Optional[str] = None,
     user_id: Optional[UUID] = None,
     details: Optional[Dict[str, Any]] = None,
     request: Optional[Request] = None,
@@ -54,6 +55,7 @@ def log_audit(
         action: The action being performed (CREATE, UPDATE, DELETE, etc.)
         resource_type: The type of resource being acted upon
         resource_id: Optional ID of the resource
+        resource_name: Optional name of the resource for display and search
         user_id: Optional ID of the user performing the action
         details: Optional dictionary with additional context/details
         request: Optional FastAPI request object for extracting IP and user agent
@@ -118,6 +120,7 @@ def log_audit(
             audit_service.audit_create(
                 resource_type=resource_type,
                 resource_id=resource_id,
+                resource_name=resource_name,
                 resource_data=audit_details,
                 user_id=user_id,
                 ip_address=ip_address,
@@ -126,6 +129,7 @@ def log_audit(
             audit_service.audit_update(
                 resource_type=resource_type,
                 resource_id=resource_id,
+                resource_name=resource_name,
                 previous_data=previous_state or {},
                 new_data=new_state or {},
                 user_id=user_id,
@@ -135,6 +139,7 @@ def log_audit(
             audit_service.audit_delete(
                 resource_type=resource_type,
                 resource_id=resource_id,
+                resource_name=resource_name,
                 resource_data=audit_details,
                 user_id=user_id,
                 ip_address=ip_address,
@@ -163,6 +168,7 @@ def log_audit(
             audit_service.audit_access(
                 resource_type=resource_type,
                 resource_id=resource_id,
+                resource_name=resource_name,
                 access_type=access_type,
                 granted=granted,
                 user_id=user_id,
@@ -191,6 +197,7 @@ def log_audit(
                 action=action,
                 resource_type=resource_type,
                 resource_id=resource_id,
+                resource_name=resource_name,
                 user_id=user_id,
                 ip_address=ip_address,
                 details=audit_details,
@@ -218,6 +225,7 @@ def log_audit_async(
     action: AuditActionEnum,
     resource_type: AuditResourceTypeEnum,
     resource_id: Optional[UUID] = None,
+    resource_name: Optional[str] = None,
     user_id: Optional[UUID] = None,
     details: Optional[Dict[str, Any]] = None,
     request: Optional[Request] = None,
@@ -253,6 +261,7 @@ def log_audit_async(
                 action=AuditActionEnum.CREATE,
                 resource_type=AuditResourceTypeEnum.ENDPOINT,
                 resource_id=endpoint.id,
+                resource_name=endpoint.name,
                 user_id=current_user_id,
                 details={"endpoint_name": endpoint.name},
                 request=request,
@@ -268,6 +277,7 @@ def log_audit_async(
         action=action,
         resource_type=resource_type,
         resource_id=resource_id,
+        resource_name=resource_name,
         user_id=user_id,
         details=details,
         request=request,

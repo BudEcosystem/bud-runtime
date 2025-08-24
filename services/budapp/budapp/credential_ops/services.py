@@ -113,6 +113,7 @@ class CredentialService(SessionMixin):
             action=AuditActionEnum.CREATE,
             resource_type=AuditResourceTypeEnum.API_KEY,
             resource_id=db_credential.id,
+            resource_name=db_credential.name,
             user_id=current_user_id,
             details=audit_details,
             request=request,
@@ -415,6 +416,7 @@ class CredentialService(SessionMixin):
             action=AuditActionEnum.DELETE,
             resource_type=AuditResourceTypeEnum.API_KEY,
             resource_id=credential_id,
+            resource_name=db_credential.name,
             user_id=user_id,
             details=audit_details,
             request=request,
@@ -527,6 +529,7 @@ class CredentialService(SessionMixin):
             action=AuditActionEnum.UPDATE,
             resource_type=AuditResourceTypeEnum.API_KEY,
             resource_id=credential_id,
+            resource_name=db_credential.name,
             user_id=user_id,
             previous_state=previous_state,
             new_state=new_state,
@@ -646,6 +649,7 @@ class ProprietaryCredentialService(SessionMixin):
             action=AuditActionEnum.CREATE,
             resource_type=AuditResourceTypeEnum.API_KEY,
             resource_id=db_credential.id,
+            resource_name=db_credential.name,
             user_id=current_user_id,
             details={
                 "credential_name": db_credential.name,
@@ -846,6 +850,7 @@ class ProprietaryCredentialService(SessionMixin):
             action=AuditActionEnum.UPDATE,
             resource_type=AuditResourceTypeEnum.API_KEY,
             resource_id=credential_id,
+            resource_name=db_credential.name,
             user_id=current_user_id,
             previous_state=previous_state,
             new_state={
@@ -896,6 +901,7 @@ class ProprietaryCredentialService(SessionMixin):
             action=AuditActionEnum.DELETE,
             resource_type=AuditResourceTypeEnum.API_KEY,
             resource_id=credential_id,
+            resource_name=credential_name,
             user_id=current_user_id,
             details={
                 "credential_name": credential_name,

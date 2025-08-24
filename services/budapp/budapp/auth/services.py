@@ -73,6 +73,7 @@ class AuthService(SessionMixin):
                 session=self.session,
                 action=AuditActionEnum.LOGIN_FAILED,
                 resource_type=AuditResourceTypeEnum.USER,
+                resource_name=user.email,
                 details={"email": user.email, "reason": "Email not registered"},
                 request=request,
                 success=False,
@@ -92,6 +93,7 @@ class AuthService(SessionMixin):
                     action=AuditActionEnum.LOGIN_FAILED,
                     resource_type=AuditResourceTypeEnum.USER,
                     resource_id=db_user.id,
+                    resource_name=db_user.email,
                     user_id=db_user.id,
                     details={"email": user.email, "reason": "Invalid tenant ID", "tenant_id": str(user.tenant_id)},
                     request=request,
@@ -110,6 +112,7 @@ class AuthService(SessionMixin):
                     action=AuditActionEnum.LOGIN_FAILED,
                     resource_type=AuditResourceTypeEnum.USER,
                     resource_id=db_user.id,
+                    resource_name=db_user.email,
                     user_id=db_user.id,
                     details={
                         "email": user.email,
@@ -132,6 +135,7 @@ class AuthService(SessionMixin):
                     action=AuditActionEnum.LOGIN_FAILED,
                     resource_type=AuditResourceTypeEnum.USER,
                     resource_id=db_user.id,
+                    resource_name=db_user.email,
                     user_id=db_user.id,
                     details={"email": user.email, "reason": "Default tenant not found"},
                     request=request,
@@ -157,6 +161,7 @@ class AuthService(SessionMixin):
                 action=AuditActionEnum.LOGIN_FAILED,
                 resource_type=AuditResourceTypeEnum.USER,
                 resource_id=db_user.id,
+                resource_name=db_user.email,
                 user_id=db_user.id,
                 details={"email": user.email, "reason": "User does not belong to any tenant"},
                 request=request,
@@ -175,6 +180,7 @@ class AuthService(SessionMixin):
                 action=AuditActionEnum.LOGIN_FAILED,
                 resource_type=AuditResourceTypeEnum.USER,
                 resource_id=db_user.id,
+                resource_name=db_user.email,
                 user_id=db_user.id,
                 details={
                     "email": user.email,
@@ -190,11 +196,13 @@ class AuthService(SessionMixin):
 
         # Authenticate with Keycloak
         keycloak_manager = KeycloakManager()
+        # Decrypt client secret for use
+        decrypted_secret = await tenant_client.get_decrypted_client_secret()
         credentials = TenantClientSchema(
             id=tenant_client.id,
             client_id=tenant_client.client_id,
             client_named_id=tenant_client.client_named_id,
-            client_secret=tenant_client.client_secret,
+            client_secret=decrypted_secret,
         )
 
         token_data = await keycloak_manager.authenticate_user(
@@ -204,8 +212,6 @@ class AuthService(SessionMixin):
             credentials=credentials,
         )
 
-        logger.debug(f"Token data: {token_data}")
-
         if not token_data:
             logger.debug(f"Invalid credentials for user: {user.email}")
             # Log failed login attempt - wrong password
@@ -214,6 +220,7 @@ class AuthService(SessionMixin):
                 action=AuditActionEnum.LOGIN_FAILED,
                 resource_type=AuditResourceTypeEnum.USER,
                 resource_id=db_user.id,
+                resource_name=db_user.email,
                 user_id=db_user.id,
                 details={"email": user.email, "reason": "Incorrect password", "tenant": tenant.realm_name},
                 request=request,
@@ -229,6 +236,7 @@ class AuthService(SessionMixin):
                 action=AuditActionEnum.LOGIN_FAILED,
                 resource_type=AuditResourceTypeEnum.USER,
                 resource_id=db_user.id,
+                resource_name=db_user.email,
                 user_id=db_user.id,
                 details={
                     "email": user.email,
@@ -249,6 +257,7 @@ class AuthService(SessionMixin):
             action=AuditActionEnum.LOGIN,
             resource_type=AuditResourceTypeEnum.USER,
             resource_id=db_user.id,
+            resource_name=db_user.email,
             user_id=db_user.id,
             details={"email": user.email, "tenant": tenant.realm_name if tenant else None},
             request=request,
@@ -315,11 +324,13 @@ class AuthService(SessionMixin):
             logger.debug(f"::USER:: Tenant client: {tenant_client.id} {tenant_client.client_id}")
 
             keycloak_manager = KeycloakManager()
+            # Decrypt client secret for use
+            decrypted_secret = await tenant_client.get_decrypted_client_secret()
             credentials = TenantClientSchema(
                 id=tenant_client.id,
                 client_id=tenant_client.client_id,
                 client_named_id=tenant_client.client_named_id,
-                client_secret=tenant_client.client_secret,
+                client_secret=decrypted_secret,
             )
 
             # Refresh Token
@@ -328,8 +339,6 @@ class AuthService(SessionMixin):
                 credentials=credentials,
                 refresh_token=token.refresh_token,
             )
-
-            logger.debug(f"Token data: {token_data}")
 
             return RefreshTokenResponse(
                 code=status.HTTP_200_OK,
@@ -361,11 +370,13 @@ class AuthService(SessionMixin):
                             TenantClient, {"tenant_id": default_tenant.id}, missing_ok=True
                         )
                         if tenant_client:
+                            # Decrypt client secret for use
+                            decrypted_secret = await tenant_client.get_decrypted_client_secret()
                             credentials = TenantClientSchema(
                                 id=tenant_client.id,
                                 client_named_id=tenant_client.client_named_id,
                                 client_id=tenant_client.client_id,
-                                client_secret=tenant_client.client_secret,
+                                client_secret=decrypted_secret,
                             )
                             keycloak_manager = KeycloakManager()
                             decoded = await keycloak_manager.validate_token(
@@ -412,11 +423,13 @@ class AuthService(SessionMixin):
 
         # Logout from Keycloak
         keycloak_manager = KeycloakManager()
+        # Decrypt client secret for use
+        decrypted_secret = await tenant_client.get_decrypted_client_secret()
         credentials = TenantClientSchema(
             id=tenant_client.id,
             client_id=tenant_client.client_id,
             client_named_id=tenant_client.client_named_id,
-            client_secret=tenant_client.client_secret,
+            client_secret=decrypted_secret,
         )
 
         success = await keycloak_manager.logout_user(
@@ -596,7 +609,7 @@ class AuthService(SessionMixin):
 
                     # Associate the user with the project
                     default_project.users.append(db_user)
-                    await self.session.commit()
+                    self.session.commit()
 
                     # Create permissions for the project in Keycloak
                     permission_service = PermissionService(self.session)

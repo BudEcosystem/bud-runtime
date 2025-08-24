@@ -62,6 +62,7 @@ class TestHashUtilities:
             ip_address="192.168.1.1",
             previous_state=None,
             new_state={"created": True},
+            resource_name="Test Project",
         )
 
         hash2 = generate_audit_hash(
@@ -75,6 +76,7 @@ class TestHashUtilities:
             ip_address="192.168.1.1",
             previous_state=None,
             new_state={"created": True},
+            resource_name="Test Project",
         )
 
         assert hash1 == hash2
@@ -93,6 +95,7 @@ class TestHashUtilities:
             "ip_address": "192.168.1.1",
             "previous_state": None,
             "new_state": {"created": True},
+            "resource_name": "Test Project",
         }
 
         hash1 = generate_audit_hash(**base_params)
@@ -117,6 +120,7 @@ class TestHashUtilities:
         audit_record.ip_address = "10.0.0.1"
         audit_record.previous_state = None
         audit_record.new_state = {"status": "active"}
+        audit_record.resource_name = "Test Model"
 
         # Generate the expected hash
         expected_hash = generate_audit_hash(
@@ -130,6 +134,7 @@ class TestHashUtilities:
             ip_address=audit_record.ip_address,
             previous_state=audit_record.previous_state,
             new_state=audit_record.new_state,
+            resource_name=audit_record.resource_name,
         )
 
         # Verify the hash
@@ -149,6 +154,7 @@ class TestHashUtilities:
         audit_record.ip_address = "10.0.0.1"
         audit_record.previous_state = None
         audit_record.new_state = {"status": "active"}
+        audit_record.resource_name = "Test Endpoint"
 
         # Use an incorrect hash
         invalid_hash = "0" * 64
@@ -170,6 +176,7 @@ class TestHashUtilities:
         audit_record.ip_address = "172.16.0.1"
         audit_record.previous_state = {"status": "active"}
         audit_record.new_state = None
+        audit_record.resource_name = "Production Cluster"
 
         # Generate and set the correct hash
         audit_record.record_hash = generate_audit_hash(
@@ -183,6 +190,7 @@ class TestHashUtilities:
             ip_address=audit_record.ip_address,
             previous_state=audit_record.previous_state,
             new_state=audit_record.new_state,
+            resource_name=audit_record.resource_name,
         )
 
         is_valid, message = verify_audit_integrity(audit_record)
@@ -203,6 +211,7 @@ class TestHashUtilities:
         audit_record.ip_address = "192.168.1.100"
         audit_record.previous_state = {"email": "old@example.com"}
         audit_record.new_state = {"email": "new@example.com"}
+        audit_record.resource_name = "User Profile"
 
         # Generate hash for original state
         audit_record.record_hash = generate_audit_hash(
@@ -216,6 +225,7 @@ class TestHashUtilities:
             ip_address=audit_record.ip_address,
             previous_state=audit_record.previous_state,
             new_state=audit_record.new_state,
+            resource_name=audit_record.resource_name,
         )
 
         # Tamper with the record (change the action)
@@ -261,6 +271,7 @@ class TestHashWithComplexData:
             ip_address=None,
             previous_state=None,
             new_state=None,
+            resource_name="Complex Project",
         )
 
         assert len(hash1) == 64
@@ -284,6 +295,7 @@ class TestHashWithComplexData:
             ip_address="::1",  # IPv6 address
             previous_state={"name": "old"},
             new_state=unicode_data,
+            resource_name="测试项目",  # Unicode resource name
         )
 
         assert len(hash1) == 64
@@ -311,7 +323,38 @@ class TestHashWithComplexData:
                 "permissions": ["read", "write"],
                 "last_access": "2024-01-15T10:30:00Z",
             },
+            resource_name="API Endpoint v1/models",
         )
 
         assert len(full_data) == 64
         assert all(c in "0123456789abcdef" for c in full_data)  # Valid hex string
+
+    def test_hash_resource_name_affects_result(self):
+        """Test that different resource_name values generate different hashes."""
+        base_params = {
+            "action": AuditActionEnum.CREATE,
+            "resource_type": AuditResourceTypeEnum.PROJECT,
+            "resource_id": uuid4(),
+            "user_id": uuid4(),
+            "actioned_by": None,
+            "timestamp": datetime.now(timezone.utc),
+            "details": {"test": "data"},
+            "ip_address": "192.168.1.1",
+            "previous_state": None,
+            "new_state": {"created": True},
+        }
+
+        # Generate hash with first resource name
+        hash1 = generate_audit_hash(**base_params, resource_name="Project Alpha")
+
+        # Generate hash with different resource name
+        hash2 = generate_audit_hash(**base_params, resource_name="Project Beta")
+
+        # Generate hash with None resource name
+        hash3 = generate_audit_hash(**base_params, resource_name=None)
+
+        # All hashes should be different
+        assert hash1 != hash2
+        assert hash1 != hash3
+        assert hash2 != hash3
+        assert len({hash1, hash2, hash3}) == 3  # All unique

@@ -35,6 +35,7 @@ class TestAuditTrailModel:
             action=AuditActionEnum.CREATE,
             resource_type=AuditResourceTypeEnum.PROJECT,
             resource_id=uuid4(),
+            resource_name="Test Project",
             timestamp=datetime.now(timezone.utc),
             details={"test": "data"},
             ip_address="192.168.1.1",
@@ -45,6 +46,7 @@ class TestAuditTrailModel:
         assert audit.id is not None
         assert audit.action == AuditActionEnum.CREATE
         assert audit.resource_type == AuditResourceTypeEnum.PROJECT
+        assert audit.resource_name == "Test Project"
         assert audit.details == {"test": "data"}
         assert audit.ip_address == "192.168.1.1"
 
@@ -83,6 +85,7 @@ class TestAuditSchemas:
             "action": AuditActionEnum.CREATE,
             "resource_type": AuditResourceTypeEnum.ENDPOINT,
             "resource_id": str(uuid4()),
+            "resource_name": "Test Endpoint",
             "user_id": str(uuid4()),
             "actioned_by": str(uuid4()),
             "details": {"operation": "test"},
@@ -92,6 +95,7 @@ class TestAuditSchemas:
         schema = AuditRecordCreate(**data)
         assert schema.action == AuditActionEnum.CREATE
         assert schema.resource_type == AuditResourceTypeEnum.ENDPOINT
+        assert schema.resource_name == "Test Endpoint"
         assert schema.details == {"operation": "test"}
 
     def test_audit_record_entry_schema(self):
@@ -103,6 +107,7 @@ class TestAuditSchemas:
             "action": "update",
             "resource_type": "cluster",
             "resource_id": str(uuid4()),
+            "resource_name": "Test Cluster",
             "timestamp": datetime.now(timezone.utc),
             "created_at": datetime.now(timezone.utc),
             "record_hash": "a" * 64,  # SHA256 hash is 64 characters
@@ -111,6 +116,7 @@ class TestAuditSchemas:
         schema = AuditRecordEntry(**data)
         assert schema.action == "update"
         assert schema.resource_type == "cluster"
+        assert schema.resource_name == "Test Cluster"
         assert schema.record_hash == "a" * 64
 
     def test_ip_address_validation(self):
@@ -167,6 +173,7 @@ class TestAuditTrailDataManager:
             resource_id=resource_id,
             user_id=user_id,
             actioned_by=actioned_by,
+            resource_name="Test Project",
             details={"test": "data"},
             ip_address="192.168.1.1",
         )
@@ -217,6 +224,7 @@ class TestAuditTrailDataManager:
             user_id=user_id,
             action=AuditActionEnum.CREATE,
             resource_type=AuditResourceTypeEnum.PROJECT,
+            resource_name="Test",
             start_date=datetime.now(timezone.utc) - timedelta(days=7),
             end_date=datetime.now(timezone.utc),
             offset=0,
@@ -225,6 +233,25 @@ class TestAuditTrailDataManager:
 
         # Assert
         assert total == 10
+        assert records == []
+        data_manager.execute_scalar.assert_called_once()
+        data_manager.scalars_all.assert_called_once()
+
+    def test_get_audit_records_with_resource_name_filter(self, data_manager):
+        """Test retrieving audit records filtered by resource_name."""
+        # Arrange
+        data_manager.execute_scalar = MagicMock(return_value=2)
+        data_manager.scalars_all = MagicMock(return_value=[])
+
+        # Act - test with resource_name filter (partial match)
+        records, total = data_manager.get_audit_records(
+            resource_name="Test Project",
+            offset=0,
+            limit=20,
+        )
+
+        # Assert
+        assert total == 2
         assert records == []
         data_manager.execute_scalar.assert_called_once()
         data_manager.scalars_all.assert_called_once()
@@ -263,6 +290,7 @@ class TestAuditService:
             resource_data=resource_data,
             user_id=user_id,
             actioned_by=actioned_by,
+            resource_name="test-model",
             ip_address="10.0.0.1",
         )
 
@@ -291,6 +319,7 @@ class TestAuditService:
             resource_id=resource_id,
             previous_data=previous_data,
             new_data=new_data,
+            resource_name="Test Endpoint",
         )
 
         # Assert

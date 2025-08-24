@@ -1,9 +1,10 @@
 "use client";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Button, Card, Row, Col, Flex, Input, Dropdown } from "antd";
+import { Card, Row, Col, Flex, Input, Dropdown, Button } from "antd";
 import { Typography } from "antd";
 import { PlusOutlined, MoreOutlined } from "@ant-design/icons";
+import { PrimaryButton } from "@/components/ui/button";
 import { Icon } from "@iconify/react/dist/iconify.js";
 import dayjs from "dayjs";
 import { type Project as ContextProject } from "@/context/projectContext";
@@ -241,14 +242,10 @@ export default function ProjectsPage() {
                   />
                 }
               />
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                className="bg-bud-purple border-bud-purple hover:bg-bud-purple-hover h-[2.5rem] px-[1.5rem]"
-                onClick={handleCreateProject}
-              >
-                Project
-              </Button>
+              <PrimaryButton onClick={handleCreateProject}>
+                <PlusOutlined className="mr-2" />
+                <span>Project</span>
+              </PrimaryButton>
             </Flex>
           </Flex>
 
@@ -294,14 +291,10 @@ export default function ProjectsPage() {
               <Text className="text-bud-text-muted mb-6 block">
                 Create your first project to start organizing your AI resources
               </Text>
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                className="bg-bud-purple border-bud-purple hover:bg-bud-purple-hover"
-                onClick={handleCreateProject}
-              >
-                Create Your First Project
-              </Button>
+              <PrimaryButton onClick={handleCreateProject}>
+                <PlusOutlined className="mr-2" />
+                <span>Create Your First Project</span>
+              </PrimaryButton>
             </div>
           )}
         </div>

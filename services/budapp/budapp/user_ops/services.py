@@ -179,12 +179,13 @@ class UserService(SessionMixin):
                 logger.error("User token is missing")
                 raise ClientException("User authentication token not found", status_code=401)
 
-            # Credentials
+            # Credentials - decrypt client secret for use
+            decrypted_secret = await tenant_client.get_decrypted_client_secret()
             credentials = TenantClientSchema(
                 id=tenant_client.id,
                 client_named_id=tenant_client.client_named_id,
                 client_id=tenant_client.client_id,
-                client_secret=tenant_client.client_secret,
+                client_secret=decrypted_secret,
             )
 
             # Keycloak Manager

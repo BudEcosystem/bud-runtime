@@ -11,6 +11,7 @@ import { Model } from "@/hooks/useModels";
 import { successToast } from "@/components/toast";
 import DrawerCard from "@/components/ui/bud/card/DrawerCard";
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
+import DrawerBreadCrumbNavigation from "@/components/ui/bud/card/DrawerBreadCrumbNavigation";
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
@@ -88,7 +89,7 @@ const ModelDetailDrawer: React.FC<ModelDetailDrawerProps> = ({
   );
 };
 
-const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }> = ({
+export const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }> = ({
   model,
   onClose,
 }) => {
@@ -631,10 +632,11 @@ fetch('${apiUrl}', {
 
         <div className="flex justify-start">
           <CustomDropDown
+          parentClassNames="cursor-pointer"
             Placement="bottomLeft"
             buttonContent={
-              <div className="border border-[.5px] border-[#965CDE] rounded-[6px] bg-[#1E0C34] min-w-[4rem] min-h-[1.75rem] flex items-center justify-center px-[.6rem]">
-                <Text_12_600_EEEEEE className="flex items-center justify-center">
+              <div className="cursor-pointer border border-[.5px] border-[#965CDE] rounded-[6px] bg-[#1E0C34] min-w-[4rem] min-h-[1.75rem] flex items-center justify-center px-[.6rem]">
+                <Text_12_600_EEEEEE className=" cursor-pointer flex items-center justify-center">
                   {selectedCode.charAt(0).toUpperCase() + selectedCode.slice(1)}
                 </Text_12_600_EEEEEE>
                 <ChevronDown className="w-[1rem] text-[#EEEEEE] text-[.75rem] ml-[.15rem]" />
@@ -710,7 +712,7 @@ fetch('${apiUrl}', {
         children: <UseThisModel />,
       },
     ],
-    [],
+    [GeneralTab, UseThisModel],
   );
 
   useEffect(() => {
@@ -723,7 +725,12 @@ fetch('${apiUrl}', {
 
   return (
     <BudForm
-      data={{}}
+      data={{
+        name: "Model details",
+        description: "",
+        tags: [],
+        icon: "",
+      }}
       onNext={() => {
         onClose();
       }}
