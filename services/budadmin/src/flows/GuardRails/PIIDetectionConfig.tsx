@@ -15,6 +15,7 @@ import {
   Text_14_400_EEEEEE,
   Text_14_600_FFFFFF,
 } from "@/components/ui/text";
+import Tags from "../components/DrawerTags";
 
 export default function PIIDetectionConfig() {
   const { openDrawerWithStep } = useDrawer();
@@ -176,12 +177,10 @@ export default function PIIDetectionConfig() {
                 </Text_12_400_757575>
                 <div className="flex gap-[5px]">
                   {probeTypes.map((type) => (
-                    <Tag
-                      key={type}
-                      className="bg-[#d1b85420] border-[#d1b854] text-[#d1b854] m-0"
-                    >
-                      {type}
-                    </Tag>
+                    <Tags
+                      name={type}
+                      color="#d1b854"
+                      key={type}></Tags>
                   ))}
                 </div>
               </div>
@@ -191,12 +190,10 @@ export default function PIIDetectionConfig() {
                 </Text_12_400_757575>
                 <div className="flex gap-[5px] flex-wrap">
                   {guardTypes.map((type) => (
-                    <Tag
-                      key={type}
-                      className="bg-[#d1b85420] border-[#d1b854] text-[#d1b854] m-0"
-                    >
-                      {type}
-                    </Tag>
+                    <Tags
+                      name={type}
+                      color="#d1b854"
+                      key={type}></Tags>
                   ))}
                 </div>
               </div>
