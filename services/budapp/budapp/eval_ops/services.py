@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from budapp.commons import logging
 from budapp.commons.config import app_settings
-from budapp.commons.constants import WorkflowTypeEnum
+from budapp.commons.constants import WorkflowTypeEnum, BudServeWorkflowStepEventName
 from budapp.commons.exceptions import ClientException
 from budapp.endpoint_ops.models import Endpoint as EndpointModel
 from budapp.eval_ops.models import ExpDataset as DatasetModel
@@ -68,6 +68,7 @@ from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.workflow_ops.models import WorkflowStatusEnum
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
+from budapp.workflow_ops.services import WorkflowStepService
 
 
 logger = logging.get_logger(__name__)
@@ -1856,6 +1857,26 @@ class EvaluationWorkflowService:
             if request.step_number == 5 and request.trigger_workflow:
                 logger.info("*" * 10)
                 logger.info(f"\n\nTriggering budeval evaluation for experiment {experiment_id} \n\n")
+
+                # Ensure an evaluation_events step exists to receive notifications
+                try:
+                    skeleton = {
+                        BudServeWorkflowStepEventName.EVALUATION_EVENTS.value: {
+                            "steps": [
+                                {"id": "verify_cluster_connection", "title": "Verify Cluster Connection"},
+                                {"id": "deploy_eval_job", "title": "Deploy Evaluation Job"},
+                                {"id": "monitor_eval_job_progress", "title": "Monitor Evaluation Job"},
+                            ]
+                        }
+                    }
+                    await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+                        workflow_id=workflow.id,
+                        step_number=request.step_number + 1,
+                        data=skeleton,
+                    )
+                except Exception:
+                    logger.exception("Failed to initialize evaluation_events step skeleton for workflow %s", workflow.id)
+
                 await self._trigger_evaluations_for_experiment_and_get_response(experiment_id)
 
             # Return unified workflow response matching cluster creation
@@ -2643,6 +2664,9 @@ class EvaluationWorkflowService:
                 "extra_args": {},
                 "datasets": ["demo_gsm8k_chat_gen"],  # all_datasets,
                 "kubeconfig": "",  # TODO: Get actual kubeconfig
+                # Ensure budeval knows how to route notifications back to budapp
+                "source": app_settings.source_topic,
+                "source_topic": app_settings.source_topic,
             }
 
             # Update all runs status to running
