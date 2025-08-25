@@ -80,24 +80,36 @@ jobs:
       - name: Set up environment
         run: |
           cp .env.sample .env
-          # Update test database connection
+
+          # Database configuration
           sed -i 's/PSQL_HOST=.*/PSQL_HOST=0.0.0.0/' .env
           sed -i 's/PSQL_DB_NAME=.*/PSQL_DB_NAME=bud_prompt_test/' .env
+          # Add PSQL_USER and PSQL_PASSWORD (required by PostgreSQL container)
+          echo "PSQL_USER=postgres" >> .env
+          echo "PSQL_PASSWORD=postgres" >> .env
+
+          # Redis configuration
           sed -i 's/REDIS_HOST=.*/REDIS_HOST=0.0.0.0/' .env
-
-          # Fix Redis URI format
           sed -i 's/SECRETS_REDIS_URI=.*/SECRETS_REDIS_URI=0.0.0.0:6379/' .env
+          sed -i 's/SECRETS_REDIS_PASSWORD=.*/SECRETS_REDIS_PASSWORD=redis_test_password/' .env
+          # Add REDIS_PORT (required by docker-compose)
+          echo "REDIS_PORT=6379" >> .env
 
-          # Set Gateway URL for testing
-          sed -i 's|BUD_GATEWAY_BASE_URL=.*|BUD_GATEWAY_BASE_URL=http://20.66.97.208/v1|' .env
-          sed -i 's|BUD_DEFAULT_MODEL_NAME=.*|BUD_DEFAULT_MODEL_NAME=qwen3-32b|' .env
-
-          # Set required secrets for testing
+          # Database secrets (used by application)
           sed -i 's/SECRETS_PSQL_USER=.*/SECRETS_PSQL_USER=postgres/' .env
           sed -i 's/SECRETS_PSQL_PASSWORD=.*/SECRETS_PSQL_PASSWORD=postgres/' .env
 
+          # Dapr configuration
+          sed -i 's/DAPR_API_TOKEN=.*/DAPR_API_TOKEN=test_token/' .env
+
+          # Gateway configuration
+          sed -i 's|BUD_GATEWAY_BASE_URL=.*|BUD_GATEWAY_BASE_URL=http://20.66.97.208/v1|' .env
+          sed -i 's|BUD_DEFAULT_MODEL_NAME=.*|BUD_DEFAULT_MODEL_NAME=qwen3-32b|' .env
+
           # Show environment file for debugging (without sensitive data)
           echo "Environment file setup complete"
+          echo "Key variables set:"
+          grep -E "^(APP_NAME|PSQL_DB_NAME|REDIS_PORT|PSQL_USER)=" .env
 
       - name: Start services with Docker Compose
         run: |
