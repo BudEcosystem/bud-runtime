@@ -132,7 +132,12 @@ jobs:
       - name: Run tests with coverage
         run: |
           echo "::group::Running pytest with coverage"
+          # Install pytest-cov inside the container first
+          echo "Installing pytest-cov in container..."
+          docker exec budserve-development-budprompt pip install pytest-cov
+
           # Run tests inside the Docker container
+          echo "Running tests..."
           docker exec budserve-development-budprompt pytest tests/ \
             --cov=budprompt \
             --cov-report=xml \
@@ -142,8 +147,8 @@ jobs:
             -x
 
           # Copy coverage reports from container to host
-          docker cp budserve-development-budprompt:/app/coverage.xml ./coverage.xml
-          docker cp budserve-development-budprompt:/app/htmlcov ./htmlcov
+          docker cp budserve-development-budprompt:/app/coverage.xml ./coverage.xml || true
+          docker cp budserve-development-budprompt:/app/htmlcov ./htmlcov || true
           echo "::endgroup::"
 
       - name: Stop services
