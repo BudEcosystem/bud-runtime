@@ -59,6 +59,9 @@ async def get_session() -> AsyncGenerator[Session, None]:
     session = SessionLocal()
     try:
         yield session
+    except Exception:
+        session.rollback()  # Rollback any uncommitted changes on exception
+        raise
     finally:
         session.close()
 
