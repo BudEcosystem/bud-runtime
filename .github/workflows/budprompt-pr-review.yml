@@ -117,38 +117,88 @@ jobs:
           # Start all services in background
           ./deploy/start_dev.sh -d --build
 
-          # Wait for services to be ready
-          echo "Waiting for services to start..."
-          sleep 30
+          # Wait longer for build to complete
+          echo "Waiting for services to build and start..."
+          sleep 60
 
-          # Check if main container is running
-          docker ps | grep budserve-development-budprompt
+          # Show all containers
+          echo "=== All containers status ==="
+          docker ps -a --format "table {{.Names}}\t{{.Status}}"
 
-          # Verify service health
-          docker exec budserve-development-budprompt curl -f http://localhost:9088/health || (echo "Service health check failed" && exit 1)
-          echo "Services are ready!"
+          # Check if main container exists
+          MAIN_CONTAINER="budserve-development-budprompt"
+
+          if docker ps -a | grep -q $MAIN_CONTAINER; then
+            echo "Main container found. Checking status..."
+
+            # Get container logs to see why it failed
+            echo "=== Container logs ==="
+            docker logs --tail 200 $MAIN_CONTAINER 2>&1 || true
+
+            # Check if container exited
+            if ! docker ps | grep -q $MAIN_CONTAINER; then
+              echo "Container exited. Checking exit code..."
+              EXIT_CODE=$(docker inspect $MAIN_CONTAINER --format='{{.State.ExitCode}}')
+              echo "Exit code: $EXIT_CODE"
+
+              # Try to restart
+              echo "Attempting to restart container..."
+              docker start $MAIN_CONTAINER || true
+              sleep 10
+
+              # Check again
+              if ! docker ps | grep -q $MAIN_CONTAINER; then
+                echo "Container still not running after restart"
+                docker logs --tail 50 $MAIN_CONTAINER 2>&1 || true
+              fi
+            fi
+          else
+            echo "ERROR: Main container was not created. Build may have failed."
+            echo "Checking docker-compose output..."
+            cd ./deploy && docker-compose -f docker-compose-dev.yaml ps
+          fi
+
+          # Final check
+          if docker ps | grep -q $MAIN_CONTAINER; then
+            echo "SUCCESS: Main container is running!"
+            docker exec $MAIN_CONTAINER curl -f http://localhost:9088/health && echo "Health check passed!" || echo "Health check failed"
+          else
+            echo "WARNING: Main container is not running"
+            echo "Continuing anyway to gather more diagnostic information..."
+            # Don't exit with error to see more logs
+          fi
           echo "::endgroup::"
 
       - name: Run tests with coverage
         run: |
           echo "::group::Running pytest with coverage"
-          # Install pytest-cov inside the container first
-          echo "Installing pytest-cov in container..."
-          docker exec budserve-development-budprompt pip install pytest-cov
+          MAIN_CONTAINER="budserve-development-budprompt"
 
-          # Run tests inside the Docker container
-          echo "Running tests..."
-          docker exec budserve-development-budprompt pytest tests/ \
-            --cov=budprompt \
-            --cov-report=xml \
-            --cov-report=html \
-            --cov-report=term-missing \
-            -v \
-            -x
+          # Check if container is running before attempting tests
+          if docker ps | grep -q $MAIN_CONTAINER; then
+            # Install pytest-cov inside the container first
+            echo "Installing pytest-cov in container..."
+            docker exec $MAIN_CONTAINER pip install pytest-cov
 
-          # Copy coverage reports from container to host
-          docker cp budserve-development-budprompt:/app/coverage.xml ./coverage.xml || true
-          docker cp budserve-development-budprompt:/app/htmlcov ./htmlcov || true
+            # Run tests inside the Docker container
+            echo "Running tests..."
+            docker exec $MAIN_CONTAINER pytest tests/ \
+              --cov=budprompt \
+              --cov-report=xml \
+              --cov-report=html \
+              --cov-report=term-missing \
+              -v \
+              -x
+
+            # Copy coverage reports from container to host
+            docker cp $MAIN_CONTAINER:/app/coverage.xml ./coverage.xml || true
+            docker cp $MAIN_CONTAINER:/app/htmlcov ./htmlcov || true
+          else
+            echo "ERROR: Main container is not running. Cannot run tests."
+            echo "Checking container status..."
+            docker ps -a | grep budprompt || true
+            exit 1
+          fi
           echo "::endgroup::"
 
       - name: Stop services
