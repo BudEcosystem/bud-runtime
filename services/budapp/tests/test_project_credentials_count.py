@@ -79,6 +79,12 @@ class TestProjectCredentialsCount:
         mock_project.id = uuid4()
         mock_project.name = "Test Project"
         mock_project.project_type = ProjectTypeEnum.CLIENT_APP.value
+        mock_project.description = "Test description"
+        mock_project.tags = []
+        mock_project.icon = "icon.png"
+        mock_project.created_by = uuid4()
+        mock_project.created_at = datetime.now(timezone.utc)
+        mock_project.modified_at = datetime.now(timezone.utc)
 
         # Mock the execute_all to return project with counts
         # The query returns: Project, user_count, profile_colors, endpoint_count, credential_count
@@ -117,6 +123,12 @@ class TestProjectCredentialsCount:
         mock_project.id = uuid4()
         mock_project.name = "Participated Project"
         mock_project.project_type = ProjectTypeEnum.CLIENT_APP.value
+        mock_project.description = "Test description"
+        mock_project.tags = []
+        mock_project.icon = "icon.png"
+        mock_project.created_by = uuid4()
+        mock_project.created_at = datetime.now(timezone.utc)
+        mock_project.modified_at = datetime.now(timezone.utc)
 
         # Mock the execute_all to return project with counts
         mock_result = [
@@ -221,6 +233,12 @@ class TestProjectCredentialsCount:
         mock_project.id = uuid4()
         mock_project.name = "Searchable Project"
         mock_project.project_type = ProjectTypeEnum.CLIENT_APP.value
+        mock_project.description = "Test searchable description"
+        mock_project.tags = []
+        mock_project.icon = "search-icon.png"
+        mock_project.created_by = uuid4()
+        mock_project.created_at = datetime.now(timezone.utc)
+        mock_project.modified_at = datetime.now(timezone.utc)
 
         # Mock search result with credentials_count
         mock_result = [
@@ -278,6 +296,12 @@ class TestProjectCredentialsCount:
         mock_project.id = uuid4()
         mock_project.name = "Client App Project"
         mock_project.project_type = ProjectTypeEnum.CLIENT_APP.value
+        mock_project.description = "Test description"
+        mock_project.tags = []
+        mock_project.icon = "icon.png"
+        mock_project.created_by = uuid4()
+        mock_project.created_at = datetime.now(timezone.utc)
+        mock_project.modified_at = datetime.now(timezone.utc)
 
         mock_crud_result = [
             (mock_project, 2, "blue", 3, 5),  # 5 credentials for CLIENT_APP
@@ -314,6 +338,12 @@ class TestProjectCredentialsCount:
         mock_project.id = uuid4()
         mock_project.name = "Admin App Project"
         mock_project.project_type = ProjectTypeEnum.ADMIN_APP.value
+        mock_project.description = "Test admin description"
+        mock_project.tags = []
+        mock_project.icon = "admin-icon.png"
+        mock_project.created_by = uuid4()
+        mock_project.created_at = datetime.now(timezone.utc)
+        mock_project.modified_at = datetime.now(timezone.utc)
 
         # Admin apps typically don't have credentials, but the field should still be present
         mock_crud_result = [
