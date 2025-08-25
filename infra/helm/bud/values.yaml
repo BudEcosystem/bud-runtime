@@ -274,6 +274,12 @@ clickhouseExtra:
         - budeval
 postgresql:
     enabled: true
+    primary:
+        resources:
+            requests:
+                memory: 256Mi
+            limits:
+                memory: 512Mi
     architecture: standalone
     auth:
         postgresPassword: bud
@@ -307,12 +313,11 @@ kafka:
     enabled: true
     clusterId: bud
     controller:
-        replicaCount: 1
         resources:
             requests:
-                memory: 768Mi
-            limits:
                 memory: 1024Mi
+            limits:
+                memory: 2048Mi
     tls:
         existingSecret: kafka-jks
         keystorePassword: jksPassword
@@ -356,9 +361,9 @@ minio:
     enabled: true
     resources:
         requests:
-            memory: 384Mi
-        limits:
             memory: 512Mi
+        limits:
+            memory: 1024Mi
     provisioning:
         enabled: true
         buckets:
