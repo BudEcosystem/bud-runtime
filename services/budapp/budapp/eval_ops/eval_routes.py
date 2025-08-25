@@ -17,7 +17,6 @@ from budapp.eval_ops.schemas import (
     DeleteRunResponse,
     EvaluationWorkflowResponse,
     EvaluationWorkflowStepRequest,
-    ExperimentWorkflowResponse,
     ExperimentWorkflowStepRequest,
     GetDatasetResponse,
     GetExperimentResponse,
@@ -32,7 +31,9 @@ from budapp.eval_ops.schemas import (
     UpdateRunRequest,
     UpdateRunResponse,
 )
+from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.eval_ops.services import EvaluationWorkflowService, ExperimentService, ExperimentWorkflowService
+from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.user_ops.models import User
 
 
@@ -335,7 +336,8 @@ def delete_experiment(
 
 @router.post(
     "/workflow",
-    response_model=ExperimentWorkflowResponse,
+    response_model=RetrieveWorkflowDataResponse,
+    response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
     responses={
         status.HTTP_400_BAD_REQUEST: {"model": ErrorResponse},
@@ -390,7 +392,8 @@ async def experiment_workflow_step(
 
 @router.get(
     "/workflow/{workflow_id}",
-    response_model=ExperimentWorkflowResponse,
+    response_model=RetrieveWorkflowDataResponse,
+    response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
     responses={
         status.HTTP_400_BAD_REQUEST: {"model": ErrorResponse},
@@ -709,7 +712,8 @@ def get_dataset_by_id(
 
 @router.post(
     "/{experiment_id}/evaluations/workflow",
-    response_model=EvaluationWorkflowResponse,
+    response_model=RetrieveWorkflowDataResponse,
+    response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
     responses={
         status.HTTP_400_BAD_REQUEST: {"model": ErrorResponse},
@@ -774,7 +778,8 @@ async def evaluation_workflow_step(
 
 @router.get(
     "/{experiment_id}/evaluations/workflow/{workflow_id}",
-    response_model=EvaluationWorkflowResponse,
+    response_model=RetrieveWorkflowDataResponse,
+    response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
     responses={
         status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},

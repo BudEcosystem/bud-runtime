@@ -65,6 +65,7 @@ from budapp.eval_ops.schemas import (
 from budapp.model_ops.models import Model as ModelTable
 from budapp.workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
 from budapp.workflow_ops.models import Workflow as WorkflowModel
+from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.workflow_ops.models import WorkflowStatusEnum
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 
@@ -1272,7 +1273,7 @@ class ExperimentWorkflowService:
 
     async def process_experiment_workflow_step(
         self, request: ExperimentWorkflowStepRequest, current_user_id: uuid.UUID
-    ) -> ExperimentWorkflowResponse:
+    ) -> "RetrieveWorkflowDataResponse":
         """Process a step in the experiment creation workflow.
 
         Parameters:
@@ -1351,34 +1352,13 @@ class ExperimentWorkflowService:
                 # if experiment_id:
                 #     await self._call_eval_workflow(experiment_id)
 
-            # After storing the workflow step, retrieve all accumulated data
-            all_step_data = await self._get_accumulated_step_data(workflow.id)
+            # We now rely on unified workflow retrieval output; skip assembling local data
+            _ = await self._get_accumulated_step_data(workflow.id)
 
-            # Determine if workflow is complete
-            is_complete = (
-                request.step_number == 5 and request.trigger_workflow
-            ) or workflow.status == WorkflowStatusEnum.COMPLETED.value
-            next_step = None if is_complete else request.step_number + 1
+            from budapp.workflow_ops.services import WorkflowService as GenericWorkflowService
 
-            # Prepare next step data only if not complete
-            next_step_data = None
-            if not is_complete and next_step is not None:
-                next_step_data = await self._prepare_next_step_data(next_step, current_user_id)
-
-            return ExperimentWorkflowResponse(
-                code=status.HTTP_200_OK,
-                object="experiment.workflow.step",
-                message=f"Step {request.step_number} completed successfully",
-                workflow_id=workflow.id,
-                current_step=request.step_number,
-                total_steps=request.workflow_total_steps,
-                next_step=next_step,
-                is_complete=is_complete,
-                status=workflow.status,
-                experiment_id=experiment_id,
-                data=all_step_data,
-                next_step_data=next_step_data,
-            )
+            # Return unified workflow response matching cluster creation
+            return await GenericWorkflowService(self.session).retrieve_workflow_data(workflow.id)
 
         except HTTPException:
             raise
@@ -1711,7 +1691,7 @@ class ExperimentWorkflowService:
 
     async def get_experiment_workflow_data(
         self, workflow_id: uuid.UUID, current_user_id: uuid.UUID
-    ) -> ExperimentWorkflowResponse:
+    ) -> "RetrieveWorkflowDataResponse":
         """Get complete experiment workflow data for review.
 
         Parameters:
@@ -1742,20 +1722,10 @@ class ExperimentWorkflowService:
             if not is_complete:
                 next_step_data = await self._prepare_next_step_data(workflow.current_step + 1, current_user_id)
 
-            return ExperimentWorkflowResponse(
-                code=status.HTTP_200_OK,
-                object="experiment.workflow.review",
-                message="Workflow data retrieved successfully",
-                workflow_id=workflow.id,
-                current_step=workflow.current_step,
-                total_steps=5,
-                next_step=next_step,
-                is_complete=is_complete,
-                status=workflow.status,
-                experiment_id=None,  # Will be populated when workflow is complete
-                data=all_step_data,
-                next_step_data=next_step_data,
-            )
+            from budapp.workflow_ops.services import WorkflowService as GenericWorkflowService
+
+            # Return unified workflow response matching cluster creation
+            return await GenericWorkflowService(self.session).retrieve_workflow_data(workflow.id)
 
         except Exception as e:
             logger.error(f"Failed to get experiment workflow data: {e}")
@@ -1775,7 +1745,7 @@ class EvaluationWorkflowService:
 
     async def process_evaluation_workflow_step(
         self, experiment_id: uuid.UUID, request: EvaluationWorkflowStepRequest, current_user_id: uuid.UUID
-    ) -> Union[EvaluationWorkflowResponse, WorkflowMetadataResponse]:
+    ) -> RetrieveWorkflowDataResponse:
         """Process a step in the evaluation creation workflow.
 
         Parameters:
@@ -1784,13 +1754,12 @@ class EvaluationWorkflowService:
             current_user_id (uuid.UUID): Current user ID for authorization.
 
         Returns:
-            Union[EvaluationWorkflowResponse, WorkflowMetadataResponse]: EvaluationWorkflowResponse for steps 1-4,
-                WorkflowMetadataResponse when trigger_workflow=true at step 5.
+            RetrieveWorkflowDataResponse: Unified workflow response for all steps
 
         Raises:
             HTTPException: If validation fails or workflow errors occur.
         """
-        from budapp.eval_ops.schemas import EvaluationWorkflowResponse
+        from budapp.workflow_ops.services import WorkflowService as GenericWorkflowService
 
         try:
             # Verify experiment exists and user has access
@@ -1885,27 +1854,12 @@ class EvaluationWorkflowService:
 
             # Trigger budeval evaluation if this is the final step
             if request.step_number == 5 and request.trigger_workflow:
-                # Get the WorkflowMetadataResponse from BudEval and return it
                 logger.info("*" * 10)
                 logger.info(f"\n\nTriggering budeval evaluation for experiment {experiment_id} \n\n")
+                await self._trigger_evaluations_for_experiment_and_get_response(experiment_id)
 
-                budeval_response = await self._trigger_evaluations_for_experiment_and_get_response(experiment_id)
-                if budeval_response:
-                    return budeval_response
-
-            return EvaluationWorkflowResponse(
-                code=status.HTTP_200_OK,
-                object="evaluation.workflow.step",
-                message="Workflow step processed successfully",
-                workflow_id=workflow.id,
-                current_step=request.step_number,
-                total_steps=request.workflow_total_steps,
-                is_complete=is_complete,
-                next_step=next_step,
-                next_step_data=next_step_data,
-                status=workflow.status,
-                runs_created=runs_created,
-            )
+            # Return unified workflow response matching cluster creation
+            return await GenericWorkflowService(self.session).retrieve_workflow_data(workflow.id)
 
         except HTTPException:
             raise
@@ -2331,7 +2285,7 @@ class EvaluationWorkflowService:
 
     async def get_evaluation_workflow_data(
         self, experiment_id: uuid.UUID, workflow_id: uuid.UUID, current_user_id: uuid.UUID
-    ) -> EvaluationWorkflowResponse:
+    ) -> RetrieveWorkflowDataResponse:
         """Get complete evaluation workflow data for review.
 
         Parameters:
@@ -2340,9 +2294,9 @@ class EvaluationWorkflowService:
             current_user_id (uuid.UUID): Current user ID for authorization.
 
         Returns:
-            EvaluationWorkflowResponse: Complete workflow data response.
+            RetrieveWorkflowDataResponse: Complete workflow data response.
         """
-        from budapp.eval_ops.schemas import EvaluationWorkflowResponse
+        from budapp.workflow_ops.services import WorkflowService as GenericWorkflowService
 
         try:
             # Verify experiment exists and user has access
@@ -2366,32 +2320,8 @@ class EvaluationWorkflowService:
                     status_code=status.HTTP_403_FORBIDDEN, detail="Workflow does not belong to this experiment"
                 )
 
-            # Get all accumulated step data
-            all_step_data = await self._get_accumulated_step_data(workflow_id)
-
-            # Determine completion state
-            is_complete = workflow.status == WorkflowStatusEnum.COMPLETED.value
-            next_step = None if is_complete else workflow.current_step + 1
-
-            # Prepare next step data if not complete
-            next_step_data = None
-            if not is_complete and next_step and next_step <= 5:
-                next_step_data = await self._get_next_step_data(next_step, all_step_data, experiment_id)
-
-            return EvaluationWorkflowResponse(
-                code=status.HTTP_200_OK,
-                object="evaluation.workflow.get",
-                message="Workflow data retrieved successfully",
-                workflow_id=workflow.id,
-                current_step=workflow.current_step,
-                total_steps=5,
-                next_step=next_step,
-                is_complete=is_complete,
-                status=workflow.status,
-                runs_created=None,
-                data=all_step_data,
-                next_step_data=next_step_data,
-            )
+            # Return unified workflow response
+            return await GenericWorkflowService(self.session).retrieve_workflow_data(workflow.id)
 
         except HTTPException:
             raise
