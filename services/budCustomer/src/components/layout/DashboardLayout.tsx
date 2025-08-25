@@ -86,7 +86,7 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
       label: "Models",
       route: "/models",
       icon: "/icons/modelRepo.png",
-      iconWhite: "/icons/modelRepoWhite.png",
+      iconWhite: "/icons/modelsLight.png",
       shortcut: "0",
     },
     {
@@ -99,29 +99,29 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
     {
       label: "Batches",
       route: "/batches",
-      icon: "/icons/batches.svg",
-      iconWhite: "/icons/batchesWhite.svg",
+      icon: "/icons/batchesDark.png",
+      iconWhite: "/icons/batchesLight.png",
       shortcut: "2",
     },
     {
       label: "Logs",
       route: "/logs",
-      icon: "/icons/logs.svg",
-      iconWhite: "/icons/logsWhite.svg",
+      icon: "/icons/logsDark.png",
+      iconWhite: "/icons/logsLight.png",
       shortcut: "3",
     },
     {
       label: "Usage & Billing",
       route: "/usage",
-      icon: "/icons/billing.svg",
-      iconWhite: "/icons/billingWhite.svg",
+      icon: "/icons/billingDark.png",
+      iconWhite: "/icons/billingWhite.png",
       shortcut: "4",
     },
     {
       label: "Audit",
       route: "/audit",
-      icon: "/icons/logs.svg", // Using logs icon as fallback
-      iconWhite: "/icons/logsWhite.svg",
+      icon: "/icons/auditDark.png", // Using logs icon as fallback
+      iconWhite: "/icons/auditLight.png",
       shortcut: "5",
     },
     {
