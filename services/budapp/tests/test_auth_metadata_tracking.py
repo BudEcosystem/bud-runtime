@@ -1,5 +1,6 @@
 """Tests for authentication metadata tracking in Redis cache."""
 
+import hashlib
 import json
 import uuid
 from datetime import datetime, timedelta
@@ -9,6 +10,11 @@ import pytest
 from fastapi import HTTPException
 
 from budapp.credential_ops.services import CredentialService
+
+
+def hash_api_key(api_key: str) -> str:
+    """Helper function to hash API key in the same way as the application."""
+    return hashlib.sha256(f"bud-{api_key}".encode()).hexdigest()
 
 
 @pytest.mark.asyncio
@@ -28,7 +34,7 @@ async def test_update_proxy_cache_with_metadata_single_key():
     mock_credential = MagicMock()
     mock_credential.id = credential_id
     mock_credential.user_id = user_id
-    mock_credential.key = api_key
+    mock_credential.encrypted_key = "encrypted_test_key"  # Use encrypted_key instead of key
     mock_credential.expiry = expiry
 
     # Mock the credential data manager
@@ -60,8 +66,9 @@ async def test_update_proxy_cache_with_metadata_single_key():
                     cache_data_json = call_args[0][1]
                     cache_data = json.loads(cache_data_json)
 
-                    # Verify Redis key format
-                    assert redis_key == f"api_key:{api_key}"
+                    # Verify Redis key format - should be hashed now
+                    expected_hashed_key = hash_api_key(api_key)
+                    assert redis_key == f"api_key:{expected_hashed_key}"
 
                     # Verify metadata is present
                     assert "__metadata__" in cache_data
@@ -88,7 +95,7 @@ async def test_update_proxy_cache_with_metadata_all_keys():
         mock_credential = MagicMock()
         mock_credential.id = uuid.uuid4()
         mock_credential.user_id = uuid.uuid4()
-        mock_credential.key = f"api-key-{i}"
+        # mock_credential.key = f"api-key-{i}"  # Removed as key field doesn't exist
         mock_credential.encrypted_key = "48656c6c6f20576f726c64"  # Hex encoded string
         mock_credential.expiry = datetime.now() + timedelta(days=30)
         credentials.append(mock_credential)
@@ -205,7 +212,7 @@ async def test_update_proxy_cache_backward_compatibility():
     mock_credential = MagicMock()
     mock_credential.id = uuid.uuid4()
     mock_credential.user_id = uuid.uuid4()
-    mock_credential.key = api_key
+    mock_credential.encrypted_key = "encrypted_test_key"  # Use encrypted_key instead of key
     mock_credential.expiry = None
 
     # Mock endpoint

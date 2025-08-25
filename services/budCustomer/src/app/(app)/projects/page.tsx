@@ -1,9 +1,10 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Button, Card, Row, Col, Flex, Input, Dropdown } from "antd";
+import { Card, Row, Col, Flex, Input, Dropdown, Button, Spin } from "antd";
 import { Typography } from "antd";
 import { PlusOutlined, MoreOutlined } from "@ant-design/icons";
+import { PrimaryButton } from "@/components/ui/button";
 import { Icon } from "@iconify/react/dist/iconify.js";
 import dayjs from "dayjs";
 import { type Project as ContextProject } from "@/context/projectContext";
@@ -12,6 +13,121 @@ import { useDrawer } from "@/hooks/useDrawer";
 import BudDrawer from "@/components/ui/bud/drawer/BudDrawer";
 
 const { Text, Title } = Typography;
+
+// Separate component for project card to prevent re-renders
+const ProjectCard = React.memo(({
+  project,
+  onDelete,
+  onEdit,
+  onClick
+}: {
+  project: ContextProject;
+  onDelete: (project: ContextProject) => void;
+  onEdit: (project: ContextProject) => void;
+  onClick: (project: ContextProject) => void;
+}) => {
+  // Handle menu item clicks
+  const handleMenuClick = useCallback((e: any) => {
+    e.domEvent?.stopPropagation?.();
+
+    switch (e.key) {
+      case 'edit':
+        onEdit(project);
+        break;
+      case 'delete':
+        onDelete(project);
+        break;
+    }
+  }, [project, onEdit, onDelete]);
+
+  // Static menu items without onClick handlers
+  const menuItems = useMemo(() => [
+    {
+      key: "edit",
+      label: "Edit",
+      icon: <Icon icon="ph:pencil-simple" className="text-bud-text-primary" />,
+      className: "hover:!bg-bud-bg-tertiary",
+    },
+    {
+      key: "delete",
+      label: "Delete",
+      icon: <Icon icon="ph:trash" className="text-bud-error" />,
+      danger: true,
+      className: "hover:!bg-bud-bg-tertiary text-bud-error",
+    },
+  ], []);
+
+  return (
+    <Card
+      className="h-full bg-bud-bg-secondary border-bud-border hover:border-bud-purple hover:shadow-lg transition-all duration-300 cursor-pointer overflow-hidden"
+      styles={{ body: { padding: 0 } }}
+      onClick={() => onClick(project)}
+    >
+      <div className="p-6 mb-20">
+        {/* Header with Icon and Actions */}
+        <div className="flex items-start justify-between mb-6">
+          <div
+            className="w-12 h-12 rounded-lg flex items-center justify-center"
+            style={{ backgroundColor: project.color }}
+          >
+            <Icon
+              icon="ph:folder"
+              className="text-white text-[1.5rem]"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Text className="text-bud-text-disabled text-[12px]">
+              {dayjs(project.updated_at).format("DD MMM")}
+            </Text>
+            <Dropdown
+              menu={{
+                items: menuItems,
+                onClick: handleMenuClick,
+                className: "!bg-bud-bg-secondary !border-bud-border",
+              }}
+              trigger={["click"]}
+              placement="bottomRight"
+              overlayClassName="bud-dropdown-menu"
+            >
+              <Button
+                type="text"
+                icon={<MoreOutlined />}
+                className="!text-bud-text-disabled hover:!text-bud-text-primary hover:!bg-bud-bg-tertiary transition-all"
+                size="small"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </Dropdown>
+          </div>
+        </div>
+
+        {/* Project Title */}
+        <Text className="text-bud-text-primary text-[19px] font-semibold mb-3 line-clamp-1 block">
+          {project.name}
+        </Text>
+
+        {/* Description */}
+        <Text className="text-bud-text-muted text-[13px] mb-6 line-clamp-2 leading-relaxed block">
+          {project.description}
+        </Text>
+      </div>
+
+      {/* Footer Section */}
+      <div className="bg-bud-bg-tertiary px-6 py-4 border-t border-bud-border absolute bottom-0 left-0 w-full">
+        <div className="flex items-center gap-2">
+          <Icon
+            icon="ph:key"
+            className="text-bud-text-disabled text-sm"
+          />
+          <Text className="text-bud-text-primary text-[13px]">
+            {project.resources?.api_keys || 0} API Keys
+          </Text>
+        </div>
+      </div>
+    </Card>
+  );
+});
+
+ProjectCard.displayName = "ProjectCard";
 
 export default function ProjectsPage() {
   const { globalProjects, getGlobalProjects, loading, getGlobalProject } =
@@ -52,7 +168,7 @@ export default function ProjectsPage() {
       project_type: projectData.project_type,
       status: "active" as const,
       resources: {
-        api_keys: p.endpoints_count || 0,
+        api_keys: p.credentials_count || 0,
         batches: 0,
         logs: 0,
         models: 0,
@@ -65,7 +181,7 @@ export default function ProjectsPage() {
     openDrawer("new-project", {});
   };
 
-  const handleEditProject = (project: ContextProject) => {
+  const handleEditProject = useCallback(async (project: ContextProject) => {
     try {
       // Fetch the full project data from API
       const projectData = globalProjects.find(
@@ -73,16 +189,31 @@ export default function ProjectsPage() {
       );
       if (projectData) {
         // Set the selected project for editing
-        getGlobalProject(project.id);
-        // Open the edit drawer
-        openDrawer("edit-project", {});
+        await getGlobalProject(project.id);
+        // Open the edit drawer after project is fetched
+        setTimeout(() => {
+          openDrawer("edit-project", {});
+        }, 100);
       }
     } catch (error) {
       console.error("Failed to open edit project:", error);
     }
-  };
+  }, [globalProjects, getGlobalProject, openDrawer]);
 
-  const handleDeleteProject = (project: ContextProject) => {
+  const handleProjectClick = useCallback(async (project: ContextProject) => {
+    try {
+      // Set the selected project for viewing details
+      await getGlobalProject(project.id);
+      // Open the view drawer after project is fetched
+      setTimeout(() => {
+        openDrawer("view-project-details", {});
+      }, 100);
+    } catch (error) {
+      console.error("Failed to open project details:", error);
+    }
+  }, [getGlobalProject, openDrawer]);
+
+  const handleDeleteProject = useCallback(async (project: ContextProject) => {
     try {
       // Fetch the full project data from API
       const projectData = globalProjects.find(
@@ -90,32 +221,16 @@ export default function ProjectsPage() {
       );
       if (projectData) {
         // Set the selected project for deletion
-        getGlobalProject(project.id);
-        // Open the delete drawer
-        openDrawer("delete-project", {});
+        await getGlobalProject(project.id);
+        // Open the delete drawer after project is fetched
+        setTimeout(() => {
+          openDrawer("delete-project", {});
+        }, 100);
       }
     } catch (error) {
       console.error("Failed to open delete project:", error);
     }
-  };
-
-  const getProjectMenuItems = (project: ContextProject) => [
-    {
-      key: "edit",
-      label: <span className="text-bud-text-primary">Edit Project</span>,
-      icon: <Icon icon="ph:pencil" className="text-bud-text-primary" />,
-      onClick: () => handleEditProject(project),
-      className: "hover:!bg-bud-bg-tertiary",
-    },
-    {
-      key: "delete",
-      label: <span className="text-bud-error">Delete</span>,
-      icon: <Icon icon="ph:trash" className="text-bud-error" />,
-      danger: true,
-      onClick: () => handleDeleteProject(project),
-      className: "hover:!bg-bud-bg-tertiary",
-    },
-  ];
+  }, [globalProjects, getGlobalProject, openDrawer]);
 
   // Filter to only show active projects or all if status is not available
   const activeProjects = projects.filter(
@@ -153,104 +268,42 @@ export default function ProjectsPage() {
                   />
                 }
               />
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                className="bg-bud-purple border-bud-purple hover:bg-bud-purple-hover h-[2.5rem] px-[1.5rem]"
-                onClick={handleCreateProject}
-              >
-                Project
-              </Button>
+              <PrimaryButton onClick={handleCreateProject}>
+                <PlusOutlined className="mr-2" />
+                <span>Project</span>
+              </PrimaryButton>
             </Flex>
           </Flex>
 
           {/* Loading State */}
           {loading && activeProjects.length === 0 && (
-            <div className="text-center py-16">
-              <Icon
-                icon="ph:spinner"
-                className="text-4xl text-bud-text-disabled mb-4 animate-spin"
-              />
-              <Text className="text-bud-text-muted block">
-                Loading projects...
-              </Text>
+            <div className="flex justify-center items-center h-64">
+              <Spin size="large" />
             </div>
           )}
 
           {/* Projects */}
-          {!loading && activeProjects.length > 0 && (
+          {activeProjects.length > 0 && (
             <div className="mb-[3rem]">
               <Row gutter={[24, 24]}>
                 {activeProjects.map((project) => (
                   <Col key={project.id} xs={24} sm={12} lg={8}>
-                    <Card
-                      className="h-full bg-bud-bg-secondary border-bud-border hover:border-bud-purple hover:shadow-lg transition-all duration-300 cursor-pointer overflow-hidden"
-                      styles={{ body: { padding: 0 } }}
-                    >
-                      <div className="p-6 mb-20">
-                        {/* Header with Icon and Actions */}
-                        <div className="flex items-start justify-between mb-6">
-                          <div
-                            className="w-12 h-12 rounded-lg flex items-center justify-center"
-                            style={{ backgroundColor: project.color }}
-                          >
-                            <Icon
-                              icon="ph:folder"
-                              className="text-white text-[1.5rem]"
-                            />
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Text className="text-bud-text-disabled text-[12px]">
-                              {dayjs(project.updated_at).format("DD MMM")}
-                            </Text>
-                            <Dropdown
-                              menu={{
-                                items: getProjectMenuItems(project),
-                                className:
-                                  "!bg-bud-bg-secondary !border-bud-border",
-                              }}
-                              trigger={["click"]}
-                              placement="bottomRight"
-                              overlayClassName="bud-dropdown-menu"
-                            >
-                              <Button
-                                type="text"
-                                icon={<MoreOutlined />}
-                                className="!text-bud-text-disabled hover:!text-bud-text-primary hover:!bg-bud-bg-tertiary transition-all"
-                                size="small"
-                                onClick={(e) => e.stopPropagation()}
-                              />
-                            </Dropdown>
-                          </div>
-                        </div>
-
-                        {/* Project Title */}
-                        <Text className="text-bud-text-primary text-[19px] font-semibold mb-3 line-clamp-1 block">
-                          {project.name}
-                        </Text>
-
-                        {/* Description */}
-                        <Text className="text-bud-text-muted text-[13px] mb-6 line-clamp-2 leading-relaxed block">
-                          {project.description}
-                        </Text>
-                      </div>
-
-                      {/* Footer Section */}
-                      <div className="bg-bud-bg-tertiary px-6 py-4 border-t border-bud-border absolute bottom-0 left-0 w-full">
-                        <div className="flex items-center gap-2">
-                          <Icon
-                            icon="ph:key"
-                            className="text-bud-text-disabled text-sm"
-                          />
-                          <Text className="text-bud-text-primary text-[13px]">
-                            {project.resources?.api_keys || 0} API Keys
-                          </Text>
-                        </div>
-                      </div>
-                    </Card>
+                    <ProjectCard
+                      project={project}
+                      onDelete={handleDeleteProject}
+                      onEdit={handleEditProject}
+                      onClick={handleProjectClick}
+                    />
                   </Col>
                 ))}
               </Row>
+            </div>
+          )}
+
+          {/* Loading indicator for pagination/search */}
+          {loading && activeProjects.length > 0 && (
+            <div className="flex justify-center items-center py-4">
+              <Spin />
             </div>
           )}
 
@@ -267,14 +320,10 @@ export default function ProjectsPage() {
               <Text className="text-bud-text-muted mb-6 block">
                 Create your first project to start organizing your AI resources
               </Text>
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                className="bg-bud-purple border-bud-purple hover:bg-bud-purple-hover"
-                onClick={handleCreateProject}
-              >
-                Create Your First Project
-              </Button>
+              <PrimaryButton onClick={handleCreateProject}>
+                <PlusOutlined className="mr-2" />
+                <span>Create Your First Project</span>
+              </PrimaryButton>
             </div>
           )}
         </div>

@@ -111,8 +111,122 @@ Required environment variables (see `.env.sample`):
 
 ## Testing Guidelines
 
+### General Testing Practices
 - Tests require Dapr to be running
 - Use async test functions with `pytest.mark.asyncio`
 - Mock external services (Keycloak, MinIO) in tests
 - Test database operations use transactions that rollback after each test
 - Include both positive and negative test cases
+
+### Common Testing Pitfalls to Avoid
+
+#### 1. SQLAlchemy Query Mocking
+**Wrong:**
+```python
+# Old-style mocking that doesn't work with modern SQLAlchemy
+mock_session.query = Mock(return_value=mock_query)
+```
+
+**Correct:**
+```python
+# Mock the DataManagerUtils methods directly
+data_manager.execute_scalar = Mock(return_value=5)  # For count queries
+data_manager.scalars_all = Mock(return_value=[])   # For list queries
+data_manager.scalar_one_or_none = Mock(return_value=record)  # For single record
+```
+
+#### 2. CRUD Method Parameters
+**Wrong:**
+```python
+# Don't pass schema objects to CRUD methods
+audit_data = AuditRecordCreate(...)
+data_manager.create_audit_record(audit_data)
+```
+
+**Correct:**
+```python
+# Pass individual parameters
+data_manager.create_audit_record(
+    action=AuditActionEnum.CREATE,
+    resource_type=AuditResourceTypeEnum.PROJECT,
+    resource_id=resource_id,
+    user_id=user_id,
+    details={"key": "value"},
+)
+```
+
+#### 3. Mock Records for Pydantic Validation
+**Wrong:**
+```python
+# Incomplete mock missing required fields
+record = Mock(spec=AuditTrail)
+record.id = uuid4()
+record.record_hash = "hash"
+# Missing other required fields - will fail Pydantic validation
+```
+
+**Correct:**
+```python
+# Complete mock with ALL required fields
+record = Mock(spec=AuditTrail)
+record.id = uuid4()
+record.user_id = uuid4()
+record.action = "CREATE"
+record.resource_type = "PROJECT"
+record.timestamp = datetime.now(timezone.utc)
+record.record_hash = "a" * 64
+record.created_at = datetime.now(timezone.utc)
+record.details = {}
+record.ip_address = "192.168.1.1"
+# Include all fields that Pydantic schema expects
+```
+
+#### 4. JSON Serialization Format
+**Wrong:**
+```python
+# Don't expect JSON with spaces
+assert result == '{"a": 1, "b": 2}'
+```
+
+**Correct:**
+```python
+# Expect compact JSON format
+assert result == '{"a":1,"b":2}'
+```
+
+#### 5. Boolean Serialization
+**Wrong:**
+```python
+# Don't expect Python string representation
+assert serialize_for_hash(True) == "True"
+```
+
+**Correct:**
+```python
+# Expect JSON format
+assert serialize_for_hash(True) == "true"
+assert serialize_for_hash(False) == "false"
+```
+
+#### 6. Return Structure Keys
+**Wrong:**
+```python
+# Don't assume field names - check the actual implementation
+assert tampered[0]["audit_id"] == str(record_id)
+assert tampered[0]["reason"] == "message"
+```
+
+**Correct:**
+```python
+# Use the actual keys from the service implementation
+assert tampered[0]["id"] == str(record_id)
+assert tampered[0]["verification_message"] == "message"
+```
+
+### Testing Best Practices
+
+1. **Always check the actual implementation** for correct field names and return structures
+2. **Mock at the right level** - DataManagerUtils methods, not session.query
+3. **Create complete mocks** - Include all required fields for Pydantic schemas
+4. **Use consistent serialization** - Compact JSON, lowercase booleans
+5. **Verify return structures** - Check actual service methods for correct keys

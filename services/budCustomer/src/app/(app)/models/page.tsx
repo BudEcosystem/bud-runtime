@@ -17,7 +17,8 @@ import {
 } from "antd";
 import { FilterOutlined } from "@ant-design/icons";
 import { Icon } from "@iconify/react/dist/iconify.js";
-import ModelDetailDrawer from "@/components/ModelDetailDrawer";
+import { useDrawer } from "@/hooks/useDrawer";
+import BudDrawer from "@/components/ui/bud/drawer/BudDrawer";
 const assetBaseUrl = process.env.NEXT_PUBLIC_BASE_URL;
 import {
   Text_13_400_EEEEEE,
@@ -92,8 +93,15 @@ const SelectedFilters = ({
 };
 
 export default function ModelsPage() {
-  const { models, loading, getModelsCatalog, totalModels, totalPages } =
-    useModels();
+  const {
+    models,
+    loading,
+    getModelsCatalog,
+    totalModels,
+    totalPages,
+    setSelectedModel,
+  } = useModels();
+  const { openDrawer } = useDrawer();
 
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(12);
@@ -101,8 +109,6 @@ export default function ModelsPage() {
   const [filter, setFilter] = useState<Filters>(defaultFilter);
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterReset, setFilterReset] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<any>(null);
-  const [drawerVisible, setDrawerVisible] = useState(false);
 
   // Load models with filters
   const load = useCallback(
@@ -223,11 +229,7 @@ export default function ModelsPage() {
 
   const handleModelClick = (model: any) => {
     setSelectedModel(model);
-    setDrawerVisible(true);
-  };
-
-  const handleCloseDrawer = () => {
-    setDrawerVisible(false);
+    openDrawer("view-model", {});
   };
 
   return (
@@ -360,7 +362,10 @@ export default function ModelsPage() {
                               mode="multiple"
                               value={tempFilter.modality}
                               onChange={(value) =>
-                                setTempFilter({ ...tempFilter, modality: value })
+                                setTempFilter({
+                                  ...tempFilter,
+                                  modality: value,
+                                })
                               }
                               options={cloudProviders.map((modality) => ({
                                 label: modality.label,
@@ -399,10 +404,10 @@ export default function ModelsPage() {
         {(filter.modality?.length ||
           filter.model_size_min !== undefined ||
           filter.model_size_max !== undefined) && (
-            <div className="flex-shrink-0">
-              <SelectedFilters filters={filter} removeTag={removeSelectedTag} />
-            </div>
-          )}
+          <div className="flex-shrink-0">
+            <SelectedFilters filters={filter} removeTag={removeSelectedTag} />
+          </div>
+        )}
 
         {/* Models Grid */}
         <div
@@ -417,9 +422,9 @@ export default function ModelsPage() {
             <Empty
               description={
                 filter.name ||
-                  filter.modality?.length ||
-                  filter.model_size_min !== undefined ||
-                  filter.model_size_max !== undefined
+                filter.modality?.length ||
+                filter.model_size_min !== undefined ||
+                filter.model_size_max !== undefined
                   ? `No models found`
                   : "No models available"
               }
@@ -520,15 +525,27 @@ export default function ModelsPage() {
                       {model.pricing ? (
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
-                            <Icon icon="ph:arrow-down" className="text-bud-text-muted text-xs" />
+                            <Icon
+                              icon="ph:arrow-down"
+                              className="text-bud-text-muted text-xs"
+                            />
                             <Text_13_400_EEEEEE>
-                              Input: {model.pricing.input_cost} {model.pricing.currency} / {model.pricing.per_tokens} Tokens
+                              Input:{" "}
+                              {model.pricing.input_cost === 0
+                                ? "Free"
+                                : `${model.pricing.input_cost} ${model.pricing.currency} / ${model.pricing.per_tokens} Tokens`}
                             </Text_13_400_EEEEEE>
                           </div>
                           <div className="flex items-center gap-2">
-                            <Icon icon="ph:arrow-up" className="text-bud-text-muted text-xs" />
+                            <Icon
+                              icon="ph:arrow-up"
+                              className="text-bud-text-muted text-xs"
+                            />
                             <Text_13_400_EEEEEE>
-                              Output: {model.pricing.output_cost} {model.pricing.currency} / {model.pricing.per_tokens} Tokens
+                              Output:{" "}
+                              {model.pricing.output_cost === 0
+                                ? "Free"
+                                : `${model.pricing.output_cost} ${model.pricing.currency} / ${model.pricing.per_tokens} Tokens`}
                             </Text_13_400_EEEEEE>
                           </div>
                         </div>
@@ -552,11 +569,7 @@ export default function ModelsPage() {
       </div>
 
       {/* Model Detail Drawer */}
-      <ModelDetailDrawer
-        visible={drawerVisible}
-        onClose={handleCloseDrawer}
-        model={selectedModel}
-      />
+      <BudDrawer />
     </DashboardLayout>
   );
 }

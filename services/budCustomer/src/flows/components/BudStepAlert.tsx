@@ -1,6 +1,9 @@
 "use client";
 
 import React from "react";
+import AlertIcons from "./AlertIcons";
+import { Text_12_400_757575, Text_14_400_EEEEEE } from "@/components/ui/text";
+import { PrimaryButton, SecondaryButton } from "@/components/ui/button";
 
 interface BudStepAlertProps {
   children?: React.ReactNode;
@@ -26,31 +29,44 @@ const BudStepAlert: React.FC<BudStepAlertProps> = ({
   cancelText = "Cancel",
 }) => {
   return (
-    <div className={`p-4 rounded-lg ${className}`}>
-      {title && <div className="font-semibold text-white mb-2">{title}</div>}
-      {description && <div className="text-gray-300 mb-4">{description}</div>}
-      {children}
-      {(cancelAction || confirmAction) && (
-        <div className="flex gap-2 mt-4">
+    <div className={`p-[1.5rem] rounded-[6px] flex`}>
+      <AlertIcons
+        type={
+          type === "success"
+            ? "success"
+            : type === "warning"
+            ? "warining"
+            : type === "error"
+            ? "failed"
+            : "success" // default fallback
+        }
+      />
+      <div className="ml-[1rem]  w-full">
+        <Text_14_400_EEEEEE>{title}</Text_14_400_EEEEEE>
+        <div className="height-10"></div>
+        <Text_12_400_757575 className="pb-[1.5rem]">{description}</Text_12_400_757575>
+        <div className="flex justify-end items-center w-full gap-[.6rem]">
           {cancelAction && (
-            <button
+            <SecondaryButton
               onClick={cancelAction}
-              className="px-3 py-1 bg-gray-600 text-white rounded text-sm"
+              classNames="!px-[.8rem] tracking-[.02rem]"
             >
               {cancelText}
-            </button>
+            </SecondaryButton>
           )}
           {confirmAction && (
-            <button
+            <PrimaryButton
+              type="submit"
               onClick={confirmAction}
-              className="px-3 py-1 bg-red-600 text-white rounded text-sm"
+              classNames="!px-[.8rem] tracking-[.02rem]"
             >
               {confirmText}
-            </button>
+            </PrimaryButton>
           )}
         </div>
-      )}
+      </div>
     </div>
+
   );
 };
 

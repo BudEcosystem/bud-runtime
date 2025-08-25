@@ -171,11 +171,13 @@ def require_permissions(
                     TenantClient, {"tenant_id": tenant.id}, missing_ok=True
                 )
 
+                # Decrypt client secret for use
+                decrypted_secret = await tenant_client.get_decrypted_client_secret()
                 credentials = TenantClientSchema(
                     id=tenant_client.id,
                     client_id=tenant_client.client_id,
                     client_named_id=tenant_client.client_named_id,
-                    client_secret=tenant_client.client_secret,
+                    client_secret=decrypted_secret,
                 )
                 openid = keycloak_manager.get_keycloak_openid_client(realm_name, credentials)
 

@@ -1,5 +1,5 @@
 "use client";
-import React, { ReactNode, useState } from "react";
+import React, { ReactNode, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Image, Badge, Avatar, Typography } from "antd";
@@ -18,6 +18,7 @@ import { useShortCut } from "@/hooks/useShortCut";
 import ThemeSwitcher from "@/components/ui/ThemeSwitcher";
 import { useTheme } from "@/context/themeContext";
 import { useUser } from "@/stores/useUser";
+import BudIsland from "@/components/island/BudIsland";
 
 const { Text } = Typography;
 
@@ -78,14 +79,14 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   // User context
-  const { user, logout } = useUser();
+  const { user, logout, getUser: fetchUser } = useUser();
 
   const tabs: TabItem[] = [
     {
       label: "Models",
       route: "/models",
       icon: "/icons/modelRepo.png",
-      iconWhite: "/icons/modelRepoWhite.png",
+      iconWhite: "/icons/modelsLight.png",
       shortcut: "0",
     },
     {
@@ -98,29 +99,29 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
     {
       label: "Batches",
       route: "/batches",
-      icon: "/icons/batches.svg",
-      iconWhite: "/icons/batchesWhite.svg",
+      icon: "/icons/batchesDark.png",
+      iconWhite: "/icons/batchesLight.png",
       shortcut: "2",
     },
     {
       label: "Logs",
       route: "/logs",
-      icon: "/icons/logs.svg",
-      iconWhite: "/icons/logsWhite.svg",
+      icon: "/icons/logsDark.png",
+      iconWhite: "/icons/logsLight.png",
       shortcut: "3",
     },
     {
       label: "Usage & Billing",
       route: "/usage",
-      icon: "/icons/billing.svg",
-      iconWhite: "/icons/billingWhite.svg",
+      icon: "/icons/billingDark.png",
+      iconWhite: "/icons/billingWhite.png",
       shortcut: "4",
     },
     {
       label: "Audit",
       route: "/audit",
-      icon: "/icons/logs.svg", // Using logs icon as fallback
-      iconWhite: "/icons/logsWhite.svg",
+      icon: "/icons/auditDark.png", // Using logs icon as fallback
+      iconWhite: "/icons/auditLight.png",
       shortcut: "5",
     },
     {
@@ -144,6 +145,25 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
   const handleLogout = () => {
     logout();
   };
+
+
+  const getUser = async () => {
+    // showLoader();
+    try {
+      const userData: any = await fetchUser();
+      console.log(userData)
+    } catch (error) {
+      console.error("Error  fetching user", error);
+      return router.push("/login");
+    } finally {
+      // hideLoader();
+    }
+  };
+  useEffect(()=> {
+    if(!user?.id) {
+      getUser();
+    }
+  }, [user])
 
   return (
     <div className="flex h-screen bg-bud-bg-primary">
@@ -202,8 +222,9 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
           )} */}
 
           {/* Notifications */}
+        <BudIsland />
 
-            <div className="bg-bud-bg-secondary rounded-lg p-3 mb-1 cursor-pointer hover:bg-bud-bg-tertiary transition-colors">
+            <div className="bg-bud-bg-secondary rounded-lg p-3 mb-1 cursor-pointer hover:bg-bud-bg-tertiary transition-colors hidden">
               <Badge
                 count={88}
                 offset={isCollapsed ? [0, -10] : [50, -10]}

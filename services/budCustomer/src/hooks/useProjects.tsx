@@ -20,6 +20,7 @@ export type Project = {
   project: ProjectData;
   users_count: number;
   endpoints_count: number;
+  credentials_count: number;
   profile_colors: string[];
 };
 
@@ -94,7 +95,7 @@ export const useProjects = create<{
   globalProjects: Project[];
   globalSelectedProject: Project | null;
   getGlobalProjects: (page: any, limit: any, search?: string) => void;
-  getGlobalProject: (projectId: string) => void;
+  getGlobalProject: (projectId: string) => Promise<any>;
 }>((set, get) => ({
   globalProjects: [],
   globalSelectedProject: null,

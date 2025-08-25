@@ -47,7 +47,7 @@ export default function Login() {
         } else {
           hideLoader();
         }
-    }, [handleAdd, hideLoader]);
+    }, [hideLoader]);
     return (
       <div className={`w-full h-screen logginBg box-border relative overflow-hidden ${isLoading ? 'opacity-0' : 'opacity-100'}`}>
         <div className="loginWrap w-full h-full loginBg-glass flex justify-between box-border ">

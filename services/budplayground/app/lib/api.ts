@@ -1,16 +1,31 @@
 import { AppRequest } from "@/app/api/requests";
 
+// Helper function to check if a string looks like a JWT
+const isJWT = (token: string): boolean => {
+  if (!token) return false;
+  const parts = token.split('.');
+  return parts.length === 3;
+};
 
 export const getEndpoints = async (page = 1, limit = 25, apiKey = "", accessKey = "") => {
     const headers: any = {
         'Content-Type': 'application/json'
       };
-      if (apiKey) {
-        headers["api-key"] = apiKey;
+
+      // Check if accessKey is a JWT token
+      if (accessKey && isJWT(accessKey)) {
+        // Use access_key as Bearer token if it's a JWT
+        headers["Authorization"] = `Bearer ${accessKey}`;
+      } else {
+        // Regular API key authentication
+        if (apiKey) {
+          headers["api-key"] = apiKey;
+        }
+        if (accessKey) {
+          headers["access-key"] = accessKey;
+        }
       }
-      if (accessKey) {
-        headers["access-key"] = accessKey;
-      }
+
       try {
         const result = await AppRequest.Post(`api/deployments`, {
           page: page,

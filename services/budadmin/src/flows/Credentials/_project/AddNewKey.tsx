@@ -2,10 +2,9 @@ import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
-import { Text_12_300_EEEEEE } from "@/components/ui/text";
 import React, { useContext, useEffect, useState } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
-import { Input, Image, Form, Select, ConfigProvider } from "antd"; // Added Checkbox import
+import { Input, Image, Form, Select, ConfigProvider } from "antd";
 import CustomPopover from "src/flows/components/customPopover";
 import { tempApiBaseUrl } from "@/components/environment";
 import { axiosInstance } from "src/pages/api/requests";
@@ -20,6 +19,35 @@ function AddKeyForm({ setDisableNext }) {
   const [options, setOptions] = useState([]);
   const [projectData, setProjectData] = useState<any>();
   const { projects, getProjects } = useProjects();
+
+  // Detect if dark mode is active
+  const [isDarkMode, setIsDarkMode] = useState(true);
+
+  useEffect(() => {
+    // Check if dark mode is active by checking if the document has the 'dark' class
+    const checkDarkMode = () => {
+      const hasDarkClass = document.documentElement.classList.contains('dark');
+      setIsDarkMode(hasDarkClass);
+    };
+
+    checkDarkMode();
+
+    // Watch for changes
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
+  // Dynamic styles based on theme
+  const labelBgColor = isDarkMode ? "#101010" : "#ffffff";
+  const labelTextColor = isDarkMode ? "#EEEEEE" : "#1a1a1a";
+  const inputBorderColor = isDarkMode ? "#757575" : "#d0d0d0";
+  const inputHoverBorderColor = isDarkMode ? "#EEEEEE" : "#999999";
+  const inputTextColor = isDarkMode ? "#EEEEEE" : "#1a1a1a";
   async function fetchList(tagname) {
     await axiosInstance(`${tempApiBaseUrl}/models/tags?page=1&limit=1000`).then(
       (result) => {
@@ -57,7 +85,13 @@ function AddKeyForm({ setDisableNext }) {
         className={`flex items-center rounded-[6px] relative !bg-[transparent] w-[100%] mb-[0]`}
       >
         <div className="w-full">
-          <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap">
+          <div
+            className="absolute -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap text-[.75rem] font-[300] px-1"
+            style={{
+              backgroundColor: labelBgColor,
+              color: labelTextColor
+            }}
+          >
             Credential Name
             <CustomPopover title="This is the name">
               <Image
@@ -67,14 +101,14 @@ function AddKeyForm({ setDisableNext }) {
                 style={{ width: ".75rem", height: ".75rem" }}
               />
             </CustomPopover>
-          </Text_12_300_EEEEEE>
+          </div>
         </div>
         <Input
           placeholder="Enter name"
           style={{
             backgroundColor: "transparent",
-            color: "#EEEEEE",
-            border: "0.5px solid #757575",
+            color: inputTextColor,
+            border: `0.5px solid ${inputBorderColor}`,
           }}
           size="large"
           onChange={(e) => {
@@ -95,7 +129,13 @@ function AddKeyForm({ setDisableNext }) {
         className={`flex items-center rounded-[6px] relative !bg-[transparent] w-[100%] mb-[0]`}
       >
         <div className="w-full">
-          <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1">
+          <div
+            className="absolute -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-[.75rem] font-[300] px-1"
+            style={{
+              backgroundColor: labelBgColor,
+              color: labelTextColor
+            }}
+          >
             Project
             {/* <span className="text-[red] text-[1rem]">*</span> */}
             <CustomPopover title="This is the project ">
@@ -106,7 +146,7 @@ function AddKeyForm({ setDisableNext }) {
                 style={{ width: ".75rem", height: ".75rem" }}
               />
             </CustomPopover>
-          </Text_12_300_EEEEEE>
+          </div>
         </div>
         <div className="custom-select-two w-full rounded-[6px] relative">
           <ConfigProvider
@@ -120,8 +160,8 @@ function AddKeyForm({ setDisableNext }) {
               placeholder="Select project"
               style={{
                 backgroundColor: "transparent",
-                color: "#EEEEEE",
-                border: "0.5px solid #757575",
+                color: inputTextColor,
+                border: `0.5px solid ${inputBorderColor}`,
               }}
               size="large"
               className="drawerInp !bg-[transparent] text-[#EEEEEE] font-[300]  text-[.75rem] shadow-none w-full indent-[.4rem] border-0 outline-0 hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] py-[1rem]"
@@ -146,7 +186,13 @@ function AddKeyForm({ setDisableNext }) {
         className={`flex items-center rounded-[6px] relative !bg-[transparent] w-[100%] mb-[0]`}
       >
         <div className="w-full">
-          <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap">
+          <div
+            className="absolute -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap text-[.75rem] font-[300] px-1"
+            style={{
+              backgroundColor: labelBgColor,
+              color: labelTextColor
+            }}
+          >
             Set Expiry
             {/* <span className="text-[red] text-[1rem]">*</span> */}
             <CustomPopover title="This is the Set Expiry ">
@@ -157,7 +203,7 @@ function AddKeyForm({ setDisableNext }) {
                 style={{ width: ".75rem", height: ".75rem" }}
               />
             </CustomPopover>
-          </Text_12_300_EEEEEE>
+          </div>
         </div>
         <div className="custom-select-two w-full rounded-[6px] relative">
           <ConfigProvider
@@ -171,8 +217,8 @@ function AddKeyForm({ setDisableNext }) {
               placeholder="Select Expiry"
               style={{
                 backgroundColor: "transparent",
-                color: "#EEEEEE",
-                border: "0.5px solid #757575",
+                color: inputTextColor,
+                border: `0.5px solid ${inputBorderColor}`,
               }}
               size="large"
               className="drawerInp !bg-[transparent] text-[#EEEEEE] font-[300]  text-[.75rem] shadow-none w-full indent-[.4rem] border-0 outline-0 hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] py-[1rem]"
@@ -203,7 +249,13 @@ function AddKeyForm({ setDisableNext }) {
         className={`flex items-center rounded-[6px] relative !bg-[transparent] w-[100%] mb-[0]`}
       >
         <div className="w-full">
-          <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap">
+          <div
+            className="absolute -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap text-[.75rem] font-[300] px-1"
+            style={{
+              backgroundColor: labelBgColor,
+              color: labelTextColor
+            }}
+          >
             Set Max Budget
             <CustomPopover title="This is the Set Max Budget">
               <Image
@@ -213,7 +265,7 @@ function AddKeyForm({ setDisableNext }) {
                 style={{ width: ".75rem", height: ".75rem" }}
               />
             </CustomPopover>
-          </Text_12_300_EEEEEE>
+          </div>
         </div>
         <Input
           type="number"
@@ -240,15 +292,8 @@ function AddKeyForm({ setDisableNext }) {
 }
 
 export default function AddNewKey() {
-  const { openDrawerWithStep, closeDrawer } = useDrawer();
-  const {
-    setProjectCredentialsDetails,
-    projectCredentialDetails,
-    addProjectCredentials,
-  } = useCredentials();
-  // const imageUrl = assetBaseUrl + (selectedProvider?.icon)
-  const [disableNext, setDisableNext] = useState(true);
-  const [loading, setLoading] = useState(false);
+  const { openDrawerWithStep, closeDrawer } = useDrawer()
+  const { projectCredentialDetails, addProjectCredentials } = useCredentials();
 
   return (
     <BudForm
@@ -261,8 +306,7 @@ export default function AddNewKey() {
       }
       onNext={async () => {
         try {
-          const values = await projectCredentialDetails; // Get form values
-          setLoading(true);
+          const values = projectCredentialDetails // Get form values
           const payload = {
             name: values.name,
             project_id: values.project,
@@ -283,8 +327,6 @@ export default function AddNewKey() {
           }
         } catch (error) {
           console.error("Error during form submission:", error);
-        } finally {
-          setLoading(false);
         }
       }}
       nextText="Create"
@@ -297,7 +339,7 @@ export default function AddNewKey() {
         <BudDrawerLayout>
           <DrawerTitleCard title="New Key" description="Create New key here" />
           <div>
-            <AddKeyForm setDisableNext={setDisableNext} />
+            <AddKeyForm setDisableNext={() => {}} />
           </div>
         </BudDrawerLayout>
       </BudWraperBox>

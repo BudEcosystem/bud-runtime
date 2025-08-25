@@ -19,7 +19,7 @@
 from typing import List, Optional, Union
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.orm import Session
 from typing_extensions import Annotated
 
@@ -205,6 +205,7 @@ async def get_project_tags(
 )
 @require_permissions(permissions=[PermissionEnum.PROJECT_MANAGE])
 async def create_project(
+    request: Request,
     project_data: ProjectCreateRequest,
     current_user: Annotated[
         User,
@@ -238,7 +239,7 @@ async def create_project(
                     message=f"Invalid project type: {project_dict['project_type']}",
                 )
 
-        db_project = await ProjectService(session).create_project(project_dict, current_user.id)
+        db_project = await ProjectService(session).create_project(project_dict, current_user.id, request)
     except ClientException as e:
         logger.exception(f"Failed to create project: {e}")
         return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
@@ -343,6 +344,7 @@ async def get_all_projects(
 )
 @require_permissions(permissions=[PermissionEnum.PROJECT_MANAGE])
 async def edit_project(
+    request: Request,
     project_id: UUID,
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
@@ -351,7 +353,10 @@ async def edit_project(
     """Edit project."""
     try:
         db_project = await ProjectService(session).edit_project(
-            project_id=project_id, data=edit_project.model_dump(exclude_unset=True, exclude_none=True)
+            project_id=project_id,
+            data=edit_project.model_dump(exclude_unset=True, exclude_none=True),
+            current_user_id=current_user.id,
+            request=request,
         )
         return SingleProjectResponse(
             project=db_project,
@@ -493,10 +498,34 @@ async def retrieve_project(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to retrieve project"
         ).to_http_response()
 
+    # Fetch credential data only for CLIENT_APP projects
+    credentials_count = None
+    credentials = None
+    if db_project.project_type == ProjectTypeEnum.CLIENT_APP.value:
+        from ..credential_ops.crud import CredentialDataManager
+
+        credential_data_manager = CredentialDataManager(session)
+        # Get credentials for this project
+        project_credentials, count = await credential_data_manager.get_all_credentials(
+            filters={"project_id": project_id},
+            limit=100,  # Get all credentials for the project
+        )
+        credentials_count = count
+
+        # Convert to CredentialSummary format
+        from .schemas import CredentialSummary
+
+        credentials = [
+            CredentialSummary(id=cred.id, name=cred.name, last_used_at=cred.last_used_at)
+            for cred in project_credentials
+        ]
+
     return ProjectDetailResponse(
         message="Project retrieved successfully",
         project=db_project,
         endpoints_count=endpoints_count,
+        credentials_count=credentials_count,
+        credentials=credentials,
         object="project.retrieve",
         code=status.HTTP_200_OK,
     ).to_http_response()
@@ -522,6 +551,7 @@ async def retrieve_project(
 )
 @require_permissions(permissions=[PermissionEnum.PROJECT_MANAGE])
 async def delete_project(
+    request: Request,
     project_id: UUID,
     current_user: Annotated[
         User,
@@ -536,7 +566,9 @@ async def delete_project(
 ) -> Union[SuccessResponse, ErrorResponse]:
     """Delete an active project."""
     try:
-        _ = await ProjectService(session).delete_active_project(project_id, remove_credential)
+        _ = await ProjectService(session).delete_active_project(
+            project_id, remove_credential, current_user_id=current_user.id, request=request
+        )
         logger.info(f"Project deleted: {project_id}")
     except ClientException as e:
         logger.exception(f"Failed to delete project: {e}")

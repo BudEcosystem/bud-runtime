@@ -141,6 +141,7 @@
             { system, pkgs }:
             {
               workflow_tofu_apply = pkgs.callPackage ./nix/workflows/tofu_apply { };
+              workflow_budcustomer_bumper = pkgs.callPackage ./nix/workflows/budcustomer_bumper { };
               workflow_dockerhub_budcustomer = pkgs.callPackage ./nix/workflows/dockerhub_budcustomer { };
 
               budcustomer = pkgs.callPackage ./nix/packages/budcustomer.nix { };

@@ -660,7 +660,6 @@ export default function Publish() {
                 <div className="w-[41%]">
                   <CustomSelect
                     name="per_tokens"
-                    label=""
                     placeholder="Select token count"
                     selectOptions={tokenOptions}
                     value={selectedTokenOption.toString()}

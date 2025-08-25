@@ -122,7 +122,7 @@ async def login_user(
 ) -> Union[UserLoginResponse, ErrorResponse]:
     """Login a user with email and password."""
     try:
-        auth_token = await AuthService(session).login_user(user)
+        auth_token = await AuthService(session).login_user(user, request=request)
         return UserLoginResponse(
             code=status.HTTP_200_OK,
             message="User logged in successfully",
