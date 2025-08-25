@@ -122,6 +122,82 @@ class TestProjectFilteringAPI:
         ]
         return projects
 
+    @pytest.fixture
+    def mock_project_list_responses(self):
+        """Create mock project list responses with all required fields for ProjectListResponse."""
+        base_time = "2024-01-01T00:00:00"
+        project_list_responses = [
+            {
+                "project": {
+                    "id": str(uuid4()),
+                    "name": "Client Project 1",
+                    "description": "First client project",
+                    "project_type": ProjectTypeEnum.CLIENT_APP.value,
+                    "created_at": base_time,
+                    "modified_at": base_time,
+                    "created_by": str(uuid4()),
+                    "tags": [],
+                    "icon": None,
+                },
+                "users_count": 3,
+                "endpoints_count": 5,
+                "credentials_count": 2,
+                "profile_colors": ["#FF0000", "#00FF00", "#0000FF"],
+            },
+            {
+                "project": {
+                    "id": str(uuid4()),
+                    "name": "Client Project 2",
+                    "description": "Second client project",
+                    "project_type": ProjectTypeEnum.CLIENT_APP.value,
+                    "created_at": base_time,
+                    "modified_at": base_time,
+                    "created_by": str(uuid4()),
+                    "tags": [],
+                    "icon": None,
+                },
+                "users_count": 1,
+                "endpoints_count": 2,
+                "credentials_count": 1,
+                "profile_colors": ["#FFFF00"],
+            },
+            {
+                "project": {
+                    "id": str(uuid4()),
+                    "name": "Admin Project 1",
+                    "description": "First admin project",
+                    "project_type": ProjectTypeEnum.ADMIN_APP.value,
+                    "created_at": base_time,
+                    "modified_at": base_time,
+                    "created_by": str(uuid4()),
+                    "tags": [],
+                    "icon": None,
+                },
+                "users_count": 2,
+                "endpoints_count": 1,
+                "credentials_count": 3,
+                "profile_colors": ["#FF00FF", "#00FFFF"],
+            },
+            {
+                "project": {
+                    "id": str(uuid4()),
+                    "name": "Admin Project 2",
+                    "description": "Second admin project",
+                    "project_type": ProjectTypeEnum.ADMIN_APP.value,
+                    "created_at": base_time,
+                    "modified_at": base_time,
+                    "created_by": str(uuid4()),
+                    "tags": [],
+                    "icon": None,
+                },
+                "users_count": 4,
+                "endpoints_count": 3,
+                "credentials_count": 0,
+                "profile_colors": ["#FFA500", "#800080", "#008000", "#FFC0CB"],
+            },
+        ]
+        return project_list_responses
+
     # @pytest.mark.asyncio
     # async def test_filter_by_client_app_type(self, client: TestClient, mock_user, mock_projects):
     #     """Test filtering projects by CLIENT_APP type."""

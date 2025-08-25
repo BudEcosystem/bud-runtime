@@ -27,10 +27,10 @@ async def test_logout_blacklists_access_token():
     # Mock the database queries
     with patch("budapp.auth.services.UserDataManager") as mock_user_manager:
         with patch("budapp.auth.services.KeycloakManager") as mock_keycloak:
-            with patch("budapp.auth.services.RedisService") as mock_redis_class:
+            with patch("budapp.auth.services.JWTBlacklistService") as mock_jwt_blacklist_class:
                 # Setup mocks
-                mock_redis = AsyncMock()
-                mock_redis_class.return_value = mock_redis
+                mock_jwt_blacklist = AsyncMock()
+                mock_jwt_blacklist_class.return_value = mock_jwt_blacklist
 
                 mock_data_manager = AsyncMock()
                 mock_user_manager.return_value = mock_data_manager
@@ -46,7 +46,7 @@ async def test_logout_blacklists_access_token():
                 mock_tenant_client.id = "8be3c315-1964-4db9-9957-8c62d4ce4559"  # Valid UUID v4
                 mock_tenant_client.client_id = "test-client"
                 mock_tenant_client.client_named_id = "test-client-named"
-                mock_tenant_client.client_secret = "secret"
+                mock_tenant_client.get_decrypted_client_secret = AsyncMock(return_value="secret")
 
                 # Configure retrieve_by_fields to return different values based on the model
                 async def retrieve_by_fields_side_effect(model, *args, **kwargs):
@@ -70,16 +70,16 @@ async def test_logout_blacklists_access_token():
                 # Execute logout with access token
                 await auth_service.logout_user(logout_request, access_token)
 
-                # Verify Redis blacklist was called
-                mock_redis.set.assert_called_once()
-                call_args = mock_redis.set.call_args
+                # Verify JWT blacklist was called
+                mock_jwt_blacklist.blacklist_token.assert_called_once()
+                call_args = mock_jwt_blacklist.blacklist_token.call_args
 
-                # Check the blacklist key format
-                assert call_args[0][0] == "token_blacklist:test_access_token"
-                assert call_args[0][1] == "1"
+                # Check the token and TTL
+                assert call_args[0][0] == "test_access_token"
                 # Check TTL is set (should be around 3600 seconds)
-                assert call_args[1]["ex"] > 0
-                assert call_args[1]["ex"] <= 3600
+                assert "ttl" in call_args[1]
+                assert call_args[1]["ttl"] > 0
+                assert call_args[1]["ttl"] <= 3600
 
 
 @pytest.mark.asyncio
@@ -93,10 +93,10 @@ async def test_logout_without_access_token():
 
     with patch("budapp.auth.services.UserDataManager") as mock_user_manager:
         with patch("budapp.auth.services.KeycloakManager") as mock_keycloak:
-            with patch("budapp.auth.services.RedisService") as mock_redis_class:
+            with patch("budapp.auth.services.JWTBlacklistService") as mock_jwt_blacklist_class:
                 # Setup mocks
-                mock_redis = AsyncMock()
-                mock_redis_class.return_value = mock_redis
+                mock_jwt_blacklist = AsyncMock()
+                mock_jwt_blacklist_class.return_value = mock_jwt_blacklist
 
                 mock_data_manager = AsyncMock()
                 mock_user_manager.return_value = mock_data_manager
@@ -111,7 +111,7 @@ async def test_logout_without_access_token():
                 mock_tenant_client.id = "6f959769-f619-427d-b7d8-c2fe78ba9fad"  # Valid UUID v4
                 mock_tenant_client.client_id = "test-client"
                 mock_tenant_client.client_named_id = "test-client-named"
-                mock_tenant_client.client_secret = "secret"
+                mock_tenant_client.get_decrypted_client_secret = AsyncMock(return_value="secret")
 
                 # Configure retrieve_by_fields to return different values based on the model
                 async def retrieve_by_fields_side_effect(model, *args, **kwargs):
@@ -131,8 +131,8 @@ async def test_logout_without_access_token():
                 # Execute logout without access token
                 await auth_service.logout_user(logout_request, None)
 
-                # Verify Redis blacklist was NOT called (no access token)
-                mock_redis.set.assert_not_called()
+                # Verify JWT blacklist was NOT called (no access token)
+                mock_jwt_blacklist.blacklist_token.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -144,15 +144,15 @@ async def test_get_current_user_checks_blacklist():
 
     mock_session = MagicMock(spec=Session)
 
-    with patch("budapp.commons.dependencies.RedisService") as mock_redis_class:
+    with patch("budapp.commons.dependencies.JWTBlacklistService") as mock_jwt_blacklist_class:
         with patch("budapp.commons.dependencies.UserDataManager") as mock_user_manager:
             with patch("budapp.commons.dependencies.KeycloakManager") as mock_keycloak:
-                # Setup Redis mock
-                mock_redis = AsyncMock()
-                mock_redis_class.return_value = mock_redis
+                # Setup JWT blacklist mock
+                mock_jwt_blacklist = AsyncMock()
+                mock_jwt_blacklist_class.return_value = mock_jwt_blacklist
 
                 # Test case 1: Token is blacklisted
-                mock_redis.get.return_value = "1"  # Token is in blacklist
+                mock_jwt_blacklist.is_token_blacklisted.return_value = True  # Token is in blacklist
 
                 with pytest.raises(HTTPException) as exc_info:
                     await get_current_user(mock_token, mock_session)
@@ -160,11 +160,11 @@ async def test_get_current_user_checks_blacklist():
                 assert exc_info.value.status_code == 401
                 assert exc_info.value.detail == "Invalid authentication credentials"
 
-                # Verify Redis was checked
-                mock_redis.get.assert_called_with("token_blacklist:test_access_token")
+                # Verify JWT blacklist was checked
+                mock_jwt_blacklist.is_token_blacklisted.assert_called_with("test_access_token")
 
                 # Test case 2: Token is not blacklisted
-                mock_redis.get.return_value = None  # Token not in blacklist
+                mock_jwt_blacklist.is_token_blacklisted.return_value = False  # Token not in blacklist
 
                 # Setup other mocks for successful validation
                 mock_data_manager = AsyncMock()
@@ -178,7 +178,7 @@ async def test_get_current_user_checks_blacklist():
                 mock_tenant_client.id = "326a0d45-8cc0-49aa-9613-636026e04697"  # Valid UUID v4
                 mock_tenant_client.client_id = "test-client"
                 mock_tenant_client.client_named_id = "test-client-named"
-                mock_tenant_client.client_secret = "secret"
+                mock_tenant_client.get_decrypted_client_secret = AsyncMock(return_value="secret")
 
                 mock_user = MagicMock(spec=User)
                 mock_user.auth_id = "user-auth-id"  # This is not a UUID, just an auth ID
@@ -220,11 +220,11 @@ async def test_logout_continues_on_blacklist_failure():
 
     with patch("budapp.auth.services.UserDataManager") as mock_user_manager:
         with patch("budapp.auth.services.KeycloakManager") as mock_keycloak:
-            with patch("budapp.auth.services.RedisService") as mock_redis_class:
-                # Setup Redis to fail
-                mock_redis = AsyncMock()
-                mock_redis.set.side_effect = Exception("Redis connection failed")
-                mock_redis_class.return_value = mock_redis
+            with patch("budapp.auth.services.JWTBlacklistService") as mock_jwt_blacklist_class:
+                # Setup JWT blacklist to fail
+                mock_jwt_blacklist = AsyncMock()
+                mock_jwt_blacklist.blacklist_token.side_effect = Exception("Dapr state store connection failed")
+                mock_jwt_blacklist_class.return_value = mock_jwt_blacklist
 
                 # Setup other mocks
                 mock_data_manager = AsyncMock()
@@ -239,7 +239,7 @@ async def test_logout_continues_on_blacklist_failure():
                 mock_tenant_client.id = "31a52d0d-c623-49c7-a9b4-03d5ef939f8d"  # Valid UUID v4
                 mock_tenant_client.client_id = "test-client"
                 mock_tenant_client.client_named_id = "test-client-named"
-                mock_tenant_client.client_secret = "secret"
+                mock_tenant_client.get_decrypted_client_secret = AsyncMock(return_value="secret")
 
                 # Configure retrieve_by_fields to return different values based on the model
                 async def retrieve_by_fields_side_effect(model, *args, **kwargs):

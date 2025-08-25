@@ -42,6 +42,7 @@ def generate_audit_hash(
     action: str,
     resource_type: str,
     resource_id: Optional[UUID],
+    resource_name: Optional[str],
     user_id: Optional[UUID],
     actioned_by: Optional[UUID],
     timestamp: datetime,
@@ -60,6 +61,7 @@ def generate_audit_hash(
         action: Type of action performed
         resource_type: Type of resource affected
         resource_id: ID of the affected resource
+        resource_name: Name of the affected resource
         user_id: ID of the user who performed the action
         actioned_by: ID of the admin/user who performed the action on behalf
         timestamp: When the action occurred
@@ -77,6 +79,7 @@ def generate_audit_hash(
         serialize_for_hash(action),
         serialize_for_hash(resource_type),
         serialize_for_hash(resource_id),
+        serialize_for_hash(resource_name),
         serialize_for_hash(user_id),
         serialize_for_hash(actioned_by),
         serialize_for_hash(timestamp),
@@ -109,6 +112,7 @@ def verify_audit_hash(audit_record: Any, expected_hash: str) -> bool:
         action=audit_record.action,
         resource_type=audit_record.resource_type,
         resource_id=audit_record.resource_id,
+        resource_name=getattr(audit_record, "resource_name", None),
         user_id=audit_record.user_id,
         actioned_by=audit_record.actioned_by,
         timestamp=audit_record.timestamp,

@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 from uuid import UUID
 
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from budapp.audit_ops.hash_utils import generate_audit_hash
@@ -37,6 +37,7 @@ class AuditTrailDataManager(DataManagerUtils):
         action: AuditActionEnum,
         resource_type: AuditResourceTypeEnum,
         resource_id: Optional[UUID] = None,
+        resource_name: Optional[str] = None,
         user_id: Optional[UUID] = None,
         actioned_by: Optional[UUID] = None,
         details: Optional[dict] = None,
@@ -51,6 +52,7 @@ class AuditTrailDataManager(DataManagerUtils):
             action: Type of action performed
             resource_type: Type of resource affected
             resource_id: ID of the affected resource
+            resource_name: Name of the affected resource for display and search
             user_id: ID of the user who performed the action
             actioned_by: ID of the admin/user who performed the action on behalf of another user
             details: Additional context about the action
@@ -70,6 +72,7 @@ class AuditTrailDataManager(DataManagerUtils):
             action=action,
             resource_type=resource_type,
             resource_id=resource_id,
+            resource_name=resource_name,
             user_id=user_id,
             actioned_by=actioned_by,
             timestamp=timestamp,
@@ -83,6 +86,7 @@ class AuditTrailDataManager(DataManagerUtils):
             action=action,
             resource_type=resource_type,
             resource_id=resource_id,
+            resource_name=resource_name,
             user_id=user_id,
             actioned_by=actioned_by,
             details=details,
@@ -123,6 +127,7 @@ class AuditTrailDataManager(DataManagerUtils):
         action: Optional[AuditActionEnum] = None,
         resource_type: Optional[AuditResourceTypeEnum] = None,
         resource_id: Optional[UUID] = None,
+        resource_name: Optional[str] = None,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
         ip_address: Optional[str] = None,
@@ -138,6 +143,7 @@ class AuditTrailDataManager(DataManagerUtils):
             action: Filter by action type
             resource_type: Filter by resource type
             resource_id: Filter by specific resource ID
+            resource_name: Filter by resource name (partial match)
             start_date: Filter by start date (inclusive)
             end_date: Filter by end date (inclusive)
             ip_address: Filter by IP address
@@ -161,6 +167,9 @@ class AuditTrailDataManager(DataManagerUtils):
             conditions.append(AuditTrail.resource_type == resource_type)
         if resource_id is not None:
             conditions.append(AuditTrail.resource_id == resource_id)
+        if resource_name is not None:
+            # Use ILIKE for case-insensitive partial match
+            conditions.append(AuditTrail.resource_name.ilike(f"%{resource_name}%"))
         if start_date is not None:
             conditions.append(AuditTrail.timestamp >= start_date)
         if end_date is not None:
@@ -257,9 +266,40 @@ class AuditTrailDataManager(DataManagerUtils):
         user_results = self.session.execute(users_activity_stmt).all()
         most_active_users = [{"user_id": str(user_id), "count": count} for user_id, count in user_results]
 
+        # Count of unique resources that were updated
+        unique_updated_resources_stmt = (
+            select(func.count(func.distinct(AuditTrail.resource_id)))
+            .select_from(AuditTrail)
+            .where(AuditTrail.action == AuditActionEnum.UPDATE)
+            .where(AuditTrail.resource_id.isnot(None))
+        )
+        if where_clause is not None:
+            unique_updated_resources_stmt = unique_updated_resources_stmt.where(where_clause)
+        unique_resources_updated = self.execute_scalar(unique_updated_resources_stmt) or 0
+
+        # Count of failure events
+        # Failure events are those with action ending in _FAILED or details containing success=false
+        failure_actions = [
+            AuditActionEnum.LOGIN_FAILED,
+            AuditActionEnum.WORKFLOW_FAILED,
+            AuditActionEnum.ACCESS_DENIED,
+        ]
+
+        failure_conditions = [
+            AuditTrail.action.in_(failure_actions),
+            AuditTrail.details.op("->>")("success") == "false",
+        ]
+
+        failure_stmt = select(func.count()).select_from(AuditTrail).where(or_(*failure_conditions))
+        if where_clause is not None:
+            failure_stmt = failure_stmt.where(where_clause)
+        failure_events_count = self.execute_scalar(failure_stmt) or 0
+
         return {
             "total_records": total_records,
             "unique_users": unique_users,
+            "unique_resources_updated": unique_resources_updated,
+            "failure_events_count": failure_events_count,
             "most_common_actions": most_common_actions,
             "most_active_users": most_active_users,
             "date_range": {

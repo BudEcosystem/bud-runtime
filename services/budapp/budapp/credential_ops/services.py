@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, Dict, List, Optional, Union
 from uuid import UUID
 
+import httpx
 from fastapi import HTTPException, Request, status
 from fastapi.exceptions import HTTPException
 
@@ -16,6 +17,8 @@ from budapp.commons.constants import (
     AuditResourceTypeEnum,
     EndpointStatusEnum,
     ModelProviderTypeEnum,
+    NotificationCategory,
+    NotificationStatus,
     PermissionEnum,
     ProjectStatusEnum,
     ProjectTypeEnum,
@@ -33,6 +36,7 @@ from budapp.model_ops.models import Provider as ProviderModel
 from budapp.permissions.crud import PermissionDataManager, ProjectPermissionDataManager
 from budapp.project_ops.crud import ProjectDataManager
 from budapp.project_ops.services import ProjectService
+from budapp.shared.notification_service import BudNotifyService, NotificationBuilder
 from budapp.shared.redis_service import RedisService, cache
 from budapp.user_ops.crud import UserDataManager
 from budapp.user_ops.models import User as UserModel
@@ -113,6 +117,7 @@ class CredentialService(SessionMixin):
             action=AuditActionEnum.CREATE,
             resource_type=AuditResourceTypeEnum.API_KEY,
             resource_id=db_credential.id,
+            resource_name=db_credential.name,
             user_id=current_user_id,
             details=audit_details,
             request=request,
@@ -206,6 +211,37 @@ class CredentialService(SessionMixin):
         credential_model.hashed_key = CredentialModel.set_hashed_key(api_key)
         db_credential = await CredentialDataManager(self.session).create_credential(credential_model)
         logger.info(f"Credential inserted to database: {db_credential.id}")
+
+        # Send notification for CLIENT_APP credential creation
+        if credential_type == ApiCredentialTypeEnum.CLIENT_APP:
+            try:
+                notification = (
+                    NotificationBuilder()
+                    .set_content(
+                        title="Client App API Key Created",
+                        message=f"API key '{db_credential.name}' has been successfully created for your client app project",
+                        status=NotificationStatus.COMPLETED,
+                        icon="key",
+                        result={
+                            "credential_id": str(db_credential.id),
+                            "credential_name": db_credential.name,
+                            "project_id": str(db_credential.project_id),
+                            "project_name": db_project.name,
+                        },
+                    )
+                    .set_payload(
+                        category=NotificationCategory.INAPP,
+                        type="credential_creation",
+                        source=app_settings.source_topic,
+                    )
+                    .set_notification_request(subscriber_ids=str(user_id))
+                    .build()
+                )
+                await BudNotifyService().send_notification(notification)
+                logger.info(f"Notification sent for CLIENT_APP credential creation: {db_credential.id}")
+            except Exception as e:
+                logger.error(f"Failed to send notification for CLIENT_APP credential creation: {e}")
+                # Don't fail the credential creation if notification fails
 
         return db_credential
 
@@ -415,6 +451,7 @@ class CredentialService(SessionMixin):
             action=AuditActionEnum.DELETE,
             resource_type=AuditResourceTypeEnum.API_KEY,
             resource_id=credential_id,
+            resource_name=db_credential.name,
             user_id=user_id,
             details=audit_details,
             request=request,
@@ -527,6 +564,7 @@ class CredentialService(SessionMixin):
             action=AuditActionEnum.UPDATE,
             resource_type=AuditResourceTypeEnum.API_KEY,
             resource_id=credential_id,
+            resource_name=db_credential.name,
             user_id=user_id,
             previous_state=previous_state,
             new_state=new_state,
@@ -618,6 +656,107 @@ class CredentialService(SessionMixin):
             logger.error(f"Error validating credential: {e}")
             return False
 
+    async def update_credential_last_used(self, credential_usage: Dict[UUID, datetime]) -> Dict:
+        """Update last_used_at timestamps for credentials.
+
+        Args:
+            credential_usage: Dictionary mapping credential IDs to last used timestamps
+
+        Returns:
+            Dictionary with update statistics
+        """
+        if not credential_usage:
+            return {"updated_count": 0, "failed_count": 0, "errors": []}
+
+        logger.info(f"Updating last_used_at for {len(credential_usage)} credentials")
+
+        try:
+            credential_dm = CredentialDataManager(self.session)
+            result = await credential_dm.batch_update_last_used(credential_usage)
+
+            logger.info(f"Successfully updated {result['updated_count']} credentials")
+            return result
+
+        except Exception as e:
+            logger.error(f"Failed to update credential usage: {e}")
+            return {"updated_count": 0, "failed_count": len(credential_usage), "errors": [str(e)]}
+
+    async def fetch_recent_credential_usage(self, since_minutes: int = 10) -> Dict[UUID, datetime]:
+        """Fetch recent credential usage data from budmetrics service.
+
+        Args:
+            since_minutes: How many minutes back to query for usage data
+
+        Returns:
+            Dictionary mapping credential IDs to their last used timestamps
+        """
+        try:
+            # Calculate since timestamp
+            since = datetime.now(UTC) - timedelta(minutes=since_minutes)
+
+            # Prepare request payload
+            payload = {"since": since.isoformat()}
+
+            # Use Dapr service invocation to call budmetrics
+            dapr_url = f"{app_settings.dapr_base_url}/v1.0/invoke/budmetrics/method/observability/credential-usage"
+
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(dapr_url, json=payload)
+                response.raise_for_status()
+
+                data = response.json()
+
+                # Parse the response into a dictionary
+                credential_usage = {}
+                for item in data.get("credentials", []):
+                    credential_id = UUID(item["credential_id"])
+                    # Handle different datetime formats
+                    last_used_str = item["last_used_at"]
+                    if isinstance(last_used_str, str):
+                        # Handle ISO format with Z or timezone
+                        if last_used_str.endswith("Z"):
+                            last_used_at = datetime.fromisoformat(last_used_str.replace("Z", "+00:00"))
+                        else:
+                            last_used_at = datetime.fromisoformat(last_used_str)
+                    else:
+                        # If it's already a datetime object or something else
+                        last_used_at = last_used_str
+                    credential_usage[credential_id] = last_used_at
+
+                logger.info(f"Retrieved usage data for {len(credential_usage)} credentials")
+                return credential_usage
+
+        except httpx.HTTPError as e:
+            logger.error(f"HTTP error fetching credential usage: {e}")
+            return {}
+        except Exception as e:
+            logger.error(f"Error fetching credential usage: {e}")
+            return {}
+
+    async def sync_credential_usage_from_metrics(self) -> Dict:
+        """Sync credential usage data from budmetrics and update local database.
+
+        Returns:
+            Dictionary with sync statistics
+        """
+        try:
+            # Fetch recent usage data from budmetrics
+            usage_data = await self.fetch_recent_credential_usage(since_minutes=10)
+
+            if not usage_data:
+                return {"total_credentials": 0, "updated_count": 0, "failed_count": 0, "errors": []}
+
+            # Update credentials with usage data
+            result = await self.update_credential_last_used(usage_data)
+            result["total_credentials"] = len(usage_data)
+
+            logger.info(f"Credential usage sync complete: {result}")
+            return result
+
+        except Exception as e:
+            logger.error(f"Failed to sync credential usage: {e}")
+            return {"total_credentials": 0, "updated_count": 0, "failed_count": 0, "errors": [str(e)]}
+
 
 class ProprietaryCredentialService(SessionMixin):
     async def add_credential(
@@ -646,6 +785,7 @@ class ProprietaryCredentialService(SessionMixin):
             action=AuditActionEnum.CREATE,
             resource_type=AuditResourceTypeEnum.API_KEY,
             resource_id=db_credential.id,
+            resource_name=db_credential.name,
             user_id=current_user_id,
             details={
                 "credential_name": db_credential.name,
@@ -846,6 +986,7 @@ class ProprietaryCredentialService(SessionMixin):
             action=AuditActionEnum.UPDATE,
             resource_type=AuditResourceTypeEnum.API_KEY,
             resource_id=credential_id,
+            resource_name=db_credential.name,
             user_id=current_user_id,
             previous_state=previous_state,
             new_state={
@@ -896,6 +1037,7 @@ class ProprietaryCredentialService(SessionMixin):
             action=AuditActionEnum.DELETE,
             resource_type=AuditResourceTypeEnum.API_KEY,
             resource_id=credential_id,
+            resource_name=credential_name,
             user_id=current_user_id,
             details={
                 "credential_name": credential_name,

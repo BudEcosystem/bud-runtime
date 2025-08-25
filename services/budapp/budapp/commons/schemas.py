@@ -353,8 +353,12 @@ class ErrorResponse(ResponseBase):
         Returns:
             dict: The validated and potentially adjusted data.
         """
-        data["type"] = data.get("type") or cls.to_pascal_case(HTTPStatus(data["code"]).phrase, suffix="Error")
-        data["message"] = data.get("message") or HTTPStatus(data["code"]).description
+        # Use default code if not provided
+        code = data.get("code", HTTPStatus.INTERNAL_SERVER_ERROR.value)
+        data["code"] = code
+
+        data["type"] = data.get("type") or cls.to_pascal_case(HTTPStatus(code).phrase, suffix="Error")
+        data["message"] = data.get("message") or HTTPStatus(code).description
 
         return data
 

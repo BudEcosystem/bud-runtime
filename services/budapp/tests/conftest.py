@@ -33,6 +33,9 @@ def mock_env_vars():
         "POSTGRES_USER": "test_user",
         "POSTGRES_PASSWORD": "test_password",
         "POSTGRES_DB": "test_db",
+        "PSQL_HOST": "localhost",
+        "PSQL_PORT": "5432",
+        "PSQL_DB_NAME": "test_db",
         "SUPER_USER_EMAIL": "test@example.com",
         "SUPER_USER_PASSWORD": "test_super_password",
         "DAPR_BASE_URL": "http://localhost:3500",
@@ -40,7 +43,17 @@ def mock_env_vars():
         "BUD_MODEL_APP_ID": "model-app",
         "BUD_SIMULATOR_APP_ID": "simulator-app",
         "BUD_METRICS_APP_ID": "metrics-app",
-        "BUD_NOTIFY_APP_ID": "notify-app"
+        "BUD_NOTIFY_APP_ID": "notify-app",
+        "KEYCLOAK_SERVER_URL": "http://localhost:8080",
+        "KEYCLOAK_ADMIN_USERNAME": "admin",
+        "KEYCLOAK_ADMIN_PASSWORD": "admin",
+        "KEYCLOAK_REALM_NAME": "test-realm",
+        "GRAFANA_SCHEME": "http",
+        "GRAFANA_URL": "localhost:3000",
+        "GRAFANA_USERNAME": "admin",
+        "GRAFANA_PASSWORD": "admin",
+        "CLOUD_MODEL_SEEDER_ENGINE": "openai",
+        "BUD_CONNECT_BASE_URL": "http://localhost:8001"
     }
 
     # Actually set the environment variables

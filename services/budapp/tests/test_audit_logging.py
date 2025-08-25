@@ -45,6 +45,7 @@ class TestAuditLogging:
             action=AuditActionEnum.CREATE,
             resource_type=AuditResourceTypeEnum.PROJECT,
             resource_id=resource_id,
+            resource_name="Test Project",
             user_id=user_id,
             details=details,
             request=request,
@@ -87,6 +88,7 @@ class TestAuditLogging:
             session=session,
             action=AuditActionEnum.LOGIN,
             resource_type=AuditResourceTypeEnum.USER,
+            resource_name="john.doe@example.com",
             user_id=user_id,
             details=details,
             success=True,
@@ -128,6 +130,7 @@ class TestAuditLogging:
             action=AuditActionEnum.UPDATE,
             resource_type=AuditResourceTypeEnum.PROJECT,
             resource_id=resource_id,
+            resource_name="Test Project Updated",
             user_id=user_id,
             previous_state=previous_state,
             new_state=new_state,
@@ -158,6 +161,7 @@ class TestAuditLogging:
             session=session,
             action=AuditActionEnum.CREATE,
             resource_type=AuditResourceTypeEnum.PROJECT,
+            resource_name="Test Project",
             success=True,
         )
 
@@ -181,6 +185,7 @@ class TestAuditLogging:
             session=session,
             action=AuditActionEnum.DELETE,
             resource_type=AuditResourceTypeEnum.CLUSTER,
+            resource_name="test-cluster",
             success=False,
         )
 
@@ -214,6 +219,7 @@ class TestAsyncAuditLogging:
             action=AuditActionEnum.CREATE,
             resource_type=AuditResourceTypeEnum.ENDPOINT,
             resource_id=resource_id,
+            resource_name="test-endpoint",
             user_id=user_id,
             details=details,
             success=True,
@@ -256,6 +262,7 @@ class TestIntegrationScenarios:
             session=session,
             action=AuditActionEnum.LOGIN_FAILED,
             resource_type=AuditResourceTypeEnum.USER,
+            resource_name="user@example.com",
             details={
                 "email": "user@example.com",
                 "reason": "Invalid password",
@@ -291,6 +298,7 @@ class TestIntegrationScenarios:
             action=AuditActionEnum.PERMISSION_CHANGED,
             resource_type=AuditResourceTypeEnum.PROJECT,
             resource_id=project_id,
+            resource_name="Test Project Permissions",
             user_id=user_id,
             details={
                 "operation": "add_member",
@@ -337,6 +345,7 @@ class TestIntegrationScenarios:
             action=AuditActionEnum.WORKFLOW_STARTED,
             resource_type=AuditResourceTypeEnum.WORKFLOW,
             resource_id=workflow_id,
+            resource_name="deployment-workflow-llama-2-7b",
             user_id=user_id,
             details={
                 "workflow_type": "DEPLOYMENT",

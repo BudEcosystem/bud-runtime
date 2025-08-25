@@ -18,6 +18,9 @@ from budmetrics.observability.schemas import (
     AudioInferenceDetail,
     CacheMetric,
     CountMetric,
+    CredentialUsageItem,
+    CredentialUsageRequest,
+    CredentialUsageResponse,
     EmbeddingInferenceDetail,
     EnhancedInferenceDetailResponse,
     FeedbackItem,
@@ -2946,3 +2949,91 @@ class ObservabilityMetricsService:
         except Exception as e:
             logger.error(f"Failed to get block count for rule {rule_id}: {e}")
             return 0
+
+    async def get_credential_usage(
+        self,
+        request: CredentialUsageRequest,
+    ) -> CredentialUsageResponse:
+        """Get credential usage statistics from ModelInferenceDetails.
+
+        This method queries the ModelInferenceDetails table to find the most recent
+        usage for each credential (api_key_id) within the specified time window.
+
+        Args:
+            request: Request containing the time window and optional credential IDs
+
+        Returns:
+            CredentialUsageResponse with usage statistics for each credential
+        """
+        self._ensure_initialized()
+
+        try:
+            # Build the query to get last usage per credential
+            query = """
+            SELECT
+                api_key_id as credential_id,
+                MAX(request_arrival_time) as last_used_at,
+                COUNT(*) as request_count
+            FROM ModelInferenceDetails
+            WHERE request_arrival_time >= %(since)s
+                AND api_key_id IS NOT NULL
+            """
+
+            params = {"since": request.since}
+
+            # Add credential ID filter if specified
+            if request.credential_ids:
+                placeholders = [f"%(cred_{i})s" for i in range(len(request.credential_ids))]
+                query += f" AND api_key_id IN ({','.join(placeholders)})"
+                for i, cred_id in enumerate(request.credential_ids):
+                    params[f"cred_{i}"] = str(cred_id)
+
+            query += """
+            GROUP BY api_key_id
+            ORDER BY last_used_at DESC
+            """
+
+            # Execute the query
+            results = await self.clickhouse_client.execute_query(query, params)
+
+            # Parse results into response items
+            credentials = []
+            for row in results:
+                # Handle both UUID objects and strings from ClickHouse
+                cred_id = row[0]
+                if isinstance(cred_id, str):
+                    cred_id = UUID(cred_id)
+                elif not isinstance(cred_id, UUID):
+                    # Convert to string first if it's neither UUID nor string
+                    cred_id = UUID(str(cred_id))
+
+                credentials.append(
+                    CredentialUsageItem(
+                        credential_id=cred_id,
+                        last_used_at=row[1],
+                        request_count=row[2],
+                    )
+                )
+
+            # Create response
+            response = CredentialUsageResponse(
+                credentials=credentials,
+                query_window={
+                    "since": request.since,
+                    "until": datetime.now(),
+                },
+            )
+
+            return response
+
+        except Exception as e:
+            logger.error(f"Error fetching credential usage: {e}")
+            # Return empty credentials list on error
+            response = CredentialUsageResponse(
+                credentials=[],
+                query_window={
+                    "since": request.since,
+                    "until": datetime.now(),
+                },
+            )
+            return response

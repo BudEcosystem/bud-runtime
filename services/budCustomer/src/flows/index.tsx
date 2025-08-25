@@ -8,6 +8,8 @@ import AddNewKey from "./ApiKeys/AddNewKey";
 import ApiKeySuccess from "./ApiKeys/ApiKeySuccess";
 import ViewApiKey from "./ApiKeys/ViewApiKey";
 import EditApiKey from "./ApiKeys/EditApiKey";
+import ViewModelDetails from "./ViewModelDetails";
+import ViewProjectDetails from "./ViewProjectDetails";
 
 // Placeholder component factory
 const createPlaceholderComponent = (name: string) => {
@@ -65,6 +67,7 @@ const stepComponentNames = [
   "create-cluster-success",
   "edit-cluster",
   "view-model-details",
+  "view-project-details",
   "edit-project",
   "add-members",
   "add-worker",
@@ -160,5 +163,7 @@ StepComponents["add-new-key"] = AddNewKey;
 StepComponents["api-key-success"] = ApiKeySuccess;
 StepComponents["view-api-key"] = ViewApiKey;
 StepComponents["edit-api-key"] = EditApiKey;
+StepComponents["view-model-details"] = ViewModelDetails;
+StepComponents["view-project-details"] = ViewProjectDetails;
 
 export type StepComponentsType = keyof typeof StepComponents;

@@ -316,7 +316,7 @@ export default function UsagePage() {
             <Button
               type="primary"
               icon={<Icon icon="ph:bell" />}
-              className="bg-bud-purple border-bud-purple hover:bg-bud-purple-hover h-[2.5rem] px-[1.5rem]"
+              className="bg-bud-purple border-bud-purple hover:bg-bud-purple-hover h-[2.5rem] px-[1.5rem] hidden"
               onClick={() => setShowAlertModal(true)}
             >
               Set Alert

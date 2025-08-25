@@ -67,7 +67,8 @@ class AuditService:
         self,
         resource_type: AuditResourceTypeEnum,
         resource_id: UUID,
-        resource_data: Dict[str, Any],
+        resource_name: Optional[str] = None,
+        resource_data: Dict[str, Any] = None,
         user_id: Optional[UUID] = None,
         actioned_by: Optional[UUID] = None,
         ip_address: Optional[str] = None,
@@ -78,6 +79,7 @@ class AuditService:
         Args:
             resource_type: Type of resource created
             resource_id: ID of the created resource
+            resource_name: Name of the created resource for display and search
             resource_data: Data of the created resource
             user_id: ID of the user who created the resource
             actioned_by: ID of the admin/user who performed the action on behalf of another user
@@ -95,6 +97,7 @@ class AuditService:
             action=AuditActionEnum.CREATE,
             resource_type=resource_type,
             resource_id=resource_id,
+            resource_name=resource_name,
             user_id=user_id,
             actioned_by=actioned_by,
             details=details,
@@ -106,8 +109,9 @@ class AuditService:
         self,
         resource_type: AuditResourceTypeEnum,
         resource_id: UUID,
-        previous_data: Dict[str, Any],
-        new_data: Dict[str, Any],
+        resource_name: Optional[str] = None,
+        previous_data: Dict[str, Any] = None,
+        new_data: Dict[str, Any] = None,
         user_id: Optional[UUID] = None,
         actioned_by: Optional[UUID] = None,
         ip_address: Optional[str] = None,
@@ -118,6 +122,7 @@ class AuditService:
         Args:
             resource_type: Type of resource updated
             resource_id: ID of the updated resource
+            resource_name: Name of the updated resource for display and search
             previous_data: Data before the update
             new_data: Data after the update
             user_id: ID of the user who updated the resource
@@ -143,6 +148,7 @@ class AuditService:
             action=AuditActionEnum.UPDATE,
             resource_type=resource_type,
             resource_id=resource_id,
+            resource_name=resource_name,
             user_id=user_id,
             actioned_by=actioned_by,
             details=details,
@@ -155,7 +161,8 @@ class AuditService:
         self,
         resource_type: AuditResourceTypeEnum,
         resource_id: UUID,
-        resource_data: Dict[str, Any],
+        resource_name: Optional[str] = None,
+        resource_data: Dict[str, Any] = None,
         user_id: Optional[UUID] = None,
         actioned_by: Optional[UUID] = None,
         ip_address: Optional[str] = None,
@@ -166,6 +173,7 @@ class AuditService:
         Args:
             resource_type: Type of resource deleted
             resource_id: ID of the deleted resource
+            resource_name: Name of the deleted resource for display and search
             resource_data: Data of the deleted resource
             user_id: ID of the user who deleted the resource
             actioned_by: ID of the admin/user who performed the action on behalf of another user
@@ -183,6 +191,7 @@ class AuditService:
             action=AuditActionEnum.DELETE,
             resource_type=resource_type,
             resource_id=resource_id,
+            resource_name=resource_name,
             user_id=user_id,
             actioned_by=actioned_by,
             details=details,
@@ -194,8 +203,9 @@ class AuditService:
         self,
         resource_type: AuditResourceTypeEnum,
         resource_id: UUID,
-        access_type: str,
-        granted: bool,
+        resource_name: Optional[str] = None,
+        access_type: str = "unknown",
+        granted: bool = False,
         user_id: Optional[UUID] = None,
         ip_address: Optional[str] = None,
         reason: Optional[str] = None,
@@ -205,6 +215,7 @@ class AuditService:
         Args:
             resource_type: Type of resource accessed
             resource_id: ID of the resource
+            resource_name: Name of the resource for display and search
             access_type: Type of access (read, write, execute, etc.)
             granted: Whether access was granted or denied
             user_id: ID of the user who attempted access
@@ -227,6 +238,7 @@ class AuditService:
             action=action,
             resource_type=resource_type,
             resource_id=resource_id,
+            resource_name=resource_name,
             user_id=user_id,
             details=details,
             ip_address=ip_address,
@@ -334,6 +346,7 @@ class AuditService:
             action=filter_params.action,
             resource_type=filter_params.resource_type,
             resource_id=filter_params.resource_id,
+            resource_name=filter_params.resource_name,
             start_date=filter_params.start_date,
             end_date=filter_params.end_date,
             ip_address=filter_params.ip_address,

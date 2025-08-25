@@ -36,6 +36,7 @@ from ..commons.constants import (
     PROJECT_INVITATION_WORKFLOW,
     EndpointStatusEnum,
     NotificationCategory,
+    NotificationStatus,
     NotificationTypeEnum,
     PermissionEnum,
     ProjectStatusEnum,
@@ -122,6 +123,7 @@ class ProjectService(SessionMixin):
                 action=AuditActionEnum.CREATE,
                 resource_type=AuditResourceTypeEnum.PROJECT,
                 resource_id=db_project.id,
+                resource_name=db_project.name,
                 user_id=current_user_id,
                 details={
                     "project_name": db_project.name,
@@ -138,6 +140,7 @@ class ProjectService(SessionMixin):
                 action=AuditActionEnum.CREATE,
                 resource_type=AuditResourceTypeEnum.PROJECT,
                 resource_id=db_project.id,
+                resource_name=db_project.name if db_project else project_data.get("name"),
                 user_id=current_user_id,
                 details={
                     "project_name": project_data.get("name"),
@@ -147,6 +150,36 @@ class ProjectService(SessionMixin):
                 success=False,
             )
             raise ClientException("Failed to update permission in Keycloak")
+
+        # Send notification for CLIENT_APP project creation
+        if db_project.project_type == ProjectTypeEnum.CLIENT_APP:
+            try:
+                notification = (
+                    NotificationBuilder()
+                    .set_content(
+                        title="Client App Project Created",
+                        message=f"Your client app project '{db_project.name}' has been successfully created",
+                        status=NotificationStatus.COMPLETED,
+                        icon="project",
+                        result={
+                            "project_id": str(db_project.id),
+                            "project_name": db_project.name,
+                            "project_type": ProjectTypeEnum.CLIENT_APP.value,
+                        },
+                    )
+                    .set_payload(
+                        category=NotificationCategory.INAPP,
+                        type="project_creation",
+                        source=app_settings.source_topic,
+                    )
+                    .set_notification_request(subscriber_ids=str(current_user_id))
+                    .build()
+                )
+                await BudNotifyService().send_notification(notification)
+                logger.info(f"Notification sent for CLIENT_APP project creation: {db_project.id}")
+            except Exception as e:
+                logger.error(f"Failed to send notification for CLIENT_APP project creation: {e}")
+                # Don't fail the project creation if notification fails
 
         return db_project
 
@@ -193,6 +226,7 @@ class ProjectService(SessionMixin):
             action=AuditActionEnum.UPDATE,
             resource_type=AuditResourceTypeEnum.PROJECT,
             resource_id=project_id,
+            resource_name=db_project.name,
             user_id=current_user_id,
             previous_state=previous_state,
             new_state={
@@ -557,13 +591,14 @@ class ProjectService(SessionMixin):
         result = []
 
         for db_result in db_results:
-            db_project, users_count, profile_colors, endpoints_count = db_result
+            db_project, users_count, profile_colors, endpoints_count, credentials_count = db_result
             profile_colors = profile_colors.split(",") if profile_colors else []
             result.append(
                 ProjectListResponse(
                     project=db_project,
                     endpoints_count=endpoints_count,
                     users_count=users_count,
+                    credentials_count=credentials_count,
                     profile_colors=profile_colors[:3],
                 )
             )
@@ -610,6 +645,7 @@ class ProjectService(SessionMixin):
                 action=AuditActionEnum.DELETE,
                 resource_type=AuditResourceTypeEnum.PROJECT,
                 resource_id=project_id,
+                resource_name=db_project.name,
                 user_id=current_user_id,
                 details=project_details,
                 request=request,
@@ -629,6 +665,7 @@ class ProjectService(SessionMixin):
                 action=AuditActionEnum.DELETE,
                 resource_type=AuditResourceTypeEnum.PROJECT,
                 resource_id=project_id,
+                resource_name=db_project.name,
                 user_id=current_user_id,
                 details=project_details,
                 request=request,
@@ -652,6 +689,7 @@ class ProjectService(SessionMixin):
                         action=AuditActionEnum.DELETE,
                         resource_type=AuditResourceTypeEnum.API_KEY,
                         resource_id=credential.id,
+                        resource_name=credential.name if hasattr(credential, "name") and credential.name else None,
                         user_id=current_user_id,
                         details=credential_details,
                         request=request,
@@ -696,6 +734,7 @@ class ProjectService(SessionMixin):
             action=AuditActionEnum.DELETE,
             resource_type=AuditResourceTypeEnum.PROJECT,
             resource_id=project_id,
+            resource_name=db_project.name,
             user_id=current_user_id,
             details=project_details,
             request=request,

@@ -172,7 +172,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             await asyncio.sleep(1800)
 
     async def schedule_credential_usage_sync() -> None:
-        """Schedule periodic synchronization of credential usage from budmetrics."""
+        """Schedule periodic synchronization of credential usage data from budmetrics."""
         from .commons.database import SessionLocal
         from .credential_ops.services import CredentialService
 
@@ -181,15 +181,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
         while True:
             try:
-                logger.debug("Running scheduled credential usage sync")
+                logger.info("Running scheduled credential usage sync")
                 # Create a new session for this sync operation
                 with SessionLocal() as session:
                     credential_service = CredentialService(session)
-                    result = await credential_service.sync_credential_usage_from_metrics(minutes_back=10)
-                    if result.get("success"):
-                        logger.debug("Credential usage sync completed: %s", result)
-                    else:
-                        logger.warning("Credential usage sync failed: %s", result)
+                    result = await credential_service.sync_credential_usage_from_metrics()
+                    logger.info("Credential usage sync completed: %s", result)
             except Exception as e:
                 logger.error("Failed to sync credential usage: %s", e)
 

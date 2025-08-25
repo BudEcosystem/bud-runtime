@@ -15,14 +15,15 @@ export async function POST(req: Request) {
   const authorization = req.headers.get('authorization');
   const apiKey = req.headers.get('api-key');
 
-  if (!authorization) {
+  // Accept either JWT (Bearer token) or API key
+  if (!authorization && !apiKey) {
     return new Response('Unauthorized', { status: 401 });
   }
 
+  console.log(metadata.base_url || copyCodeApiBaseUrl)
   const proxyOpenAI = createOpenAI({
     // custom settings, e.g.
     baseURL: metadata.base_url || copyCodeApiBaseUrl,
-    // apiKey: "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",
     fetch: (input, init) => {
       const request = {
         ...init,
@@ -30,7 +31,10 @@ export async function POST(req: Request) {
         headers: {
           ...init?.headers,
           'project-id': metadata.project_id,
-          'Authorization': authorization
+          // Pass through the authorization header (JWT Bearer token)
+          ...(authorization && { 'Authorization': authorization }),
+          // Pass through the API key header if present
+          ...(apiKey && { 'api-key': apiKey })
         },
         body: JSON.stringify({
           id,
