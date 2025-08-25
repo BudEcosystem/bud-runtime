@@ -3,13 +3,13 @@
 
 import asyncio
 import time
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 from budapp.shared.jwt_blacklist_service import JWTBlacklistService
 
 
 async def test_jwt_blacklist_service():
-    """Test the JWT blacklist service functionality.
+    """Test the JWT blacklist service functionality."""
 
     print("Testing JWT Blacklist Service with Dapr State Store")
     print("=" * 50)
@@ -69,8 +69,6 @@ async def test_jwt_blacklist_service():
 
     print("\n" + "=" * 50)
     print("Test completed!")
-    """
-    pass
 
 async def test_with_mock_dapr():
     """Test with mocked Dapr client for unit testing."""
@@ -81,6 +79,10 @@ async def test_with_mock_dapr():
     with patch('budapp.shared.jwt_blacklist_service.DaprService') as MockDaprService:
         mock_dapr = Mock()
         MockDaprService.return_value = mock_dapr
+
+        # Mock async save_to_statestore method
+        mock_dapr.save_to_statestore = AsyncMock()
+        mock_dapr.delete_state = Mock()
 
         # Mock get_state response for blacklisted token
         mock_response_blacklisted = Mock()
