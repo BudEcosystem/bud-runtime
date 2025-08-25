@@ -136,6 +136,27 @@ jobs:
         run: |
           alembic -c ./alembic.ini upgrade head
 
+      - name: Start BudPrompt service
+        run: |
+          echo "::group::Starting BudPrompt service"
+          # Start the service in background
+          uvicorn budprompt.main:app --host 0.0.0.0 --port 9088 &
+          # Save the PID for later cleanup
+          echo $! > budprompt.pid
+          # Wait for service to be ready
+          echo "Waiting for service to start..."
+          for i in {1..30}; do
+            if curl -f http://localhost:9088/health 2>/dev/null; then
+              echo "Service is ready!"
+              break
+            fi
+            echo "Waiting... ($i/30)"
+            sleep 1
+          done
+          # Verify service is running
+          curl -f http://localhost:9088/health || (echo "Service failed to start" && exit 1)
+          echo "::endgroup::"
+
       - name: Run tests with coverage
         run: |
           echo "::group::Running pytest with coverage"
@@ -147,6 +168,15 @@ jobs:
             -v \
             -x
           echo "::endgroup::"
+
+      - name: Stop BudPrompt service
+        if: always()
+        run: |
+          if [ -f budprompt.pid ]; then
+            echo "Stopping BudPrompt service..."
+            kill $(cat budprompt.pid) || true
+            rm budprompt.pid
+          fi
 
       - name: Upload coverage reports
         uses: actions/upload-artifact@v4
