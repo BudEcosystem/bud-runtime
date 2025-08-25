@@ -10,19 +10,6 @@ import pytest
 from fastapi import status
 from sqlalchemy.orm import Session
 
-from budapp.commons.constants import (
-    EndpointStatusEnum,
-    ProjectStatusEnum,
-    ProjectTypeEnum,
-    UserStatusEnum,
-    UserTypeEnum,
-)
-from budapp.project_ops.crud import ProjectDataManager
-from budapp.project_ops.models import Project as ProjectModel
-from budapp.project_ops.schemas import ProjectListResponse, PaginatedProjectsResponse
-from budapp.project_ops.services import ProjectService
-from budapp.user_ops.schemas import User
-
 
 class TestProjectCredentialsCount:
     """Test suite for project credentials count functionality."""
@@ -41,17 +28,30 @@ class TestProjectCredentialsCount:
     @pytest.fixture
     def mock_user(self):
         """Create a mock user for testing."""
+        # Import here to avoid module-level import issues
+        from budapp.commons.constants import UserRoleEnum, UserStatusEnum, UserTypeEnum
+        from budapp.user_ops.schemas import User
+
         return User(
             id=uuid4(),
             email="test@example.com",
             name="Test User",
             status=UserStatusEnum.ACTIVE,
             user_type=UserTypeEnum.ADMIN,
+            color="#FF0000",
+            role=UserRoleEnum.ADMIN,
+            auth_id=uuid4(),
+            password="hashed_password",
+            created_at=datetime.now(timezone.utc),
+            modified_at=datetime.now(timezone.utc),
         )
 
     @pytest.fixture
     def mock_project_with_counts(self):
         """Create a mock project with associated counts."""
+        from budapp.commons.constants import ProjectStatusEnum, ProjectTypeEnum
+        from budapp.project_ops.models import Project as ProjectModel
+
         project = Mock(spec=ProjectModel)
         project.id = uuid4()
         project.name = "Test Project"
@@ -68,6 +68,10 @@ class TestProjectCredentialsCount:
     @pytest.mark.asyncio
     async def test_get_all_active_projects_returns_credentials_count(self, mock_session):
         """Test that get_all_active_projects returns credentials_count in tuple."""
+        from budapp.commons.constants import ProjectStatusEnum, ProjectTypeEnum
+        from budapp.project_ops.crud import ProjectDataManager
+        from budapp.project_ops.models import Project as ProjectModel
+
         crud = ProjectDataManager(mock_session)
 
         # Mock project
@@ -101,6 +105,10 @@ class TestProjectCredentialsCount:
     @pytest.mark.asyncio
     async def test_get_all_participated_projects_returns_credentials_count(self, mock_session):
         """Test that get_all_participated_projects returns credentials_count in tuple."""
+        from budapp.commons.constants import ProjectStatusEnum, ProjectTypeEnum
+        from budapp.project_ops.crud import ProjectDataManager
+        from budapp.project_ops.models import Project as ProjectModel
+
         crud = ProjectDataManager(mock_session)
         user_id = uuid4()
 
@@ -135,6 +143,9 @@ class TestProjectCredentialsCount:
     @pytest.mark.asyncio
     async def test_parse_project_list_results_includes_credentials_count(self, mock_session, mock_project_with_counts):
         """Test that parse_project_list_results correctly parses credentials_count."""
+        from budapp.project_ops.schemas import ProjectListResponse
+        from budapp.project_ops.services import ProjectService
+
         service = ProjectService(mock_session)
 
         # Create mock database results with credentials_count
@@ -161,6 +172,10 @@ class TestProjectCredentialsCount:
     @pytest.mark.asyncio
     async def test_get_all_active_projects_service_returns_credentials_count(self, mock_session, mock_user, mock_project_with_counts):
         """Test that ProjectService.get_all_active_projects returns projects with credentials_count."""
+        from budapp.project_ops.crud import ProjectDataManager
+        from budapp.project_ops.schemas import ProjectListResponse
+        from budapp.project_ops.services import ProjectService
+
         service = ProjectService(mock_session)
 
         # Mock the CRUD layer response
@@ -196,6 +211,10 @@ class TestProjectCredentialsCount:
     @pytest.mark.asyncio
     async def test_credentials_count_with_search(self, mock_session):
         """Test that credentials_count is included when using search functionality."""
+        from budapp.commons.constants import ProjectTypeEnum
+        from budapp.project_ops.crud import ProjectDataManager
+        from budapp.project_ops.models import Project as ProjectModel
+
         crud = ProjectDataManager(mock_session)
 
         mock_project = Mock(spec=ProjectModel)
@@ -229,6 +248,8 @@ class TestProjectCredentialsCount:
     @pytest.mark.asyncio
     async def test_credentials_count_null_handling(self, mock_session, mock_project_with_counts):
         """Test that NULL credentials_count is handled properly."""
+        from budapp.project_ops.services import ProjectService
+
         service = ProjectService(mock_session)
 
         # Create mock database results with NULL credentials_count
@@ -245,6 +266,11 @@ class TestProjectCredentialsCount:
     @pytest.mark.asyncio
     async def test_client_app_projects_have_credentials_count(self, mock_session, mock_user):
         """Test that CLIENT_APP projects include credentials_count."""
+        from budapp.commons.constants import UserTypeEnum, ProjectTypeEnum
+        from budapp.project_ops.crud import ProjectDataManager
+        from budapp.project_ops.models import Project as ProjectModel
+        from budapp.project_ops.services import ProjectService
+
         mock_user.user_type = UserTypeEnum.CLIENT
         service = ProjectService(mock_session)
 
@@ -277,6 +303,11 @@ class TestProjectCredentialsCount:
     @pytest.mark.asyncio
     async def test_admin_app_projects_have_credentials_count(self, mock_session, mock_user):
         """Test that ADMIN_APP projects also include credentials_count (should be 0 for admin apps)."""
+        from budapp.commons.constants import ProjectTypeEnum
+        from budapp.project_ops.crud import ProjectDataManager
+        from budapp.project_ops.models import Project as ProjectModel
+        from budapp.project_ops.services import ProjectService
+
         service = ProjectService(mock_session)
 
         mock_project = Mock(spec=ProjectModel)
@@ -312,6 +343,9 @@ class TestProjectCredentialsCount:
 
     def test_project_list_response_schema_includes_credentials_count(self):
         """Test that ProjectListResponse schema properly includes credentials_count."""
+        from budapp.commons.constants import ProjectTypeEnum
+        from budapp.project_ops.schemas import ProjectListResponse
+
         base_time = datetime.now(timezone.utc)
         project_data = {
             "project": {
@@ -338,6 +372,9 @@ class TestProjectCredentialsCount:
 
     def test_project_list_response_schema_converts_none_to_zero(self):
         """Test that ProjectListResponse converts None values to 0."""
+        from budapp.commons.constants import ProjectTypeEnum
+        from budapp.project_ops.schemas import ProjectListResponse
+
         base_time = datetime.now(timezone.utc)
         project_data = {
             "project": {
@@ -364,6 +401,9 @@ class TestProjectCredentialsCount:
 
     def test_paginated_projects_response_includes_credentials_count(self):
         """Test that PaginatedProjectsResponse properly includes projects with credentials_count."""
+        from budapp.commons.constants import ProjectTypeEnum
+        from budapp.project_ops.schemas import ProjectListResponse, PaginatedProjectsResponse
+
         base_time = datetime.now(timezone.utc)
         projects = []
 
