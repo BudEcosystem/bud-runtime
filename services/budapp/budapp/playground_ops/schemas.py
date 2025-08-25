@@ -20,6 +20,7 @@
 import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional
+from uuid import UUID
 
 from pydantic import UUID4, BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -405,3 +406,48 @@ class NoteFilter(BaseModel):
     """Note filter schema."""
 
     note: str | None = None
+
+
+class PlaygroundInitializeRequest(BaseModel):
+    """Request schema for playground JWT initialization."""
+
+    jwt_token: str = Field(..., description="JWT token to initialize playground session")
+
+    @field_validator("jwt_token")
+    @classmethod
+    def validate_jwt_format(cls, v: str) -> str:
+        """Basic JWT format validation."""
+        if not v or not v.strip():
+            raise ValueError("JWT token cannot be empty")
+
+        # Basic JWT format check (three parts separated by dots)
+        parts = v.split(".")
+        if len(parts) != 3:
+            raise ValueError("Invalid JWT token format")
+
+        return v.strip()
+
+
+class EndpointInfo(BaseModel):
+    """Information about an endpoint available to the user."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    name: str
+    model_id: UUID
+    model_name: str
+    status: EndpointStatusEnum
+    project_id: UUID
+    context_length: int | None = None
+    input_cost: dict | None = None
+    output_cost: dict | None = None
+
+
+class PlaygroundInitializeResponse(BaseModel):
+    """Response schema for playground JWT initialization."""
+
+    user_id: UUID = Field(..., description="User ID from JWT")
+    initialization_status: str = Field(default="success", description="Status of initialization")
+    ttl: int | None = Field(None, description="Session TTL in seconds based on JWT expiry")
+    message: str | None = Field(None, description="Optional message about initialization")

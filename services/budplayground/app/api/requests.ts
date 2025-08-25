@@ -127,10 +127,17 @@ const Post = (endPoint: string, payload?: any, params?: any, headers?: any) => {
   }
 
   if (headers) {
+    // Merge headers but don't override Authorization if it's being set by interceptor
+    const token = localStorage.getItem("token");
     config["headers"] = {
       ...config["headers"],
       ...headers
     };
+
+    // Ensure Authorization header is set correctly for JWT tokens
+    if (token && !token.startsWith('budserve_')) {
+      config["headers"]["Authorization"] = `Bearer ${token}`;
+    }
   }
 
   return axiosInstance.post(endPoint, payload, config);
