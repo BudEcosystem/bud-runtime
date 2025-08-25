@@ -27,7 +27,7 @@ class TestInputValidationIntegration:
     """Integration tests for input validation using actual API calls."""
 
     base_url = "http://localhost:9088"
-    deployment_name = "qwen3-4b"
+    deployment_name = "qwen3-32b"
 
     @pytest.fixture
     def http_client(self):
@@ -61,7 +61,7 @@ class TestInputValidationIntegration:
             ],
             "input_schema": InputSchema.model_json_schema(),
             "output_schema": OutputSchema.model_json_schema(),
-            "input_data": {"content": {"name": "John", "age": 25}},
+            "input_data": {"name": "John", "age": 25},
             # No input_validation_prompt - validation should be disabled
         }
 
@@ -94,7 +94,7 @@ class TestInputValidationIntegration:
             ],
             "input_schema": InputSchema.model_json_schema(),
             "output_schema": OutputSchema.model_json_schema(),
-            "input_data": {"content": {"name": "John", "age": 30, "email": "john@example.com"}},
+            "input_data": {"name": "John", "age": 30, "email": "john@example.com"},
             "input_validation_prompt": "Age must be greater than 25",
         }
 
@@ -128,7 +128,7 @@ class TestInputValidationIntegration:
             ],
             "input_schema": InputSchema.model_json_schema(),
             "output_schema": OutputSchema.model_json_schema(),
-            "input_data": {"content": {"name": "Jane", "age": 16, "email": "jane@example.com"}},
+            "input_data": {"name": "Jane", "age": 16, "email": "jane@example.com"},
             "input_validation_prompt": "Age must be greater than 18",
         }
 
@@ -164,7 +164,7 @@ class TestInputValidationIntegration:
             ],
             "input_schema": InputSchema.model_json_schema(),
             "output_schema": OutputSchema.model_json_schema(),
-            "input_data": {"content": {"name": "John", "age": 30, "city": "New York"}},
+            "input_data": {"name": "John", "age": 30, "city": "New York"},
             "input_validation_prompt": "Name must be exactly 'Alice'",
         }
 
@@ -206,14 +206,12 @@ class TestInputValidationIntegration:
             "input_schema": InputSchema.model_json_schema(),
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": {
-                "content": {
-                    "name": "Alice",
-                    "age": 28,
-                    "address": {
-                        "street": "123 Main St",
-                        "city": "Bangalore",
-                        "country": "India"
-                    }
+                "name": "Alice",
+                "age": 28,
+                "address": {
+                    "street": "123 Main St",
+                    "city": "Bangalore",
+                    "country": "India"
                 }
             },
             "input_validation_prompt": "The person must live in Bangalore city",
@@ -255,14 +253,12 @@ class TestInputValidationIntegration:
             "input_schema": InputSchema.model_json_schema(),
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": {
-                "content": {
-                    "name": "Bob",
-                    "age": 35,
-                    "address": {
-                        "street": "456 Oak St",
-                        "city": "Mumbai",
-                        "country": "India"
-                    }
+                "name": "Bob",
+                "age": 35,
+                "address": {
+                    "street": "456 Oak St",
+                    "city": "Mumbai",
+                    "country": "India"
                 }
             },
             "input_validation_prompt": "The person must live in Bangalore city",
@@ -305,14 +301,12 @@ class TestInputValidationIntegration:
             "input_schema": InputSchema.model_json_schema(),
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": {
-                "content": {
-                    "team_name": "Alpha Team",
-                    "members": [
-                        {"name": "Alice", "age": 25, "hobbies": ["reading", "coding"]},
-                        {"name": "Bob", "age": 30, "hobbies": ["gaming", "music"]},
-                        {"name": "Charlie", "age": 28, "hobbies": ["sports", "cooking"]}
-                    ]
-                }
+                "team_name": "Alpha Team",
+                "members": [
+                    {"name": "Alice", "age": 25, "hobbies": ["reading", "coding"]},
+                    {"name": "Bob", "age": 30, "hobbies": ["gaming", "music"]},
+                    {"name": "Charlie", "age": 28, "hobbies": ["sports", "cooking"]}
+                ]
             },
             "input_validation_prompt": "Team must have exactly 3 members and all members must be over 20 years old",
         }
@@ -351,14 +345,12 @@ class TestInputValidationIntegration:
             "input_schema": InputSchema.model_json_schema(),
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": {
-                "content": {
-                    "team_name": "Beta Team",
-                    "members": [
-                        {"name": "Alice", "age": 25},
-                        {"name": "Bob", "age": 17},  # Too young
-                        {"name": "Charlie", "age": 28}
-                    ]
-                }
+                "team_name": "Beta Team",
+                "members": [
+                    {"name": "Alice", "age": 25},
+                    {"name": "Bob", "age": 17},  # Too young
+                    {"name": "Charlie", "age": 28}
+                ]
             },
             "input_validation_prompt": "All team members must be over 18 years old",
         }
@@ -396,12 +388,10 @@ class TestInputValidationIntegration:
             "input_schema": InputSchema.model_json_schema(),
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": {
-                "content": {
-                    "name": "Alexander",
-                    "age": 30,
-                    "city": "Mumbai",
-                    "email": "alex@gmail.com"
-                }
+                "name": "Alexander",
+                "age": 30,
+                "city": "Mumbai",
+                "email": "alex@gmail.com"
             },
             "input_validation_prompt": "Name must start with 'A', age must be between 25 and 35, city must be 'Mumbai', and email must contain '@gmail.com'",
         }
@@ -462,12 +452,10 @@ class TestInputValidationIntegration:
             "input_schema": InputSchema.model_json_schema(),
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": {
-                "content": {
-                    "name": "Laptop",
-                    "price": 55.0,
-                    "rating": 4.5,
-                    "quantity": 10
-                }
+                "name": "Laptop",
+                "price": 55.0,
+                "rating": 4.5,
+                "quantity": 10
             },
             "input_validation_prompt": "Price must be between 10.0 and 100.0, rating must be between 4.0 and 5.0, quantity must be greater than 0",
         }
@@ -503,12 +491,10 @@ class TestInputValidationIntegration:
             "input_schema": InputSchema.model_json_schema(),
             "output_schema": OutputSchema.model_json_schema(),
             "input_data": {
-                "content": {
-                    "name": "Zero Test",
-                    "value": 0.0,
-                    "unit": "meters",
-                    "is_positive": False
-                }
+                "name": "Zero Test",
+                "value": 0.0,
+                "unit": "meters",
+                "is_positive": False
             },
             "input_validation_prompt": "Value must be exactly 0.0, unit must be 'meters', is_positive must be false",
         }
