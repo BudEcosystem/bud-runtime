@@ -2636,10 +2636,12 @@ class ObservabilityMetricsService:
         """Convert value to safe float, handling NaN and Infinity."""
         if value is None:
             return 0.0
-        if isinstance(value, (int, float)):
+        if isinstance(value, int):
+            return float(value)
+        if isinstance(value, float):
             if math.isnan(value) or math.isinf(value):
                 return 0.0
-            return float(value)
+            return value
         return 0.0
 
     def _format_metric_value(self, metric: str, value: Union[int, float, None]) -> tuple[str, str]:
