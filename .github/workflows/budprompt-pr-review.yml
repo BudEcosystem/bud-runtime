@@ -82,15 +82,15 @@ jobs:
           cp .env.sample .env
 
           # Database configuration
-          sed -i 's/PSQL_HOST=.*/PSQL_HOST=0.0.0.0/' .env
+          sed -i 's/PSQL_HOST=.*/PSQL_HOST=127.0.0.1/' .env
           sed -i 's/PSQL_DB_NAME=.*/PSQL_DB_NAME=bud_prompt_test/' .env
           # Add PSQL_USER and PSQL_PASSWORD (required by PostgreSQL container)
           echo "PSQL_USER=postgres" >> .env
           echo "PSQL_PASSWORD=postgres" >> .env
 
           # Redis configuration
-          sed -i 's/REDIS_HOST=.*/REDIS_HOST=0.0.0.0/' .env
-          sed -i 's/SECRETS_REDIS_URI=.*/SECRETS_REDIS_URI=0.0.0.0:6379/' .env
+          sed -i 's/REDIS_HOST=.*/REDIS_HOST=127.0.0.1/' .env
+          sed -i 's/SECRETS_REDIS_URI=.*/SECRETS_REDIS_URI=127.0.0.1:6379/' .env
           sed -i 's/SECRETS_REDIS_PASSWORD=.*/SECRETS_REDIS_PASSWORD=redis_test_password/' .env
           # Add REDIS_PORT (required by docker-compose)
           echo "REDIS_PORT=6379" >> .env
