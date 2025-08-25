@@ -3517,6 +3517,27 @@ const flows = {
   "edit-profile": editProfile,
   // route
   "create-route": createRoute,
+  // project details
+  "view-project-details": {
+    title: "Project Details",
+    description: "View project information",
+    totalSteps: 1,
+    steps: [
+      {
+        navigation: () => ["Projects", "Details"],
+        id: "view-project-details",
+        confirmClose: false,
+        step: 1,
+        component: StepComponents["view-project-details"],
+        progress: [
+          {
+            status: FormProgressStatus.inProgress,
+            title: "View Details",
+          },
+        ],
+      },
+    ],
+  },
 };
 
 export const flowMapping: {

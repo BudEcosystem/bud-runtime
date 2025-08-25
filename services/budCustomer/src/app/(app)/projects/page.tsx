@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Card, Row, Col, Flex, Input, Dropdown, Button } from "antd";
+import { Card, Row, Col, Flex, Input, Dropdown, Button, Spin } from "antd";
 import { Typography } from "antd";
 import { PlusOutlined, MoreOutlined } from "@ant-design/icons";
 import { PrimaryButton } from "@/components/ui/button";
@@ -17,24 +17,37 @@ const { Text, Title } = Typography;
 // Separate component for project card to prevent re-renders
 const ProjectCard = React.memo(({
   project,
-  onDelete
+  onDelete,
+  onEdit,
+  onClick
 }: {
   project: ContextProject;
   onDelete: (project: ContextProject) => void;
+  onEdit: (project: ContextProject) => void;
+  onClick: (project: ContextProject) => void;
 }) => {
   // Handle menu item clicks
   const handleMenuClick = useCallback((e: any) => {
     e.domEvent?.stopPropagation?.();
 
     switch (e.key) {
+      case 'edit':
+        onEdit(project);
+        break;
       case 'delete':
         onDelete(project);
         break;
     }
-  }, [project, onDelete]);
+  }, [project, onEdit, onDelete]);
 
-  // Static menu items without onClick handlers - Edit removed temporarily
+  // Static menu items without onClick handlers
   const menuItems = useMemo(() => [
+    {
+      key: "edit",
+      label: "Edit",
+      icon: <Icon icon="ph:pencil-simple" className="text-bud-text-primary" />,
+      className: "hover:!bg-bud-bg-tertiary",
+    },
     {
       key: "delete",
       label: "Delete",
@@ -48,6 +61,7 @@ const ProjectCard = React.memo(({
     <Card
       className="h-full bg-bud-bg-secondary border-bud-border hover:border-bud-purple hover:shadow-lg transition-all duration-300 cursor-pointer overflow-hidden"
       styles={{ body: { padding: 0 } }}
+      onClick={() => onClick(project)}
     >
       <div className="p-6 mb-20">
         {/* Header with Icon and Actions */}
@@ -167,25 +181,37 @@ export default function ProjectsPage() {
     openDrawer("new-project", {});
   };
 
-  // Edit project functionality temporarily disabled due to infinite loop issue
-  // const handleEditProject = useCallback(async (project: ContextProject) => {
-  //   try {
-  //     // Fetch the full project data from API
-  //     const projectData = globalProjects.find(
-  //       (p) => p.project.id === project.id,
-  //     );
-  //     if (projectData) {
-  //       // Set the selected project for editing
-  //       await getGlobalProject(project.id);
-  //       // Open the edit drawer after project is fetched
-  //       setTimeout(() => {
-  //         openDrawer("edit-project", {});
-  //       }, 100);
-  //     }
-  //   } catch (error) {
-  //     console.error("Failed to open edit project:", error);
-  //   }
-  // }, [globalProjects, getGlobalProject, openDrawer]);
+  const handleEditProject = useCallback(async (project: ContextProject) => {
+    try {
+      // Fetch the full project data from API
+      const projectData = globalProjects.find(
+        (p) => p.project.id === project.id,
+      );
+      if (projectData) {
+        // Set the selected project for editing
+        await getGlobalProject(project.id);
+        // Open the edit drawer after project is fetched
+        setTimeout(() => {
+          openDrawer("edit-project", {});
+        }, 100);
+      }
+    } catch (error) {
+      console.error("Failed to open edit project:", error);
+    }
+  }, [globalProjects, getGlobalProject, openDrawer]);
+
+  const handleProjectClick = useCallback(async (project: ContextProject) => {
+    try {
+      // Set the selected project for viewing details
+      await getGlobalProject(project.id);
+      // Open the view drawer after project is fetched
+      setTimeout(() => {
+        openDrawer("view-project-details", {});
+      }, 100);
+    } catch (error) {
+      console.error("Failed to open project details:", error);
+    }
+  }, [getGlobalProject, openDrawer]);
 
   const handleDeleteProject = useCallback(async (project: ContextProject) => {
     try {
@@ -251,19 +277,13 @@ export default function ProjectsPage() {
 
           {/* Loading State */}
           {loading && activeProjects.length === 0 && (
-            <div className="text-center py-16">
-              <Icon
-                icon="ph:spinner"
-                className="text-4xl text-bud-text-disabled mb-4 animate-spin"
-              />
-              <Text className="text-bud-text-muted block">
-                Loading projects...
-              </Text>
+            <div className="flex justify-center items-center h-64">
+              <Spin size="large" />
             </div>
           )}
 
           {/* Projects */}
-          {!loading && activeProjects.length > 0 && (
+          {activeProjects.length > 0 && (
             <div className="mb-[3rem]">
               <Row gutter={[24, 24]}>
                 {activeProjects.map((project) => (
@@ -271,10 +291,19 @@ export default function ProjectsPage() {
                     <ProjectCard
                       project={project}
                       onDelete={handleDeleteProject}
+                      onEdit={handleEditProject}
+                      onClick={handleProjectClick}
                     />
                   </Col>
                 ))}
               </Row>
+            </div>
+          )}
+
+          {/* Loading indicator for pagination/search */}
+          {loading && activeProjects.length > 0 && (
+            <div className="flex justify-center items-center py-4">
+              <Spin />
             </div>
           )}
 

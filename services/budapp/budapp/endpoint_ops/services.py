@@ -2870,10 +2870,12 @@ class EndpointService(SessionMixin):
             encrypted_credential_data = endpoint.credential.other_provider_creds
 
         # Call add_model_to_proxy_cache with endpoint information
+        # Use model.source for provider type (openai, anthropic, etc.), not model_type (which is architecture info)
+        model_provider_type = endpoint.model.source.lower() if endpoint.model.source else "vllm"
         await self.add_model_to_proxy_cache(
             endpoint_id=endpoint.id,
             model_name=endpoint.name,
-            model_type=endpoint.model.model_type if endpoint.model else "vllm",  # Default to vllm
+            model_type=model_provider_type,  # Use source field for provider type
             api_base=endpoint.url,
             supported_endpoints=endpoint.supported_endpoints,
             encrypted_credential_data=encrypted_credential_data,
