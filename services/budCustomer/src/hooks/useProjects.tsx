@@ -20,6 +20,7 @@ export type Project = {
   project: ProjectData;
   users_count: number;
   endpoints_count: number;
+  credentials_count: number;
   profile_colors: string[];
 };
 
