@@ -217,11 +217,21 @@ class PaginatedProjectsResponse(PaginatedSuccessResponse):
     projects: list[ProjectListResponse] = []
 
 
+class CredentialSummary(BaseModel):
+    """Summary of credential information for project response."""
+
+    id: UUID4
+    name: str
+    last_used_at: datetime | None
+
+
 class ProjectDetailResponse(SuccessResponse):
     """Project response to client schema."""
 
     project: ProjectResponse
     endpoints_count: int
+    credentials_count: int | None = None
+    credentials: list[CredentialSummary] | None = None
 
 
 class ProjectUserAddList(BaseModel):
