@@ -93,8 +93,14 @@ const SelectedFilters = ({
 };
 
 export default function ModelsPage() {
-  const { models, loading, getModelsCatalog, totalModels, totalPages, setSelectedModel } =
-    useModels();
+  const {
+    models,
+    loading,
+    getModelsCatalog,
+    totalModels,
+    totalPages,
+    setSelectedModel,
+  } = useModels();
   const { openDrawer } = useDrawer();
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -356,7 +362,10 @@ export default function ModelsPage() {
                               mode="multiple"
                               value={tempFilter.modality}
                               onChange={(value) =>
-                                setTempFilter({ ...tempFilter, modality: value })
+                                setTempFilter({
+                                  ...tempFilter,
+                                  modality: value,
+                                })
                               }
                               options={cloudProviders.map((modality) => ({
                                 label: modality.label,
@@ -395,10 +404,10 @@ export default function ModelsPage() {
         {(filter.modality?.length ||
           filter.model_size_min !== undefined ||
           filter.model_size_max !== undefined) && (
-            <div className="flex-shrink-0">
-              <SelectedFilters filters={filter} removeTag={removeSelectedTag} />
-            </div>
-          )}
+          <div className="flex-shrink-0">
+            <SelectedFilters filters={filter} removeTag={removeSelectedTag} />
+          </div>
+        )}
 
         {/* Models Grid */}
         <div
@@ -413,9 +422,9 @@ export default function ModelsPage() {
             <Empty
               description={
                 filter.name ||
-                  filter.modality?.length ||
-                  filter.model_size_min !== undefined ||
-                  filter.model_size_max !== undefined
+                filter.modality?.length ||
+                filter.model_size_min !== undefined ||
+                filter.model_size_max !== undefined
                   ? `No models found`
                   : "No models available"
               }
@@ -516,15 +525,27 @@ export default function ModelsPage() {
                       {model.pricing ? (
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
-                            <Icon icon="ph:arrow-down" className="text-bud-text-muted text-xs" />
+                            <Icon
+                              icon="ph:arrow-down"
+                              className="text-bud-text-muted text-xs"
+                            />
                             <Text_13_400_EEEEEE>
-                              Input: {model.pricing.input_cost} {model.pricing.currency} / {model.pricing.per_tokens} Tokens
+                              Input:{" "}
+                              {model.pricing.input_cost === 0
+                                ? "Free"
+                                : `${model.pricing.input_cost} ${model.pricing.currency} / ${model.pricing.per_tokens} Tokens`}
                             </Text_13_400_EEEEEE>
                           </div>
                           <div className="flex items-center gap-2">
-                            <Icon icon="ph:arrow-up" className="text-bud-text-muted text-xs" />
+                            <Icon
+                              icon="ph:arrow-up"
+                              className="text-bud-text-muted text-xs"
+                            />
                             <Text_13_400_EEEEEE>
-                              Output: {model.pricing.output_cost} {model.pricing.currency} / {model.pricing.per_tokens} Tokens
+                              Output:{" "}
+                              {model.pricing.output_cost === 0
+                                ? "Free"
+                                : `${model.pricing.output_cost} ${model.pricing.currency} / ${model.pricing.per_tokens} Tokens`}
                             </Text_13_400_EEEEEE>
                           </div>
                         </div>
