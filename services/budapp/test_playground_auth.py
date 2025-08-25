@@ -108,18 +108,21 @@ class TestPlaygroundInitialization:
         mock_endpoint.model.name = "test-model"
 
         # Setup mocks
-        with patch('budapp.playground_ops.services.UserDataManager') as mock_user_manager, \
-             patch('budapp.playground_ops.services.ProjectService') as mock_project_service, \
-             patch('budapp.playground_ops.services.EndpointDataManager') as mock_endpoint_manager, \
-             patch('budapp.playground_ops.services.RedisService') as mock_redis:
-
+        with (
+            patch("budapp.playground_ops.services.UserDataManager") as mock_user_manager,
+            patch("budapp.playground_ops.services.ProjectService") as mock_project_service,
+            patch("budapp.playground_ops.services.EndpointDataManager") as mock_endpoint_manager,
+            patch("budapp.playground_ops.services.RedisService") as mock_redis,
+        ):
             # Configure mocks
             mock_user_manager.return_value.retrieve_by_fields = AsyncMock(return_value=mock_user)
 
             # Mock project service response with proper structure
             mock_project_response = Mock()
             mock_project_response.project = mock_project
-            mock_project_service.return_value.get_all_active_projects = AsyncMock(return_value=([mock_project_response], 1))
+            mock_project_service.return_value.get_all_active_projects = AsyncMock(
+                return_value=([mock_project_response], 1)
+            )
 
             mock_endpoint_manager.return_value.get_all_playground_deployments = AsyncMock(
                 return_value=([(mock_endpoint, None, None, None)], 1)
@@ -175,15 +178,18 @@ class TestPlaygroundInitialization:
         mock_project.id = uuid4()
 
         # Setup mocks
-        with patch('budapp.playground_ops.services.UserDataManager') as mock_user_manager, \
-             patch('budapp.playground_ops.services.ProjectService') as mock_project_service:
-
+        with (
+            patch("budapp.playground_ops.services.UserDataManager") as mock_user_manager,
+            patch("budapp.playground_ops.services.ProjectService") as mock_project_service,
+        ):
             mock_user_manager.return_value.retrieve_by_fields = AsyncMock(return_value=mock_user)
 
             # Mock project service response with proper structure
             mock_project_response = Mock()
             mock_project_response.project = mock_project
-            mock_project_service.return_value.get_all_active_projects = AsyncMock(return_value=([mock_project_response], 1))
+            mock_project_service.return_value.get_all_active_projects = AsyncMock(
+                return_value=([mock_project_response], 1)
+            )
 
             # Act & Assert
             with pytest.raises(ClientException) as exc_info:
@@ -207,9 +213,10 @@ class TestPlaygroundInitialization:
         mock_user.user_type = UserTypeEnum.CLIENT
 
         # Setup mocks
-        with patch('budapp.playground_ops.services.UserDataManager') as mock_user_manager, \
-             patch('budapp.playground_ops.services.ProjectService') as mock_project_service:
-
+        with (
+            patch("budapp.playground_ops.services.UserDataManager") as mock_user_manager,
+            patch("budapp.playground_ops.services.ProjectService") as mock_project_service,
+        ):
             mock_user_manager.return_value.retrieve_by_fields = AsyncMock(return_value=mock_user)
             mock_project_service.return_value.get_all_active_projects = AsyncMock(return_value=([], 0))
 
@@ -255,24 +262,24 @@ class TestPlaygroundInitialization:
         endpoint2.model = Mock(id=uuid4(), name="model2")
 
         # Setup mocks
-        with patch('budapp.playground_ops.services.UserDataManager') as mock_user_manager, \
-             patch('budapp.playground_ops.services.ProjectService') as mock_project_service, \
-             patch('budapp.playground_ops.services.EndpointDataManager') as mock_endpoint_manager, \
-             patch('budapp.playground_ops.services.RedisService') as mock_redis:
-
+        with (
+            patch("budapp.playground_ops.services.UserDataManager") as mock_user_manager,
+            patch("budapp.playground_ops.services.ProjectService") as mock_project_service,
+            patch("budapp.playground_ops.services.EndpointDataManager") as mock_endpoint_manager,
+            patch("budapp.playground_ops.services.RedisService") as mock_redis,
+        ):
             mock_user_manager.return_value.retrieve_by_fields = AsyncMock(return_value=mock_user)
 
             # Mock project service response with proper structure
             mock_project_response = Mock()
             mock_project_response.project = mock_project
-            mock_project_service.return_value.get_all_active_projects = AsyncMock(return_value=([mock_project_response], 1))
+            mock_project_service.return_value.get_all_active_projects = AsyncMock(
+                return_value=([mock_project_response], 1)
+            )
 
             # Admin users should get all endpoints (not filtered by is_published)
             mock_endpoint_manager.return_value.get_all_playground_deployments = AsyncMock(
-                return_value=(
-                    [(endpoint1, None, None, None), (endpoint2, None, None, None)],
-                    2
-                )
+                return_value=([(endpoint1, None, None, None), (endpoint2, None, None, None)], 2)
             )
 
             mock_redis_instance = Mock()
@@ -288,9 +295,9 @@ class TestPlaygroundInitialization:
 
             # Verify endpoint manager was called without is_published filter
             call_args = mock_endpoint_manager.return_value.get_all_playground_deployments.call_args
-            filters = call_args[1]['filters']
-            assert 'is_published' not in filters
-            assert filters['status'] == EndpointStatusEnum.RUNNING
+            filters = call_args[1]["filters"]
+            assert "is_published" not in filters
+            assert filters["status"] == EndpointStatusEnum.RUNNING
 
 
 class TestRedisCache:
@@ -337,11 +344,12 @@ class TestRedisCache:
             mock_endpoints.append((mock_ep, None, None, None))
 
         # Setup mocks
-        with patch('budapp.playground_ops.services.UserDataManager') as mock_user_manager, \
-             patch('budapp.playground_ops.services.ProjectService') as mock_project_service, \
-             patch('budapp.playground_ops.services.EndpointDataManager') as mock_endpoint_manager, \
-             patch('budapp.playground_ops.services.RedisService') as mock_redis:
-
+        with (
+            patch("budapp.playground_ops.services.UserDataManager") as mock_user_manager,
+            patch("budapp.playground_ops.services.ProjectService") as mock_project_service,
+            patch("budapp.playground_ops.services.EndpointDataManager") as mock_endpoint_manager,
+            patch("budapp.playground_ops.services.RedisService") as mock_redis,
+        ):
             mock_user_manager.return_value.retrieve_by_fields = AsyncMock(return_value=mock_user)
             mock_project_service.return_value.list_projects = AsyncMock(return_value=([mock_project], 1))
             mock_endpoint_manager.return_value.get_all_playground_deployments = AsyncMock(
@@ -390,17 +398,16 @@ class TestRedisCache:
         mock_project = Mock(id=project_id)
 
         # Setup mocks
-        with patch('budapp.playground_ops.services.UserDataManager') as mock_user_manager, \
-             patch('budapp.playground_ops.services.ProjectService') as mock_project_service, \
-             patch('budapp.playground_ops.services.EndpointDataManager') as mock_endpoint_manager, \
-             patch('budapp.playground_ops.services.RedisService') as mock_redis, \
-             patch('budapp.playground_ops.services.time.time', return_value=current_time):
-
+        with (
+            patch("budapp.playground_ops.services.UserDataManager") as mock_user_manager,
+            patch("budapp.playground_ops.services.ProjectService") as mock_project_service,
+            patch("budapp.playground_ops.services.EndpointDataManager") as mock_endpoint_manager,
+            patch("budapp.playground_ops.services.RedisService") as mock_redis,
+            patch("budapp.playground_ops.services.time.time", return_value=current_time),
+        ):
             mock_user_manager.return_value.retrieve_by_fields = AsyncMock(return_value=mock_user)
             mock_project_service.return_value.list_projects = AsyncMock(return_value=([mock_project], 1))
-            mock_endpoint_manager.return_value.get_all_playground_deployments = AsyncMock(
-                return_value=([], 0)
-            )
+            mock_endpoint_manager.return_value.get_all_playground_deployments = AsyncMock(return_value=([], 0))
 
             mock_redis_instance = Mock()
             mock_redis_instance.set = AsyncMock()
@@ -415,7 +422,7 @@ class TestRedisCache:
             # Verify Redis was called with correct TTL
             mock_redis_instance.set.assert_called_once()
             call_kwargs = mock_redis_instance.set.call_args[1]
-            assert call_kwargs.get('ex') == 7200
+            assert call_kwargs.get("ex") == 7200
 
 
 class TestPlaygroundInitializeRequest:
@@ -434,8 +441,7 @@ class TestPlaygroundInitializeRequest:
 
     def test_invalid_jwt_format_missing_parts(self):
         """Test that JWT with missing parts fails validation."""
-        # Arrange
-        invalid_jwt = "not.a.jwt"  # Only 2 parts instead of 3
+        # Arrange - JWT with only 2 parts instead of 3
 
         # Act & Assert
         with pytest.raises(ValueError) as exc_info:
