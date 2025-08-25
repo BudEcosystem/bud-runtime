@@ -308,6 +308,11 @@ kafka:
     clusterId: bud
     controller:
         replicaCount: 1
+        resources:
+            requests:
+                memory: 768Mi
+            limits:
+                memory: 1024Mi
     tls:
         existingSecret: kafka-jks
         keystorePassword: jksPassword
@@ -349,6 +354,11 @@ novu:
         existingSecret: '{{ $.Release.Name }}-novu-externals3'
 minio:
     enabled: true
+    resources:
+        requests:
+            memory: 384Mi
+        limits:
+            memory: 512Mi
     provisioning:
         enabled: true
         buckets:
