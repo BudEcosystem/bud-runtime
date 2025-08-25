@@ -3,7 +3,7 @@
 import json
 import time
 from datetime import UTC, datetime, timedelta
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, Mock, patch, MagicMock
 from uuid import uuid4
 
 import pytest
@@ -58,7 +58,7 @@ class TestPlaygroundInitializeEndpoint:
         try:
             # Mock service dependencies
             with patch('budapp.playground_ops.services.UserDataManager') as mock_user_manager, \
-                 patch('budapp.playground_ops.services.ProjectService') as mock_project_service, \
+                 patch('budapp.playground_ops.services.ProjectService') as mock_project_service_class, \
                  patch('budapp.playground_ops.services.EndpointDataManager') as mock_endpoint_manager, \
                  patch('budapp.playground_ops.services.RedisService') as mock_redis:
 
@@ -66,11 +66,15 @@ class TestPlaygroundInitializeEndpoint:
                 mock_db_user = Mock(id=user_id, user_type=UserTypeEnum.CLIENT)
                 mock_user_manager.return_value.retrieve_by_fields = AsyncMock(return_value=mock_db_user)
 
+                # Mock ProjectService class and its instance
+                mock_project_service_instance = Mock()
                 mock_project = Mock(id=project_id, name="Test Project")
-                # Mock project service with proper structure
                 mock_project_wrapper = Mock()
                 mock_project_wrapper.project = mock_project
-                mock_project_service.return_value.get_all_active_projects = AsyncMock(return_value=([mock_project_wrapper], 1))
+                mock_project_service_instance.get_all_active_projects = AsyncMock(
+                    return_value=([mock_project_wrapper], 1)
+                )
+                mock_project_service_class.return_value = mock_project_service_instance
 
                 mock_endpoint = Mock()
                 mock_endpoint.id = uuid4()
@@ -117,17 +121,45 @@ class TestPlaygroundInitializeEndpoint:
         app.dependency_overrides[get_session] = lambda: Mock()
 
         try:
-            # Act
-            response = client.post(
-                "/playground/initialize",
-                json={"jwt_token": invalid_jwt},
-                headers={"Authorization": f"Bearer {invalid_jwt}"}
-            )
+            # We need to mock the services to prevent actual execution
+            with patch('budapp.playground_ops.services.UserDataManager') as mock_user_manager, \
+                 patch('budapp.playground_ops.services.ProjectService') as mock_project_service_class, \
+                 patch('budapp.playground_ops.services.EndpointDataManager') as mock_endpoint_manager, \
+                 patch('budapp.playground_ops.services.RedisService') as mock_redis:
 
-            # Assert
-            assert response.status_code == 422  # Validation error
-            data = response.json()
-            assert "Invalid JWT token format" in str(data)
+                # Even though we expect validation to fail, the endpoint may still
+                # try to process the request, so we need to mock the services
+                mock_db_user = Mock(id=mock_user.id, user_type=UserTypeEnum.CLIENT)
+                mock_user_manager.return_value.retrieve_by_fields = AsyncMock(return_value=mock_db_user)
+
+                # Mock ProjectService to avoid the KeyError
+                mock_project_service_instance = Mock()
+                mock_project_wrapper = Mock()
+                mock_project_wrapper.project = Mock(id=uuid4())
+                mock_project_service_instance.get_all_active_projects = AsyncMock(
+                    return_value=([mock_project_wrapper], 1)
+                )
+                mock_project_service_class.return_value = mock_project_service_instance
+
+                mock_endpoint_manager.return_value.get_all_playground_deployments = AsyncMock(
+                    return_value=([], 0)
+                )
+
+                mock_redis_instance = Mock()
+                mock_redis_instance.set = AsyncMock()
+                mock_redis.return_value = mock_redis_instance
+
+                # Act
+                response = client.post(
+                    "/playground/initialize",
+                    json={"jwt_token": invalid_jwt},
+                    headers={"Authorization": f"Bearer {invalid_jwt}"}
+                )
+
+                # Assert
+                assert response.status_code == 422  # Validation error
+                data = response.json()
+                assert "Invalid JWT token format" in str(data)
         finally:
             # Clean up the overrides
             app.dependency_overrides.clear()
@@ -181,17 +213,21 @@ class TestJWTToRedisFlow:
 
         # Mock dependencies
         with patch('budapp.playground_ops.services.UserDataManager') as mock_user_manager, \
-             patch('budapp.playground_ops.services.ProjectService') as mock_project_service, \
+             patch('budapp.playground_ops.services.ProjectService') as mock_project_service_class, \
              patch('budapp.playground_ops.services.EndpointDataManager') as mock_endpoint_manager, \
              patch('budapp.playground_ops.services.RedisService') as mock_redis:
 
             mock_user = Mock(id=user_id, user_type=UserTypeEnum.CLIENT)
             mock_user_manager.return_value.retrieve_by_fields = AsyncMock(return_value=mock_user)
 
-            # Mock project service with proper structure
+            # Mock ProjectService class properly
+            mock_project_service_instance = Mock()
             mock_project_wrapper = Mock()
             mock_project_wrapper.project = Mock(id=project_id)
-            mock_project_service.return_value.get_all_active_projects = AsyncMock(return_value=([mock_project_wrapper], 1))
+            mock_project_service_instance.get_all_active_projects = AsyncMock(
+                return_value=([mock_project_wrapper], 1)
+            )
+            mock_project_service_class.return_value = mock_project_service_instance
 
             mock_endpoint_manager.return_value.get_all_playground_deployments = AsyncMock(
                 return_value=([], 0)
@@ -233,17 +269,21 @@ class TestJWTToRedisFlow:
 
         # Mock dependencies
         with patch('budapp.playground_ops.services.UserDataManager') as mock_user_manager, \
-             patch('budapp.playground_ops.services.ProjectService') as mock_project_service, \
+             patch('budapp.playground_ops.services.ProjectService') as mock_project_service_class, \
              patch('budapp.playground_ops.services.EndpointDataManager') as mock_endpoint_manager, \
              patch('budapp.playground_ops.services.RedisService') as mock_redis:
 
             mock_user = Mock(id=user_id, user_type=UserTypeEnum.ADMIN)
             mock_user_manager.return_value.retrieve_by_fields = AsyncMock(return_value=mock_user)
 
-            # Mock project service with proper structure for ADMIN user
+            # Mock ProjectService class properly for ADMIN user
+            mock_project_service_instance = Mock()
             mock_project_wrapper = Mock()
             mock_project_wrapper.project = Mock(id=project_id)
-            mock_project_service.return_value.get_all_active_projects = AsyncMock(return_value=([mock_project_wrapper], 1))
+            mock_project_service_instance.get_all_active_projects = AsyncMock(
+                return_value=([mock_project_wrapper], 1)
+            )
+            mock_project_service_class.return_value = mock_project_service_instance
 
             mock_endpoint_manager.return_value.get_all_playground_deployments = AsyncMock(
                 return_value=([(mock_endpoint, None, None, None)], 1)
@@ -297,7 +337,7 @@ class TestJWTToRedisFlow:
 
         # Mock dependencies
         with patch('budapp.playground_ops.services.UserDataManager') as mock_user_manager, \
-             patch('budapp.playground_ops.services.ProjectService') as mock_project_service, \
+             patch('budapp.playground_ops.services.ProjectService') as mock_project_service_class, \
              patch('budapp.playground_ops.services.EndpointDataManager') as mock_endpoint_manager, \
              patch('budapp.playground_ops.services.RedisService') as mock_redis, \
              patch('budapp.playground_ops.services.time.time', return_value=current_time):
@@ -305,10 +345,14 @@ class TestJWTToRedisFlow:
             mock_user = Mock(id=user_id, user_type=UserTypeEnum.CLIENT)
             mock_user_manager.return_value.retrieve_by_fields = AsyncMock(return_value=mock_user)
 
-            # Mock project service with proper structure
+            # Mock ProjectService class properly
+            mock_project_service_instance = Mock()
             mock_project_wrapper = Mock()
             mock_project_wrapper.project = Mock(id=project_id)
-            mock_project_service.return_value.get_all_active_projects = AsyncMock(return_value=([mock_project_wrapper], 1))
+            mock_project_service_instance.get_all_active_projects = AsyncMock(
+                return_value=([mock_project_wrapper], 1)
+            )
+            mock_project_service_class.return_value = mock_project_service_instance
 
             mock_endpoint_manager.return_value.get_all_playground_deployments = AsyncMock(
                 return_value=([], 0)
@@ -352,18 +396,20 @@ class TestUserTypeFiltering:
 
         # Mock dependencies
         with patch('budapp.playground_ops.services.UserDataManager') as mock_user_manager, \
-             patch('budapp.playground_ops.services.ProjectService') as mock_project_service, \
+             patch('budapp.playground_ops.services.ProjectService') as mock_project_service_class, \
              patch('budapp.playground_ops.services.EndpointDataManager') as mock_endpoint_manager, \
              patch('budapp.playground_ops.services.RedisService'):
 
             mock_user_manager.return_value.retrieve_by_fields = AsyncMock(return_value=mock_user)
 
-            # Mock project service with proper structure
+            # Mock ProjectService class properly
+            mock_project_service_instance = Mock()
             mock_project_wrapper = Mock()
             mock_project_wrapper.project = Mock(id=project_id)
-            mock_project_service.return_value.get_all_active_projects = AsyncMock(
+            mock_project_service_instance.get_all_active_projects = AsyncMock(
                 return_value=([mock_project_wrapper], 1)
             )
+            mock_project_service_class.return_value = mock_project_service_instance
 
             # Capture the filters passed to endpoint manager
             captured_filters = {}
@@ -400,18 +446,20 @@ class TestUserTypeFiltering:
 
         # Mock dependencies
         with patch('budapp.playground_ops.services.UserDataManager') as mock_user_manager, \
-             patch('budapp.playground_ops.services.ProjectService') as mock_project_service, \
+             patch('budapp.playground_ops.services.ProjectService') as mock_project_service_class, \
              patch('budapp.playground_ops.services.EndpointDataManager') as mock_endpoint_manager, \
              patch('budapp.playground_ops.services.RedisService'):
 
             mock_user_manager.return_value.retrieve_by_fields = AsyncMock(return_value=mock_user)
 
-            # Mock project service with proper structure for ADMIN user - gets multiple projects
+            # Mock ProjectService class properly for ADMIN user
+            mock_project_service_instance = Mock()
             mock_project_wrapper = Mock()
             mock_project_wrapper.project = Mock(id=project_id)
-            mock_project_service.return_value.get_all_active_projects = AsyncMock(
+            mock_project_service_instance.get_all_active_projects = AsyncMock(
                 return_value=([mock_project_wrapper], 1)
             )
+            mock_project_service_class.return_value = mock_project_service_instance
 
             # Capture the filters passed to endpoint manager
             captured_filters = {}
