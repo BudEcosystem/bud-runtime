@@ -35,7 +35,7 @@ spec:
     maxMessagesCount: 1
     maxAwaitDurationMs: 50
 scopes:
-  - budmetrics
+  - {{ .Release.Name }}-budmetrics
 ---
 apiVersion: dapr.io/v2alpha1
 kind: Subscription
@@ -51,7 +51,7 @@ spec:
   pubsubname: {{ .Release.Name }}-pubsub
   deadLetterTopic: poisonMessages
 scopes:
-  - budapp
+  - {{ .Release.Name }}-budapp
 ---
 apiVersion: dapr.io/v2alpha1
 kind: Subscription
@@ -64,7 +64,7 @@ spec:
   pubsubname: {{ .Release.Name }}-pubsub
   deadLetterTopic: poisonMessages
 scopes:
-  - budsim
+  - {{ .Release.Name }}-budsim
 ---
 apiVersion: dapr.io/v2alpha1
 kind: Subscription
@@ -77,7 +77,7 @@ spec:
   pubsubname: {{ .Release.Name }}-pubsub
   deadLetterTopic: poisonMessages
 scopes:
-  - budcluster
+  - {{ .Release.Name }}-budcluster
 ---
 apiVersion: dapr.io/v2alpha1
 kind: Subscription
@@ -90,7 +90,7 @@ spec:
   pubsubname: {{ .Release.Name }}-pubsub
   deadLetterTopic: poisonMessages
 scopes:
-  - budmodel
+  - {{ .Release.Name }}-budmodel
 ---
 apiVersion: dapr.io/v2alpha1
 kind: Subscription
@@ -103,7 +103,7 @@ spec:
   pubsubname: {{ .Release.Name }}-pubsub
   deadLetterTopic: poisonMessages
 scopes:
-  - askbud
+  - {{ .Release.Name }}-askbud
 ---
 apiVersion: dapr.io/v2alpha1
 kind: Subscription
@@ -116,4 +116,4 @@ spec:
   pubsubname: {{ .Release.Name }}-pubsub
   deadLetterTopic: poisonMessages
 scopes:
-  - budeval
+  - {{ .Release.Name }}-budeval
