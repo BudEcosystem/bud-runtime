@@ -4,7 +4,15 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Text_12_300_EEEEEE, Text_12_400_EEEEEE } from "@/components/ui/text";
 import { Project, useProjects } from "src/hooks/useProjects";
 import { useDrawer } from "src/hooks/useDrawer";
-import { Tabs, Image, Popover, ConfigProvider, Select, Table, Slider } from "antd";
+import {
+  Tabs,
+  Image,
+  Popover,
+  ConfigProvider,
+  Select,
+  Table,
+  Slider,
+} from "antd";
 import Tags from "src/flows/components/DrawerTags";
 import { CustomBreadcrumb } from "@/components/ui/bud/card/DrawerBreadCrumbNavigation";
 import BackButton from "@/components/ui/bud/drawer/BackButton";
@@ -44,7 +52,7 @@ const defaultFilter = {
   min_tpot: undefined,
   max_tpot: undefined,
   min_ttft: undefined,
-  max_ttft: undefined
+  max_ttft: undefined,
 };
 
 interface DataType {
@@ -133,11 +141,11 @@ const PerfomanceBenchmarks = () => {
   }, []);
 
   useEffect(() => {
-    console.log('modelFilterList', modelFilterList)
+    console.log("modelFilterList", modelFilterList);
   }, [modelFilterList]);
 
   useEffect(() => {
-    console.log('clusterFilterList', clusterFilterList)
+    console.log("clusterFilterList", clusterFilterList);
   }, [clusterFilterList]);
 
   useEffect(() => {
@@ -145,14 +153,14 @@ const PerfomanceBenchmarks = () => {
       page: 1,
       limit: 10000,
       search: false,
-      resource: 'model'
-    })
+      resource: "model",
+    });
     getfilterList({
       page: 1,
       limit: 10000,
       search: false,
-      resource: 'cluster'
-    })
+      resource: "cluster",
+    });
   }, []);
 
   useEffect(() => {
@@ -210,7 +218,7 @@ const PerfomanceBenchmarks = () => {
       });
       hideLoader();
     },
-    [currentPage, pageSize, getBenchmarks]
+    [currentPage, pageSize, getBenchmarks],
   );
 
   useEffect(() => {
@@ -286,7 +294,7 @@ const PerfomanceBenchmarks = () => {
               text="Bud Performance benchmarking tools allows model evaluation on different clusters & Nodes to check its performance on the hardware"
               buttonLabel={"Run Another Benchmark"}
               hClass=""
-              buttonPermission = {hasPermission(PermissionEnum.ModelManage)}
+              buttonPermission={hasPermission(PermissionEnum.ModelManage)}
               buttonAction={() => {
                 reset();
                 openDrawer("model_benchmark");
@@ -313,8 +321,8 @@ const PerfomanceBenchmarks = () => {
                             Filter
                           </div>
                           <div className="text-12 font-400 text-[#757575]">
-                            Apply the following filters to find benchmark of your
-                            choice.
+                            Apply the following filters to find benchmark of
+                            your choice.
                           </div>
                         </div>
                         <div className="height-1 bg-[#1F1F1F] mb-[1.5rem] w-full"></div>
@@ -377,7 +385,10 @@ const PerfomanceBenchmarks = () => {
                                     tagRender={(props) => {
                                       const { label } = props;
                                       return (
-                                        <Tags name={label} color="#D1B854"></Tags>
+                                        <Tags
+                                          name={label}
+                                          color="#D1B854"
+                                        ></Tags>
                                       );
                                     }}
                                   />
@@ -437,7 +448,10 @@ const PerfomanceBenchmarks = () => {
                                     tagRender={(props) => {
                                       const { label } = props;
                                       return (
-                                        <Tags name={label} color="#D1B854"></Tags>
+                                        <Tags
+                                          name={label}
+                                          color="#D1B854"
+                                        ></Tags>
                                       );
                                     }}
                                   />
@@ -497,7 +511,10 @@ const PerfomanceBenchmarks = () => {
                                     tagRender={(props) => {
                                       const { label } = props;
                                       return (
-                                        <Tags name={label} color="#D1B854"></Tags>
+                                        <Tags
+                                          name={label}
+                                          color="#D1B854"
+                                        ></Tags>
                                       );
                                     }}
                                   />
@@ -650,7 +667,7 @@ const PerfomanceBenchmarks = () => {
                   >
                     <label
                       className="h-[1.7rem] text-[#FFFFFF] mx-2 flex items-center cursor-pointer text-xs font-normal leading-3 rounded-[6px] shadow-none bg-transparent"
-                      onClick={() => { }}
+                      onClick={() => {}}
                     >
                       <MixerHorizontalIcon
                         style={{ width: "0.875rem", height: "0.875rem" }}

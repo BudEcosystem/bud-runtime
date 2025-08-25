@@ -2,8 +2,22 @@ import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
-import { Input, Checkbox, Tag, Button, Select, ConfigProvider, Modal, Popover } from "antd";
-import { PlusOutlined, DeleteOutlined, EyeOutlined, CloseOutlined } from "@ant-design/icons";
+import {
+  Input,
+  Checkbox,
+  Tag,
+  Button,
+  Select,
+  ConfigProvider,
+  Modal,
+  Popover,
+} from "antd";
+import {
+  PlusOutlined,
+  DeleteOutlined,
+  EyeOutlined,
+  CloseOutlined,
+} from "@ant-design/icons";
 import React, { useState } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
 import {
@@ -18,14 +32,24 @@ import {
 
 interface GuardRailRule {
   id: string;
-  type: 'regex' | 'semantic' | 'word';
+  type: "regex" | "semantic" | "word";
   pattern?: string;
   words?: string[];
   preview?: string[];
-  options?: {[key: string]: boolean};
+  options?: { [key: string]: boolean };
 }
 
-const WORD_SUGGESTIONS = ["Hello", "Hi", "Howdy", "Greetings", "Welcome", "Hey", "Good morning", "Good afternoon", "Good evening"];
+const WORD_SUGGESTIONS = [
+  "Hello",
+  "Hi",
+  "Howdy",
+  "Greetings",
+  "Welcome",
+  "Hey",
+  "Good morning",
+  "Good afternoon",
+  "Good evening",
+];
 
 export default function AddCustomGuardRail() {
   const { openDrawerWithStep } = useDrawer();
@@ -39,7 +63,7 @@ export default function AddCustomGuardRail() {
   const [activeRuleId, setActiveRuleId] = useState<string>("");
   const [searchWord, setSearchWord] = useState("");
   const [tempSelectedWords, setTempSelectedWords] = useState<string[]>([]);
-  const [ruleOptions, setRuleOptions] = useState<{[key: string]: any}>({});
+  const [ruleOptions, setRuleOptions] = useState<{ [key: string]: any }>({});
 
   const handleBack = () => {
     openDrawerWithStep("select-probe-type");
@@ -66,13 +90,11 @@ export default function AddCustomGuardRail() {
   };
 
   const updateRule = (id: string, updates: Partial<GuardRailRule>) => {
-    setRules(
-      rules.map((r) => (r.id === id ? { ...r, ...updates } : r))
-    );
+    setRules(rules.map((r) => (r.id === id ? { ...r, ...updates } : r)));
   };
 
   const openWordSelector = (ruleId: string) => {
-    const rule = rules.find(r => r.id === ruleId);
+    const rule = rules.find((r) => r.id === ruleId);
     setActiveRuleId(ruleId);
     setTempSelectedWords(rule?.words || []);
     setSearchWord("");
@@ -98,12 +120,12 @@ export default function AddCustomGuardRail() {
   };
 
   const removeWordFromSelection = (word: string) => {
-    setTempSelectedWords(tempSelectedWords.filter(w => w !== word));
+    setTempSelectedWords(tempSelectedWords.filter((w) => w !== word));
   };
 
   const openRuleConfig = (ruleId: string) => {
     setActiveRuleId(ruleId);
-    const rule = rules.find(r => r.id === ruleId);
+    const rule = rules.find((r) => r.id === ruleId);
     if (rule) {
       setRuleOptions(rule.options || {});
     }
@@ -123,33 +145,36 @@ export default function AddCustomGuardRail() {
 
   const getRuleConfigOptions = (ruleType: string) => {
     switch (ruleType) {
-      case 'regex':
+      case "regex":
         return [
-          { key: 'allowAlphanumeric', label: 'Allow alphanumeric characters' },
-          { key: 'filterAlphanumeric', label: 'Filter alphanumeric characters' },
-          { key: 'allowNumbers', label: 'Allow numbers only' },
-          { key: 'filterNumbers', label: 'Filter numbers' },
-          { key: 'allowLetters', label: 'Allow letters only' },
-          { key: 'filterLetters', label: 'Filter letters' },
-          { key: 'caseSensitive', label: 'Case sensitive matching' },
-          { key: 'multiline', label: 'Multiline matching' },
+          { key: "allowAlphanumeric", label: "Allow alphanumeric characters" },
+          {
+            key: "filterAlphanumeric",
+            label: "Filter alphanumeric characters",
+          },
+          { key: "allowNumbers", label: "Allow numbers only" },
+          { key: "filterNumbers", label: "Filter numbers" },
+          { key: "allowLetters", label: "Allow letters only" },
+          { key: "filterLetters", label: "Filter letters" },
+          { key: "caseSensitive", label: "Case sensitive matching" },
+          { key: "multiline", label: "Multiline matching" },
         ];
-      case 'semantic':
+      case "semantic":
         return [
-          { key: 'strictMatching', label: 'Strict semantic matching' },
-          { key: 'contextAware', label: 'Context-aware detection' },
-          { key: 'synonymMatching', label: 'Include synonyms' },
-          { key: 'relatedConcepts', label: 'Match related concepts' },
-          { key: 'sentimentAnalysis', label: 'Consider sentiment' },
+          { key: "strictMatching", label: "Strict semantic matching" },
+          { key: "contextAware", label: "Context-aware detection" },
+          { key: "synonymMatching", label: "Include synonyms" },
+          { key: "relatedConcepts", label: "Match related concepts" },
+          { key: "sentimentAnalysis", label: "Consider sentiment" },
         ];
-      case 'word':
+      case "word":
         return [
-          { key: 'exactMatch', label: 'Exact word matching' },
-          { key: 'partialMatch', label: 'Partial word matching' },
-          { key: 'caseSensitive', label: 'Case sensitive' },
-          { key: 'wholeWord', label: 'Whole word only' },
-          { key: 'stemming', label: 'Include word stems' },
-          { key: 'plurals', label: 'Include plurals' },
+          { key: "exactMatch", label: "Exact word matching" },
+          { key: "partialMatch", label: "Partial word matching" },
+          { key: "caseSensitive", label: "Case sensitive" },
+          { key: "wholeWord", label: "Whole word only" },
+          { key: "stemming", label: "Include word stems" },
+          { key: "plurals", label: "Include plurals" },
         ];
       default:
         return [];
@@ -157,59 +182,61 @@ export default function AddCustomGuardRail() {
   };
 
   const removeWordFromRule = (ruleId: string, word: string) => {
-    const rule = rules.find(r => r.id === ruleId);
+    const rule = rules.find((r) => r.id === ruleId);
     if (rule?.words) {
       updateRule(ruleId, {
-        words: rule.words.filter(w => w !== word)
+        words: rule.words.filter((w) => w !== word),
       });
     }
   };
 
   const getFilteredSuggestions = () => {
     if (!searchWord) return WORD_SUGGESTIONS.slice(0, 5);
-    return WORD_SUGGESTIONS
-      .filter(word => word.toLowerCase().startsWith(searchWord.toLowerCase()))
-      .slice(0, 5);
+    return WORD_SUGGESTIONS.filter((word) =>
+      word.toLowerCase().startsWith(searchWord.toLowerCase()),
+    ).slice(0, 5);
   };
 
   const generateRuleEffects = (rule: GuardRailRule): string[] => {
     const effects: string[] = [];
 
-    if (rule.type === 'regex' && rule.pattern) {
+    if (rule.type === "regex" && rule.pattern) {
       // Analyze regex pattern to determine effects
-      if (rule.pattern.includes('[0-9]') || rule.pattern.includes('\\d')) {
-        effects.push('• Filters numbers');
+      if (rule.pattern.includes("[0-9]") || rule.pattern.includes("\\d")) {
+        effects.push("• Filters numbers");
       }
-      if (rule.pattern.includes('[a-zA-Z]') || rule.pattern.includes('\\w')) {
-        effects.push('• Filters alphabets');
+      if (rule.pattern.includes("[a-zA-Z]") || rule.pattern.includes("\\w")) {
+        effects.push("• Filters alphabets");
       }
-      if (rule.pattern.includes('[^') || rule.pattern.includes('!')) {
-        effects.push('• Excludes specific characters');
+      if (rule.pattern.includes("[^") || rule.pattern.includes("!")) {
+        effects.push("• Excludes specific characters");
       }
-      if (rule.pattern.includes('+') || rule.pattern.includes('*')) {
-        effects.push('• Matches multiple occurrences');
+      if (rule.pattern.includes("+") || rule.pattern.includes("*")) {
+        effects.push("• Matches multiple occurrences");
       }
-      if (rule.pattern.includes('^')) {
-        effects.push('• Matches start of text');
+      if (rule.pattern.includes("^")) {
+        effects.push("• Matches start of text");
       }
-      if (rule.pattern.includes('$')) {
-        effects.push('• Matches end of text');
+      if (rule.pattern.includes("$")) {
+        effects.push("• Matches end of text");
       }
       if (effects.length === 0) {
         effects.push(`• Matches pattern: ${rule.pattern}`);
       }
-    } else if (rule.type === 'semantic' && rule.pattern) {
+    } else if (rule.type === "semantic" && rule.pattern) {
       effects.push(`• Semantic similarity matching`);
       effects.push(`• Finds related meanings to: "${rule.pattern}"`);
       effects.push(`• Context-aware detection`);
-    } else if (rule.type === 'word' && rule.words?.length) {
+    } else if (rule.type === "word" && rule.words?.length) {
       effects.push(`• Blocks exact word matches`);
       if (rule.words.length > 0) {
-        effects.push(`• Filters: ${rule.words.slice(0, 3).join(', ')}${rule.words.length > 3 ? '...' : ''}`);
+        effects.push(
+          `• Filters: ${rule.words.slice(0, 3).join(", ")}${rule.words.length > 3 ? "..." : ""}`,
+        );
       }
       effects.push(`• Case-sensitive matching`);
     } else {
-      effects.push('• No effects - configure the rule');
+      effects.push("• No effects - configure the rule");
     }
 
     return effects;
@@ -223,7 +250,7 @@ export default function AddCustomGuardRail() {
       backText="Back"
       nextText="Save"
     >
-      <BudWraperBox >
+      <BudWraperBox>
         <BudDrawerLayout>
           <DrawerTitleCard
             title="Add Custom GuardRail"
@@ -253,8 +280,8 @@ export default function AddCustomGuardRail() {
                         onChange={(value) => {
                           updateRule(rule.id, {
                             type: value,
-                            pattern: value !== 'word' ? '' : undefined,
-                            words: value === 'word' ? [] : undefined
+                            pattern: value !== "word" ? "" : undefined,
+                            words: value === "word" ? [] : undefined,
                           });
                         }}
                         style={{
@@ -275,7 +302,7 @@ export default function AddCustomGuardRail() {
 
                   {/* Pattern/Words Field */}
                   <div className="flex-1">
-                    {rule.type === 'word' ? (
+                    {rule.type === "word" ? (
                       <div
                         className="h-[32px] px-[11px] py-[4px] border border-[#757575] rounded-[6px] bg-transparent hover:border-[#EEEEEE] cursor-pointer flex gap-[4px] items-center overflow-hidden"
                         onClick={() => openWordSelector(rule.id)}
@@ -302,14 +329,20 @@ export default function AddCustomGuardRail() {
                             )}
                           </div>
                         ) : (
-                          <Text_12_400_757575>Select words...</Text_12_400_757575>
+                          <Text_12_400_757575>
+                            Select words...
+                          </Text_12_400_757575>
                         )}
                       </div>
                     ) : (
                       <Input
-                        placeholder={rule.type === 'regex' ? "Pattern" : "Semantic pattern"}
+                        placeholder={
+                          rule.type === "regex" ? "Pattern" : "Semantic pattern"
+                        }
                         value={rule.pattern}
-                        onChange={(e) => updateRule(rule.id, { pattern: e.target.value })}
+                        onChange={(e) =>
+                          updateRule(rule.id, { pattern: e.target.value })
+                        }
                         className="bg-transparent text-[#EEEEEE] border-[#757575] hover:border-[#EEEEEE]"
                         style={{ backgroundColor: "transparent" }}
                       />
@@ -331,7 +364,11 @@ export default function AddCustomGuardRail() {
                       icon={<DeleteOutlined />}
                       onClick={() => removeRule(rule.id)}
                       className="!bg-transparent hover:!bg-[#FF000010]"
-                      style={{ backgroundColor: "transparent", color: "#ec7575", borderColor: "#ec7575" }}
+                      style={{
+                        backgroundColor: "transparent",
+                        color: "#ec7575",
+                        borderColor: "#ec7575",
+                      }}
                       danger
                     />
                   )}
@@ -344,7 +381,10 @@ export default function AddCustomGuardRail() {
                   icon={<PlusOutlined />}
                   onClick={addRule}
                   className="!bg-transparent text-[#965CDE] !border-[#965CDE] !border-solid hover:!bg-[#965CDE10]"
-                  style={{ backgroundColor: "transparent", borderStyle: "solid" }}
+                  style={{
+                    backgroundColor: "transparent",
+                    borderStyle: "solid",
+                  }}
                 >
                   New Field
                 </Button>
@@ -354,7 +394,8 @@ export default function AddCustomGuardRail() {
             {/* Caution Message */}
             <div className="mb-[1rem] p-[0.75rem] bg-[#d1b85410] border border-[#d1b854] rounded-[6px]">
               <Text_10_400_757575 className="text-[#d1b854]">
-                ⚠️ Caution: We currently only support OR based matching. For the input fields we select if any of them match.
+                ⚠️ Caution: We currently only support OR based matching. For the
+                input fields we select if any of them match.
               </Text_10_400_757575>
             </div>
 
@@ -423,71 +464,77 @@ export default function AddCustomGuardRail() {
           className="custom-modal"
           styles={{
             content: {
-              boxShadow: '0px 0px 5px 1px #7575754a',
-              borderRadius: '10px'
-            }
+              boxShadow: "0px 0px 5px 1px #7575754a",
+              borderRadius: "10px",
+            },
           }}
         >
-        {/* Search Input */}
-        <div className="mb-[1rem]">
-          <Input
-            placeholder="Type to search words..."
-            value={searchWord}
-            onChange={(e) => setSearchWord(e.target.value)}
-            className="bg-transparent text-[#EEEEEE] border-[#757575]"
-            style={{ backgroundColor: "transparent" }}
-          />
-        </div>
-
-        {/* Selected Words */}
-        {tempSelectedWords.length > 0 && (
-          <div className="mb-[1rem] p-[0.75rem] bg-[#FFFFFF08] rounded-[6px] border border-[#1F1F1F]">
-            <Text_12_400_757575 className="mb-[0.5rem]">Selected words:</Text_12_400_757575>
-            <div className="flex flex-wrap gap-[0.5rem]">
-              {tempSelectedWords.map((word) => (
-                <Tag
-                  key={word}
-                  closable
-                  onClose={() => removeWordFromSelection(word)}
-                  className="bg-[#965CDE20] border-[#965CDE] text-[#EEEEEE]"
-                >
-                  {word}
-                </Tag>
-              ))}
-            </div>
+          {/* Search Input */}
+          <div className="mb-[1rem]">
+            <Input
+              placeholder="Type to search words..."
+              value={searchWord}
+              onChange={(e) => setSearchWord(e.target.value)}
+              className="bg-transparent text-[#EEEEEE] border-[#757575]"
+              style={{ backgroundColor: "transparent" }}
+            />
           </div>
-        )}
 
-        {/* Suggestions List */}
-        <div className="space-y-[0.5rem]">
-          <Text_12_400_757575 className="mb-[0.5rem]">Click to add:</Text_12_400_757575>
-          {getFilteredSuggestions().map((word) => {
-            const isSelected = tempSelectedWords.includes(word);
-            return (
-              <div
-                key={word}
-                className={`p-[0.5rem] border rounded-[6px] cursor-pointer transition-all ${
-                  isSelected
-                    ? "border-[#965CDE50] bg-[#965CDE10] opacity-50 cursor-not-allowed"
-                    : "border-[#757575] hover:border-[#965CDE] hover:bg-[#965CDE10]"
-                }`}
-                onClick={() => !isSelected && addWordToSelection(word)}
-              >
-                <div className="flex items-center justify-between">
-                  <Text_12_400_EEEEEE className={isSelected ? "opacity-50" : ""}>
+          {/* Selected Words */}
+          {tempSelectedWords.length > 0 && (
+            <div className="mb-[1rem] p-[0.75rem] bg-[#FFFFFF08] rounded-[6px] border border-[#1F1F1F]">
+              <Text_12_400_757575 className="mb-[0.5rem]">
+                Selected words:
+              </Text_12_400_757575>
+              <div className="flex flex-wrap gap-[0.5rem]">
+                {tempSelectedWords.map((word) => (
+                  <Tag
+                    key={word}
+                    closable
+                    onClose={() => removeWordFromSelection(word)}
+                    className="bg-[#965CDE20] border-[#965CDE] text-[#EEEEEE]"
+                  >
                     {word}
-                  </Text_12_400_EEEEEE>
-                  {isSelected && (
-                    <Text_10_400_757575>Already added</Text_10_400_757575>
-                  )}
-                </div>
+                  </Tag>
+                ))}
               </div>
-            );
-          })}
-          {getFilteredSuggestions().length === 0 && (
-            <Text_12_400_757575>No suggestions found</Text_12_400_757575>
+            </div>
           )}
-        </div>
+
+          {/* Suggestions List */}
+          <div className="space-y-[0.5rem]">
+            <Text_12_400_757575 className="mb-[0.5rem]">
+              Click to add:
+            </Text_12_400_757575>
+            {getFilteredSuggestions().map((word) => {
+              const isSelected = tempSelectedWords.includes(word);
+              return (
+                <div
+                  key={word}
+                  className={`p-[0.5rem] border rounded-[6px] cursor-pointer transition-all ${
+                    isSelected
+                      ? "border-[#965CDE50] bg-[#965CDE10] opacity-50 cursor-not-allowed"
+                      : "border-[#757575] hover:border-[#965CDE] hover:bg-[#965CDE10]"
+                  }`}
+                  onClick={() => !isSelected && addWordToSelection(word)}
+                >
+                  <div className="flex items-center justify-between">
+                    <Text_12_400_EEEEEE
+                      className={isSelected ? "opacity-50" : ""}
+                    >
+                      {word}
+                    </Text_12_400_EEEEEE>
+                    {isSelected && (
+                      <Text_10_400_757575>Already added</Text_10_400_757575>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+            {getFilteredSuggestions().length === 0 && (
+              <Text_12_400_757575>No suggestions found</Text_12_400_757575>
+            )}
+          </div>
         </Modal>
       </ConfigProvider>
 
@@ -539,9 +586,9 @@ export default function AddCustomGuardRail() {
           width={500}
           styles={{
             content: {
-              boxShadow: '0px 0px 5px 1px #7575754a',
-              borderRadius: '10px'
-            }
+              boxShadow: "0px 0px 5px 1px #7575754a",
+              borderRadius: "10px",
+            },
           }}
         >
           {activeRuleId && (
@@ -551,7 +598,7 @@ export default function AddCustomGuardRail() {
                 <div className="flex items-center gap-[0.5rem]">
                   <Text_12_400_757575>Rule Type:</Text_12_400_757575>
                   <Text_14_400_EEEEEE className="capitalize">
-                    {rules.find(r => r.id === activeRuleId)?.type}
+                    {rules.find((r) => r.id === activeRuleId)?.type}
                   </Text_14_400_EEEEEE>
                 </div>
               </div>
@@ -562,14 +609,19 @@ export default function AddCustomGuardRail() {
                   Configuration Options:
                 </Text_14_400_EEEEEE>
                 <div className="space-y-[0.5rem] max-h-[300px] overflow-y-auto">
-                  {getRuleConfigOptions(rules.find(r => r.id === activeRuleId)?.type || '').map((option) => (
-                    <div key={option.key} className="flex items-start gap-[0.5rem]">
+                  {getRuleConfigOptions(
+                    rules.find((r) => r.id === activeRuleId)?.type || "",
+                  ).map((option) => (
+                    <div
+                      key={option.key}
+                      className="flex items-start gap-[0.5rem]"
+                    >
                       <Checkbox
                         checked={ruleOptions[option.key] || false}
                         onChange={(e) => {
                           setRuleOptions({
                             ...ruleOptions,
-                            [option.key]: e.target.checked
+                            [option.key]: e.target.checked,
                           });
                         }}
                         className="AntCheckbox mt-[2px]"
@@ -584,16 +636,23 @@ export default function AddCustomGuardRail() {
 
               {/* Preview Section */}
               <div className="mt-[1.5rem] p-[0.75rem] bg-[#FFFFFF08] rounded-[6px] border border-[#1F1F1F]">
-                <Text_12_400_757575 className="mb-[0.5rem]">Selected Options:</Text_12_400_757575>
+                <Text_12_400_757575 className="mb-[0.5rem]">
+                  Selected Options:
+                </Text_12_400_757575>
                 <div className="space-y-[0.25rem]">
-                  {Object.entries(ruleOptions).filter(([_, value]) => value).length > 0 ? (
+                  {Object.entries(ruleOptions).filter(([_, value]) => value)
+                    .length > 0 ? (
                     Object.entries(ruleOptions)
                       .filter(([_, value]) => value)
                       .map(([key, _]) => {
-                        const option = getRuleConfigOptions(rules.find(r => r.id === activeRuleId)?.type || '')
-                          .find(opt => opt.key === key);
+                        const option = getRuleConfigOptions(
+                          rules.find((r) => r.id === activeRuleId)?.type || "",
+                        ).find((opt) => opt.key === key);
                         return (
-                          <Text_10_400_757575 key={key} className="text-[#965CDE]">
+                          <Text_10_400_757575
+                            key={key}
+                            className="text-[#965CDE]"
+                          >
                             • {option?.label}
                           </Text_10_400_757575>
                         );

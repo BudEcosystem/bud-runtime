@@ -51,7 +51,7 @@ export default function CreateRoute() {
         name: stepOneData?.name || "",
         description: stepOneData?.description || "",
         tags: stepOneData?.tags || [],
-        strategy: stepOneData?.routing_strategy?.[0]?.name || "" ,
+        strategy: stepOneData?.routing_strategy?.[0]?.name || "",
       }}
       disableNext={!submittable}
       onNext={async (values) => {
@@ -97,9 +97,7 @@ export default function CreateRoute() {
               label="Route Name"
               onChange={(value) => null}
               placeholder="Enter Route Name"
-              rules={[
-                { required: true, message: "Please enter route name" },
-              ]}
+              rules={[{ required: true, message: "Please enter route name" }]}
               ClassNames="mt-[.3rem]"
               formItemClassnames="pb-[.6rem] mb-[1rem]"
               infoText="Enter route name"

@@ -1,4 +1,3 @@
-
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
@@ -16,18 +15,21 @@ import { useCredentials } from "src/stores/useCredentials";
 
 function AddKeyForm({ setDisableNext }) {
   const { form } = useContext(BudFormContext);
-  const { setProjectCredentialsDetails, projectCredentialDetails } = useCredentials();
+  const { setProjectCredentialsDetails, projectCredentialDetails } =
+    useCredentials();
   const [options, setOptions] = useState([]);
   const [projectData, setProjectData] = useState<any>();
   const { projects, getProjects } = useProjects();
   async function fetchList(tagname) {
-    await axiosInstance(`${tempApiBaseUrl}/models/tags?page=1&limit=1000`).then((result) => {
-      const data = result.data?.tags?.map((result) => ({
-        name: result.name,
-        color: result.color,
-      }));
-      setOptions(data);
-    });
+    await axiosInstance(`${tempApiBaseUrl}/models/tags?page=1&limit=1000`).then(
+      (result) => {
+        const data = result.data?.tags?.map((result) => ({
+          name: result.name,
+          color: result.color,
+        }));
+        setOptions(data);
+      },
+    );
   }
 
   useEffect(() => {
@@ -40,31 +42,29 @@ function AddKeyForm({ setDisableNext }) {
   useEffect(() => {
     const data = projects.map((item) => ({
       ...item,
-      label: item?.['project'].name,
-      value: item?.['project'].id,
+      label: item?.["project"].name,
+      value: item?.["project"].id,
     }));
-    setProjectData(data)
+    setProjectData(data);
   }, [projects]);
-
 
   return (
     <div className="px-[1.4rem] py-[2.1rem] flex flex-col gap-[1.6rem]">
-      <Form.Item hasFeedback
+      <Form.Item
+        hasFeedback
         name={"name"}
-        rules={[
-          { required: true, message: "Please input name!" },
-        ]}
+        rules={[{ required: true, message: "Please input name!" }]}
         className={`flex items-center rounded-[6px] relative !bg-[transparent] w-[100%] mb-[0]`}
       >
         <div className="w-full">
           <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap">
             Credential Name
-            <CustomPopover title="This is the name" >
+            <CustomPopover title="This is the name">
               <Image
                 src="/images/info.png"
                 preview={false}
                 alt="info"
-                style={{ width: '.75rem', height: '.75rem' }}
+                style={{ width: ".75rem", height: ".75rem" }}
               />
             </CustomPopover>
           </Text_12_300_EEEEEE>
@@ -79,16 +79,17 @@ function AddKeyForm({ setDisableNext }) {
           size="large"
           onChange={(e) => {
             form.setFieldsValue({ name: e.target.value });
-            form.validateFields(['name']);
+            form.validateFields(["name"]);
             setProjectCredentialsDetails({
               ...projectCredentialDetails,
-              name: e.target.value
+              name: e.target.value,
             });
           }}
           className="drawerInp py-[.65rem] pt-[.8rem] pb-[.45rem] bg-transparent text-[#EEEEEE] font-[300] border-[0.5px] border-[#757575] rounded-[6px] hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] text-[.75rem] shadow-none w-full indent-[.4rem]"
         />
       </Form.Item>
-      <Form.Item hasFeedback
+      <Form.Item
+        hasFeedback
         rules={[{ required: true, message: "Please select project!" }]}
         name={"project"}
         className={`flex items-center rounded-[6px] relative !bg-[transparent] w-[100%] mb-[0]`}
@@ -97,12 +98,12 @@ function AddKeyForm({ setDisableNext }) {
           <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1">
             Project
             {/* <span className="text-[red] text-[1rem]">*</span> */}
-            <CustomPopover title="This is the project " >
+            <CustomPopover title="This is the project ">
               <Image
                 src="/images/info.png"
                 preview={false}
                 alt="info"
-                style={{ width: '.75rem', height: '.75rem' }}
+                style={{ width: ".75rem", height: ".75rem" }}
               />
             </CustomPopover>
           </Text_12_300_EEEEEE>
@@ -111,7 +112,7 @@ function AddKeyForm({ setDisableNext }) {
           <ConfigProvider
             theme={{
               token: {
-                colorTextPlaceholder: '#808080',
+                colorTextPlaceholder: "#808080",
               },
             }}
           >
@@ -127,10 +128,10 @@ function AddKeyForm({ setDisableNext }) {
               options={projectData}
               onChange={(value) => {
                 form.setFieldsValue({ project: value });
-                form.validateFields(['project']);
+                form.validateFields(["project"]);
                 setProjectCredentialsDetails({
                   ...projectCredentialDetails,
-                  project: value
+                  project: value,
                 });
               }}
             />
@@ -138,7 +139,8 @@ function AddKeyForm({ setDisableNext }) {
         </div>
       </Form.Item>
 
-      <Form.Item hasFeedback
+      <Form.Item
+        hasFeedback
         rules={[{ required: true, message: "Please select Set Expiry!" }]}
         name={"SetExpiry"}
         className={`flex items-center rounded-[6px] relative !bg-[transparent] w-[100%] mb-[0]`}
@@ -147,12 +149,12 @@ function AddKeyForm({ setDisableNext }) {
           <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap">
             Set Expiry
             {/* <span className="text-[red] text-[1rem]">*</span> */}
-            <CustomPopover title="This is the Set Expiry " >
+            <CustomPopover title="This is the Set Expiry ">
               <Image
                 src="/images/info.png"
                 preview={false}
                 alt="info"
-                style={{ width: '.75rem', height: '.75rem' }}
+                style={{ width: ".75rem", height: ".75rem" }}
               />
             </CustomPopover>
           </Text_12_300_EEEEEE>
@@ -161,7 +163,7 @@ function AddKeyForm({ setDisableNext }) {
           <ConfigProvider
             theme={{
               token: {
-                colorTextPlaceholder: '#808080',
+                colorTextPlaceholder: "#808080",
               },
             }}
           >
@@ -180,17 +182,18 @@ function AddKeyForm({ setDisableNext }) {
               ]}
               onChange={(value) => {
                 form.setFieldsValue({ SetExpiry: value });
-                form.validateFields(['SetExpiry']);
+                form.validateFields(["SetExpiry"]);
                 setProjectCredentialsDetails({
                   ...projectCredentialDetails,
-                  SetExpiry: value
+                  SetExpiry: value,
                 });
               }}
             />
           </ConfigProvider>
         </div>
       </Form.Item>
-      <Form.Item hasFeedback
+      <Form.Item
+        hasFeedback
         name={"SetMaxBudget"}
         rules={[
           { required: true, message: "Please input Max Budget!" },
@@ -202,12 +205,12 @@ function AddKeyForm({ setDisableNext }) {
         <div className="w-full">
           <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap">
             Set Max Budget
-            <CustomPopover title="This is the Set Max Budget" >
+            <CustomPopover title="This is the Set Max Budget">
               <Image
                 src="/images/info.png"
                 preview={false}
                 alt="info"
-                style={{ width: '.75rem', height: '.75rem' }}
+                style={{ width: ".75rem", height: ".75rem" }}
               />
             </CustomPopover>
           </Text_12_300_EEEEEE>
@@ -223,35 +226,42 @@ function AddKeyForm({ setDisableNext }) {
           size="large"
           onChange={(e) => {
             form.setFieldsValue({ SetMaxBudget: e.target.value });
-            form.validateFields(['SetMaxBudget']);
+            form.validateFields(["SetMaxBudget"]);
             setProjectCredentialsDetails({
               ...projectCredentialDetails,
-              SetMaxBudget: e.target.value
+              SetMaxBudget: e.target.value,
             });
           }}
           className="drawerInp py-[.65rem] pt-[.8rem] pb-[.45rem] bg-transparent text-[#EEEEEE] font-[300] border-[0.5px] border-[#757575] rounded-[6px] hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] text-[.75rem] shadow-none w-full indent-[.4rem] px-[1rem]"
         />
       </Form.Item>
     </div>
-  )
+  );
 }
 
 export default function AddNewKey() {
-  const { openDrawerWithStep, closeDrawer } = useDrawer()
-  const { setProjectCredentialsDetails, projectCredentialDetails, addProjectCredentials } = useCredentials();
+  const { openDrawerWithStep, closeDrawer } = useDrawer();
+  const {
+    setProjectCredentialsDetails,
+    projectCredentialDetails,
+    addProjectCredentials,
+  } = useCredentials();
   // const imageUrl = assetBaseUrl + (selectedProvider?.icon)
   const [disableNext, setDisableNext] = useState(true);
   const [loading, setLoading] = useState(false);
 
   return (
     <BudForm
-      data={{
-
-      }}
-      disableNext={!projectCredentialDetails?.name ||!projectCredentialDetails?.project || !projectCredentialDetails?.SetExpiry || !projectCredentialDetails?.SetMaxBudget}
+      data={{}}
+      disableNext={
+        !projectCredentialDetails?.name ||
+        !projectCredentialDetails?.project ||
+        !projectCredentialDetails?.SetExpiry ||
+        !projectCredentialDetails?.SetMaxBudget
+      }
       onNext={async () => {
         try {
-          const values = await projectCredentialDetails // Get form values
+          const values = await projectCredentialDetails; // Get form values
           setLoading(true);
           const payload = {
             name: values.name,
@@ -267,7 +277,7 @@ export default function AddNewKey() {
           const response = await addProjectCredentials(payload);
 
           if (response?.success) {
-            openDrawerWithStep("credentials-success")
+            openDrawerWithStep("credentials-success");
           } else {
             console.error("Submission failed:", response);
           }
@@ -276,7 +286,6 @@ export default function AddNewKey() {
         } finally {
           setLoading(false);
         }
-
       }}
       nextText="Create"
       backText="Cancel"
@@ -286,10 +295,7 @@ export default function AddNewKey() {
     >
       <BudWraperBox>
         <BudDrawerLayout>
-          <DrawerTitleCard
-            title="New Key"
-            description="Create New key here"
-          />
+          <DrawerTitleCard title="New Key" description="Create New key here" />
           <div>
             <AddKeyForm setDisableNext={setDisableNext} />
           </div>

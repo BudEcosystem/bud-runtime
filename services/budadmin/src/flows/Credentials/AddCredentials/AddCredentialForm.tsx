@@ -64,7 +64,7 @@ export default function AddCredentialForm() {
       const result = await createProprietaryCredentials(
         values.name,
         selectedProvider.type,
-        payload
+        payload,
       );
       openDrawerWithStep("credentials-success");
     } catch (error) {

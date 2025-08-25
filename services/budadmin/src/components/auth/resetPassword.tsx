@@ -46,7 +46,7 @@ const ResetPasswordPage = ({ onSubmit }: ResetPasswordProps) => {
   }, []);
 
   useEffect(() => {
-    getUser()
+    getUser();
   }, [getUser]);
 
   const passwordRegex =
@@ -94,8 +94,9 @@ const ResetPasswordPage = ({ onSubmit }: ResetPasswordProps) => {
         >
           <Form.Field name="password" className="mb-5">
             <Box
-              className={`flex items-center border ${password ? "border-[#CFCFCF]" : "border-[#757575]"
-                } rounded-[5px] relative hover:bg-white hover:bg-opacity-[3%]`}
+              className={`flex items-center border ${
+                password ? "border-[#CFCFCF]" : "border-[#757575]"
+              } rounded-[5px] relative hover:bg-white hover:bg-opacity-[3%]`}
             >
               <Box className="">
                 <Text_12_300_EEEEEE className="absolute px-1.5 bg-black -top-1.5 left-1.5 inline-block tracking-[.035rem]">
@@ -158,8 +159,9 @@ const ResetPasswordPage = ({ onSubmit }: ResetPasswordProps) => {
           </Form.Field>
           <Form.Field name="rePassword" className="mb-[.9rem]">
             <Box
-              className={`flex items-center border ${rePassword ? "border-[#CFCFCF]" : "border-[#757575]"
-                } rounded-[5px] relative hover:bg-white hover:bg-opacity-[3%]`}
+              className={`flex items-center border ${
+                rePassword ? "border-[#CFCFCF]" : "border-[#757575]"
+              } rounded-[5px] relative hover:bg-white hover:bg-opacity-[3%]`}
             >
               <Box className="">
                 <Text_12_300_EEEEEE className="absolute px-1.5 bg-black -top-1.5 left-1.5 inline-block tracking-[.035rem]">
@@ -272,14 +274,18 @@ const ResetPasswordPage = ({ onSubmit }: ResetPasswordProps) => {
       {authError && (
         <motion.div
           initial={{ opacity: 0, y: -10 }} // Start slightly above and transparent
-          animate={{ opacity: 1, y: 0 }}   // Move down and appear
+          animate={{ opacity: 1, y: 0 }} // Move down and appear
           transition={{ duration: 0.5, ease: "easeIn" }} // Smooth transition
           className="border-[1px] border-[#EC7575] rounded-[6px] px-[.5rem] py-[1rem] flex justify-center items-center w-[76.6%] mt-[1.5rem]"
           style={{
             backgroundColor: getChromeColor("#EC7575"),
           }}
         >
-          <Text_12_400_EEEEEE className="text-[#EC7575]">{authError.includes('Cannot read properties') ? 'Something went wrong, please try again later.' : authError}</Text_12_400_EEEEEE>
+          <Text_12_400_EEEEEE className="text-[#EC7575]">
+            {authError.includes("Cannot read properties")
+              ? "Something went wrong, please try again later."
+              : authError}
+          </Text_12_400_EEEEEE>
         </motion.div>
       )}
     </>

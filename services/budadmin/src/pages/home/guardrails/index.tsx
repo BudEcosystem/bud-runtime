@@ -46,19 +46,19 @@ function GuardRailCard({ item, index }: { item: Probe; index: number }) {
 
   const getTypeIcon = (providerType: string) => {
     switch (providerType?.toLowerCase()) {
-      case 'bud_sentinel':
-      case 'bud-sentinel':
-        return '🛡️';
-      case 'azure':
-      case 'azure_ai':
-        return '☁️';
-      case 'aws':
-      case 'aws_bedrock':
-        return '🔶';
-      case 'custom':
-        return '⚙️';
+      case "bud_sentinel":
+      case "bud-sentinel":
+        return "🛡️";
+      case "azure":
+      case "azure_ai":
+        return "☁️";
+      case "aws":
+      case "aws_bedrock":
+        return "🔶";
+      case "custom":
+        return "⚙️";
       default:
-        return '🛡️';
+        return "🛡️";
     }
   };
 
@@ -81,9 +81,7 @@ function GuardRailCard({ item, index }: { item: Probe; index: number }) {
               {item.name}
             </Text_17_600_FFFFFF>
             {item.provider_name && (
-              <Text_12_400_B3B3B3>
-                by {item.provider_name}
-              </Text_12_400_B3B3B3>
+              <Text_12_400_B3B3B3>by {item.provider_name}</Text_12_400_B3B3B3>
             )}
           </div>
         </div>
@@ -111,20 +109,19 @@ function GuardRailCard({ item, index }: { item: Probe; index: number }) {
 
       <div className="flex items-center justify-between mt-auto pt-[1rem] border-t border-[#1F1F1F]">
         <div className="flex items-center gap-[0.5rem] flex-wrap">
-          {item.tags && item.tags.slice(0, 3).map((tag, idx) => (
-            <Tag
-              key={idx}
-              className="text-[#B3B3B3] border-[0] rounded-[6px] flex items-center px-[0.75rem] py-[0.375rem]"
-              style={{
-                backgroundColor: tag.color + "20" || "#1F1F1F",
-                color: tag.color || "#B3B3B3"
-              }}
-            >
-              <span className="text-[0.75rem] font-[400]">
-                {tag.name}
-              </span>
-            </Tag>
-          ))}
+          {item.tags &&
+            item.tags.slice(0, 3).map((tag, idx) => (
+              <Tag
+                key={idx}
+                className="text-[#B3B3B3] border-[0] rounded-[6px] flex items-center px-[0.75rem] py-[0.375rem]"
+                style={{
+                  backgroundColor: tag.color + "20" || "#1F1F1F",
+                  color: tag.color || "#B3B3B3",
+                }}
+              >
+                <span className="text-[0.75rem] font-[400]">{tag.name}</span>
+              </Tag>
+            ))}
           {item.tags && item.tags.length > 3 && (
             <Tag
               className="text-[#757575] border-[0] rounded-[6px] flex items-center px-[0.75rem] py-[0.375rem]"
@@ -236,7 +233,6 @@ const SelectedFilters = ({
   );
 };
 
-
 export default function GuardRails() {
   const [isMounted, setIsMounted] = useState(false);
   const { hasPermission, loadingUser } = useUser();
@@ -245,6 +241,7 @@ export default function GuardRails() {
   const { reset } = useDeployModel();
 
   // Use guardrails hook for API integration
+  const { clearWorkflow } = useGuardrails();
   const {
     probes,
     probesLoading,
@@ -287,20 +284,22 @@ export default function GuardRails() {
         if (filter.provider && filter.provider.length > 0) {
           // Map frontend provider values to API provider_type values
           const providerMapping: Record<string, string> = {
-            'bud-sentinel': 'bud_sentinel',
-            'azure-ai': 'azure',
-            'aws-bedrock': 'aws',
-            'custom': 'custom'
+            "bud-sentinel": "bud_sentinel",
+            "azure-ai": "azure",
+            "aws-bedrock": "aws",
+            custom: "custom",
           };
-          const mappedProviders = filter.provider.map(p => providerMapping[p] || p);
-          params.provider_type = mappedProviders.join(',');
+          const mappedProviders = filter.provider.map(
+            (p) => providerMapping[p] || p,
+          );
+          params.provider_type = mappedProviders.join(",");
         }
 
         // Fetch probes from API
         await fetchProbes(params);
       }
     },
-    [hasPermission, currentPage, pageSize, fetchProbes]
+    [hasPermission, currentPage, pageSize, fetchProbes],
   );
 
   const handleOpenChange = (open) => {
@@ -326,10 +325,14 @@ export default function GuardRails() {
   };
 
   const removeSelectedTag = (key: string, item: string) => {
-    if (key === "provider" || key === "guardRailType" || key === "modality" || key === "status") {
-      const filteredItems = tempFilter[key]?.filter(
-        (element) => element !== item
-      ) || [];
+    if (
+      key === "provider" ||
+      key === "guardRailType" ||
+      key === "modality" ||
+      key === "status"
+    ) {
+      const filteredItems =
+        tempFilter[key]?.filter((element) => element !== item) || [];
       setTempFilter({ ...tempFilter, [key]: filteredItems });
     }
     setFilterReset(true);
@@ -368,6 +371,7 @@ export default function GuardRails() {
             buttonLabel="Add Guardrail"
             buttonPermission={hasPermission(PermissionEnum.ModelManage)}
             buttonAction={() => {
+              clearWorkflow(); // Clear any existing workflow state
               openDrawer("add-guardrail");
               reset();
             }}
@@ -389,7 +393,9 @@ export default function GuardRails() {
                         sizePopupArrow: 0,
                       },
                     }}
-                    getPopupContainer={(trigger) => (trigger.parentNode as HTMLElement) || document.body}
+                    getPopupContainer={(trigger) =>
+                      (trigger.parentNode as HTMLElement) || document.body
+                    }
                   >
                     <Popover
                       open={filterOpen}
@@ -402,14 +408,16 @@ export default function GuardRails() {
                               Filter
                             </div>
                             <div className="text-[0.75rem] font-400 text-[#757575]">
-                              Apply the following filters to find guardrails of your choice.
+                              Apply the following filters to find guardrails of
+                              your choice.
                             </div>
                           </div>
                           <div className="height-1 bg-[#1F1F1F] mb-[1.5rem] w-full"></div>
                           <div className="w-full flex flex-col gap-size-20 px-[1.5rem] pb-[1.5rem]">
-
                             {/* Provider Filter */}
-                            <div className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]`}>
+                            <div
+                              className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]`}
+                            >
                               <div className="w-full">
                                 <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap">
                                   Provider
@@ -457,7 +465,10 @@ export default function GuardRails() {
                                     tagRender={(props) => {
                                       const { label } = props;
                                       return (
-                                        <Tags name={label} color="#965CDE"></Tags>
+                                        <Tags
+                                          name={label}
+                                          color="#965CDE"
+                                        ></Tags>
                                       );
                                     }}
                                   />
@@ -466,7 +477,9 @@ export default function GuardRails() {
                             </div>
 
                             {/* GuardRail Type Filter */}
-                            <div className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]`}>
+                            <div
+                              className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]`}
+                            >
                               <div className="w-full">
                                 <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap">
                                   GuardRail Type
@@ -514,7 +527,10 @@ export default function GuardRails() {
                                     tagRender={(props) => {
                                       const { label } = props;
                                       return (
-                                        <Tags name={label} color="#965CDE"></Tags>
+                                        <Tags
+                                          name={label}
+                                          color="#965CDE"
+                                        ></Tags>
                                       );
                                     }}
                                   />
@@ -523,7 +539,9 @@ export default function GuardRails() {
                             </div>
 
                             {/* Modality Filter */}
-                            <div className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]`}>
+                            <div
+                              className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]`}
+                            >
                               <div className="w-full">
                                 <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1">
                                   Modality
@@ -571,7 +589,10 @@ export default function GuardRails() {
                                     tagRender={(props) => {
                                       const { label } = props;
                                       return (
-                                        <Tags name={label} color="#965CDE"></Tags>
+                                        <Tags
+                                          name={label}
+                                          color="#965CDE"
+                                        ></Tags>
                                       );
                                     }}
                                   />
@@ -580,7 +601,9 @@ export default function GuardRails() {
                             </div>
 
                             {/* Status Filter */}
-                            <div className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]`}>
+                            <div
+                              className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]`}
+                            >
                               <div className="w-full">
                                 <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1">
                                   Status
@@ -631,7 +654,10 @@ export default function GuardRails() {
                                     tagRender={(props) => {
                                       const { label } = props;
                                       return (
-                                        <Tags name={label} color="#965CDE"></Tags>
+                                        <Tags
+                                          name={label}
+                                          color="#965CDE"
+                                        ></Tags>
                                       );
                                     }}
                                   />
@@ -661,7 +687,7 @@ export default function GuardRails() {
                     >
                       <label
                         className="group h-[1.7rem] text-[#EEEEEE] mx-2 flex items-center cursor-pointer text-xs font-normal leading-3 rounded-[6px] shadow-none bg-transparent"
-                        onClick={() => { }}
+                        onClick={() => {}}
                       >
                         <MixerHorizontalIcon
                           style={{ width: "0.875rem", height: "0.875rem" }}
@@ -671,7 +697,6 @@ export default function GuardRails() {
                       </label>
                     </Popover>
                   </ConfigProvider>
-
                 </div>
               )
             }
@@ -689,70 +714,85 @@ export default function GuardRails() {
                   name="All"
                   color={selectedCategory === "all" ? "#FFFFFF" : "#B3B3B3"}
                   textClass={selectedCategory === "all" ? "!text-white" : ""}
-                  classNames={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${selectedCategory === "all"
+                  classNames={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
+                    selectedCategory === "all"
                       ? "!bg-[#965CDE]"
                       : "!bg-transparent border-[0.5px] border-[#757575] hover:border-[#965CDE]"
-                    }`}
+                  }`}
                   onTagClick={() => setSelectedCategory("all")}
                 />
                 <Tags
                   name="Harm"
                   color={selectedCategory === "harm" ? "#FFFFFF" : "#B3B3B3"}
                   textClass={selectedCategory === "harm" ? "!text-white" : ""}
-                  classNames={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${selectedCategory === "harm"
+                  classNames={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
+                    selectedCategory === "harm"
                       ? "!bg-[#965CDE]"
                       : "!bg-transparent border-[0.5px] border-[#757575] hover:border-[#965CDE]"
-                    }`}
+                  }`}
                   onTagClick={() => setSelectedCategory("harm")}
                 />
                 <Tags
                   name="Jailbreak"
-                  color={selectedCategory === "jailbreak" ? "#FFFFFF" : "#B3B3B3"}
-                  textClass={selectedCategory === "jailbreak" ? "!text-white" : ""}
-                  classNames={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${selectedCategory === "jailbreak"
+                  color={
+                    selectedCategory === "jailbreak" ? "#FFFFFF" : "#B3B3B3"
+                  }
+                  textClass={
+                    selectedCategory === "jailbreak" ? "!text-white" : ""
+                  }
+                  classNames={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
+                    selectedCategory === "jailbreak"
                       ? "!bg-[#965CDE]"
                       : "!bg-transparent border-[0.5px] border-[#757575] hover:border-[#965CDE]"
-                    }`}
+                  }`}
                   onTagClick={() => setSelectedCategory("jailbreak")}
                 />
                 <Tags
                   name="Toxic"
                   color={selectedCategory === "toxic" ? "#FFFFFF" : "#B3B3B3"}
                   textClass={selectedCategory === "toxic" ? "!text-white" : ""}
-                  classNames={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${selectedCategory === "toxic"
+                  classNames={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
+                    selectedCategory === "toxic"
                       ? "!bg-[#965CDE]"
                       : "!bg-transparent border-[0.5px] border-[#757575] hover:border-[#965CDE]"
-                    }`}
+                  }`}
                   onTagClick={() => setSelectedCategory("toxic")}
                 />
                 <Tags
                   name="Bias"
                   color={selectedCategory === "bias" ? "#FFFFFF" : "#B3B3B3"}
                   textClass={selectedCategory === "bias" ? "!text-white" : ""}
-                  classNames={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${selectedCategory === "bias"
+                  classNames={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
+                    selectedCategory === "bias"
                       ? "!bg-[#965CDE]"
                       : "!bg-transparent border-[0.5px] border-[#757575] hover:border-[#965CDE]"
-                    }`}
+                  }`}
                   onTagClick={() => setSelectedCategory("bias")}
                 />
                 <Tags
                   name="Compliance"
-                  color={selectedCategory === "compliance" ? "#FFFFFF" : "#B3B3B3"}
-                  textClass={selectedCategory === "compliance" ? "!text-white" : ""}
-                  classNames={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${selectedCategory === "compliance"
+                  color={
+                    selectedCategory === "compliance" ? "#FFFFFF" : "#B3B3B3"
+                  }
+                  textClass={
+                    selectedCategory === "compliance" ? "!text-white" : ""
+                  }
+                  classNames={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
+                    selectedCategory === "compliance"
                       ? "!bg-[#965CDE]"
                       : "!bg-transparent border-[0.5px] border-[#757575] hover:border-[#965CDE]"
-                    }`}
+                  }`}
                   onTagClick={() => setSelectedCategory("compliance")}
                 />
                 <Tags
                   name="Custom"
                   color={selectedCategory === "custom" ? "#FFFFFF" : "#B3B3B3"}
                   textClass={selectedCategory === "custom" ? "!text-white" : ""}
-                  classNames={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${selectedCategory === "custom"
+                  classNames={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
+                    selectedCategory === "custom"
                       ? "!bg-[#965CDE]"
                       : "!bg-transparent border-[0.5px] border-[#757575] hover:border-[#965CDE]"
-                    }`}
+                  }`}
                   onTagClick={() => setSelectedCategory("custom")}
                 />
               </div>
@@ -762,58 +802,73 @@ export default function GuardRails() {
                 <div className="flex justify-center items-center h-[50vh]">
                   <Spin size="large" />
                 </div>
-              ) : (() => {
-                // Filter probes by selected category
-                const filteredProbes = selectedCategory === "all"
-                  ? probes
-                  : probes.filter(probe =>
-                    probe.tags?.some(tag =>
-                      tag.name.toLowerCase() === selectedCategory.toLowerCase()
-                    )
-                  );
+              ) : (
+                (() => {
+                  // Filter probes by selected category
+                  const filteredProbes =
+                    selectedCategory === "all"
+                      ? probes
+                      : probes.filter((probe) =>
+                          probe.tags?.some(
+                            (tag) =>
+                              tag.name.toLowerCase() ===
+                              selectedCategory.toLowerCase(),
+                          ),
+                        );
 
-                return filteredProbes && filteredProbes.length > 0 ? (
-                  <>
-                    <div className="grid gap-[1.5rem] grid-cols-3 pb-[1.5rem] px-[1.5rem]">
-                      {filteredProbes.map((item, index) => (
-                        <GuardRailCard key={item.id} item={item} index={index} />
-                      ))}
-                    </div>
-
-                    {/* Pagination */}
-                    {totalPages > 1 && (
-                      <div className="flex justify-center items-center gap-[1rem] py-[2rem] border-t border-[#1F1F1F]">
-                        <button
-                          onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                          disabled={currentPage === 1}
-                          className="px-[1rem] py-[0.5rem] bg-[#1F1F1F] text-[#EEEEEE] rounded-[6px] hover:bg-[#2A2A2A] disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          Previous
-                        </button>
-                        <span className="text-[#B3B3B3]">
-                          Page {currentPage} of {totalPages}
-                        </span>
-                        <button
-                          onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                          disabled={currentPage === totalPages}
-                          className="px-[1rem] py-[0.5rem] bg-[#1F1F1F] text-[#EEEEEE] rounded-[6px] hover:bg-[#2A2A2A] disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          Next
-                        </button>
+                  return filteredProbes && filteredProbes.length > 0 ? (
+                    <>
+                      <div className="grid gap-[1.5rem] grid-cols-3 pb-[1.5rem] px-[1.5rem]">
+                        {filteredProbes.map((item, index) => (
+                          <GuardRailCard
+                            key={item.id}
+                            item={item}
+                            index={index}
+                          />
+                        ))}
                       </div>
-                    )}
-                  </>
-                ) : (
-                  <NoDataFount
-                    classNames="h-[50vh]"
-                    textMessage={
-                      selectedCategory === "all"
-                        ? "No guardrails found"
-                        : `No guardrails found for the "${selectedCategory}" category`
-                    }
-                  />
-                );
-              })()}
+
+                      {/* Pagination */}
+                      {totalPages > 1 && (
+                        <div className="flex justify-center items-center gap-[1rem] py-[2rem] border-t border-[#1F1F1F]">
+                          <button
+                            onClick={() =>
+                              setCurrentPage(Math.max(1, currentPage - 1))
+                            }
+                            disabled={currentPage === 1}
+                            className="px-[1rem] py-[0.5rem] bg-[#1F1F1F] text-[#EEEEEE] rounded-[6px] hover:bg-[#2A2A2A] disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            Previous
+                          </button>
+                          <span className="text-[#B3B3B3]">
+                            Page {currentPage} of {totalPages}
+                          </span>
+                          <button
+                            onClick={() =>
+                              setCurrentPage(
+                                Math.min(totalPages, currentPage + 1),
+                              )
+                            }
+                            disabled={currentPage === totalPages}
+                            className="px-[1rem] py-[0.5rem] bg-[#1F1F1F] text-[#EEEEEE] rounded-[6px] hover:bg-[#2A2A2A] disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            Next
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <NoDataFount
+                      classNames="h-[50vh]"
+                      textMessage={
+                        selectedCategory === "all"
+                          ? "No guardrails found"
+                          : `No guardrails found for the "${selectedCategory}" category`
+                      }
+                    />
+                  );
+                })()
+              )}
             </div>
           </>
         ) : (

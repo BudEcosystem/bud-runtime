@@ -1,4 +1,3 @@
-
 import DrawerCard from "@/components/ui/bud/card/DrawerCard";
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
@@ -12,7 +11,6 @@ import React, { useContext, useEffect } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
 import { InviteUser, useProjects } from "src/hooks/useProjects";
 
-
 export default function InviteMembers() {
   const [users, setUsers] = React.useState<InviteUser[]>([]);
   const { selectedProjectId, getProjects, inviteMembers } = useProjects();
@@ -21,11 +19,15 @@ export default function InviteMembers() {
 
   useEffect(() => {
     if (values?.users) {
-      setUsers(values?.users?.map((item) => ({
-        user_id: item?.id,
-        email: item?.id ? undefined : item?.email || item.label,
-        scopes: item.scopes
-      }))?.filter(Boolean) || [])
+      setUsers(
+        values?.users
+          ?.map((item) => ({
+            user_id: item?.id,
+            email: item?.id ? undefined : item?.email || item.label,
+            scopes: item.scopes,
+          }))
+          ?.filter(Boolean) || [],
+      );
     }
   }, [values]);
 
@@ -40,13 +42,13 @@ export default function InviteMembers() {
             getProjects(1, 10);
           })
           .finally(() => {
-            openDrawerWithStep('invite-success');
+            openDrawerWithStep("invite-success");
           });
       }}
       backText="Skip"
       nextText="Send Invite"
       onBack={() => {
-        openDrawerWithStep('project-success');
+        openDrawerWithStep("project-success");
       }}
       disableNext={!submittable}
     >

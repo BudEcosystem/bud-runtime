@@ -19,9 +19,7 @@ const CurrentMetricsTable: React.FC<CurrentMetricsTableProps> = ({ data }) => {
       title: "Evaluation",
       dataIndex: "evaluation",
       key: "evaluation",
-      render: (text: string) => (
-        <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>
-      ),
+      render: (text: string) => <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>,
     },
     {
       title: "GPT-4 Score",
@@ -49,15 +47,15 @@ const CurrentMetricsTable: React.FC<CurrentMetricsTableProps> = ({ data }) => {
         }
         .current-metrics-table .ant-table-thead > tr > th {
           background: transparent;
-          border-bottom: 1px solid #1F1F1F;
-          color: #B3B3B3;
+          border-bottom: 1px solid #1f1f1f;
+          color: #b3b3b3;
           font-size: 12px;
           font-weight: 400;
           padding: 12px 16px;
         }
         .current-metrics-table .ant-table-tbody > tr > td {
           background: transparent;
-          border-bottom: 1px solid #1F1F1F;
+          border-bottom: 1px solid #1f1f1f;
           padding: 12px 16px;
         }
         .current-metrics-table .ant-table-tbody > tr:hover > td {

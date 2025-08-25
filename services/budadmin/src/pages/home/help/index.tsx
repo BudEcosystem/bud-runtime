@@ -11,7 +11,7 @@ export default function Help() {
   return (
     <DashBoardLayout>
       <div className="boardPageView flex justify-center items-center">
-        <ComingSoon shrink={true} scaleValue={.9} comingYpos='0%'/>
+        <ComingSoon shrink={true} scaleValue={0.9} comingYpos="0%" />
       </div>
     </DashBoardLayout>
   );

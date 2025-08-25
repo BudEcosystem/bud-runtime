@@ -5,14 +5,21 @@ import { Table, Tag, Popover, ConfigProvider, Select } from "antd";
 import { ColumnsType } from "antd/es/table";
 import { useRouter } from "next/router";
 import { MixerHorizontalIcon } from "@radix-ui/react-icons";
-import { useEvaluations, ExperimentData, GetExperimentsPayload } from "src/hooks/useEvaluations";
+import {
+  useEvaluations,
+  ExperimentData,
+  GetExperimentsPayload,
+} from "src/hooks/useEvaluations";
 import {
   Text_12_400_EEEEEE,
   Text_16_600_FFFFFF,
   Text_12_300_EEEEEE,
   Text_12_400_B3B3B3,
 } from "@/components/ui/text";
-import { PrimaryButton, SecondaryButton } from "@/components/ui/bud/form/Buttons";
+import {
+  PrimaryButton,
+  SecondaryButton,
+} from "@/components/ui/bud/form/Buttons";
 import SearchHeaderInput from "src/flows/components/SearchHeaderInput";
 import NoDataFount from "@/components/ui/noDataFount";
 import { SortIcon } from "@/components/ui/bud/table/SortIcon";
@@ -21,7 +28,6 @@ import Tags from "src/flows/components/DrawerTags";
 import ProjectTags from "src/flows/components/ProjectTags";
 import { capitalize } from "@/lib/utils";
 import { endpointStatusMapping } from "@/lib/colorMapping";
-
 
 // Remove the local interface since we're importing it from the hook
 
@@ -41,7 +47,8 @@ const ExperimentsTable = () => {
   const [order, setOrder] = useState("");
   const [orderBy, setOrderBy] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
-  const [tempFilter, setTempFilter] = useState<ExperimentFilters>(defaultFilter);
+  const [tempFilter, setTempFilter] =
+    useState<ExperimentFilters>(defaultFilter);
   const [filter, setFilter] = useState<ExperimentFilters>(defaultFilter);
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -56,7 +63,7 @@ const ExperimentsTable = () => {
       traits: "Accuracy, Speed, Cost",
       tags: ["production", "benchmark"],
       status: "Completed",
-      createdDate: "2024-01-15T10:30:00Z"
+      createdDate: "2024-01-15T10:30:00Z",
     },
     {
       id: "exp-2",
@@ -65,7 +72,7 @@ const ExperimentsTable = () => {
       traits: "Translation Quality, Latency",
       tags: ["translation", "multi-lingual"],
       status: "Running",
-      createdDate: "2024-01-14T14:45:00Z"
+      createdDate: "2024-01-14T14:45:00Z",
     },
     {
       id: "exp-3",
@@ -74,7 +81,7 @@ const ExperimentsTable = () => {
       traits: "Code Quality, Syntax Accuracy",
       tags: ["coding", "benchmark"],
       status: "Failed",
-      createdDate: "2024-01-13T09:15:00Z"
+      createdDate: "2024-01-13T09:15:00Z",
     },
     {
       id: "exp-4",
@@ -83,7 +90,7 @@ const ExperimentsTable = () => {
       traits: "Response Quality, Customer Satisfaction",
       tags: ["customer-support", "production"],
       status: "Completed",
-      createdDate: "2024-01-12T16:20:00Z"
+      createdDate: "2024-01-12T16:20:00Z",
     },
     {
       id: "exp-5",
@@ -92,17 +99,13 @@ const ExperimentsTable = () => {
       traits: "Accuracy, F1-Score",
       tags: ["nlp", "sentiment"],
       status: "Running",
-      createdDate: "2024-01-11T11:00:00Z"
-    }
+      createdDate: "2024-01-11T11:00:00Z",
+    },
   ];
 
   // Use Zustand store
-  const {
-    experimentsList,
-    experimentsListTotal,
-    loading,
-    getExperiments
-  } = useEvaluations();
+  const { experimentsList, experimentsListTotal, loading, getExperiments } =
+    useEvaluations();
 
   // Fetch experiments data from API
   const fetchExperiments = useCallback(async () => {
@@ -122,7 +125,15 @@ const ExperimentsTable = () => {
       console.error("Failed to fetch experiments:", error);
       // You could show a toast notification here or handle the error as needed
     }
-  }, [currentPage, pageSize, searchValue, filter, order, orderBy, getExperiments]);
+  }, [
+    currentPage,
+    pageSize,
+    searchValue,
+    filter,
+    order,
+    orderBy,
+    getExperiments,
+  ]);
 
   // Initial data fetch
   useEffect(() => {
@@ -159,11 +170,7 @@ const ExperimentsTable = () => {
       render: (text) => <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>,
       sorter: true,
       sortOrder:
-        orderBy === "name"
-          ? order === "-"
-            ? "descend"
-            : "ascend"
-          : undefined,
+        orderBy === "name" ? (order === "-" ? "descend" : "ascend") : undefined,
       sortIcon: SortIcon,
     },
     {
@@ -202,14 +209,24 @@ const ExperimentsTable = () => {
       render: (status: string) => (
         <ProjectTags
           name={capitalize(status)}
-          color={endpointStatusMapping[capitalize(status) === 'Running' ? capitalize(status) + '-yellow' : capitalize(status)]}
+          color={
+            endpointStatusMapping[
+              capitalize(status) === "Running"
+                ? capitalize(status) + "-yellow"
+                : capitalize(status)
+            ]
+          }
           textClass="text-[.75rem] py-[.22rem]"
           tagClass="py-[0rem]"
         />
       ),
       sorter: true,
       sortOrder:
-        orderBy === "status" ? (order === "-" ? "descend" : "ascend") : undefined,
+        orderBy === "status"
+          ? order === "-"
+            ? "descend"
+            : "ascend"
+          : undefined,
       sortIcon: SortIcon,
     },
     {
@@ -237,9 +254,7 @@ const ExperimentsTable = () => {
       dataIndex: "createdDate",
       key: "createdDate",
       render: (date) => (
-        <Text_12_400_EEEEEE>
-          {formatDate(date)}
-        </Text_12_400_EEEEEE>
+        <Text_12_400_EEEEEE>{formatDate(date)}</Text_12_400_EEEEEE>
       ),
       sorter: true,
       sortOrder:
@@ -277,7 +292,9 @@ const ExperimentsTable = () => {
 
     // Ensure experimentsList is an array
     if (!experimentsList || !Array.isArray(experimentsList)) {
-      console.log("Using sample experiments because experimentsList is not an array");
+      console.log(
+        "Using sample experiments because experimentsList is not an array",
+      );
       return sampleExperiments;
     }
     // Use sample data if experimentsList is empty
@@ -366,7 +383,7 @@ const ExperimentsTable = () => {
           columns={columns}
           dataSource={Array.isArray(filteredData) ? filteredData : []}
           pagination={{
-            className: 'small-pagination',
+            className: "small-pagination",
             current: currentPage,
             pageSize: pageSize,
             total: experimentsListTotal || 0,
@@ -375,14 +392,15 @@ const ExperimentsTable = () => {
               setPageSize(size);
             },
             showSizeChanger: true,
-            pageSizeOptions: ['5', '10', '20', '50'],
+            pageSizeOptions: ["5", "10", "20", "50"],
           }}
           loading={loading}
           onChange={handleTableChange}
           onRow={(record) => ({
-            onClick: () => router.push(`/home/evaluations/experiments/${record.id}`),
+            onClick: () =>
+              router.push(`/home/evaluations/experiments/${record.id}`),
             style: { cursor: "pointer" },
-            className: 'group'
+            className: "group",
           })}
           showSorterTooltip={false}
           rowKey="id"
@@ -416,8 +434,20 @@ const ExperimentsTable = () => {
                             onClick={() => setFilterOpen(false)}
                             className="text-[#B3B3B3] hover:text-[#FFFFFF]"
                           >
-                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                              <path d="M13 1L1 13M1 1L13 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                            <svg
+                              width="14"
+                              height="14"
+                              viewBox="0 0 14 14"
+                              fill="none"
+                              xmlns="http://www.w3.org/2000/svg"
+                            >
+                              <path
+                                d="M13 1L1 13M1 1L13 13"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
                             </svg>
                           </button>
                         </div>
@@ -555,7 +585,7 @@ const ExperimentsTable = () => {
                   >
                     <label
                       className="group h-[1.7rem] text-[#EEEEEE] mx-2 flex items-center cursor-pointer text-xs font-normal leading-3 rounded-[6px] shadow-none bg-transparent"
-                      onClick={() => { }}
+                      onClick={() => {}}
                     >
                       <MixerHorizontalIcon
                         style={{ width: "0.875rem", height: "0.875rem" }}

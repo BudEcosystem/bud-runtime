@@ -90,7 +90,6 @@ function TextInput(props: BudInputProps) {
             className={`border border-[#757575] hover:!border-[#CFCFCF] hover:!bg-[#FFFFFF08] shadow-none !placeholder-[#808080] !placeholder:text-[#808080] !placeholder:font-[300] ${props.InputClasses}`}
           />
         )}
-
       </div>
     </Form.Item>
   );

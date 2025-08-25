@@ -1,20 +1,29 @@
-import React, { useEffect, useState } from 'react';
-import { Button, Table, Tag, Tooltip, Typography, message } from 'antd';
-import { EyeOutlined, DownloadOutlined, CopyOutlined, ReloadOutlined } from '@ant-design/icons';
-import type { ColumnsType } from 'antd/es/table';
-import { format } from 'date-fns';
-import { useRouter } from 'next/router';
-import { useInferences, InferenceListItem } from '@/stores/useInferences';
-import InferenceFilters from '@/components/inferences/InferenceFilters';
-import { Text_12_300_EEEEEE, Text_12_400_EEEEEE, Text_16_600_FFFFFF } from '../../text';
-import SearchHeaderInput from 'src/flows/components/SearchHeaderInput';
-import NoDataFount from '../../noDataFount';
-import { PrimaryButton, SecondaryButton } from '../form/Buttons';
-import ProjectTags from 'src/flows/components/ProjectTags';
-import { SortIcon } from './SortIcon';
-import { formatDate, formatTimestamp } from 'src/utils/formatDate';
-import { useLoaderOnLoding } from 'src/hooks/useLoaderOnLoading';
-import { ClientTimestamp } from '../../ClientTimestamp';
+import React, { useEffect, useState } from "react";
+import { Button, Table, Tag, Tooltip, Typography, message } from "antd";
+import {
+  EyeOutlined,
+  DownloadOutlined,
+  CopyOutlined,
+  ReloadOutlined,
+} from "@ant-design/icons";
+import type { ColumnsType } from "antd/es/table";
+import { format } from "date-fns";
+import { useRouter } from "next/router";
+import { useInferences, InferenceListItem } from "@/stores/useInferences";
+import InferenceFilters from "@/components/inferences/InferenceFilters";
+import {
+  Text_12_300_EEEEEE,
+  Text_12_400_EEEEEE,
+  Text_16_600_FFFFFF,
+} from "../../text";
+import SearchHeaderInput from "src/flows/components/SearchHeaderInput";
+import NoDataFount from "../../noDataFount";
+import { PrimaryButton, SecondaryButton } from "../form/Buttons";
+import ProjectTags from "src/flows/components/ProjectTags";
+import { SortIcon } from "./SortIcon";
+import { formatDate, formatTimestamp } from "src/utils/formatDate";
+import { useLoaderOnLoding } from "src/hooks/useLoaderOnLoading";
+import { ClientTimestamp } from "../../ClientTimestamp";
 
 const { Text } = Typography;
 
@@ -22,11 +31,13 @@ interface InferenceListTableProps {
   projectId?: string;
 }
 
-const InferenceListTable: React.FC<InferenceListTableProps> = ({ projectId: propProjectId }) => {
+const InferenceListTable: React.FC<InferenceListTableProps> = ({
+  projectId: propProjectId,
+}) => {
   const router = useRouter();
   const { slug } = router.query;
   const projectId = propProjectId || (slug as string);
-  const [searchValue, setSearchValue] = useState('');
+  const [searchValue, setSearchValue] = useState("");
   const [showFilters, setShowFilters] = useState(false);
 
   const {
@@ -44,7 +55,7 @@ const InferenceListTable: React.FC<InferenceListTableProps> = ({ projectId: prop
 
   // Fetch inferences when component mounts or projectId changes
   useEffect(() => {
-    if (projectId && typeof projectId === 'string') {
+    if (projectId && typeof projectId === "string") {
       fetchInferences(projectId);
     }
   }, [projectId, fetchInferences]);
@@ -64,39 +75,41 @@ const InferenceListTable: React.FC<InferenceListTableProps> = ({ projectId: prop
   // Copy inference ID to clipboard
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    message.success('Copied to clipboard');
+    message.success("Copied to clipboard");
   };
 
   // Table columns definition
   const columns: ColumnsType<InferenceListItem> = [
     {
-      title: 'Timestamp',
-      dataIndex: 'timestamp',
-      key: 'timestamp',
+      title: "Timestamp",
+      dataIndex: "timestamp",
+      key: "timestamp",
       width: 180,
       render: (timestamp: string) => (
-        <Text_12_400_EEEEEE><ClientTimestamp timestamp={timestamp} /></Text_12_400_EEEEEE>
+        <Text_12_400_EEEEEE>
+          <ClientTimestamp timestamp={timestamp} />
+        </Text_12_400_EEEEEE>
       ),
       sorter: true,
       sortIcon: SortIcon,
     },
     {
-      title: 'Deployment',
-      dataIndex: 'endpoint_name',
-      key: 'endpoint_name',
+      title: "Deployment",
+      dataIndex: "endpoint_name",
+      key: "endpoint_name",
       width: 200,
       render: (endpoint_name: string) => (
-        <Tooltip title={endpoint_name || 'N/A'}>
+        <Tooltip title={endpoint_name || "N/A"}>
           <Text_12_400_EEEEEE className="truncate max-w-[180px]">
-            {endpoint_name || '-'}
+            {endpoint_name || "-"}
           </Text_12_400_EEEEEE>
         </Tooltip>
       ),
     },
     {
-      title: 'Prompt Preview',
-      dataIndex: 'prompt_preview',
-      key: 'prompt_preview',
+      title: "Prompt Preview",
+      dataIndex: "prompt_preview",
+      key: "prompt_preview",
       width: 400,
       render: (prompt: string) => (
         <Tooltip title={prompt}>
@@ -107,33 +120,33 @@ const InferenceListTable: React.FC<InferenceListTableProps> = ({ projectId: prop
       ),
     },
     {
-      title: 'Response Time',
-      dataIndex: 'response_time_ms',
-      key: 'response_time_ms',
+      title: "Response Time",
+      dataIndex: "response_time_ms",
+      key: "response_time_ms",
       width: 120,
       render: (response_time_ms: number) => (
         <Text_12_400_EEEEEE>
-          {response_time_ms ? `${response_time_ms.toLocaleString()} ms` : '-'}
+          {response_time_ms ? `${response_time_ms.toLocaleString()} ms` : "-"}
         </Text_12_400_EEEEEE>
       ),
       sorter: true,
       sortIcon: SortIcon,
     },
     {
-      title: 'Status',
-      key: 'status',
+      title: "Status",
+      key: "status",
       width: 100,
       render: (_, record) => (
         <ProjectTags
-          name={record.is_success ? 'Success' : 'Failed'}
-          color={record.is_success ? '#22c55e' : '#ef4444'}
+          name={record.is_success ? "Success" : "Failed"}
+          color={record.is_success ? "#22c55e" : "#ef4444"}
           textClass="text-[.75rem]"
         />
       ),
     },
     {
-      title: '',
-      key: 'actions',
+      title: "",
+      key: "actions",
       width: 100,
       render: (_, record) => (
         <div className="flex items-center gap-2 visible-on-hover">
@@ -143,7 +156,9 @@ const InferenceListTable: React.FC<InferenceListTableProps> = ({ projectId: prop
             icon={<EyeOutlined />}
             onClick={(e) => {
               e.stopPropagation();
-              router.push(`/home/projects/${projectId}/inferences/${record.inference_id}`);
+              router.push(
+                `/home/projects/${projectId}/inferences/${record.inference_id}`,
+              );
             }}
           />
           <Button
@@ -161,16 +176,20 @@ const InferenceListTable: React.FC<InferenceListTableProps> = ({ projectId: prop
   ];
 
   // Handle table change (pagination, sorting)
-  const handleTableChange = (newPagination: any, _filters: any, sorter: any) => {
+  const handleTableChange = (
+    newPagination: any,
+    _filters: any,
+    sorter: any,
+  ) => {
     // Handle sorting
     if (sorter.field) {
       const sortMap: Record<string, string> = {
-        timestamp: 'timestamp',
-        response_time_ms: 'latency',
+        timestamp: "timestamp",
+        response_time_ms: "latency",
       };
 
-      const sortBy = sortMap[sorter.field] || 'timestamp';
-      const sortOrder = sorter.order === 'ascend' ? 'asc' : 'desc';
+      const sortBy = sortMap[sorter.field] || "timestamp";
+      const sortOrder = sorter.order === "ascend" ? "asc" : "desc";
 
       setFilters({
         sort_by: sortBy as any,
@@ -183,14 +202,14 @@ const InferenceListTable: React.FC<InferenceListTableProps> = ({ projectId: prop
   // Export menu items
   const exportMenu = [
     {
-      key: 'csv',
-      label: 'Export as CSV',
-      onClick: () => exportInferences('csv'),
+      key: "csv",
+      label: "Export as CSV",
+      onClick: () => exportInferences("csv"),
     },
     {
-      key: 'json',
-      label: 'Export as JSON',
-      onClick: () => exportInferences('json'),
+      key: "json",
+      label: "Export as JSON",
+      onClick: () => exportInferences("json"),
     },
   ];
 
@@ -220,9 +239,11 @@ const InferenceListTable: React.FC<InferenceListTableProps> = ({ projectId: prop
         onRow={(record) => ({
           onClick: (e) => {
             e.preventDefault();
-            router.push(`/home/projects/${projectId}/inferences/${record.inference_id}`);
+            router.push(
+              `/home/projects/${projectId}/inferences/${record.inference_id}`,
+            );
           },
-          className: 'cursor-pointer hover:bg-gray-900',
+          className: "cursor-pointer hover:bg-gray-900",
         })}
         title={() => (
           <div className="flex justify-between items-center px-[0.75rem] py-[1rem]">
@@ -235,12 +256,21 @@ const InferenceListTable: React.FC<InferenceListTableProps> = ({ projectId: prop
                 searchValue={searchValue}
                 setSearchValue={setSearchValue}
               />
-              <SecondaryButton
-                onClick={() => setShowFilters(!showFilters)}
-              >
-                <span style={{ display: 'flex', alignItems: 'center' }}>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12" fill="none">
-                    <path d="M2 3h8M3 6h6M4 9h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              <SecondaryButton onClick={() => setShowFilters(!showFilters)}>
+                <span style={{ display: "flex", alignItems: "center" }}>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="12"
+                    height="12"
+                    viewBox="0 0 12 12"
+                    fill="none"
+                  >
+                    <path
+                      d="M2 3h8M3 6h6M4 9h4"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                    />
                   </svg>
                   <span className="ml-2">Filters</span>
                 </span>
@@ -251,9 +281,7 @@ const InferenceListTable: React.FC<InferenceListTableProps> = ({ projectId: prop
                 <ReloadOutlined />
                 <span className="ml-2">Refresh</span>
               </PrimaryButton>
-              <SecondaryButton
-                onClick={() => exportInferences('csv')}
-              >
+              <SecondaryButton onClick={() => exportInferences("csv")}>
                 <DownloadOutlined />
                 <span className="ml-2">Export</span>
               </SecondaryButton>

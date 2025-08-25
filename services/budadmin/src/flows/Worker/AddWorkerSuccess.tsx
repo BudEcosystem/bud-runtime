@@ -17,22 +17,24 @@ const AddWorkerSuccess: React.FC = () => {
   const { getEndpointClusterDetails } = useEndPoints();
   const { getWorkers } = useWorkers();
   const router = useRouter();
-  const projectId = router.query.projectId as string
+  const projectId = router.query.projectId as string;
   React.useEffect(() => {
     getWorkflow();
   }, []);
 
   useEffect(() => {
     if (currentWorkflow?.workflow_steps?.endpoint?.id) {
-      getEndpointClusterDetails(currentWorkflow?.workflow_steps?.endpoint?.id, projectId);
+      getEndpointClusterDetails(
+        currentWorkflow?.workflow_steps?.endpoint?.id,
+        projectId,
+      );
       getWorkers(currentWorkflow?.workflow_steps?.endpoint?.id, projectId);
     }
   }, [currentWorkflow]);
 
   return (
     <BudForm
-      data={{
-      }}
+      data={{}}
       nextText={"View Workers"}
       onNext={async () => {
         closeDrawer();

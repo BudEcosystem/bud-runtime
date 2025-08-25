@@ -83,7 +83,7 @@ function DeployModelTemplateSelect() {
   } = useDeployModel();
 
   useEffect(() => {
-    getTemplates({ page, limit});
+    getTemplates({ page, limit });
   }, []);
 
   useEffect(() => {

@@ -3,8 +3,6 @@ import { AppRequest } from "src/pages/api/requests";
 import { create } from "zustand";
 import { Provider } from "./useCloudProviders";
 
-
-
 export type User = {
   color: string;
   email: string;
@@ -46,17 +44,17 @@ type GetUserParams = {
   role?: string;
   status?: string;
   user_type?: string;
-  search?: any
+  search?: any;
 };
 
 export const useUsers = create<{
   loading: boolean;
   totalPages: number;
   totalUsers: number;
-  users: User[],
-  userDetails: any,
-  createdUser: any,
-  userPermissions,
+  users: User[];
+  userDetails: any;
+  createdUser: any;
+  userPermissions;
   filters: any;
 
   getUsers: (parms: GetUserParams) => void;
@@ -81,12 +79,11 @@ export const useUsers = create<{
     set({ createdUser: data });
   },
   fetchUsers: async (params: GetUserParams) => {
-    Object.keys(params)
-      .forEach((key) => {
-        if (!params[key]) {
-          delete params[key];
-        }
-      });
+    Object.keys(params).forEach((key) => {
+      if (!params[key]) {
+        delete params[key];
+      }
+    });
 
     set({ loading: true });
     try {
@@ -94,12 +91,15 @@ export const useUsers = create<{
         params: {
           ...params,
           search: Boolean(params.email),
-        }
+        },
       });
-      set({ totalPages: response.data.total_pages, totalUsers: response.data.total_record });
+      set({
+        totalPages: response.data.total_pages,
+        totalUsers: response.data.total_record,
+      });
       console.log("response", response);
       const listData = response.data;
-      const updatedListData = listData.users
+      const updatedListData = listData.users;
       return updatedListData;
     } catch (error) {
       console.error("Error creating model:", error);
@@ -107,7 +107,7 @@ export const useUsers = create<{
       set({ loading: false });
     }
   },
-  getUsers: async (params: GetUserParams,) => {
+  getUsers: async (params: GetUserParams) => {
     let updatedListData = await get().fetchUsers(params);
     if (params.page !== 1) {
       updatedListData = [...get().users, ...updatedListData];
@@ -115,25 +115,28 @@ export const useUsers = create<{
     set({ users: updatedListData, filters: params });
   },
 
-  getUsersDetails: async (Id,) => {
+  getUsersDetails: async (Id) => {
     set({ loading: true });
     const response: any = await AppRequest.Get(`/users/${Id}`);
     let userData = response.data?.user;
     set({ userDetails: userData });
     set({ loading: false });
-    if(userData) {
+    if (userData) {
       return userData;
     }
   },
 
-  getUsersPermissions: async (Id,) => {
+  getUsersPermissions: async (Id) => {
     const response: any = await AppRequest.Get(`/users/${Id}/permissions`);
     let userData = response.data?.result;
     set({ userPermissions: userData });
   },
 
   setUsersPermissions: async (Id, userPermissions) => {
-    const response: any = await AppRequest.Put(`/permissions/${Id}/global`, userPermissions);
+    const response: any = await AppRequest.Put(
+      `/permissions/${Id}/global`,
+      userPermissions,
+    );
     let userData = response.data?.result;
     if (userData) {
       await get().getUsersPermissions(Id);
@@ -144,14 +147,14 @@ export const useUsers = create<{
   updateUser: async (Id, payload) => {
     const response: any = await AppRequest.Patch(`/users/${Id}`, payload);
     let userData = response.data?.result;
-    return userData
+    return userData;
   },
 
   deleteUser: async (Id) => {
     const response: any = await AppRequest.Delete(`/users/${Id}`);
-    console.log('response', response)
+    console.log("response", response);
     let userData = response.data?.message;
-    return userData
+    return userData;
   },
 
   addUser: async (payload) => {
@@ -160,7 +163,6 @@ export const useUsers = create<{
       get().getUsers({ page: 1, limit: 10, order_by: "-created_at" });
     }
     let userData = response?.data;
-    return userData
+    return userData;
   },
-
 }));

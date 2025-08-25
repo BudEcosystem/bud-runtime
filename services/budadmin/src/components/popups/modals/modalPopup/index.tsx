@@ -144,16 +144,16 @@ const CommonModal: React.FC<CommonModalProps> = ({
 
   // Filter fields to get only SelectFieldType
   const selectFields: SelectFieldType[] = fields.filter(
-    (field): field is SelectFieldType => field.type === 'select'
+    (field): field is SelectFieldType => field.type === "select",
   );
   const cloudSelectFields = cloudFields.filter(
-    (field) => field.type === "select"
+    (field) => field.type === "select",
   );
   const editFields = fields.filter(
-    (field) => field.name === "name" || field.name === "uri"
+    (field) => field.name === "name" || field.name === "uri",
   );
   const nonEditFields = fields.filter(
-    (field) => field.name !== "name" && field.name !== "uri"
+    (field) => field.name !== "name" && field.name !== "uri",
   );
   return (
     <Dialog.Root open={isOpen} onOpenChange={onOpenChange}>
@@ -382,7 +382,7 @@ const CommonModal: React.FC<CommonModalProps> = ({
                 size="1"
                 className="w-full"
                 onClick={handleSubmit}
-              // disabled={!isFormValid()}
+                // disabled={!isFormValid()}
               >
                 Add Model
               </ButtonInput>

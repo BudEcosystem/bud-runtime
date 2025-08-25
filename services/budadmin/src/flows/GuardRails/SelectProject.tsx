@@ -9,10 +9,7 @@ import { useDrawer } from "src/hooks/useDrawer";
 import { errorToast } from "@/components/toast";
 import { useProjects } from "src/hooks/useProjects";
 import useGuardrails from "src/hooks/useGuardrails";
-import {
-  Text_12_400_757575,
-  Text_14_400_EEEEEE,
-} from "@/components/ui/text";
+import { Text_12_400_757575, Text_14_400_EEEEEE } from "@/components/ui/text";
 
 export default function SelectProject() {
   const { openDrawerWithStep } = useDrawer();
@@ -23,8 +20,12 @@ export default function SelectProject() {
   // Use the projects hook to fetch actual project data
   const { projects, loading, getProjects } = useProjects();
 
-  // Use guardrails hook to store selected project
-  const { setSelectedProject: setSelectedProjectInStore } = useGuardrails();
+  // Use guardrails hook to store selected project and update workflow
+  const {
+    setSelectedProject: setSelectedProjectInStore,
+    updateWorkflow,
+    workflowLoading,
+  } = useGuardrails();
 
   // Fetch projects on component mount and when search changes
   useEffect(() => {
@@ -39,15 +40,28 @@ export default function SelectProject() {
     openDrawerWithStep("deployment-types");
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (!selectedProject || !selectedProjectData) {
       errorToast("Please select a project");
       return;
     }
-    // Save selected project to guardrails store
-    setSelectedProjectInStore(selectedProjectData);
-    // Move to deployment selection
-    openDrawerWithStep("select-deployment");
+
+    try {
+      // Update workflow with selected project
+      await updateWorkflow({
+        step_number: 4, // Project selection is step 4
+        workflow_total_steps: 6,
+        project_id: selectedProject,
+        trigger_workflow: false,
+      });
+
+      // Save selected project to guardrails store
+      setSelectedProjectInStore(selectedProjectData);
+      // Move to deployment selection
+      openDrawerWithStep("select-deployment");
+    } catch (error) {
+      console.error("Failed to update workflow:", error);
+    }
   };
 
   const handleProjectSelect = (project: any) => {
@@ -64,7 +78,7 @@ export default function SelectProject() {
       onNext={handleNext}
       backText="Back"
       nextText="Next"
-      disableNext={!selectedProject}
+      disableNext={!selectedProject || workflowLoading}
     >
       <BudWraperBox>
         <BudDrawerLayout>
@@ -115,7 +129,12 @@ export default function SelectProject() {
                         <div className="flex items-center gap-[1rem]">
                           {/* Project Icon */}
                           <div className="bg-[#1F1F1F] rounded-[0.515625rem] w-[2.6875rem] h-[2.6875rem] flex justify-center items-center shrink-0">
-                            <span className="text-[1.2rem]">{project.project.icon && project.project.icon != 'string' ? project.project.icon : "📁"}</span>
+                            <span className="text-[1.2rem]">
+                              {project.project.icon &&
+                              project.project.icon != "string"
+                                ? project.project.icon
+                                : "📁"}
+                            </span>
                           </div>
 
                           {/* Project Details */}
@@ -149,7 +168,9 @@ export default function SelectProject() {
 
                   {(!projects || projects.length === 0) && (
                     <div className="text-center py-[2rem]">
-                      <Text_12_400_757575>No projects found matching your search</Text_12_400_757575>
+                      <Text_12_400_757575>
+                        No projects found matching your search
+                      </Text_12_400_757575>
                     </div>
                   )}
                 </>

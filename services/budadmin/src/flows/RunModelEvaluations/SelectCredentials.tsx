@@ -1,8 +1,12 @@
-
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
-import { Text_12_400_B3B3B3, Text_12_400_EEEEEE, Text_14_400_EEEEEE, Text_14_600_EEEEEE } from "@/components/ui/text";
+import {
+  Text_12_400_B3B3B3,
+  Text_12_400_EEEEEE,
+  Text_14_400_EEEEEE,
+  Text_14_600_EEEEEE,
+} from "@/components/ui/text";
 import React from "react";
 import { useDrawer } from "src/hooks/useDrawer";
 import { Image } from "antd"; // Added Checkbox import
@@ -12,62 +16,59 @@ import { useModels } from "src/hooks/useModels";
 
 const tags = [
   {
-    icon: '/images/drawer/huggingface.png',
-    name: 'OpenAI',
-    color: '#D1B854',
-    background: '#423A1A40'
+    icon: "/images/drawer/huggingface.png",
+    name: "OpenAI",
+    color: "#D1B854",
+    background: "#423A1A40",
   },
   {
-    icon: '/images/drawer/huggingface.png',
-    name: 'Together.ai',
-    color: '#D1B854',
-    background: '#423A1A40'
+    icon: "/images/drawer/huggingface.png",
+    name: "Together.ai",
+    color: "#D1B854",
+    background: "#423A1A40",
   },
   {
-    icon: '/images/drawer/huggingface.png',
-    name: 'Provider name',
-    color: '#D1B854',
-    background: '#423A1A40'
+    icon: "/images/drawer/huggingface.png",
+    name: "Provider name",
+    color: "#D1B854",
+    background: "#423A1A40",
   },
   {
-    icon: '/images/drawer/huggingface.png',
-    name: 'Provider name',
-    color: '#D1B854',
-    background: '#423A1A40'
+    icon: "/images/drawer/huggingface.png",
+    name: "Provider name",
+    color: "#D1B854",
+    background: "#423A1A40",
   },
   {
-    icon: '/images/drawer/huggingface.png',
-    name: 'Provider name',
-    color: '#D1B854',
-    background: '#423A1A40'
+    icon: "/images/drawer/huggingface.png",
+    name: "Provider name",
+    color: "#D1B854",
+    background: "#423A1A40",
   },
   {
-    icon: '/images/drawer/huggingface.png',
-    name: 'Provider name',
-    color: '#D1B854',
-    background: '#423A1A40'
+    icon: "/images/drawer/huggingface.png",
+    name: "Provider name",
+    color: "#D1B854",
+    background: "#423A1A40",
   },
   {
-    icon: '/images/drawer/huggingface.png',
-    name: 'Provider name',
-    color: '#D1B854',
-    background: '#423A1A40'
+    icon: "/images/drawer/huggingface.png",
+    name: "Provider name",
+    color: "#D1B854",
+    background: "#423A1A40",
   },
-]
-
+];
 
 export default function SelectCredentials() {
-  const { closeDrawer } = useDrawer()
+  const { closeDrawer } = useDrawer();
   const { selectedCredentials } = useDeployModel();
   const { selectedModel } = useModels();
   const providerType = selectedModel?.provider?.type;
 
-
   return (
     <BudForm
       disableNext={selectedCredentials === null}
-      data={{
-      }}
+      data={{}}
       onNext={() => {
         closeDrawer();
       }}
@@ -83,7 +84,7 @@ export default function SelectCredentials() {
                 preview={false}
                 src="/images/drawer/zephyr.png"
                 alt="info"
-                style={{ width: '1.75rem' }}
+                style={{ width: "1.75rem" }}
               />
             </div>
             <div>
@@ -96,7 +97,7 @@ export default function SelectCredentials() {
                     preview={false}
                     src="/images/drawer/edit.png"
                     alt="info"
-                    style={{ width: '.75rem', height: '.75rem' }}
+                    style={{ width: ".75rem", height: ".75rem" }}
                   />
                 </div>
               </div>
@@ -106,7 +107,7 @@ export default function SelectCredentials() {
                     key={index}
                     style={{
                       backgroundColor: `${tag.background}`,
-                      color: '#EEEEEE',
+                      color: "#EEEEEE",
                     }}
                     className="text-[0.625rem]  font-[400] rounded-[6px] px-[.3rem] py-[.2rem] leading-[100%] flex justify-center items-center"
                   >
@@ -115,13 +116,14 @@ export default function SelectCredentials() {
                         preview={false}
                         src={tag.icon}
                         className="!w-[.75rem] !h-[.75rem]"
-                        style={{ width: '.75rem', height: '.75rem' }}
+                        style={{ width: ".75rem", height: ".75rem" }}
                         alt="home"
                       />
                     </div>
-                    <span className={`text-[0.625] font-[400]`}
+                    <span
+                      className={`text-[0.625] font-[400]`}
                       style={{
-                        color: `${tag.color}`
+                        color: `${tag.color}`,
                       }}
                     >
                       {tag.name}
@@ -139,25 +141,31 @@ export default function SelectCredentials() {
                     preview={false}
                     src="/images/drawer/calander.png"
                     alt="info"
-                    style={{ width: '.75rem' }}
+                    style={{ width: ".75rem" }}
                   />
                 </div>
                 <Text_12_400_B3B3B3>Updated on</Text_12_400_B3B3B3>
               </div>
-              <Text_12_400_EEEEEE>
-                3rd July, 2024
-              </Text_12_400_EEEEEE>
+              <Text_12_400_EEEEEE>3rd July, 2024</Text_12_400_EEEEEE>
             </div>
             <Text_12_400_B3B3B3 className="mt-[1.2rem] leading-[1.1rem]">
-              InternLM 2.5 offers strong reasoning across the board as well as tool use for developers, while sitting at the sweet spot of size for those with 24GB GPUs.
+              InternLM 2.5 offers strong reasoning across the board as well as
+              tool use for developers, while sitting at the sweet spot of size
+              for those with 24GB GPUs.
             </Text_12_400_B3B3B3>
           </div>
           <div className="px-[1.4rem] pt-[1.1rem] mb-[1.2rem]">
             <Text_14_600_EEEEEE>Evaluation Information</Text_14_600_EEEEEE>
             <div className="flex justify-start items-center flex-wrap	mt-[1.2rem] gap-[.5rem]">
-              <div className="text-[#D1B854] text-[0.625rem] font-[400] bg-[#423A1A40] rounded-[6px] px-[.4rem] py-[.15rem]">MMLU</div>
-              <div className="text-[#D1B854] text-[0.625rem] font-[400] bg-[#423A1A40] rounded-[6px] px-[.4rem] py-[.15rem]">Toxicity</div>
-              <div className="text-[#D1B854] text-[0.625rem] font-[400] bg-[#423A1A40] rounded-[6px] px-[.4rem] py-[.15rem]">Finance</div>
+              <div className="text-[#D1B854] text-[0.625rem] font-[400] bg-[#423A1A40] rounded-[6px] px-[.4rem] py-[.15rem]">
+                MMLU
+              </div>
+              <div className="text-[#D1B854] text-[0.625rem] font-[400] bg-[#423A1A40] rounded-[6px] px-[.4rem] py-[.15rem]">
+                Toxicity
+              </div>
+              <div className="text-[#D1B854] text-[0.625rem] font-[400] bg-[#423A1A40] rounded-[6px] px-[.4rem] py-[.15rem]">
+                Finance
+              </div>
             </div>
           </div>
           <div className="flex justify-between items-center w-[48%] mb-[1.4rem] px-[1.4rem]">
@@ -168,7 +176,7 @@ export default function SelectCredentials() {
                     preview={false}
                     src="/images/drawer/cluster.png"
                     alt="info"
-                    style={{ height: '.75rem' }}
+                    style={{ height: ".75rem" }}
                   />
                 </div>
               </div>
@@ -176,12 +184,12 @@ export default function SelectCredentials() {
                 Cluster Name
               </Text_12_400_B3B3B3>
             </div>
-            <Text_12_400_EEEEEE className="min-w-[3.5rem]">name123</Text_12_400_EEEEEE>
+            <Text_12_400_EEEEEE className="min-w-[3.5rem]">
+              name123
+            </Text_12_400_EEEEEE>
           </div>
         </BudDrawerLayout>
-        <ProprietaryCredentialsFormList
-          providerType={providerType}
-        />
+        <ProprietaryCredentialsFormList providerType={providerType} />
       </BudWraperBox>
     </BudForm>
   );

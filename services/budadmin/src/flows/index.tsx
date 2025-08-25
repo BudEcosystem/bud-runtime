@@ -79,13 +79,13 @@ import ChooseCloudSource from "./Cluster/ChooseCloudSource";
 import CloudChooser from "./Cluster/CloudChooser";
 import ChooseCloudCredentialStep from "./Cluster/_cloud/ChooseCloudCredential";
 import ConfigureClusterDetails from "./Cluster/_cloud/ConfigureClusterDetails";
-import QuantizationDetail from './Quantization/QuantizationDetail';
-import QuantizationMethod from './Quantization/QuantizationMethod';
-import AdvancedSettings from './Quantization/AdvancedSettings';
-import SimulationStatus from './Quantization/SimulationStatus';
-import QuantizationSelectCluster from './Quantization/SelectCluster';
-import QuantizationResult from './Quantization/QuantizationResult';
-import DeploymentStatus from './Quantization/DeploymentStatus';
+import QuantizationDetail from "./Quantization/QuantizationDetail";
+import QuantizationMethod from "./Quantization/QuantizationMethod";
+import AdvancedSettings from "./Quantization/AdvancedSettings";
+import SimulationStatus from "./Quantization/SimulationStatus";
+import QuantizationSelectCluster from "./Quantization/SelectCluster";
+import QuantizationResult from "./Quantization/QuantizationResult";
+import DeploymentStatus from "./Quantization/DeploymentStatus";
 import SelectEvaluationType from "./runSimulation/SelectType";
 import SelectUseCase from "./runSimulation/SelectUseCase";
 import AdditionalSettings from "./runSimulation/AdditionalSettings";
@@ -187,7 +187,7 @@ export const StepComponents = {
   "add-members": AddMembers,
   "worker-details": WorkerDetails,
   "use-model": UseModel,
-  "publish": Publish,
+  publish: Publish,
   "delete-cluster": DeleteCluster,
   "deploy-model-success": DeployModelSuccess,
   "delete-cluster-status": ClusterDeleteStatus,
@@ -208,9 +208,9 @@ export const StepComponents = {
   "reset-password": ResetPassword,
   "add-user": AddUser,
   "add-user-details": AddUserDetails,
-  "model_benchmark": AddBenchmark,
-  "Datasets": Datasets,
-  "Configuration": Configuration,
+  model_benchmark: AddBenchmark,
+  Datasets: Datasets,
+  Configuration: Configuration,
   "Select-Cluster": SelectCluster,
   "Select-Nodes": SelectNodes,
   "Select-Model": SelectModel,
@@ -227,13 +227,13 @@ export const StepComponents = {
   "add-cluster-select-provider": CloudChooser,
   "choose-cloud-credential": ChooseCloudCredentialStep,
   "configure-cluster-details": ConfigureClusterDetails,
-  'quantization-detail': QuantizationDetail,
-  'quantization-method': QuantizationMethod,
-  'advanced-settings': AdvancedSettings,
-  'quantization-simulation-status': SimulationStatus,
-  'quantization-select-cluster': QuantizationSelectCluster,
-  'quantization-deployment-status': DeploymentStatus,
-  'quantization-result': QuantizationResult,
+  "quantization-detail": QuantizationDetail,
+  "quantization-method": QuantizationMethod,
+  "advanced-settings": AdvancedSettings,
+  "quantization-simulation-status": SimulationStatus,
+  "quantization-select-cluster": QuantizationSelectCluster,
+  "quantization-deployment-status": DeploymentStatus,
+  "quantization-result": QuantizationResult,
   "select-evaluation-type": SelectEvaluationType,
   "select-use-case": SelectUseCase,
   "additional-settings": AdditionalSettings,
@@ -285,7 +285,6 @@ export const StepComponents = {
   "probe-deployment-success": ProbeDeploymentSuccess,
   "probe-details": ProbeDetails,
   "view-guardrail-details": ViewGuardRailDetails,
-
 };
 
 export type StepComponentsType = keyof typeof StepComponents;

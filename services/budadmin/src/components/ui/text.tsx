@@ -1,8 +1,7 @@
 import * as React from "react";
 import { Heading, Text } from "@radix-ui/themes";
 
-export const pxToRem = (px) => `${px / 16}rem`
-
+export const pxToRem = (px) => `${px / 16}rem`;
 
 const Text_12_400_red = ({ children, className = "", ...props }) => (
   <Text
@@ -105,7 +104,7 @@ const Text_8_300_FFFFFF = ({ children, className = "", ...props }) => (
     {children}
   </Text>
 );
-const Text_12_400_5B6168 = ({ children="", className = "", ...props }) => (
+const Text_12_400_5B6168 = ({ children = "", className = "", ...props }) => (
   <Text
     as="div"
     className={`block text-xs font-normal text-[#5B6168]  ${className}`}
@@ -440,8 +439,8 @@ const Text_12_400_EEEEEE = ({ children, className = "", ...props }) => (
     className={`block text-xs font-normal ${className}`}
     {...props}
     style={{
-      lineHeight: '.75rem',
-      color: '#EEEEEE'
+      lineHeight: ".75rem",
+      color: "#EEEEEE",
     }}
   >
     {children}
@@ -453,7 +452,7 @@ const Text_12_600_EEEEEE = ({ children, className = "", ...props }) => (
     className={`block text-[0.75rem] font-[600] text-[#EEEEEE] ${className}`}
     {...props}
     style={{
-      lineHeight: '100%'
+      lineHeight: "100%",
     }}
   >
     {children}
@@ -468,7 +467,7 @@ const Text_13_300_FFFFFF = ({ children, className = "", ...props }) => (
     {children}
   </Text>
 );
-const Text_13_400_B3B3B3= ({ children, className = "", ...props }) => (
+const Text_13_400_B3B3B3 = ({ children, className = "", ...props }) => (
   <Text
     as="div"
     className={`block text-[0.8125rem] font-normal text-[#B3B3B3] leading-[.75rem] ${className}`}
@@ -477,7 +476,7 @@ const Text_13_400_B3B3B3= ({ children, className = "", ...props }) => (
     {children}
   </Text>
 );
-const Text_13_400_tag= ({ children, className = "", ...props }) => (
+const Text_13_400_tag = ({ children, className = "", ...props }) => (
   <Text
     as="div"
     className={`block text-[0.8125rem] font-[400] leading-[100%] ${className}`}
@@ -570,7 +569,7 @@ const Text_24_600_FFFFFF = ({ children, className = "", ...props }) => (
     as="div"
     className={`block font-[600] text-[1.5rem] ${className}`}
     style={{
-      color: '#FFFFFF',
+      color: "#FFFFFF",
     }}
     {...props}
   >
@@ -640,7 +639,8 @@ const Text_14_600_EEEEEE = ({ children, className = "", ...props }) => (
   >
     {children}
   </Text>
-);const Text_14_600_B3B3B3 = ({ children, className = "", ...props }) => (
+);
+const Text_14_600_B3B3B3 = ({ children, className = "", ...props }) => (
   <Text
     as="div"
     className={`text-[#B3B3B3] text-[0.875rem] font-semibold leading-[1.5rem] ${className}`}
@@ -649,7 +649,7 @@ const Text_14_600_EEEEEE = ({ children, className = "", ...props }) => (
     {children}
   </Text>
 );
-const Text_24_500_EEEEEE = ({})
+const Text_24_500_EEEEEE = {};
 const Text_18_700_FFFFFF = ({ children, className = "", ...props }) => (
   <Text
     as="div"
@@ -711,7 +711,7 @@ const Text_32_600_FFFFFF = ({ children, className = "", ...props }) => (
     as="div"
     className={` text-[2rem] font-semibold leading-[24px] ${className}`}
     style={{
-      color: '#FFFFFF',
+      color: "#FFFFFF",
     }}
     {...props}
   >
@@ -787,7 +787,7 @@ const Heading_26_600_FFFFFF = ({ children, className = "", ...props }) => (
     as="div"
     className={`text-[#FFFFFF] text-[1.625rem] font-[600] ${className}`}
     style={{
-      lineHeight: '100%',
+      lineHeight: "100%",
     }}
     {...props}
   >
@@ -799,7 +799,7 @@ const Heading_30_600_FFFFFF = ({ children, className = "", ...props }) => (
     as="div"
     className={`text-[#FFFFFF] text-[1.875rem] font-[600] ${className}`}
     style={{
-      lineHeight: '100%',
+      lineHeight: "100%",
     }}
     {...props}
   >
@@ -826,7 +826,6 @@ const Ibm_12_500_EEEEEE = ({ children, className = "", ...props }) => (
     {children}
   </Text>
 );
-
 
 export {
   Heading_26_600_FFFFFF,

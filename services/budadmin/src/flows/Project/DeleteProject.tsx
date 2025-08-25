@@ -1,4 +1,3 @@
-
 import DrawerCard from "@/components/ui/bud/card/DrawerCard";
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
@@ -14,15 +13,10 @@ import { axiosInstance } from "src/pages/api/requests";
 import { tempApiBaseUrl } from "@/components/environment";
 import { useProjects } from "src/hooks/useProjects";
 
-
-
-
-
 export default function EditProject() {
   const { values } = useContext(BudFormContext);
   const { openDrawer } = useDrawer();
   const { selectedProject } = useProjects();
-
 
   return (
     <BudForm
@@ -30,12 +24,10 @@ export default function EditProject() {
       nextText="Save"
       disableNext={!values.name || !values.description}
       onBack={() => openDrawer("view-model")}
-      onNext={async () => {
-
-      }}
+      onNext={async () => {}}
       data={selectedProject}
     >
-     <div></div>
+      <div></div>
     </BudForm>
   );
 }

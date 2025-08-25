@@ -10,7 +10,7 @@ import {
   Text_12_400_EEEEEE,
   Text_28_600_FFFFFF,
   Text_14_400_FFFFFF,
-  Text_24_600_FFFFFF
+  Text_24_600_FFFFFF,
 } from "@/components/ui/text";
 import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
 import MetricCard from "src/components/evaluations/MetricCard";
@@ -49,13 +49,13 @@ interface ExperimentDetails {
     eta: string;
     processingRate: number;
     averageScore: number;
-    status: 'Running' | 'Completed';
+    status: "Running" | "Completed";
     progress: number;
   }>;
   runsHistory: Array<{
     runId: string;
     model: string;
-    status: 'Completed' | 'Failed' | 'Running';
+    status: "Completed" | "Failed" | "Running";
     startedDate: string;
     duration: string;
     benchmarkScore: string;
@@ -63,17 +63,17 @@ interface ExperimentDetails {
 }
 
 const sampletags = [
-  { name: 'text', color: '#D1B854' },
-  { name: 'image', color: '#D1B854' },
-  { name: 'video', color: '#D1B854' },
-  { name: 'actions', color: '#D1B854' },
-  { name: 'embeddings', color: '#D1B854' },
-  { name: 'text', color: '#D1B854' },
-  { name: 'text', color: '#D1B854' },
-  { name: 'text', color: '#D1B854' },
-  { name: 'text', color: '#D1B854' },
-  { name: 'text', color: '#D1B854' },
-]
+  { name: "text", color: "#D1B854" },
+  { name: "image", color: "#D1B854" },
+  { name: "video", color: "#D1B854" },
+  { name: "actions", color: "#D1B854" },
+  { name: "embeddings", color: "#D1B854" },
+  { name: "text", color: "#D1B854" },
+  { name: "text", color: "#D1B854" },
+  { name: "text", color: "#D1B854" },
+  { name: "text", color: "#D1B854" },
+  { name: "text", color: "#D1B854" },
+];
 
 const ExperimentDetailsPage = () => {
   const { openDrawer, openDrawerWithStep } = useDrawer();
@@ -88,22 +88,30 @@ const ExperimentDetailsPage = () => {
     experimentDetails,
     experimentRuns,
     getExperimentDetails,
-    getExperimentRuns
+    getExperimentRuns,
   } = useEvaluations();
 
   // Dummy data for experimentMetrics
   const experimentMetrics = {
     budgetUsed: 45.67,
-    budgetTotal: 100.00,
+    budgetTotal: 100.0,
     tokensProcessed: 2500000,
     runtime: 185, // in minutes
     processingRate: 13500,
     currentMetrics: [
       { evaluation: "Code Generation", gpt4Score: 92.5, claude3Score: 89.3 },
-      { evaluation: "Language Understanding", gpt4Score: 94.2, claude3Score: 93.8 },
+      {
+        evaluation: "Language Understanding",
+        gpt4Score: 94.2,
+        claude3Score: 93.8,
+      },
       { evaluation: "Reasoning", gpt4Score: 88.7, claude3Score: 91.2 },
-      { evaluation: "Math Problem Solving", gpt4Score: 85.4, claude3Score: 87.9 }
-    ]
+      {
+        evaluation: "Math Problem Solving",
+        gpt4Score: 85.4,
+        claude3Score: 87.9,
+      },
+    ],
   };
 
   // Dummy data for experimentBenchmarks
@@ -112,28 +120,30 @@ const ExperimentDetailsPage = () => {
       {
         id: "bench-1",
         title: "Multi-Modal Understanding Benchmark",
-        objective: "Evaluate model performance on text and image understanding tasks",
+        objective:
+          "Evaluate model performance on text and image understanding tasks",
         currentEvaluation: "Image Captioning",
         currentModel: "GPT-4 Vision",
         eta: "2h 30m",
         processingRate: 125,
         averageScore: 87.5,
-        status: 'Running' as const,
-        progress: 65
+        status: "Running" as const,
+        progress: 65,
       },
       {
         id: "bench-2",
         title: "Code Generation Quality",
-        objective: "Test code generation accuracy across multiple programming languages",
+        objective:
+          "Test code generation accuracy across multiple programming languages",
         currentEvaluation: "Python Code Generation",
         currentModel: "Claude-3",
         eta: "1h 15m",
         processingRate: 200,
         averageScore: 91.2,
-        status: 'Running' as const,
-        progress: 82
-      }
-    ]
+        status: "Running" as const,
+        progress: 82,
+      },
+    ],
   };
 
   // Dummy data for runs history
@@ -141,38 +151,37 @@ const ExperimentDetailsPage = () => {
     {
       runId: "run-001",
       model: "GPT-4",
-      status: 'Completed' as const,
+      status: "Completed" as const,
       startedDate: "2024-01-15T10:30:00Z",
       duration: "2h 15m",
-      benchmarkScore: "92.5%"
+      benchmarkScore: "92.5%",
     },
     {
       runId: "run-002",
       model: "Claude-3",
-      status: 'Completed' as const,
+      status: "Completed" as const,
       startedDate: "2024-01-15T13:45:00Z",
       duration: "2h 30m",
-      benchmarkScore: "91.2%"
+      benchmarkScore: "91.2%",
     },
     {
       runId: "run-003",
       model: "Llama-2",
-      status: 'Running' as const,
+      status: "Running" as const,
       startedDate: "2024-01-15T16:00:00Z",
       duration: "1h 45m",
-      benchmarkScore: "-"
-    }
+      benchmarkScore: "-",
+    },
   ];
 
   useEffect(() => {
-    if (experimentId && typeof experimentId === 'string') {
+    if (experimentId && typeof experimentId === "string") {
       setIsMounted(true);
       // Fetch all experiment data
       getExperimentDetails(experimentId);
       getExperimentRuns(experimentId);
     }
   }, [experimentId]);
-
 
   const handleNewEvaluation = () => {
     // Navigate to new evaluation flow
@@ -231,7 +240,8 @@ const ExperimentDetailsPage = () => {
             </button>
             <CustomBreadcrumb
               urls={["/evaluations", experimentDetails?.name || "Experiment"]}
-              data={["experiments", experimentDetails?.name || "Experiment"]} />
+              data={["experiments", experimentDetails?.name || "Experiment"]}
+            />
           </div>
         )}
       </div>
@@ -241,7 +251,7 @@ const ExperimentDetailsPage = () => {
   return (
     <DashBoardLayout>
       <div className="temp-bg h-full w-full flex flex-col">
-      {/* <div className="temp-bg h-full w-full flex flex-col"> */}
+        {/* <div className="temp-bg h-full w-full flex flex-col"> */}
         {/* Header */}
         <div className="border-b-[1px] border-b-[#2c2654] px-[1.15rem] py-[1.05rem] flex-shrink-0">
           <ExperimentHeader />
@@ -250,36 +260,51 @@ const ExperimentDetailsPage = () => {
           {/* Metrics Cards */}
           <div className="w-full pt-[1.8rem]">
             <div className="w-full flex justify-between items-center">
-              <Text_28_600_FFFFFF>{experimentDetails?.name || "Loading..."}</Text_28_600_FFFFFF>
-              <PrimaryButton classNames="shadow-purple-glow" textClass="text-[0.8125rem]" onClick={() => openDrawerWithStep('new-evaluation', { experimentId })}>Run Evaluation</PrimaryButton>
+              <Text_28_600_FFFFFF>
+                {experimentDetails?.name || "Loading..."}
+              </Text_28_600_FFFFFF>
+              <PrimaryButton
+                classNames="shadow-purple-glow"
+                textClass="text-[0.8125rem]"
+                onClick={() =>
+                  openDrawerWithStep("new-evaluation", { experimentId })
+                }
+              >
+                Run Evaluation
+              </PrimaryButton>
             </div>
             <div className="flex flex-wrap justify-start items-center gap-[.45rem] mt-[0.8rem] max-w-[80%]">
-              {experimentDetails?.tags && (showAllTags ? experimentDetails.tags : experimentDetails.tags.slice(0, 5)).map((tag, index) => (
-                <Tags
-                  key={index}
-                  name={tag}
-                  color="#D1B854"
-                  classNames={`${showAllTags && index >= 5 ? "animate-fadeIn" : ""} py-[.25rem]`}
-                />
-              ))}
+              {experimentDetails?.tags &&
+                (showAllTags
+                  ? experimentDetails.tags
+                  : experimentDetails.tags.slice(0, 5)
+                ).map((tag, index) => (
+                  <Tags
+                    key={index}
+                    name={tag}
+                    color="#D1B854"
+                    classNames={`${showAllTags && index >= 5 ? "animate-fadeIn" : ""} py-[.25rem]`}
+                  />
+                ))}
               {experimentDetails?.tags && experimentDetails.tags.length > 5 && (
                 <button
                   onClick={() => setShowAllTags(!showAllTags)}
                   className="px-3 py-1 text-[#EEEEEE] hover:text-[#FFFFFF] transition-colors duration-200 text-[.65rem] font-[400]"
                 >
-                  {showAllTags ? "Show less" : `+${experimentDetails.tags.length - 5} more`}
+                  {showAllTags
+                    ? "Show less"
+                    : `+${experimentDetails.tags.length - 5} more`}
                 </button>
               )}
             </div>
-
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-[3.1rem]">
             {experimentMetrics ? (
               <>
                 <MetricCard
                   title="Budget Used"
-                  value={`$${experimentMetrics.budgetUsed?.toFixed(2) || '0.00'}`}
-                  subtitle={`/ $${experimentMetrics.budgetTotal?.toFixed(2) || '100.00'}`}
+                  value={`$${experimentMetrics.budgetUsed?.toFixed(2) || "0.00"}`}
+                  subtitle={`/ $${experimentMetrics.budgetTotal?.toFixed(2) || "100.00"}`}
                   color="#965CDE"
                 />
                 <MetricCard
@@ -303,43 +328,84 @@ const ExperimentDetailsPage = () => {
               </>
             ) : (
               <>
-                <MetricCard title="Budget Used" value="$0.00" subtitle="/ $100.00" color="#965CDE" />
-                <MetricCard title="Tokens Processed" value="0M" subtitle="tokens processed" color="#965CDE" />
-                <MetricCard title="Runtime" value="0h 0m" subtitle="total runtime" color="#965CDE" />
-                <MetricCard title="Processing Rate" value="0/min" subtitle="tokens per minute" color="#965CDE" />
+                <MetricCard
+                  title="Budget Used"
+                  value="$0.00"
+                  subtitle="/ $100.00"
+                  color="#965CDE"
+                />
+                <MetricCard
+                  title="Tokens Processed"
+                  value="0M"
+                  subtitle="tokens processed"
+                  color="#965CDE"
+                />
+                <MetricCard
+                  title="Runtime"
+                  value="0h 0m"
+                  subtitle="total runtime"
+                  color="#965CDE"
+                />
+                <MetricCard
+                  title="Processing Rate"
+                  value="0/min"
+                  subtitle="tokens per minute"
+                  color="#965CDE"
+                />
               </>
             )}
           </div>
 
           {/* Current Metrics */}
           <div className="pt-[2.9rem]">
-            <Text_24_600_FFFFFF className="mb-[.6rem]">Current Metrics</Text_24_600_FFFFFF>
+            <Text_24_600_FFFFFF className="mb-[.6rem]">
+              Current Metrics
+            </Text_24_600_FFFFFF>
             <Text_14_400_FFFFFF className="mb-[1rem] leading-[140%]">
-              Current metrics description metrics description metrics description...
+              Current metrics description metrics description metrics
+              description...
             </Text_14_400_FFFFFF>
-            <CurrentMetricsTable data={experimentMetrics?.currentMetrics || []} />
+            <CurrentMetricsTable
+              data={experimentMetrics?.currentMetrics || []}
+            />
           </div>
 
           {/* Performance Benchmark Details */}
           <div className="pt-[2.9rem]">
-            <Text_24_600_FFFFFF className="mb-[.6rem]">Performance Benchmark Details</Text_24_600_FFFFFF>
+            <Text_24_600_FFFFFF className="mb-[.6rem]">
+              Performance Benchmark Details
+            </Text_24_600_FFFFFF>
             <Text_14_400_FFFFFF className="mb-[1rem] leading-[140%]">
-              Objective: Compare GPT-4 and Claude 3 performance across academic benchmarks
+              Objective: Compare GPT-4 and Claude 3 performance across academic
+              benchmarks
             </Text_14_400_FFFFFF>
             <div className="space-y-[1rem]">
               {experimentBenchmarks?.benchmarkProgress?.map((benchmark) => (
                 <BenchmarkProgress key={benchmark.id} benchmark={benchmark} />
-              )) || <Text_14_400_FFFFFF>No benchmark data available</Text_14_400_FFFFFF>}
+              )) || (
+                <Text_14_400_FFFFFF>
+                  No benchmark data available
+                </Text_14_400_FFFFFF>
+              )}
             </div>
           </div>
 
           {/* Runs History */}
           <div className="pt-[2.9rem] pb-[3rem]">
-            <Text_24_600_FFFFFF className="mb-[.6rem]">Runs History</Text_24_600_FFFFFF>
+            <Text_24_600_FFFFFF className="mb-[.6rem]">
+              Runs History
+            </Text_24_600_FFFFFF>
             <Text_14_400_FFFFFF className="mb-[1rem] leading-[140%]">
-              Runs history description history description history description...
+              Runs history description history description history
+              description...
             </Text_14_400_FFFFFF>
-            <RunsHistoryTable data={experimentRuns?.runsHistory || experimentRuns || dummyRunsHistory} />
+            <RunsHistoryTable
+              data={
+                experimentRuns?.runsHistory ||
+                experimentRuns ||
+                dummyRunsHistory
+              }
+            />
           </div>
         </div>
       </div>

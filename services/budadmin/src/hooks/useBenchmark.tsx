@@ -166,7 +166,7 @@ export const useBenchmarks = create<{
   getBenchmarkResult: (id: string) => Promise<any>;
   setSelectedBenchmark: (benchmark: Benchmark) => void;
   getBenchmarkAnalysisField1VsField2: (
-    params: Field1VsFieldParams
+    params: Field1VsFieldParams,
   ) => Promise<any>;
   getBenchmarkResultRequestMetrics: (params: RequestMetricsParams) => void;
   getTTFTvsTokens: (benchmarkId: string) => void;
@@ -216,7 +216,7 @@ export const useBenchmarks = create<{
           params: {
             ...params,
           },
-        }
+        },
       );
       set({
         totalPages: response.data.total_pages,
@@ -245,7 +245,7 @@ export const useBenchmarks = create<{
       return;
     }
     const response: any = await AppRequest.Get(
-      `${tempApiBaseUrl}/benchmark/${id}/model-cluster-detail`
+      `${tempApiBaseUrl}/benchmark/${id}/model-cluster-detail`,
     );
     set({ modelClusterDetails: response?.data?.result });
   },
@@ -254,7 +254,7 @@ export const useBenchmarks = create<{
       return;
     }
     const response: any = await AppRequest.Get(
-      `${tempApiBaseUrl}/benchmark/result?benchmark_id=${id}`
+      `${tempApiBaseUrl}/benchmark/result?benchmark_id=${id}`,
     );
     set({ benchmarkResult: response?.data?.param?.result });
   },
@@ -271,7 +271,7 @@ export const useBenchmarks = create<{
           page: params.page,
           limit: params.limit,
         },
-      }
+      },
     );
     set({ benchmarkRequestMetrics: response?.data?.items });
     set({ benchmarkRequestMetricsTotalCount: response?.data?.total_items });
@@ -279,20 +279,21 @@ export const useBenchmarks = create<{
 
   getInputDistribution: async (params: DistributionParams) => {
     const response: any = await AppRequest.Post(
-      `${tempApiBaseUrl}/benchmark/dataset/input-distribution?benchmark_id=${params.benchmark_id
+      `${tempApiBaseUrl}/benchmark/dataset/input-distribution?benchmark_id=${
+        params.benchmark_id
       }&num_bins=${params.num_bins || 10}`,
-      get().selectedBenchmark?.dataset_ids
+      get().selectedBenchmark?.dataset_ids,
     );
     set({ inputDistribution: response?.data?.param?.result });
     // console.log("inputDistribution", response);
   },
 
-
   getOutputDistribution: async (params: DistributionParams) => {
     const response: any = await AppRequest.Post(
-      `${tempApiBaseUrl}/benchmark/dataset/output-distribution?benchmark_id=${params.benchmark_id
+      `${tempApiBaseUrl}/benchmark/dataset/output-distribution?benchmark_id=${
+        params.benchmark_id
       }&num_bins=${params.num_bins || 10}`,
-      get().selectedBenchmark?.dataset_ids
+      get().selectedBenchmark?.dataset_ids,
     );
     set({ outputDistribution: response?.data?.param?.result });
     // console.log("OutputDistribution", response);
@@ -300,7 +301,7 @@ export const useBenchmarks = create<{
 
   getBenchmarkAnalysisField1VsField2: async (params: Field1VsFieldParams) => {
     const response: any = await AppRequest.Post(
-      `${tempApiBaseUrl}/benchmark/${params.benchmark_id}/analysis/field1_vs_field2?field1=${params.field1}&field2=${params.field2}`
+      `${tempApiBaseUrl}/benchmark/${params.benchmark_id}/analysis/field1_vs_field2?field1=${params.field1}&field2=${params.field2}`,
     );
     return response?.data?.param?.result;
   },
@@ -391,9 +392,9 @@ export const useBenchmarks = create<{
     if (params.resource) query.append("resource", params.resource);
 
     const response: any = await AppRequest.Get(
-      `${tempApiBaseUrl}/benchmark/filters?${query.toString()}`
+      `${tempApiBaseUrl}/benchmark/filters?${query.toString()}`,
     );
-    if (params.resource == 'model') {
+    if (params.resource == "model") {
       set({ modelFilterList: response?.data?.result });
     } else {
       set({ clusterFilterList: response?.data?.result });

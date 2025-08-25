@@ -92,7 +92,12 @@ export default function SelectDeployment() {
     getEndPoints,
     totalRecords: totalEndpoints,
   } = useEndPoints();
-  const { selectedProject } = useGuardrails();
+  const {
+    selectedProject,
+    updateWorkflow,
+    workflowLoading,
+    setSelectedDeployment: setSelectedDeploymentInStore,
+  } = useGuardrails();
 
   // Reset page when search term changes
   useEffect(() => {
@@ -211,19 +216,34 @@ export default function SelectDeployment() {
     openDrawerWithStep("select-project");
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (!selectedDeployment) {
       errorToast("Please select a deployment");
       return;
     }
-    // Move to probe settings
-    openDrawerWithStep("probe-settings");
+
+    try {
+      // Update workflow with selected deployment (endpoint)
+      await updateWorkflow({
+        step_number: 5, // Deployment/endpoint selection is step 5
+        workflow_total_steps: 6,
+        endpoint_id: selectedDeployment,
+        trigger_workflow: false,
+      });
+
+      // Move to probe settings
+      openDrawerWithStep("probe-settings");
+    } catch (error) {
+      console.error("Failed to update workflow:", error);
+    }
   };
 
   const handleDeploymentSelect = (deployment: any, type: string) => {
     const id = deployment.endpoint_id || deployment.id;
     setSelectedDeployment(id);
     setSelectedDeploymentData({ ...deployment, type });
+    // Store the deployment in the guardrails store
+    setSelectedDeploymentInStore({ ...deployment, type });
   };
 
   const getFilteredDeployments = () => {
@@ -432,7 +452,7 @@ export default function SelectDeployment() {
       onNext={handleNext}
       backText="Back"
       nextText="Next"
-      disableNext={!selectedDeployment}
+      disableNext={!selectedDeployment || workflowLoading}
     >
       <BudWraperBox>
         <BudDrawerLayout>

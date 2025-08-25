@@ -5,7 +5,7 @@ import {
   Text_24_600_FFFFFF,
   Text_32_600_FFFFFF,
   Text_18_400_EEEEEE,
-  Text_10_400_B3B3B3
+  Text_10_400_B3B3B3,
 } from "@/components/ui/text";
 
 interface MetricCardProps {
@@ -26,8 +26,12 @@ const MetricCard: React.FC<MetricCardProps> = ({
       <div className="flex flex-col space-y-2 pt-[.4rem] pb-[.4rem] justify-center items-center">
         <Text_18_400_EEEEEE className="pb-[.7rem]">{title}</Text_18_400_EEEEEE>
         <div className="flex flex-col items-center justify-center space-x-2">
-          <Text_32_600_FFFFFF className={`text-[${color}]`}>{value}</Text_32_600_FFFFFF>
-          <Text_10_400_B3B3B3 className="pt-[.5rem]">{subtitle}</Text_10_400_B3B3B3>
+          <Text_32_600_FFFFFF className={`text-[${color}]`}>
+            {value}
+          </Text_32_600_FFFFFF>
+          <Text_10_400_B3B3B3 className="pt-[.5rem]">
+            {subtitle}
+          </Text_10_400_B3B3B3>
         </div>
       </div>
     </div>

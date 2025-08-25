@@ -1,4 +1,4 @@
 export interface BudComponentProps {
-    data: any;
-    id: string
-  }
+  data: any;
+  id: string;
+}

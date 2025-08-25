@@ -19,7 +19,11 @@ const RequestSent = (props: Props) => {
   return (
     <>
       <Box className="w-[76.6%]">
-        <Image src="/gifs/up-hands.gif" alt="" className="w-[9.5rem] h-auto mb-[3.2rem]" />
+        <Image
+          src="/gifs/up-hands.gif"
+          alt=""
+          className="w-[9.5rem] h-auto mb-[3.2rem]"
+        />
         <Text_32_400_FFFFFF className="tracking-[.02em] leading-[100%] text-center !font-thin mb-[1.2rem]">
           Request Sent
         </Text_32_400_FFFFFF>

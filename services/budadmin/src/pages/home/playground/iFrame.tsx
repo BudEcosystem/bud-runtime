@@ -1,15 +1,19 @@
-import { playGroundUrl, askBudModel, askBudUrl } from "@/components/environment";
+import {
+  playGroundUrl,
+  askBudModel,
+  askBudUrl,
+} from "@/components/environment";
 import React, { useEffect, useRef, useState } from "react";
 
-const EmbeddedIframe = ({singleChat = false}: {singleChat?: boolean}) => {
+const EmbeddedIframe = ({ singleChat = false }: { singleChat?: boolean }) => {
   const [_accessToken, _setAccessToken] = useState("");
   const [_refreshToken, _setRefreshToken] = useState("");
 
   const iframeRef = useRef(null);
-  let iframeUrl = `${playGroundUrl}/login?embedded=true&access_token=${_accessToken}&refresh_token=${_refreshToken}&is_single_chat=${singleChat}`
-  if(singleChat){
-    iframeUrl = `${playGroundUrl}/chat?embedded=true&access_token=${_accessToken}&refresh_token=${_refreshToken}&is_single_chat=${singleChat}`
-    iframeUrl += `&model=${askBudModel}&base_url=${askBudUrl}&storage=ask-bud`
+  let iframeUrl = `${playGroundUrl}/login?embedded=true&access_token=${_accessToken}&refresh_token=${_refreshToken}&is_single_chat=${singleChat}`;
+  if (singleChat) {
+    iframeUrl = `${playGroundUrl}/chat?embedded=true&access_token=${_accessToken}&refresh_token=${_refreshToken}&is_single_chat=${singleChat}`;
+    iframeUrl += `&model=${askBudModel}&base_url=${askBudUrl}&storage=ask-bud`;
   }
   useEffect(() => {
     if (typeof window !== "undefined") {

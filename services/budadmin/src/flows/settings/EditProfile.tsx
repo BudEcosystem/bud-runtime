@@ -1,4 +1,3 @@
-
 import DrawerCard from "@/components/ui/bud/card/DrawerCard";
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
@@ -17,19 +16,21 @@ export default function EditProfile() {
   const { user, updateCurrentUser } = useUser();
   const { form, submittable } = useContext(BudFormContext);
 
-
   return (
     <BudForm
       data={{
         name: user?.name,
         description: "",
         tags: [],
-        icon: ""
+        icon: "",
       }}
       disableNext={
         !submittable ||
-        (form.getFieldValue("password") && form.getFieldValue("password") !== form.getFieldValue("repassword")) ||
-        (!form.getFieldValue("password") && user?.name === form.getFieldValue("name"))
+        (form.getFieldValue("password") &&
+          form.getFieldValue("password") !==
+            form.getFieldValue("repassword")) ||
+        (!form.getFieldValue("password") &&
+          user?.name === form.getFieldValue("name"))
       }
       onNext={(values) => {
         if (submittable) {
@@ -38,14 +39,13 @@ export default function EditProfile() {
               name: values.name,
               password: values.password,
             },
-            user?.id
+            user?.id,
           ).then(() => {
             form.resetFields();
             closeDrawer();
-          }
-          )
+          });
           return;
-        };
+        }
       }}
       nextText="Next"
     >
@@ -70,9 +70,19 @@ export default function EditProfile() {
                 onChange={(value) => form.setFieldsValue({ password: value })}
                 rules={[
                   { required: false, message: "Please enter your password" },
-                  { pattern: /^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/, message: "Password must be at least 8 characters long, include one uppercase letter, one number, and one special character (@$!%*?&)." },
+                  {
+                    pattern:
+                      /^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,
+                    message:
+                      "Password must be at least 8 characters long, include one uppercase letter, one number, and one special character (@$!%*?&).",
+                  },
                 ]}
-                inputStyle={{ paddingTop: ".37rem", paddingBottom: ".37rem", fontSize: ".75rem", fontWeight: 300 }}
+                inputStyle={{
+                  paddingTop: ".37rem",
+                  paddingBottom: ".37rem",
+                  fontSize: ".75rem",
+                  fontWeight: 300,
+                }}
               />
               <CustomPasswordInput
                 name="repassword"
@@ -88,16 +98,25 @@ export default function EditProfile() {
                         return Promise.resolve();
                       }
                       if (password && !value) {
-                        return Promise.reject(new Error("Please re-enter your password"));
+                        return Promise.reject(
+                          new Error("Please re-enter your password"),
+                        );
                       }
                       if (password !== value) {
-                        return Promise.reject(new Error("Passwords do not match"));
+                        return Promise.reject(
+                          new Error("Passwords do not match"),
+                        );
                       }
                       return Promise.resolve();
                     },
                   },
                 ]}
-                inputStyle={{ paddingTop: ".37rem", paddingBottom: ".37rem", fontSize: ".75rem", fontWeight: 300 }}
+                inputStyle={{
+                  paddingTop: ".37rem",
+                  paddingBottom: ".37rem",
+                  fontSize: ".75rem",
+                  fontWeight: 300,
+                }}
               />
             </div>
           </DrawerCard>

@@ -47,12 +47,13 @@ export const colourOptions = [
   { value: COLOR_17, label: "Green" },
   { value: COLOR_18, label: "Grey" },
   { value: COLOR_19, label: "White" },
-  { value: "#3EC564", label:"Available" },
-  { value: COLOR_20, label:"Gray40" },
-
+  { value: "#3EC564", label: "Available" },
+  { value: COLOR_20, label: "Gray40" },
 ];
 
-export const colourStyles = (overrides: any = {}): StylesConfig<ColourOption, true> => {
+export const colourStyles = (
+  overrides: any = {},
+): StylesConfig<ColourOption, true> => {
   return {
     control: (styles) => ({
       ...styles,
@@ -64,31 +65,38 @@ export const colourStyles = (overrides: any = {}): StylesConfig<ColourOption, tr
       "&:hover": {
         borderColor: "#CFCFCF",
       },
-      borderRadius: '6px',
+      borderRadius: "6px",
       ...overrides.control,
     }),
     indicatorSeparator: (styles) => ({
-      ...styles, display: "none",
-      ...overrides.indicatorSeparator
+      ...styles,
+      display: "none",
+      ...overrides.indicatorSeparator,
     }),
     clearIndicator: (styles) => ({
-      ...styles, display: "none",
-      ...overrides.clearIndicator
+      ...styles,
+      display: "none",
+      ...overrides.clearIndicator,
     }),
     container: (state) => ({
-      ...state, backgroundColor: "#1F1F1F",
-      ...overrides.container
+      ...state,
+      backgroundColor: "#1F1F1F",
+      ...overrides.container,
     }),
     menu: (styles) => ({
-      ...styles, backgroundColor: "#161616", marginTop: '.4rem', backdropFilter: 'blur(4px)', border: '1px solid #1F1F1F',
+      ...styles,
+      backgroundColor: "#161616",
+      marginTop: ".4rem",
+      backdropFilter: "blur(4px)",
+      border: "1px solid #1F1F1F",
       ...overrides.menu,
-      zIndex: 9999
+      zIndex: 9999,
     }),
     option: (styles, { data, isDisabled, isFocused, isSelected }) => {
       let color = chroma("#FFF");
       try {
         color = chroma(data.value);
-      } catch (error) { }
+      } catch (error) {}
       return {
         ...styles,
         backgroundColor: isDisabled
@@ -159,7 +167,7 @@ export const colourStyles = (overrides: any = {}): StylesConfig<ColourOption, tr
       ...overrides.dropdownIndicator,
     }),
   };
-}
+};
 
 export function randomColor() {
   return colourOptions[Math.floor(Math.random() * colourOptions.length)];
@@ -180,7 +188,9 @@ export function getChromeColor(color: string) {
 export function getChromeColorHex(color: string, alpha?: number): string {
   try {
     // Return a hex code with alpha (e.g. "#RRGGBBAA")
-    return chroma(color).alpha(alpha || 0.1).css('hex8');
+    return chroma(color)
+      .alpha(alpha || 0.1)
+      .css("hex8");
   } catch (error) {
     return "transparent";
   }

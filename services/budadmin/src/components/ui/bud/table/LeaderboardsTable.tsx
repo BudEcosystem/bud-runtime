@@ -2,9 +2,7 @@ import React, { useMemo, useState } from "react";
 import { Table, Tooltip } from "antd";
 import ProjectTags from "src/flows/components/ProjectTags";
 import { LeaderBoardItem } from "src/hooks/useModels";
-import {
-  Text_12_300_EEEEEE,
-} from "../../text";
+import { Text_12_300_EEEEEE } from "../../text";
 import NoDataFount from "../../noDataFount";
 
 function SortIcon({ sortOrder }: { sortOrder: string }) {
@@ -43,7 +41,13 @@ function SortIcon({ sortOrder }: { sortOrder: string }) {
   ) : null;
 }
 
-function LeaderboardsTable({ data, leaderboardClasses }: { data: LeaderBoardItem[], leaderboardClasses?: string }) {
+function LeaderboardsTable({
+  data,
+  leaderboardClasses,
+}: {
+  data: LeaderBoardItem[];
+  leaderboardClasses?: string;
+}) {
   const [orderBy, setOrderBy] = useState<string>("");
   const [order, setOrder] = useState<string>("");
 
@@ -77,7 +81,7 @@ function LeaderboardsTable({ data, leaderboardClasses }: { data: LeaderBoardItem
 
     horizontalRows.forEach((row) => {
       const existingRow = mergedRows.find(
-        (mergedRow) => mergedRow.label === row.label
+        (mergedRow) => mergedRow.label === row.label,
       );
       if (existingRow) {
         mergedRows[mergedRows.indexOf(existingRow)] = {
@@ -93,10 +97,11 @@ function LeaderboardsTable({ data, leaderboardClasses }: { data: LeaderBoardItem
   }, [data]);
 
   return (
-    <div className={`${leaderboardClasses}`}
+    <div
+      className={`${leaderboardClasses}`}
       style={{
-        paddingBottom: '60px',
-        paddingTop: '.4rem'
+        paddingBottom: "60px",
+        paddingTop: ".4rem",
       }}
     >
       <Table<LeaderBoardItem>
@@ -116,7 +121,9 @@ function LeaderboardsTable({ data, leaderboardClasses }: { data: LeaderBoardItem
             title: "Type",
             dataIndex: "dataset",
             key: "dataset",
-            render: (text) => <ProjectTags color="#D1B854" name={text || 'N/A'} />,
+            render: (text) => (
+              <ProjectTags color="#D1B854" name={text || "N/A"} />
+            ),
             sortIcon: SortIcon,
           },
           data
@@ -146,13 +153,15 @@ function LeaderboardsTable({ data, leaderboardClasses }: { data: LeaderBoardItem
               return {
                 width: 120,
                 ellipsis: true,
-                title: <Tooltip placement="topLeft" title={item.model?.uri}>{item.model?.uri}</Tooltip>,
+                title: (
+                  <Tooltip placement="topLeft" title={item.model?.uri}>
+                    {item.model?.uri}
+                  </Tooltip>
+                ),
                 dataIndex: item.model?.uri,
                 key: item.model?.uri,
                 render: (text) => (
-                  <Text_12_300_EEEEEE className="">
-                    {text}
-                  </Text_12_300_EEEEEE>
+                  <Text_12_300_EEEEEE className="">{text}</Text_12_300_EEEEEE>
                 ),
                 sortIcon: SortIcon,
               };
@@ -170,7 +179,7 @@ function LeaderboardsTable({ data, leaderboardClasses }: { data: LeaderBoardItem
             order: "ascend" | "descend";
             field: string;
           },
-          extra
+          extra,
         ) => {
           setOrder(sorter.order === "ascend" ? "" : "-");
           setOrderBy(sorter.field);

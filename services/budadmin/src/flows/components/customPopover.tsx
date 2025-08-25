@@ -2,7 +2,8 @@ import { ConfigProvider, Popover, PopoverProps } from "antd";
 import React from "react";
 import { TooltipPlacement } from "antd/es/tooltip";
 
-interface CustomPopoverProps extends Omit<PopoverProps, 'content' | 'title' | 'children' | 'classNames'> {
+interface CustomPopoverProps
+  extends Omit<PopoverProps, "content" | "title" | "children" | "classNames"> {
   children?: React.ReactNode;
   customClassName?: string;
   contentClassNames?: string;
@@ -11,11 +12,19 @@ interface CustomPopoverProps extends Omit<PopoverProps, 'content' | 'title' | 'c
   Placement?: TooltipPlacement;
 }
 
-
-const CustomPopover: React.FC<CustomPopoverProps> = ({ children, title, customClassName, contentClassNames, titleClassName,  Placement="top", ...rest}) => {
+const CustomPopover: React.FC<CustomPopoverProps> = ({
+  children,
+  title,
+  customClassName,
+  contentClassNames,
+  titleClassName,
+  Placement = "top",
+  ...rest
+}) => {
   return (
-    <div className={`antPopoverArrow ${customClassName ?? ''}`}
-    style={{width: '100%'}}
+    <div
+      className={`antPopoverArrow ${customClassName ?? ""}`}
+      style={{ width: "100%" }}
     >
       <ConfigProvider
         theme={{
@@ -31,13 +40,18 @@ const CustomPopover: React.FC<CustomPopoverProps> = ({ children, title, customCl
           showArrow
           // open = {open}
           content={
-            <div className={`flex items-center gap-[.8rem] backdropBlur rounded-[6px] border-[#1F1F1F] ${contentClassNames}`}
-            style={{
-              padding: '.5rem',
-              backgroundColor: '#1F1F1F',
-            }}
+            <div
+              className={`flex items-center gap-[.8rem] backdropBlur rounded-[6px] border-[#1F1F1F] ${contentClassNames}`}
+              style={{
+                padding: ".5rem",
+                backgroundColor: "#1F1F1F",
+              }}
             >
-              <div className={`text-[#b3b3b3] text-[.75rem] font-400 ${titleClassName}`}>{title}</div>
+              <div
+                className={`text-[#b3b3b3] text-[.75rem] font-400 ${titleClassName}`}
+              >
+                {title}
+              </div>
             </div>
           }
           getPopupContainer={(trigger) =>

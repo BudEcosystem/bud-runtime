@@ -34,6 +34,8 @@ export default function BudSentinelProbes() {
     totalProbes,
     fetchProbeById,
     setSelectedProbe: setSelectedProbeInStore,
+    updateWorkflow,
+    workflowLoading,
   } = useGuardrails();
 
   // Fetch probes on component mount and when search changes
@@ -69,7 +71,7 @@ export default function BudSentinelProbes() {
     openDrawerWithStep("select-provider");
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (!selectedProbe) {
       return;
     }
@@ -81,24 +83,41 @@ export default function BudSentinelProbes() {
       // Save the selected probe to the store
       setSelectedProbeInStore(selectedProbeObject);
 
-      const isPIIProbe =
-        selectedProbeObject.name
-          ?.toLowerCase()
-          .includes("personal identifier") ||
-        selectedProbeObject.name?.toLowerCase().includes("pii") ||
-        selectedProbeObject.tags?.some(
-          (tag) =>
-            tag.name.toLowerCase().includes("dlp") ||
-            tag.name.toLowerCase().includes("personal"),
-        );
+      try {
+        // Update workflow with selected probe
+        await updateWorkflow({
+          step_number: 2,
+          workflow_total_steps: 6,
+          probe_selections: [
+            {
+              probe_id: selectedProbe,
+              enabled: true,
+            },
+          ],
+          trigger_workflow: false,
+        });
 
-      // Navigate to specific configuration page based on selection
-      if (isPIIProbe) {
-        // PII Detection selected - go to PII configuration page
-        openDrawerWithStep("pii-detection-config");
-      } else {
-        // For other selections, go directly to details
-        openDrawerWithStep("guardrail-details");
+        const isPIIProbe =
+          selectedProbeObject.name
+            ?.toLowerCase()
+            .includes("personal identifier") ||
+          selectedProbeObject.name?.toLowerCase().includes("pii") ||
+          selectedProbeObject.tags?.some(
+            (tag) =>
+              tag.name.toLowerCase().includes("dlp") ||
+              tag.name.toLowerCase().includes("personal"),
+          );
+
+        // Navigate to specific configuration page based on selection
+        if (isPIIProbe) {
+          // PII Detection selected - go to PII configuration page
+          openDrawerWithStep("pii-detection-config");
+        } else {
+          // For other selections, skip PII config and go to deployment types
+          openDrawerWithStep("deployment-types");
+        }
+      } catch (error) {
+        console.error("Failed to update workflow:", error);
       }
     }
   };
@@ -178,7 +197,7 @@ export default function BudSentinelProbes() {
       onNext={handleNext}
       backText="Back"
       nextText="Next"
-      disableNext={!selectedProbe}
+      disableNext={!selectedProbe || workflowLoading}
     >
       <BudWraperBox>
         <BudDrawerLayout>
