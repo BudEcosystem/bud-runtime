@@ -11,6 +11,7 @@ from fastapi import status
 from fastapi.testclient import TestClient
 
 from budapp.commons.constants import EndpointStatusEnum, UserTypeEnum
+from budapp.commons.dependencies import get_current_user, get_session
 from budapp.commons.exceptions import ClientException
 from budapp.main import app
 from budapp.playground_ops.schemas import PlaygroundInitializeRequest, PlaygroundInitializeResponse
@@ -34,48 +35,116 @@ def mock_current_user():
     return user
 
 
+@pytest.fixture
+def mock_session():
+    """Create a mock database session."""
+    return Mock()
+
+
 class TestPlaygroundInitializeEndpoint:
     """Integration tests for /playground/initialize endpoint."""
 
-    def test_initialize_endpoint_success(self, client, mock_current_user):
+    def test_initialize_endpoint_success(self, client, mock_current_user, mock_session):
         """Test successful initialization through the endpoint."""
         # Arrange
         user_id = mock_current_user.id
         project_id = uuid4()
         jwt_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyLCJleHAiOjE5MTYyMzkwMjJ9.4Adcj3UFYzPUVaVF43FmMab6RlaQD8A9V8wFzzht-KQ"
 
-        # Mock dependencies
-        with patch('budapp.commons.dependencies.get_current_user', return_value=mock_current_user), \
-             patch('budapp.playground_ops.services.UserDataManager') as mock_user_manager, \
-             patch('budapp.playground_ops.services.ProjectService') as mock_project_service, \
-             patch('budapp.playground_ops.services.EndpointDataManager') as mock_endpoint_manager, \
-             patch('budapp.playground_ops.services.RedisService') as mock_redis:
+        # Override FastAPI dependencies
+        app.dependency_overrides[get_current_user] = lambda: mock_current_user
+        app.dependency_overrides[get_session] = lambda: mock_session
 
-            # Setup database mocks
-            mock_db_user = Mock(id=user_id, user_type=UserTypeEnum.CLIENT)
-            mock_user_manager.return_value.retrieve_by_fields = AsyncMock(return_value=mock_db_user)
+        try:
+            # Mock service dependencies
+            with patch('budapp.playground_ops.services.UserDataManager') as mock_user_manager, \
+                 patch('budapp.playground_ops.services.ProjectService') as mock_project_service, \
+                 patch('budapp.playground_ops.services.EndpointDataManager') as mock_endpoint_manager, \
+                 patch('budapp.playground_ops.services.RedisService') as mock_redis:
 
-            mock_project = Mock(id=project_id, name="Test Project")
-            # Mock project service with proper structure
-            mock_project_wrapper = Mock()
-            mock_project_wrapper.project = mock_project
-            mock_project_service.return_value.get_all_active_projects = AsyncMock(return_value=([mock_project_wrapper], 1))
+                # Setup database mocks
+                mock_db_user = Mock(id=user_id, user_type=UserTypeEnum.CLIENT)
+                mock_user_manager.return_value.retrieve_by_fields = AsyncMock(return_value=mock_db_user)
 
-            mock_endpoint = Mock()
-            mock_endpoint.id = uuid4()
-            mock_endpoint.name = "test-endpoint"
-            mock_endpoint.status = EndpointStatusEnum.RUNNING
-            mock_endpoint.project_id = project_id
-            mock_endpoint.model = Mock(id=uuid4(), name="test-model")
+                mock_project = Mock(id=project_id, name="Test Project")
+                # Mock project service with proper structure
+                mock_project_wrapper = Mock()
+                mock_project_wrapper.project = mock_project
+                mock_project_service.return_value.get_all_active_projects = AsyncMock(return_value=([mock_project_wrapper], 1))
 
-            mock_endpoint_manager.return_value.get_all_playground_deployments = AsyncMock(
-                return_value=([(mock_endpoint, None, None, None)], 1)
+                mock_endpoint = Mock()
+                mock_endpoint.id = uuid4()
+                mock_endpoint.name = "test-endpoint"
+                mock_endpoint.status = EndpointStatusEnum.RUNNING
+                mock_endpoint.project_id = project_id
+                mock_endpoint.model = Mock(id=uuid4(), name="test-model")
+
+                mock_endpoint_manager.return_value.get_all_playground_deployments = AsyncMock(
+                    return_value=([(mock_endpoint, None, None, None)], 1)
+                )
+
+                mock_redis_instance = Mock()
+                mock_redis_instance.set = AsyncMock()
+                mock_redis.return_value = mock_redis_instance
+
+                # Act
+                response = client.post(
+                    "/playground/initialize",
+                    json={"jwt_token": jwt_token},
+                    headers={"Authorization": f"Bearer {jwt_token}"}
+                )
+
+                # Assert
+                assert response.status_code == 200
+                data = response.json()
+                assert data["initialization_status"] == "success"
+                assert data["user_id"] == str(user_id)
+
+                # Verify Redis was called
+                mock_redis_instance.set.assert_called_once()
+        finally:
+            # Clean up the overrides
+            app.dependency_overrides.clear()
+
+    def test_initialize_endpoint_invalid_jwt_format(self, client):
+        """Test initialization with invalid JWT format."""
+        # Arrange
+        invalid_jwt = "not.a.jwt"  # Invalid format
+        mock_user = Mock(id=uuid4())
+
+        # Override dependencies to avoid Dapr issues
+        app.dependency_overrides[get_current_user] = lambda: mock_user
+        app.dependency_overrides[get_session] = lambda: Mock()
+
+        try:
+            # Act
+            response = client.post(
+                "/playground/initialize",
+                json={"jwt_token": invalid_jwt},
+                headers={"Authorization": f"Bearer {invalid_jwt}"}
             )
 
-            mock_redis_instance = Mock()
-            mock_redis_instance.set = AsyncMock()
-            mock_redis.return_value = mock_redis_instance
+            # Assert
+            assert response.status_code == 422  # Validation error
+            data = response.json()
+            assert "Invalid JWT token format" in str(data)
+        finally:
+            # Clean up the overrides
+            app.dependency_overrides.clear()
 
+    def test_initialize_endpoint_unauthorized(self, client):
+        """Test initialization without proper authorization."""
+        # Arrange
+        jwt_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+
+        # Override dependency to raise an exception
+        def raise_unauthorized():
+            raise Exception("Unauthorized")
+
+        app.dependency_overrides[get_current_user] = raise_unauthorized
+        app.dependency_overrides[get_session] = lambda: Mock()
+
+        try:
             # Act
             response = client.post(
                 "/playground/initialize",
@@ -83,47 +152,11 @@ class TestPlaygroundInitializeEndpoint:
                 headers={"Authorization": f"Bearer {jwt_token}"}
             )
 
-            # Assert
-            assert response.status_code == 200
-            data = response.json()
-            assert data["initialization_status"] == "success"
-            assert data["user_id"] == str(user_id)
-
-            # Verify Redis was called
-            mock_redis_instance.set.assert_called_once()
-
-    def test_initialize_endpoint_invalid_jwt_format(self, client):
-        """Test initialization with invalid JWT format."""
-        # Arrange
-        invalid_jwt = "not.a.jwt"  # Invalid format
-
-        # Act
-        response = client.post(
-            "/playground/initialize",
-            json={"jwt_token": invalid_jwt},
-            headers={"Authorization": f"Bearer {invalid_jwt}"}
-        )
-
-        # Assert
-        assert response.status_code == 422  # Validation error
-        data = response.json()
-        assert "Invalid JWT token format" in str(data)
-
-    def test_initialize_endpoint_unauthorized(self, client):
-        """Test initialization without proper authorization."""
-        # Arrange
-        jwt_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
-
-        with patch('budapp.commons.dependencies.get_current_user', side_effect=Exception("Unauthorized")):
-            # Act
-            response = client.post(
-                "/playground/initialize",
-                json={"jwt_token": jwt_token}
-                # No Authorization header
-            )
-
-            # Assert
-            assert response.status_code in [401, 403, 422, 500]  # Unauthorized or validation error
+            # Assert - should get 500 error when dependency raises exception
+            assert response.status_code == 500
+        finally:
+            # Clean up the overrides
+            app.dependency_overrides.clear()
 
 
 class TestJWTToRedisFlow:
