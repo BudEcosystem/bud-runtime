@@ -1,0 +1,135 @@
+---
+title: 'Development Environment'
+description: 'Setting Up a Cloud-Backed Development Environment'
+---
+
+# Development Workflow
+
+This guide outlines the best practices and workflow for setting up and contributing to the Bud Runtime project. It covers environment setup, configuration, and deployment processes to ensure a smooth development experience. Follow these steps to get started.
+
+> [!TIP]
+> An example commit for setting up PDE: https://github.com/BudEcosystem/bud-runtime/pull/182/commits/5518f3ad489ce21a7a67e74d3e3497c6b5b5f27e
+
+## Prerequisites
+
+- A GitHub account with access to the repository.
+- An SSH key pair (if you don't have one, generate it with `ssh-keygen -t ed25519`).
+- A name or pseudonym (e.g., your username) that will be used for your development environment URL (e.g., `<name>.bud.studio`).
+
+## Step 1: Install Nix
+
+If Nix is not already installed on your system, install it using the Determinate Systems installer:
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install
+```
+
+Follow the on-screen instructions to complete the installation. Verify Nix is installed by running `nix --version`.
+
+## Step 2: Enter the Nix Development Shell
+
+Clone the repository (if not already done) and navigate to the project root. Then, enter the Nix shell to set up the development environment:
+
+```bash
+git clone git@github.com:BudEcosystem/bud-runtime.git
+cd bud-runtime
+nix develop
+```
+
+This will provide you with the necessary tools and dependencies.
+
+**Tip:** If you encounter missing command-line packages (not Python packages), add them to `nix/shell/default.nix` and re-enter the Nix development shell with `nix develop`. Avoid installing packages locally to maintain reproducibility.
+
+## Step 3: Set Up SOPS for Secrets Management
+
+Run the following command to generate a public key for SOPS (Secrets Operations):
+
+```bash
+bud_sops
+```
+
+Copy the output public key and add it to the `.sops.yaml` file in the project root. Edit the file to include your key under the appropriate section (e.g., under `creation_rules` and `keys`).
+
+## Step 4: Generate WireGuard Configuration
+
+Generate a WireGuard config for secure access. The usage is:
+
+```bash
+bud_wg <host_addr> <name>
+```
+
+- `<host_addr>`: A unique host address. Check `nix/nixos/master/modules/wireguard.nix` for existing addresses to avoid conflicts. should be in the range 5-100
+- `<name>`: Your name or pseudonym.
+
+Copy the output, which includes the private key, and save it securely (e.g., in a local file). Do not commit the private key to the repository.
+
+## Step 5: Add WireGuard Config to the Repository
+
+Add the generated WireGuard configuration (last block) to `nix/nixos/master/modules/wireguard.nix`. Follow the existing format in the file.
+
+## Step 6: Add Your SSH Key
+
+Add your public SSH key to `nix/nixos/common/modules/users.nix`. This grants you access to the infrastructure. Insert it under the relevant user section.
+
+## Step 7: Add Your Environment Name to DNS Configuration
+
+Add your name or pseudonym to `infra/terraform/main/dns.tf`. This will be used as the environment name, and your dev environment will be served at `<name>.bud.studio`. Follow the existing entries as a template.
+
+## Step 8: Create Helm Values Override File
+
+Create a new file at `infra/helm/bud/values.<name>.yaml`, where `<name>` is your name or pseudonym. Use `infra/helm/bud/values.sinan.yaml` as a template.
+
+In this file, define your overrides. At minimum, set:
+
+```yaml
+ingress:
+  hosts:
+    root: <name>.bud.studio
+```
+
+Customize other values as needed for your environment.
+
+## Step 9: Create a Pull Request
+
+Commit your changes and create a pull request (PR) on GitHub. In the PR description, ping `@sinanmohd` for review.
+
+**Best Practice:** To avoid breaking the development environment, test significant changes or large PRs on your personal development environment (PDE) before merging to master.
+
+After the PR is reviewed and merged, wait for the CI/CD pipeline to pick up the changes. You'll receive a Slack notification once the deployment is complete.
+
+## Step 10: Install WireGuard Client
+
+Download and install the WireGuard client for your OS:
+
+- **macOS**: Use the official app from the App Store: [WireGuard for macOS](https://apps.apple.com/us/app/wireguard/id1451685025?mt=12).
+- **Linux**: Follow the installation guide for your distribution. For example, on Arch Linux, refer to the [Arch Wiki WireGuard page](https://wiki.archlinux.org/title/WireGuard#wg-quick). Use `wg-quick` for quick setup.
+
+Import your saved WireGuard configuration (from Step 4) into the client and connect to the VPN.
+
+## Step 11: Enter Nix Develop Shell
+
+Once connected via WireGuard, run:
+
+```bash
+nix develop
+```
+
+This will give you access to the Bud Kubernetes (k8s) cluster.
+
+## Step 12: Deploy Your Environment
+
+Start deploying your development environment with:
+
+```bash
+bud_pde <name>
+```
+
+Replace `<name>` with your name or pseudonym. Monitor the deployment logs for any issues.
+
+## Best Practices
+
+- Keep your PDE up-to-date and use it for testing to prevent disruptions.
+- Ensure all dependencies are managed through Nix for consistency across environments.
+- All secrets should be committed to git after encrypting with SOPS.
+
+Once set up, you'll have full access to deploy and manage your dev environment at `<name>.bud.studio`. Follow these guidelines to contribute effectively to Bud Runtime!
