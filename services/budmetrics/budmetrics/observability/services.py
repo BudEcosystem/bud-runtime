@@ -1854,12 +1854,7 @@ class ObservabilityMetricsService:
         """
 
         # Execute query
-        logger = logging.get_logger(__name__)
-        logger.info(f"Executing aggregated metrics query: {query}")
-        logger.info(f"Query parameters: {params}")
-        logger.info(f"Group by fields: {group_by_fields}")
         results = await self.clickhouse_client.execute_query(query, params)
-        logger.info(f"Query returned {len(results) if results else 0} results")
 
         # Process results
         groups = []
@@ -1878,9 +1873,10 @@ class ObservabilityMetricsService:
             row = results[0]
             for i, metric in enumerate(request.metrics):
                 value = row[i] if i < len(row) else 0
-                formatted_value, unit = self._format_metric_value(metric, value)
+                safe_value = self._safe_float(value)
+                formatted_value, unit = self._format_metric_value(metric, safe_value)
                 overall_summary[metric] = AggregatedMetricValue(
-                    value=value or 0, formatted_value=formatted_value, unit=unit
+                    value=safe_value, formatted_value=formatted_value, unit=unit
                 )
         else:
             # Process grouped results
@@ -1919,9 +1915,10 @@ class ObservabilityMetricsService:
                 # Extract metrics
                 for i, metric in enumerate(request.metrics):
                     value = row[field_offset + i] if field_offset + i < len(row) else 0
-                    formatted_value, unit = self._format_metric_value(metric, value)
+                    safe_value = self._safe_float(value)
+                    formatted_value, unit = self._format_metric_value(metric, safe_value)
                     group.metrics[metric] = AggregatedMetricValue(
-                        value=value or 0, formatted_value=formatted_value, unit=unit
+                        value=safe_value, formatted_value=formatted_value, unit=unit
                     )
 
                 groups.append(group)
@@ -2095,7 +2092,8 @@ class ObservabilityMetricsService:
             values = {}
             for i, metric in enumerate(request.metrics):
                 metric_value = row[field_idx + i] if field_idx + i < len(row) else None
-                values[metric] = metric_value
+                # Ensure safe float values for JSON serialization
+                values[metric] = self._safe_float(metric_value)
 
             groups_dict[group_key].append({"timestamp": time_bucket, "values": values, "group_info": group_info})
 
@@ -2401,7 +2399,6 @@ class ObservabilityMetricsService:
                     END
             """
 
-            logger.debug(f"Executing latency distribution query: {query}")
             result = await self.clickhouse_client.execute_query(query)
 
             # Get total count for percentage calculation
@@ -2416,13 +2413,15 @@ class ObservabilityMetricsService:
             for bucket in buckets:
                 count, avg_latency = bucket_data.get(bucket["label"], (0, 0))
                 percentage = (count / total_requests * 100) if total_requests > 0 else 0
+                safe_percentage = self._safe_float(percentage)
+                safe_avg_latency = self._safe_float(avg_latency) if avg_latency else None
 
                 overall_buckets.append(
                     LatencyDistributionBucket(
                         range=bucket["label"],
                         count=count,
-                        percentage=round(percentage, 2),
-                        avg_latency=round(avg_latency, 2) if avg_latency else None,
+                        percentage=round(safe_percentage, 2),
+                        avg_latency=round(safe_avg_latency, 2) if safe_avg_latency else None,
                     )
                 )
 
@@ -2486,7 +2485,6 @@ class ObservabilityMetricsService:
             ORDER BY group_total DESC, bucket
         """
 
-        logger.debug(f"Executing grouped latency distribution query: {query}")
         result = await self.clickhouse_client.execute_query(query)
 
         # Get overall total for percentage calculations
@@ -2547,13 +2545,15 @@ class ObservabilityMetricsService:
                 count = bucket_info["count"]
                 avg_latency = bucket_info["avg_latency"]
                 percentage = (count / group_total * 100) if group_total > 0 else 0
+                safe_percentage = self._safe_float(percentage)
+                safe_avg_latency = self._safe_float(avg_latency) if avg_latency else None
 
                 group_buckets.append(
                     LatencyDistributionBucket(
                         range=bucket["label"],
                         count=count,
-                        percentage=round(percentage, 2),
-                        avg_latency=round(avg_latency, 2) if avg_latency else None,
+                        percentage=round(safe_percentage, 2),
+                        avg_latency=round(safe_avg_latency, 2) if safe_avg_latency else None,
                     )
                 )
 
@@ -2599,16 +2599,18 @@ class ObservabilityMetricsService:
             bucket_data = overall_bucket_counts.get(bucket["label"], {"count": 0, "latencies": []})
             count = bucket_data["count"]
             percentage = (count / total_requests * 100) if total_requests > 0 else 0
+            safe_percentage = self._safe_float(percentage)
             avg_latency = (
                 (sum(bucket_data["latencies"]) / len(bucket_data["latencies"])) if bucket_data["latencies"] else None
             )
+            safe_avg_latency = self._safe_float(avg_latency) if avg_latency else None
 
             overall_buckets.append(
                 LatencyDistributionBucket(
                     range=bucket["label"],
                     count=count,
-                    percentage=round(percentage, 2),
-                    avg_latency=round(avg_latency, 2) if avg_latency else None,
+                    percentage=round(safe_percentage, 2),
+                    avg_latency=round(safe_avg_latency, 2) if safe_avg_latency else None,
                 )
             )
 
@@ -2630,10 +2632,23 @@ class ObservabilityMetricsService:
             bucket_definitions=clean_buckets,
         )
 
+    def _safe_float(self, value: Union[int, float, None]) -> float:
+        """Convert value to safe float, handling NaN and Infinity."""
+        if value is None:
+            return 0.0
+        if isinstance(value, (int, float)):
+            if math.isnan(value) or math.isinf(value):
+                return 0.0
+            return float(value)
+        return 0.0
+
     def _format_metric_value(self, metric: str, value: Union[int, float, None]) -> tuple[str, str]:
         """Format metric values with appropriate units and human-readable formatting."""
         if value is None:
             return "0", ""
+
+        # Ensure value is safe for JSON serialization
+        value = self._safe_float(value)
 
         # Percentage metrics
         if metric in ["success_rate", "cache_hit_rate", "error_rate"]:
