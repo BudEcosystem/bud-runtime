@@ -52,31 +52,6 @@ jobs:
       run:
         working-directory: ./services/budprompt
 
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: bud_prompt_test
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-
-      redis:
-        image: redis:7-alpine
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 6379:6379
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -106,77 +81,64 @@ jobs:
         run: |
           cp .env.sample .env
           # Update test database connection
-          sed -i 's/PSQL_HOST=.*/PSQL_HOST=localhost/' .env
+          sed -i 's/PSQL_HOST=.*/PSQL_HOST=0.0.0.0/' .env
           sed -i 's/PSQL_DB_NAME=.*/PSQL_DB_NAME=bud_prompt_test/' .env
-          sed -i 's/REDIS_HOST=.*/REDIS_HOST=localhost/' .env
+          sed -i 's/REDIS_HOST=.*/REDIS_HOST=0.0.0.0/' .env
 
-          # Fix Redis URI format (must include redis:// scheme)
-          sed -i 's/SECRETS_REDIS_URI=.*/SECRETS_REDIS_URI=redis:\/\/localhost:6379/' .env
+          # Fix Redis URI format
+          sed -i 's/SECRETS_REDIS_URI=.*/SECRETS_REDIS_URI=0.0.0.0:6379/' .env
 
           # Set Gateway URL for testing
           sed -i 's|BUD_GATEWAY_BASE_URL=.*|BUD_GATEWAY_BASE_URL=http://20.66.97.208/v1|' .env
           sed -i 's|BUD_DEFAULT_MODEL_NAME=.*|BUD_DEFAULT_MODEL_NAME=qwen3-32b|' .env
 
           # Set required secrets for testing
-          sed -i 's/PSQL_USER=.*/PSQL_USER=postgres/' .env
-          sed -i 's/PSQL_PASSWORD=.*/PSQL_PASSWORD=postgres/' .env
+          sed -i 's/SECRETS_PSQL_USER=.*/SECRETS_PSQL_USER=postgres/' .env
+          sed -i 's/SECRETS_PSQL_PASSWORD=.*/SECRETS_PSQL_PASSWORD=postgres/' .env
 
           # Show environment file for debugging (without sensitive data)
           echo "Environment file setup complete"
 
-      - name: Run database migrations
-        env:
-          PSQL_HOST: localhost
-          PSQL_PORT: 5432
-          PSQL_DB_NAME: bud_prompt_test
-          PSQL_USER: postgres
-          PSQL_PASSWORD: postgres
-          SECRETS_PSQL_PASSWORD: postgres
-          SECRETS_PSQL_USER: postgres
+      - name: Start services with Docker Compose
         run: |
-          alembic -c ./alembic.ini upgrade head
+          echo "::group::Starting services with Docker Compose"
+          # Start all services in background
+          ./deploy/start_dev.sh -d --build
 
-      - name: Start BudPrompt service
-        run: |
-          echo "::group::Starting BudPrompt service"
-          # Start the service in background
-          uvicorn budprompt.main:app --host 0.0.0.0 --port 9088 &
-          # Save the PID for later cleanup
-          echo $! > budprompt.pid
-          # Wait for service to be ready
-          echo "Waiting for service to start..."
-          for i in {1..30}; do
-            if curl -f http://localhost:9088/health 2>/dev/null; then
-              echo "Service is ready!"
-              break
-            fi
-            echo "Waiting... ($i/30)"
-            sleep 1
-          done
-          # Verify service is running
-          curl -f http://localhost:9088/health || (echo "Service failed to start" && exit 1)
+          # Wait for services to be ready
+          echo "Waiting for services to start..."
+          sleep 30
+
+          # Check if main container is running
+          docker ps | grep budserve-development-budprompt
+
+          # Verify service health
+          docker exec budserve-development-budprompt curl -f http://localhost:9088/health || (echo "Service health check failed" && exit 1)
+          echo "Services are ready!"
           echo "::endgroup::"
 
       - name: Run tests with coverage
         run: |
           echo "::group::Running pytest with coverage"
-          pytest tests/ \
+          # Run tests inside the Docker container
+          docker exec budserve-development-budprompt pytest tests/ \
             --cov=budprompt \
             --cov-report=xml \
             --cov-report=html \
             --cov-report=term-missing \
             -v \
             -x
+
+          # Copy coverage reports from container to host
+          docker cp budserve-development-budprompt:/app/coverage.xml ./coverage.xml
+          docker cp budserve-development-budprompt:/app/htmlcov ./htmlcov
           echo "::endgroup::"
 
-      - name: Stop BudPrompt service
+      - name: Stop services
         if: always()
         run: |
-          if [ -f budprompt.pid ]; then
-            echo "Stopping BudPrompt service..."
-            kill $(cat budprompt.pid) || true
-            rm budprompt.pid
-          fi
+          echo "Stopping Docker Compose services..."
+          ./deploy/stop_dev.sh || true
 
       - name: Upload coverage reports
         uses: actions/upload-artifact@v4
