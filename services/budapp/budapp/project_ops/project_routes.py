@@ -498,10 +498,34 @@ async def retrieve_project(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to retrieve project"
         ).to_http_response()
 
+    # Fetch credential data only for CLIENT_APP projects
+    credentials_count = None
+    credentials = None
+    if db_project.project_type == ProjectTypeEnum.CLIENT_APP.value:
+        from ..credential_ops.crud import CredentialDataManager
+
+        credential_data_manager = CredentialDataManager(session)
+        # Get credentials for this project
+        project_credentials, count = await credential_data_manager.get_all_credentials(
+            filters={"project_id": project_id},
+            limit=100,  # Get all credentials for the project
+        )
+        credentials_count = count
+
+        # Convert to CredentialSummary format
+        from .schemas import CredentialSummary
+
+        credentials = [
+            CredentialSummary(id=cred.id, name=cred.name, last_used_at=cred.last_used_at)
+            for cred in project_credentials
+        ]
+
     return ProjectDetailResponse(
         message="Project retrieved successfully",
         project=db_project,
         endpoints_count=endpoints_count,
+        credentials_count=credentials_count,
+        credentials=credentials,
         object="project.retrieve",
         code=status.HTTP_200_OK,
     ).to_http_response()
