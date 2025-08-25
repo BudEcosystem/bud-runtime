@@ -125,6 +125,12 @@ jobs:
           echo "Environment file setup complete"
 
       - name: Run database migrations
+        env:
+          PSQL_HOST: localhost
+          PSQL_PORT: 5432
+          PSQL_DB_NAME: bud_prompt_test
+          PSQL_USER: postgres
+          PSQL_PASSWORD: postgres
         run: |
           alembic -c ./alembic.ini upgrade head
 
