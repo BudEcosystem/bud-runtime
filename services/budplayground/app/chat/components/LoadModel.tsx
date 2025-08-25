@@ -33,8 +33,8 @@ export default function LoadModel(props: LoadModelProps) {
         document.documentElement.scrollTop = document.documentElement.clientHeight;
         document.documentElement.scrollLeft = document.documentElement.clientWidth;
 
-        getEndPoints({ page: 1, limit: 25, apiKey: "" });
-    }, [getEndPoints]);
+        getEndPoints({ page: 1, limit: 25 });
+    }, []); // Empty dependency array - only run once on mount
 
     useEffect(() => {
 
