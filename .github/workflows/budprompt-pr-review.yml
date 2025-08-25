@@ -131,6 +131,8 @@ jobs:
           PSQL_DB_NAME: bud_prompt_test
           PSQL_USER: postgres
           PSQL_PASSWORD: postgres
+          SECRETS_PSQL_PASSWORD: postgres
+          SECRETS_PSQL_USER: postgres
         run: |
           alembic -c ./alembic.ini upgrade head
 
