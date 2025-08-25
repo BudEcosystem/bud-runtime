@@ -1,12 +1,16 @@
 import os
 import alembic_postgresql_enum
 from logging.config import fileConfig
+from dotenv import load_dotenv
 
 from pydantic import PostgresDsn
 from sqlalchemy import engine_from_config, pool, create_engine
 from sqlalchemy_utils import create_database, database_exists
 
 from alembic import context  # type: ignore
+
+# Load environment variables from .env file
+load_dotenv()
 
 
 # this is the Alembic Config object, which provides
