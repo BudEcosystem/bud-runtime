@@ -16,7 +16,7 @@
 
 """Initialization module for the `commons` subpackage. Contains common utilities, configurations, constants, and helper functions that are shared across the project."""
 
-from budmicroframe.shared.psql_service import PSQLBase as PSQLBase
+from budmicroframe.shared.psql_service import PSQLBase  # noqa
 
 # Import specific models instead of using wildcard import to avoid F403 error
 # Import models here
