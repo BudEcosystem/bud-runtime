@@ -168,31 +168,6 @@ export const ProjectDetailContent: React.FC<{ projectId: string; onClose: () => 
               <div className="hR w-full bg-[#1F1F1F50] h-[1px]"></div>
               {/* Project Information */}
               <Row gutter={[16, 16]} className="px-[1.4rem] mt-[1rem]">
-                <Col span={24}>
-                  <div className="flex items-center justify-between">
-                    <Text className="text-gray-400">Project ID</Text>
-                    <Space>
-                      <Text className="text-white font-mono">{project.id}</Text>
-                      <Tooltip title="Copy ID">
-                        <Button
-                          type="text"
-                          size="small"
-                          icon={<CopyOutlined />}
-                          onClick={() => copyToClipboard(project.id)}
-                        />
-                      </Tooltip>
-                    </Space>
-                  </div>
-                </Col>
-
-                <Col span={24}>
-                  <div className="flex items-center justify-between">
-                    <Text className="text-gray-400">Project Type</Text>
-                    <Tag color="blue" icon={<FolderOutlined />}>
-                      {getProjectTypeLabel(project.project_type)}
-                    </Tag>
-                  </div>
-                </Col>
 
                 <Col span={24}>
                   <div className="flex items-center justify-between py-[1rem]">
@@ -208,6 +183,13 @@ export const ProjectDetailContent: React.FC<{ projectId: string; onClose: () => 
                         <Text className="text-gray-500">No tags</Text>
                       )}
                     </Space>
+                  </div>
+                </Col>
+
+                <Col span={24} className="mb-[1rem]">
+                  <div className="flex items-center justify-between">
+                    <Text className="text-gray-400">Endpoints</Text>
+                    <Text className="text-white">{project.endpoints_count || 0}</Text>
                   </div>
                 </Col>
 
@@ -246,37 +228,6 @@ export const ProjectDetailContent: React.FC<{ projectId: string; onClose: () => 
                 )}
               </Row>
             </div>
-
-            {/* Resource Statistics */}
-            <Title level={5} className="!mb-4 text-white px-[1.4rem] mt-[1.4  rem]">
-              Resources
-            </Title>
-            <Row gutter={[16, 16]} className="px-[1.4rem] mb-[1.4rem]">
-              <Col span={8}>
-                <Card className="bg-[transparent] border-[#2a2a3e] text-center">
-                  <div className="text-2xl font-bold text-[#965CDE]">
-                    {project.endpoints_count || 0}
-                  </div>
-                  <Text className="text-gray-400">Endpoints</Text>
-                </Card>
-              </Col>
-              <Col span={8}>
-                <Card className="bg-[transparent] border-[#2a2a3e] text-center">
-                  <div className="text-2xl font-bold text-[#965CDE]">
-                    {project.models_count || 0}
-                  </div>
-                  <Text className="text-gray-400">Models</Text>
-                </Card>
-              </Col>
-              <Col span={8}>
-                <Card className="bg-[transparent] border-[#2a2a3e] text-center">
-                  <div className="text-2xl font-bold text-[#965CDE]">
-                    {project.clusters_count || 0}
-                  </div>
-                  <Text className="text-gray-400">Clusters</Text>
-                </Card>
-              </Col>
-            </Row>
           </div>
         </BudDrawerLayout>
       </BudWraperBox>
