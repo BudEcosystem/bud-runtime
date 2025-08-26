@@ -46,23 +46,35 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: Cache pnpm store
-        uses: actions/cache@v3
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
         with:
-          path: ~/.pnpm-store
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
+          version: 9
+          run_install: false
 
-      - name: Install pnpm with retry
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
         run: |
-          for i in 1 2 3; do
-            npm install -g pnpm@10 && break || sleep 60
-          done
-          pnpm config set store-dir ~/.pnpm-store
+          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+            ~/.pnpm-store
+            **/node_modules
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: |
+          npm config set registry https://registry.npmjs.org/
+          pnpm install --frozen-lockfile --prefer-offline
+        env:
+          HUSKY: 0
 
       - name: Run ESLint
         run: |
@@ -105,23 +117,35 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: Cache pnpm store
-        uses: actions/cache@v3
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
         with:
-          path: ~/.pnpm-store
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
+          version: 9
+          run_install: false
 
-      - name: Install pnpm with retry
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
         run: |
-          for i in 1 2 3; do
-            npm install -g pnpm@10 && break || sleep 60
-          done
-          pnpm config set store-dir ~/.pnpm-store
+          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+            ~/.pnpm-store
+            **/node_modules
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: |
+          npm config set registry https://registry.npmjs.org/
+          pnpm install --frozen-lockfile --prefer-offline
+        env:
+          HUSKY: 0
 
       - name: Run pnpm audit
         run: |
