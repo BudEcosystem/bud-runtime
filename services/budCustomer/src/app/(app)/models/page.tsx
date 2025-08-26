@@ -481,7 +481,7 @@ export default function ModelsPage() {
                         </div>
 
                         {/* Model Title */}
-                        <Text_19_600_EEEEEE className="mb-3 line-clamp-1 !leading-[120%]">
+                        <Text_19_600_EEEEEE className="mb-3 line-clamp-1 !leading-[130%]">
                           {model.endpoint_name}
                         </Text_19_600_EEEEEE>
 
@@ -493,7 +493,16 @@ export default function ModelsPage() {
                         </div>
 
                         {/* Model Tags */}
-                        <ModelTags model={model} maxTags={3} limit={true} />
+                        <ModelTags 
+                          model={{
+                            ...model,
+                            endpoints_count: model.supported_endpoints 
+                              ? Object.values(model.supported_endpoints).filter((e: any) => e.enabled).length 
+                              : model.endpoints_count
+                          }} 
+                          maxTags={3} 
+                          limit={true} 
+                        />
 
                         {/* Author and Tasks */}
                         <div className="flex items-center gap-2 flex-wrap">
