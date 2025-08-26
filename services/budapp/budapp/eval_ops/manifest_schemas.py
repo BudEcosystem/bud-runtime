@@ -98,6 +98,7 @@ class Dataset(BaseModel):
     sample_count: int
     traits: List[str]
     metadata: DatasetMetadata
+    eval_type: Optional[Dict[str, str]] = None  # Evaluation type configurations
     original_data: Optional[Dict[str, Any]] = None  # Original metadata from source
 
 
