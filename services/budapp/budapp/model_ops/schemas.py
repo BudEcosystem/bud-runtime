@@ -407,6 +407,8 @@ class ModelDetailSuccessResponse(SuccessResponse):
     eval_result: dict | None = None  # TODO: integrate actual eval result
     model_tree: ModelTree
     endpoints_count: int
+    endpoint_id: str | None = None
+    endpoint_name: str | None = None
 
 
 class CreateCloudModelWorkflowRequest(BaseModel):
@@ -1271,6 +1273,7 @@ class ModelCatalogItem(BaseModel):
     # Publication metadata
     published_date: datetime
     endpoint_id: UUID4
+    endpoint_name: str
     supported_endpoints: List[ModelEndpointEnum]
 
     @field_serializer("modality")

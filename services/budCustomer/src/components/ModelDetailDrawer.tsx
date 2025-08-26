@@ -502,7 +502,7 @@ export const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }>
     }, []);
 
     const { endpoint, payloadExample } = getEndpointConfig;
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://api.example.com';
+    const baseUrl = process.env.NEXT_PUBLIC_COPY_CODE_API_BASE_URL || 'https://api.example.com';
     const apiUrl = `${baseUrl}${endpoint}`;
 
     const generateCurlCommand = useMemo(() => {

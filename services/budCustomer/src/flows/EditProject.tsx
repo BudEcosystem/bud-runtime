@@ -236,6 +236,7 @@ export default function EditProject() {
               name="description"
               label="Description"
               required
+              defaultValue={currentProject?.description || ""}
               info="This is the project's elevator pitch, use clear and concise words to summarize the project in few sentences"
               placeholder="Provide a brief description about the project."
               rules={[

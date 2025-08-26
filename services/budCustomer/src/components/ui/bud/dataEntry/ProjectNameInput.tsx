@@ -125,7 +125,7 @@ export function ModelNameInput({
   const imageUrl = assetBaseUrl + icon;
 
   return (
-    <div className="drawerNameInput flex flex-row items-start justify-between mb-[1rem]">
+    <div className="drawerNameInput flex flex-row items-start justify-between">
       <Form.Item name={"icon"} className="relative mr-[.3rem]">
         <div className="h-[2.25rem]">
           {type == "huggingface" ? (
@@ -155,8 +155,7 @@ export function ModelNameInput({
       <Form.Item
         hasFeedback
         name={"name"}
-        // className="w-full pb-0 mb-[0]"
-        className="w-full pb-0 mb-[0] justify-center nameBorder"
+        className="w-full justify-center nameBorder"
         rules={[
           {
             required: true,
@@ -195,7 +194,7 @@ export function NameIconInput({
   showIcon?: boolean;
 }) {
   return (
-    <div className="drawerNameInput flex flex-row items-center justify-between  mb-[1rem]">
+    <div className="drawerNameInput flex flex-row items-start justify-between">
       {showIcon && (
         <Form.Item
           name={"icon"}
@@ -274,7 +273,6 @@ export function NameIconInput({
       <Form.Item
         hasFeedback
         name={"name"}
-        // className="w-full"
         className="w-full border-[1px] border-[#757575] box-border rounded-[6px] justify-center"
         rules={[
           {

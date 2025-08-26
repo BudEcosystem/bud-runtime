@@ -16,13 +16,17 @@
 
 """The playground ops services. Contains business logic for playground ops."""
 
+import hashlib
+import json
+import time
+from datetime import UTC, datetime
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
 from fastapi import status
 
 from ..commons import logging
-from ..commons.constants import EndpointStatusEnum, ProjectTypeEnum, UserTypeEnum
+from ..commons.constants import EndpointStatusEnum, ProjectStatusEnum, ProjectTypeEnum, UserTypeEnum
 from ..commons.db_utils import SessionMixin
 from ..commons.exceptions import ClientException
 from ..commons.security import hash_token
@@ -33,6 +37,8 @@ from ..endpoint_ops.models import Endpoint as EndpointModel
 from ..model_ops.services import ModelService
 from ..project_ops.crud import ProjectDataManager
 from ..project_ops.models import Project as ProjectModel
+from ..project_ops.services import ProjectService
+from ..shared.redis_service import RedisService
 from ..user_ops.crud import UserDataManager
 from ..user_ops.models import User as UserModel
 from .crud import ChatSessionDataManager, ChatSettingDataManager, MessageDataManager, NoteDataManager
@@ -41,9 +47,11 @@ from .schemas import (
     ChatSessionCreate,
     ChatSessionListResponse,
     ChatSettingListResponse,
+    EndpointInfo,
     EndpointListResponse,
     MessageResponse,
     NoteResponse,
+    PlaygroundInitializeResponse,
 )
 
 
@@ -175,6 +183,146 @@ class PlaygroundService(SessionMixin):
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 message="Unauthorized to access this resource",
             )
+
+    async def hash_jwt_token(self, jwt: str) -> str:
+        """Hash JWT token using same pattern as API keys.
+
+        This ensures compatibility with existing gateway validation logic.
+        Uses the same hashing pattern as CredentialModel.set_hashed_key()
+
+        Args:
+            jwt: The JWT token to hash
+
+        Returns:
+            str: The hashed JWT token
+        """
+        # Use same pattern as CredentialModel.set_hashed_key()
+        return hash_token(f"bud-{jwt}")
+
+    async def initialize_session(
+        self, jwt_token: str, user_id: UUID, jwt_expiry: Optional[int] = None
+    ) -> PlaygroundInitializeResponse:
+        """Initialize playground session with JWT authentication.
+
+        This method:
+        1. Hashes the JWT token for Redis storage
+        2. Fetches user's available endpoints/deployments for Redis cache
+        3. Stores data in Redis with appropriate TTL (same structure as API keys)
+        4. Returns simple initialization response (without endpoint details)
+
+        Args:
+            jwt_token: The JWT token to use for authentication
+            user_id: The user ID extracted from the JWT
+            jwt_expiry: Optional JWT expiry timestamp (unix timestamp)
+
+        Returns:
+            PlaygroundInitializeResponse with session info
+        """
+        # Get user details
+        db_user = await UserDataManager(self.session).retrieve_by_fields(UserModel, {"id": user_id})
+
+        # Get user's accessible projects
+        project_service = ProjectService(self.session)
+
+        # CLIENT users see published models, ADMIN users see all
+        filter_published_only = db_user.user_type == UserTypeEnum.CLIENT
+
+        # Get project IDs based on user type
+        if filter_published_only:
+            # CLIENT users: Get their first active project for metadata
+            user_projects, _ = await project_service.get_all_active_projects(
+                current_user=db_user,
+                offset=0,
+                limit=1,  # Just need one for metadata
+            )
+
+            if not user_projects:
+                raise ClientException(
+                    status_code=status.HTTP_404_NOT_FOUND, message="No active projects found for user"
+                )
+
+            project = user_projects[0]
+            project_ids = None  # CLIENT users see all published endpoints
+        else:
+            # ADMIN users: Get ALL their active projects
+            all_projects, total_count = await project_service.get_all_active_projects(
+                current_user=db_user,
+                offset=0,
+                limit=1000,  # Get all projects (reasonable upper limit)
+            )
+
+            if not all_projects:
+                raise ClientException(
+                    status_code=status.HTTP_404_NOT_FOUND, message="No active projects found for user"
+                )
+
+            project = all_projects[0]  # Use first project for metadata
+            # Extract all project IDs for ADMIN users
+            project_ids = [p.project.id for p in all_projects]
+
+        # Hash the JWT token for Redis storage
+        hashed_jwt = await self.hash_jwt_token(jwt_token)
+
+        # Prepare filters for endpoint retrieval
+        endpoint_filters = {"status": EndpointStatusEnum.RUNNING}
+        if filter_published_only:
+            endpoint_filters["is_published"] = True
+
+        # Get endpoints - CLIENT users get all published, ADMIN users get from all their projects
+        db_endpoints, _ = await EndpointDataManager(self.session).get_all_playground_deployments(
+            project_ids=project_ids,  # None for CLIENT (all published), list of IDs for ADMIN
+            offset=0,
+            limit=1000,  # Increased limit to get more endpoints
+            filters=endpoint_filters,
+            order_by=[],
+            search=False,
+        )
+
+        # Prepare cache data (same structure as API keys)
+        cache_data = {}
+
+        for db_endpoint_tuple in db_endpoints:
+            endpoint, input_cost, output_cost, context_length = db_endpoint_tuple
+
+            # Prepare cache data (same structure as API keys)
+            cache_data[endpoint.name] = {
+                "endpoint_id": str(endpoint.id),
+                "model_id": str(endpoint.model.id),
+                "project_id": str(endpoint.project_id),
+            }
+
+        # Add metadata to cache
+        cache_data["__metadata__"] = {
+            "api_key_id": None,  # Not applicable for JWT
+            "user_id": str(user_id),
+            "api_key_project_id": str(project.project.id),
+        }
+
+        # Calculate TTL based on JWT expiry
+        ttl = None
+        if jwt_expiry:
+            current_time = int(time.time())
+            ttl = max(jwt_expiry - current_time, 0)
+
+            # Don't cache if token is already expired
+            if ttl == 0:
+                raise ClientException(status_code=status.HTTP_401_UNAUTHORIZED, message="JWT token has expired")
+
+        # Store in Redis with same key format as API keys
+        redis_service = RedisService()
+        redis_key = f"api_key:{hashed_jwt}"
+
+        await redis_service.set(
+            redis_key,
+            json.dumps(cache_data),
+            ex=ttl,  # Set expiry if TTL is provided
+        )
+
+        logger.info(f"Initialized playground session for user {user_id} with {len(db_endpoints)} endpoints cached")
+
+        return PlaygroundInitializeResponse(
+            user_id=user_id, initialization_status="success", ttl=ttl, message="JWT session initialized successfully"
+        )
 
 
 class ChatSessionService(SessionMixin):

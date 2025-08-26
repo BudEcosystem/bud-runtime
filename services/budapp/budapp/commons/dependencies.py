@@ -32,7 +32,7 @@ from budapp.commons.config import app_settings
 from budapp.commons.constants import UserStatusEnum
 from budapp.commons.database import SessionLocal
 from budapp.commons.keycloak import KeycloakManager
-from budapp.shared.redis_service import RedisService
+from budapp.shared.jwt_blacklist_service import JWTBlacklistService
 from budapp.user_ops.crud import UserDataManager
 from budapp.user_ops.models import Tenant, TenantClient
 from budapp.user_ops.models import User as UserModel
@@ -59,6 +59,9 @@ async def get_session() -> AsyncGenerator[Session, None]:
     session = SessionLocal()
     try:
         yield session
+    except Exception:
+        session.rollback()  # Rollback any uncommitted changes on exception
+        raise
     finally:
         session.close()
 
@@ -83,10 +86,9 @@ async def get_current_user(
     )
 
     try:
-        # Check if token is blacklisted
-        redis_service = RedisService()
-        blacklist_key = f"token_blacklist:{token.credentials}"
-        is_blacklisted = await redis_service.get(blacklist_key)
+        # Check if token is blacklisted using Dapr state store
+        jwt_blacklist_service = JWTBlacklistService()
+        is_blacklisted = await jwt_blacklist_service.is_token_blacklisted(token.credentials)
 
         if is_blacklisted:
             logger.warning("::USER:: Token is blacklisted")

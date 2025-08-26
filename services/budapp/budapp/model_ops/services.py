@@ -3934,6 +3934,7 @@ class ModelCatalogService(SessionMixin):
                 "provider_icon": provider_icon if provider_icon else model.icon,
                 "published_date": endpoint.published_date.isoformat() if endpoint.published_date else None,
                 "endpoint_id": str(endpoint.id),
+                "endpoint_name": endpoint.name,
                 "supported_endpoints": supported_endpoints_values,
             }
 
@@ -4045,6 +4046,7 @@ class ModelCatalogService(SessionMixin):
             "provider_icon": provider_icon if provider_icon else model.icon,
             "published_date": endpoint.published_date.isoformat() if endpoint.published_date else None,
             "endpoint_id": str(endpoint.id),
+            "endpoint_name": endpoint.name,
             "supported_endpoints": supported_endpoints_values,
         }
 
@@ -4136,6 +4138,8 @@ class ModelCatalogService(SessionMixin):
             model_tree=model_tree,
             scan_result=model.model_security_scan_result,
             endpoints_count=db_endpoint_count,
+            endpoint_id=str(endpoint.id),
+            endpoint_name=endpoint.name,
             message="Model retrieved successfully",
             code=status.HTTP_200_OK,
             object="catalog.model.get",

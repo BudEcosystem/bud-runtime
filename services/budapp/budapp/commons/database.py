@@ -54,14 +54,26 @@ def get_engine() -> Engine:
         path=app_settings.psql_dbname,
     ).__str__()
 
-    return create_engine(postgres_url)
+    return create_engine(
+        postgres_url,
+        pool_size=20,  # Increased from default 5
+        max_overflow=40,  # Increased from default 10
+        pool_pre_ping=True,  # Verify connections before using them
+        pool_recycle=3600,  # Recycle connections after 1 hour
+        echo_pool=True,  # Enable pool logging for debugging
+    )
 
 
 # Create sqlalchemy engine
 engine = get_engine()
 
-# Create session class
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+# Create session class with proper configuration
+SessionLocal = sessionmaker(
+    autocommit=False,
+    autoflush=False,
+    bind=engine,
+    expire_on_commit=False,  # Prevent unnecessary database hits after commit
+)
 
 # Constraint naming convention to fix alembic autogenerate command issues
 # https://docs.sqlalchemy.org/en/20/core/constraints.html#constraint-naming-conventions
