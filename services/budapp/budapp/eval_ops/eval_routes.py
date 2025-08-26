@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from budapp.commons import logging
 from budapp.commons.dependencies import get_current_active_user, get_session
+from budapp.commons.exceptions import ClientException
 from budapp.commons.schemas import ErrorResponse
 from budapp.eval_ops.schemas import (
     ConfigureRunsRequest,
@@ -31,10 +32,9 @@ from budapp.eval_ops.schemas import (
     UpdateRunRequest,
     UpdateRunResponse,
 )
-from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.eval_ops.services import EvaluationWorkflowService, ExperimentService, ExperimentWorkflowService
-from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.user_ops.models import User
+from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 
 
 router = APIRouter(prefix="/experiments", tags=["experiments"])
@@ -69,6 +69,8 @@ def create_experiment(
     """
     try:
         experiment = ExperimentService(session).create_experiment(request, current_user.id)
+    except ClientException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
     except HTTPException as e:
         raise e
     except Exception as e:

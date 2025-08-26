@@ -38,11 +38,11 @@ from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 from ..benchmark_ops.services import BenchmarkService
 from ..endpoint_ops.services import EndpointService
 from ..model_ops.services import LocalModelWorkflowService, ModelService
+from ..shared.notification_service import BudNotifyService, NotificationBuilder
 from .crud import IconDataManager, ModelTemplateDataManager
 from .models import Icon as IconModel
 from .models import ModelTemplate as ModelTemplateModel
 from .schemas import NotificationPayload, NotificationResponse, NotificationResult
-from ..shared.notification_service import BudNotifyService, NotificationBuilder
 
 
 logger = logging.get_logger(__name__)

@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from budapp.commons import logging
 from budapp.commons.config import app_settings
-from budapp.commons.constants import WorkflowTypeEnum, BudServeWorkflowStepEventName
+from budapp.commons.constants import BudServeWorkflowStepEventName, WorkflowTypeEnum
 from budapp.commons.exceptions import ClientException
 from budapp.endpoint_ops.models import Endpoint as EndpointModel
 from budapp.eval_ops.models import ExpDataset as DatasetModel
@@ -65,9 +65,9 @@ from budapp.eval_ops.schemas import (
 from budapp.model_ops.models import Model as ModelTable
 from budapp.workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
 from budapp.workflow_ops.models import Workflow as WorkflowModel
-from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.workflow_ops.models import WorkflowStatusEnum
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
+from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.workflow_ops.services import WorkflowStepService
 
 
@@ -113,15 +113,34 @@ class ExperimentService:
             ExperimentSchema: Pydantic schema of the created Experiment.
 
         Raises:
+            HTTPException(status_code=400): If experiment with same name already exists for the user.
             HTTPException(status_code=500): If database insertion fails.
         """
+        # Check for duplicate experiment name for this user
+        # Note: name has already been validated and trimmed by Pydantic
+        existing_experiment = (
+            self.session.query(ExperimentModel)
+            .filter(
+                ExperimentModel.name == req.name,
+                ExperimentModel.created_by == user_id,
+                ExperimentModel.status != ExperimentStatusEnum.DELETED.value,
+            )
+            .first()
+        )
+
+        if existing_experiment:
+            raise ClientException(
+                message=f"An experiment with the name '{req.name}' already exists. Please choose a different name.",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
         # Create experiment without project_id initially
         ev = ExperimentModel(
             name=req.name,
             description=req.description,
             # project_id=req.project_id,  # Commented out - made optional
             created_by=user_id,
-            status="active",
+            status=ExperimentStatusEnum.ACTIVE.value,
             tags=req.tags or [],
         )
 
@@ -140,7 +159,7 @@ class ExperimentService:
             ) from e
 
         # Create experiment schema with empty models and traits (new experiment has no runs yet)
-        exp_data = ExperimentSchema.from_orm(ev)
+        exp_data = ExperimentSchema.model_validate(ev)
         exp_data.models = []
         exp_data.traits = []
         exp_data.status = "no_runs"  # New experiment has no runs
@@ -1340,9 +1359,8 @@ class ExperimentWorkflowService:
             )
 
             # If this is the final step and trigger_workflow is True, create the experiment
-            experiment_id = None
             if request.step_number == 5 and request.trigger_workflow:
-                experiment_id = await self._create_experiment_from_workflow(workflow.id, current_user_id)
+                await self._create_experiment_from_workflow(workflow.id, current_user_id)
                 # Mark workflow as completed
                 await WorkflowDataManager(self.session).update_by_fields(
                     workflow,
@@ -1712,16 +1730,14 @@ class ExperimentWorkflowService:
             workflow = cast(WorkflowModel, workflow)
 
             # Get all accumulated step data
-            all_step_data = await self._get_accumulated_step_data(workflow_id)
+            await self._get_accumulated_step_data(workflow_id)
 
             # Determine completion state
             is_complete = workflow.current_step >= 5
-            next_step = None if is_complete else workflow.current_step + 1
 
             # Prepare next step data if not complete
-            next_step_data = None
             if not is_complete:
-                next_step_data = await self._prepare_next_step_data(workflow.current_step + 1, current_user_id)
+                await self._prepare_next_step_data(workflow.current_step + 1, current_user_id)
 
             from budapp.workflow_ops.services import WorkflowService as GenericWorkflowService
 
@@ -1830,9 +1846,8 @@ class EvaluationWorkflowService:
                 )
 
             # If this is the final step and trigger_workflow is True, create the runs
-            runs_created = None
             if request.step_number == 5 and request.trigger_workflow:
-                runs_created = await self._create_runs_from_workflow(workflow.id, experiment_id, current_user_id)
+                await self._create_runs_from_workflow(workflow.id, experiment_id, current_user_id)
                 # Mark workflow as completed
                 # await WorkflowDataManager(self.session).update_by_fields(
                 #     workflow,
@@ -1849,9 +1864,8 @@ class EvaluationWorkflowService:
 
             # Determine next step
             next_step = None if is_complete else request.step_number + 1
-            next_step_data = (
-                await self._get_next_step_data(next_step, all_step_data, experiment_id) if next_step else None
-            )
+            if next_step:
+                await self._get_next_step_data(next_step, all_step_data, experiment_id)
 
             # Trigger budeval evaluation if this is the final step
             if request.step_number == 5 and request.trigger_workflow:
@@ -1875,7 +1889,9 @@ class EvaluationWorkflowService:
                         data=skeleton,
                     )
                 except Exception:
-                    logger.exception("Failed to initialize evaluation_events step skeleton for workflow %s", workflow.id)
+                    logger.exception(
+                        "Failed to initialize evaluation_events step skeleton for workflow %s", workflow.id
+                    )
 
                 await self._trigger_evaluations_for_experiment_and_get_response(experiment_id)
 
@@ -2378,6 +2394,9 @@ class EvaluationWorkflowService:
             # Create evaluation request matching budeval schema
             eval_request = {
                 "uuid": str(run_id),
+                "experiment_id": str(evaluation_request.get("experiment_id"))
+                if evaluation_request.get("experiment_id")
+                else None,
                 "eval_model_info": {
                     "model_name": evaluation_request["model_name"],
                     "endpoint": evaluation_request["endpoint"],
@@ -2560,13 +2579,14 @@ class EvaluationWorkflowService:
 
             # Prepare single evaluation request with all datasets
             evaluation_request = {
-                "model_name": "qwen3-4b",
+                "model_name": "qwen3-32b",
                 "endpoint": "http://20.66.97.208/v1",
                 "api_key": "sk-BudLiteLLMMasterKey_123",
-                "datasets": demo_gsm8k_chat_gen,  # all_datasets,
+                "datasets": ["demo_gsm8k_chat_gen", "demo_gsm8k_chat_gen"],  # all_datasets,
                 "engine": "opencompass",  # Default engine
                 "extra_args": runs[0].config or {} if runs else {},  # Use first run's config
                 "kubeconfig": None,  # Will use default kubeconfig
+                "experiment_id": experiment_id,  # Ensure experiment ID is forwarded
             }
 
             # Update all runs status to running
@@ -2658,7 +2678,7 @@ class EvaluationWorkflowService:
             # Prepare single evaluation request with all datasets
 
             evaluation_request = {
-                "model_name": "qwen3-4b",
+                "model_name": "qwen3-32b",
                 "endpoint": "http://20.66.97.208/v1",
                 "api_key": "sk-BudLiteLLMMasterKey_123",
                 "extra_args": {},
@@ -2667,6 +2687,7 @@ class EvaluationWorkflowService:
                 # Ensure budeval knows how to route notifications back to budapp
                 "source": app_settings.source_topic,
                 "source_topic": app_settings.source_topic,
+                "experiment_id": experiment_id,  # Include experiment ID for tracking
             }
 
             # Update all runs status to running

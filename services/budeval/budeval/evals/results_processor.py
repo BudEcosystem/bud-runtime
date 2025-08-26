@@ -296,7 +296,7 @@ class ResultsProcessor:
             return {}
 
     async def process_opencompass_results(
-        self, extracted_path: str, job_id: str, model_name: str
+        self, extracted_path: str, job_id: str, model_name: str, experiment_id: Optional[str] = None
     ) -> ProcessedEvaluationResults:
         """Process OpenCompass results from extracted path.
 
@@ -304,6 +304,7 @@ class ResultsProcessor:
             extracted_path: Path where results were extracted
             job_id: Job ID
             model_name: Model name
+            experiment_id: Optional experiment ID for tracking
 
         Returns:
             ProcessedEvaluationResults object
@@ -390,6 +391,7 @@ class ResultsProcessor:
             extracted_at=datetime.utcnow(),
             extraction_path=extracted_path,
             output_pvc_name=f"{job_id}-output-pvc",
+            experiment_id=experiment_id,
         )
 
         logger.info(
@@ -398,7 +400,12 @@ class ResultsProcessor:
         return processed_results
 
     async def extract_and_process(
-        self, job_id: str, model_name: str, namespace: str = "budeval", kubeconfig: Optional[str] = None
+        self,
+        job_id: str,
+        model_name: str,
+        namespace: str = "budeval",
+        kubeconfig: Optional[str] = None,
+        experiment_id: Optional[str] = None,
     ) -> ProcessedEvaluationResults:
         """Extract results from PVC and process them.
 
@@ -407,6 +414,7 @@ class ResultsProcessor:
             model_name: Model name
             namespace: Kubernetes namespace
             kubeconfig: Optional kubeconfig content
+            experiment_id: Optional experiment ID for tracking
 
         Returns:
             ProcessedEvaluationResults object
@@ -416,7 +424,7 @@ class ResultsProcessor:
             extracted_path = self.extract_from_pvc(job_id, namespace, kubeconfig)
 
             # Process results
-            results = await self.process_opencompass_results(extracted_path, job_id, model_name)
+            results = await self.process_opencompass_results(extracted_path, job_id, model_name, experiment_id)
 
             # Store results
             await self.storage.save_results(job_id, results.model_dump())
