@@ -1501,7 +1501,7 @@ const viewModel: DrawerFlowType = {
     {
       navigation: () => [
         "Model",
-        `${useModels.getState().selectedModel?.name}`,
+        `${useModels.getState().selectedModel?.endpoint_name}`,
       ],
       id: "view-model-details",
       confirmClose: false,

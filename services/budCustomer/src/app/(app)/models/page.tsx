@@ -33,6 +33,7 @@ import ModelTags from "@/components/ui/ModelTags";
 // Filter interface
 interface Filters {
   name?: string;
+  endpoint_name?: string;
   author?: string;
   tasks?: string[];
   model_size_min?: number;
@@ -43,6 +44,7 @@ interface Filters {
 
 const defaultFilter: Filters = {
   name: "",
+  endpoint_name: "",
   modality: [],
   model_size_min: undefined,
   model_size_max: undefined,
@@ -116,7 +118,7 @@ export default function ModelsPage() {
       await getModelsCatalog({
         page: currentPage,
         limit: pageSize,
-        name: filterParams.name,
+        name: filterParams.endpoint_name,
         modality: filterParams.modality?.length
           ? filterParams.modality
           : undefined,
@@ -479,8 +481,8 @@ export default function ModelsPage() {
                         </div>
 
                         {/* Model Title */}
-                        <Text_19_600_EEEEEE className="mb-3 line-clamp-1">
-                          {model.name}
+                        <Text_19_600_EEEEEE className="mb-3 line-clamp-1 !leading-[130%]">
+                          {model.endpoint_name}
                         </Text_19_600_EEEEEE>
 
                         {/* Description */}
@@ -491,7 +493,16 @@ export default function ModelsPage() {
                         </div>
 
                         {/* Model Tags */}
-                        <ModelTags model={model} maxTags={3} limit={true} />
+                        <ModelTags
+                          model={{
+                            ...model,
+                            endpoints_count: model.supported_endpoints
+                              ? Object.values(model.supported_endpoints).filter((e: any) => e.enabled).length
+                              : model.endpoints_count
+                          }}
+                          maxTags={3}
+                          limit={true}
+                        />
 
                         {/* Author and Tasks */}
                         <div className="flex items-center gap-2 flex-wrap">
