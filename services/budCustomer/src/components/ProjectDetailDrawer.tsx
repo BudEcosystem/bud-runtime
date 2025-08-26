@@ -56,31 +56,31 @@ export const ProjectDetailContent: React.FC<{ projectId: string; onClose: () => 
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const fetchProjectDetails = async () => {
+      try {
+        setLoading(true);
+        const response = await AppRequest.Get(`/projects/${projectId}`);
+        if (response.data?.project) {
+          setProject({
+            ...response.data.project,
+            endpoints_count: response.data.endpoints_count || 0,
+            models_count: response.data.models_count || 0,
+            clusters_count: response.data.clusters_count || 0,
+            credentials_count: response.data.credentials_count || 0,
+            credentials: response.data.credentials || [],
+          });
+        }
+      } catch (error) {
+        console.error("Failed to fetch project details:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     if (projectId) {
       fetchProjectDetails();
     }
   }, [projectId]);
-
-  const fetchProjectDetails = async () => {
-    try {
-      setLoading(true);
-      const response = await AppRequest.Get(`/projects/${projectId}`);
-      if (response.data?.project) {
-        setProject({
-          ...response.data.project,
-          endpoints_count: response.data.endpoints_count || 0,
-          models_count: response.data.models_count || 0,
-          clusters_count: response.data.clusters_count || 0,
-          credentials_count: response.data.credentials_count || 0,
-          credentials: response.data.credentials || [],
-        });
-      }
-    } catch (error) {
-      console.error("Failed to fetch project details:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
