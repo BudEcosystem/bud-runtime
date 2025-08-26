@@ -105,6 +105,7 @@ export type Model = {
   id: string;
   name: string;
   author: string;
+  endpoint_name?: string;
   modality: {
     audio: { input: boolean; output: boolean; label: string };
     image: { input: boolean; output: boolean; label: string };
