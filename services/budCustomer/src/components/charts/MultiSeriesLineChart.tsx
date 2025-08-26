@@ -16,9 +16,13 @@ interface MultiSeriesLineChartProps {
 
 const MultiSeriesLineChart: React.FC<MultiSeriesLineChartProps> = ({ data }) => {
   const chartRef = useRef<HTMLDivElement>(null);
+  
+  // Check if data is empty
+  const hasData = data?.series && data.series.length > 0 && 
+                  data.series.some(s => s.data && s.data.length > 0 && s.data.some(val => val > 0));
 
   useEffect(() => {
-    if (!chartRef.current) return;
+    if (!chartRef.current || !hasData) return;
 
     const chart = echarts.init(chartRef.current, 'dark');
 
@@ -131,6 +135,17 @@ const MultiSeriesLineChart: React.FC<MultiSeriesLineChartProps> = ({ data }) => 
       chart.dispose();
     };
   }, [data]);
+
+  // Show no data message
+  if (!hasData) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <p className="text-[#757575] text-sm">No data available</p>
+        </div>
+      </div>
+    );
+  }
 
   return <div ref={chartRef} style={{ width: '100%', height: '100%' }} />;
 };

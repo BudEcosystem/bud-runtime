@@ -1544,11 +1544,16 @@ const editProject: DrawerFlowType = {
   totalSteps: 1,
   steps: [
     {
-      navigation: () => [
-        "Projects",
-        `${useProjects.getState().selectedProject?.project?.icon} ${useProjects.getState().selectedProject?.project?.name}`,
-        "Edit Project",
-      ],
+      navigation: () => {
+        const state = useProjects.getState();
+        const project = state.globalSelectedProject?.project || state.globalSelectedProject;
+        const projectName = project?.name || "Project";
+        return [
+          "Projects",
+          projectName,
+          "Edit Project",
+        ];
+      },
       id: "edit-project",
       confirmClose: false,
       step: 1,

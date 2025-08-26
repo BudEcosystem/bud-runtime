@@ -23,8 +23,11 @@ const BarChart: React.FC<BarChartProps> = ({ data }) => {
   }, [data]);
 
   const chartRef = useRef<HTMLDivElement>(null);
+  
+  // Check if data is empty
+  const hasData = data?.data && data.data.length > 0 && data.data.some((val: any) => val > 0);
   useEffect(() => {
-    if (chartRef.current) {
+    if (chartRef.current && hasData) {
       const containerWidth = chartRef.current.clientWidth;
       const containerHeight = chartRef.current.clientHeight;
 
@@ -154,6 +157,17 @@ const BarChart: React.FC<BarChartProps> = ({ data }) => {
       };
     }
   }, [barChartData]);
+
+  // Show no data message
+  if (!hasData) {
+    return (
+      <Box className='relative h-full flex items-center justify-center'>
+        <div className="text-center">
+          <p className="text-[#757575] text-sm">No data available</p>
+        </div>
+      </Box>
+    );
+  }
 
   return (
     <Box className='relative h-full'>
