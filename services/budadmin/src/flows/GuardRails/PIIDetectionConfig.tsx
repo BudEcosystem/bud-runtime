@@ -33,6 +33,7 @@ export default function PIIDetectionConfig() {
     clearProbeRules,
     updateWorkflow,
     workflowLoading,
+    currentWorkflow,
   } = useGuardrails();
 
   // Fetch rules when component mounts or selected probe changes
@@ -97,19 +98,27 @@ export default function PIIDetectionConfig() {
     }
 
     try {
-      // Update workflow with selected rules
-      await updateWorkflow({
+      // Build the update payload with workflow_id if available
+      const updatePayload: any = {
         step_number: 2, // Both probe selection and rule selection are step 2
         workflow_total_steps: 6,
         probe_selections: [
           {
             probe_id: selectedProbe?.id || "",
             enabled: true,
-            rule_selections: selectedRules,
+            rule_selections: selectedRules, // List of selected rule IDs
           },
         ],
         trigger_workflow: false,
-      });
+      };
+
+      // Add workflow_id if it exists in currentWorkflow
+      if (currentWorkflow?.workflow_id) {
+        updatePayload.workflow_id = currentWorkflow.workflow_id;
+      }
+
+      // Update workflow with selected rules
+      await updateWorkflow(updatePayload);
 
       // Move to deployment types selection
       openDrawerWithStep("deployment-types");
