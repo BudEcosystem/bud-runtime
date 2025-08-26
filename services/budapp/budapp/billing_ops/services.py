@@ -170,6 +170,7 @@ class BillingService(DataManagerUtils):
         start_date: datetime,
         end_date: datetime,
         granularity: str = "daily",
+        project_id: Optional[UUID] = None,
     ) -> Dict[str, Any]:
         """Get historical usage data with specified granularity."""
         try:
@@ -181,6 +182,9 @@ class BillingService(DataManagerUtils):
                     "end_date": end_date.isoformat(),
                     "granularity": granularity,
                 }
+
+                if project_id:
+                    params["project_id"] = str(project_id)
 
                 response = await client.get(
                     f"{self.budmetrics_base_url}/observability/usage/history",
