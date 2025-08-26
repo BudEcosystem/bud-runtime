@@ -98,6 +98,19 @@ export default function PIIDetectionConfig() {
     }
 
     try {
+      // Convert selected rule IDs to the expected object format
+      const ruleSelections = selectedRules.map(ruleId => {
+        // Find the rule object from probeRules
+        const rule = probeRules.find(r => r.id === ruleId);
+        return {
+          rule_id: ruleId,
+          enabled: true,
+          // Include other rule properties if needed
+          name: rule?.name || "",
+          description: rule?.description || ""
+        };
+      });
+
       // Build the update payload with workflow_id if available
       const updatePayload: any = {
         step_number: 2, // Both probe selection and rule selection are step 2
@@ -106,7 +119,7 @@ export default function PIIDetectionConfig() {
           {
             probe_id: selectedProbe?.id || "",
             enabled: true,
-            rule_selections: selectedRules, // List of selected rule IDs
+            rule_selections: ruleSelections, // Array of rule objects
           },
         ],
         trigger_workflow: false,
