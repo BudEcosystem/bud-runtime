@@ -109,7 +109,7 @@ export const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }>
       return { type: "url", value: iconUrl };
     }
 
-    const name = model.name?.toLowerCase() || "";
+    const name = model.endpoint_name?.toLowerCase() || "";
     if (name.includes("gpt"))
       return { type: "icon", value: "simple-icons:openai" };
     if (name.includes("claude"))
@@ -173,7 +173,7 @@ export const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }>
           <div className="bg-[rgba(255,255,255,0.027)] backdrop-blur-[10px] border border-[#1F1F1F] rounded-lg p-4 space-y-3">
             <div className="flex justify-between items-center">
               <Text_12_400_B3B3B3>Model Name</Text_12_400_B3B3B3>
-              <Text_12_400_EEEEEE className="text-right">{model.name}</Text_12_400_EEEEEE>
+              <Text_12_400_EEEEEE className="text-right">{model.endpoint_name}</Text_12_400_EEEEEE>
             </div>
             <div className="flex justify-between items-center">
               <Text_12_400_B3B3B3>Source</Text_12_400_B3B3B3>
@@ -435,7 +435,7 @@ export const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }>
 
     // Function to get the appropriate endpoint and payload based on model type
     const getEndpointConfig = useMemo(() => {
-      const modelName = model?.name || 'model';
+      const modelName = model?.endpoint_name || 'model';
 
       // Default to chat endpoint
       let endpoint = '/v1/chat/completions';
@@ -741,7 +741,7 @@ fetch('${apiUrl}', {
         <BudDrawerLayout>
           <DrawerTitleCard
             title="Model Details"
-            description={`View detailed information about ${model?.name || 'this model'}`}
+            description={`View detailed information about ${model?.endpoint_name || 'this model'}`}
           />
           <DrawerCard classNames="pb-0">
             {/* Model Header with Icon and Tags */}
@@ -753,7 +753,7 @@ fetch('${apiUrl}', {
                     return iconData.type === "url" ? (
                       <img
                         src={iconData.value}
-                        alt={model.name}
+                        alt={model.endpoint_name}
                         className="w-6 h-6 object-contain"
                         onError={(e) => {
                           e.currentTarget.style.display = "none";
@@ -770,7 +770,7 @@ fetch('${apiUrl}', {
               </div>
               <div className="flex-1">
                 <Text_14_400_EEEEEE className="mb-2 font-medium">
-                  {model?.name}
+                  {model?.endpoint_name}
                 </Text_14_400_EEEEEE>
                 <ModelTags model={model} maxTags={3} limit={true} />
                 <div className="flex items-center gap-2 mt-2">
