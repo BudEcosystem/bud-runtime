@@ -148,7 +148,7 @@ export const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }>
                 isExpanded ? "" : "line-clamp-3"
               } overflow-hidden`}
             >
-              <Text_12_400_B3B3B3 className="leading-[180%]">
+              <Text_12_400_B3B3B3 className="leading-[180%] text-gray-800 dark:text-[#B3B3B3]">
                 {model?.description}
               </Text_12_400_B3B3B3>
             </div>
@@ -167,27 +167,27 @@ export const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }>
 
         {/* Basic Information */}
         <div>
-          <Text_14_500_EEEEEE className="mb-3">
+          <Text_14_500_EEEEEE className="mb-3 text-gray-900 dark:text-[#EEEEEE]">
             Basic Information
           </Text_14_500_EEEEEE>
-          <div className="bg-[rgba(255,255,255,0.027)] backdrop-blur-[10px] border border-[#1F1F1F] rounded-lg p-4 space-y-3">
+          <div className="bg-gray-50 dark:bg-[rgba(255,255,255,0.027)] backdrop-blur-[10px] border border-gray-200 dark:border-[#1F1F1F] rounded-lg p-4 space-y-3">
             <div className="flex justify-between items-center">
-              <Text_12_400_B3B3B3>Model Name</Text_12_400_B3B3B3>
-              <Text_12_400_EEEEEE className="text-right">{model.endpoint_name}</Text_12_400_EEEEEE>
+              <Text_12_400_B3B3B3 className="text-gray-700 dark:text-[#B3B3B3]">Model Name</Text_12_400_B3B3B3>
+              <Text_12_400_EEEEEE className="text-right text-gray-900 dark:text-[#EEEEEE]">{model.endpoint_name}</Text_12_400_EEEEEE>
             </div>
             <div className="flex justify-between items-center">
-              <Text_12_400_B3B3B3>Source</Text_12_400_B3B3B3>
-              <Text_12_400_EEEEEE className="text-right">{model.source || "N/A"}</Text_12_400_EEEEEE>
+              <Text_12_400_B3B3B3 className="text-gray-700 dark:text-[#B3B3B3]">Source</Text_12_400_B3B3B3>
+              <Text_12_400_EEEEEE className="text-right text-gray-900 dark:text-[#EEEEEE]">{model.source || "N/A"}</Text_12_400_EEEEEE>
             </div>
             <div className="flex justify-between items-center">
-              <Text_12_400_B3B3B3>Model Size</Text_12_400_B3B3B3>
-              <Text_12_400_EEEEEE className="text-right">
+              <Text_12_400_B3B3B3 className="text-gray-700 dark:text-[#B3B3B3]">Model Size</Text_12_400_B3B3B3>
+              <Text_12_400_EEEEEE className="text-right text-gray-900 dark:text-[#EEEEEE]">
                 {model.model_size ? `${model.model_size}B` : "N/A"}
               </Text_12_400_EEEEEE>
             </div>
             <div className="flex justify-between items-center">
-              <Text_12_400_B3B3B3>Provider Type</Text_12_400_B3B3B3>
-              <Text_12_400_EEEEEE className="text-right">
+              <Text_12_400_B3B3B3 className="text-gray-700 dark:text-[#B3B3B3]">Provider Type</Text_12_400_B3B3B3>
+              <Text_12_400_EEEEEE className="text-right text-gray-900 dark:text-[#EEEEEE]">
                 {model.provider_type === "cloud_model" ? "Cloud" : "Local"}
               </Text_12_400_EEEEEE>
             </div>
@@ -196,13 +196,13 @@ export const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }>
 
         {/* Modalities */}
         <div>
-          <Text_14_500_EEEEEE>Modalities</Text_14_500_EEEEEE>
-          <Text_12_400_757575 className="mt-1 mb-3">
+          <Text_14_500_EEEEEE className="text-gray-900 dark:text-[#EEEEEE]">Modalities</Text_14_500_EEEEEE>
+          <Text_12_400_757575 className="mt-1 mb-3 text-gray-600 dark:text-[#757575]">
             Input and output capabilities of the model
           </Text_12_400_757575>
           <div className="flex gap-3">
-            <div className="flex flex-col items-center gap-3 bg-[rgba(255,255,255,0.027)] backdrop-blur-[10px] border border-[#1F1F1F] w-[50%] p-4 rounded-lg">
-              <Text_14_400_EEEEEE>Input</Text_14_400_EEEEEE>
+            <div className="flex flex-col items-center gap-3 bg-gray-50 dark:bg-[rgba(255,255,255,0.027)] backdrop-blur-[10px] border border-gray-200 dark:border-[#1F1F1F] w-[50%] p-4 rounded-lg">
+              <Text_14_400_EEEEEE className="text-gray-900 dark:text-[#EEEEEE]">Input</Text_14_400_EEEEEE>
               <div className="flex justify-center items-center gap-3">
                 <Image
                   preview={false}
@@ -235,7 +235,7 @@ export const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }>
                   style={{ width: "1.25rem", height: "1.25rem" }}
                 />
               </div>
-              <Text_12_400_EEEEEE className="text-center">
+              <Text_12_400_EEEEEE className="text-center text-gray-900 dark:text-[#EEEEEE]">
                 {[
                   model.modality.text.input && model.modality.text.label,
                   model.modality.image.input && model.modality.image.label,
@@ -245,8 +245,8 @@ export const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }>
                   .join(", ")}
               </Text_12_400_EEEEEE>
             </div>
-            <div className="flex flex-col items-center gap-3 bg-[rgba(255,255,255,0.027)] backdrop-blur-[10px] border border-[#1F1F1F] w-[50%] p-4 rounded-lg">
-              <Text_14_400_EEEEEE>Output</Text_14_400_EEEEEE>
+            <div className="flex flex-col items-center gap-3 bg-gray-50 dark:bg-[rgba(255,255,255,0.027)] backdrop-blur-[10px] border border-gray-200 dark:border-[#1F1F1F] w-[50%] p-4 rounded-lg">
+              <Text_14_400_EEEEEE className="text-gray-900 dark:text-[#EEEEEE]">Output</Text_14_400_EEEEEE>
               <div className="flex justify-center items-center gap-3">
                 <Image
                   preview={false}
@@ -279,7 +279,7 @@ export const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }>
                   style={{ width: "1.25rem", height: "1.25rem" }}
                 />
               </div>
-              <Text_12_400_EEEEEE className="text-center">
+              <Text_12_400_EEEEEE className="text-center text-gray-900 dark:text-[#EEEEEE]">
                 {[
                   model.modality.text.output && model.modality.text.label,
                   model.modality.image.output && model.modality.image.label,
@@ -294,8 +294,8 @@ export const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }>
 
         {/* Supported Endpoints */}
         <div>
-          <Text_14_500_EEEEEE>Supported Endpoints</Text_14_500_EEEEEE>
-          <Text_12_400_757575 className="mt-1 mb-3">
+          <Text_14_500_EEEEEE className="text-gray-900 dark:text-[#EEEEEE]">Supported Endpoints</Text_14_500_EEEEEE>
+          <Text_12_400_757575 className="mt-1 mb-3 text-gray-600 dark:text-[#757575]">
             Available API endpoints for this model
           </Text_12_400_757575>
           <div className="grid grid-cols-2 gap-3">
@@ -306,7 +306,7 @@ export const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }>
               return (
                 <div
                   key={key}
-                  className="flex items-center gap-3 bg-[rgba(255,255,255,0.027)] backdrop-blur-[10px] border border-[#1F1F1F] p-3 rounded-lg"
+                  className="flex items-center gap-3 bg-gray-50 dark:bg-[rgba(255,255,255,0.027)] backdrop-blur-[10px] border border-gray-200 dark:border-[#1F1F1F] p-3 rounded-lg"
                 >
                   <Image
                     preview={false}
@@ -322,15 +322,15 @@ export const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }>
                   <div className="flex-1 min-w-0">
                     {value.enabled ? (
                       <>
-                        <Text_14_400_EEEEEE className="truncate">{value.label}</Text_14_400_EEEEEE>
-                        <Text_12_400_B3B3B3 className="truncate">
+                        <Text_14_400_EEEEEE className="truncate text-gray-900 dark:text-[#EEEEEE]">{value.label}</Text_14_400_EEEEEE>
+                        <Text_12_400_B3B3B3 className="truncate text-gray-700 dark:text-[#B3B3B3]">
                           {value.path}
                         </Text_12_400_B3B3B3>
                       </>
                     ) : (
                       <>
-                        <Text_14_400_757575 className="truncate">{value.label}</Text_14_400_757575>
-                        <Text_12_400_757575 className="truncate">
+                        <Text_14_400_757575 className="truncate text-gray-700 dark:text-[#757575]">{value.label}</Text_14_400_757575>
+                        <Text_12_400_757575 className="truncate text-gray-600 dark:text-[#757575]">
                           {value.path}
                         </Text_12_400_757575>
                       </>
@@ -345,12 +345,12 @@ export const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }>
         {/* Model URI */}
         {model.uri && (
           <div>
-            <Text_14_500_EEEEEE className="mb-3">
+            <Text_14_500_EEEEEE className="mb-3 text-gray-900 dark:text-[#EEEEEE]">
               Model URI
             </Text_14_500_EEEEEE>
-            <div className="bg-[rgba(255,255,255,0.027)] backdrop-blur-[10px] border border-[#1F1F1F] rounded-lg p-4">
+            <div className="bg-gray-50 dark:bg-[rgba(255,255,255,0.027)] backdrop-blur-[10px] border border-gray-200 dark:border-[#1F1F1F] rounded-lg p-4">
               <div className="flex items-center justify-between gap-3">
-                <Text_12_400_EEEEEE className="font-mono truncate flex-1">
+                <Text_12_400_EEEEEE className="font-mono truncate flex-1 text-gray-900 dark:text-[#EEEEEE]">
                   {model.uri}
                 </Text_12_400_EEEEEE>
                 <button
@@ -367,7 +367,7 @@ export const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }>
         {/* Tags */}
         {model.tags && model.tags.length > 0 && (
           <div>
-            <Text_14_500_EEEEEE className="mb-3">Tags</Text_14_500_EEEEEE>
+            <Text_14_500_EEEEEE className="mb-3 text-gray-900 dark:text-[#EEEEEE]">Tags</Text_14_500_EEEEEE>
             <div className="flex flex-wrap gap-2">
               {model.tags.map((tag, index) => (
                 <Tag
@@ -384,16 +384,16 @@ export const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }>
         {/* Strengths */}
         {model?.strengths?.length > 0 && (
           <div>
-            <Text_14_500_EEEEEE>Model is Great at</Text_14_500_EEEEEE>
-            <Text_12_400_757575 className="mt-1 mb-3">
+            <Text_14_500_EEEEEE className="text-gray-900 dark:text-[#EEEEEE]">Model is Great at</Text_14_500_EEEEEE>
+            <Text_12_400_757575 className="mt-1 mb-3 text-gray-600 dark:text-[#757575]">
               Key strengths and capabilities
             </Text_12_400_757575>
-            <div className="bg-[rgba(255,255,255,0.027)] backdrop-blur-[10px] border border-[#1F1F1F] rounded-lg p-4">
+            <div className="bg-gray-50 dark:bg-[rgba(255,255,255,0.027)] backdrop-blur-[10px] border border-gray-200 dark:border-[#1F1F1F] rounded-lg p-4">
               <ul className="space-y-2">
                 {model?.strengths?.map((item: any, index: number) => (
                   <li key={index} className="flex items-start gap-2">
                     <span className="text-[#89C0F2] mt-1">•</span>
-                    <Text_12_400_EEEEEE className="leading-relaxed">
+                    <Text_12_400_EEEEEE className="leading-relaxed text-gray-900 dark:text-[#EEEEEE]">
                       {item}
                     </Text_12_400_EEEEEE>
                   </li>
@@ -406,16 +406,16 @@ export const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }>
         {/* Limitations */}
         {model?.limitations?.length > 0 && (
           <div>
-            <Text_14_500_EEEEEE>Model is Not Good With</Text_14_500_EEEEEE>
-            <Text_12_400_757575 className="mt-1 mb-3">
+            <Text_14_500_EEEEEE className="text-gray-900 dark:text-[#EEEEEE]">Model is Not Good With</Text_14_500_EEEEEE>
+            <Text_12_400_757575 className="mt-1 mb-3 text-gray-600 dark:text-[#757575]">
               Known limitations and constraints
             </Text_12_400_757575>
-            <div className="bg-[rgba(255,255,255,0.027)] backdrop-blur-[10px] border border-[#1F1F1F] rounded-lg p-4">
+            <div className="bg-gray-50 dark:bg-[rgba(255,255,255,0.027)] backdrop-blur-[10px] border border-gray-200 dark:border-[#1F1F1F] rounded-lg p-4">
               <ul className="space-y-2">
                 {model?.limitations?.map((item: any, index: number) => (
                   <li key={index} className="flex items-start gap-2">
                     <span className="text-[#757575] mt-1">•</span>
-                    <Text_12_400_EEEEEE className="leading-relaxed">
+                    <Text_12_400_EEEEEE className="leading-relaxed text-gray-900 dark:text-[#EEEEEE]">
                       {item}
                     </Text_12_400_EEEEEE>
                   </li>
@@ -624,8 +624,8 @@ fetch('${apiUrl}', {
     return (
       <div className="space-y-6">
         <div>
-          <Text_20_400_FFFFFF className="tracking-[.03rem]">Code Snippet</Text_20_400_FFFFFF>
-          <Text_12_400_757575 className="tracking-[.004rem] mt-[1rem]">
+          <Text_20_400_FFFFFF className="tracking-[.03rem] text-gray-900 dark:text-[#FFFFFF]">Code Snippet</Text_20_400_FFFFFF>
+          <Text_12_400_757575 className="tracking-[.004rem] mt-[1rem] text-gray-600 dark:text-[#757575]">
             Copy the code below and use it for deployment
           </Text_12_400_757575>
         </div>
@@ -636,7 +636,7 @@ fetch('${apiUrl}', {
             Placement="bottomLeft"
             buttonContent={
               <div className="cursor-pointer border border-[.5px] border-[#965CDE] rounded-[6px] bg-[#1E0C34] min-w-[4rem] min-h-[1.75rem] flex items-center justify-center px-[.6rem]">
-                <Text_12_600_EEEEEE className=" cursor-pointer flex items-center justify-center">
+                <Text_12_600_EEEEEE className="cursor-pointer flex items-center justify-center text-gray-900 dark:text-[#EEEEEE]">
                   {selectedCode.charAt(0).toUpperCase() + selectedCode.slice(1)}
                 </Text_12_600_EEEEEE>
                 <ChevronDown className="w-[1rem] text-[#EEEEEE] text-[.75rem] ml-[.15rem]" />
@@ -769,7 +769,7 @@ fetch('${apiUrl}', {
                 </div>
               </div>
               <div className="flex-1">
-                <Text_14_400_EEEEEE className="mb-2 font-medium">
+                <Text_14_400_EEEEEE className="mb-2 font-medium text-gray-900 dark:text-[#EEEEEE]">
                   {model?.endpoint_name}
                 </Text_14_400_EEEEEE>
                 <ModelTags model={model} maxTags={3} limit={true} />
@@ -778,8 +778,8 @@ fetch('${apiUrl}', {
                     icon="ph:calendar"
                     className="text-[#757575] text-[0.875rem]"
                   />
-                  <Text_12_400_B3B3B3>Created on&nbsp;&nbsp;</Text_12_400_B3B3B3>
-                  <Text_12_400_EEEEEE>
+                  <Text_12_400_B3B3B3 className="text-gray-700 dark:text-[#B3B3B3]">Created on&nbsp;&nbsp;</Text_12_400_B3B3B3>
+                  <Text_12_400_EEEEEE className="text-gray-900 dark:text-[#EEEEEE]">
                     {dayjs(model.created_at).format("DD MMM, YYYY")}
                   </Text_12_400_EEEEEE>
                 </div>
@@ -804,7 +804,7 @@ fetch('${apiUrl}', {
                 defaultActiveKey="1"
                 items={filteredItems}
                 onChange={onChange}
-                className="generalTabs"
+                className="generalTabs [&_.ant-tabs-tab]:text-gray-500 [&_.ant-tabs-tab]:dark:text-[#757575] [&_.ant-tabs-tab-active_.ant-tabs-tab-btn]:!text-black [&_.ant-tabs-tab-active_.ant-tabs-tab-btn]:dark:!text-[#EEEEEE] [&_.ant-tabs-tab:hover]:text-gray-700 [&_.ant-tabs-tab:hover]:dark:text-[#B3B3B3]"
               />
             </ConfigProvider>
           </DrawerCard>
