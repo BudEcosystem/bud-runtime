@@ -155,6 +155,7 @@ async def get_usage_history(
             start_date=request.start_date,
             end_date=request.end_date,
             granularity=request.granularity,
+            project_id=request.project_id,
         )
         return SingleResponse(
             result=history,
