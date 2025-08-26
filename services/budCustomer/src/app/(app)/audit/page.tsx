@@ -687,10 +687,12 @@ export default function AuditPage() {
                 onChange={setSelectedAction}
                 className="w-48"
                 allowClear
-                options={Object.values(AuditAction).map((action) => ({
-                  label: getActionDisplay(action).label,
-                  value: action,
-                }))}
+                options={Object.values(AuditAction)
+                  .filter((action) => action !== AuditAction.REGENERATE && action !== AuditAction.LOGOUT)
+                  .map((action) => ({
+                    label: getActionDisplay(action).label,
+                    value: action === AuditAction.ACCESS ? "access_granted" : action === AuditAction.EXPORT ? "data_export" : action,
+                  }))}
               />
             </ConfigProvider>
             <ConfigProvider theme={themeConfig}>
