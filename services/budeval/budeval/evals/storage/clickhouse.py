@@ -79,36 +79,45 @@ class ClickHouseStorage(StorageAdapter):
         logger.info("Running ClickHouse database migrations")
 
         try:
-            # Read migration file
-            migration_file = Path(__file__).parent.parent.parent.parent / "migrations" / "001_initial_schema.sql"
+            # List of migration files in order
+            migration_files = [
+                "001_initial_schema.sql",
+                "002_add_experiment_id.sql",
+                "003_add_status.sql",
+            ]
+            migrations_dir = Path(__file__).parent.parent.parent.parent / "migrations"
 
-            if not migration_file.exists():
-                logger.warning(f"Migration file not found: {migration_file}")
-                return
+            for migration_filename in migration_files:
+                migration_file = migrations_dir / migration_filename
 
-            with open(migration_file, "r") as f:
-                migration_sql = f.read()
+                if not migration_file.exists():
+                    logger.warning(f"Migration file not found: {migration_file}")
+                    continue
 
-            # Split migration into individual statements (excluding comments and empty lines)
-            statements = []
-            for line in migration_sql.split("\n"):
-                line = line.strip()
-                if line and not line.startswith("--"):
-                    statements.append(line)
+                logger.info(f"Running migration: {migration_filename}")
+                with open(migration_file, "r") as f:
+                    migration_sql = f.read()
 
-            # Join and split by semicolon
-            full_sql = " ".join(statements)
-            commands = [cmd.strip() for cmd in full_sql.split(";") if cmd.strip()]
+                # Split migration into individual statements (excluding comments and empty lines)
+                statements = []
+                for line in migration_sql.split("\n"):
+                    line = line.strip()
+                    if line and not line.startswith("--"):
+                        statements.append(line)
 
-            async with self.get_connection() as conn, conn.cursor() as cursor:
-                for command in commands:
-                    try:
-                        logger.debug(f"Executing migration command: {command[:50]}...")
-                        await cursor.execute(command)
-                    except Exception as e:
-                        # Log error but continue with other commands (some may already exist)
-                        logger.warning(f"Migration command failed (might already exist): {str(e)[:100]}")
-                        continue
+                # Join and split by semicolon
+                full_sql = " ".join(statements)
+                commands = [cmd.strip() for cmd in full_sql.split(";") if cmd.strip()]
+
+                async with self.get_connection() as conn, conn.cursor() as cursor:
+                    for command in commands:
+                        try:
+                            logger.debug(f"Executing migration command: {command[:50]}...")
+                            await cursor.execute(command)
+                        except Exception as e:
+                            # Log error but continue with other commands (some may already exist)
+                            logger.warning(f"Migration command failed (might already exist): {str(e)[:100]}")
+                            continue
 
             logger.info("ClickHouse database migrations completed successfully")
 
@@ -175,8 +184,10 @@ class ClickHouseStorage(StorageAdapter):
         """Save the main evaluation job record."""
         job_data = {
             "job_id": job_id,
+            "experiment_id": results.get("experiment_id"),
             "model_name": results.get("model_name", ""),
             "engine": results.get("engine", "opencompass"),
+            "status": results.get("status", "succeeded"),
             "job_start_time": self._parse_datetime(results.get("job_start_time")),
             "job_end_time": self._parse_datetime(results.get("job_end_time")),
             "job_duration_seconds": float(results.get("job_duration_seconds") or 0.0),
@@ -191,7 +202,7 @@ class ClickHouseStorage(StorageAdapter):
 
         query = """
         INSERT INTO budeval.evaluation_jobs
-        (job_id, model_name, engine, job_start_time, job_end_time, job_duration_seconds,
+        (job_id, experiment_id, model_name, engine, status, job_start_time, job_end_time, job_duration_seconds,
          overall_accuracy, total_datasets, total_examples, total_correct,
          extracted_at, created_at, updated_at)
         VALUES
@@ -199,6 +210,98 @@ class ClickHouseStorage(StorageAdapter):
 
         async with conn.cursor() as cursor:
             await cursor.execute(query, [job_data])
+
+    async def create_initial_job_record(
+        self,
+        job_id: str,
+        experiment_id: Optional[str],
+        model_name: str,
+        engine: str = "opencompass",
+        status: str = "running",
+        job_start_time: Optional[datetime] = None,
+    ) -> None:
+        """Create an initial job record at the start of execution.
+
+        Sets job_end_time equal to job_start_time and duration to 0.0.
+        """
+        start_time = job_start_time or datetime.now()
+        job_row = {
+            "job_id": job_id,
+            "experiment_id": experiment_id,
+            "model_name": model_name,
+            "engine": engine,
+            "status": status,
+            "job_start_time": start_time,
+            "job_end_time": start_time,
+            "job_duration_seconds": 0.0,
+            "overall_accuracy": 0.0,
+            "total_datasets": 0,
+            "total_examples": 0,
+            "total_correct": 0,
+            "extracted_at": start_time,
+            "created_at": datetime.now(),
+            "updated_at": datetime.now(),
+        }
+
+        query = """
+        INSERT INTO budeval.evaluation_jobs
+        (job_id, experiment_id, model_name, engine, status, job_start_time, job_end_time, job_duration_seconds,
+         overall_accuracy, total_datasets, total_examples, total_correct,
+         extracted_at, created_at, updated_at)
+        VALUES
+        """
+
+        async with self.get_connection() as conn, conn.cursor() as cursor:
+            await cursor.execute(query, [job_row])
+
+    async def update_job_status(
+        self,
+        job_id: str,
+        experiment_id: Optional[str],
+        model_name: str,
+        engine: str,
+        status: str,
+        job_start_time: Optional[datetime] = None,
+        job_end_time: Optional[datetime] = None,
+        job_duration_seconds: Optional[float] = None,
+    ) -> None:
+        """Insert an updated job row to reflect new status and timing."""
+        start_time = job_start_time or datetime.now()
+        end_time = job_end_time or datetime.now()
+        duration = (
+            job_duration_seconds
+            if job_duration_seconds is not None
+            else max((end_time - start_time).total_seconds(), 0.0)
+        )
+
+        job_row = {
+            "job_id": job_id,
+            "experiment_id": experiment_id,
+            "model_name": model_name,
+            "engine": engine,
+            "status": status,
+            "job_start_time": start_time,
+            "job_end_time": end_time,
+            "job_duration_seconds": float(duration),
+            "overall_accuracy": 0.0,
+            "total_datasets": 0,
+            "total_examples": 0,
+            "total_correct": 0,
+            "extracted_at": end_time,
+            "created_at": datetime.now(),
+            "updated_at": datetime.now(),
+        }
+
+        query = """
+        INSERT INTO budeval.evaluation_jobs
+        (job_id, experiment_id, model_name, engine, status, job_start_time, job_end_time, job_duration_seconds,
+         overall_accuracy, total_datasets, total_examples, total_correct,
+         extracted_at, created_at, updated_at)
+        VALUES
+        """
+
+        async with self.get_connection() as conn, conn.cursor() as cursor:
+            await cursor.execute(query, [job_row])
 
     async def _save_dataset_results(self, conn, job_id: str, results: Dict) -> None:
         """Save dataset-level results."""
@@ -210,6 +313,7 @@ class ClickHouseStorage(StorageAdapter):
         for dataset in datasets:
             record = {
                 "job_id": job_id,
+                "experiment_id": results.get("experiment_id"),
                 "model_name": results.get("model_name", ""),
                 "dataset_name": dataset.get("dataset_name", ""),
                 "accuracy": dataset.get("accuracy", 0.0),
@@ -223,7 +327,7 @@ class ClickHouseStorage(StorageAdapter):
 
         query = """
         INSERT INTO budeval.dataset_results
-        (job_id, model_name, dataset_name, accuracy, total_examples, correct_examples,
+        (job_id, experiment_id, model_name, dataset_name, accuracy, total_examples, correct_examples,
          evaluated_at, metadata, created_at)
         VALUES
         """
@@ -235,6 +339,7 @@ class ClickHouseStorage(StorageAdapter):
         """Save predictions in batches for optimal performance."""
         datasets = results.get("datasets", [])
         model_name = results.get("model_name", "")
+        experiment_id = results.get("experiment_id")
         evaluated_at = self._parse_datetime(results.get("extracted_at"))
 
         for dataset in datasets:
@@ -248,14 +353,23 @@ class ClickHouseStorage(StorageAdapter):
             batch_size = self._config.clickhouse_batch_size
             for i in range(0, len(predictions), batch_size):
                 batch = predictions[i : i + batch_size]
-                await self._insert_prediction_batch(conn, job_id, model_name, dataset_name, evaluated_at, batch)
+                await self._insert_prediction_batch(
+                    conn, job_id, experiment_id, model_name, dataset_name, evaluated_at, batch
+                )
 
                 # Small delay between batches to avoid overwhelming ClickHouse
                 if i + batch_size < len(predictions):
                     await asyncio.sleep(0.01)
 
     async def _insert_prediction_batch(
-        self, conn, job_id: str, model_name: str, dataset_name: str, evaluated_at: datetime, predictions: List[Dict]
+        self,
+        conn,
+        job_id: str,
+        experiment_id: Optional[str],
+        model_name: str,
+        dataset_name: str,
+        evaluated_at: datetime,
+        predictions: List[Dict],
     ) -> None:
         """Insert a batch of predictions."""
         prediction_records = []
@@ -263,6 +377,7 @@ class ClickHouseStorage(StorageAdapter):
         for pred in predictions:
             record = {
                 "job_id": job_id,
+                "experiment_id": experiment_id,
                 "model_name": model_name,
                 "dataset_name": dataset_name,
                 "example_id": pred.get("example_abbr", ""),
@@ -278,7 +393,7 @@ class ClickHouseStorage(StorageAdapter):
 
         query = """
         INSERT INTO budeval.predictions
-        (job_id, model_name, dataset_name, example_id, prediction_text, origin_prompt,
+        (job_id, experiment_id, model_name, dataset_name, example_id, prediction_text, origin_prompt,
          model_answer, correct_answer, is_correct, evaluated_at, created_at)
         VALUES
         """
@@ -300,8 +415,11 @@ class ClickHouseStorage(StorageAdapter):
             async with self.get_connection() as conn:
                 # Get main job info
                 job_query = """
-                SELECT * FROM budeval.evaluation_jobs
+                SELECT job_id, model_name, engine, overall_accuracy, total_datasets, total_examples, total_correct
+                FROM budeval.evaluation_jobs
                 WHERE job_id = %(job_id)s
+                ORDER BY updated_at DESC
+                LIMIT 1
                 """
 
                 async with conn.cursor() as cursor:
@@ -329,10 +447,10 @@ class ClickHouseStorage(StorageAdapter):
                         "engine": job_row[2],
                         "datasets": [],
                         "summary": {
-                            "overall_accuracy": job_row[6],
-                            "total_datasets": job_row[7],
-                            "total_examples": job_row[8],
-                            "total_correct": job_row[9],
+                            "overall_accuracy": job_row[3],
+                            "total_datasets": job_row[4],
+                            "total_examples": job_row[5],
+                            "total_correct": job_row[6],
                             "model_name": job_row[1],
                         },
                     }
@@ -418,6 +536,28 @@ class ClickHouseStorage(StorageAdapter):
 
         except Exception as e:
             logger.error(f"Failed to delete results for job {job_id}: {e}")
+            return False
+
+    async def purge_all(self) -> bool:
+        """Delete all budeval evaluation records from ClickHouse.
+
+        Deletes in dependency order: predictions -> dataset_results -> evaluation_jobs.
+        Returns True on success, False on failure.
+        """
+        try:
+            async with self.get_connection() as conn:
+                tables = ["budeval.predictions", "budeval.dataset_results", "budeval.evaluation_jobs"]
+
+                for table in tables:
+                    query = f"ALTER TABLE {table} DELETE WHERE 1"
+                    async with conn.cursor() as cursor:
+                        await cursor.execute(query)
+
+            logger.info("Successfully purged all budeval records from ClickHouse")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to purge all budeval records: {e}")
             return False
 
     async def list_results(self) -> List[str]:

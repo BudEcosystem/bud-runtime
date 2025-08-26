@@ -1,9 +1,10 @@
 # budapp/eval_ops/schemas.py
 
+import re
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import UUID4, BaseModel, Field
+from pydantic import UUID4, BaseModel, Field, field_validator
 
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse
 from budapp.eval_ops.models import RunStatusEnum
@@ -135,10 +136,69 @@ class ProgressOverview(BaseModel):
 class CreateExperimentRequest(BaseModel):
     """The request to create an experiment."""
 
-    name: str = Field(..., description="The name of the experiment.")
-    description: Optional[str] = Field(None, description="The description of the experiment.")
+    name: str = Field(..., min_length=1, max_length=255, description="The name of the experiment.")
+    description: Optional[str] = Field(None, max_length=500, description="The description of the experiment.")
     project_id: Optional[UUID4] = Field(None, description="The project ID for the experiment (optional).")
     tags: Optional[List[str]] = Field(None, description="List of tags for the experiment.")
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        """Validate experiment name."""
+        if not v or not v.strip():
+            raise ValueError("Experiment name cannot be empty or only whitespace")
+
+        # Strip leading/trailing whitespace
+        v = v.strip()
+
+        # Check length after stripping
+        if len(v) < 1:
+            raise ValueError("Experiment name must be at least 1 character long")
+        if len(v) > 255:
+            raise ValueError("Experiment name must not exceed 255 characters")
+
+        # Validate allowed characters (alphanumeric, spaces, hyphens, underscores)
+        if not re.match(r"^[a-zA-Z0-9\s\-_]+$", v):
+            raise ValueError("Experiment name can only contain letters, numbers, spaces, hyphens, and underscores")
+
+        return v
+
+    @field_validator("description")
+    @classmethod
+    def validate_description(cls, v: Optional[str]) -> Optional[str]:
+        """Validate experiment description."""
+        if v is not None:
+            v = v.strip()
+            if v and len(v) > 500:
+                raise ValueError("Description must not exceed 500 characters")
+        return v
+
+    @field_validator("tags")
+    @classmethod
+    def validate_tags(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+        """Validate tags."""
+        if v is not None:
+            # Remove duplicates and strip whitespace
+            cleaned_tags = []
+            seen = set()
+            for tag in v:
+                if tag:
+                    tag = tag.strip()
+                    if tag and tag not in seen:
+                        if len(tag) > 20:
+                            raise ValueError(f"Tag '{tag}' exceeds 20 characters")
+                        if not re.match(r"^[a-zA-Z0-9\-_]+$", tag):
+                            raise ValueError(
+                                f"Tag '{tag}' can only contain letters, numbers, hyphens, and underscores"
+                            )
+                        cleaned_tags.append(tag)
+                        seen.add(tag)
+
+            if len(cleaned_tags) > 10:
+                raise ValueError("Maximum 10 tags allowed")
+
+            return cleaned_tags if cleaned_tags else None
+        return v
 
 
 class Experiment(BaseModel):

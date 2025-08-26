@@ -542,6 +542,8 @@ class AnsibleOrchestrator:
                 "data_pvc_status": "unknown",
                 "output_pvc_status": "unknown",
                 "message": "Status retrieved",
+                "start_time": None,
+                "completion_time": None,
             }
 
             # Try to extract information from Ansible events
@@ -580,6 +582,21 @@ class AnsibleOrchestrator:
                                     status_info["status"] = "running"
                                 else:
                                     status_info["status"] = "pending"
+
+                                # Extract start and completion times if present under common key variants
+                                def _get_time(js: dict, keys: list[str]) -> str | None:
+                                    for k in keys:
+                                        v = js.get(k)
+                                        if v:
+                                            return str(v)
+                                    return None
+
+                                status_info["start_time"] = _get_time(
+                                    job_status, ["start_time", "startTime"]
+                                ) or status_info.get("start_time")
+                                status_info["completion_time"] = _get_time(
+                                    job_status, ["completion_time", "completionTime"]
+                                ) or status_info.get("completion_time")
 
                                 break
 

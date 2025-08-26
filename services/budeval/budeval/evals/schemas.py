@@ -36,6 +36,9 @@ class EvaluationRequest(CloudEventBase):
     # Using uuid as primary identifier to match bud-eval
     uuid: UUID = Field(..., description="Unique identifier for the evaluation request")
 
+    # Experiment ID to track evaluation back to experiment
+    experiment_id: Optional[UUID] = Field(None, description="The experiment ID this evaluation belongs to")
+
     # Nested model info structure
     eval_model_info: EvalModelInfo = Field(..., description="Model information for evaluation")
 
@@ -57,6 +60,7 @@ class EvaluationRequest(CloudEventBase):
         json_schema_extra = {
             "example": {
                 "uuid": "123e4567-e89b-12d3-a456-426614174000",
+                "experiment_id": "987f6543-e89b-12d3-a456-426614174000",
                 "engine": "opencompass",
                 "eval_model_info": {
                     "model_name": "gpt-4",
@@ -78,6 +82,9 @@ class StartEvaluationRequest(CloudEventBase):
     # Using uuid as primary identifier to match bud-eval
     uuid: UUID = Field(..., description="Unique identifier for the evaluation request")
 
+    # Experiment ID to track evaluation back to experiment
+    experiment_id: Optional[UUID] = Field(None, description="The experiment ID this evaluation belongs to")
+
     # Nested model info structure
     eval_model_info: EvalModelInfo = Field(..., description="Model information for evaluation")
 
@@ -99,6 +106,7 @@ class StartEvaluationRequest(CloudEventBase):
         json_schema_extra = {
             "example": {
                 "uuid": "123e4567-e89b-12d3-a456-426614174000",
+                "experiment_id": "987f6543-e89b-12d3-a456-426614174000",
                 "engine": "opencompass",
                 "eval_model_info": {
                     "model_name": "gpt-4",

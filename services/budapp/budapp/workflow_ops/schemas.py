@@ -51,6 +51,7 @@ class RetrieveWorkflowStepData(BaseModel):
     model_security_scan_events: dict | None = None
     bud_simulator_events: dict | None = None
     budserve_cluster_events: dict | None = None
+    evaluation_events: dict | None = None
     icon: str | None = None
     uri: str | None = None
     author: str | None = None
