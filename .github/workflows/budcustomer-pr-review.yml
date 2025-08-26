@@ -46,13 +46,23 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - uses: pnpm/action-setup@v4
-        name: Install pnpm
+      - name: Cache pnpm store
+        uses: actions/cache@v3
         with:
-          version: 10
+          path: ~/.pnpm-store
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install pnpm with retry
+        run: |
+          for i in 1 2 3; do
+            npm install -g pnpm@10 && break || sleep 60
+          done
+          pnpm config set store-dir ~/.pnpm-store
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Run ESLint
         run: |
@@ -95,13 +105,23 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - uses: pnpm/action-setup@v4
-        name: Install pnpm
+      - name: Cache pnpm store
+        uses: actions/cache@v3
         with:
-          version: 10
+          path: ~/.pnpm-store
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install pnpm with retry
+        run: |
+          for i in 1 2 3; do
+            npm install -g pnpm@10 && break || sleep 60
+          done
+          pnpm config set store-dir ~/.pnpm-store
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Run pnpm audit
         run: |
