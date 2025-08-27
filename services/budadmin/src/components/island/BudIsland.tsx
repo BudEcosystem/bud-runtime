@@ -1,14 +1,12 @@
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import { Modal, Tooltip } from "antd";
 import { useIsland } from "src/hooks/useIsland";
 import { Image } from "antd";
 import { Text_10_400_B3B3B3 } from "../ui/text";
-import ComingSoon from "../ui/comingSoon";
 import { IMessage, useFetchNotifications, useSocket } from "@novu/notification-center";
 import { useUser } from "src/stores/useUser";
 import { useWorkflow } from "src/stores/useWorkflow";
 import { useDrawer } from "src/hooks/useDrawer";
-import IslandIcon from "./IslandIcon";
 import { BudWidget } from "./BudWidget";
 import { NotificationsWidget } from "./BudNotification";
 import BudChat from "../chat/BudChat";
@@ -88,9 +86,9 @@ const BudIsland: React.FC = () => {
             });
     }, [allNotifications]);
 
-    const loadNotifications = async () => {
-        await refetch();
-    }
+    const loadNotifications = useCallback(() => {
+        refetch();
+    }, [refetch]);
 
     useEffect(() => {
         if (socket) {
@@ -106,7 +104,7 @@ const BudIsland: React.FC = () => {
         if (!user) return;
         refetch();
         getWorkflowList();
-    }, [isOpen, user, refetch, getWorkflowList]);
+    }, [isOpen, user]);
 
     // Hide the minimized item after 5 seconds
     useEffect(() => {

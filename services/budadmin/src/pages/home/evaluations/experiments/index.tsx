@@ -366,10 +366,10 @@ const ExperimentsTable = () => {
     if (Array.isArray(experimentsList)) {
       experimentsList.forEach((exp) => {
         if (Array.isArray(exp.tags)) {
-          exp.tags.forEach((tag) => {
+          exp.tags.forEach((tag: any) => {
             if (typeof tag === 'string') {
               tags.add(tag);
-            } else if (tag && tag.name) {
+            } else if (tag && typeof tag === 'object' && 'name' in tag) {
               tags.add(tag.name);
             }
           });
