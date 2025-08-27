@@ -32,6 +32,7 @@ from budapp.auth.oauth_error_handler import (
     get_user_friendly_message,
     handle_oauth_error,
 )
+from budapp.auth.oauth_proxy_services import ProxiedOAuthURLGenerator
 from budapp.commons import logging
 from budapp.commons.config import app_settings
 from budapp.commons.constants import OAuthProviderEnum, UserColorEnum, UserRoleEnum, UserStatusEnum, UserTypeEnum
@@ -64,12 +65,15 @@ class OAuthService(SessionMixin):
         super().__init__(session)
         self.keycloak_manager = KeycloakManager()
 
-    async def initiate_oauth_login(self, request: OAuthLoginRequest, base_url: str) -> OAuthLoginResponse:
+    async def initiate_oauth_login(
+        self, request: OAuthLoginRequest, base_url: str, use_proxy: bool = True
+    ) -> OAuthLoginResponse:
         """Initiate OAuth login flow.
 
         Args:
             request: OAuth login request
             base_url: Base URL for callback
+            use_proxy: Whether to use proxied URLs (default: True)
 
         Returns:
             OAuthLoginResponse with auth URL and state
@@ -117,12 +121,23 @@ class OAuthService(SessionMixin):
         self.session.commit()
 
         # Generate authorization URL
-        auth_url = self.keycloak_manager.get_broker_login_url(
-            realm_name=tenant.realm_name,
-            provider=request.provider.value,
-            redirect_uri=oauth_session.redirect_uri,
-            state=state,
-        )
+        if use_proxy:
+            # Use proxied URL that hides Keycloak from clients
+            auth_url = ProxiedOAuthURLGenerator.get_proxied_authorization_url(
+                base_url=base_url,
+                realm_name=tenant.realm_name,
+                provider=request.provider.value,
+                redirect_uri=oauth_session.redirect_uri,
+                state=state,
+            )
+        else:
+            # Use direct Keycloak URL (for backward compatibility)
+            auth_url = self.keycloak_manager.get_broker_login_url(
+                realm_name=tenant.realm_name,
+                provider=request.provider.value,
+                redirect_uri=oauth_session.redirect_uri,
+                state=state,
+            )
 
         return OAuthLoginResponse(auth_url=auth_url, state=state, expires_at=oauth_session.expires_at)
 
@@ -456,17 +471,40 @@ class OAuthService(SessionMixin):
                     provider=user_info.provider.value,
                 )
 
-        # Create user in database
+        # Import required models for permissions
+        from budapp.commons.constants import PermissionEnum
+        from budapp.permissions.schemas import PermissionList
+
+        # Set default permissions for CLIENT users (same as registration)
+        client_permissions = [
+            PermissionList(name=PermissionEnum.CLIENT_ACCESS, has_permission=True),
+            PermissionList(name=PermissionEnum.PROJECT_VIEW, has_permission=True),
+            PermissionList(name=PermissionEnum.PROJECT_MANAGE, has_permission=True),
+        ]
+
+        # Process permissions to add implicit view permissions for manage permissions
+        permission_dict = {p.name: p for p in client_permissions}
+        manage_to_view_mapping = PermissionEnum.get_manage_to_view_mapping()
+
+        for permission in client_permissions:
+            if permission.has_permission and permission.name in manage_to_view_mapping:
+                view_permission_name = manage_to_view_mapping[permission.name]
+                permission_dict[view_permission_name] = PermissionList(name=view_permission_name, has_permission=True)
+
+        processed_permissions = list(permission_dict.values())
+
+        # Create user in database with CLIENT type and permissions
         user = User(
             auth_id=UUID(secrets.token_hex(16)),  # Will be replaced by Keycloak ID
             name=user_info.name or user_info.email.split("@")[0],
             email=user_info.email,
             role=UserRoleEnum.DEVELOPER,  # Default role
-            status=UserStatusEnum.ACTIVE,
-            user_type=UserTypeEnum.CLIENT,
+            status=UserStatusEnum.ACTIVE,  # SSO users are active immediately
+            user_type=UserTypeEnum.CLIENT,  # Set as CLIENT user type
             color=UserColorEnum.get_random_color(),
             first_login=True,
-            is_reset_password=False,
+            is_reset_password=False,  # SSO users don't need password reset
+            permissions=processed_permissions,  # Add default CLIENT permissions
             auth_providers=[
                 {
                     "provider": user_info.provider.value,
@@ -492,27 +530,76 @@ class OAuthService(SessionMixin):
         )
         UserDataManager(self.session).add_one(oauth_link)
 
-        # Create user in Keycloak
-        keycloak_user_id = await self.keycloak_manager.create_user(
-            username=user.email,
+        # Get tenant client for Keycloak user creation
+        tenant_client = await UserDataManager(self.session).retrieve_by_fields(
+            TenantClient, {"tenant_id": tenant.id}, missing_ok=True
+        )
+        if not tenant_client:
+            raise ClientException("Tenant client configuration not found")
+
+        # Create user in Keycloak with permissions
+        # We need to create a UserCreate-like object for the Keycloak manager
+        from budapp.user_ops.schemas import UserCreate
+
+        user_create_data = UserCreate(
+            name=user.name,
             email=user.email,
             password=secrets.token_urlsafe(32),  # Random password for OAuth users
-            realm_name=tenant.realm_name,
             role=user.role,
+            user_type=user.user_type,
+            permissions=processed_permissions,
+            status=user.status,
         )
 
-        # Update user with Keycloak ID
-        user.auth_id = UUID(keycloak_user_id)
+        # Create user in Keycloak with permissions
+        try:
+            keycloak_user_id = await self.keycloak_manager.create_user_with_permissions(
+                user_create_data,
+                realm_name=tenant.realm_name,
+                client_id=tenant_client.client_id,
+            )
 
-        # Link OAuth account in Keycloak
-        await self.keycloak_manager.link_provider_account(
-            user_id=keycloak_user_id,
-            provider=user_info.provider.value,
-            provider_user_id=user_info.external_id,
-            realm_name=tenant.realm_name,
-        )
+            # Update user with Keycloak ID
+            user.auth_id = UUID(keycloak_user_id)
+            logger.info(f"Created user {user.email} in Keycloak with ID {keycloak_user_id}")
+
+            # Try to link OAuth account in Keycloak (if method exists)
+            try:
+                if hasattr(self.keycloak_manager, "link_provider_account"):
+                    await self.keycloak_manager.link_provider_account(
+                        user_id=keycloak_user_id,
+                        provider=user_info.provider.value,
+                        provider_user_id=user_info.external_id,
+                        realm_name=tenant.realm_name,
+                    )
+                    logger.info(f"Linked {user_info.provider.value} account for user {user.email}")
+                else:
+                    logger.warning("link_provider_account method not available - skipping OAuth link in Keycloak")
+            except Exception as link_error:
+                logger.warning(f"Failed to link OAuth account in Keycloak: {link_error}")
+                # Continue without linking - user can still authenticate
+
+        except Exception as kc_error:
+            logger.error(f"Failed to create user in Keycloak: {kc_error}")
+            # Check if user already exists in Keycloak
+            try:
+                realm_admin = self.keycloak_manager.get_realm_admin(tenant.realm_name)
+                keycloak_users = realm_admin.get_users(query={"email": user.email})
+                if keycloak_users:
+                    # User exists, update auth_id
+                    user.auth_id = UUID(keycloak_users[0]["id"])
+                    logger.info(f"User {user.email} already exists in Keycloak, updated auth_id")
+                else:
+                    # User doesn't exist and we couldn't create - this is an error
+                    # but we'll continue without auth_id for now
+                    logger.error(f"Could not create or find user {user.email} in Keycloak")
+            except Exception as lookup_error:
+                logger.error(f"Failed to lookup user in Keycloak after creation failure: {lookup_error}")
 
         self.session.commit()
+
+        # Note: Billing plan and default project setup moved to secure_oauth_callback
+        # This keeps the OAuth service focused on user creation only
 
         return user
 

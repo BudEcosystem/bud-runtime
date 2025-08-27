@@ -45,6 +45,7 @@ class OAuthSession(Base, TimestampMixin):
     tenant_id: Mapped[UUID | None] = mapped_column(Uuid, ForeignKey("tenant.id"), nullable=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     completed: Mapped[bool] = mapped_column(Boolean, default=False)
+    session_metadata: Mapped[dict | None] = mapped_column(JSONB, nullable=True)  # Store redirect URLs and other data
 
     # Relationships
     user: Mapped["User"] = relationship("User", foreign_keys=[user_id])

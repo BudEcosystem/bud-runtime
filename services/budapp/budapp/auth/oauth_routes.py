@@ -79,7 +79,8 @@ async def initiate_oauth_login(
         # Get base URL from request
         base_url = str(request.base_url).rstrip("/")
 
-        response = await oauth_service.initiate_oauth_login(login_request, base_url)
+        # Use proxy by default to hide Keycloak URL
+        response = await oauth_service.initiate_oauth_login(login_request, base_url, use_proxy=True)
 
         return SingleResponse[OAuthLoginResponse](
             success=True,
