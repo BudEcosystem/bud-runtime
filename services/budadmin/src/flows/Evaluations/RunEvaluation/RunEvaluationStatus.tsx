@@ -53,7 +53,7 @@ export default function RunEvaluationStatus() {
         <CommonStatus
             workflowId={currentWorkflow?.workflow_id}
             events_field_id="evaluation_workflow_events"
-            success_payload_type="run_evaluation"
+            success_payload_type="evaluation_events"
             onCompleted={() => {
                 console.log("Evaluation completed");
                 openDrawerWithStep("run-evaluation-success");

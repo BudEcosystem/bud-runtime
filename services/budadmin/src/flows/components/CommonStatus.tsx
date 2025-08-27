@@ -46,7 +46,7 @@ export default function CommonStatus({
     | 'performance_benchmark'
     | 'deploy_quantization'
     | 'add_adapter'
-    | 'run_evaluation',
+    | 'evaluation_events',
     events_field_id:
     'bud_simulator_events'
     | 'budserve_cluster_events'
