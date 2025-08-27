@@ -10,6 +10,7 @@ import DrawerCard from "@/components/ui/bud/card/DrawerCard";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import TextInput from "../components/TextInput";
 import { useRouter } from "next/router";
+import { useEndPoints } from "src/hooks/useEndPoint";
 
 
 export const AdapterDetail = () => {
@@ -17,6 +18,7 @@ export const AdapterDetail = () => {
     const { openDrawerWithStep, closeDrawer } = useDrawer();
     const { values, form } = useContext(BudFormContext);
     const { updateAdapterDetailWorkflow, adapterWorkflow, setAdapterWorkflow, currentWorkflow } = useDeployModel();
+    const { adapters, getAdapters } = useEndPoints();
     const router = useRouter();
     const projectId = router.query.projectId as string;
 
@@ -31,6 +33,36 @@ export const AdapterDetail = () => {
             adapterId: currentWorkflow.workflow_steps.adapter_config?.adapter_id
         })
     }, [currentWorkflow])
+
+    // Fetch existing adapters for validation
+    useEffect(() => {
+        if (currentWorkflow?.workflow_steps?.adapter_config?.endpoint_id) {
+            const endpointId = currentWorkflow.workflow_steps.adapter_config.endpoint_id;
+            getAdapters({
+                endpointId: endpointId,
+                page: 1,
+                limit: 100, // Get all adapters for validation
+            }, projectId);
+        }
+    }, [currentWorkflow?.workflow_steps?.adapter_config?.endpoint_id, projectId])
+
+    // Validation function to check for duplicate names
+    const validateAdapterName = (_, value) => {
+        if (!value) {
+            return Promise.resolve();
+        }
+        
+        // Check if the name already exists (case-insensitive)
+        const existingAdapter = adapters.find(adapter => 
+            adapter.name.toLowerCase() === value.toLowerCase()
+        );
+        
+        if (existingAdapter) {
+            return Promise.reject(new Error('An adapter with this name already exists'));
+        }
+        
+        return Promise.resolve();
+    };
 
     const handleNext = async () => {
         form.submit();
@@ -64,7 +96,10 @@ export const AdapterDetail = () => {
                             name="adapterName"
                             label="Adapter deployment name"
                             placeholder="Enter adapter deployment name"
-                            rules={[{ required: true, message: "Please enter deployment name" }]}
+                            rules={[
+                                { required: true, message: "Please enter deployment name" },
+                                { validator: validateAdapterName }
+                            ]}
                             ClassNames="mt-[.4rem]"
                             infoText="Enter a name for the deployment of the adapter"
                             onChange={(e) => setAdapterWorkflow({ ...adapterWorkflow, "adapterName": e })}
