@@ -16,9 +16,10 @@
 
 """Defines authentication routes for the microservices, providing endpoints for user authentication."""
 
-from typing import Union
+from typing import Optional, Union
 
 from fastapi import APIRouter, Depends, Request, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 from typing_extensions import Annotated
 
@@ -45,6 +46,7 @@ from .services import AuthService
 logger = logging.get_logger(__name__)
 
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
+security = HTTPBearer(auto_error=False)  # auto_error=False makes it optional
 
 
 @auth_router.post(
@@ -77,7 +79,7 @@ async def register_user(
     try:
         # Force user_type to CLIENT for public registration to prevent privilege escalation
         user.user_type = UserTypeEnum.CLIENT
-        await AuthService(session).register_user(user)
+        await AuthService(session).register_user(user, is_self_registration=True)
         return UserRegisterResponse(
             code=status.HTTP_200_OK,
             message="User registered successfully",
@@ -120,7 +122,7 @@ async def login_user(
 ) -> Union[UserLoginResponse, ErrorResponse]:
     """Login a user with email and password."""
     try:
-        auth_token = await AuthService(session).login_user(user)
+        auth_token = await AuthService(session).login_user(user, request=request)
         return UserLoginResponse(
             code=status.HTTP_200_OK,
             message="User logged in successfully",
@@ -155,14 +157,18 @@ async def login_user(
             "description": "Successfully logged out user",
         },
     },
-    description="Logout a user by invalidating their refresh token",
+    description="Logout a user by invalidating their refresh token and blacklisting access token",
 )
 async def logout_user(
-    logout_data: LogoutRequest, session: Annotated[Session, Depends(get_session)]
+    logout_data: LogoutRequest,
+    session: Annotated[Session, Depends(get_session)],
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
 ) -> Union[LogoutResponse, None]:
-    """Logout a user by invalidating their refresh token."""
+    """Logout a user by invalidating their refresh token and blacklisting access token."""
     try:
-        await AuthService(session).logout_user(logout_data)
+        # Extract access token from credentials if present
+        access_token = credentials.credentials if credentials else None
+        await AuthService(session).logout_user(logout_data, access_token)
         return LogoutResponse(code=status.HTTP_200_OK, message="User logged out successfully").to_http_response()
     except ClientException as e:
         logger.error(f"ClientException: {e}")

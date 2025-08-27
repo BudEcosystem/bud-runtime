@@ -7,6 +7,7 @@ from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Ta
 from ..cluster_ops.schemas import ClusterResponse
 from ..commons.constants import (
     AddModelModalityEnum,
+    GuardrailDeploymentTypeEnum,
     ModelProviderTypeEnum,
     VisibilityEnum,
     WorkflowStatusEnum,
@@ -15,6 +16,7 @@ from ..commons.constants import (
 from ..core.schemas import ModelTemplateResponse
 from ..credential_ops.schemas import ProprietaryCredentialResponse
 from ..endpoint_ops.schemas import AddAdapterWorkflowStepData, EndpointResponse
+from ..guardrails.schemas import ProbeSelection
 from ..model_ops.schemas import (
     CloudModel,
     Model,
@@ -49,6 +51,7 @@ class RetrieveWorkflowStepData(BaseModel):
     model_security_scan_events: dict | None = None
     bud_simulator_events: dict | None = None
     budserve_cluster_events: dict | None = None
+    evaluation_events: dict | None = None
     icon: str | None = None
     uri: str | None = None
     author: str | None = None
@@ -83,6 +86,11 @@ class RetrieveWorkflowStepData(BaseModel):
     endpoint_details: dict | None = None
     template: ModelTemplateResponse | None = None
     add_model_modality: list[AddModelModalityEnum] | None = None
+    # Guardrail-related fields
+    deployment_type: GuardrailDeploymentTypeEnum | None = None
+    guard_types: list[str] | None = None
+    threshold: float | None = None
+    probe_selections: list[ProbeSelection] | None = None
 
 
 class RetrieveWorkflowDataResponse(SuccessResponse):

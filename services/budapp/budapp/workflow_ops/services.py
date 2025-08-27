@@ -128,6 +128,7 @@ class WorkflowService(SessionMixin):
             delete_endpoint_events = required_data.get(BudServeWorkflowStepEventName.DELETE_ENDPOINT_EVENTS.value)
             delete_worker_events = required_data.get(BudServeWorkflowStepEventName.DELETE_WORKER_EVENTS.value)
             model_extraction_events = required_data.get(BudServeWorkflowStepEventName.MODEL_EXTRACTION_EVENTS.value)
+            evaluation_events = required_data.get(BudServeWorkflowStepEventName.EVALUATION_EVENTS.value)
             bud_serve_cluster_events = required_data.get(BudServeWorkflowStepEventName.BUDSERVE_CLUSTER_EVENTS.value)
             model_security_scan_events = required_data.get(
                 BudServeWorkflowStepEventName.MODEL_SECURITY_SCAN_EVENTS.value
@@ -166,6 +167,11 @@ class WorkflowService(SessionMixin):
             template_id = required_data.get("template_id")
             endpoint_details = required_data.get("endpoint_details")
             add_model_modality = required_data.get("add_model_modality")
+            # Guardrail-related fields
+            deployment_type = required_data.get("deployment_type")
+            guard_types = required_data.get("guard_types")
+            threshold = required_data.get("threshold")
+            probe_selections = required_data.get("probe_selections")
             quantization_config = (
                 QuantizeModelWorkflowStepData(
                     model_id=model_id,
@@ -285,6 +291,7 @@ class WorkflowService(SessionMixin):
                 author=author if author else None,
                 tags=tags if tags else None,
                 model_extraction_events=model_extraction_events if model_extraction_events else None,
+                evaluation_events=evaluation_events if evaluation_events else None,
                 description=description if description else None,
                 security_scan_result_id=security_scan_result_id if security_scan_result_id else None,
                 model_security_scan_events=model_security_scan_events if model_security_scan_events else None,
@@ -324,6 +331,11 @@ class WorkflowService(SessionMixin):
                 endpoint_details=endpoint_details if endpoint_details else None,
                 template=db_template if db_template else None,
                 add_model_modality=add_model_modality if add_model_modality else None,
+                # Guardrail-related fields
+                deployment_type=deployment_type if deployment_type else None,
+                guard_types=guard_types if guard_types else None,
+                threshold=threshold if threshold else None,
+                probe_selections=probe_selections if probe_selections else None,
             )
         else:
             workflow_steps = RetrieveWorkflowStepData()
@@ -437,6 +449,9 @@ class WorkflowService(SessionMixin):
                 "user_confirmation",
                 "run_as_simulation",
             ],
+            "evaluation": [
+                BudServeWorkflowStepEventName.EVALUATION_EVENTS.value,
+            ],
             "add_adapter": [
                 "adapter_model_id",
                 "adapter_name",
@@ -457,6 +472,21 @@ class WorkflowService(SessionMixin):
                 "credential_id",
                 "endpoint_details",
                 "scaling_specification",
+            ],
+            "guardrail_deployment": [
+                "provider_ids",
+                "probe_selections",
+                "deployment_type",
+                "project_id",
+                "endpoint_id",
+                "guard_types",
+                "threshold",
+                "deployment_name",
+                "deployment_description",
+                "estimated_deployment_time",
+                "deployment_status",
+                "deployment_message",
+                "deployment_id",
             ],
         }
 

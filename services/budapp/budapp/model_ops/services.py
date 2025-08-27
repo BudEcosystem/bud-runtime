@@ -2498,7 +2498,7 @@ class ModelService(SessionMixin):
         Args:
             workflow_id: The ID of the workflow to cancel.
         """
-        cancel_model_deployment_endpoint = f"{app_settings.dapr_base_url}v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment/cancel/{workflow_id}"
+        cancel_model_deployment_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment/cancel/{workflow_id}"
 
         logger.debug(f"Performing cancel model deployment request to budcluster {cancel_model_deployment_endpoint}")
         try:
@@ -3536,9 +3536,9 @@ class ModelService(SessionMixin):
 
         # Get recommended cluster info from Bud Simulator
         recommended_cluster_endpoint = (
-            f"{app_settings.dapr_base_url}v1.0/invoke/{app_settings.bud_simulator_app_id}/method/simulator/run"
+            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_simulator_app_id}/method/simulator/run"
         )
-
+        logger.debug(f"simulator url: {recommended_cluster_endpoint}")
         # Perform recommended cluster simulation
         try:
             async with aiohttp.ClientSession() as session:
@@ -3625,7 +3625,7 @@ class ModelService(SessionMixin):
             provider=db_model.source,
         )
         model_deployment_endpoint = (
-            f"{app_settings.dapr_base_url}v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment"
+            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment"
         )
         model_deployment_payload = model_deployment_request.model_dump(mode="json", exclude_none=True)
         logger.debug("model_deployment_payload: %s", model_deployment_payload)
@@ -3876,7 +3876,7 @@ class ModelCatalogService(SessionMixin):
         # Transform results to catalog items
         catalog_items = []
         for row in results:
-            model, endpoint, input_cost, output_cost, currency, per_tokens = row
+            model, endpoint, input_cost, output_cost, currency, per_tokens, provider_icon = row
 
             # Build capabilities from strengths and tags
             capabilities = []
@@ -3929,8 +3929,12 @@ class ModelCatalogService(SessionMixin):
                 "author": model.author,
                 "model_size": model.model_size,
                 "provider_type": provider_type_value,
+                "uri": model.uri,
+                "source": model.source,
+                "provider_icon": provider_icon if provider_icon else model.icon,
                 "published_date": endpoint.published_date.isoformat() if endpoint.published_date else None,
                 "endpoint_id": str(endpoint.id),
+                "endpoint_name": endpoint.name,
                 "supported_endpoints": supported_endpoints_values,
             }
 
@@ -3985,7 +3989,7 @@ class ModelCatalogService(SessionMixin):
                 message=f"Published model not found for endpoint {endpoint_id}",
             )
 
-        model, endpoint, input_cost, output_cost, currency, per_tokens = result
+        model, endpoint, input_cost, output_cost, currency, per_tokens, provider_icon = result
 
         # Build capabilities
         capabilities = []
@@ -4037,8 +4041,12 @@ class ModelCatalogService(SessionMixin):
             "author": model.author,
             "model_size": model.model_size,
             "provider_type": provider_type_value,
+            "uri": model.uri,
+            "source": model.source,
+            "provider_icon": provider_icon if provider_icon else model.icon,
             "published_date": endpoint.published_date.isoformat() if endpoint.published_date else None,
             "endpoint_id": str(endpoint.id),
+            "endpoint_name": endpoint.name,
             "supported_endpoints": supported_endpoints_values,
         }
 
@@ -4084,7 +4092,7 @@ class ModelCatalogService(SessionMixin):
                 message=f"Published model not found for endpoint {endpoint_id}",
             )
 
-        model, endpoint, input_cost, output_cost, currency, per_tokens = result
+        model, endpoint, input_cost, output_cost, currency, per_tokens, provider_icon = result
 
         # Get base model relation count
         model_tree_count = await ModelDataManager(self.session).get_model_tree_count(model.uri)
@@ -4130,6 +4138,8 @@ class ModelCatalogService(SessionMixin):
             model_tree=model_tree,
             scan_result=model.model_security_scan_result,
             endpoints_count=db_endpoint_count,
+            endpoint_id=str(endpoint.id),
+            endpoint_name=endpoint.name,
             message="Model retrieved successfully",
             code=status.HTTP_200_OK,
             object="catalog.model.get",

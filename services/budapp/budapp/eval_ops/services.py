@@ -1,14 +1,15 @@
 import uuid
-from typing import Any, Dict, List, Optional, Tuple, cast
+from typing import Any, Dict, List, Optional, Tuple, Union, cast
 
 import aiohttp
+from budmicroframe.commons.schemas import WorkflowMetadataResponse
 from fastapi import HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from budapp.commons import logging
 from budapp.commons.config import app_settings
-from budapp.commons.constants import WorkflowTypeEnum
+from budapp.commons.constants import BudServeWorkflowStepEventName, WorkflowTypeEnum
 from budapp.commons.exceptions import ClientException
 from budapp.endpoint_ops.models import Endpoint as EndpointModel
 from budapp.eval_ops.models import ExpDataset as DatasetModel
@@ -66,6 +67,8 @@ from budapp.workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManage
 from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStatusEnum
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
+from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
+from budapp.workflow_ops.services import WorkflowService, WorkflowStepService
 
 
 logger = logging.get_logger(__name__)
@@ -110,15 +113,34 @@ class ExperimentService:
             ExperimentSchema: Pydantic schema of the created Experiment.
 
         Raises:
+            HTTPException(status_code=400): If experiment with same name already exists for the user.
             HTTPException(status_code=500): If database insertion fails.
         """
+        # Check for duplicate experiment name for this user
+        # Note: name has already been validated and trimmed by Pydantic
+        existing_experiment = (
+            self.session.query(ExperimentModel)
+            .filter(
+                ExperimentModel.name == req.name,
+                ExperimentModel.created_by == user_id,
+                ExperimentModel.status != ExperimentStatusEnum.DELETED.value,
+            )
+            .first()
+        )
+
+        if existing_experiment:
+            raise ClientException(
+                message=f"An experiment with the name '{req.name}' already exists. Please choose a different name.",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
         # Create experiment without project_id initially
         ev = ExperimentModel(
             name=req.name,
             description=req.description,
             # project_id=req.project_id,  # Commented out - made optional
             created_by=user_id,
-            status="active",
+            status=ExperimentStatusEnum.ACTIVE.value,
             tags=req.tags or [],
         )
 
@@ -137,7 +159,7 @@ class ExperimentService:
             ) from e
 
         # Create experiment schema with empty models and traits (new experiment has no runs yet)
-        exp_data = ExperimentSchema.from_orm(ev)
+        exp_data = ExperimentSchema.model_validate(ev)
         exp_data.models = []
         exp_data.traits = []
         exp_data.status = "no_runs"  # New experiment has no runs
@@ -1271,7 +1293,7 @@ class ExperimentWorkflowService:
 
     async def process_experiment_workflow_step(
         self, request: ExperimentWorkflowStepRequest, current_user_id: uuid.UUID
-    ) -> ExperimentWorkflowResponse:
+    ) -> "RetrieveWorkflowDataResponse":
         """Process a step in the experiment creation workflow.
 
         Parameters:
@@ -1337,9 +1359,8 @@ class ExperimentWorkflowService:
             )
 
             # If this is the final step and trigger_workflow is True, create the experiment
-            experiment_id = None
             if request.step_number == 5 and request.trigger_workflow:
-                experiment_id = await self._create_experiment_from_workflow(workflow.id, current_user_id)
+                await self._create_experiment_from_workflow(workflow.id, current_user_id)
                 # Mark workflow as completed
                 await WorkflowDataManager(self.session).update_by_fields(
                     workflow,
@@ -1350,34 +1371,13 @@ class ExperimentWorkflowService:
                 # if experiment_id:
                 #     await self._call_eval_workflow(experiment_id)
 
-            # After storing the workflow step, retrieve all accumulated data
-            all_step_data = await self._get_accumulated_step_data(workflow.id)
+            # We now rely on unified workflow retrieval output; skip assembling local data
+            _ = await self._get_accumulated_step_data(workflow.id)
 
-            # Determine if workflow is complete
-            is_complete = (
-                request.step_number == 5 and request.trigger_workflow
-            ) or workflow.status == WorkflowStatusEnum.COMPLETED.value
-            next_step = None if is_complete else request.step_number + 1
+            from budapp.workflow_ops.services import WorkflowService as GenericWorkflowService
 
-            # Prepare next step data only if not complete
-            next_step_data = None
-            if not is_complete and next_step is not None:
-                next_step_data = await self._prepare_next_step_data(next_step, current_user_id)
-
-            return ExperimentWorkflowResponse(
-                code=status.HTTP_200_OK,
-                object="experiment.workflow.step",
-                message=f"Step {request.step_number} completed successfully",
-                workflow_id=workflow.id,
-                current_step=request.step_number,
-                total_steps=request.workflow_total_steps,
-                next_step=next_step,
-                is_complete=is_complete,
-                status=workflow.status,
-                experiment_id=experiment_id,
-                data=all_step_data,
-                next_step_data=next_step_data,
-            )
+            # Return unified workflow response matching cluster creation
+            return await GenericWorkflowService(self.session).retrieve_workflow_data(workflow.id)
 
         except HTTPException:
             raise
@@ -1710,7 +1710,7 @@ class ExperimentWorkflowService:
 
     async def get_experiment_workflow_data(
         self, workflow_id: uuid.UUID, current_user_id: uuid.UUID
-    ) -> ExperimentWorkflowResponse:
+    ) -> "RetrieveWorkflowDataResponse":
         """Get complete experiment workflow data for review.
 
         Parameters:
@@ -1730,31 +1730,19 @@ class ExperimentWorkflowService:
             workflow = cast(WorkflowModel, workflow)
 
             # Get all accumulated step data
-            all_step_data = await self._get_accumulated_step_data(workflow_id)
+            await self._get_accumulated_step_data(workflow_id)
 
             # Determine completion state
             is_complete = workflow.current_step >= 5
-            next_step = None if is_complete else workflow.current_step + 1
 
             # Prepare next step data if not complete
-            next_step_data = None
             if not is_complete:
-                next_step_data = await self._prepare_next_step_data(workflow.current_step + 1, current_user_id)
+                await self._prepare_next_step_data(workflow.current_step + 1, current_user_id)
 
-            return ExperimentWorkflowResponse(
-                code=status.HTTP_200_OK,
-                object="experiment.workflow.review",
-                message="Workflow data retrieved successfully",
-                workflow_id=workflow.id,
-                current_step=workflow.current_step,
-                total_steps=5,
-                next_step=next_step,
-                is_complete=is_complete,
-                status=workflow.status,
-                experiment_id=None,  # Will be populated when workflow is complete
-                data=all_step_data,
-                next_step_data=next_step_data,
-            )
+            from budapp.workflow_ops.services import WorkflowService as GenericWorkflowService
+
+            # Return unified workflow response matching cluster creation
+            return await GenericWorkflowService(self.session).retrieve_workflow_data(workflow.id)
 
         except Exception as e:
             logger.error(f"Failed to get experiment workflow data: {e}")
@@ -1774,7 +1762,7 @@ class EvaluationWorkflowService:
 
     async def process_evaluation_workflow_step(
         self, experiment_id: uuid.UUID, request: EvaluationWorkflowStepRequest, current_user_id: uuid.UUID
-    ) -> EvaluationWorkflowResponse:
+    ) -> RetrieveWorkflowDataResponse:
         """Process a step in the evaluation creation workflow.
 
         Parameters:
@@ -1783,12 +1771,12 @@ class EvaluationWorkflowService:
             current_user_id (uuid.UUID): Current user ID for authorization.
 
         Returns:
-            EvaluationWorkflowResponse: Response with workflow status and next step data.
+            RetrieveWorkflowDataResponse: Unified workflow response for all steps
 
         Raises:
             HTTPException: If validation fails or workflow errors occur.
         """
-        from budapp.eval_ops.schemas import EvaluationWorkflowResponse
+        from budapp.workflow_ops.services import WorkflowService as GenericWorkflowService
 
         try:
             # Verify experiment exists and user has access
@@ -1858,10 +1846,9 @@ class EvaluationWorkflowService:
                 )
 
             # If this is the final step and trigger_workflow is True, create the runs
-            runs_created = None
             if request.step_number == 5 and request.trigger_workflow:
-                runs_created = await self._create_runs_from_workflow(workflow.id, experiment_id, current_user_id)
-                # Mark workflow as completed
+                await self._create_runs_from_workflow(workflow.id, experiment_id, current_user_id)
+                # TODO: Mark workflow as completed
                 await WorkflowDataManager(self.session).update_by_fields(
                     workflow,
                     {"status": WorkflowStatusEnum.COMPLETED.value},  # type: ignore
@@ -1870,6 +1857,8 @@ class EvaluationWorkflowService:
             # After storing the workflow step, retrieve all accumulated data
             all_step_data = await self._get_accumulated_step_data(workflow.id)
 
+            logger.debug(f"All Step Data: {all_step_data}")
+
             # Determine if workflow is complete
             is_complete = (
                 request.step_number == 5 and request.trigger_workflow
@@ -1877,27 +1866,77 @@ class EvaluationWorkflowService:
 
             # Determine next step
             next_step = None if is_complete else request.step_number + 1
-            next_step_data = (
-                await self._get_next_step_data(next_step, all_step_data, experiment_id) if next_step else None
-            )
+            if next_step:
+                await self._get_next_step_data(next_step, all_step_data, experiment_id)
 
             # Trigger budeval evaluation if this is the final step
             if request.step_number == 5 and request.trigger_workflow:
-                await self._trigger_evaluations_for_experiment(experiment_id)
+                logger.info("*" * 10)
+                logger.info(f"\n\nTriggering budeval evaluation for experiment {experiment_id} \n\n")
 
-            return EvaluationWorkflowResponse(
-                code=status.HTTP_200_OK,
-                object="evaluation.workflow.step",
-                message="Workflow step processed successfully",
-                workflow_id=workflow.id,
-                current_step=request.step_number,
-                total_steps=request.workflow_total_steps,
-                is_complete=is_complete,
-                next_step=next_step,
-                next_step_data=next_step_data,
-                status=workflow.status,
-                runs_created=runs_created,
-            )
+                current_step_number = request.step_number + 1
+                workflow_current_step = current_step_number
+
+                # Trigger Eval
+                trigger_workflow_response = await self._trigger_evaluations_for_experiment_and_get_response(
+                    experiment_id
+                )
+
+                # for step in trigger_workflow_response["steps"]:
+                #     step["payload"] = {}
+
+                logger.debug(f"Trigger Workflow Response 01 : {trigger_workflow_response}")
+
+                evaluation_events_payload = {
+                    BudServeWorkflowStepEventName.EVALUATION_EVENTS.value: trigger_workflow_response
+                }
+
+                db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+                    workflow.id, current_step_number, evaluation_events_payload
+                )
+
+                logger.debug(f"Workflow step created with id {db_workflow_step.id}")
+
+                evaluation_events_payload["progress_type"] = BudServeWorkflowStepEventName.EVALUATION_EVENTS.value
+                await WorkflowDataManager(self.session).update_by_fields(
+                    workflow, {"progress": evaluation_events_payload, "current_step": workflow_current_step}
+                )
+
+                logger.debug(f"Trigger Workflow Response 02: {evaluation_events_payload}")
+
+                # Get All The Step From Workflow
+                # db_workflow_step = await self._create_or_update_next_workflow_step(workflow.id, current_step_number, {})
+
+                # db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                #     workflow,
+                #     {"current_step": workflow_current_step},
+                # )
+
+                # Ensure an evaluation_events step exists to receive notifications
+                # try:
+                #     skeleton = {
+                #         BudServeWorkflowStepEventName.EVALUATION_EVENTS.value: {
+                #             "steps": [
+                #                 {"id": "verify_cluster_connection", "title": "Verify Cluster Connection"},
+                #                 {"id": "deploy_eval_job", "title": "Deploy Evaluation Job"},
+                #                 {"id": "monitor_eval_job_progress", "title": "Monitor Evaluation Job"},
+                #             ]
+                #         }
+                #     }
+                #     db_workflow_step=  await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+                #         workflow_id=workflow.id,
+                #         step_number=request.step_number + 1,
+                #         data=skeleton,
+                #     )
+                # except Exception:
+                #     raise ClientException("error in workflow step service")
+
+                # await self._trigger_evaluations_for_experiment_and_get_response(experiment_id)
+
+                # Return unified workflow response matching cluster creation
+                # return await GenericWorkflowService(self.session).retrieve_workflow_data(workflow.id)
+                logger.debug(f"Trigger Workflow Response 03: {trigger_workflow_response}")
+            return await WorkflowService(self.session).retrieve_workflow_data(workflow.id)
 
         except HTTPException:
             raise
@@ -1943,6 +1982,8 @@ class EvaluationWorkflowService:
             dict: Combined data from all steps with enriched information.
         """
         steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps({"workflow_id": workflow_id})
+
+        logger.debug(f"Steps: {steps}")
 
         accumulated_data = {}
         for step in steps:
@@ -2144,7 +2185,7 @@ class EvaluationWorkflowService:
         self.session.commit()
 
         # Trigger budeval evaluation for all created runs
-        await self._trigger_evaluations_for_experiment(experiment_id)
+        # await self._trigger_evaluations_for_experiment(experiment_id)
 
         return runs_created
 
@@ -2323,7 +2364,7 @@ class EvaluationWorkflowService:
 
     async def get_evaluation_workflow_data(
         self, experiment_id: uuid.UUID, workflow_id: uuid.UUID, current_user_id: uuid.UUID
-    ) -> EvaluationWorkflowResponse:
+    ) -> RetrieveWorkflowDataResponse:
         """Get complete evaluation workflow data for review.
 
         Parameters:
@@ -2332,9 +2373,9 @@ class EvaluationWorkflowService:
             current_user_id (uuid.UUID): Current user ID for authorization.
 
         Returns:
-            EvaluationWorkflowResponse: Complete workflow data response.
+            RetrieveWorkflowDataResponse: Complete workflow data response.
         """
-        from budapp.eval_ops.schemas import EvaluationWorkflowResponse
+        from budapp.workflow_ops.services import WorkflowService as GenericWorkflowService
 
         try:
             # Verify experiment exists and user has access
@@ -2358,32 +2399,8 @@ class EvaluationWorkflowService:
                     status_code=status.HTTP_403_FORBIDDEN, detail="Workflow does not belong to this experiment"
                 )
 
-            # Get all accumulated step data
-            all_step_data = await self._get_accumulated_step_data(workflow_id)
-
-            # Determine completion state
-            is_complete = workflow.status == WorkflowStatusEnum.COMPLETED.value
-            next_step = None if is_complete else workflow.current_step + 1
-
-            # Prepare next step data if not complete
-            next_step_data = None
-            if not is_complete and next_step and next_step <= 5:
-                next_step_data = await self._get_next_step_data(next_step, all_step_data, experiment_id)
-
-            return EvaluationWorkflowResponse(
-                code=status.HTTP_200_OK,
-                object="evaluation.workflow.get",
-                message="Workflow data retrieved successfully",
-                workflow_id=workflow.id,
-                current_step=workflow.current_step,
-                total_steps=5,
-                next_step=next_step,
-                is_complete=is_complete,
-                status=workflow.status,
-                runs_created=None,
-                data=all_step_data,
-                next_step_data=next_step_data,
-            )
+            # Return unified workflow response
+            return await GenericWorkflowService(self.session).retrieve_workflow_data(workflow.id)
 
         except HTTPException:
             raise
@@ -2393,9 +2410,7 @@ class EvaluationWorkflowService:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to retrieve workflow data"
             ) from e
 
-    async def trigger_budeval_evaluation(
-        self, run_id: uuid.UUID, evaluation_request: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def trigger_budeval_evaluation(self, run_id: uuid.UUID, evaluation_request: Dict[str, Any]) -> Any:
         """Trigger evaluation in budeval service via Dapr.
 
         Parameters:
@@ -2403,20 +2418,25 @@ class EvaluationWorkflowService:
             evaluation_request (Dict[str, Any]): The evaluation request data.
 
         Returns:
-            Dict[str, Any]: Response from budeval service.
+            WorkflowMetadataResponse: Workflow metadata response from budeval service.
 
         Raises:
             ClientException: If the budeval request fails.
         """
         try:
-            # Prepare request for budeval
+            # Prepare request for budeval - use correct endpoint
             budeval_endpoint = (
                 f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_eval_app_id}/method/evals/start"
             )
 
+            # budeval_endpoint = "http://localhost:8099/evals/start"
+
             # Create evaluation request matching budeval schema
             eval_request = {
-                "uuid": str(run_id),
+                "uuid": str(evaluation_request.get("experiment_id")),
+                "experiment_id": str(evaluation_request.get("experiment_id"))
+                if evaluation_request.get("experiment_id")
+                else None,
                 "eval_model_info": {
                     "model_name": evaluation_request["model_name"],
                     "endpoint": evaluation_request["endpoint"],
@@ -2425,7 +2445,7 @@ class EvaluationWorkflowService:
                 },
                 "eval_datasets": [{"dataset_id": ds} for ds in evaluation_request["datasets"]],
                 "eval_configs": evaluation_request.get("eval_configs", []),
-                "engine": evaluation_request.get("engine", "opencompass"),
+                "kubeconfig": evaluation_request.get("kubeconfig", ""),  # Add required kubeconfig field
             }
 
             logger.info(f"Triggering budeval evaluation for run {run_id} with request: {eval_request}")
@@ -2442,7 +2462,9 @@ class EvaluationWorkflowService:
                         raise ClientException(error_message)
 
                     logger.info(f"Successfully triggered evaluation in budeval service for run {run_id}")
+                    # Parse the response as WorkflowMetadataResponse
                     return response_data
+                    # return WorkflowMetadataResponse(**response_data)
 
         except ClientException:
             raise
@@ -2560,7 +2582,7 @@ class EvaluationWorkflowService:
             self.session.rollback()
             raise
 
-    async def _trigger_evaluations_for_experiment(self, experiment_id: uuid.UUID) -> None:
+    async def _trigger_evaluations_for_experiment(self, experiment_id: uuid.UUID) -> Any:
         """Trigger budeval evaluation for all pending runs in the experiment.
 
         Parameters:
@@ -2568,6 +2590,99 @@ class EvaluationWorkflowService:
         """
         try:
             # Get all pending runs for this experiment
+            runs = self.session.query(RunModel).filter(RunModel.experiment_id == experiment_id).all()
+
+            # TODO: .filter(RunModel.experiment_id == experiment_id, RunModel.status == RunStatusEnum.PENDING.value)
+
+            if not runs:
+                logger.info(f"No pending runs found for experiment {experiment_id}")
+                return
+
+            logger.info(f"Triggering budeval evaluation for {len(runs)} runs in experiment {experiment_id}")
+
+            # Collect all datasets from runs, starting with the demo dataset
+            all_datasets = ["demo_gsm8k_chat_gen"]
+
+            # Add datasets from each run (avoiding duplicates)
+            for run in runs:
+                try:
+                    # Get dataset information for the run
+                    # TODO: Uncomment when dataset_version relationship is properly set up
+                    # if hasattr(run, 'dataset_version') and run.dataset_version:
+                    #     dataset_id = run.dataset_version.dataset.dataset_id
+                    #     if dataset_id not in all_datasets:
+                    #         all_datasets.append(dataset_id)
+                    pass
+                except Exception as e:
+                    logger.warning(f"Could not retrieve dataset for run {run.id}: {e}")
+
+            # Prepare single evaluation request with all datasets
+            evaluation_request = {
+                "model_name": "qwen3-32b",
+                "endpoint": "http://20.66.97.208/v1",
+                "api_key": "sk-BudLiteLLMMasterKey_123",
+                "datasets": ["demo_gsm8k_chat_gen", "demo_gsm8k_chat_gen"],  # all_datasets,
+                "engine": "opencompass",  # Default engine
+                "extra_args": runs[0].config or {} if runs else {},  # Use first run's config
+                "kubeconfig": None,  # Will use default kubeconfig
+                "experiment_id": experiment_id,  # Ensure experiment ID is forwarded
+            }
+
+            # Update all runs status to running
+            for run in runs:
+                run.status = RunStatusEnum.RUNNING.value
+            self.session.commit()
+
+            # Trigger single budeval evaluation for all runs
+            try:
+                response = await self.trigger_budeval_evaluation(
+                    run_id=runs[0].id,  # Use first run's ID as representative
+                    evaluation_request=evaluation_request,
+                )
+
+                # Store budeval job information for all runs
+                for run in runs:
+                    if hasattr(run, "budeval_job_id"):
+                        run.budeval_job_id = response.get("job_id")
+                    if hasattr(run, "budeval_workflow_id"):
+                        run.budeval_workflow_id = response.get("workflow_id")
+                    if hasattr(run, "evaluation_status"):
+                        run.evaluation_status = "initiated"
+
+                self.session.commit()
+                logger.info(
+                    f"Successfully triggered single evaluation for {len(runs)} runs with datasets: {all_datasets}"
+                )
+
+                logger.debug(f"Response X02: {response}")
+
+                return response
+
+            except Exception as e:
+                logger.error(f"Failed to trigger evaluation for experiment {experiment_id}: {e}")
+                # Mark all runs as failed
+                for run in runs:
+                    run.status = RunStatusEnum.FAILED.value
+                    if hasattr(run, "evaluation_error"):
+                        run.evaluation_error = str(e)
+                self.session.commit()
+
+        except Exception as e:
+            logger.error(f"Failed to trigger evaluations for experiment {experiment_id}: {e}")
+
+    async def _trigger_evaluations_for_experiment_and_get_response(
+        self, experiment_id: uuid.UUID
+    ) -> Optional[WorkflowMetadataResponse] | Any:
+        """Trigger budeval evaluation for all pending runs in experiment and return first WorkflowMetadataResponse.
+
+        Parameters:
+            experiment_id (uuid.UUID): The experiment ID to evaluate.
+
+        Returns:
+            Optional[WorkflowMetadataResponse]: The WorkflowMetadataResponse from first triggered evaluation, or None if no runs.
+        """
+        try:
+            # Get pending runs for the experiment
             runs = (
                 self.session.query(RunModel)
                 .filter(RunModel.experiment_id == experiment_id, RunModel.status == RunStatusEnum.PENDING.value)
@@ -2576,65 +2691,94 @@ class EvaluationWorkflowService:
 
             if not runs:
                 logger.info(f"No pending runs found for experiment {experiment_id}")
-                return
+                return None
 
             logger.info(f"Triggering budeval evaluation for {len(runs)} runs in experiment {experiment_id}")
+            logger.info("*" * 10)
 
-            # Trigger evaluation for each run
+            # Collect all datasets from runs, starting with the demo dataset
+            all_datasets = ["demo_gsm8k_chat_gen"]
+
+            # Get model and endpoint information from the first run
+            # first_run = runs[0]
+            # model = self.session.query(ModelTable).filter(ModelTable.id == first_run.model_id).first()
+            # endpoint = self.session.query(EndpointModel).filter(EndpointModel.model_id == first_run.model_id).first()
+
+            # if not model or not endpoint:
+            #     logger.error(f"Model or endpoint not found for first run {first_run.id}")
+            #     return None
+
+            # Add datasets from each run (avoiding duplicates)
+            # for run in runs:
+            #     try:
+            #         if hasattr(run, 'dataset_version') and run.dataset_version and run.dataset_version.dataset:
+            #             dataset_id = run.dataset_version.dataset.dataset_id
+            #             if dataset_id not in all_datasets:
+            #                 all_datasets.append(dataset_id)
+            #     except Exception as e:
+            #         logger.warning(f"Could not retrieve dataset for run {run.id}: {e}")
+
+            # Prepare single evaluation request with all datasets
+
+            evaluation_request = {
+                "model_name": "qwen3-32b",
+                "endpoint": "http://20.66.97.208/v1",
+                "api_key": "sk-BudLiteLLMMasterKey_123",
+                "extra_args": {},
+                "datasets": ["demo_gsm8k_chat_gen"],  # all_datasets,
+                "kubeconfig": "",  # TODO: Get actual kubeconfig
+                # Ensure budeval knows how to route notifications back to budapp
+                "source": app_settings.source_topic,
+                "source_topic": app_settings.source_topic,
+                "experiment_id": experiment_id,  # Include experiment ID for tracking
+            }
+
+            # Update all runs status to running
             for run in runs:
-                try:
-                    # Get model information for the run
-                    # model = self.session.get(ModelTable, run.model_id)
-                    # dataset_version = self.session.get(ExpDatasetVersion, run.dataset_version_id)
+                run.status = RunStatusEnum.RUNNING.value
+            self.session.commit()
 
-                    # if not model or not dataset_version:
-                    #     logger.error(f"Missing model or dataset for run {run.id}")
-                    #     continue
+            # Trigger single budeval evaluation for all runs
+            try:
+                response = await self.trigger_budeval_evaluation(
+                    run_id=runs[0].id,  # Use first run's ID as representative
+                    evaluation_request=evaluation_request,
+                )
 
-                    # Get endpoint information
-                    # Check if model has endpoint information
-                    # endpoint_info = None
-                    # if hasattr(model, 'endpoints') and model.endpoints:
-                    #     endpoint_info = model.endpoints[0] if model.endpoints else None
-
-                    # Prepare evaluation request
-                    evaluation_request = {
-                        "model_name": "qwen3-4b",
-                        "endpoint": "http://20.66.97.208/v1",
-                        "api_key": "sk-BudLiteLLMMasterKey_123",
-                        "datasets": ["demo_gsm8k_chat_gen"],
-                        "engine": "opencompass",  # Default engine
-                        "extra_args": run.config or {},
-                        "kubeconfig": None,  # Will use default kubeconfig
-                    }
-
-                    # Update run status to running
-                    run.status = RunStatusEnum.RUNNING.value
-                    self.session.commit()
-
-                    # Trigger budeval evaluation
-                    response = await self.trigger_budeval_evaluation(
-                        run_id=run.id, evaluation_request=evaluation_request
-                    )
-
-                    # Store budeval job information if we have the fields
-                    # These fields will be added in the database migration
+                # Store budeval job information for all runs
+                for run in runs:
                     if hasattr(run, "budeval_job_id"):
-                        run.budeval_job_id = response.get("job_id")
+                        run.budeval_job_id = (
+                            response.get("job_id") if isinstance(response, dict) else getattr(response, "job_id", None)
+                        )
                     if hasattr(run, "budeval_workflow_id"):
-                        run.budeval_workflow_id = response.get("workflow_id")
+                        run.budeval_workflow_id = (
+                            response.get("workflow_id")
+                            if isinstance(response, dict)
+                            else getattr(response, "workflow_id", None)
+                        )
                     if hasattr(run, "evaluation_status"):
                         run.evaluation_status = "initiated"
-                    self.session.commit()
 
-                    logger.info(f"Successfully triggered evaluation for run {run.id}")
+                self.session.commit()
+                logger.info(
+                    f"Successfully triggered single evaluation for {len(runs)} runs with datasets: {all_datasets}"
+                )
 
-                except Exception as e:
-                    logger.error(f"Failed to trigger evaluation for run {run.id}: {e}")
+                logger.debug(f"Response X01: {response}")
+
+                return response
+            except Exception as e:
+                logger.error(f"Failed to trigger evaluation for experiment {experiment_id}: {e}")
+                # Mark all runs as failed
+                for run in runs:
                     run.status = RunStatusEnum.FAILED.value
                     if hasattr(run, "evaluation_error"):
                         run.evaluation_error = str(e)
-                    self.session.commit()
+                self.session.commit()
+
+                return None
 
         except Exception as e:
             logger.error(f"Failed to trigger evaluations for experiment {experiment_id}: {e}")
+            return None

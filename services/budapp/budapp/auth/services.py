@@ -17,14 +17,24 @@
 
 """Implements auth services and business logic that power the microservices, including key functionality and integrations."""
 
+from uuid import UUID
+
 from fastapi import status
 
+from budapp.audit_ops import log_audit
 from budapp.commons import logging
-from budapp.commons.config import app_settings
-from budapp.commons.constants import UserColorEnum, UserStatusEnum, UserTypeEnum
+from budapp.commons.config import app_settings, secrets_settings
+from budapp.commons.constants import (
+    AuditActionEnum,
+    AuditResourceTypeEnum,
+    UserColorEnum,
+    UserStatusEnum,
+    UserTypeEnum,
+)
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
 from budapp.commons.keycloak import KeycloakManager
+from budapp.commons.security import HashManager
 from budapp.user_ops.crud import UserDataManager
 from budapp.user_ops.models import Tenant, TenantClient, TenantUserMapping
 from budapp.user_ops.models import User as UserModel
@@ -37,6 +47,7 @@ from ..permissions.schemas import PermissionList
 from ..permissions.service import PermissionService
 from ..project_ops.models import Project as ProjectModel
 from ..project_ops.schemas import ProjectUserAdd
+from ..shared.jwt_blacklist_service import JWTBlacklistService
 from ..shared.notification_service import BudNotifyHandler
 from .schemas import LogoutRequest, RefreshTokenRequest, RefreshTokenResponse, ResourceCreate, UserLogin, UserLoginData
 
@@ -45,7 +56,7 @@ logger = logging.get_logger(__name__)
 
 
 class AuthService(SessionMixin):
-    async def login_user(self, user: UserLogin) -> UserLoginData:
+    async def login_user(self, user: UserLogin, request=None) -> UserLoginData:
         """Login a user with email and password."""
         logger.debug(f"::USER:: User: {user}")
 
@@ -57,6 +68,16 @@ class AuthService(SessionMixin):
         # Check if user exists
         if not db_user:
             logger.debug(f"User not found in database: {user.email}")
+            # Log failed login attempt - email not registered
+            log_audit(
+                session=self.session,
+                action=AuditActionEnum.LOGIN_FAILED,
+                resource_type=AuditResourceTypeEnum.USER,
+                resource_name=user.email,
+                details={"email": user.email, "reason": "Email not registered"},
+                request=request,
+                success=False,
+            )
             raise ClientException("This email is not registered")
 
         # Get tenant information
@@ -66,6 +87,18 @@ class AuthService(SessionMixin):
                 Tenant, {"id": user.tenant_id}, missing_ok=True
             )
             if not tenant:
+                # Log failed login attempt - invalid tenant
+                log_audit(
+                    session=self.session,
+                    action=AuditActionEnum.LOGIN_FAILED,
+                    resource_type=AuditResourceTypeEnum.USER,
+                    resource_id=db_user.id,
+                    resource_name=db_user.email,
+                    user_id=db_user.id,
+                    details={"email": user.email, "reason": "Invalid tenant ID", "tenant_id": str(user.tenant_id)},
+                    request=request,
+                    success=False,
+                )
                 raise ClientException("Invalid tenant ID")
 
             # Verify user belongs to tenant
@@ -73,6 +106,22 @@ class AuthService(SessionMixin):
                 TenantUserMapping, {"tenant_id": user.tenant_id, "user_id": db_user.id}, missing_ok=True
             )
             if not tenant_mapping:
+                # Log failed login attempt - user not in tenant
+                log_audit(
+                    session=self.session,
+                    action=AuditActionEnum.LOGIN_FAILED,
+                    resource_type=AuditResourceTypeEnum.USER,
+                    resource_id=db_user.id,
+                    resource_name=db_user.email,
+                    user_id=db_user.id,
+                    details={
+                        "email": user.email,
+                        "reason": "User does not belong to this tenant",
+                        "tenant_id": str(user.tenant_id),
+                    },
+                    request=request,
+                    success=False,
+                )
                 raise ClientException("User does not belong to this tenant")
         else:
             # Get the default tenant
@@ -80,6 +129,18 @@ class AuthService(SessionMixin):
                 Tenant, {"realm_name": app_settings.default_realm_name}, missing_ok=True
             )
             if not tenant:
+                # Log failed login attempt - default tenant not found
+                log_audit(
+                    session=self.session,
+                    action=AuditActionEnum.LOGIN_FAILED,
+                    resource_type=AuditResourceTypeEnum.USER,
+                    resource_id=db_user.id,
+                    resource_name=db_user.email,
+                    user_id=db_user.id,
+                    details={"email": user.email, "reason": "Default tenant not found"},
+                    request=request,
+                    success=False,
+                )
                 raise ClientException("Default tenant not found")
 
             # # If no tenant specified, get the first tenant the user belongs to
@@ -91,9 +152,21 @@ class AuthService(SessionMixin):
             #         Tenant, {"id": tenant_mapping.tenant_id}, missing_ok=True
             #  )
 
-        logger.debug(f"::USER:: Tenant: {tenant.realm_name}")
+        logger.debug(f"::USER:: Tenant: {tenant.realm_name if tenant else 'None'}")
 
         if not tenant:
+            # Log failed login attempt - no tenant association
+            log_audit(
+                session=self.session,
+                action=AuditActionEnum.LOGIN_FAILED,
+                resource_type=AuditResourceTypeEnum.USER,
+                resource_id=db_user.id,
+                resource_name=db_user.email,
+                user_id=db_user.id,
+                details={"email": user.email, "reason": "User does not belong to any tenant"},
+                request=request,
+                success=False,
+            )
             raise ClientException("User does not belong to any tenant")
 
         # Get tenant client credentials
@@ -101,17 +174,35 @@ class AuthService(SessionMixin):
             TenantClient, {"tenant_id": tenant.id}, missing_ok=True
         )
         if not tenant_client:
+            # Log failed login attempt - tenant client config missing
+            log_audit(
+                session=self.session,
+                action=AuditActionEnum.LOGIN_FAILED,
+                resource_type=AuditResourceTypeEnum.USER,
+                resource_id=db_user.id,
+                resource_name=db_user.email,
+                user_id=db_user.id,
+                details={
+                    "email": user.email,
+                    "reason": "Tenant client configuration not found",
+                    "tenant": tenant.realm_name,
+                },
+                request=request,
+                success=False,
+            )
             raise ClientException("Tenant client configuration not found")
 
         logger.debug(f"::USER:: Tenant client: {tenant_client.id} {tenant_client.client_id}")
 
         # Authenticate with Keycloak
         keycloak_manager = KeycloakManager()
+        # Decrypt client secret for use
+        decrypted_secret = await tenant_client.get_decrypted_client_secret()
         credentials = TenantClientSchema(
             id=tenant_client.id,
             client_id=tenant_client.client_id,
             client_named_id=tenant_client.client_named_id,
-            client_secret=tenant_client.client_secret,
+            client_secret=decrypted_secret,
         )
 
         token_data = await keycloak_manager.authenticate_user(
@@ -121,17 +212,57 @@ class AuthService(SessionMixin):
             credentials=credentials,
         )
 
-        logger.debug(f"Token data: {token_data}")
-
         if not token_data:
             logger.debug(f"Invalid credentials for user: {user.email}")
+            # Log failed login attempt - wrong password
+            log_audit(
+                session=self.session,
+                action=AuditActionEnum.LOGIN_FAILED,
+                resource_type=AuditResourceTypeEnum.USER,
+                resource_id=db_user.id,
+                resource_name=db_user.email,
+                user_id=db_user.id,
+                details={"email": user.email, "reason": "Incorrect password", "tenant": tenant.realm_name},
+                request=request,
+                success=False,
+            )
             raise ClientException("Incorrect email or password")
 
         if db_user.status == UserStatusEnum.DELETED:
             logger.debug(f"User account is not active: {user.email}")
+            # Log failed login attempt - account deleted/inactive
+            log_audit(
+                session=self.session,
+                action=AuditActionEnum.LOGIN_FAILED,
+                resource_type=AuditResourceTypeEnum.USER,
+                resource_id=db_user.id,
+                resource_name=db_user.email,
+                user_id=db_user.id,
+                details={
+                    "email": user.email,
+                    "reason": "User account is not active",
+                    "status": db_user.status,
+                    "tenant": tenant.realm_name,
+                },
+                request=request,
+                success=False,
+            )
             raise ClientException("User account is not active")
 
         logger.debug(f"User Retrieved: {user.email}")
+
+        # Log successful login
+        log_audit(
+            session=self.session,
+            action=AuditActionEnum.LOGIN,
+            resource_type=AuditResourceTypeEnum.USER,
+            resource_id=db_user.id,
+            resource_name=db_user.email,
+            user_id=db_user.id,
+            details={"email": user.email, "tenant": tenant.realm_name if tenant else None},
+            request=request,
+            success=True,
+        )
 
         # Create auth token
         # token = await TokenService(self.session).create_auth_token(str(db_user.auth_id))
@@ -193,11 +324,13 @@ class AuthService(SessionMixin):
             logger.debug(f"::USER:: Tenant client: {tenant_client.id} {tenant_client.client_id}")
 
             keycloak_manager = KeycloakManager()
+            # Decrypt client secret for use
+            decrypted_secret = await tenant_client.get_decrypted_client_secret()
             credentials = TenantClientSchema(
                 id=tenant_client.id,
                 client_id=tenant_client.client_id,
                 client_named_id=tenant_client.client_named_id,
-                client_secret=tenant_client.client_secret,
+                client_secret=decrypted_secret,
             )
 
             # Refresh Token
@@ -206,8 +339,6 @@ class AuthService(SessionMixin):
                 credentials=credentials,
                 refresh_token=token.refresh_token,
             )
-
-            logger.debug(f"Token data: {token_data}")
 
             return RefreshTokenResponse(
                 code=status.HTTP_200_OK,
@@ -218,8 +349,54 @@ class AuthService(SessionMixin):
             logger.error(f"Failed to refresh token: {e}")
             raise ClientException("Failed to refresh token") from e
 
-    async def logout_user(self, logout_data: LogoutRequest) -> None:
-        """Logout a user by invalidating their refresh token."""
+    async def logout_user(self, logout_data: LogoutRequest, access_token: str | None = None) -> None:
+        """Logout a user by invalidating their refresh token and blacklisting access token."""
+        # Blacklist the access token if provided
+        if access_token:
+            try:
+                jwt_blacklist_service = JWTBlacklistService()
+                import time
+
+                # Try to decode the token to get its expiration
+                ttl = 3600  # Default 1 hour TTL
+
+                try:
+                    # Get default tenant for token validation
+                    default_tenant = await UserDataManager(self.session).retrieve_by_fields(
+                        Tenant, {"realm_name": app_settings.default_realm_name, "is_active": True}, missing_ok=True
+                    )
+                    if default_tenant:
+                        tenant_client = await UserDataManager(self.session).retrieve_by_fields(
+                            TenantClient, {"tenant_id": default_tenant.id}, missing_ok=True
+                        )
+                        if tenant_client:
+                            # Decrypt client secret for use
+                            decrypted_secret = await tenant_client.get_decrypted_client_secret()
+                            credentials = TenantClientSchema(
+                                id=tenant_client.id,
+                                client_named_id=tenant_client.client_named_id,
+                                client_id=tenant_client.client_id,
+                                client_secret=decrypted_secret,
+                            )
+                            keycloak_manager = KeycloakManager()
+                            decoded = await keycloak_manager.validate_token(
+                                access_token, default_tenant.realm_name, credentials
+                            )
+                            # Calculate TTL based on token expiration
+                            exp = decoded.get("exp", 0)
+                            current_time = int(time.time())
+                            if exp > current_time:
+                                ttl = exp - current_time
+                except Exception as e:
+                    logger.warning(f"Could not decode access token for TTL calculation: {e}")
+                    # Continue with default TTL
+
+                # Add token to blacklist with TTL using Dapr state store
+                await jwt_blacklist_service.blacklist_token(access_token, ttl=ttl)
+                logger.info(f"Access token blacklisted with TTL {ttl} seconds")
+            except Exception as e:
+                logger.error(f"Failed to blacklist access token: {e}")
+                # Continue with logout even if blacklisting fails
         # Get tenant information
         tenant = None
         if logout_data.tenant_id:
@@ -245,8 +422,13 @@ class AuthService(SessionMixin):
 
         # Logout from Keycloak
         keycloak_manager = KeycloakManager()
+        # Decrypt client secret for use
+        decrypted_secret = await tenant_client.get_decrypted_client_secret()
         credentials = TenantClientSchema(
-            id=tenant_client.id, client_id=tenant_client.client_id, client_secret=tenant_client.client_secret
+            id=tenant_client.id,
+            client_id=tenant_client.client_id,
+            client_named_id=tenant_client.client_named_id,
+            client_secret=decrypted_secret,
         )
 
         success = await keycloak_manager.logout_user(
@@ -256,7 +438,7 @@ class AuthService(SessionMixin):
         if not success:
             raise ClientException("Failed to logout user")
 
-    async def register_user(self, user: UserCreate) -> UserModel:
+    async def register_user(self, user: UserCreate, is_self_registration: bool = False) -> UserModel:
         # Check if email is already registered
         email_exists = await UserDataManager(self.session).retrieve_by_fields(
             UserModel, {"email": user.email}, missing_ok=True
@@ -330,21 +512,30 @@ class AuthService(SessionMixin):
                 user, app_settings.default_realm_name, tenant_client.client_id
             )
 
-            # Hash password
-            # salted_password = user.password + secrets_settings.password_salt
-            # user.password = await HashManager().get_hash(salted_password)
-            # logger.info(f"Password hashed for {user.email}")
+            # Hash password - CRITICAL: Never store plain text passwords!
+            if hasattr(user, "password") and user.password:
+                salted_password = user.password + secrets_settings.password_salt
+                hashed_password = await HashManager().get_hash(salted_password)
+                logger.info(f"Password hashed for {user.email}")
+            else:
+                hashed_password = None
 
-            user_data = user.model_dump(exclude={"permissions"})
+            user_data = user.model_dump(exclude={"permissions", "password"})
+            if hashed_password:
+                user_data["password"] = hashed_password
             user_data["color"] = UserColorEnum.get_random_color()
 
-            user_data["status"] = UserStatusEnum.INVITED
+            # Self-registered users are active immediately, admin-created users are invited
+            user_data["status"] = UserStatusEnum.ACTIVE if is_self_registration else UserStatusEnum.INVITED
 
             user_model = UserModel(**user_data)
             user_model.auth_id = user_auth_id
 
-            # NOTE: is_reset_password, first_login will be set to True by default |  # TODO
-            # NOTE: status wil be invited by default
+            # Users who register themselves set their own password, so no reset needed
+            # Admin-created users should reset their password on first login
+            user_model.is_reset_password = not is_self_registration
+
+            # NOTE: first_login will be set to True by default
             # Create user
             db_user = await UserDataManager(self.session).insert_one(user_model)
 
@@ -361,6 +552,42 @@ class AuthService(SessionMixin):
 
             await UserDataManager(self.session).insert_one(tenant_user_mapping)
             logger.info(f"User {db_user.email} mapped to tenant {tenant.name}")
+
+            # Assign free billing plan for CLIENT users
+            if user.user_type == UserTypeEnum.CLIENT:
+                try:
+                    from datetime import datetime, timezone
+                    from uuid import uuid4
+
+                    from budapp.billing_ops.models import UserBilling
+
+                    # Calculate billing period (monthly)
+                    now = datetime.now(timezone.utc)
+                    billing_period_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+                    # Get next month
+                    if billing_period_start.month == 12:
+                        billing_period_end = billing_period_start.replace(year=billing_period_start.year + 1, month=1)
+                    else:
+                        billing_period_end = billing_period_start.replace(month=billing_period_start.month + 1)
+
+                    # Create user billing with free plan
+                    user_billing = UserBilling(
+                        id=uuid4(),
+                        user_id=db_user.id,
+                        billing_plan_id=UUID("00000000-0000-0000-0000-000000000001"),  # Free plan ID
+                        billing_period_start=billing_period_start,
+                        billing_period_end=billing_period_end,
+                        is_active=True,
+                        is_suspended=False,
+                    )
+
+                    await UserDataManager(self.session).insert_one(user_billing)
+                    logger.info(f"Free billing plan assigned to client user: {db_user.email}")
+
+                except Exception as billing_error:
+                    logger.error(f"Failed to assign billing plan to user {db_user.email}: {billing_error}")
+                    # Don't fail the registration if billing assignment fails
 
             # Create a default project for CLIENT users
             if user.user_type == UserTypeEnum.CLIENT:
@@ -381,7 +608,7 @@ class AuthService(SessionMixin):
 
                     # Associate the user with the project
                     default_project.users.append(db_user)
-                    await self.session.commit()
+                    self.session.commit()
 
                     # Create permissions for the project in Keycloak
                     permission_service = PermissionService(self.session)

@@ -1,31 +1,30 @@
 import { create } from "zustand";
 import { Tag } from "@/components/ui/bud/dataEntry/TagsInput";
 import { Cluster } from "./useCluster";
+import { AppRequest } from "@/services/api/requests";
+import { successToast } from "@/components/toast";
 
-export type Project = {
+export type ProjectData = {
   id: string;
   name: string;
   description: string;
-  tags: Tag[];
-  icon: string;
-  created_user: {
-    name: string;
-    email: string;
-    id: string;
-    color: string;
-    role: string;
-  };
+  tags: Tag[] | null;
+  icon: string | null;
+  project_type: "client_app" | "existing_app";
+  created_by: string;
   created_at: string;
-  endpoints_count: number;
-  project?: any;
+  modified_at: string;
 };
 
-export interface IProject {
-  project: Project;
+export type Project = {
+  project: ProjectData;
   users_count: number;
   endpoints_count: number;
+  credentials_count: number;
   profile_colors: string[];
-}
+};
+
+export interface IProject extends Project {}
 
 export type Scopes =
   | "endpoint:view"
@@ -96,7 +95,7 @@ export const useProjects = create<{
   globalProjects: Project[];
   globalSelectedProject: Project | null;
   getGlobalProjects: (page: any, limit: any, search?: string) => void;
-  getGlobalProject: (projectId: string) => void;
+  getGlobalProject: (projectId: string) => Promise<any>;
 }>((set, get) => ({
   globalProjects: [],
   globalSelectedProject: null,
@@ -116,31 +115,89 @@ export const useProjects = create<{
   },
 
   getProjects: async (page: any, limit: any, search?: string) => {
-    // Stub implementation
-    return Promise.resolve({ projects: [], total_record: 0, total_pages: 0 });
+    let url;
+    if (search) {
+      url = `/projects/?page=${page}&limit=${limit}&search=true&name=${search}&order_by=-created_at`;
+    } else {
+      url = `/projects/?page=${page}&limit=${limit}&search=false&order_by=-created_at`;
+    }
+    set({ loading: true });
+    try {
+      const response: any = await AppRequest.Get(url);
+      set({
+        projects: response.data.projects,
+        totalProjects: response.data.total_record,
+        totalPages: response.data.total_pages
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching projects:", error);
+      return { projects: [], total_record: 0, total_pages: 0 };
+    } finally {
+      set({ loading: false });
+    }
   },
 
   getProjectTags: async () => {
-    // Stub implementation
+    const url = `/projects/tags?page=1&limit=1000`;
+    set({ loading: true });
+    try {
+      const response: any = await AppRequest.Get(url);
+      set({
+        projectTags: response.data.tags,
+      });
+    } catch (error) {
+      console.error("Error fetching project tags:", error);
+    } finally {
+      set({ loading: false });
+    }
   },
 
   getGlobalProjects: async (page: any, limit: any, search?: string) => {
-    // Stub implementation
+    let result = await get().getProjects(page, limit, search);
+    let updatedListData = result?.projects;
+    if (result && result?.page !== 1) {
+      updatedListData = [...get().globalProjects, ...updatedListData];
+    }
+    set({ globalProjects: updatedListData });
   },
 
   createProject: async (data: any): Promise<any> => {
-    // Stub implementation
-    return Promise.resolve({});
+    try {
+      const response: any = await AppRequest.Post("/projects/", data);
+      successToast(response.data.message || "Project created successfully");
+      return response.data.project;
+    } catch (error) {
+      console.error("Error creating project:", error);
+      throw error;
+    }
   },
 
   deleteProject: async (projectId: string, router: any): Promise<any> => {
-    // Stub implementation
-    return Promise.resolve({});
+    try {
+      const response: any = await AppRequest.Delete(`/projects/${projectId}`);
+      successToast(response.data.message || "Project deleted successfully");
+      if (router) {
+        setTimeout(() => {
+          router.back();
+        }, 600);
+      }
+      return response.data;
+    } catch (error) {
+      console.error("Error deleting project:", error);
+      throw error;
+    }
   },
 
   updateProject: async (projectId: string, data: any) => {
-    // Stub implementation
-    return Promise.resolve({});
+    try {
+      const response: any = await AppRequest.Patch(`/projects/${projectId}`, data);
+      successToast(response.data.message || "Project updated successfully");
+      return response.data.project;
+    } catch (error) {
+      console.error("Error updating project:", error);
+      throw error;
+    }
   },
 
   inviteMembers: async (
@@ -153,11 +210,27 @@ export const useProjects = create<{
   },
 
   getGlobalProject: async (projectId: string) => {
-    // Stub implementation
+    try {
+      const response: any = await AppRequest.Get(`/projects/${projectId}`);
+      // Check if response has nested structure or direct project
+      const projectData = response.data.project?.project ? response.data.project : response.data;
+      set({ globalSelectedProject: projectData });
+      return projectData;
+    } catch (error) {
+      console.error("Error fetching project:", error);
+    }
   },
 
-  getProject: async (projectId) => {
-    // Stub implementation
+  getProject: async (projectId: string) => {
+    try {
+      const response: any = await AppRequest.Get(`/projects/${projectId}`);
+      // Check if response has nested structure or direct project
+      const projectData = response.data.project?.project ? response.data.project : response.data;
+      set({ selectedProject: projectData });
+      return projectData;
+    } catch (error) {
+      console.error("Error fetching project:", error);
+    }
   },
 
   setSelectedProjectId: (projectId: string) => {

@@ -10,6 +10,7 @@ import { useEnvironment } from "@/components/providers/EnvironmentProvider";
 import { useUser } from "@/stores/useUser";
 import { successToast } from "@/components/toast";
 import { AppRequest } from "@/services/api/requests";
+import ContactAdmin from "../contactAdmin";
 
 interface DataInterface {
   email?: string;
@@ -17,7 +18,7 @@ interface DataInterface {
 }
 
 export default function Login() {
-  const { activePage, setAuthError } = useAuthNavigation();
+  const { activePage, setActivePage, setAuthError } = useAuthNavigation();
   const { showLoader, hideLoader } = useLoader();
   const router = useRouter();
   const [isBackToLogin, setIsBackToLogin] = useState(false);
@@ -89,7 +90,7 @@ export default function Login() {
         });
 
         // Handle different login scenarios
-        if (response.data.is_reset_password || response.data.first_login) {
+        if (response.data.is_reset_password) {
           router.push("/auth/resetPassword");
         } else {
           router.push("/models");
@@ -113,6 +114,23 @@ export default function Login() {
       hideLoader();
     }
   };
+  const handleForgetPassword = async (email: string) => {
+    showLoader();
+    try {
+      const response = await AppRequest.Post(`users/reset-password`, {
+        email,
+      });
+      if (response) {
+        setActivePage(1);
+      }
+      console.log("response", response);
+      successToast(response.data.message);
+      hideLoader();
+    } catch (error) {
+      console.error("Reset password error:", error);
+      hideLoader();
+    }
+  }
 
   return (
     <AuthLayout>
@@ -127,6 +145,7 @@ export default function Login() {
             className="w-[70%] h-full open-sans mt-[-1rem] flex justify-center items-center flex-col"
           >
             <>{activePage === 1 && <LoginForm onSubmit={handleLogin} />}</>
+              {activePage === 4 && <ContactAdmin onSubmit={handleForgetPassword} />}
             {/* Other pages can be added here - reset password, contact admin, etc. */}
           </motion.div>
         </AnimatePresence>

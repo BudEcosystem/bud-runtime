@@ -600,7 +600,7 @@ class QuantizationService(SessionMixin):
         Args:
             workflow_id: The ID of the workflow to cancel.
         """
-        cancel_model_quantization_endpoint = f"{app_settings.dapr_base_url}v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment/cancel/{workflow_id}"
+        cancel_model_quantization_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment/cancel/{workflow_id}"
 
         logger.debug(
             f"Performing cancel model quantization request to budcluster {cancel_model_quantization_endpoint}"

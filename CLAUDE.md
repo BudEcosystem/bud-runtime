@@ -438,3 +438,40 @@ Complete API documentation available in `docs/api/inference-endpoints.md` coveri
 - Error handling
 - Rate limiting
 - Best practices
+
+- Don't save any keys as plain text in DBs. Always use encryption. Security is of high priority.
+
+## Testing Best Practices (IMPORTANT)
+
+### Common Testing Pitfalls to Avoid
+
+1. **SQLAlchemy Modern API**: Don't mock `session.query()` - instead mock `execute_scalar`, `scalars_all`, and `scalar_one_or_none` from DataManagerUtils
+2. **CRUD Methods**: Pass individual parameters to CRUD methods, not Pydantic schema objects
+3. **Mock Completeness**: When mocking for Pydantic validation, include ALL required fields
+4. **JSON Format**: Use compact JSON format (no spaces) - `{"a":1}` not `{"a": 1}`
+5. **Boolean Serialization**: Use JSON format - `"true"`/`"false"` not `"True"`/`"False"`
+6. **Return Structure**: Always verify actual implementation for correct field names
+
+### Example of Correct Test Patterns
+
+```python
+# Correct SQLAlchemy mocking
+data_manager.execute_scalar = Mock(return_value=5)
+data_manager.scalars_all = Mock(return_value=[])
+
+# Correct CRUD usage
+data_manager.create_audit_record(
+    action=AuditActionEnum.CREATE,
+    resource_type=AuditResourceTypeEnum.PROJECT,
+    resource_id=uuid4(),
+    user_id=uuid4(),
+    details={"key": "value"}
+)
+
+# Complete mock for Pydantic
+record = Mock(spec=Model)
+record.id = uuid4()
+record.field1 = "value"
+record.field2 = 123
+# ... include ALL required fields
+```

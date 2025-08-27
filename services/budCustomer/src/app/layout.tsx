@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import { AntdRegistry } from "@ant-design/nextjs-registry";
 import { App } from "antd";
 import "./globals.css";
+import "../styles/globals.scss";
 import { AuthNavigationProvider, LoaderProvider } from "@/context/authContext";
 import { ThemeProvider } from "@/context/themeContext";
 import { ProjectProvider } from "@/context/projectContext";
@@ -11,6 +12,7 @@ import { AppInitializer } from "@/components/AppInitializer";
 import AuthGuard from "@/components/auth/AuthGuard";
 import { EnvironmentProvider } from "@/components/providers/EnvironmentProvider";
 import { getServerEnvironment } from "@/lib/environment";
+import { NovuCustomProvider } from "./providerNovu";
 
 const geistSans = localFont({
   src: "../../public/fonts/Geist-VariableFont_wght.ttf",
@@ -50,7 +52,9 @@ export default function RootLayout({
                   <AppInitializer />
                   <AuthNavigationProvider>
                     <LoaderProvider>
-                      <ProjectProvider>{children}</ProjectProvider>
+                      <NovuCustomProvider>
+                        <ProjectProvider>{children}</ProjectProvider>
+                      </NovuCustomProvider>
                     </LoaderProvider>
                   </AuthNavigationProvider>
                 </NotificationProvider>

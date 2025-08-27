@@ -407,6 +407,8 @@ class ModelDetailSuccessResponse(SuccessResponse):
     eval_result: dict | None = None  # TODO: integrate actual eval result
     model_tree: ModelTree
     endpoints_count: int
+    endpoint_id: str | None = None
+    endpoint_name: str | None = None
 
 
 class CreateCloudModelWorkflowRequest(BaseModel):
@@ -1263,11 +1265,15 @@ class ModelCatalogItem(BaseModel):
     author: Optional[str] = None
     model_size: Optional[int] = None
     provider_type: ModelProviderTypeEnum
+    uri: str
+    source: str
+    provider_icon: Optional[str] = None
     # Pricing information
     pricing: Optional[DeploymentPricingInfo] = None
     # Publication metadata
     published_date: datetime
     endpoint_id: UUID4
+    endpoint_name: str
     supported_endpoints: List[ModelEndpointEnum]
 
     @field_serializer("modality")

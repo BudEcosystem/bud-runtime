@@ -1,0 +1,6 @@
+ingress:
+    hosts:
+        root: adarsh.bud.studio
+
+# disable keel
+deploymentAnnotations: null

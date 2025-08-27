@@ -22,10 +22,11 @@ from uuid import UUID
 from fastapi import HTTPException, status
 
 from budapp.commons import logging
-from budapp.commons.config import app_settings
+from budapp.commons.config import app_settings, secrets_settings
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import BudNotifyException, ClientException
 from budapp.commons.keycloak import KeycloakManager
+from budapp.commons.security import HashManager
 from budapp.core.schemas import SubscriberCreate, SubscriberUpdate
 from budapp.shared.notification_service import BudNotifyHandler
 from budapp.user_ops.crud import UserDataManager
@@ -97,13 +98,23 @@ class UserService(SessionMixin):
             )
 
         if "password" in fields:
+            # Store the plain password temporarily for Keycloak
+            plain_password = fields["password"]
+
             # Keycloak Manager
             keycloak_manager = KeycloakManager()
             await keycloak_manager.update_user_password(
                 current_user.auth_id,
-                fields["password"],
+                plain_password,
                 realm_name,
             )
+
+            # Hash the password for database storage - CRITICAL SECURITY FIX
+            hash_manager = HashManager()
+            salted_password = plain_password + secrets_settings.password_salt
+            hashed_password = await hash_manager.get_hash(salted_password)
+            fields["password"] = hashed_password
+            logger.info(f"Password hashed for user {user_id}")
 
             if user_id == current_user.id:
                 # Updating user own password doesn't require password after login
@@ -168,12 +179,13 @@ class UserService(SessionMixin):
                 logger.error("User token is missing")
                 raise ClientException("User authentication token not found", status_code=401)
 
-            # Credentials
+            # Credentials - decrypt client secret for use
+            decrypted_secret = await tenant_client.get_decrypted_client_secret()
             credentials = TenantClientSchema(
                 id=tenant_client.id,
                 client_named_id=tenant_client.client_named_id,
                 client_id=tenant_client.client_id,
-                client_secret=tenant_client.client_secret,
+                client_secret=decrypted_secret,
             )
 
             # Keycloak Manager

@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import {
   Flex,
@@ -20,6 +20,9 @@ const { Text, Title } = Typography;
 import { Icon } from "@iconify/react/dist/iconify.js";
 import styles from "./usage.module.scss";
 import dayjs from "dayjs";
+import { AppRequest } from "@/services/api/requests";
+import { formatDate } from "src/utils/formatDate";
+import { useProjects } from "@/hooks/useProjects";
 
 const { RangePicker } = DatePicker;
 
@@ -41,8 +44,12 @@ interface BillingAlert {
 }
 
 export default function UsagePage() {
+  const { globalProjects, getGlobalProjects, loading, getGlobalProject } =
+      useProjects();
   const [timeRange, setTimeRange] = useState("7d");
   const [selectedModel, setSelectedModel] = useState("all");
+  const [selectedProject, setSelectedProject] = useState("all");
+  const [availableProjects, setAvailableProjects] = useState<any>([]);
   const [showAlertModal, setShowAlertModal] = useState(false);
   const [alertType, setAlertType] = useState<"cost" | "usage" | "requests">(
     "cost",
@@ -50,60 +57,29 @@ export default function UsagePage() {
   const [alertThreshold, setAlertThreshold] = useState(100);
 
   // Mock billing plan data
-  const billingPlan = {
-    name: "Pro Plan",
-    cost: "$49/month",
-    quotaLimit: 1000000, // tokens
-    quotaUsed: 750000,
-    requestsLimit: 10000,
-    requestsUsed: 7500,
-    billingCycle: "Monthly",
-    nextBilling: "2024-02-15",
-  };
+  const [billingPlan, setBillingPlan] = useState({
+    has_billing: false,
+    billing_period_start: "",
+    billing_period_end: "",
+    plan_name: "Free",
+    base_monthly_price: 0.0,
+    usage: {
+        tokens_used: 0,
+        tokens_quota: 0,
+        tokens_usage_percent: 0,
+        cost_used: 0,
+        cost_quota: 0,
+        cost_usage_percent: 0,
+        request_count: 0,
+        success_rate: 0
+    },
+    is_suspended: false,
+    suspension_reason: null
+  });
 
   // Mock usage data
-  const usageData: UsageData[] = [
-    {
-      date: "2024-01-20",
-      tokens: 15420,
-      cost: 12.5,
-      requests: 150,
-      model: "gpt-4",
-      endpoint: "/v1/chat/completions",
-    },
-    {
-      date: "2024-01-19",
-      tokens: 12800,
-      cost: 10.2,
-      requests: 120,
-      model: "claude-3-opus",
-      endpoint: "/v1/chat/completions",
-    },
-    {
-      date: "2024-01-18",
-      tokens: 9200,
-      cost: 7.8,
-      requests: 95,
-      model: "gpt-3.5-turbo",
-      endpoint: "/v1/chat/completions",
-    },
-    {
-      date: "2024-01-17",
-      tokens: 18500,
-      cost: 15.4,
-      requests: 180,
-      model: "gpt-4",
-      endpoint: "/v1/chat/completions",
-    },
-    {
-      date: "2024-01-16",
-      tokens: 11300,
-      cost: 9.1,
-      requests: 110,
-      model: "claude-3-sonnet",
-      endpoint: "/v1/chat/completions",
-    },
-  ];
+  const [usageData, setUsageData] =  useState<UsageData[]>([]);
+  const [filterParams, setFilterParams] = useState({});
 
   // Mock alerts
   const [alerts, setAlerts] = useState<BillingAlert[]>([
@@ -125,14 +101,14 @@ export default function UsagePage() {
         colorText: "var(--text-primary)",
         optionSelectedColor: "var(--text-primary)",
         optionActiveBg: "var(--bg-hover)",
-      }
-    }
-  }
+      },
+    },
+  };
 
-  const getUsagePercentage = () =>
-    (billingPlan.quotaUsed / billingPlan.quotaLimit) * 100;
-  const getRequestsPercentage = () =>
-    (billingPlan.requestsUsed / billingPlan.requestsLimit) * 100;
+  // const getUsagePercentage = () =>
+  //   (billingPlan.usage.tokens_used / billingPlan.quotaLimit) * 100;
+  // const getRequestsPercentage = () =>
+  //   (billingPlan.requestsUsed / billingPlan.requestsLimit) * 100;
 
   const handleCreateAlert = () => {
     const newAlert: BillingAlert = {
@@ -153,6 +129,108 @@ export default function UsagePage() {
       ),
     );
   };
+
+  const fetchUsageData = async() => {
+    try {
+      const response = await AppRequest.Get("/billing/current");
+      setBillingPlan(response.data.result);
+    } catch (error) {
+      console.error("Failed to fetch usage data:", error);
+    } finally {
+    }
+  }
+
+  const fetchBillingHistoryData = async(params: any) => {
+    try {
+      const response = await AppRequest.Post("/billing/history", params);
+      setUsageData(response.data.result.data);
+    } catch (error) {
+      console.error("Failed to fetch usage data:", error);
+    } finally {
+    }
+  }
+
+  useEffect(()=> {
+    const projectsList: any = globalProjects.map((item)=> ({value: item.project.id, label: item.project.name}))
+    setAvailableProjects([
+      { value: "all", label: "All Projects" },
+      ...projectsList,
+    ]);
+  }, [globalProjects])
+
+  useEffect(() => {
+    fetchUsageData();
+    getGlobalProjects(1, 1000);
+  }, []);
+
+  const pad = (n: number) => {
+    return n < 10 ? "0" + n : n;
+  }
+
+  const formatDateString = (date: Date, endOfDay = false) => {
+    const y = date.getFullYear();
+    const m = pad(date.getMonth() + 1);
+    const d = pad(date.getDate());
+
+    if (endOfDay) {
+      return `${y}-${m}-${d} 23:59:59`;
+    } else {
+      return `${y}-${m}-${d} 00:00:00`;
+    }
+  }
+
+  const getDateRange = (option: string) => {
+    const now = new Date();
+    const end = new Date(now);
+    end.setHours(23, 59, 59, 999);
+
+    let start = new Date(now);
+
+    switch (option) {
+      case "1d":
+        // yesterday 00:00:00
+        start.setDate(start.getDate() - 1);
+        start.setHours(0, 0, 0, 0);
+        break;
+
+      case "7d":
+        start.setDate(start.getDate() - 7);
+        start.setHours(0, 0, 0, 0);
+        break;
+
+      case "30d":
+        start.setDate(start.getDate() - 30);
+        start.setHours(0, 0, 0, 0);
+        break;
+
+      case "90d":
+        start.setDate(start.getDate() - 90);
+        start.setHours(0, 0, 0, 0);
+        break;
+
+      default:
+        throw new Error("Invalid option selected");
+    }
+    return {
+      start: formatDateString(start, false), // 00:00:00
+      end: formatDateString(end, true),      // 23:59:59
+    };
+  }
+
+  useEffect(()=> {
+    const dateRanges = getDateRange(timeRange)
+    let params: any = {
+      ...filterParams,
+      granularity: 'daily',
+      start_date: dateRanges.start,
+      end_date: dateRanges.end
+    };
+    if(selectedProject != 'all') {
+      params = {...params, project_id: selectedProject}
+    }
+    setFilterParams(params)
+    fetchBillingHistoryData(params);
+  }, [timeRange, selectedProject])
 
   const columns = [
     {
@@ -238,7 +316,7 @@ export default function UsagePage() {
             <Button
               type="primary"
               icon={<Icon icon="ph:bell" />}
-              className="bg-bud-purple border-bud-purple hover:bg-bud-purple-hover h-[2.5rem] px-[1.5rem]"
+              className="bg-bud-purple border-bud-purple hover:bg-bud-purple-hover h-[2.5rem] px-[1.5rem] hidden"
               onClick={() => setShowAlertModal(true)}
             >
               Set Alert
@@ -259,13 +337,13 @@ export default function UsagePage() {
                 </Text>
               </Flex>
               <Text className="text-bud-text-primary text-[24px] font-medium mb-[0.5rem] block">
-                {billingPlan.name}
+                {billingPlan.plan_name}
               </Text>
               <Text className="text-bud-text-muted text-[14px] mb-[1rem] block">
-                {billingPlan.cost}
+                ${billingPlan.base_monthly_price}/month
               </Text>
               <Text className="text-bud-text-disabled text-[12px]">
-                Next billing: {billingPlan.nextBilling}
+                Next billing: {formatDate(billingPlan.billing_period_end)}
               </Text>
             </Card>
 
@@ -281,13 +359,13 @@ export default function UsagePage() {
                 </Text>
               </Flex>
               <Text className="text-bud-text-primary text-[24px] font-medium mb-[0.5rem] block">
-                {(billingPlan.quotaUsed / 1000).toFixed(0)}K
+                {(billingPlan.usage.tokens_used / 1000).toFixed(0)}K
               </Text>
               <Text className="text-bud-text-muted text-[12px] mb-[1rem] block">
-                of {(billingPlan.quotaLimit / 1000).toFixed(0)}K tokens
+                of {(billingPlan.usage.tokens_quota / 1000).toFixed(0)}K tokens
               </Text>
               <Progress
-                percent={getUsagePercentage()}
+                percent={billingPlan.usage.tokens_usage_percent}
                 strokeColor="#4077E6"
                 trailColor="var(--bud-border-secondary)"
                 showInfo={false}
@@ -303,17 +381,17 @@ export default function UsagePage() {
                   className="text-[#479D5F] text-[1.5rem]"
                 />
                 <Text className="text-bud-text-primary font-semibold text-[15px]">
-                  API Requests
+                  Cost
                 </Text>
               </Flex>
               <Text className="text-bud-text-primary text-[24px] font-medium mb-[0.5rem] block">
-                {billingPlan.requestsUsed.toLocaleString()}
+                $ {billingPlan.usage.cost_used.toFixed(2)}
               </Text>
               <Text className="text-bud-text-muted text-[12px] mb-[1rem] block">
-                of {billingPlan.requestsLimit.toLocaleString()} requests
+                of ${billingPlan.usage.cost_quota.toLocaleString()}
               </Text>
               <Progress
-                percent={getRequestsPercentage()}
+                percent={billingPlan.usage.cost_usage_percent}
                 strokeColor="#479D5F"
                 trailColor="var(--bud-border-secondary)"
                 showInfo={false}
@@ -321,6 +399,51 @@ export default function UsagePage() {
               />
             </Card>
           </div>
+
+          {/* Filters */}
+          <Flex gap={16} className="mb-[2rem]" wrap="wrap">
+            <ConfigProvider
+              theme={themeConfig}>
+              <Select
+                value={timeRange}
+                onChange={setTimeRange}
+                style={{ width: 150 }}
+                className={styles.selectFilter}
+                options={[
+                  { value: "1d", label: "Last 24h" },
+                  { value: "7d", label: "Last 7 days" },
+                  { value: "30d", label: "Last 30 days" },
+                  { value: "90d", label: "Last 90 days" },
+                ]}
+              />
+            </ConfigProvider>
+            {/* <ConfigProvider
+              theme={themeConfig}>
+              <Select
+                value={selectedModel}
+                onChange={setSelectedModel}
+                style={{ width: 200 }}
+                className={styles.selectFilter}
+                options={[
+                  { value: "all", label: "All Models" },
+                  { value: "gpt-4", label: "GPT-4" },
+                  { value: "gpt-3.5-turbo", label: "GPT-3.5 Turbo" },
+                  { value: "claude-3-opus", label: "Claude 3 Opus" },
+                  { value: "claude-3-sonnet", label: "Claude 3 Sonnet" },
+                ]}
+              />
+            </ConfigProvider> */}
+            <ConfigProvider
+              theme={themeConfig}>
+              <Select
+                value={selectedProject}
+                onChange={setSelectedProject}
+                style={{ width: 200 }}
+                className={styles.selectFilter}
+                options={availableProjects}
+              />
+            </ConfigProvider>
+          </Flex>
 
           {/* Usage Statistics */}
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-[1rem] mb-[2rem]">
@@ -353,15 +476,14 @@ export default function UsagePage() {
                 Avg Cost/Token
               </Text>
               <Text className="text-bud-text-primary text-[24px] font-medium mt-[0.5rem] block">
-                ${((totalCost / totalTokens) * 1000).toFixed(3)}
+                ${totalCost ? ((totalCost / totalTokens)).toFixed(3) : 0}
               </Text>
             </div>
           </div>
 
           {/* Filters */}
           <Flex gap={16} className="mb-[2rem]" wrap="wrap">
-            <ConfigProvider
-              theme={themeConfig}>
+            <ConfigProvider theme={themeConfig}>
               <Select
                 value={timeRange}
                 onChange={setTimeRange}
@@ -375,8 +497,7 @@ export default function UsagePage() {
                 ]}
               />
             </ConfigProvider>
-            <ConfigProvider
-              theme={themeConfig}>
+            <ConfigProvider theme={themeConfig}>
               <Select
                 value={selectedModel}
                 onChange={setSelectedModel}
@@ -394,7 +515,7 @@ export default function UsagePage() {
           </Flex>
 
           {/* Billing Alerts */}
-          <Card className="bg-bud-bg-secondary border-bud-border rounded-[12px] mb-[2rem]">
+          <Card className="bg-bud-bg-secondary border-bud-border rounded-[12px] mb-[2rem] hidden">
             <Flex
               justify="space-between"
               align="center"

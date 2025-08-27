@@ -17,7 +17,7 @@ spec:
         app: {{ .Release.Name}}-budapp
       annotations:
         dapr.io/enabled: "true"
-        dapr.io/app-id: "budapp"
+        dapr.io/app-id: {{ .Values.microservices.budapp.daprid }}
         dapr.io/app-port: "9082"
     spec:
       containers:
@@ -37,7 +37,21 @@ spec:
                 key: private-key-password
           - name: PUBLIC_KEY_PATH
             value: "/app/keys/rsa-public-key.pem"
-        {{ $root := . }}
+          - name: BUD_CLUSTER_APP_ID
+            value: {{ .Values.microservices.budcluster.daprid }}
+          - name: BUD_MODEL_APP_ID
+            value: {{ .Values.microservices.budmodel.daprid }}
+          - name: BUD_METRICS_APP_ID
+            value: {{ .Values.microservices.budmetrics.daprid }}
+          - name: BUD_NOTIFY_APP_ID
+            value: {{ .Values.microservices.budnotify.daprid }}
+          - name: BUD_SIMULATOR_APP_ID
+            value: {{ .Values.microservices.budsim.daprid }}
+          - name: BUD_EVAL_APP_ID
+            value: {{ .Values.microservices.budeval.daprid }}
+          - name: CORS_ORIGINS
+            value: {{ join "," .Values.microservices.budapp.corsOrigins }},{{ include "bud.ingress.url.budadmin" $ }},{{ include "bud.ingress.url.budplayground" $ }},{{ include "bud.ingress.url.budcustomer" $ }}
+        {{- $root := . }}
         {{- range $key, $value := .Values.microservices.budapp.env }}
           - name: {{ $key }}
             value: {{ tpl $value $root | quote }}

@@ -20,7 +20,8 @@ import datetime
 import math
 import re
 from http import HTTPStatus
-from typing import Any, ClassVar, Dict, Generic, Optional, Set, Tuple, Type, TypeVar, Union
+from typing import Any, ClassVar, Dict, Generic, List, Optional, Set, Tuple, Type, TypeVar, Union
+from uuid import UUID
 
 from fastapi.responses import JSONResponse
 from pydantic import (
@@ -352,8 +353,12 @@ class ErrorResponse(ResponseBase):
         Returns:
             dict: The validated and potentially adjusted data.
         """
-        data["type"] = data.get("type") or cls.to_pascal_case(HTTPStatus(data["code"]).phrase, suffix="Error")
-        data["message"] = data.get("message") or HTTPStatus(data["code"]).description
+        # Use default code if not provided
+        code = data.get("code", HTTPStatus.INTERNAL_SERVER_ERROR.value)
+        data["code"] = code
+
+        data["type"] = data.get("type") or cls.to_pascal_case(HTTPStatus(code).phrase, suffix="Error")
+        data["message"] = data.get("message") or HTTPStatus(code).description
 
         return data
 
@@ -390,3 +395,38 @@ class BudNotificationMetadata(BaseModel):
     workflow_id: str
     subscriber_ids: str
     name: str
+
+
+# Proxy-related schemas for guardrails integration
+
+
+class ProxyGuardrailRuleConfig(BaseModel):
+    """Rule configuration for proxy."""
+
+    rule_id: UUID
+    rule_name: str
+    sentinel_id: Optional[str] = None
+    is_enabled: bool
+    configuration: Optional[Dict[str, Any]] = None
+    threshold_override: Optional[float] = None
+
+
+class ProxyGuardrailProbeConfig(BaseModel):
+    """Probe configuration for proxy."""
+
+    probe_id: UUID
+    probe_name: str
+    sentinel_id: Optional[str] = None
+    is_enabled: bool
+    configuration: Optional[Dict[str, Any]] = None
+    threshold_override: Optional[float] = None
+    rules: List[ProxyGuardrailRuleConfig]
+
+
+class ProxyGuardrailConfig(BaseModel):
+    """Guardrail configuration for proxy."""
+
+    name: str
+    configuration: Optional[Dict[str, Any]] = None
+    default_threshold: Optional[float] = None
+    probes: List[ProxyGuardrailProbeConfig]

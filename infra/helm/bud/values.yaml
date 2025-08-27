@@ -36,10 +36,15 @@ microservices:
         image: budstudio/budproxy:nightly
     askbud:
         image: budstudio/askbud:nightly
+        daprid: askbud
         env:
             INFERENCE_MODEL: qwen3-32b
     budapp:
         image: budstudio/budapp:nightly
+        daprid: budapp
+        corsOrigins:
+            - "http://localhost:3000"
+            - "http://localhost:3001"
         env:
             APP_CONFIG: '{}'
             STATIC_DIR: /data/static-dir
@@ -66,9 +71,10 @@ microservices:
     # backend internal services
     budcluster:
         image: budstudio/budcluster:nightly
+        daprid: budcluster
         env:
             APP_CONFIG: '{}'
-            LOG_LEVEL: DEBUG
+            LOG_LEVEL: INFO
             RSA_KEY_NAME: rsa-private-key.pem
             VOLUME_TYPE: nfs
 
@@ -98,6 +104,7 @@ microservices:
             MINIO_ENDPOINT: '{{ .Release.Name }}-minio:{{ .Values.minio.service.ports.api }}'
             MINIO_SECURE: "false"
     budmetrics:
+        daprid: budmetrics
         image: budstudio/budmetrics:nightly
         env:
             #deadlink
@@ -116,8 +123,9 @@ microservices:
             SECRETS_CLICKHOUSE_PASSWORD: '{{ .Values.clickhouse.auth.password }}'
     budmodel:
         image: budstudio/budmodel:nightly
+        daprid: budmodel
         env:
-            LOG_LEVEL: DEBUG
+            LOG_LEVEL: INFO
 
             PSQL_HOST: '{{ $.Release.Name }}-postgresql'
             PSQL_PORT: "5432"
@@ -126,6 +134,7 @@ microservices:
             PSQL_DB_NAME: budmodel
     budeval:
         image: budstudio/budeval:nightly
+        daprid: budeval
         env:
             PSQL_HOST: '{{ $.Release.Name }}-postgresql'
             PSQL_PORT: "5432"
@@ -134,6 +143,7 @@ microservices:
             PSQL_DB_NAME: budeval
     budsim:
         image: budstudio/budsim:nightly
+        daprid: budsim
         env:
             LOG_LEVEL: INFO
 
@@ -144,6 +154,7 @@ microservices:
             PSQL_DB_NAME: budsim
     budnotify:
         image: budstudio/budnotify:nightly
+        daprid: budnotify
     global:
         env:
             PROMETHEUS_URL: https://metric.bud.studio
@@ -172,13 +183,8 @@ microservices:
             APP_PORT_BUDPROXY: "3000"
             AWS_ACCESS_KEY_ID: test
             AWS_SECRET_ACCESS_KEY: test
-            BUD_CLUSTER_APP_ID: budcluster
             BUD_CONNECT_URL: https://budconnect.bud.studio
             BUD_LLM_MODEL: qwen3-32b
-            BUD_METRICS_APP_ID: budmetrics
-            BUD_MODEL_APP_ID: budmodel
-            BUD_NOTIFY_APP_ID: budnotify
-            BUD_SIMULATOR_APP_ID: budsim
             CI: "true"
             CLICKHOUSE_USER: '{{ .Values.clickhouse.auth.username }}'
             CLICKHOUSE_PASSWORD: '{{ .Values.clickhouse.auth.password }}'
@@ -194,7 +200,7 @@ microservices:
             IS_MULTI_TENANCY_ENABLED: "true"
             IS_TOPIC_NOTIFICATION_ENABLED: "true"
             LITELLM_PROXY_SERVER_IMAGE: ghcr.io/berriai/litellm:main-latest
-            LOG_LEVEL: DEBUG
+            LOG_LEVEL: INFO
             MINIO_ACCESS_KEY: '{{ .Values.minio.auth.rootUser }}'
             MINIO_BUCKET: models-registry
             MINIO_ENDPOINT: '{{ .Release.Name }}-minio:{{ .Values.minio.service.ports.api }}'
@@ -268,6 +274,12 @@ clickhouseExtra:
         - budeval
 postgresql:
     enabled: true
+    primary:
+        resources:
+            requests:
+                memory: 256Mi
+            limits:
+                memory: 512Mi
     architecture: standalone
     auth:
         postgresPassword: bud
@@ -301,7 +313,11 @@ kafka:
     enabled: true
     clusterId: bud
     controller:
-        replicaCount: 1
+        resources:
+            requests:
+                memory: 1024Mi
+            limits:
+                memory: 2048Mi
     tls:
         existingSecret: kafka-jks
         keystorePassword: jksPassword
@@ -343,6 +359,11 @@ novu:
         existingSecret: '{{ $.Release.Name }}-novu-externals3'
 minio:
     enabled: true
+    resources:
+        requests:
+            memory: 512Mi
+        limits:
+            memory: 1024Mi
     provisioning:
         enabled: true
         buckets:

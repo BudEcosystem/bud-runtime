@@ -175,8 +175,8 @@ import os
 models = [
     dict(
         type=OpenAISDK,
-        abbr=os.environ.get('MODEL_NAME', 'qwen3-4b'),
-        path=os.environ.get('MODEL_NAME', 'qwen3-4b'),  # Actual model name for API
+        abbr=os.environ.get('MODEL_NAME', 'qwen3-32b'),
+        path=os.environ.get('MODEL_NAME', 'qwen3-32b'),  # Actual model name for API
         key=os.environ.get('OPENAI_API_KEY'),
         openai_api_base=os.environ.get('OPENAI_API_BASE'),
         query_per_second={int(request.model.extra_params.get("query_per_second", "10"))},

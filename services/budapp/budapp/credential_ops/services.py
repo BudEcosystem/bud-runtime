@@ -4,15 +4,21 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, Dict, List, Optional, Union
 from uuid import UUID
 
-from fastapi import HTTPException, status
+import httpx
+from fastapi import HTTPException, Request, status
 from fastapi.exceptions import HTTPException
 
+from budapp.audit_ops import log_audit
 from budapp.commons import logging
 from budapp.commons.config import app_settings
 from budapp.commons.constants import (
     ApiCredentialTypeEnum,
+    AuditActionEnum,
+    AuditResourceTypeEnum,
     EndpointStatusEnum,
     ModelProviderTypeEnum,
+    NotificationCategory,
+    NotificationStatus,
     PermissionEnum,
     ProjectStatusEnum,
     ProjectTypeEnum,
@@ -30,6 +36,7 @@ from budapp.model_ops.models import Provider as ProviderModel
 from budapp.permissions.crud import PermissionDataManager, ProjectPermissionDataManager
 from budapp.project_ops.crud import ProjectDataManager
 from budapp.project_ops.services import ProjectService
+from budapp.shared.notification_service import BudNotifyService, NotificationBuilder
 from budapp.shared.redis_service import RedisService, cache
 from budapp.user_ops.crud import UserDataManager
 from budapp.user_ops.models import User as UserModel
@@ -42,20 +49,16 @@ from .models import Credential as CredentialModel
 from .models import ProprietaryCredential as ProprietaryCredentialModel
 from .schemas import (
     BudCredentialCreate,
-    CacheConfig,
     CloudProvidersCreateRequest,
     CredentialDetails,
     CredentialRequest,
     CredentialResponse,
     CredentialUpdate,
-    ModelConfig,
     ProprietaryCredentialDetailedView,
     ProprietaryCredentialRequest,
     ProprietaryCredentialResponse,
     ProprietaryCredentialResponseList,
     ProprietaryCredentialUpdate,
-    RouterConfig,
-    RoutingPolicy,
 )
 
 
@@ -69,7 +72,9 @@ class CredentialService(SessionMixin):
         )
         return db_credential is not None
 
-    async def add_credential(self, current_user_id: UUID, credential: CredentialRequest) -> CredentialResponse:
+    async def add_credential(
+        self, current_user_id: UUID, credential: CredentialRequest, request: Optional[Request] = None
+    ) -> CredentialResponse:
         # Validate project id
         db_project = await ProjectDataManager(self.session).retrieve_project_by_fields(
             {"id": credential.project_id, "status": ProjectStatusEnum.ACTIVE}
@@ -94,16 +99,42 @@ class CredentialService(SessionMixin):
         # Add or generate credential
         db_credential = await self.add_or_generate_credential(credential, current_user_id)
 
-        await self.update_proxy_cache(db_credential.project_id, db_credential.key, db_credential.expiry)
+        # Decrypt the key for cache update
+        decrypted_key = await RSAHandler().decrypt(db_credential.encrypted_key)
+        await self.update_proxy_cache(db_credential.project_id, decrypted_key, db_credential.expiry)
 
+        # Log successful credential creation
+        audit_details = {
+            "credential_name": db_credential.name,
+            "project_name": db_project.name,
+            "expiry": str(db_credential.expiry) if db_credential.expiry else None,
+        }
+        if db_credential.max_budget is not None:
+            audit_details["max_budget"] = db_credential.max_budget
+
+        log_audit(
+            session=self.session,
+            action=AuditActionEnum.CREATE,
+            resource_type=AuditResourceTypeEnum.API_KEY,
+            resource_id=db_credential.id,
+            resource_name=db_credential.name,
+            user_id=current_user_id,
+            details=audit_details,
+            request=request,
+            success=True,
+        )
+
+        # Use the encrypted key directly
         credential_response = CredentialResponse(
             name=db_credential.name,
             project_id=db_credential.project_id,
-            key=await RSAHandler().encrypt(db_credential.key),
+            key=db_credential.encrypted_key,  # Already encrypted
             expiry=db_credential.expiry,
             max_budget=db_credential.max_budget,
             model_budgets=db_credential.model_budgets,
             id=db_credential.id,
+            created_at=db_credential.created_at,
+            last_used_at=db_credential.last_used_at,
             credential_type=db_credential.credential_type,
             ip_whitelist=db_credential.ip_whitelist,
         )
@@ -159,12 +190,16 @@ class CredentialService(SessionMixin):
         api_key = generate_secure_api_key(credential_type.value)
 
         expiry = datetime.now(UTC) + timedelta(days=request.expiry) if request.expiry else None
+
+        # Encrypt the API key for storage
+        encrypted_api_key = await RSAHandler().encrypt(api_key)
+
         credential_data = BudCredentialCreate(
             name=request.name,
             user_id=user_id,
             project_id=request.project_id,
             expiry=expiry,
-            key=api_key,
+            encrypted_key=encrypted_api_key,
             max_budget=request.max_budget,
             model_budgets=request.model_budgets,
             credential_type=credential_type,
@@ -173,9 +208,40 @@ class CredentialService(SessionMixin):
 
         # Insert credential in to database
         credential_model = CredentialModel(**credential_data.model_dump())
-        credential_model.hashed_key = CredentialModel.set_hashed_key(credential_model.key)
+        credential_model.hashed_key = CredentialModel.set_hashed_key(api_key)
         db_credential = await CredentialDataManager(self.session).create_credential(credential_model)
         logger.info(f"Credential inserted to database: {db_credential.id}")
+
+        # Send notification for CLIENT_APP credential creation
+        if credential_type == ApiCredentialTypeEnum.CLIENT_APP:
+            try:
+                notification = (
+                    NotificationBuilder()
+                    .set_content(
+                        title="Client App API Key Created",
+                        message=f"API key '{db_credential.name}' has been successfully created for your client app project",
+                        status=NotificationStatus.COMPLETED,
+                        icon="key",
+                        result={
+                            "credential_id": str(db_credential.id),
+                            "credential_name": db_credential.name,
+                            "project_id": str(db_credential.project_id),
+                            "project_name": db_project.name,
+                        },
+                    )
+                    .set_payload(
+                        category=NotificationCategory.INAPP,
+                        type="credential_creation",
+                        source=app_settings.source_topic,
+                    )
+                    .set_notification_request(subscriber_ids=str(user_id))
+                    .build()
+                )
+                await BudNotifyService().send_notification(notification)
+                logger.info(f"Notification sent for CLIENT_APP credential creation: {db_credential.id}")
+            except Exception as e:
+                logger.error(f"Failed to send notification for CLIENT_APP credential creation: {e}")
+                # Don't fail the credential creation if notification fails
 
         return db_credential
 
@@ -201,18 +267,22 @@ class CredentialService(SessionMixin):
                 filters={"project_id": project_id}
             )
             for credential in db_credentials:
+                # Decrypt API key from encrypted storage
+                decrypted_key = await RSAHandler().decrypt(credential.encrypted_key)
+
                 keys_to_update.append(
                     {
-                        "api_key": credential.key,
+                        "api_key": decrypted_key,
                         "expiry": credential.expiry,
                         "credential_id": credential.id,
                         "user_id": credential.user_id,  # Using existing user_id field
                     }
                 )
         else:
-            # Fetch credential details for single key update
+            # Fetch credential details for single key update using hashed key
+            hashed_key = CredentialModel.set_hashed_key(api_key)
             credential = await CredentialDataManager(self.session).retrieve_credential_by_fields(
-                {"key": api_key, "project_id": project_id}, missing_ok=True
+                {"hashed_key": hashed_key, "project_id": project_id}, missing_ok=True
             )
             keys_to_update.append(
                 {
@@ -260,8 +330,11 @@ class CredentialService(SessionMixin):
             ttl = None
             if key_info["expiry"]:
                 ttl = int((key_info["expiry"] - datetime.now()).total_seconds())
-            # Store with flat structure including metadata
-            await redis_service.set(f"api_key:{key_info['api_key']}", json.dumps(cache_data), ex=ttl)
+
+            # Hash the API key before storing in Redis (consistent with database storage)
+            hashed_key = CredentialModel.set_hashed_key(key_info["api_key"])
+            # Store with flat structure including metadata using hashed key
+            await redis_service.set(f"api_key:{hashed_key}", json.dumps(cache_data), ex=ttl)
 
         logger.info(f"Updated {len(keys_to_update)} api keys in proxy cache with metadata")
 
@@ -289,10 +362,6 @@ class CredentialService(SessionMixin):
         )
         return await self.parse_credentials(db_credentials), count
 
-    async def retrieve_credential_details(self, api_key: str) -> CredentialModel:
-        db_credential = await CredentialDataManager(self.session).retrieve_credential_by_fields({"key": api_key})
-        return db_credential
-
     async def parse_credentials(
         self,
         db_credentials: List[CredentialModel],
@@ -304,15 +373,19 @@ class CredentialService(SessionMixin):
         for db_credential in db_credentials:
             if db_credential.project and db_credential.project.benchmark:
                 continue
+            # Use encrypted key directly
+            encrypted_key = db_credential.encrypted_key
+
             bud_serve_credentials.append(
                 CredentialDetails(
                     name=db_credential.name,
                     project=db_credential.project,
-                    key=await RSAHandler().encrypt(db_credential.key),
+                    key=encrypted_key,  # Already encrypted
                     expiry=db_credential.expiry,
                     max_budget=db_credential.max_budget,
                     model_budgets=db_credential.model_budgets,
                     id=db_credential.id,
+                    created_at=db_credential.created_at,
                     last_used_at=db_credential.last_used_at,
                     credential_type=db_credential.credential_type,
                     ip_whitelist=db_credential.ip_whitelist,
@@ -320,7 +393,7 @@ class CredentialService(SessionMixin):
             )
         return bud_serve_credentials
 
-    async def delete_credential(self, credential_id: UUID, user_id: UUID) -> None:
+    async def delete_credential(self, credential_id: UUID, user_id: UUID, request: Optional[Request] = None) -> None:
         """Delete the credential from the database."""
         # Retrieve the credential from the database
         db_credential = await CredentialDataManager(self.session).retrieve_credential_by_fields(
@@ -333,6 +406,12 @@ class CredentialService(SessionMixin):
                 detail="User does not have permission to update this credential",
             )
 
+        # Get project name for audit log
+        db_project = await ProjectDataManager(self.session).retrieve_project_by_fields(
+            {"id": db_credential.project_id}, missing_ok=True
+        )
+        project_name = db_project.name if db_project else None
+
         # project_id = db_credential.project_id
         # # Check user permissions for viewing credentials
         # db_permission = await PermissionDataManager(self.session).retrieve_permission_by_fields({"user_id": user_id}, missing_ok=True)
@@ -342,15 +421,48 @@ class CredentialService(SessionMixin):
         #     await ProjectService(self.session).check_project_membership(project_id, user_id)
 
         # delete proxy cache related to this credential
-        api_key = db_credential.key
+        # Decrypt API key from encrypted storage
+        api_key = await RSAHandler().decrypt(db_credential.encrypted_key)
+
+        # Hash the API key before deleting from Redis (consistent with storage)
+        hashed_key = CredentialModel.set_hashed_key(api_key)
+
         redis_service = RedisService()
-        await redis_service.delete_keys_by_pattern(f"api_key:{api_key}*")
+        await redis_service.delete_keys_by_pattern(f"api_key:{hashed_key}*")
+
+        # Store credential details before deletion
+        credential_name = db_credential.name
+        credential_expiry = str(db_credential.expiry) if db_credential.expiry else None
+
         # Delete the credential from the database
         await CredentialDataManager(self.session).delete_credential(db_credential)
 
+        # Log successful credential deletion
+        audit_details = {
+            "credential_name": credential_name,
+            "project_name": project_name,
+            "expiry": credential_expiry,
+        }
+        if db_credential.max_budget is not None:
+            audit_details["max_budget"] = db_credential.max_budget
+
+        log_audit(
+            session=self.session,
+            action=AuditActionEnum.DELETE,
+            resource_type=AuditResourceTypeEnum.API_KEY,
+            resource_id=credential_id,
+            resource_name=db_credential.name,
+            user_id=user_id,
+            details=audit_details,
+            request=request,
+            success=True,
+        )
+
         return
 
-    async def update_credential(self, data: CredentialUpdate, credential_id: UUID, user_id: UUID) -> CredentialModel:
+    async def update_credential(
+        self, data: CredentialUpdate, credential_id: UUID, user_id: UUID, request: Optional[Request] = None
+    ) -> CredentialModel:
         """Update the OpenAI or HuggingFace credential in the database."""
         # Check if credential exists
         db_credential = await CredentialDataManager(self.session).retrieve_credential_by_fields({"id": credential_id})
@@ -419,9 +531,48 @@ class CredentialService(SessionMixin):
             except ValueError as e:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
+        # Capture previous state for audit
+        previous_state = {
+            "credential_name": db_credential.name,
+            "expiry": str(db_credential.expiry) if db_credential.expiry else None,
+        }
+        if db_credential.max_budget is not None:
+            previous_state["max_budget"] = db_credential.max_budget
+
         # Update the credential in the database
         db_credential = await CredentialDataManager(self.session).update_credential_by_fields(
             db_credential, credential_update_data
+        )
+
+        # Get project name for audit log
+        db_project = await ProjectDataManager(self.session).retrieve_project_by_fields(
+            {"id": db_credential.project_id}, missing_ok=True
+        )
+        project_name = db_project.name if db_project else None
+
+        # Build new state for audit
+        new_state = {
+            "credential_name": db_credential.name,
+            "expiry": str(db_credential.expiry) if db_credential.expiry else None,
+        }
+        if db_credential.max_budget is not None:
+            new_state["max_budget"] = db_credential.max_budget
+
+        # Log credential update
+        log_audit(
+            session=self.session,
+            action=AuditActionEnum.UPDATE,
+            resource_type=AuditResourceTypeEnum.API_KEY,
+            resource_id=credential_id,
+            resource_name=db_credential.name,
+            user_id=user_id,
+            previous_state=previous_state,
+            new_state=new_state,
+            details={
+                "project_name": project_name,
+            },
+            request=request,
+            success=True,
         )
 
         return db_credential
@@ -505,276 +656,111 @@ class CredentialService(SessionMixin):
             logger.error(f"Error validating credential: {e}")
             return False
 
-    # @cache(
-    #     key_func=lambda s, api_key, endpoint_name: f"router_config:{api_key}:{endpoint_name}",
-    #     ttl=3600,
-    #     serializer=lambda x: x.model_dump_json(),
-    #     deserializer=lambda x: RouterConfig.model_validate_json(x),
-    # )
-    async def get_router_config(
-        self, api_key: Optional[str], endpoint_name: str, current_user_id: Optional[UUID], project_id: Optional[UUID]
-    ) -> RouterConfig:
-        router_config = None
-        db_project = None
-
-        # Project can be identified by either api_key or current_user_id and project_id
-        if api_key:
-            db_credential = await self.retrieve_credential_details(api_key)
-            db_project = db_credential.project
-        elif current_user_id and project_id:
-            db_project = await ProjectDataManager(self.session).retrieve_by_fields(
-                ProjectModel, {"id": project_id, "status": ProjectStatusEnum.ACTIVE}
-            )
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Api-key or User accessible project id required.",
-            )
-
-        endpoints = db_project.endpoints
-        db_endpoint = None
-        adapters, _ = await AdapterDataManager(self.session).get_all_adapters_in_project(db_project.id)
-        logger.info("adapters: %s", adapters)
-        db_router = None
-        db_adapter = None
-        for endpoint in endpoints:
-            if endpoint.name == endpoint_name and endpoint.status == EndpointStatusEnum.RUNNING.value:
-                db_endpoint = endpoint
-                break
-        if not db_endpoint and adapters:
-            for adapter in adapters:
-                if adapter.name == endpoint_name:
-                    db_adapter = adapter
-                    break
-        if not db_endpoint and not db_adapter:
-            for router in db_project.routers:
-                if router.name == endpoint_name:
-                    db_router = router
-                    break
-        if not db_endpoint and not db_adapter and not db_router:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Endpoint or Route not found")
-
-        if db_router:
-            router_config = await self.generate_route_config_from_router(db_router)
-        elif db_adapter:
-            db_model = db_adapter.model
-            router_config = await self.generate_route_config_from_adapter(db_adapter, db_model)
-        else:
-            db_model = db_endpoint.model
-            router_config = await self.generate_route_config_from_endpoint(db_endpoint, db_model)
-
-        return router_config
-
-    async def generate_route_config_from_endpoint(self, db_endpoint: EndpointModel, db_model: Model) -> RouterConfig:
-        db_project = db_endpoint.project
-        db_model = db_endpoint.model
-        # For cloud model, the model name is the endpoint name
-        # because cloud model deployment is done using endpoint name and proprietary credentials
-        # For other models, the model name is the uri
-        # because central litellm proxy uses openai client to forward request to actual bud runtime deployment
-        # which accepts model uri as model parameter
-        actual_model_name = f"openai/{db_endpoint.name}"
-        api_base = db_endpoint.url
-        if db_model.provider_type != ModelProviderTypeEnum.CLOUD_MODEL:
-            api_base = f"{db_endpoint.url}/v1"
-            deploy_model_uri = f"{db_endpoint.namespace}"
-            actual_model_name = f"openai/{deploy_model_uri}"
-        else:
-            model_uri = db_model.uri
-            model_source = db_model.source
-            if model_uri.startswith(f"{model_source}/"):
-                model_uri = model_uri.removeprefix(f"{model_source}/")
-            deploy_model_uri = f"{model_source}/{model_uri}"
-            actual_model_name = f"openai/{db_endpoint.namespace}"
-
-        model_config = ModelConfig(
-            model_name=db_endpoint.namespace,
-            litellm_params={
-                "model": actual_model_name,
-                "api_base": api_base,
-                "api_key": app_settings.litellm_proxy_master_key,
-            },
-            model_info={
-                "id": db_model.id,
-                "metadata": {
-                    "name": db_model.name,
-                    "provider": db_model.provider.name,
-                    "modality": [modality.value for modality in db_model.modality],
-                    "endpoint_id": db_endpoint.id,
-                    "cloud": db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL,
-                    "deploy_model_uri": deploy_model_uri,
-                },
-            },
-            input_cost_per_token=None,
-            output_cost_per_token=None,
-            tpm=None,
-            rpm=None,
-            complexity_threshold=None,
-            weight=None,
-            cool_down_period=None,
-            fallback_endpoint_ids=None,
-        )
-
-        router_config = RouterConfig(
-            project_id=db_project.id,
-            project_name=db_project.name,
-            endpoint_name=db_endpoint.name,
-            routing_policy=None,
-            cache_configuration=CacheConfig(**json.loads(db_endpoint.cache_config))
-            if db_endpoint.cache_enabled
-            else None,
-            model_configuration=[model_config],
-        )
-
-        return router_config
-
-    async def generate_route_config_from_adapter(self, db_adapter, db_model) -> RouterConfig:
-        """Generate a RouterConfig from the given adapter and model.
+    async def update_credential_last_used(self, credential_usage: Dict[UUID, datetime]) -> Dict:
+        """Update last_used_at timestamps for credentials.
 
         Args:
-            db_adapter: The database adapter instance.
-            db_model: The database model instance.
+            credential_usage: Dictionary mapping credential IDs to last used timestamps
 
         Returns:
-            RouterConfig: The generated router configuration.
+            Dictionary with update statistics
         """
-        db_endpoint = db_adapter.endpoint
-        db_model = db_adapter.model
+        if not credential_usage:
+            return {"updated_count": 0, "failed_count": 0, "errors": []}
 
-        actual_model_name = f"openai/{db_adapter.name}"
+        logger.info(f"Updating last_used_at for {len(credential_usage)} credentials")
 
-        api_base = f"{db_endpoint.url}/v1"
-        deploy_model_uri = f"{db_adapter.deployment_name}"
-        actual_model_name = f"openai/{deploy_model_uri}"
+        try:
+            credential_dm = CredentialDataManager(self.session)
+            result = await credential_dm.batch_update_last_used(credential_usage)
 
-        model_config = ModelConfig(
-            model_name=db_adapter.deployment_name,
-            litellm_params={
-                "model": actual_model_name,
-                "api_base": api_base,
-                "api_key": app_settings.litellm_proxy_master_key,
-            },
-            model_info={
-                "id": db_model.id,
-                "metadata": {
-                    "name": db_model.name,
-                    "provider": db_model.provider.name,
-                    "modality": [modality.value for modality in db_model.modality],
-                    "endpoint_id": db_endpoint.id,
-                    "adapter_id": db_adapter.id,
-                    "cloud": db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL,
-                    "deploy_model_uri": deploy_model_uri,
-                },
-            },
-            input_cost_per_token=None,
-            output_cost_per_token=None,
-            tpm=None,
-            rpm=None,
-            complexity_threshold=None,
-            weight=None,
-            cool_down_period=None,
-            fallback_endpoint_ids=None,
-        )
+            logger.info(f"Successfully updated {result['updated_count']} credentials")
+            return result
 
-        router_config = RouterConfig(
-            project_id=db_endpoint.project_id,
-            project_name=db_endpoint.project.name,
-            endpoint_name=db_adapter.name,
-            routing_policy=None,
-            cache_configuration=CacheConfig(**json.loads(db_endpoint.cache_config))
-            if db_endpoint.cache_enabled
-            else None,
-            model_configuration=[model_config],
-        )
+        except Exception as e:
+            logger.error(f"Failed to update credential usage: {e}")
+            return {"updated_count": 0, "failed_count": len(credential_usage), "errors": [str(e)]}
 
-        return router_config
+    async def fetch_recent_credential_usage(self, since_minutes: int = 10) -> Dict[UUID, datetime]:
+        """Fetch recent credential usage data from budmetrics service.
 
-    async def generate_route_config_from_router(self, db_router) -> RouterConfig:
-        db_project = db_router.project
-        model_configs = []
+        Args:
+            since_minutes: How many minutes back to query for usage data
 
-        for db_router_endpoint in db_router.endpoints:
-            db_endpoint = db_router_endpoint.endpoint
-            db_model = db_endpoint.model
-            actual_model_name = f"openai/{db_endpoint.name}"
-            api_base = db_endpoint.url
-            if db_model.provider_type != ModelProviderTypeEnum.CLOUD_MODEL:
-                api_base = f"{db_endpoint.url}/v1"
-                deploy_model_uri = f"{app_settings.add_model_dir}/{db_model.local_path}"
-                actual_model_name = f"openai/{deploy_model_uri}"
-            else:
-                model_uri = db_model.uri
-                model_source = db_model.source
-                if model_uri.startswith(f"{model_source}/"):
-                    model_uri = model_uri.removeprefix(f"{model_source}/")
-                deploy_model_uri = f"{model_source}/{model_uri}"
+        Returns:
+            Dictionary mapping credential IDs to their last used timestamps
+        """
+        try:
+            # Calculate since timestamp
+            since = datetime.now(UTC) - timedelta(minutes=since_minutes)
 
-            # TODO: Take fallback endpoint ids from router
-            model_configs.append(
-                ModelConfig(
-                    model_name=db_endpoint.name,
-                    litellm_params={
-                        "model": actual_model_name,
-                        "api_base": api_base,
-                        "api_key": app_settings.litellm_proxy_master_key,
-                    },
-                    model_info={
-                        "id": db_model.id,
-                        "metadata": {
-                            "name": db_model.name,
-                            "provider": db_model.provider.name,
-                            "modality": [modality.value for modality in db_model.modality],
-                            "endpoint_id": db_endpoint.id,
-                            "cloud": db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL,
-                            "deploy_model_uri": deploy_model_uri,
-                        },
-                        # "sequence_length": 4096,
-                        "tasks": db_model.tasks,
-                        "domains": db_model.tags,
-                        "languages": db_model.languages,
-                        "use_cases": db_model.use_cases,
-                        "evals": {},
-                    },
-                    input_cost_per_token=None,
-                    output_cost_per_token=None,
-                    tpm=db_router_endpoint.tpm,
-                    rpm=db_router_endpoint.rpm,
-                    complexity_threshold=None,
-                    weight=db_router_endpoint.weight,
-                    cool_down_period=db_router_endpoint.cool_down_period,
-                    fallback_endpoint_ids=db_router_endpoint.fallback_endpoint_ids,
-                )
-            )
+            # Prepare request payload
+            payload = {"since": since.isoformat()}
 
-        router_config = RouterConfig(
-            project_id=db_project.id,
-            project_name=db_project.name,
-            endpoint_name=db_router.name,
-            routing_policy=RoutingPolicy(
-                name=db_router.name,
-                strategies=db_router.routing_strategy,
-                fallback_policies=[],
-                decision_mode="intersection",
-            ),
-            cache_configuration=None,  # TODO: add cache configuration per endpoint
-            model_configuration=model_configs,
-        )
+            # Use Dapr service invocation to call budmetrics
+            dapr_url = f"{app_settings.dapr_base_url}/v1.0/invoke/budmetrics/method/observability/credential-usage"
 
-        return router_config
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(dapr_url, json=payload)
+                response.raise_for_status()
 
-    @cache(
-        key_func=lambda s, api_key: f"decrypted_key:{api_key}",
-        ttl=3600,
-        serializer=lambda x: x,
-        deserializer=lambda x: x,
-    )
-    async def decrypt_credential(self, api_key: str) -> str:
-        return await RSAHandler().decrypt(api_key)
+                data = response.json()
+
+                # Parse the response into a dictionary
+                credential_usage = {}
+                for item in data.get("credentials", []):
+                    credential_id = UUID(item["credential_id"])
+                    # Handle different datetime formats
+                    last_used_str = item["last_used_at"]
+                    if isinstance(last_used_str, str):
+                        # Handle ISO format with Z or timezone
+                        if last_used_str.endswith("Z"):
+                            last_used_at = datetime.fromisoformat(last_used_str.replace("Z", "+00:00"))
+                        else:
+                            last_used_at = datetime.fromisoformat(last_used_str)
+                    else:
+                        # If it's already a datetime object or something else
+                        last_used_at = last_used_str
+                    credential_usage[credential_id] = last_used_at
+
+                logger.info(f"Retrieved usage data for {len(credential_usage)} credentials")
+                return credential_usage
+
+        except httpx.HTTPError as e:
+            logger.error(f"HTTP error fetching credential usage: {e}")
+            return {}
+        except Exception as e:
+            logger.error(f"Error fetching credential usage: {e}")
+            return {}
+
+    async def sync_credential_usage_from_metrics(self) -> Dict:
+        """Sync credential usage data from budmetrics and update local database.
+
+        Returns:
+            Dictionary with sync statistics
+        """
+        try:
+            # Fetch recent usage data from budmetrics
+            usage_data = await self.fetch_recent_credential_usage(since_minutes=10)
+
+            if not usage_data:
+                return {"total_credentials": 0, "updated_count": 0, "failed_count": 0, "errors": []}
+
+            # Update credentials with usage data
+            result = await self.update_credential_last_used(usage_data)
+            result["total_credentials"] = len(usage_data)
+
+            logger.info(f"Credential usage sync complete: {result}")
+            return result
+
+        except Exception as e:
+            logger.error(f"Failed to sync credential usage: {e}")
+            return {"total_credentials": 0, "updated_count": 0, "failed_count": 0, "errors": [str(e)]}
 
 
 class ProprietaryCredentialService(SessionMixin):
     async def add_credential(
-        self, current_user_id: UUID, credential: ProprietaryCredentialRequest
+        self, current_user_id: UUID, credential: ProprietaryCredentialRequest, request: Optional[Request] = None
     ) -> ProprietaryCredentialResponse:
         # Check duplicate credential exists with same name and type for user_id
         db_credential = await ProprietaryCredentialDataManager(self.session).retrieve_credential_by_fields(
@@ -792,6 +778,22 @@ class ProprietaryCredentialService(SessionMixin):
 
         # Encrypt credential and add in db
         db_credential = await self.add_encrypted_credential(credential, current_user_id)
+
+        # Log successful proprietary credential creation
+        log_audit(
+            session=self.session,
+            action=AuditActionEnum.CREATE,
+            resource_type=AuditResourceTypeEnum.API_KEY,
+            resource_id=db_credential.id,
+            resource_name=db_credential.name,
+            user_id=current_user_id,
+            details={
+                "credential_name": db_credential.name,
+                "credential_type": db_credential.type,
+            },
+            request=request,
+            success=True,
+        )
 
         credential_response = ProprietaryCredentialResponse(
             name=db_credential.name,
@@ -888,6 +890,7 @@ class ProprietaryCredentialService(SessionMixin):
         credential_id: UUID,
         data: ProprietaryCredentialUpdate,
         current_user_id: UUID,
+        request: Optional[Request] = None,
     ) -> ProprietaryCredentialResponse:
         # Check if credential exists
         db_credential = await ProprietaryCredentialDataManager(self.session).retrieve_credential_by_fields(
@@ -967,14 +970,38 @@ class ProprietaryCredentialService(SessionMixin):
                         )
                 db_credential.endpoints.append(db_endpoint)
 
+        # Capture previous state for audit
+        previous_state = {
+            "credential_name": db_credential.name,
+        }
+
         # Update the credential in the database
         db_credential = await ProprietaryCredentialDataManager(self.session).update_credential_by_fields(
             db_credential, proprietary_update_data
         )
 
+        # Log credential update
+        log_audit(
+            session=self.session,
+            action=AuditActionEnum.UPDATE,
+            resource_type=AuditResourceTypeEnum.API_KEY,
+            resource_id=credential_id,
+            resource_name=db_credential.name,
+            user_id=current_user_id,
+            previous_state=previous_state,
+            new_state={
+                "credential_name": db_credential.name,
+            },
+            details={
+                "credential_type": db_credential.type,
+            },
+            request=request,
+            success=True,
+        )
+
         return db_credential
 
-    async def delete_credential(self, credential_id: UUID, current_user_id: UUID):
+    async def delete_credential(self, credential_id: UUID, current_user_id: UUID, request: Optional[Request] = None):
         """Delete the proprietary credential from the database."""
         # Retrieve the credential from the database
         db_credential = await ProprietaryCredentialDataManager(self.session).retrieve_credential_by_fields(
@@ -997,8 +1024,28 @@ class ProprietaryCredentialService(SessionMixin):
                 Please delete the deployed models first or link other credentials to those models for deleting this credential""",
             )
 
+        # Store credential details before deletion
+        credential_name = db_credential.name
+        credential_type = db_credential.type
+
         # Delete the credential from the database
         await ProprietaryCredentialDataManager(self.session).delete_credential(db_credential)
+
+        # Log successful credential deletion
+        log_audit(
+            session=self.session,
+            action=AuditActionEnum.DELETE,
+            resource_type=AuditResourceTypeEnum.API_KEY,
+            resource_id=credential_id,
+            resource_name=credential_name,
+            user_id=current_user_id,
+            details={
+                "credential_name": credential_name,
+                "credential_type": credential_type,
+            },
+            request=request,
+            success=True,
+        )
 
     async def get_credential_details(
         self, credential_id: UUID, detailed_view: bool = False
@@ -1095,11 +1142,17 @@ class ClusterProviderService(SessionMixin):
                         detail=f"Required field '{field}' is missing in the credential values",
                     )
 
+            # Encrypt credential values before saving
+            encrypted_credential_values = {}
+            for key, value in req.credential_values.items():
+                # Encrypt each credential value
+                encrypted_credential_values[key] = await RSAHandler().encrypt(str(value))
+
             # Save the credential values
             cloud_credential = CloudCredentials(
                 user_id=current_user_id,
                 provider_id=provider_id,
-                credential=req.credential_values,
+                encrypted_credential=encrypted_credential_values,  # Store encrypted version only
                 credential_name=req.credential_name,
             )
             await CloudProviderDataManager(self.session).insert_one(cloud_credential)

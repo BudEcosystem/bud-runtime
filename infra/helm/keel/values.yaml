@@ -7,3 +7,8 @@ keel:
     botName: "infrabot"
     channel: "infra"
     approvalsChannel: "infra"
+  resources:
+    limits:
+      memory: 256Mi
+    requests:
+      memory: 128Mi

@@ -32,6 +32,7 @@ from budapp.commons.config import app_settings
 from budapp.commons.constants import UserStatusEnum
 from budapp.commons.database import SessionLocal
 from budapp.commons.keycloak import KeycloakManager
+from budapp.shared.jwt_blacklist_service import JWTBlacklistService
 from budapp.user_ops.crud import UserDataManager
 from budapp.user_ops.models import Tenant, TenantClient
 from budapp.user_ops.models import User as UserModel
@@ -58,6 +59,9 @@ async def get_session() -> AsyncGenerator[Session, None]:
     session = SessionLocal()
     try:
         yield session
+    except Exception:
+        session.rollback()  # Rollback any uncommitted changes on exception
+        raise
     finally:
         session.close()
 
@@ -82,6 +86,14 @@ async def get_current_user(
     )
 
     try:
+        # Check if token is blacklisted using Dapr state store
+        jwt_blacklist_service = JWTBlacklistService()
+        is_blacklisted = await jwt_blacklist_service.is_token_blacklisted(token.credentials)
+
+        if is_blacklisted:
+            logger.warning("::USER:: Token is blacklisted")
+            raise credentials_exception
+
         realm_name = app_settings.default_realm_name
 
         # logger.debug(f"::USER:: Validating token for realm: {realm_name}")
@@ -102,11 +114,13 @@ async def get_current_user(
         if not tenant_client:
             raise credentials_exception
 
+        # Decrypt client secret for validation
+        decrypted_secret = await tenant_client.get_decrypted_client_secret()
         credentials = TenantClientSchema(
             id=tenant_client.id,
             client_named_id=tenant_client.client_named_id,
             client_id=tenant_client.client_id,
-            client_secret=tenant_client.client_secret,
+            client_secret=decrypted_secret,
         )
 
         manager = KeycloakManager()

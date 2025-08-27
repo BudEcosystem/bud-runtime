@@ -324,6 +324,7 @@ pub async fn inference_handler(
                         write_info.observability_metadata,
                         write_info.gateway_request,
                         gateway_response,
+                        write_info.model_pricing,
                     )
                     .await;
                 });
@@ -1901,6 +1902,7 @@ pub async fn embedding_handler(
         let gateway_request_json = _gateway_request;
         let gateway_response_json = gateway_response.clone();
         let async_writes = config.gateway.observability.async_writes;
+        let model_pricing = model.pricing.clone();
 
         let write_future = tokio::spawn(async move {
             write_inference(
@@ -1913,6 +1915,7 @@ pub async fn embedding_handler(
                 observability_metadata,
                 gateway_request_json,
                 gateway_response_json,
+                model_pricing,
             )
             .await;
         });
@@ -2315,6 +2318,7 @@ pub async fn moderation_handler(
         let kafka_info = kafka_connection_info.clone();
         let gateway_response_json_clone = gateway_response_json.clone();
         let async_writes = config.gateway.observability.async_writes;
+        let model_pricing = model_config.pricing.clone();
 
         let write_future = tokio::spawn(async move {
             write_inference(
@@ -2327,6 +2331,7 @@ pub async fn moderation_handler(
                 observability_metadata,
                 gateway_request_json,
                 gateway_response_json_clone,
+                model_pricing,
             )
             .await;
         });
@@ -3596,6 +3601,7 @@ pub async fn image_generation_handler(
         let kafka_info = kafka_connection_info.clone();
         let gateway_response_json = gateway_response_json.clone();
         let async_writes = config.gateway.observability.async_writes;
+        let model_pricing = model.pricing.clone();
 
         let write_future = tokio::spawn(async move {
             write_inference(
@@ -3608,6 +3614,7 @@ pub async fn image_generation_handler(
                 observability_metadata,
                 gateway_request_json,
                 gateway_response_json,
+                model_pricing,
             )
             .await;
         });

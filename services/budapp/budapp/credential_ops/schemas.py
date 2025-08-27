@@ -19,7 +19,7 @@ from pydantic import (
 from budapp.commons import logging
 from budapp.commons.config import app_settings
 from budapp.commons.constants import ApiCredentialTypeEnum, CredentialTypeEnum
-from budapp.commons.schemas import CloudEventBase, PaginatedSuccessResponse, SuccessResponse
+from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse
 from budapp.initializers.provider_seeder import ProviderSeeder
 
 
@@ -32,33 +32,10 @@ model_budget_type = Annotated[
 ]
 
 
-class CredentialUpdatePayload(BaseModel):
-    hashed_key: str
-    last_used_at: datetime
-
-
-class CredentialUpdateRequest(CloudEventBase):
-    """Request to update the credential last used at time."""
-
-    model_config = ConfigDict(extra="allow")
-
-    payload: CredentialUpdatePayload
-
-    @model_validator(mode="before")
-    def log_credential_update(cls, data):
-        """Log the credential update hits for debugging purposes."""
-        # TODO: remove this function after Debugging
-        logger.info("================================================")
-        logger.info("Received hit in credentials/update:")
-        logger.info(f"{data}")
-        logger.info("================================================")
-        return data
-
-
 class CredentialBase(BaseModel):
     """Credential base schema."""
 
-    key: str
+    encrypted_key: str
 
 
 class CredentialCreate(CredentialBase):
@@ -74,9 +51,11 @@ class CredentialFilter(BaseModel):
     project_id: Optional[UUID] = None
 
 
-class BudCredentialCreate(CredentialCreate):
+class BudCredentialCreate(BaseModel):
     """Create credential schema."""
 
+    user_id: UUID
+    encrypted_key: str
     name: str
     project_id: UUID
     expiry: datetime | None
@@ -137,6 +116,8 @@ class CredentialResponse(BaseModel):
     max_budget: float | None
     model_budgets: Optional[model_budget_type] = None
     id: UUID
+    created_at: datetime
+    last_used_at: datetime | None
     credential_type: ApiCredentialTypeEnum
     ip_whitelist: Optional[List[str]] = None
 
@@ -164,6 +145,7 @@ class CredentialDetails(BaseModel):
     max_budget: float | None
     model_budgets: Optional[model_budget_type] = None
     id: UUID
+    created_at: datetime
     last_used_at: datetime | None
     credential_type: ApiCredentialTypeEnum
     ip_whitelist: Optional[List[str]] = None
@@ -301,54 +283,6 @@ def common_validator_for_provider_creds(v, info: ValidationInfo):
             # TODO: Add more type validations here
 
     return v
-
-
-class CacheConfig(BaseModel):
-    embedding_model: Optional[str] = app_settings.cache_embedding_model
-    eviction_policy: Optional[str] = app_settings.cache_eviction_policy
-    max_size: Optional[int] = app_settings.cache_max_size
-    ttl: Optional[int] = app_settings.cache_ttl
-    score_threshold: Optional[float] = app_settings.cache_score_threshold
-
-
-class ModelConfig(BaseModel):
-    """Model config schema."""
-
-    model_config = ConfigDict(protected_namespaces=())
-
-    model_name: str
-    litellm_params: dict
-    model_info: dict
-    input_cost_per_token: float | None
-    output_cost_per_token: float | None
-    tpm: float | None
-    rpm: float | None
-    complexity_threshold: float | None
-    weight: float | None
-    cool_down_period: int | None
-    fallback_endpoint_ids: List[UUID] | None
-
-
-class RoutingPolicy(BaseModel):
-    """Routing policy schema."""
-
-    name: str
-    strategies: List[Dict[str, Any]]
-    fallback_policies: List[Dict[str, Any]]
-    decision_mode: str
-
-
-class RouterConfig(BaseModel):
-    """Router config schema."""
-
-    model_config = ConfigDict(protected_namespaces=())
-
-    project_id: UUID
-    project_name: str
-    endpoint_name: str
-    routing_policy: RoutingPolicy | None
-    cache_configuration: CacheConfig | None
-    model_configuration: List[ModelConfig] | None
 
 
 # Cloud Providers

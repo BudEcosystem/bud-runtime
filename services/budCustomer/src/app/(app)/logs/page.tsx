@@ -1,664 +1,1245 @@
 "use client";
-import React, { useState, useEffect } from "react";
-import DashboardLayout from "@/components/layout/DashboardLayout";
-import {
-  Table,
-  Select,
-  DatePicker,
-  Popover,
-  ConfigProvider,
-  TableProps,
-  Input,
-  Tag,
-} from "antd";
-import { Typography } from "antd";
-import styles from "./logs.module.scss";
 
-const { Text, Title } = Typography;
-import { MixerHorizontalIcon } from "@radix-ui/react-icons";
-import { PrimaryButton, SecondaryButton } from "@/components/ui/button";
-import NoDataFount from "@/components/ui/noChartData";
-import dayjs from "dayjs";
-import { errorToast, successToast } from "@/components/toast";
+import React, { useEffect, useState } from 'react';
+import { Tabs, Button, Table, Tag, Tooltip, Typography, message, Card, Row, Col, Statistic, Select, DatePicker, Space, Segmented, Image, ConfigProvider } from 'antd';
+import { DownloadOutlined, ReloadOutlined, ArrowUpOutlined, ArrowDownOutlined, BarChartOutlined, LineChartOutlined, PieChartOutlined, GlobalOutlined, FilterOutlined, UserOutlined, AppstoreOutlined, RocketOutlined, CodeOutlined } from '@ant-design/icons';
+import type { ColumnsType } from 'antd/es/table';
+import { format } from 'date-fns';
+import { formatTimestamp } from '@/utils/formatDateNew';
+import { useRouter } from 'next/navigation';
+import { useInferences, InferenceListItem } from '@/stores/useInferences';
+import InferenceFilters from '@/components/inferences/InferenceFilters';
+import { Text_12_300_EEEEEE, Text_12_400_EEEEEE, Text_16_600_FFFFFF, Text_14_600_EEEEEE, Text_14_600_B3B3B3, Text_12_400_808080 } from '@/components/ui/text';
+import SearchHeaderInput from 'src/flows/components/SearchHeaderInput';
+import NoDataFount from '@/components/ui/noDataFount';
+import { PrimaryButton, SecondaryButton } from '@/components/ui/bud/form/Buttons';
+import ProjectTags from 'src/flows/components/ProjectTags';
+import { SortIcon } from '@/components/ui/bud/table/SortIcon';
+import { formatDate } from 'src/utils/formatDate';
+import { useLoaderOnLoading } from 'src/hooks/useLoaderOnLoading';
+import DashboardLayout from "@/components/layout/DashboardLayout";
+import PageHeader from '@/components/ui/pageHeader';
+import { useTheme } from '@/context/themeContext';
+import { ClientTimestamp } from '@/components/ui/ClientTimestamp';
+import MetricsTab from './MetricsTab';
+import RulesTab from './RulesTab';
+import type { RangePickerProps } from 'antd/es/date-picker';
+import dayjs from 'dayjs';
+
+const { Text } = Typography;
 const { RangePicker } = DatePicker;
 
-interface APIKey {
-  id: string;
-  name: string;
-  key: string;
-  user_id: string;
-  created_at: string;
-  last_used: string | null;
-  expires_at: string | null;
-  status: "active" | "revoked" | "expired";
-  usage_limit: number | null;
-  usage_count: number;
-  rate_limit: number;
-  allowed_models: string[];
-  allowed_endpoints: string[];
-  description: string;
-}
+export default function ObservabilityPage() {
+  const router = useRouter();
+  const { effectiveTheme } = useTheme();
+  const [searchValue, setSearchValue] = useState('');
+  const [activeTab, setActiveTab] = useState('metrics');
+  // Initialize with consistent rounded times
+  const [timeRange, setTimeRange] = useState<[dayjs.Dayjs, dayjs.Dayjs]>([
+    dayjs().startOf('day').subtract(7, 'days'),
+    dayjs().startOf('hour')
+  ]);
+  const [viewBy, setViewBy] = useState<'model' | 'deployment' | 'project' | 'user'>('model');
+  const [selectedPreset, setSelectedPreset] = useState<string>('Last 7 days');
 
-type ColumnsType<T extends object> = TableProps<T>["columns"];
+  const {
+    inferences,
+    pagination,
+    isLoading,
+    fetchInferences,
+    setPagination,
+    exportInferences,
+    setFilters,
+    filters,
+  } = useInferences();
 
-const defaultFilter = {
-  status: "",
-  model: "",
-  dateRange: null as [dayjs.Dayjs, dayjs.Dayjs] | null,
-};
+  // Show global loader for both tabs
+  useLoaderOnLoading(isLoading);
 
-function SortIcon({ sortOrder }: { sortOrder: string | null | undefined }) {
-  if (!sortOrder) return null;
-
-  return sortOrder === "descend" ? (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="12"
-      height="13"
-      viewBox="0 0 12 13"
-      fill="none"
-    >
-      <path
-        fillRule="evenodd"
-        clipRule="evenodd"
-        d="M6.00078 2.10938C6.27692 2.10938 6.50078 2.33324 6.50078 2.60938L6.50078 9.40223L8.84723 7.05578C9.04249 6.86052 9.35907 6.86052 9.55433 7.05578C9.7496 7.25104 9.7496 7.56763 9.55433 7.76289L6.35433 10.9629C6.15907 11.1582 5.84249 11.1582 5.64723 10.9629L2.44723 7.76289C2.25197 7.56763 2.25197 7.25104 2.44723 7.05578C2.64249 6.86052 2.95907 6.86052 3.15433 7.05578L5.50078 9.40223L5.50078 2.60938C5.50078 2.33324 5.72464 2.10938 6.00078 2.10938Z"
-        fill="#B3B3B3"
-      />
-    </svg>
-  ) : (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="12"
-      height="13"
-      viewBox="0 0 12 13"
-      fill="none"
-    >
-      <path
-        fillRule="evenodd"
-        clipRule="evenodd"
-        d="M6.00078 10.8906C6.27692 10.8906 6.50078 10.6668 6.50078 10.3906L6.50078 3.59773L8.84723 5.94418C9.04249 6.13944 9.35907 6.13944 9.55433 5.94418C9.7496 5.74892 9.7496 5.43233 9.55433 5.23707L6.35433 2.03707C6.15907 1.84181 5.84249 1.84181 5.64723 2.03707L2.44723 5.23707C2.25197 5.43233 2.25197 5.74892 2.44723 5.94418C2.64249 6.13944 2.95907 6.13944 3.15433 5.94418L5.50078 3.59773L5.50078 10.3906C5.50078 10.6668 5.72464 10.8906 6.00078 10.8906Z"
-        fill="#B3B3B3"
-      />
-    </svg>
-  );
-}
-
-export default function APIKeysPage() {
-  const [filter, setFilter] = useState<{
-    status: string;
-    model: string;
-    dateRange: [dayjs.Dayjs, dayjs.Dayjs] | null;
-  }>(defaultFilter);
-  const [tempFilter, setTempFilter] = useState<any>(defaultFilter);
-  const [filterOpen, setFilterOpen] = useState(false);
-  const [filterReset, setFilterReset] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [expandedRows, setExpandedRows] = useState<string[]>([]);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-
-  // Mock data
-  const apiKeys: APIKey[] = [
-    {
-      id: "key_001",
-      name: "Production API Key",
-      key: "sk-proj-abc123...xyz789",
-      user_id: "user_123",
-      created_at: "2024-01-15T10:30:45.123Z",
-      last_used: "2024-01-20T14:30:00.000Z",
-      expires_at: "2025-01-15T10:30:45.123Z",
-      status: "active",
-      usage_limit: 1000000,
-      usage_count: 45230,
-      rate_limit: 60,
-      allowed_models: ["gpt-4", "gpt-3.5-turbo", "dall-e-3"],
-      allowed_endpoints: ["/v1/chat/completions", "/v1/images/generations"],
-      description: "Main production key for customer-facing applications",
-    },
-    {
-      id: "key_002",
-      name: "Development API Key",
-      key: "sk-dev-def456...uvw012",
-      user_id: "user_456",
-      created_at: "2024-01-10T08:15:30.456Z",
-      last_used: "2024-01-20T10:00:00.000Z",
-      expires_at: null,
-      status: "active",
-      usage_limit: 50000,
-      usage_count: 12500,
-      rate_limit: 30,
-      allowed_models: ["gpt-3.5-turbo", "claude-3-opus"],
-      allowed_endpoints: ["/v1/chat/completions"],
-      description: "Development and testing purposes only",
-    },
-    {
-      id: "key_003",
-      name: "Analytics API Key",
-      key: "sk-anly-ghi789...rst345",
-      user_id: "user_789",
-      created_at: "2023-12-01T12:00:00.000Z",
-      last_used: "2024-01-19T18:45:00.000Z",
-      expires_at: "2024-02-01T12:00:00.000Z",
-      status: "active",
-      usage_limit: null,
-      usage_count: 89450,
-      rate_limit: 120,
-      allowed_models: ["gpt-4", "gpt-3.5-turbo"],
-      allowed_endpoints: ["/v1/chat/completions", "/v1/embeddings"],
-      description: "Used for data analytics and reporting dashboards",
-    },
-    {
-      id: "key_004",
-      name: "Mobile App Key",
-      key: "sk-mob-jkl012...opq678",
-      user_id: "user_123",
-      created_at: "2023-11-20T09:30:00.000Z",
-      last_used: null,
-      expires_at: "2023-12-20T09:30:00.000Z",
-      status: "expired",
-      usage_limit: 100000,
-      usage_count: 95000,
-      rate_limit: 20,
-      allowed_models: ["gpt-3.5-turbo"],
-      allowed_endpoints: ["/v1/chat/completions"],
-      description: "Mobile application integration - iOS and Android",
-    },
-    {
-      id: "key_005",
-      name: "Webhook Integration",
-      key: "sk-whk-mno345...lmn901",
-      user_id: "user_456",
-      created_at: "2024-01-05T14:20:00.000Z",
-      last_used: "2024-01-18T16:30:00.000Z",
-      expires_at: null,
-      status: "revoked",
-      usage_limit: 25000,
-      usage_count: 18500,
-      rate_limit: 10,
-      allowed_models: ["gpt-3.5-turbo"],
-      allowed_endpoints: ["/v1/chat/completions"],
-      description: "Revoked due to suspicious activity",
-    },
-  ];
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "active":
-        return "#479D5F";
-      case "revoked":
-        return "#EC7575";
-      case "expired":
-        return "#DE9C5C";
-      default:
-        return "var(--bud-text-disabled)";
-    }
-  };
-
-  const handleOpenChange = (open: boolean) => {
-    setFilterOpen(open);
-    if (open) {
-      setTempFilter(filter);
-    }
-  };
-
-  const resetFilter = () => {
-    setCurrentPage(1);
-    setFilterReset(true);
-    setTempFilter(defaultFilter);
-    setFilter(defaultFilter);
-  };
-
-  const applyFilter = () => {
-    setFilterReset(false);
-    setFilter(tempFilter);
-    setCurrentPage(1);
-    setFilterOpen(false);
-  };
-
+  // Sync filters with timeRange on mount and fetch inferences
   useEffect(() => {
-    if (filterReset) {
-      applyFilter();
-    }
-  }, [filterReset]);
+    // Create initial filters based on timeRange
+    const initialFilters = {
+      from_date: timeRange[0].toISOString(),
+      to_date: timeRange[1].toISOString(),
+      sort_by: 'timestamp' as const,
+      sort_order: 'desc' as const
+    };
+    // Set filters in store
+    setFilters(initialFilters);
+    // Fetch with the same filters to ensure consistency
+    fetchInferences(undefined, initialFilters);
+  }, []); // Run only on mount
 
-  const handlePageChange = (currentPage: number, pageSize: number) => {
-    setCurrentPage(currentPage);
-    setPageSize(pageSize);
+  // Handle search with debounce
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchInferences(); // Fetch all with current filters
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchValue, fetchInferences]);
+
+  // Copy inference ID to clipboard
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    message.success('Copied to clipboard');
   };
 
-  const filteredKeys = apiKeys.filter((key) => {
-    const statusMatch = !filter.status || key.status === filter.status;
-    const searchMatch =
-      searchQuery === "" ||
-      key.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      key.key.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      key.user_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      key.description.toLowerCase().includes(searchQuery.toLowerCase());
-
-    let dateMatch = true;
-    if (filter.dateRange) {
-      const keyDate = dayjs(key.created_at);
-      dateMatch =
-        keyDate.isAfter(filter.dateRange[0]) &&
-        keyDate.isBefore(filter.dateRange[1]);
+  // Handle time range change
+  const handleTimeRangeChange: RangePickerProps['onChange'] = (dates) => {
+    if (dates && dates[0] && dates[1]) {
+      setTimeRange([dates[0], dates[1]]);
+      setSelectedPreset(''); // Clear preset selection when using date picker
+      // Create the new filters
+      const newFilters = {
+        from_date: dates[0].toISOString(),
+        to_date: dates[1].toISOString(),
+        sort_by: 'timestamp' as const,
+        sort_order: 'desc' as const
+      };
+      // Update filters in store
+      setFilters(newFilters);
+      // Fetch with the same filters to ensure consistency
+      fetchInferences(undefined, newFilters);
     }
+  };
 
-    return statusMatch && searchMatch && dateMatch;
-  });
-
-  const columns: ColumnsType<APIKey> = [
+  // Predefined time ranges - using function to return value for TypeScript compatibility
+  // Round times to consistent boundaries to prevent data shifting
+  const timeRangePresets = [
     {
-      title: "Name",
-      dataIndex: "name",
-      key: "name",
-      width: 200,
-      render: (name: string) => (
-        <Text className="whitespace-nowrap font-medium text-bud-text-primary text-[12px]">
-          {name}
-        </Text>
-      ),
-      sorter: (a, b) => a.name.localeCompare(b.name),
-      sortIcon: SortIcon as any,
+      label: 'Last 1 hour',
+      value: () => {
+        const now = dayjs(); // Use exact current time
+        return [now.subtract(1, 'hours'), now] as [dayjs.Dayjs, dayjs.Dayjs];
+      }
     },
     {
-      title: "API Key",
-      dataIndex: "key",
-      key: "key",
-      width: 250,
-      render: (key: string) => (
-        <div className="flex items-center gap-2">
-          <Text className="font-mono text-xs text-bud-text-primary">{key}</Text>
-          <button
-            className="text-bud-purple hover:text-bud-purple-hover text-xs"
-            onClick={(e) => {
-              e.stopPropagation();
-              navigator.clipboard.writeText(key);
-              successToast("API key copied to clipboard.");
-            }}
-          >
-            Copy
-          </button>
-        </div>
-      ),
+      label: 'Last 6 hours',
+      value: () => {
+        const now = dayjs(); // Use exact current time
+        return [now.subtract(6, 'hours'), now] as [dayjs.Dayjs, dayjs.Dayjs];
+      }
     },
     {
-      title: "Status",
-      dataIndex: "status",
-      key: "status",
-      width: 100,
-      render: (status: string) => (
-        <Tag
-          color={getStatusColor(status)}
-          className="border-0 px-[0.5rem] py-[0.125rem] text-[0.75rem]"
-        >
-          {status.toUpperCase()}
-        </Tag>
-      ),
-      sorter: (a, b) => a.status.localeCompare(b.status),
-      sortIcon: SortIcon as any,
+      label: 'Last 24 hours',
+      value: () => {
+        const now = dayjs(); // Use exact current time
+        return [now.subtract(24, 'hours'), now] as [dayjs.Dayjs, dayjs.Dayjs];
+      }
     },
     {
-      title: "Usage",
-      key: "usage",
-      width: 150,
-      render: (_: any, record: APIKey) => {
-        const percentage = record.usage_limit
-          ? Math.round((record.usage_count / record.usage_limit) * 100)
-          : 0;
-        return (
-          <div className="flex flex-col gap-1">
-            <Text className="whitespace-nowrap text-bud-text-primary text-[12px]">
-              {record.usage_count.toLocaleString()}
-              {record.usage_limit
-                ? ` / ${record.usage_limit.toLocaleString()}`
-                : " (Unlimited)"}
-            </Text>
-            {record.usage_limit && (
-              <div className="w-full bg-bud-border rounded-full h-1.5">
-                <div
-                  className="bg-bud-purple h-1.5 rounded-full"
-                  style={{ width: `${Math.min(percentage, 100)}%` }}
-                />
-              </div>
-            )}
-          </div>
-        );
-      },
-      sorter: (a, b) => a.usage_count - b.usage_count,
-      sortIcon: SortIcon as any,
+      label: 'Last 7 days',
+      value: () => {
+        const now = dayjs().startOf('day'); // Round to start of current day
+        return [now.subtract(7, 'days'), now] as [dayjs.Dayjs, dayjs.Dayjs];
+      }
     },
     {
-      title: "Rate Limit",
-      dataIndex: "rate_limit",
-      key: "rate_limit",
-      width: 100,
-      render: (rate_limit: number) => (
-        <Text className="whitespace-nowrap text-bud-text-primary text-[12px]">
-          {rate_limit} req/min
-        </Text>
-      ),
-      sorter: (a, b) => a.rate_limit - b.rate_limit,
-      sortIcon: SortIcon as any,
+      label: 'Last 30 days',
+      value: () => {
+        const now = dayjs().startOf('day'); // Round to start of current day
+        return [now.subtract(30, 'days'), now] as [dayjs.Dayjs, dayjs.Dayjs];
+      }
     },
     {
-      title: "Last Used",
-      dataIndex: "last_used",
-      key: "last_used",
-      width: 150,
-      render: (last_used: string | null) => (
-        <Text className="whitespace-nowrap text-bud-text-primary text-[12px]">
-          {last_used ? dayjs(last_used).format("YYYY-MM-DD HH:mm") : "Never"}
-        </Text>
-      ),
-      sorter: (a, b) => {
-        const aTime = a.last_used ? dayjs(a.last_used).unix() : 0;
-        const bTime = b.last_used ? dayjs(b.last_used).unix() : 0;
-        return aTime - bTime;
-      },
-      sortIcon: SortIcon as any,
-    },
-    {
-      title: "Expires",
-      dataIndex: "expires_at",
-      key: "expires_at",
-      width: 120,
-      render: (expires_at: string | null) => (
-        <Text className="whitespace-nowrap text-bud-text-primary text-[12px]">
-          {expires_at ? dayjs(expires_at).format("YYYY-MM-DD") : "Never"}
-        </Text>
-      ),
-      sorter: (a, b) => {
-        const aTime = a.expires_at
-          ? dayjs(a.expires_at).unix()
-          : Number.MAX_SAFE_INTEGER;
-        const bTime = b.expires_at
-          ? dayjs(b.expires_at).unix()
-          : Number.MAX_SAFE_INTEGER;
-        return aTime - bTime;
-      },
-      sortIcon: SortIcon as any,
-    },
-    {
-      title: "Created",
-      dataIndex: "created_at",
-      key: "created_at",
-      width: 120,
-      render: (created_at: string) => (
-        <Text className="whitespace-nowrap text-bud-text-primary text-[12px]">
-          {dayjs(created_at).format("YYYY-MM-DD")}
-        </Text>
-      ),
-      sorter: (a, b) => dayjs(a.created_at).unix() - dayjs(b.created_at).unix(),
-      sortIcon: SortIcon as any,
+      label: 'Last 3 months',
+      value: () => {
+        const now = dayjs().startOf('day'); // Round to start of current day
+        return [now.subtract(3, 'months'), now] as [dayjs.Dayjs, dayjs.Dayjs];
+      }
     },
   ];
 
-  const expandedRowRender = (record: APIKey) => {
-    return (
-      <div className="bg-bud-bg-tertiary p-[1.5rem] rounded-[8px]">
-        <div className="flex flex-col gap-4">
-          <div>
-            <Text className="text-bud-text-disabled text-[12px]">
-              Description
-            </Text>
-            <Text className="mt-[0.25rem] text-bud-text-primary text-[14px] block">
-              {record.description}
-            </Text>
-          </div>
-          <div className="flex gap-6 flex-wrap">
-            <div>
-              <Text className="text-bud-text-disabled text-[12px]">Key ID</Text>
-              <Text className="mt-[0.25rem] font-mono text-bud-text-primary text-[14px] block">
-                {record.id}
-              </Text>
-            </div>
-            <div>
-              <Text className="text-bud-text-disabled text-[12px]">
-                User ID
-              </Text>
-              <Text className="mt-[0.25rem] text-bud-text-primary text-[14px] block">
-                {record.user_id}
-              </Text>
-            </div>
-            <div>
-              <Text className="text-bud-text-disabled text-[12px]">
-                Full API Key
-              </Text>
-              <Text className="mt-[0.25rem] font-mono text-xs text-bud-text-primary block">
-                {record.key}
-              </Text>
-            </div>
-          </div>
-          <div className="flex gap-6 flex-wrap">
-            <div>
-              <Text className="text-bud-text-disabled text-[12px]">
-                Allowed Models
-              </Text>
-              <div className="mt-[0.25rem] flex gap-2 flex-wrap">
-                {record.allowed_models.map((model) => (
-                  <Tag
-                    key={model}
-                    className="border-0 px-[0.5rem] py-[0.125rem] text-[0.75rem] bg-bud-purple bg-opacity-20 text-bud-purple"
-                  >
-                    {model}
-                  </Tag>
-                ))}
-              </div>
-            </div>
-            <div>
-              <Text className="text-bud-text-disabled text-[12px]">
-                Allowed Endpoints
-              </Text>
-              <div className="mt-[0.25rem] flex gap-2 flex-wrap">
-                {record.allowed_endpoints.map((endpoint) => (
-                  <Tag
-                    key={endpoint}
-                    className="border-0 px-[0.5rem] py-[0.125rem] text-[0.75rem] bg-blue-500 bg-opacity-20 text-blue-500"
-                  >
-                    {endpoint}
-                  </Tag>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+  // View by options with appropriate icons
+  const viewByOptions = [
+    {
+      label: 'Model',
+      value: 'model',
+      icon: (active: boolean) => (
+        <Image
+          preview={false}
+          src={active ? '/images/icons/modelRepoWhite.png' : '/images/icons/modelRepo.png'}
+          style={{ width: "14px", height: "14px" }}
+          alt="Model"
+        />
+      )
+    },
+    // {
+    //   label: 'Deployment',
+    //   value: 'deployment',
+    //   icon: (active: boolean) => (
+    //     <Image
+    //       preview={false}
+    //       src={active ? '/images/icons/clustersWhite.png' : '/images/icons/cluster.png'}
+    //       style={{ width: "14px", height: "14px" }}
+    //       alt="Deployment"
+    //     />
+    //   )
+    // },
+    {
+      label: 'Project',
+      value: 'project',
+      icon: (active: boolean) => (
+        <Image
+          preview={false}
+          src={active ? '/images/icons/projectIconWhite.png' : '/images/icons/projectIcon.png'}
+          style={{ width: "14px", height: "14px" }}
+          alt="Project"
+        />
+      )
+    },
+    // {
+    //   label: 'User',
+    //   value: 'user',
+    //   icon: (active: boolean) => (
+    //     <Image
+    //       preview={false}
+    //       src={active ? '/images/icons/userWhite.png' : '/images/icons/user.png'}
+    //       style={{ width: "14px", height: "14px" }}
+    //       alt="User"
+    //     />
+    //   )
+    // },
+  ];
+
+  // Table columns definition
+  const columns: ColumnsType<InferenceListItem> = [
+    {
+      title: 'Timestamp',
+      dataIndex: 'timestamp',
+      key: 'timestamp',
+      width: 180,
+      render: (timestamp: string) => (
+        <Text_12_400_EEEEEE className="!text-[var(--text-primary)]"><ClientTimestamp timestamp={timestamp} /></Text_12_400_EEEEEE>
+      ),
+      sorter: true,
+      sortIcon: SortIcon,
+    },
+    {
+      title: 'Project',
+      dataIndex: 'project_name',
+      key: 'project_name',
+      width: 150,
+      render: (project_name: string) => (
+        <Tooltip title={project_name || 'N/A'}>
+          <Text_12_400_EEEEEE className="truncate max-w-[130px] !text-[var(--text-primary)]">
+            {project_name || '-'}
+          </Text_12_400_EEEEEE>
+        </Tooltip>
+      ),
+    },
+    {
+      title: 'Deployment',
+      dataIndex: 'endpoint_name',
+      key: 'endpoint_name',
+      width: 200,
+      render: (endpoint_name: string) => (
+        <Tooltip title={endpoint_name || 'N/A'}>
+          <Text_12_400_EEEEEE className="truncate max-w-[180px] !text-[var(--text-primary)]">
+            {endpoint_name || '-'}
+          </Text_12_400_EEEEEE>
+        </Tooltip>
+      ),
+    },
+    {
+      title: 'Prompt Preview',
+      dataIndex: 'prompt_preview',
+      key: 'prompt_preview',
+      width: 350,
+      render: (prompt: string) => (
+        <Tooltip title={prompt}>
+          <Text_12_300_EEEEEE className="truncate max-w-[330px] !text-[var(--text-muted)]">
+            {prompt}
+          </Text_12_300_EEEEEE>
+        </Tooltip>
+      ),
+    },
+    {
+      title: 'Response Time',
+      dataIndex: 'response_time_ms',
+      key: 'response_time_ms',
+      width: 120,
+      render: (response_time_ms: number) => (
+        <Text_12_400_EEEEEE className="!text-[var(--text-primary)]">
+          {response_time_ms ? `${response_time_ms.toLocaleString()} ms` : '-'}
+        </Text_12_400_EEEEEE>
+      ),
+      sorter: true,
+      sortIcon: SortIcon,
+    },
+    {
+      title: 'Tokens',
+      key: 'tokens',
+      width: 120,
+      render: (_, record) => (
+        <Text_12_400_EEEEEE className="!text-[var(--text-primary)]">
+          {record.input_tokens + record.output_tokens || '-'}
+        </Text_12_400_EEEEEE>
+      ),
+    },
+    {
+      title: 'Status',
+      key: 'status',
+      width: 100,
+      render: (_, record) => (
+        <ProjectTags
+          name={record.is_success ? 'Success' : 'Failed'}
+          color={record.is_success ? '#22c55e' : '#ef4444'}
+          textClass="text-[.75rem]"
+        />
+      ),
+    },
+  ];
+
+  // Handle table change (pagination, sorting)
+  const handleTableChange = (newPagination: any, _filters: any, sorter: any) => {
+    // Handle sorting
+    if (sorter.field) {
+      const sortMap: Record<string, string> = {
+        timestamp: 'timestamp',
+        response_time_ms: 'latency',
+      };
+
+      const sortBy = sortMap[sorter.field] || 'timestamp';
+      const sortOrder = sorter.order === 'ascend' ? 'asc' : 'desc';
+
+      setFilters({
+        sort_by: sortBy as any,
+        sort_order: sortOrder as any,
+      });
+      fetchInferences(); // Fetch all with new sorting
+    }
   };
+
+  // Export menu items
+  const exportMenu = [
+    {
+      key: 'csv',
+      label: 'Export as CSV',
+      onClick: () => exportInferences('csv'),
+    },
+    {
+      key: 'json',
+      label: 'Export as JSON',
+      onClick: () => exportInferences('json'),
+    },
+  ];
 
   return (
     <DashboardLayout>
-      <div className="p-8">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <Title level={2} className="!text-bud-text-primary !mb-0">
-              API Keys
-            </Title>
-          </div>
-          <div className="flex items-center gap-4">
-            <Input.Search
-              placeholder="Search by name, key, or description"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ width: 300 }}
-              className={`${styles.searchInput} !bg-bud-bg-secondary !border-bud-border`}
+      <style dangerouslySetInnerHTML={{ __html: `
+        /* Override Ant Design hardcoded colors for theme support */
+        .ant-card.bg-\\[\\#101010\\] {
+          background-color: var(--bg-secondary) !important;
+        }
+        .ant-card.border-\\[\\#1F1F1F\\] {
+          border-color: var(--border-color) !important;
+        }
+        /* Specific fix for the Requests tab card */
+        .ant-card-small.bg-\\[\\#101010\\] {
+          background-color: var(--bg-secondary) !important;
+        }
+        [data-theme="light"] .ant-card-small.bg-\\[\\#101010\\] {
+          background-color: #f5f5f5 !important;
+        }
+        [data-theme="dark"] .ant-card-small.bg-\\[\\#101010\\] {
+          background-color: #161616 !important;
+        }
+        /* Fallback for any ant-card with dark backgrounds */
+        .ant-card[class*="bg-\\[\\#101010\\]"],
+        .ant-card[class*="bg-\\[\\#1A1A1A\\]"],
+        .ant-card[class*="bg-\\[\\#0A0A0A\\]"] {
+          background-color: var(--bg-secondary) !important;
+        }
+        [data-theme="light"] .ant-card[class*="bg-\\[\\#101010\\]"],
+        [data-theme="light"] .ant-card[class*="bg-\\[\\#1A1A1A\\]"],
+        [data-theme="light"] .ant-card[class*="bg-\\[\\#0A0A0A\\]"] {
+          background-color: #f5f5f5 !important;
+        }
+        .ant-table-wrapper .ant-table {
+          background: var(--bg-card) !important;
+        }
+        .ant-table-wrapper .ant-table-thead > tr > th {
+          background: var(--bg-tertiary) !important;
+          color: var(--text-primary) !important;
+          border-bottom: 1px solid var(--border-color) !important;
+        }
+        .ant-table-wrapper .ant-table-tbody > tr > td {
+          border-bottom: 1px solid var(--border-color) !important;
+          background: var(--bg-card) !important;
+        }
+        .ant-table-wrapper .ant-table-tbody > tr:hover > td {
+          background: var(--bg-hover) !important;
+        }
+        .ant-table-title {
+          background: var(--bg-secondary) !important;
+          border-bottom: 1px solid var(--border-color) !important;
+        }
+        /* Light theme specific table styling */
+        [data-theme="light"] .ant-table-title {
+          background: #f5f5f5 !important;
+        }
+        [data-theme="light"] .ant-table-wrapper .ant-table-thead > tr > th {
+          background: #fafafa !important;
+        }
+        /* Fix button colors */
+        .ant-btn {
+          color: var(--text-primary) !important;
+          border-color: var(--border-color) !important;
+        }
+        .ant-btn:not(.ant-btn-primary):not(.ant-btn-dangerous) {
+          background: var(--bg-secondary) !important;
+        }
+        .ant-btn:hover:not(.ant-btn-primary):not(.ant-btn-dangerous) {
+          background: var(--bg-hover) !important;
+          border-color: var(--border-secondary) !important;
+        }
+        /* Fix Primary Button */
+        button[class*="bg-\\[\\#1E0C34\\]"] {
+          background: var(--color-purple) !important;
+          opacity: 0.9;
+        }
+        button[class*="bg-\\[\\#1E0C34\\]"]:hover {
+          background: var(--color-purple-hover) !important;
+          opacity: 1;
+        }
+        /* Button text - dark theme */
+        [data-theme="dark"] button[class*="bg-\\[\\#1E0C34\\]"] div,
+        [data-theme="dark"] button[class*="bg-\\[\\#1E0C34\\]"] span,
+        [data-theme="dark"] button[class*="bg-\\[\\#1E0C34\\]"] .anticon {
+          color: white !important;
+        }
+        /* Button text - light theme */
+        [data-theme="light"] button[class*="bg-\\[\\#1E0C34\\]"] div,
+        [data-theme="light"] button[class*="bg-\\[\\#1E0C34\\]"] span,
+        [data-theme="light"] button[class*="bg-\\[\\#1E0C34\\]"] .anticon {
+          color: #000000 !important;
+        }
+        /* Specific fix for refresh and export buttons */
+        [data-theme="dark"] .ant-btn span.ml-2 {
+          color: white !important;
+          margin-left: 0.5rem !important;
+        }
+        [data-theme="light"] .ant-btn span.ml-2 {
+          color: #000000 !important;
+          margin-left: 0.5rem !important;
+        }
+        [data-theme="dark"] .ant-btn[class*="bg-\\[\\#1E0C34\\]"] * {
+          color: white !important;
+        }
+        [data-theme="light"] .ant-btn[class*="bg-\\[\\#1E0C34\\]"] * {
+          color: #000000 !important;
+        }
+        /* Fix Secondary Button */
+        button[class*="bg-\\[\\#1F1F1F\\]"] {
+          background: var(--bg-secondary) !important;
+          border-color: var(--border-secondary) !important;
+        }
+        button[class*="bg-\\[\\#1F1F1F\\]"]:hover {
+          background: var(--bg-hover) !important;
+          border-color: var(--border-color) !important;
+        }
+        [data-theme="dark"] button[class*="bg-\\[\\#1F1F1F\\]"] span,
+        [data-theme="dark"] button[class*="bg-\\[\\#1F1F1F\\]"] .anticon {
+          color: #EEEEEE !important;
+        }
+        [data-theme="light"] button[class*="bg-\\[\\#1F1F1F\\]"] span,
+        [data-theme="light"] button[class*="bg-\\[\\#1F1F1F\\]"] .anticon {
+          color: #000000 !important;
+        }
+        /* Ensure all Ant Design icons in buttons are visible */
+        .ant-btn .anticon {
+          color: inherit !important;
+        }
+        /* Fix segmented control */
+        .antSegmented {
+          background: var(--bg-secondary) !important;
+        }
+        .antSegmented .ant-segmented-item {
+          color: var(--text-muted) !important;
+        }
+        .antSegmented .ant-segmented-item-selected {
+          background: var(--bg-hover) !important;
+          color: var(--text-primary) !important;
+        }
+        /* Fix date picker */
+        .ant-picker {
+          background: var(--bg-tertiary) !important;
+          border-color: var(--border-secondary) !important;
+        }
+        .ant-picker-input > input {
+          color: var(--text-primary) !important;
+        }
+        .ant-picker-suffix {
+          color: var(--text-muted) !important;
+        }
+        /* Fix Input fields */
+        .ant-input {
+          background: var(--bg-tertiary) !important;
+          border-color: var(--border-secondary) !important;
+          color: var(--text-primary) !important;
+        }
+        .ant-input::placeholder {
+          color: var(--text-disabled) !important;
+        }
+        .ant-input:hover {
+          border-color: var(--border-color) !important;
+        }
+        .ant-input:focus {
+          border-color: var(--color-purple) !important;
+          box-shadow: 0 0 0 2px rgba(150, 92, 222, 0.2) !important;
+        }
+        .ant-input-prefix {
+          color: var(--text-muted) !important;
+        }
+        /* Fix tabs */
+        .ant-tabs-tab {
+          color: var(--text-muted) !important;
+        }
+        .ant-tabs-tab.ant-tabs-tab-active {
+          color: var(--text-primary) !important;
+        }
+        .ant-tabs-ink-bar {
+          background: var(--color-purple) !important;
+        }
+        /* Ensure key text elements are dark black in light theme */
+        [data-theme="light"] .logs-page h1,
+        [data-theme="light"] .logs-page h2,
+        [data-theme="light"] .logs-page h3,
+        [data-theme="light"] .logs-page .ant-table-tbody > tr > td,
+        [data-theme="light"] .logs-page .ant-table-thead > tr > th,
+        [data-theme="light"] .logs-page .ant-table-title,
+        [data-theme="light"] .logs-page [class*="Text_"] {
+          color: #000000 !important;
+        }
+        [data-theme="light"] .logs-page .ant-tabs-tab {
+          color: #666666 !important;
+        }
+        [data-theme="light"] .logs-page .ant-tabs-tab.ant-tabs-tab-active {
+          color: #000000 !important;
+        }
+        /* Fix input placeholder in light theme */
+        [data-theme="light"] .logs-page .ant-input::placeholder {
+          color: #999999 !important;
+        }
+        /* Filter section background to match Inference Requests section */
+        .filter-section-bg {
+          background: var(--bg-secondary) !important;
+          border: 1px solid var(--border-color) !important;
+        }
+        [data-theme="light"] .filter-section-bg {
+          background: #f5f5f5 !important;
+          border: 1px solid #e0e0e0 !important;
+        }
+        [data-theme="dark"] .filter-section-bg {
+          background: #161616 !important;
+          border: 1px solid #1f1f1f !important;
+        }
+        /* Comprehensive fix for InferenceFilters component hardcoded colors */
+        [data-theme="light"] .filter-section-bg .ant-card {
+          background: #ffffff !important;
+          border-color: #d9d9d9 !important;
+        }
+        [data-theme="light"] .filter-section-bg .ant-card-head {
+          background: #fafafa !important;
+          border-bottom: 1px solid #d9d9d9 !important;
+        }
+        [data-theme="light"] .filter-section-bg .ant-card-body {
+          background: #ffffff !important;
+        }
+        [data-theme="light"] .filter-section-bg [class*="bg-\\[\\#1A1A1A\\]"],
+        [data-theme="light"] .filter-section-bg [class*="bg-\\[\\#101010\\]"],
+        [data-theme="light"] .filter-section-bg [class*="bg-\\[\\#1F1F1F\\]"],
+        [data-theme="light"] .filter-section-bg [class*="bg-\\[\\#2F2F2F\\]"] {
+          background: #ffffff !important;
+        }
+        [data-theme="light"] .filter-section-bg [class*="border-\\[\\#1F1F1F\\]"],
+        [data-theme="light"] .filter-section-bg [class*="border-\\[\\#2F2F2F\\]"],
+        [data-theme="light"] .filter-section-bg [class*="border-\\[\\#3F3F3F\\]"] {
+          border-color: #d9d9d9 !important;
+        }
+        [data-theme="light"] .filter-section-bg [class*="text-\\[\\#EEEEEE\\]"],
+        [data-theme="light"] .filter-section-bg [class*="text-\\[\\#B3B3B3\\]"] {
+          color: #000000 !important;
+        }
+        /* Make ALL text dark black in light theme filter section */
+        [data-theme="light"] .filter-section-bg * {
+          color: #000000 !important;
+        }
+        [data-theme="light"] .filter-section-bg .ant-card-head-title {
+          color: #000000 !important;
+        }
+        [data-theme="light"] .filter-section-bg .ant-card-head-title span {
+          color: #000000 !important;
+        }
+        [data-theme="light"] .filter-section-bg input {
+          color: #000000 !important;
+        }
+        [data-theme="light"] .filter-section-bg input::placeholder {
+          color: #666666 !important;
+        }
+        /* Fix all input elements in filter section */
+        [data-theme="light"] .filter-section-bg .ant-input,
+        [data-theme="light"] .filter-section-bg .ant-select-selector,
+        [data-theme="light"] .filter-section-bg .ant-picker,
+        [data-theme="light"] .filter-section-bg .ant-input-number,
+        [data-theme="light"] .filter-section-bg .ant-switch {
+          background: #ffffff !important;
+          border-color: #d9d9d9 !important;
+          color: #000000 !important;
+        }
+        [data-theme="light"] .filter-section-bg .ant-input-number-input {
+          color: #000000 !important;
+        }
+        [data-theme="light"] .filter-section-bg .ant-btn {
+          background: #ffffff !important;
+          border-color: #d9d9d9 !important;
+          color: #000000 !important;
+        }
+        [data-theme="light"] .filter-section-bg .ant-btn:hover {
+          background: #f5f5f5 !important;
+          border-color: #40a9ff !important;
+          color: #000000 !important;
+        }
+        [data-theme="light"] .filter-section-bg .ant-btn span {
+          color: #000000 !important;
+        }
+        [data-theme="light"] .filter-section-bg .ant-btn:hover span {
+          color: #000000 !important;
+        }
+        /* Fix form labels */
+        [data-theme="light"] .filter-section-bg .ant-form-item-label > label {
+          color: #000000 !important;
+        }
+        [data-theme="light"] .filter-section-bg .ant-form-item-label > label > span {
+          color: #000000 !important;
+        }
+        /* Fix select dropdown text */
+        [data-theme="light"] .filter-section-bg .ant-select-selection-placeholder {
+          color: #999999 !important;
+        }
+        [data-theme="light"] .filter-section-bg .ant-select-selection-item {
+          color: #000000 !important;
+        }
+        /* Fix picker text */
+        [data-theme="light"] .filter-section-bg .ant-picker-input input {
+          color: #000000 !important;
+        }
+        /* Additional text in filter components */
+        [data-theme="light"] .filter-section-bg .ant-space-item span {
+          color: #000000 !important;
+        }
+        /* Fix antd icons in filter section */
+        [data-theme="light"] .filter-section-bg .anticon {
+          color: #666666 !important;
+        }
+        /* Fix switch component */
+        [data-theme="light"] .filter-section-bg .ant-switch {
+          background: #ffffff !important;
+        }
+        [data-theme="light"] .filter-section-bg .ant-switch-checked {
+          background: #1890ff !important;
+        }
+      ` }} />
+      <div className="h-full flex flex-col p-8 logs-page">
+        <div className="boardPageTop">
+          <div className="logs-header-override">
+            <PageHeader
+              headding="Logs"
             />
+          </div>
+        </div>
+        <style dangerouslySetInnerHTML={{ __html: `
+          .logs-header-override .pageHeader h1,
+          .logs-header-override .pageHeader h2,
+          .logs-header-override .pageHeader h3,
+          .logs-header-override .pageHeader div[class*="Heading"],
+          .logs-header-override .pageHeader * {
+            color: var(--text-primary) !important;
+          }
+        ` }} />
+        <style dangerouslySetInnerHTML={{ __html: `
+          .theme-aware-logs *,
+          .theme-aware-logs div,
+          .theme-aware-logs span,
+          .theme-aware-logs p,
+          .theme-aware-logs h1,
+          .theme-aware-logs h2,
+          .theme-aware-logs h3,
+          .theme-aware-logs h4,
+          .theme-aware-logs h5,
+          .theme-aware-logs h6 {
+            color: var(--text-primary) !important;
+          }
 
-            <Popover
-              placement="bottomRight"
-              arrow={false}
-              open={filterOpen}
-              onOpenChange={handleOpenChange}
-              content={
-                <div className="bg-[var(--bg-card)] shadow-none border border-[var(--border-color)] rounded-[6px] width-348">
-                  <div className="p-[1.5rem] flex items-start justify-start flex-col">
-                    <Text className="text-[var(--text-primary)] text-[14px] font-normal">
-                      Filter
-                    </Text>
-                    <Text className="text-[12px] font-normal text-bud-text-disabled">
-                      Apply filters to find specific logs
-                    </Text>
+          /* Override specific hardcoded text components */
+          .theme-aware-logs [class*="Text_"][class*="_FFFFFF"],
+          .theme-aware-logs [class*="Text_"][class*="_EEEEEE"],
+          .theme-aware-logs [class*="Heading_"][class*="_FFFFFF"] {
+            color: var(--text-primary) !important;
+          }
+
+          .theme-aware-logs [class*="Text_"][class*="_B3B3B3"],
+          .theme-aware-logs [class*="Text_"][class*="_808080"],
+          .theme-aware-logs [class*="Text_"][class*="_757575"] {
+            color: var(--text-muted) !important;
+          }
+
+          /* Ant Design components */
+          .theme-aware-logs .ant-tabs-tab {
+            color: var(--text-muted) !important;
+          }
+          .theme-aware-logs .ant-tabs-tab-active {
+            color: var(--text-primary) !important;
+          }
+          .theme-aware-logs .ant-table {
+            color: var(--text-primary) !important;
+          }
+          .theme-aware-logs .ant-table-thead > tr > th {
+            color: var(--text-primary) !important;
+          }
+          .theme-aware-logs .ant-table-tbody > tr > td {
+            color: var(--text-primary) !important;
+          }
+          .theme-aware-logs .ant-empty-description {
+            color: var(--text-muted) !important;
+          }
+          .theme-aware-logs .ant-segmented-item {
+            color: var(--text-muted) !important;
+          }
+          .theme-aware-logs .ant-segmented-item-selected {
+            color: var(--text-primary) !important;
+          }
+
+          /* Input components and form elements */
+          .theme-aware-logs .ant-input,
+          .theme-aware-logs .ant-input:focus,
+          .theme-aware-logs .ant-input:hover,
+          .theme-aware-logs .ant-input-affix-wrapper,
+          .theme-aware-logs .ant-input-affix-wrapper:focus,
+          .theme-aware-logs .ant-input-affix-wrapper:hover {
+            color: var(--text-primary) !important;
+            background-color: var(--bg-tertiary) !important;
+            border-color: var(--border-secondary) !important;
+          }
+
+          .theme-aware-logs .ant-input::placeholder,
+          .theme-aware-logs .ant-input-affix-wrapper input::placeholder {
+            color: var(--text-disabled) !important;
+          }
+
+          /* Button components */
+          .theme-aware-logs .ant-btn,
+          .theme-aware-logs .ant-btn span {
+            color: var(--text-primary) !important;
+          }
+
+          .theme-aware-logs .ant-btn-default {
+            background-color: var(--bg-tertiary) !important;
+            border-color: var(--border-secondary) !important;
+            color: var(--text-primary) !important;
+          }
+
+          .theme-aware-logs .ant-btn-default:hover {
+            background-color: var(--bg-hover) !important;
+            border-color: var(--border-color) !important;
+            color: var(--text-primary) !important;
+          }
+
+          /* Dropdown and Select components */
+          .theme-aware-logs .ant-select,
+          .theme-aware-logs .ant-select:hover,
+          .theme-aware-logs .ant-select:focus {
+            color: var(--text-primary) !important;
+          }
+
+          .theme-aware-logs .ant-select-selector {
+            background-color: var(--bg-tertiary) !important;
+            border-color: var(--border-secondary) !important;
+            color: var(--text-primary) !important;
+          }
+
+          .theme-aware-logs .ant-select-selection-placeholder {
+            color: var(--text-disabled) !important;
+          }
+
+          .theme-aware-logs .ant-select-selection-item {
+            color: var(--text-primary) !important;
+          }
+
+          /* Date picker components */
+          .theme-aware-logs .ant-picker,
+          .theme-aware-logs .ant-picker:hover,
+          .theme-aware-logs .ant-picker:focus {
+            background-color: var(--bg-tertiary) !important;
+            border-color: var(--border-secondary) !important;
+            color: var(--text-primary) !important;
+          }
+
+          .theme-aware-logs .ant-picker input {
+            color: var(--text-primary) !important;
+          }
+
+          .theme-aware-logs .ant-picker-input > input::placeholder {
+            color: var(--text-disabled) !important;
+          }
+
+          /* Filter components specific */
+          .theme-aware-logs .ant-form-item-label > label {
+            color: var(--text-primary) !important;
+          }
+
+          .theme-aware-logs .ant-checkbox-wrapper {
+            color: var(--text-primary) !important;
+          }
+
+          .theme-aware-logs .ant-radio-wrapper {
+            color: var(--text-primary) !important;
+          }
+
+          /* Search header specific */
+          .theme-aware-logs .ant-input-search .ant-input {
+            color: var(--text-primary) !important;
+            background-color: var(--bg-tertiary) !important;
+          }
+
+          /* Any remaining text elements */
+          .theme-aware-logs label,
+          .theme-aware-logs .ant-form-item-label,
+          .theme-aware-logs .ant-form-item-control {
+            color: var(--text-primary) !important;
+          }
+
+          /* SearchHeaderInput component override */
+          .theme-aware-logs .ant-input[style*="#1A1A1A"],
+          .theme-aware-logs .ant-input[class*="bg-[#1A1A1A]"] {
+            background-color: var(--bg-tertiary) !important;
+            border-color: var(--border-secondary) !important;
+            color: var(--text-primary) !important;
+          }
+
+          /* Icon color override */
+          .theme-aware-logs .ant-input-prefix,
+          .theme-aware-logs .ant-input-prefix * {
+            color: var(--text-muted) !important;
+          }
+
+          /* Button text specific overrides */
+          .theme-aware-logs .ant-btn .ml-2,
+          .theme-aware-logs button span {
+            color: var(--text-primary) !important;
+          }
+
+          /* Ensure all divs and spans in buttons are visible */
+          .theme-aware-logs .ant-btn div,
+          .theme-aware-logs .ant-btn span,
+          .theme-aware-logs button div,
+          .theme-aware-logs button span {
+            color: inherit !important;
+          }
+
+          /* Custom button components override */
+          .theme-aware-logs button[class*="bg-[#"],
+          .theme-aware-logs .ant-btn[class*="bg-[#"] {
+            background-color: var(--bg-tertiary) !important;
+            border-color: var(--border-secondary) !important;
+            color: var(--text-primary) !important;
+          }
+
+          .theme-aware-logs button[class*="bg-[#1E0C34"] {
+            background-color: var(--color-purple) !important;
+            border-color: var(--color-purple) !important;
+            color: white !important;
+          }
+
+          /* Override hardcoded text colors in buttons */
+          .theme-aware-logs button div[class*="text-[#EEEEEE]"],
+          .theme-aware-logs button span[class*="text-[#EEEEEE]"],
+          .theme-aware-logs .ant-btn div[class*="text-[#EEEEEE]"],
+          .theme-aware-logs .ant-btn span[class*="text-[#EEEEEE]"] {
+            color: var(--text-primary) !important;
+          }
+
+          /* Force visibility for all interactive elements */
+          .theme-aware-logs input,
+          .theme-aware-logs textarea,
+          .theme-aware-logs select,
+          .theme-aware-logs button,
+          .theme-aware-logs .ant-input,
+          .theme-aware-logs .ant-btn,
+          .theme-aware-logs .ant-select,
+          .theme-aware-logs .ant-picker {
+            color: var(--text-primary) !important;
+          }
+
+          /* InferenceFilters component specific */
+          .theme-aware-logs [class*="InferenceFilters"] *,
+          .theme-aware-logs [class*="filters"] * {
+            color: var(--text-primary) !important;
+          }
+
+          /* SearchHeaderInput specific override */
+          .theme-aware-logs .theme-search-override,
+          .theme-aware-logs .theme-search-override input,
+          .theme-aware-logs .theme-search-override .ant-input {
+            background-color: var(--bg-tertiary) !important;
+            border-color: var(--border-secondary) !important;
+            color: var(--text-primary) !important;
+          }
+
+          .theme-aware-logs .theme-search-override input::placeholder {
+            color: var(--text-disabled) !important;
+          }
+
+          /* Ant Design Card components with hardcoded dark colors */
+          .theme-aware-logs .ant-card,
+          .theme-aware-logs .ant-card.ant-card-bordered,
+          .theme-aware-logs .ant-card.ant-card-small,
+          .theme-aware-logs .ant-card[class*="bg-[#101010]"],
+          .theme-aware-logs .ant-card[class*="bg-[#1A1A1A]"],
+          .theme-aware-logs .ant-card[class*="bg-[#161616]"],
+          .theme-aware-logs div[class*="bg-[#101010]"],
+          .theme-aware-logs div[class*="bg-[#1A1A1A]"],
+          .theme-aware-logs div[class*="bg-[#161616]"] {
+            background-color: var(--bg-card) !important;
+            border-color: var(--border-color) !important;
+            color: var(--text-primary) !important;
+          }
+
+          /* Card borders with hardcoded dark colors */
+          .theme-aware-logs .ant-card[class*="border-[#1F1F1F]"],
+          .theme-aware-logs .ant-card[class*="border-[#2F2F2F]"],
+          .theme-aware-logs div[class*="border-[#1F1F1F]"],
+          .theme-aware-logs div[class*="border-[#2F2F2F]"] {
+            border-color: var(--border-color) !important;
+          }
+
+          /* Card headers and content */
+          .theme-aware-logs .ant-card-head,
+          .theme-aware-logs .ant-card-body,
+          .theme-aware-logs .ant-card-head-title {
+            background-color: var(--bg-card) !important;
+            border-color: var(--border-color) !important;
+            color: var(--text-primary) !important;
+          }
+
+          /* All nested elements in cards */
+          .theme-aware-logs .ant-card *,
+          .theme-aware-logs .ant-card .ant-card-body *,
+          .theme-aware-logs div[class*="bg-[#101010]"] *,
+          .theme-aware-logs div[class*="bg-[#1A1A1A]"] * {
+            color: var(--text-primary) !important;
+          }
+
+          /* Specific override for the problematic div class */
+          .theme-aware-logs .ant-card.bg-\[\#101010\],
+          .theme-aware-logs .ant-card.border-\[\#1F1F1F\] {
+            background-color: var(--bg-card) !important;
+            border-color: var(--border-color) !important;
+          }
+
+          /* Global override for ANY element with hardcoded dark backgrounds */
+          .theme-aware-logs *[style*="background-color: rgb(16, 16, 16)"],
+          .theme-aware-logs *[style*="background-color: #101010"],
+          .theme-aware-logs *[style*="background-color: #1A1A1A"],
+          .theme-aware-logs *[style*="background-color: #161616"],
+          .theme-aware-logs *[style*="border-color: rgb(31, 31, 31)"],
+          .theme-aware-logs *[style*="border-color: #1F1F1F"],
+          .theme-aware-logs *[style*="border-color: #2F2F2F"] {
+            background-color: var(--bg-card) !important;
+            border-color: var(--border-color) !important;
+            color: var(--text-primary) !important;
+          }
+
+          /* Catch-all for any missed dark backgrounds */
+          .theme-aware-logs [class*="bg-black"],
+          .theme-aware-logs [class*="bg-gray-900"],
+          .theme-aware-logs [class*="bg-slate-900"] {
+            background-color: var(--bg-card) !important;
+          }
+
+          /* Specific fixes for inference filters */
+          .theme-aware-logs .inference-filters-container *,
+          .theme-aware-logs .filters-wrapper *,
+          .theme-aware-logs .inference-filters-container .ant-card,
+          .theme-aware-logs .filters-wrapper .ant-card {
+            background-color: var(--bg-card) !important;
+            border-color: var(--border-color) !important;
+            color: var(--text-primary) !important;
+          }
+
+          /* Force override for any stubborn components */
+          .theme-aware-logs .ant-card.css-dev-only-do-not-override-nvrefq {
+            background-color: var(--bg-card) !important;
+            border-color: var(--border-color) !important;
+            color: var(--text-primary) !important;
+          }
+        ` }} />
+
+        <div className="projectDetailsDiv antTabWrap mt-4">
+          <Tabs
+            activeKey={activeTab}
+            onChange={setActiveTab}
+            items={[
+              {
+                label: (
+                  <div className="flex items-center gap-[0.375rem] px-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width=".875rem" height=".875rem" viewBox="0 0 14 14" fill="none">
+                      <path d="M12.6875 12.3672C12.6842 12.6073 12.4901 12.8014 12.25 12.8047H2.33352C1.77079 12.8014 1.31579 12.3464 1.3125 11.7837V1.86719C1.3125 1.62546 1.50828 1.42969 1.75 1.42969C1.99172 1.42969 2.1875 1.62546 2.1875 1.86719V7.40867L3.08602 6.73765V6.73819C3.07672 6.67038 3.07672 6.60148 3.08602 6.53367C3.08602 5.96985 3.54266 5.5132 4.10649 5.5132C4.67032 5.5132 5.12751 5.96983 5.12751 6.53367C5.12751 6.61843 5.11603 6.7032 5.09251 6.78469L7.18103 8.53469C7.31447 8.47344 7.45994 8.44172 7.60651 8.44117C7.69565 8.44281 7.78424 8.45649 7.86901 8.48219L10.15 5.78117C10.0942 5.65047 10.0647 5.50937 10.0625 5.36719C10.0625 4.9543 10.3114 4.58187 10.6925 4.42383C11.0743 4.26633 11.5134 4.35328 11.8054 4.64531C12.0969 4.93733 12.1844 5.37648 12.0264 5.75765C11.8683 6.13937 11.4964 6.3882 11.0835 6.3882C10.9944 6.38655 10.9058 6.37288 10.821 6.34718L8.48751 9.03616C8.5433 9.16741 8.57283 9.30796 8.57501 9.45069C8.57501 10.0145 8.11783 10.4712 7.55399 10.4712C6.99017 10.4712 6.53352 10.0145 6.53352 9.45069C6.53297 9.36592 6.545 9.28116 6.56852 9.19967L4.48 7.44967C4.34656 7.51092 4.20109 7.54263 4.05398 7.54318C3.88882 7.54099 3.72695 7.49943 3.58148 7.42068L2.1875 8.50568V11.7836C2.1875 11.8225 2.20281 11.8597 2.23016 11.887C2.2575 11.9143 2.29469 11.9297 2.33352 11.9297H12.25C12.4901 11.9329 12.6842 12.1271 12.6875 12.3672Z" fill={activeTab === "metrics" ? (effectiveTheme === 'dark' ? "#EEEEEE" : "#1a1a1a") : (effectiveTheme === 'dark' ? "#B3B3B3" : "#666666")} />
+                    </svg>
+                    {activeTab === "metrics" ? (
+                      <Text_14_600_EEEEEE className="!text-[var(--text-primary)]">Metrics</Text_14_600_EEEEEE>
+                    ) : (
+                      <Text_14_600_B3B3B3 className="!text-[var(--text-muted)]">Metrics</Text_14_600_B3B3B3>
+                    )}
                   </div>
-                  <div className="height-1 bg-bud-border mb-[1.5rem] w-full"></div>
-                  <div className="w-full flex flex-col gap-size-20 px-[1.5rem] pb-[1.5rem]">
-                    <div
-                      className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[1rem]`}
+                ),
+                key: 'metrics',
+                children: (
+                  <>
+              {/* Enhanced Filters Section - Single Row */}
+              <div className="mb-8 mt-2 flex justify-between items-end gap-6 p-6 rounded-lg filter-section-bg">
+                {/* View By Section */}
+                <div className="flex flex-col gap-2">
+                  <Text_12_400_808080 className="!text-[var(--text-muted)]">View by</Text_12_400_808080>
+                  <Segmented
+                    options={viewByOptions.map(opt => ({
+                      label: (
+                        <span className="flex items-center gap-2">
+                          {opt.icon(viewBy === opt.value)}
+                          {opt.label}
+                        </span>
+                      ),
+                      value: opt.value
+                    }))}
+                    value={viewBy}
+                    onChange={(value) => setViewBy(value as any)}
+                    className="antSegmented"
+                  />
+                </div>
+
+                {/* Time Range Section */}
+                <div className="flex flex-col gap-2 flex-1">
+                  <Text_12_400_808080 className="!text-[var(--text-muted)]">Time Range</Text_12_400_808080>
+                  <div className="flex items-center gap-3">
+                    <ConfigProvider
+                      theme={{
+                        token: {
+                          colorPrimary: '#965CDE',
+                          colorPrimaryHover: '#a873e5',
+                          colorPrimaryActive: '#8348c7',
+                        },
+                        components: {
+                          DatePicker: {
+                            colorBgContainer: 'var(--bg-tertiary)',
+                            colorBorder: 'var(--border-secondary)',
+                            colorText: 'var(--text-primary)',
+                            colorTextPlaceholder: 'var(--text-disabled)',
+                            colorBgElevated: 'var(--bg-tertiary)',
+                            colorPrimary: 'var(--color-purple)',
+                            colorPrimaryBg: 'var(--bg-hover)',
+                            colorPrimaryBgHover: 'var(--bg-hover)',
+                            colorTextLightSolid: 'var(--text-primary)',
+                            controlItemBgActive: 'var(--color-purple)',
+                            colorLink: 'var(--color-purple)',
+                            colorLinkHover: 'var(--color-purple-hover)',
+                            colorLinkActive: 'var(--color-purple-active)',
+                          },
+                        },
+                      }}
                     >
-                      <div className="w-full">
-                        <Text className="absolute bg-[var(--bg-primary)] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap text-[var(--text-primary)] text-[12px] font-light">
-                          Status
-                        </Text>
-                      </div>
-                      <div className="custom-select-two w-full rounded-[6px] relative">
-                        <ConfigProvider
-                          theme={{
-                            token: {
-                              colorTextPlaceholder: "var(--text-disabled)",
-                              boxShadowSecondary: "none",
-                            },
-                          }}
-                        >
-                          <Select
-                            variant="borderless"
-                            placeholder="Select Status"
+                      <RangePicker
+                        value={timeRange}
+                        onChange={handleTimeRangeChange}
+                        presets={timeRangePresets}
+                        showTime
+                        format="YYYY-MM-DD HH:mm"
+                        className="bg-[var(--bg-tertiary)] border-[var(--border-secondary)] hover:border-[var(--border-color)] flex-1 h-7"
+                        placeholder={['Start Date', 'End Date']}
+                      />
+                    </ConfigProvider>
+                    <div className="flex gap-2">
+                      {timeRangePresets.slice(0, 3).map((preset) => {
+                        const isSelected = selectedPreset === preset.label;
+                        return (
+                          <Button
+                            key={preset.label}
+                            size="small"
                             style={{
-                              backgroundColor: "transparent",
-                              color: "var(--text-primary)",
-                              border: "0.5px solid var(--border-color)",
-                              width: "100%",
+                              height: '34px',
+                              backgroundColor: isSelected ? 'var(--bg-hover)' : 'transparent',
+                              borderColor: isSelected ? 'var(--color-purple)' : 'var(--border-color)',
+                              color: isSelected ? 'var(--text-primary)' : 'var(--text-muted)'
                             }}
-                            size="large"
-                            value={tempFilter.status || undefined}
-                            className="drawerInp !bg-transparent text-bud-text-primary py-[.6rem] font-light text-[.75rem] shadow-none w-full indent-[.4rem] border-0 outline-0 hover:border-bud-text-primary focus:border-bud-text-primary active:border-bud-text-primary h-[2.5rem] outline-none"
-                            options={[
-                              { label: "All Status", value: "" },
-                              { label: "Active", value: "active" },
-                              { label: "Revoked", value: "revoked" },
-                              { label: "Expired", value: "expired" },
-                            ]}
-                            onChange={(value) => {
-                              setTempFilter({ ...tempFilter, status: value });
+                            onClick={() => {
+                              // Skip if already selected and using the same preset
+                              if (selectedPreset === preset.label) {
+                                return;
+                              }
+
+                              const timeValue = preset.value();
+                              setTimeRange(timeValue);
+                              setSelectedPreset(preset.label);
+                              // Create the new filters
+                              const newFilters = {
+                                from_date: timeValue[0].toISOString(),
+                                to_date: timeValue[1].toISOString(),
+                                sort_by: 'timestamp' as const,
+                                sort_order: 'desc' as const
+                              };
+                              // Update filters in store
+                              setFilters(newFilters);
+                              // Fetch with the same filters to ensure consistency
+                              fetchInferences(undefined, newFilters);
                             }}
-                          />
-                        </ConfigProvider>
-                      </div>
-                    </div>
-
-                    <div
-                      className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[1rem]`}
-                    >
-                      <div className="w-full">
-                        <Text className="absolute bg-[var(--bg-primary)] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap text-[var(--text-primary)] text-[12px] font-light">
-                          Date Range
-                        </Text>
-                      </div>
-                      <div className="custom-select-two w-full rounded-[6px] relative">
-                        <RangePicker
-                          value={tempFilter.dateRange}
-                          onChange={(dates) =>
-                            setTempFilter({
-                              ...tempFilter,
-                              dateRange: dates as [dayjs.Dayjs, dayjs.Dayjs],
-                            })
-                          }
-                          className={`${styles.rangePicker} !bg-transparent text-bud-text-primary border-[0.5px] border-bud-text-disabled w-full hover:border-bud-text-primary focus:border-bud-text-primary`}
-                          style={{ width: "100%" }}
-                          format="YYYY-MM-DD"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <SecondaryButton
-                        type="button"
-                        onClick={resetFilter}
-                        classNames="!px-[.8rem] tracking-[.02rem] mr-[.5rem]"
-                      >
-                        Reset
-                      </SecondaryButton>
-                      <PrimaryButton
-                        type="submit"
-                        onClick={applyFilter}
-                        classNames="!px-[.8rem] tracking-[.02rem]"
-                      >
-                        Apply
-                      </PrimaryButton>
+                            className="text-xs hover:text-[var(--text-primary)] hover:border-[var(--border-secondary)]"
+                          >
+                            {preset.label}
+                          </Button>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
-              }
-              trigger={["click"]}
-            >
-              <div
-                className="group h-9 px-3 flex items-center cursor-pointer rounded-md hover:bg-bud-bg-hover transition-colors"
-                onClick={() => {}}
-              >
-                <MixerHorizontalIcon
-                  style={{ width: "0.875rem", height: "0.875rem" }}
-                  className="text-bud-text-muted group-hover:text-bud-text-primary"
+
+                {/* Refresh Button */}
+                <div style={{ color: 'var(--text-primary)' }}>
+                  <PrimaryButton
+                    onClick={() => fetchInferences()}
+                    style={{ color: 'var(--text-primary)' }}
+                  >
+                    <ReloadOutlined style={{ color: 'var(--text-primary)' }} />
+                    <span className="ml-2" style={{ color: 'var(--text-primary)' }}>Refresh</span>
+                  </PrimaryButton>
+                </div>
+              </div>
+
+                    <MetricsTab
+                      timeRange={timeRange}
+                      inferences={inferences}
+                      isLoading={isLoading}
+                      viewBy={viewBy}
+                      isActive={activeTab === 'metrics'}
+                      filters={filters}
+                    />
+                  </>
+                )
+              },
+              {
+                label: (
+                  <div className="flex items-center gap-[0.375rem] px-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width=".875rem" height=".875rem" viewBox="0 0 14 14" fill="none">
+                      <path fillRule="evenodd" clipRule="evenodd" d="M1.75 2.11719C1.50828 2.11719 1.3125 2.31296 1.3125 2.55469V12.4922C1.3125 12.7339 1.50828 12.9297 1.75 12.9297H12.25C12.4917 12.9297 12.6875 12.7339 12.6875 12.4922V4.74219C12.6875 4.50046 12.4917 4.30469 12.25 4.30469H7.875C7.71148 4.30469 7.56147 4.21718 7.48353 4.07718L6.39147 2.11719H1.75ZM0.4375 2.55469C0.4375 1.82951 1.02483 1.24219 1.75 1.24219H6.625C6.78852 1.24219 6.93853 1.3297 7.01647 1.4697L8.10853 3.42969H12.25C12.9752 3.42969 13.5625 4.01701 13.5625 4.74219V12.4922C13.5625 13.2174 12.9752 13.8047 12.25 13.8047H1.75C1.02483 13.8047 0.4375 13.2174 0.4375 12.4922V2.55469Z" fill={activeTab === "requests" ? (effectiveTheme === 'dark' ? "#EEEEEE" : "#1a1a1a") : (effectiveTheme === 'dark' ? "#B3B3B3" : "#666666")}/>
+                    </svg>
+                    {activeTab === "requests" ? (
+                      <Text_14_600_EEEEEE className="!text-[var(--text-primary)]">Requests</Text_14_600_EEEEEE>
+                    ) : (
+                      <Text_14_600_B3B3B3 className="!text-[var(--text-muted)]">Requests</Text_14_600_B3B3B3>
+                    )}
+                  </div>
+                ),
+                key: 'requests',
+                children: (
+              <div className="listingContainer">
+                <div className="mb-4 p-6 rounded-lg filter-section-bg">
+                  <InferenceFilters
+                    projectId={'all'} // Pass a dummy ID for global view
+                    onFiltersChange={() => fetchInferences()}
+                  />
+                </div>
+
+                <Table<InferenceListItem>
+                  columns={columns}
+                  dataSource={inferences}
+                  rowKey="inference_id"
+                  loading={false}
+                  pagination={false}
+                  virtual
+                  bordered={false}
+                  footer={undefined}
+                  onChange={handleTableChange}
+                  scroll={{ x: 1200 }}
+                  showSorterTooltip={true}
+                  onRow={(record) => ({
+                    onClick: (e) => {
+                      e.preventDefault();
+                      router.push(`/observability/${record.inference_id}`);
+                    },
+                    className: 'cursor-pointer hover:bg-[var(--bg-hover)]',
+                  })}
+                  title={() => (
+                    <div className="flex justify-between items-center px-[0.75rem] py-[1rem]">
+                      <Text_16_600_FFFFFF className="!text-[var(--text-primary)]">
+                        Inference Requests
+                      </Text_16_600_FFFFFF>
+                      <div className="flex items-center justify-between gap-x-[.8rem]">
+                        <div style={{ color: 'var(--text-primary)' }}>
+                          <SearchHeaderInput
+                            placeholder={"Search by prompt or response"}
+                            value={searchValue}
+                            onChange={setSearchValue}
+                            className="theme-search-override"
+                          />
+                        </div>
+                        <div style={{ color: 'var(--text-primary)' }}>
+                          <PrimaryButton
+                            onClick={() => fetchInferences()}
+                            style={{ color: 'var(--text-primary)' }}
+                          >
+                            <ReloadOutlined style={{ color: 'var(--text-primary)' }} />
+                            <span className="ml-2" style={{ color: 'var(--text-primary)' }}>Refresh</span>
+                          </PrimaryButton>
+                        </div>
+                        <div style={{ color: 'var(--text-primary)' }}>
+                          <SecondaryButton
+                            onClick={() => exportInferences('csv')}
+                            style={{ color: 'var(--text-primary)' }}
+                          >
+                            <DownloadOutlined style={{ color: 'var(--text-primary)' }} />
+                            <span className="ml-2" style={{ color: 'var(--text-primary)' }}>Export</span>
+                          </SecondaryButton>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  locale={{
+                    emptyText: (
+                      <NoDataFount
+                        className="h-[20vh]"
+                        message="No observability data found"
+                      />
+                    ),
+                  }}
                 />
               </div>
-            </Popover>
-
-            <button
-              onClick={() => console.log("Create new API key")}
-              className="px-6 py-2 bg-bud-purple text-white rounded-md hover:bg-bud-purple-hover transition-colors flex items-center gap-2"
-            >
-              <span className="text-lg">+</span>
-              Create API Key
-            </button>
-          </div>
-        </div>
-
-        {/* Table */}
-        <div className="bg-bud-bg-secondary border border-bud-border rounded-lg overflow-hidden">
-          <Table<APIKey>
-            columns={columns}
-            pagination={{
-              className: "small-pagination",
-              current: currentPage,
-              pageSize: pageSize,
-              total: filteredKeys.length,
-              onChange: handlePageChange,
-              showSizeChanger: true,
-              pageSizeOptions: ["5", "10", "20", "50"],
-            }}
-            dataSource={filteredKeys}
-            bordered={false}
-            virtual
-            onRow={(record) => {
-              return {
-                onClick: async (event) => {
-                  event.stopPropagation();
-                  if (expandedRows.includes(record.id)) {
-                    setExpandedRows(
-                      expandedRows.filter((id) => id !== record.id),
-                    );
-                  } else {
-                    setExpandedRows([...expandedRows, record.id]);
-                  }
-                },
-              };
-            }}
-            expandable={{
-              expandedRowRender,
-              expandedRowKeys: expandedRows,
-              expandRowByClick: false,
-            }}
-            showSorterTooltip={false}
-            locale={{
-              emptyText: (
-                <NoDataFount
-                  classNames="h-[20vh]"
-                  textMessage={`No API Keys Found`}
-                />
-              ),
-            }}
-            className={styles.logsTable}
+                )
+              },
+              // {
+              //   label: (
+              //     <div className="flex items-center gap-[0.375rem] px-2">
+              //       <svg xmlns="http://www.w3.org/2000/svg" width=".875rem" height=".875rem" viewBox="0 0 14 14" fill="none">
+              //         <path d="M7 1.75C7 1.33579 6.66421 1 6.25 1C5.83579 1 5.5 1.33579 5.5 1.75V2.5H3.75C3.33579 2.5 3 2.83579 3 3.25V4H11V3.25C11 2.83579 10.6642 2.5 10.25 2.5H8.5V1.75C8.5 1.33579 8.16421 1 7.75 1C7.33579 1 7 1.33579 7 1.75ZM3 5.5V11.75C3 12.1642 3.33579 12.5 3.75 12.5H10.25C10.6642 12.5 11 12.1642 11 11.75V5.5H3ZM5.5 7C5.5 6.72386 5.72386 6.5 6 6.5C6.27614 6.5 6.5 6.72386 6.5 7V10C6.5 10.2761 6.27614 10.5 6 10.5C5.72386 10.5 5.5 10.2761 5.5 10V7ZM7.5 7C7.5 6.72386 7.72386 6.5 8 6.5C8.27614 6.5 8.5 6.72386 8.5 7V10C8.5 10.2761 8.27614 10.5 8 10.5C7.72386 10.5 7.5 10.2761 7.5 10V7Z" fill={activeTab === "rules" ? "#EEEEEE" : "#B3B3B3"}/>
+              //       </svg>
+              //       {activeTab === "rules" ? (
+              //         <Text_14_600_EEEEEE>Rules</Text_14_600_EEEEEE>
+              //       ) : (
+              //         <Text_14_600_B3B3B3>Rules</Text_14_600_B3B3B3>
+              //       )}
+              //     </div>
+              //   ),
+              //   key: 'rules',
+              //   children: (
+              //     <RulesTab
+              //       timeRange={timeRange}
+              //       isActive={activeTab === 'rules'}
+              //     />
+              //   )
+              // }
+            ]}
           />
         </div>
       </div>
     </DashboardLayout>
   );
-}
+};

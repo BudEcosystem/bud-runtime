@@ -5,7 +5,7 @@ from uuid import UUID
 
 from budmicroframe.commons.schemas import CloudEventBase, ResponseBase
 from fastapi.responses import ORJSONResponse
-from pydantic import BaseModel, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 
 def validate_date_range(from_date: Optional[datetime], to_date: Optional[datetime], max_days: int = 90) -> None:
@@ -35,6 +35,46 @@ def validate_date_range(from_date: Optional[datetime], to_date: Optional[datetim
     now = datetime.now(to_date.tzinfo) if to_date.tzinfo else datetime.now()
     if to_date > now + timedelta(days=1):  # Allow 1 day in future for timezone differences
         raise ValueError("to_date cannot be more than 1 day in the future")
+
+
+class CredentialUsageRequest(BaseModel):
+    """Request for fetching credential usage statistics."""
+
+    since: datetime
+    """Get usage since this timestamp."""
+
+    credential_ids: Optional[List[UUID]] = None
+    """Optional list of specific credential IDs to query. If None, returns all."""
+
+
+class CredentialUsageItem(BaseModel):
+    """Individual credential usage information."""
+
+    model_config = ConfigDict(json_encoders={datetime: lambda v: v.isoformat()})
+
+    credential_id: UUID
+    """The credential ID (api_key_id from ModelInferenceDetails)."""
+
+    last_used_at: datetime
+    """The most recent timestamp when this credential was used."""
+
+    request_count: int
+    """Total number of requests made with this credential in the time window."""
+
+
+class CredentialUsageResponse(ResponseBase):
+    """Response containing credential usage statistics."""
+
+    model_config = ConfigDict(json_encoders={datetime: lambda v: v.isoformat()})
+
+    object: str = "credential_usage"
+    """The type of response object."""
+
+    credentials: List[CredentialUsageItem]
+    """List of credential usage information."""
+
+    query_window: Dict[str, datetime]
+    """The time window used for the query (since and until)."""
 
 
 MetricType = Literal[

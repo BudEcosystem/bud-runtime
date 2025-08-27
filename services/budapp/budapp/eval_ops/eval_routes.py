@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from budapp.commons import logging
 from budapp.commons.dependencies import get_current_active_user, get_session
+from budapp.commons.exceptions import ClientException
 from budapp.commons.schemas import ErrorResponse
 from budapp.eval_ops.schemas import (
     ConfigureRunsRequest,
@@ -17,7 +18,6 @@ from budapp.eval_ops.schemas import (
     DeleteRunResponse,
     EvaluationWorkflowResponse,
     EvaluationWorkflowStepRequest,
-    ExperimentWorkflowResponse,
     ExperimentWorkflowStepRequest,
     GetDatasetResponse,
     GetExperimentResponse,
@@ -34,6 +34,7 @@ from budapp.eval_ops.schemas import (
 )
 from budapp.eval_ops.services import EvaluationWorkflowService, ExperimentService, ExperimentWorkflowService
 from budapp.user_ops.models import User
+from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 
 
 router = APIRouter(prefix="/experiments", tags=["experiments"])
@@ -68,6 +69,8 @@ def create_experiment(
     """
     try:
         experiment = ExperimentService(session).create_experiment(request, current_user.id)
+    except ClientException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
     except HTTPException as e:
         raise e
     except Exception as e:
@@ -335,7 +338,8 @@ def delete_experiment(
 
 @router.post(
     "/workflow",
-    response_model=ExperimentWorkflowResponse,
+    response_model=RetrieveWorkflowDataResponse,
+    response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
     responses={
         status.HTTP_400_BAD_REQUEST: {"model": ErrorResponse},
@@ -390,7 +394,8 @@ async def experiment_workflow_step(
 
 @router.get(
     "/workflow/{workflow_id}",
-    response_model=ExperimentWorkflowResponse,
+    response_model=RetrieveWorkflowDataResponse,
+    response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
     responses={
         status.HTTP_400_BAD_REQUEST: {"model": ErrorResponse},
@@ -709,7 +714,8 @@ def get_dataset_by_id(
 
 @router.post(
     "/{experiment_id}/evaluations/workflow",
-    response_model=EvaluationWorkflowResponse,
+    response_model=RetrieveWorkflowDataResponse,
+    response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
     responses={
         status.HTTP_400_BAD_REQUEST: {"model": ErrorResponse},
@@ -774,7 +780,8 @@ async def evaluation_workflow_step(
 
 @router.get(
     "/{experiment_id}/evaluations/workflow/{workflow_id}",
-    response_model=EvaluationWorkflowResponse,
+    response_model=RetrieveWorkflowDataResponse,
+    response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
     responses={
         status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},

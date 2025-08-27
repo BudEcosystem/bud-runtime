@@ -3,6 +3,7 @@ node_modules/
 .pnp
 .pnp.js
 .yarn/install-state.gz
+package-lock.json
 
 # Testing
 coverage/
