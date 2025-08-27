@@ -794,11 +794,9 @@ class ClusterOpsService:
 
                     except Exception as e:
                         logger.warning(f"Enhanced node status update failed: {e}")
-                        if app_settings.nfd_fallback_to_configmap:
-                            logger.info("Falling back to ConfigMap method")
-                            return await cls.update_node_status(cluster_id)
-                        else:
-                            raise e
+                        # NFD is now the only detection method - no fallback available
+                        logger.error("NFD-based node status update failed and no fallback is available")
+                        raise e
                 else:
                     # Use existing ConfigMap approach
                     return await cls.update_node_status(cluster_id)
@@ -874,8 +872,9 @@ class ClusterOpsService:
             # Use provided config or handle missing config
             if config_dict is None or not config_dict:
                 logger.warning(f"No config provided for cluster {cluster_id}, cannot check node status")
-                # Return current status if we can't get config
-                return db_cluster.status if db_cluster.status else ClusterStatusEnum.NOT_AVAILABLE
+                # Return tuple with default values when config is missing
+                current_status = db_cluster.status if db_cluster.status else ClusterStatusEnum.NOT_AVAILABLE
+                return current_status, False, {"id": str(cluster_id), "nodes": []}, False
 
             # Get node info
             node_info = await get_node_info(config_dict, db_cluster.platform)

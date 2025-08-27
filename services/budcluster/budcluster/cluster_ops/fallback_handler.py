@@ -44,27 +44,10 @@ class ResourceDetectionFallbackHandler:
         except Exception as e:
             logger.warning(f"NFD detection failed: {e}")
 
-            # Fallback to ConfigMap if enabled
-            if app_settings.nfd_fallback_to_configmap:
-                logger.info("Falling back to ConfigMap detection")
-                try:
-                    result = await ClusterOpsService.fetch_cluster_info(
-                        fetch_cluster_info_request, task_id, workflow_id
-                    )
-                    # Add fallback indicator
-                    result_dict = json.loads(result)
-                    result_dict["detection_method"] = "configmap_fallback"
-                    result_dict["enhanced"] = False
-                    return json.dumps(result_dict)
-
-                except Exception as fallback_error:
-                    logger.error(f"ConfigMap fallback also failed: {fallback_error}")
-                    raise Exception(
-                        f"Both NFD and ConfigMap detection failed: {e}, {fallback_error}"
-                    ) from fallback_error
-            else:
-                logger.error("NFD fallback disabled, raising original error")
-                raise e
+            # NFD is now the only detection method - no fallback to ConfigMap
+            # as ConfigMap-based detection is deprecated
+            logger.error("NFD detection failed and no fallback is available")
+            raise e
 
     @classmethod
     async def update_node_status_with_fallback(cls, cluster_id: UUID) -> str:
@@ -84,19 +67,9 @@ class ResourceDetectionFallbackHandler:
         except Exception as e:
             logger.warning(f"NFD node status update failed for cluster {cluster_id}: {e}")
 
-            # Fallback to standard method if enabled
-            if app_settings.nfd_fallback_to_configmap:
-                logger.info(f"Falling back to standard node status update for cluster {cluster_id}")
-                try:
-                    return await ClusterOpsService.update_node_status(cluster_id)
-                except Exception as fallback_error:
-                    logger.error(f"Standard node status update also failed: {fallback_error}")
-                    raise Exception(
-                        f"Both NFD and standard node status update failed: {e}, {fallback_error}"
-                    ) from fallback_error
-            else:
-                logger.error("NFD fallback disabled, raising original error")
-                raise e
+            # NFD is now the only detection method - no fallback available
+            logger.error("NFD-based node status update failed and no fallback is available")
+            raise e
 
     @classmethod
     async def trigger_periodic_update_with_fallback(cls) -> Union[SuccessResponse, ErrorResponse]:
@@ -169,9 +142,9 @@ class ResourceDetectionFallbackHandler:
         """Get information about current detection method configuration."""
         return {
             "nfd_enabled": app_settings.enable_nfd_detection,
-            "fallback_enabled": app_settings.nfd_fallback_to_configmap,
+            "fallback_enabled": False,  # Deprecated - NFD is now the only method
             "detection_timeout": app_settings.nfd_detection_timeout,
             "nfd_namespace": app_settings.nfd_namespace,
             "primary_method": "nfd" if app_settings.enable_nfd_detection else "configmap",
-            "fallback_method": "configmap" if app_settings.nfd_fallback_to_configmap else None,
+            "fallback_method": None,  # Deprecated - NFD is now the only method
         }

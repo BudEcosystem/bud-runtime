@@ -35,6 +35,9 @@ def upgrade() -> None:
         batch_op.add_column(sa.Column("kernel_info", postgresql.JSONB(astext_type=sa.Text()), nullable=True))
         batch_op.add_column(sa.Column("driver_info", postgresql.JSONB(astext_type=sa.Text()), nullable=True))
 
+    # Update any NULL device_name values before making the column NOT NULL
+    op.execute("UPDATE worker_info SET device_name = 'unknown' WHERE device_name IS NULL")
+
     with op.batch_alter_table("worker_info", schema=None) as batch_op:
         batch_op.alter_column("device_name", existing_type=sa.VARCHAR(), nullable=False)
 

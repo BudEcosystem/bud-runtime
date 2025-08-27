@@ -485,18 +485,88 @@ class KubernetesHandler(BaseClusterHandler):
         )
         logger.debug(f"get_model_transfer_status {values}")
 
+        pod_info = None
         pod_status = None
         configmap_data = None
         if result["status"] == "successful":
             for event in result["events"]:
-                if event["task"] == "Get Pod status" and event["status"] == "runner_on_ok":
-                    pod_status = event["event_data"]["res"]["resources"][0]["status"]["phase"]
-                if event["task"] == "Get ConfigMap data" and event["status"] == "runner_on_ok":
+                if (
+                    event["task"] == "Get Pod status"
+                    and event["status"] == "runner_on_ok"
+                    and event["event_data"]["res"]["resources"]
+                ):
+                    pod_info = event["event_data"]["res"]["resources"][0]
+                    pod_status = pod_info["status"]["phase"]
+                if (
+                    event["task"] == "Get ConfigMap data"
+                    and event["status"] == "runner_on_ok"
+                    and event["event_data"]["res"]["resources"]
+                ):
                     configmap_data = event["event_data"]["res"]["resources"][0]["data"]
 
         transfer_status = {"status": "inprogress"}
-        if not pod_status or pod_status == "Failed" or not configmap_data:
+
+        # Check if pod exists and its status
+        if not pod_status:
             transfer_status["status"] = "failed"
+            transfer_status["reason"] = "Pod not found"
+            return transfer_status
+
+        if pod_status == "Failed":
+            transfer_status["status"] = "failed"
+            transfer_status["reason"] = "Pod failed"
+            return transfer_status
+
+        # Check for container-level failures
+        if pod_info and "status" in pod_info:
+            container_statuses = pod_info["status"].get("containerStatuses", [])
+            for container in container_statuses:
+                if "state" in container:
+                    if "waiting" in container["state"]:
+                        waiting_reason = container["state"]["waiting"].get("reason", "")
+                        if waiting_reason in ["CrashLoopBackOff", "ImagePullBackOff", "ErrImagePull"]:
+                            transfer_status["status"] = "failed"
+                            transfer_status["reason"] = f"Container error: {waiting_reason}"
+                            return transfer_status
+                    elif "terminated" in container["state"]:
+                        exit_code = container["state"]["terminated"].get("exitCode", 0)
+                        if exit_code != 0:
+                            transfer_status["status"] = "failed"
+                            transfer_status["reason"] = f"Container terminated with exit code {exit_code}"
+                            return transfer_status
+
+        # Check pod age for timeout
+        if pod_info and "metadata" in pod_info:
+            import datetime
+
+            creation_timestamp = pod_info["metadata"].get("creationTimestamp")
+            if creation_timestamp:
+                # Parse ISO format timestamp
+                try:
+                    from dateutil import parser
+
+                    pod_created = parser.parse(creation_timestamp)
+                    now = datetime.datetime.now(datetime.timezone.utc)
+                    pod_age_minutes = (now - pod_created).total_seconds() / 60
+
+                    # If pod is older than 5 minutes and no ConfigMap, check logs and consider it failed
+                    if not configmap_data and pod_age_minutes > 5:
+                        transfer_status["status"] = "failed"
+                        transfer_status["reason"] = f"ConfigMap not created after {int(pod_age_minutes)} minutes"
+
+                        # Try to get pod logs for more details
+                        log_result = self.get_pod_logs_for_errors(values.get("namespace"), "model-transfer-pod")
+                        if log_result["status"] == "success" and log_result.get("error_indicators"):
+                            # Include top 3 errors found in logs
+                            transfer_status["error_details"] = log_result["error_indicators"][:3]
+
+                        return transfer_status
+                except Exception as e:
+                    logger.warning(f"Failed to parse pod creation timestamp: {e}")
+
+        # If ConfigMap doesn't exist yet, return initializing status
+        if not configmap_data:
+            transfer_status["status"] = "initializing"
             return transfer_status
 
         transfer_status["status"] = configmap_data["status"]
@@ -522,6 +592,75 @@ class KubernetesHandler(BaseClusterHandler):
             self.delete_namespace(values["namespace"])
             raise KubernetesException("Failed to deploy runtime")
         return result["status"], self.get_ingress_url(values["namespace"])
+
+    def get_pod_logs_for_errors(
+        self, namespace: str, pod_name: str = "model-transfer-pod", tail_lines: int = 50
+    ) -> dict:
+        """Get logs from a pod and check for error patterns."""
+        try:
+            import tempfile
+
+            import yaml
+            from kubernetes import client
+            from kubernetes import config as k8s_config
+
+            # Write kubeconfig to temporary file
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+                yaml.dump(self.config, f)
+                kubeconfig_file = f.name
+
+            # Load kubeconfig
+            k8s_config.load_kube_config(config_file=kubeconfig_file)
+            v1 = client.CoreV1Api()
+
+            # Get pod logs
+            try:
+                logs = v1.read_namespaced_pod_log(name=pod_name, namespace=namespace, tail_lines=tail_lines)
+
+                # Clean up temp file
+                import os
+
+                os.unlink(kubeconfig_file)
+
+                return {"status": "success", "logs": logs, "error_indicators": self._check_log_errors(logs)}
+            except Exception as e:
+                logger.error(f"Failed to get pod logs: {e}")
+                # Clean up temp file
+                import os
+
+                if os.path.exists(kubeconfig_file):
+                    os.unlink(kubeconfig_file)
+                return {"status": "failed", "error": str(e)}
+        except Exception as e:
+            logger.error(f"Failed to initialize Kubernetes client: {e}")
+            return {"status": "failed", "error": str(e)}
+
+    def _check_log_errors(self, logs: str) -> list:
+        """Check logs for common error patterns."""
+        error_patterns = [
+            "Permission denied",
+            "Access denied",
+            "Mount failed",
+            "No such file or directory",
+            "Connection refused",
+            "Authentication failed",
+            "Out of memory",
+            "Disk full",
+            "ConfigMap creation failed",
+            "Failed to create",
+            "Error:",
+            "FATAL:",
+            "panic:",
+        ]
+
+        found_errors = []
+        for line in logs.split("\n"):
+            for pattern in error_patterns:
+                if pattern.lower() in line.lower():
+                    found_errors.append({"pattern": pattern, "line": line.strip()})
+                    break
+
+        return found_errors
 
     def delete_namespace(self, namespace: str) -> None:
         """Delete the runtime on the Kubernetes cluster."""
