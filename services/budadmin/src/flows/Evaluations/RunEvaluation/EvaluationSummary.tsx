@@ -5,10 +5,9 @@ import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
 import React from "react";
 import { useDrawer } from "src/hooks/useDrawer";
 import { useEvaluations } from "src/hooks/useEvaluations";
-import { Input } from 'antd';
-import { SearchOutlined } from "@ant-design/icons";
-import { Text_12_400_757575, Text_12_600_EEEEEE, Text_14_400_EEEEEE, Text_14_600_EEEEEE } from "@/components/ui/text";
+import { Text_14_400_EEEEEE, Text_14_600_EEEEEE } from "@/components/ui/text";
 import EvaluationList, { Evaluation } from "src/flows/components/AvailableEvaluations";
+import { successToast, errorToast } from "@/components/toast";
 import BudStepAlert from "src/flows/components/BudStepAlert";
 import { SpecificationTableItem, SpecificationTableItemProps } from "src/flows/components/SpecificationTableItem";
 import DrawerCard from "@/components/ui/bud/card/DrawerCard";
@@ -18,7 +17,7 @@ import { Model, useModels } from "src/hooks/useModels";
 
 
 export default function EvaluationSummary() {
-  const { getWorkflowData, workflowData, currentWorkflow, loading } = useEvaluations();
+  const { getWorkflowData, workflowData, currentWorkflow, createEvaluationWorkflow } = useEvaluations();
   const { getModel, selectedModel: selectedModelFromStore } = useModels();
   const [isLoadingData, setIsLoadingData] = React.useState(true);
   const [evaluations, setEvaluations] = React.useState<Evaluation[]>([]);
@@ -119,7 +118,6 @@ export default function EvaluationSummary() {
     created_at: new Date().toISOString()
   };
 
-  const [search, setSearch] = React.useState("");
   const [deploymentSpecs, detDeploymentSpecs] = React.useState<SpecificationTableItemProps[]>([
     {
       name: "Model",
@@ -163,7 +161,8 @@ export default function EvaluationSummary() {
     }
   ]);
   const [selectedEvaluation, setSelectedEvaluation] = React.useState<Evaluation | null>(null);
-  const { openDrawerWithStep } = useDrawer();
+  const { openDrawerWithStep, drawerProps } = useDrawer();
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   // Use existing workflowData if available, otherwise fetch it
   React.useEffect(() => {
@@ -316,10 +315,10 @@ export default function EvaluationSummary() {
   React.useEffect(() => {
     if (modelId) {
       console.log('Fetching model details for ID:', modelId);
-      getModel(modelId).then((response) => {
+      getModel(modelId).then((response: any) => {
         if (response) {
           // The model data is in response.model and response.model_tree
-          const modelData = {
+          const modelData: any = {
             ...response.model,
             ...response.model_tree,
             endpoints_count: response.endpoints_count,
@@ -329,7 +328,7 @@ export default function EvaluationSummary() {
           console.log('Model data fetched:', modelData);
           setSelectedModelData(modelData);
         }
-      }).catch((error) => {
+      }).catch((error: any) => {
         console.error('Error fetching model details:', error);
         // Fallback to mock model
         setSelectedModelData(mockSelectedModel);
@@ -345,11 +344,7 @@ export default function EvaluationSummary() {
     }
   }, [selectedModelFromStore, modelId]);
 
-  const filteredEvaluations = evaluations.filter((evaluation) =>
-    evaluation.name.toLowerCase().includes(search.toLowerCase()) ||
-    evaluation.description?.toLowerCase().includes(search.toLowerCase()) ||
-    evaluation.tags?.some(tag => tag.toLowerCase().includes(search.toLowerCase()))
-  );
+  const filteredEvaluations = evaluations;
 
 
 
@@ -365,10 +360,53 @@ export default function EvaluationSummary() {
       }
       }
       backText="Back"
-      onNext={() => {
-        openDrawerWithStep("select-traits");
+      disableNext={isSubmitting}
+      onNext={async () => {
+        try {
+          setIsSubmitting(true);
+
+          if (!currentWorkflow?.workflow_id) {
+            errorToast("Workflow not found. Please start over.");
+            return;
+          }
+
+          // Get experiment ID from workflow or drawer props
+          const experimentId = currentWorkflow.experiment_id || drawerProps?.experimentId;
+
+          if (!experimentId) {
+            errorToast("Experiment ID not found");
+            return;
+          }
+
+          // Prepare payload for step 5 - trigger the workflow
+          const payload = {
+            workflow_id: currentWorkflow.workflow_id,
+            step_number: 5,
+            workflow_total_steps: 5,
+            trigger_workflow: true,
+            stage_data: {}
+          };
+
+          console.log("Triggering evaluation workflow with payload:", payload);
+
+          // Call the API to trigger the evaluation
+          const response = await createEvaluationWorkflow(experimentId, payload);
+
+          console.log("Evaluation workflow triggered successfully:", response);
+
+          successToast("Evaluation workflow started successfully!");
+
+          // Navigate to status page
+          openDrawerWithStep("run-evaluation-status");
+
+        } catch (error: any) {
+          console.error("Failed to trigger evaluation workflow:", error);
+          errorToast(error.message || "Failed to start evaluation workflow");
+        } finally {
+          setIsSubmitting(false);
+        }
       }}
-      nextText="Next"
+      nextText={isSubmitting ? "Starting..." : "Run Evaluation"}
     >
 
       <BudWraperBox>
