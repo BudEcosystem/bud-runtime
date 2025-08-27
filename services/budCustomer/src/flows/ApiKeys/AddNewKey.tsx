@@ -185,7 +185,7 @@ export default function AddNewKey() {
     } catch (error: any) {
       console.error("Error during form submission:", error);
       errorToast(
-        error?.response?.data?.message || "Failed to create API key",
+        error?.response?.data?.detail || error?.response?.data?.message || "Failed to create API key",
       );
     } finally {
       // Handle loading state if needed
