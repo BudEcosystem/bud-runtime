@@ -1615,9 +1615,10 @@ class EndpointService(SessionMixin):
                 {"name": adapter_name, "endpoint_id": endpoint_id},
                 missing_ok=True,
                 exclude_fields={"status": AdapterStatusEnum.DELETED},
+                case_sensitive=False,
             )
             if db_adapters:
-                raise ClientException("Adapter name is already taken in the endpoint")
+                raise ClientException("An adapter with this name already exists")
 
             db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
                 EndpointModel,
