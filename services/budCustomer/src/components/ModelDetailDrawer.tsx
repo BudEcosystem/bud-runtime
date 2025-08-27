@@ -772,7 +772,13 @@ fetch('${apiUrl}', {
                 <Text_14_400_EEEEEE className="mb-2 font-medium text-gray-900 dark:text-[#EEEEEE]">
                   {model?.endpoint_name}
                 </Text_14_400_EEEEEE>
-                <ModelTags model={model} maxTags={3} limit={true} />
+                <ModelTags model={{
+                            ...model,
+                            endpoints_count: model.supported_endpoints
+                              ? Object.values(model.supported_endpoints).filter((e: any) => e.enabled).length
+                              : model.endpoints_count
+                          }}
+		 maxTags={3} limit={true} />
                 <div className="flex items-center gap-2 mt-2">
                   <Icon
                     icon="ph:calendar"
