@@ -38,6 +38,9 @@ $primary-color: var(--bud-purple);
       color: $text-dark-gray;
       font-weight: 400;
       padding: 1rem 1.5rem;
+      position: sticky;
+      top: 0;
+      z-index: 10;
 
       &::before {
         display: none;
@@ -59,6 +62,14 @@ $primary-color: var(--bud-purple);
 
     .ant-empty-normal {
       color: $text-gray;
+    }
+    
+    // Ensure proper scrolling
+    .ant-table-container {
+      .ant-table-body {
+        overflow-y: auto !important;
+        max-height: 400px;
+      }
     }
   }
 }
