@@ -169,7 +169,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     eval_sync_task = None
 
     try:
-        from .evals.volume_init import VolumeInitializer
+        from .evals.volume_init import DatasetVolumeNotFoundError, VolumeInitializer
 
         logger.info("Starting background initialization on startup")
 
@@ -191,10 +191,19 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             logger.error(f"Failed to initialize storage backend: {e}")
             # Don't fail startup if storage initialization fails
 
-        # Initialize volume for dataset storage
-        volume_init = VolumeInitializer()
-        logger.info("Creating background task for volume initialization")
-        _ = asyncio.create_task(volume_init.ensure_eval_datasets_volume())
+        # Check volume for dataset storage exists
+        try:
+            volume_init = VolumeInitializer()
+            logger.info("Checking for dataset volume existence")
+            await volume_init.ensure_eval_datasets_volume()
+            logger.info("Dataset volume check completed successfully")
+        except DatasetVolumeNotFoundError as e:
+            logger.error(f"Dataset volume check failed: {e}")
+            # Re-raise to fail startup if volume doesn't exist
+            raise
+        except Exception as e:
+            logger.warning(f"Could not check dataset volume (may be running outside Kubernetes): {e}")
+            # Don't fail if we can't check (e.g., local dev without k8s)
 
         # Execute initial evaluation data sync
         if app_settings.eval_sync_enabled:

@@ -17,12 +17,16 @@ logger = logging.getLogger(__name__)
 class ConfigMapManager:
     """Manages Kubernetes ConfigMaps for OpenCompass configurations."""
 
-    def __init__(self, namespace: str = "budeval"):
+    def __init__(self, namespace: Optional[str] = None):
         """Initialize ConfigMap manager.
 
         Args:
-            namespace: Kubernetes namespace to use
+            namespace: Kubernetes namespace to use. If None, uses current namespace.
         """
+        if namespace is None:
+            from budeval.commons.storage_config import StorageConfig
+
+            namespace = StorageConfig.get_current_namespace()
         self.namespace = namespace
         self.api_client = None
 

@@ -685,6 +685,11 @@ spec:
     ) -> str:
         safe_args = json.dumps(args)
 
+        # Get PVC name from configuration
+        from budeval.commons.storage_config import StorageConfig
+
+        pvc_name = StorageConfig.get_eval_datasets_pvc_name()
+
         # Extract eval_request_id for ConfigMap mounting
         eval_request_id = args.get("eval_request_id", uuid)
         configmap_name = f"opencompass-config-{eval_request_id.lower()}"
@@ -751,9 +756,8 @@ spec:
       volumes:
         - name: eval-datasets
           persistentVolumeClaim:
-            claimName: eval-datasets-pvc
+            claimName: {pvc_name}
             # Note: This PVC must exist in the same namespace as the job
-            # The eval-datasets PVC should be created in the job's namespace
         - name: output-volume
           persistentVolumeClaim:
             claimName: {uuid}-output-pvc
