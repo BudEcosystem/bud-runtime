@@ -70,8 +70,10 @@ class BudCredentialCreate(BaseModel):
 class ExpiryEnum(IntEnum):
     """Expiry enum."""
 
+    NO_EXPIRY = 0
     THIRTY_DAYS = 30
     SIXTY_DAYS = 60
+    NINETY_DAYS = 90
 
 
 class CredentialRequest(BaseModel):
