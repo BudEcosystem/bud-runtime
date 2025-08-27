@@ -14,9 +14,9 @@ interface GroupedBarChartProps {
 
 const GroupedBarChart: React.FC<GroupedBarChartProps> = ({ data }) => {
   const chartRef = useRef<HTMLDivElement>(null);
-  
+
   // Check if data is empty
-  const hasData = data?.series && data.series.length > 0 && 
+  const hasData = data?.series && data.series.length > 0 &&
                   data.series.some(s => s.data && s.data.length > 0 && s.data.some(val => val > 0));
 
   useEffect(() => {

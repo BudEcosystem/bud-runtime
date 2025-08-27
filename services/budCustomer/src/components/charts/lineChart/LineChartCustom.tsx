@@ -25,7 +25,7 @@ const LineChartCustom: React.FC<LineChartProps> = ({ data }) => {
     }, [data]);
 
     const chartRef = useRef<HTMLDivElement>(null);
-    
+
     // Check if data is empty
     const hasData = data?.data && data.data.length > 0 && data.data.some((val: any) => val > 0);
     // const [lineChartProps, setLineChartProps] = useState(data);

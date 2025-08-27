@@ -1546,8 +1546,8 @@ const editProject: DrawerFlowType = {
     {
       navigation: () => {
         const state = useProjects.getState();
-        const project = state.globalSelectedProject?.project || state.globalSelectedProject;
-        const projectName = project?.name || "Project";
+        const project = state.globalSelectedProject;
+        const projectName = (project as any)?.project?.name || (project as any)?.name || "Project";
         return [
           "Projects",
           projectName,

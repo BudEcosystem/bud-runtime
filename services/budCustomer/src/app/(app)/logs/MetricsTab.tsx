@@ -60,23 +60,23 @@ function NoDataChart({ message = "No data available" }: { message?: string }) {
 // Helper to check if chart data is empty
 function isChartDataEmpty(data: any): boolean {
   if (!data) return true;
-  
+
   // For single series data
   if (data.data) {
     return !data.data || data.data.length === 0 || data.data.every((val: any) => val === 0 || val == null);
   }
-  
+
   // For multi-series data
   if (data.series) {
-    return !data.series || data.series.length === 0 || 
+    return !data.series || data.series.length === 0 ||
            data.series.every((s: any) => !s.data || s.data.length === 0 || s.data.every((val: any) => val === 0 || val == null));
   }
-  
+
   // For categories-based data
   if (data.categories && data.data) {
     return !data.data || data.data.length === 0 || data.data.every((val: any) => val === 0 || val == null);
   }
-  
+
   return true;
 }
 
