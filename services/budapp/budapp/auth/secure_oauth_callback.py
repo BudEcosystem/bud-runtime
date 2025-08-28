@@ -116,8 +116,8 @@ async def _setup_new_sso_user(session: Session, user_email: str) -> None:
 
             # Create a default project for CLIENT users
             try:
+                from budapp.auth.schemas import ResourceCreate
                 from budapp.commons.constants import PermissionEnum, ProjectStatusEnum, ProjectTypeEnum
-                from budapp.core.schemas import ResourceCreate
                 from budapp.permissions.schemas import PermissionList
                 from budapp.permissions.service import PermissionService
                 from budapp.project_ops.models import Project as ProjectModel

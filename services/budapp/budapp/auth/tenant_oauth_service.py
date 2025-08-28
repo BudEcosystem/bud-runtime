@@ -29,6 +29,7 @@ from budapp.commons.constants import OAuthProviderEnum
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
 from budapp.commons.keycloak import KeycloakManager
+from budapp.commons.security import RSAHandler
 from budapp.user_ops.crud import UserDataManager
 from budapp.user_ops.models import Tenant
 from budapp.user_ops.oauth_models import TenantOAuthConfig
@@ -44,27 +45,16 @@ class TenantOAuthService(SessionMixin):
         """Initialize tenant OAuth service."""
         super().__init__(session)
         self.keycloak_manager = KeycloakManager()
-        self._encryption_key = self._get_or_create_encryption_key()
-        self._cipher_suite = Fernet(self._encryption_key)
+        self.rsa_handler = RSAHandler()
 
-    def _get_or_create_encryption_key(self) -> bytes:
-        """Get or create encryption key for OAuth secrets."""
-        # In production, this should be stored securely (e.g., in a key vault)
-        # For now, use a key from environment or generate one
-        key_str = app_settings.oauth_encryption_key if hasattr(app_settings, "oauth_encryption_key") else None
-        if key_str:
-            return base64.urlsafe_b64decode(key_str)
-        else:
-            # Generate a new key (in production, store this securely)
-            return Fernet.generate_key()
+    async def _encrypt_secret(self, secret: str) -> str:
+        """Encrypt OAuth client secret using RSA encryption."""
+        return await self.rsa_handler.encrypt(secret)
 
-    def _encrypt_secret(self, secret: str) -> str:
-        """Encrypt OAuth client secret."""
-        return self._cipher_suite.encrypt(secret.encode()).decode()
-
-    def _decrypt_secret(self, encrypted_secret: str) -> str:
-        """Decrypt OAuth client secret."""
-        return self._cipher_suite.decrypt(encrypted_secret.encode()).decode()
+    async def _decrypt_secret(self, encrypted_secret: str) -> str:
+        """Decrypt OAuth client secret using RSA decryption."""
+        logger.debug("Decrypting OAuth client secret")
+        return await self.rsa_handler.decrypt(encrypted_secret)
 
     async def configure_oauth_provider(
         self,
@@ -101,8 +91,8 @@ class TenantOAuthService(SessionMixin):
         )
 
         # Encrypt client secret
-        encrypted_secret = self._encrypt_secret(client_secret)
-
+        encrypted_secret = await self._encrypt_secret(client_secret)
+        logger.info(f"existing:{existing_config}")
         if existing_config:
             # Update existing configuration
             existing_config.client_id = client_id
@@ -279,17 +269,20 @@ class TenantOAuthService(SessionMixin):
         Returns:
             dict with decrypted configuration or None
         """
+        # Ensure provider is a string value
+        provider_str = provider.value if hasattr(provider, "value") else str(provider).lower()
         config = await UserDataManager(self.session).retrieve_by_fields(
-            TenantOAuthConfig, {"tenant_id": tenant_id, "provider": provider.value}, missing_ok=True
+            TenantOAuthConfig, {"tenant_id": tenant_id, "provider": provider_str}, missing_ok=True
         )
 
         if not config:
             return None
-
+        decrypted_secret = await self._decrypt_secret(config.client_secret_encrypted)
+        logger.debug(f"Successfully decrypted client secret for provider: {provider}")
         return {
             "provider": config.provider,
             "client_id": config.client_id,
-            "client_secret": self._decrypt_secret(config.client_secret_encrypted),
+            "client_secret": decrypted_secret,
             "enabled": config.enabled,
             "allowed_domains": config.allowed_domains,
             "auto_create_users": config.auto_create_users,

@@ -32,9 +32,7 @@ from .audit_ops import audit_routes
 from .auth import (
     auth_routes,
     oauth_admin_routes,
-    oauth_callback_handler,
-    oauth_direct_routes,
-    oauth_proxy_routes,
+    oauth_internal_proxy,
     oauth_routes,
     secure_oauth_callback,
     token_exchange_routes,
@@ -279,12 +277,10 @@ internal_router = APIRouter()
 internal_router.include_router(audit_routes.audit_router)
 internal_router.include_router(auth_routes.auth_router)
 internal_router.include_router(oauth_routes.oauth_router)
-internal_router.include_router(oauth_proxy_routes.oauth_proxy_router)
-internal_router.include_router(oauth_direct_routes.oauth_direct_router)
-internal_router.include_router(oauth_callback_handler.oauth_callback_router)
 internal_router.include_router(secure_oauth_callback.secure_oauth_callback_router)
 internal_router.include_router(token_exchange_routes.token_exchange_router)
 internal_router.include_router(oauth_admin_routes.oauth_admin_router)
+internal_router.include_router(oauth_internal_proxy.internal_oauth_router)
 internal_router.include_router(benchmark_routes.benchmark_router)
 internal_router.include_router(cluster_routes.cluster_router)
 internal_router.include_router(common_routes.common_router)

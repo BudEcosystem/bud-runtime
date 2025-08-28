@@ -16,7 +16,7 @@
 
 """Admin routes for managing OAuth configurations."""
 
-from typing import List, Union
+from typing import List, Optional, Union
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
@@ -47,7 +47,7 @@ class ConfigureOAuthProviderRequest(CamelCaseModel):
     client_id: str = Field(..., description="OAuth client ID")
     client_secret: str = Field(..., description="OAuth client secret")
     enabled: bool = Field(True, description="Whether provider is enabled")
-    allowed_domains: List[str] = Field(None, description="Allowed email domains")
+    allowed_domains: Optional[List[str]] = Field(None, description="Allowed email domains")
     auto_create_users: bool = Field(False, description="Auto-create users on first login")
     config_data: dict = Field(None, description="Additional provider-specific configuration")
 
@@ -60,9 +60,9 @@ class OAuthConfigurationResponse(CamelCaseModel):
     provider: str
     client_id: str
     enabled: bool
-    allowed_domains: List[str] = None
+    allowed_domains: Optional[List[str]] = Field(default=[], description="Allowed email domains")
     auto_create_users: bool
-    config_data: dict = None
+    config_data: Optional[dict] = Field(default=None, description="Additional provider configuration")
 
 
 def check_admin_permission(current_user: User) -> None:
@@ -118,7 +118,7 @@ async def configure_oauth_provider(
             provider=config.provider,
             client_id=config.client_id,
             enabled=config.enabled,
-            allowed_domains=config.allowed_domains,
+            allowed_domains=config.allowed_domains or [],
             auto_create_users=config.auto_create_users,
             config_data=config.config_data,
         )
@@ -178,7 +178,7 @@ async def get_oauth_configurations(
                 provider=config.provider,
                 client_id=config.client_id,
                 enabled=config.enabled,
-                allowed_domains=config.allowed_domains,
+                allowed_domains=config.allowed_domains or [],
                 auto_create_users=config.auto_create_users,
                 config_data=config.config_data,
             )

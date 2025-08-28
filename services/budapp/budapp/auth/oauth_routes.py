@@ -107,72 +107,73 @@ async def initiate_oauth_login(
         ).to_http_response()
 
 
-@oauth_router.get(
-    "/callback",
-    responses={
-        status.HTTP_200_OK: {
-            "model": SingleResponse[OAuthTokenResponse],
-            "description": "OAuth authentication successful",
-        },
-        status.HTTP_400_BAD_REQUEST: {
-            "model": OAuthErrorResponse,
-            "description": "OAuth authentication failed",
-        },
-    },
-    description="Handle OAuth callback from provider",
-)
-async def oauth_callback(
-    code: str = Query(..., description="Authorization code from provider"),
-    state: str = Query(..., description="State parameter for validation"),
-    error: str = Query(None, description="Error from provider"),
-    error_description: str = Query(None, description="Error description"),
-    session: Session = Depends(get_session),
-) -> Union[SingleResponse[OAuthTokenResponse], OAuthErrorResponse]:
-    """Handle OAuth callback from provider."""
-    try:
-        oauth_service = OAuthService(session)
+# DEPRECATED: Callback handled by oauth_internal_proxy.py
+# @oauth_router.get(
+#     "/callback",
+#     responses={
+#         status.HTTP_200_OK: {
+#             "model": SingleResponse[OAuthTokenResponse],
+#             "description": "OAuth authentication successful",
+#         },
+#         status.HTTP_400_BAD_REQUEST: {
+#             "model": OAuthErrorResponse,
+#             "description": "OAuth authentication failed",
+#         },
+#     },
+#     description="Handle OAuth callback from provider",
+# )
+# async def oauth_callback(
+#     code: str = Query(..., description="Authorization code from provider"),
+#     state: str = Query(..., description="State parameter for validation"),
+#     error: str = Query(None, description="Error from provider"),
+#     error_description: str = Query(None, description="Error description"),
+#     session: Session = Depends(get_session),
+# ) -> Union[SingleResponse[OAuthTokenResponse], OAuthErrorResponse]:
+#     """Handle OAuth callback from provider."""
+#     try:
+#         oauth_service = OAuthService(session)
 
-        callback_request = OAuthCallbackRequest(
-            code=code,
-            state=state,
-            error=error,
-            error_description=error_description,
-        )
+#         callback_request = OAuthCallbackRequest(
+#             code=code,
+#             state=state,
+#             error=error,
+#             error_description=error_description,
+#         )
 
-        response = await oauth_service.handle_oauth_callback(callback_request)
+#         response = await oauth_service.handle_oauth_callback(callback_request)
 
-        # Check if account linking is required
-        if response.requires_linking:
-            return SingleResponse[OAuthTokenResponse](
-                success=True,
-                message="Account linking required",
-                result=response,
-            )
+#         # Check if account linking is required
+#         if response.requires_linking:
+#             return SingleResponse[OAuthTokenResponse](
+#                 success=True,
+#                 message="Account linking required",
+#                 result=response,
+#             )
 
-        return SingleResponse[OAuthTokenResponse](
-            success=True,
-            message="OAuth authentication successful",
-            result=response,
-        )
-    except OAuthError as e:
-        logger.error(f"OAuth callback failed: {e.code} - {e.message}")
-        return OAuthErrorResponse(
-            error=e.code,
-            error_description=e.message,
-            provider=e.provider,
-        )
-    except ClientException as e:
-        logger.error(f"OAuth callback failed: {e}")
-        return OAuthErrorResponse(
-            error="authentication_failed",
-            error_description=str(e),
-        )
-    except Exception as e:
-        logger.exception(f"Unexpected error in OAuth callback: {e}")
-        return OAuthErrorResponse(
-            error="internal_error",
-            error_description="An unexpected error occurred",
-        )
+#         return SingleResponse[OAuthTokenResponse](
+#             success=True,
+#             message="OAuth authentication successful",
+#             result=response,
+#         )
+#     except OAuthError as e:
+#         logger.error(f"OAuth callback failed: {e.code} - {e.message}")
+#         return OAuthErrorResponse(
+#             error=e.code,
+#             error_description=e.message,
+#             provider=e.provider,
+#         )
+#     except ClientException as e:
+#         logger.error(f"OAuth callback failed: {e}")
+#         return OAuthErrorResponse(
+#             error="authentication_failed",
+#             error_description=str(e),
+#         )
+#     except Exception as e:
+#         logger.exception(f"Unexpected error in OAuth callback: {e}")
+#         return OAuthErrorResponse(
+#             error="internal_error",
+#             error_description="An unexpected error occurred",
+#         )
 
 
 @oauth_router.post(
