@@ -1,7 +1,7 @@
 { config, ... }:
 let
   primaryIp = config.global.budk8s.primaryIp;
-  nfsDataPath = config.diskio.devices.disk.nfs_data.content.partitions.nfs_data.content.mountpoint;
+  nfsDataPath = config.disko.devices.disk.nfs_data.content.partitions.nfs_data.content.mountpoint;
 in
 {
   networking.firewall.allowedTCPPorts = [ 2049 ];
