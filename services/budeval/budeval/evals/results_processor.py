@@ -45,7 +45,7 @@ class ResultsProcessor:
         )
 
     def extract_from_pvc(self, job_id: str, namespace: str = "budeval", kubeconfig: Optional[str] = None) -> str:
-        """Extract results from PVC using Ansible playbook.
+        """Extract results from shared PVC using Ansible playbook.
 
         Args:
             job_id: Job ID to extract results for
@@ -60,40 +60,11 @@ class ResultsProcessor:
         """
         logger.info(f"Starting PVC extraction for job {job_id}")
 
-        # Check if PVC exists before attempting extraction
-        import subprocess
+        # Get the shared PVC name from configuration
+        from budeval.commons.storage_config import StorageConfig
 
-        # Remove engine prefix from job_id if present (e.g., "opencompass-uuid" -> "uuid")
-        uuid_part = (
-            job_id.split("-", 1)[-1]
-            if "-" in job_id and job_id.startswith(("opencompass-", "vllm-", "lighteval-"))
-            else job_id
-        )
-        pvc_name = f"{uuid_part}-output-pvc"
-        try:
-            cmd = ["kubectl", "get", "pvc", pvc_name, "-n", namespace]
-            if kubeconfig:
-                kubeconfig_path = self.extraction_base_path / f"{job_id}_kubeconfig_check.yaml"
-                with open(kubeconfig_path, "w") as f:
-                    f.write(kubeconfig)
-                cmd.extend(["--kubeconfig", str(kubeconfig_path)])
-
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-
-            if kubeconfig and kubeconfig_path.exists():
-                kubeconfig_path.unlink()
-
-            if result.returncode != 0:
-                raise Exception(
-                    f"PVC {pvc_name} not found in namespace {namespace}. Cannot extract results from missing PVC."
-                )
-
-            logger.info(f"PVC {pvc_name} found, proceeding with extraction")
-        except subprocess.TimeoutExpired as err:
-            raise Exception(f"Timeout checking for PVC {pvc_name}") from err
-        except Exception as e:
-            logger.error(f"Failed to verify PVC {pvc_name} exists: {e}")
-            raise Exception(f"Cannot extract results: PVC verification failed - {e}") from e
+        pvc_name = StorageConfig.get_eval_datasets_pvc_name()
+        logger.info(f"Using shared PVC: {pvc_name} with results at subPath: results/{job_id}")
 
         local_extract_path = str(self.extraction_base_path)
 
@@ -102,6 +73,8 @@ class ResultsProcessor:
             "job_id": job_id,
             "namespace": namespace,
             "local_extract_path": local_extract_path,
+            "pvc_name": pvc_name,
+            "results_subpath": f"results/{job_id}",
         }
 
         if kubeconfig:

@@ -45,7 +45,8 @@ export default function CommonStatus({
     | 'delete_worker'
     | 'performance_benchmark'
     | 'deploy_quantization'
-    | 'add_adapter',
+    | 'add_adapter'
+    | 'run_evaluation',
     events_field_id:
     'bud_simulator_events'
     | 'budserve_cluster_events'
@@ -58,7 +59,8 @@ export default function CommonStatus({
     | 'delete_worker_events'
     | 'quantization_simulator_events'
     | 'quantization_deployment_events'
-    | 'adapter_deployment_events',
+    | 'adapter_deployment_events'
+    | 'evaluation_workflow_events',
     onCompleted: () => void,
     onFailed: () => void,
 }) {

@@ -28,7 +28,7 @@ class Job(BaseModel):
                 "runner_type": "kubernetes",
                 "namespace": "budeval",
                 "docker_image": "ghcr.io/open-compass/opencompass:0.4.2",
-                "engine_args": {"model_path": "meta-llama/Llama-3.2-3B-Instruct", "datasets": ["gsm8k_gen"]},
+                "engine_args": {"model_path": "meta-llama/Llama-3.2-3B-Instruct", "datasets": ["gsm8k"]},
                 "kubeconfig": "apiVersion: v1\nclusters:\n  - cluster:...",
                 "ttl_seconds_after_finish": 600,
             }

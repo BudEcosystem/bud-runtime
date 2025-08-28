@@ -193,7 +193,7 @@ cd /workspace
 # Run OpenCompass evaluation with model config and datasets via CLI
 python /workspace/run.py \\
     --models bud_model \\
-    --datasets demo_gsm8k_chat_gen \\
+    --datasets {datasets_str} \\
     --work-dir /workspace/outputs \\
     --max-num-workers {request.num_workers} --debug
 """
@@ -211,12 +211,17 @@ python /workspace/run.py \\
 
     def get_volume_mounts(self) -> List[Dict[str, Any]]:
         """Get volume mounts for OpenCompass."""
+        # Get PVC name from configuration
+        from budeval.commons.storage_config import StorageConfig
+
+        pvc_name = StorageConfig.get_eval_datasets_pvc_name()
+
         return [
             {
                 "name": "datasets",
                 "mountPath": "/workspace/data",
                 "readOnly": True,
-                "claimName": "eval-datasets-pvc",
+                "claimName": pvc_name,
             },
             {
                 "name": "cache",
