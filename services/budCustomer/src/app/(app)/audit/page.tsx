@@ -66,12 +66,9 @@ enum AuditAction {
 
 enum ResourceType {
   API_KEY = "api_key",
-  MODEL = "model",
   PROJECT = "project",
-  BATCH = "batch",
   USER = "user",
-  SETTINGS = "settings",
-  LOGS = "logs",
+  SESSION = "session",
 }
 
 // Audit log interface
@@ -282,12 +279,9 @@ export default function AuditPage() {
   const getResourceIcon = (resourceType: ResourceType) => {
     const icons = {
       [ResourceType.API_KEY]: <KeyOutlined />,
-      [ResourceType.MODEL]: <Icon icon="ph:cpu" />,
       [ResourceType.PROJECT]: <Icon icon="ph:folder" />,
-      [ResourceType.BATCH]: <Icon icon="ph:stack" />,
       [ResourceType.USER]: <UserOutlined />,
-      [ResourceType.SETTINGS]: <Icon icon="ph:gear" />,
-      [ResourceType.LOGS]: <FileTextOutlined />,
+      [ResourceType.SESSION]: <Icon icon="ph:stack" />,
     };
     return icons[resourceType] || <DatabaseOutlined />;
   };
