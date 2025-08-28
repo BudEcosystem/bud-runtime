@@ -375,7 +375,7 @@ export default function AuditPage() {
         end_date: dateRange?.[1] ? formatDateString(dateRange[1]?.toDate(), true) : undefined
       }
       const response = await AppRequest.Get("/audit/records", {params});
-      setAuditLogs(response.data.data.map((item: any)=> ({...item, status: item.details.success ? 'success' : 'failed'})));
+      setAuditLogs(response.data.data.map((item: any)=> ({...item, status: item.details?.success === false ? 'failed' : 'success'})));
       setTotalNumber(response.data.total_record);
     } catch (error) {
       console.error("Failed to fetch usage data:", error);
