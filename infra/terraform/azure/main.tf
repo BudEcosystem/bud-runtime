@@ -1,7 +1,7 @@
 locals {
   private_ip_space = {
     v4 = "10.177.0.0/16"
-    v6 = "fd12:3456:789a::/48"
+    v6 = "fd12:babe::/32"
   }
 }
 

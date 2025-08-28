@@ -1,10 +1,9 @@
 {
   disko.devices = {
     disk = {
-      main = {
+      os = {
         device = "/dev/nvme0n1";
         type = "disk";
-
         content = {
           type = "gpt";
           partitions = {

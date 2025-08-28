@@ -1,10 +1,3 @@
-resource "azurerm_subnet" "master" {
-  name                 = "${var.prefix}-master"
-  resource_group_name  = azurerm_resource_group.common.name
-  virtual_network_name = azurerm_virtual_network.common.name
-  address_prefixes     = ["10.177.2.0/24", "fd12:3456:789a:beef::/64"]
-}
-
 resource "azurerm_public_ip" "master" {
   for_each            = toset(["IPv4", "IPv6"])
   name                = "${var.prefix}-master-${lower(each.key)}"
@@ -12,36 +5,6 @@ resource "azurerm_public_ip" "master" {
   location            = azurerm_resource_group.common.location
   resource_group_name = azurerm_resource_group.common.name
   allocation_method   = "Static"
-}
-
-resource "azurerm_network_security_group" "master" {
-  name                = "${var.prefix}-master"
-  location            = azurerm_resource_group.common.location
-  resource_group_name = azurerm_resource_group.common.name
-
-  # pass through, firewall managed by NixOS
-  security_rule {
-    name                       = "${var.prefix}-inbound"
-    priority                   = 100
-    direction                  = "Inbound"
-    access                     = "Allow"
-    protocol                   = "*"
-    source_port_range          = "*"
-    destination_port_range     = "*"
-    source_address_prefix      = "*"
-    destination_address_prefix = "*"
-  }
-  security_rule {
-    name                       = "${var.prefix}-outbound"
-    priority                   = 100
-    direction                  = "Outbound"
-    access                     = "Allow"
-    protocol                   = "*"
-    source_port_range          = "*"
-    destination_port_range     = "*"
-    source_address_prefix      = "*"
-    destination_address_prefix = "*"
-  }
 }
 
 resource "azurerm_network_interface" "master" {
@@ -108,4 +71,20 @@ resource "azurerm_linux_virtual_machine" "master" {
     sku       = "server"
     version   = "latest"
   }
+}
+
+resource "azurerm_managed_disk" "budk8s-nfs" {
+  name                 = "budk8s-nfs"
+  location             = azurerm_resource_group.common.location
+  resource_group_name  = azurerm_resource_group.common.name
+  storage_account_type = "Premium_LRS"
+  create_option        = "Empty"
+  disk_size_gb         = 48
+}
+
+resource "azurerm_virtual_machine_data_disk_attachment" "budk8s-nfs" {
+  managed_disk_id    = azurerm_managed_disk.budk8s-nfs.id
+  virtual_machine_id = azurerm_linux_virtual_machine.master.id
+  lun                = "23"
+  caching            = "ReadWrite"
 }
