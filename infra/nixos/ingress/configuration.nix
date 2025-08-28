@@ -1,4 +1,8 @@
+{ config, ... }:
+let
+  primaryIp = config.global.budk8s.primaryIp;
+in
 {
   imports = [ ../budk8s/configuration.nix ];
-  services.k3s.serverAddr = "https://10.177.2.69:6443";
+  services.k3s.serverAddr = "https://${primaryIp}:6443";
 }
