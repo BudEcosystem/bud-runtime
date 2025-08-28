@@ -126,10 +126,12 @@ class TestOAuthLoginInitiation:
         assert response.auth_url
         assert response.expires_at > datetime.now(UTC)
 
+    @pytest.mark.asyncio
     async def test_initiate_oauth_login_provider_not_configured(
         self,
         oauth_service: OAuthService,
         test_tenant: Tenant,
+        mock_session,
     ):
         """Test OAuth login with unconfigured provider."""
         request = OAuthLoginRequest(
@@ -137,33 +139,40 @@ class TestOAuthLoginInitiation:
             tenant_id=test_tenant.id,
         )
 
-        with pytest.raises(OAuthError) as exc_info:
-            await oauth_service.initiate_oauth_login(
-                request, "https://app.example.com"
-            )
+        with patch.object(oauth_service, '_get_tenant_oauth_config') as mock_get_config:
+            mock_get_config.return_value = None
+
+            with pytest.raises(OAuthError) as exc_info:
+                await oauth_service.initiate_oauth_login(
+                    request, "https://app.example.com"
+                )
 
         assert exc_info.value.code == OAuthErrorCode.PROVIDER_NOT_CONFIGURED
 
+    @pytest.mark.asyncio
     async def test_initiate_oauth_login_provider_disabled(
         self,
         oauth_service: OAuthService,
         test_tenant: Tenant,
         test_oauth_config: TenantOAuthConfig,
+        mock_session,
     ):
         """Test OAuth login with disabled provider."""
         # Disable the provider
         test_oauth_config.enabled = False
-        await oauth_service.session.commit()
 
         request = OAuthLoginRequest(
             provider=OAuthProviderEnum.GOOGLE,
             tenant_id=test_tenant.id,
         )
 
-        with pytest.raises(OAuthError) as exc_info:
-            await oauth_service.initiate_oauth_login(
-                request, "https://app.example.com"
-            )
+        with patch.object(oauth_service, '_get_tenant_oauth_config') as mock_get_config:
+            mock_get_config.return_value = test_oauth_config
+
+            with pytest.raises(OAuthError) as exc_info:
+                await oauth_service.initiate_oauth_login(
+                    request, "https://app.example.com"
+                )
 
         assert exc_info.value.code == OAuthErrorCode.PROVIDER_DISABLED
 
@@ -171,12 +180,13 @@ class TestOAuthLoginInitiation:
 class TestOAuthCallback:
     """Test OAuth callback handling."""
 
+    @pytest.mark.asyncio
     async def test_handle_oauth_callback_new_user(
         self,
         oauth_service: OAuthService,
         test_tenant: Tenant,
         test_oauth_config: TenantOAuthConfig,
-        async_session: AsyncSession,
+        mock_session,
     ):
         """Test OAuth callback for new user."""
         # Create OAuth session
@@ -188,8 +198,8 @@ class TestOAuthCallback:
             expires_at=datetime.now(UTC) + timedelta(minutes=15),
             completed=False,
         )
-        async_session.add(oauth_session)
-        await async_session.commit()
+        mock_session.add(oauth_session)
+        mock_session.commit()
 
         # Mock user info from provider
         mock_user_info = OAuthUserInfo(
@@ -228,12 +238,13 @@ class TestOAuthCallback:
         assert user is not None
         assert user.user_type == UserTypeEnum.CLIENT
 
+    @pytest.mark.asyncio
     async def test_handle_oauth_callback_existing_user(
         self,
         oauth_service: OAuthService,
         test_tenant: Tenant,
         test_oauth_config: TenantOAuthConfig,
-        async_session: AsyncSession,
+        mock_session,
     ):
         """Test OAuth callback for existing user."""
         # Create existing user
@@ -243,7 +254,7 @@ class TestOAuthCallback:
             email="existing@example.com",
             user_type=UserTypeEnum.CLIENT,
         )
-        async_session.add(existing_user)
+        mock_session.add(existing_user)
 
         # Create OAuth session
         state = secrets.token_urlsafe(32)
@@ -254,8 +265,8 @@ class TestOAuthCallback:
             expires_at=datetime.now(UTC) + timedelta(minutes=15),
             completed=False,
         )
-        async_session.add(oauth_session)
-        await async_session.commit()
+        mock_session.add(oauth_session)
+        mock_session.commit()
 
         # Mock user info from provider
         mock_user_info = OAuthUserInfo(
@@ -284,9 +295,11 @@ class TestOAuthCallback:
         assert response.is_new_user is False
         assert response.requires_linking is False
 
+    @pytest.mark.asyncio
     async def test_handle_oauth_callback_invalid_state(
         self,
         oauth_service: OAuthService,
+        mock_session,
     ):
         """Test OAuth callback with invalid state."""
         request = OAuthCallbackRequest(
@@ -299,11 +312,12 @@ class TestOAuthCallback:
 
         assert exc_info.value.code == OAuthErrorCode.INVALID_STATE
 
+    @pytest.mark.asyncio
     async def test_handle_oauth_callback_expired_session(
         self,
         oauth_service: OAuthService,
         test_tenant: Tenant,
-        async_session: AsyncSession,
+        mock_session,
     ):
         """Test OAuth callback with expired session."""
         # Create expired OAuth session
@@ -315,8 +329,8 @@ class TestOAuthCallback:
             expires_at=datetime.now(UTC) - timedelta(minutes=1),  # Expired
             completed=False,
         )
-        async_session.add(oauth_session)
-        await async_session.commit()
+        mock_session.add(oauth_session)
+        mock_session.commit()
 
         request = OAuthCallbackRequest(
             code="test-code",
@@ -328,12 +342,13 @@ class TestOAuthCallback:
 
         assert exc_info.value.code == OAuthErrorCode.STATE_EXPIRED
 
+    @pytest.mark.asyncio
     async def test_handle_oauth_callback_domain_not_allowed(
         self,
         oauth_service: OAuthService,
         test_tenant: Tenant,
         test_oauth_config: TenantOAuthConfig,
-        async_session: AsyncSession,
+        mock_session,
     ):
         """Test OAuth callback with disallowed email domain."""
         # Create OAuth session
@@ -345,8 +360,8 @@ class TestOAuthCallback:
             expires_at=datetime.now(UTC) + timedelta(minutes=15),
             completed=False,
         )
-        async_session.add(oauth_session)
-        await async_session.commit()
+        mock_session.add(oauth_session)
+        mock_session.commit()
 
         # Mock user info with disallowed domain
         mock_user_info = OAuthUserInfo(
@@ -372,11 +387,13 @@ class TestOAuthCallback:
 class TestOAuthProviderConfiguration:
     """Test OAuth provider configuration."""
 
+    @pytest.mark.asyncio
     async def test_get_available_providers(
         self,
         oauth_service: OAuthService,
         test_tenant: Tenant,
         test_oauth_config: TenantOAuthConfig,
+        mock_session,
     ):
         """Test getting available OAuth providers."""
         providers = await oauth_service.get_available_providers(test_tenant.id)
@@ -387,10 +404,12 @@ class TestOAuthProviderConfiguration:
         assert providers[0].allowed_domains == ["example.com"]
         assert providers[0].auto_create_users is True
 
+    @pytest.mark.asyncio
     async def test_get_available_providers_empty(
         self,
         oauth_service: OAuthService,
         test_tenant: Tenant,
+        mock_session,
     ):
         """Test getting available providers when none configured."""
         providers = await oauth_service.get_available_providers(test_tenant.id)
