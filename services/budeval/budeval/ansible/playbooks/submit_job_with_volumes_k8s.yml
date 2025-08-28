@@ -15,13 +15,6 @@
         state: present
         kubeconfig: "{{ kubeconfig_path | default(omit) }}"
 
-    - name: Create output persistent volume claim
-      community.kubernetes.k8s:
-        state: present
-        definition: "{{ lookup('file', pvc_output_template_path) | from_yaml }}"
-        kubeconfig: "{{ kubeconfig_path | default(omit) }}"
-        namespace: "{{ namespace }}"
-
     - name: Deploy evaluation job
       community.kubernetes.k8s:
         state: present
@@ -56,6 +49,6 @@
           Job {{ job_name }} has been deployed successfully.
           Status: {{ job_status.resources[0].status | default('Unknown') }}
           Datasets: eval-datasets-pvc mounted at /workspace/data (read-only)
-          Output Volume: {{ job_name }}-output-pvc mounted at /workspace/outputs
+          Output: eval-datasets-pvc/results/{{ job_name }} mounted at /workspace/outputs
           Cache: emptyDir mounted at /workspace/cache
           Configs: ConfigMap mounted at /workspace/configs (read-only)
