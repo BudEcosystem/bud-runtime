@@ -17,7 +17,7 @@
 """Add OAuth support - tables and fields for SSO integration
 
 Revision ID: cc482aaabf0d
-Revises: b8f6b3853ed0
+Revises: 850058ff8f02
 Create Date: 2025-07-31 15:00:00.000000
 
 """
@@ -31,7 +31,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = "cc482aaabf0d"
-down_revision: Union[str, None] = "b8f6b3853ed0"  # "7c028d42c0df"  # Need to be updated to new
+down_revision: Union[str, None] = "850058ff8f02"  # "7c028d42c0df"  # Need to be updated to new
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
