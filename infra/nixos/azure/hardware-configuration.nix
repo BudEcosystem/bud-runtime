@@ -5,9 +5,7 @@
     "${toString modulesPath}/virtualisation/azure-common.nix"
   ];
 
-  facter.reportPath = ./facter.json;
   virtualisation.azure.acceleratedNetworking = true;
-
   boot.kernelParams = lib.mkForce [
     "console=ttyS0" # azure serial console
     "earlyprintk=ttyS0"

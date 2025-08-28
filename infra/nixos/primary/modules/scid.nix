@@ -1,7 +1,8 @@
 { config, pkgs, ... }:
 let
-  sops_key_path = "/var/secrets/master.sops";
-in {
+  sops_key_path = "/var/lib/sops-nix/key.txt";
+in
+{
   sops.secrets."misc/slack_token" = { };
 
   services.scid = {
@@ -32,17 +33,31 @@ in {
         {
           name = "NixOS";
           slack_color = "#7bb8e2";
-          exec_line = [ "nixos-rebuild" "switch" "--flake" ".#master" "-L" ];
+          exec_line = [
+            "nixos-rebuild"
+            "switch"
+            "--flake"
+            ".#master"
+            "-L"
+          ];
           watch_paths = [
             "flake.nix"
             "flake.lock"
-            "nix/nixos"
+            "nix/nixos/common"
+            "nix/nixos/azure"
+            "nix/nixos/budk8s"
+            "nix/nixos/primary"
           ];
         }
         {
           name = "OpenTofu";
           slack_color = "#fbdb1c";
-          exec_line = [ "nix" "run" ".#workflow_tofu_apply" "-L" ];
+          exec_line = [
+            "nix"
+            "run"
+            ".#workflow_tofu_apply"
+            "-L"
+          ];
           watch_paths = [
             "flake.nix"
             "flake.lock"

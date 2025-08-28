@@ -5,6 +5,7 @@ in
 {
   imports = [
     ./modules/users.nix
+    ./disko.nix
   ];
 
   global.userdata = {
@@ -13,4 +14,6 @@ in
   };
 
   sops.defaultSopsFile = lib.mkForce ../${host}/secrets.yaml;
+  facter.reportPath = ../${host}/facter.json;
+  system.stateVersion = lib.mkForce "25.11";
 }
