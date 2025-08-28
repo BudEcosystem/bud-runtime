@@ -193,7 +193,7 @@ cd /workspace
 # Run OpenCompass evaluation with model config and datasets via CLI
 python /workspace/run.py \\
     --models bud_model \\
-    --datasets demo_gsm8k_chat_gen \\
+    --datasets {datasets_str} \\
     --work-dir /workspace/outputs \\
     --max-num-workers {request.num_workers} --debug
 """

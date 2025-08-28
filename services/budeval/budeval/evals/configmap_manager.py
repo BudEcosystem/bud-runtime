@@ -179,7 +179,7 @@ models = [
 ]
 
 # Use string dataset names - OpenCompass will resolve them
-datasets = ['mmlu_gen']
+datasets = ['mmlu']
 
 # Configuration metadata
 eval_request_id = '{eval_request_id}'

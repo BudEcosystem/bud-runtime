@@ -678,10 +678,9 @@ spec:
         eval_request_id = args.get("eval_request_id", uuid)
         configmap_name = f"opencompass-config-{eval_request_id.lower()}"
 
-        # Extract datasets and append '_gen' suffix for OpenCompass
+        # Extract datasets to pass to OpenCompass
         datasets = args.get("datasets", ["mmlu"])
-        datasets_with_gen = [f"{dataset}_gen" for dataset in datasets]
-        datasets_arg = " ".join(datasets_with_gen)
+        datasets_arg = " ".join(datasets)
 
         # Model configuration is now handled via bud-model.py config file
 
