@@ -42,7 +42,7 @@ oauth_admin_router = APIRouter(prefix="/admin/oauth", tags=["oauth-admin"])
 class ConfigureOAuthProviderRequest(CamelCaseModel):
     """Request model for configuring OAuth provider."""
 
-    tenant_id: UUID = Field(..., description="Tenant ID")
+    tenant_id: Optional[UUID] = Field(None, description="Tenant ID (uses default if not provided)")
     provider: OAuthProviderEnum = Field(..., description="OAuth provider")
     client_id: str = Field(..., description="OAuth client ID")
     client_secret: str = Field(..., description="OAuth client secret")
@@ -99,10 +99,25 @@ async def configure_oauth_provider(
         # Check admin permissions
         check_admin_permission(current_user)
 
+        # Get default tenant if not provided
+        tenant_id = request.tenant_id
+        if not tenant_id:
+            from budapp.commons.config import app_settings
+            from budapp.user_ops.crud import UserDataManager
+            from budapp.user_ops.models import Tenant
+
+            default_tenant = await UserDataManager(session).retrieve_by_fields(
+                Tenant, {"realm_name": app_settings.default_realm_name}, missing_ok=True
+            )
+            if not default_tenant:
+                raise ClientException("Default tenant not found")
+            tenant_id = default_tenant.id
+            logger.info(f"Using default tenant {app_settings.default_realm_name} for OAuth configuration")
+
         service = TenantOAuthService(session)
 
         config = await service.configure_oauth_provider(
-            tenant_id=request.tenant_id,
+            tenant_id=tenant_id,
             provider=request.provider,
             client_id=request.client_id,
             client_secret=request.client_secret,

@@ -143,7 +143,26 @@ class TenantOAuthService(SessionMixin):
                     "offlineAccess": "false",
                 },
             },
-            OAuthProviderEnum.LINKEDIN: {"alias": "linkedin", "providerId": "linkedin", "config": {}},
+            OAuthProviderEnum.LINKEDIN: {
+                "alias": "linkedin",
+                # LinkedIn uses OIDC provider in Keycloak
+                "providerId": "oidc",
+                "config": {
+                    # LinkedIn-specific OIDC configuration
+                    "authorizationUrl": "https://www.linkedin.com/oauth/v2/authorization",
+                    "tokenUrl": "https://www.linkedin.com/oauth/v2/accessToken",
+                    "userInfoUrl": "https://api.linkedin.com/v2/me",
+                    "defaultScope": "r_liteprofile r_emailaddress",
+                    "syncMode": "IMPORT",
+                    "hideOnLoginPage": "false",
+                    "trustEmail": "true",
+                    "storeToken": "false",
+                    "addReadTokenRoleOnCreate": "false",
+                    "authenticateByDefault": "false",
+                    "linkOnly": "false",
+                    "useJwksUrl": "false",
+                },
+            },
             OAuthProviderEnum.GITHUB: {"alias": "github", "providerId": "github", "config": {}},
             OAuthProviderEnum.MICROSOFT: {
                 "alias": "microsoft",
