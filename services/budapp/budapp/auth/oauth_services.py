@@ -33,6 +33,7 @@ from budapp.auth.oauth_error_handler import (
     handle_oauth_error,
 )
 from budapp.auth.oauth_proxy_services import ProxiedOAuthURLGenerator
+from budapp.auth.user_onboarding_service import UserOnboardingService
 from budapp.commons import logging
 from budapp.commons.config import app_settings
 from budapp.commons.constants import OAuthProviderEnum, UserColorEnum, UserRoleEnum, UserStatusEnum, UserTypeEnum
@@ -891,143 +892,10 @@ class OAuthService(SessionMixin):
 
         # Set up billing and create default project for new CLIENT users
         logger.info(f"User type for {user.email}: {user.user_type}")
-        if user.user_type == UserTypeEnum.CLIENT:
-            logger.info(f"Setting up new CLIENT user {user.email} with billing and default project")
-            await self._setup_new_client_user(user, tenant, tenant_client)
-        else:
-            logger.info(f"Skipping default project for non-CLIENT user {user.email}")
+        onboarding_service = UserOnboardingService(self.session)
+        await onboarding_service.setup_new_client_user(user, tenant, tenant_client)
 
         return user
-
-    async def _setup_new_client_user(self, user: User, tenant: Tenant, tenant_client: TenantClient) -> None:
-        """Set up billing and create default project for new CLIENT users.
-
-        Args:
-            user: The newly created user
-            tenant: The tenant the user belongs to
-            tenant_client: The tenant client configuration
-        """
-        # Assign default billing plan
-        try:
-            from datetime import datetime, timedelta, timezone
-
-            from dateutil.relativedelta import relativedelta
-
-            from budapp.billing_ops.models import BillingPlan, UserBilling
-
-            # Check if user already has billing
-            existing_billing = await UserDataManager(self.session).retrieve_by_fields(
-                UserBilling, {"user_id": user.id}, missing_ok=True
-            )
-
-            if existing_billing:
-                logger.info(f"User {user.email} already has billing plan, skipping assignment")
-            else:
-                # Get the default free plan by name
-                free_plan = await UserDataManager(self.session).retrieve_by_fields(
-                    BillingPlan, {"name": "Free"}, missing_ok=True
-                )
-
-                if free_plan:
-                    # Calculate billing period (monthly)
-                    now = datetime.now(timezone.utc)
-                    period_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-                    period_end = (period_start + relativedelta(months=1)) - timedelta(seconds=1)
-
-                    # Create billing association with all required fields
-                    user_billing = UserBilling(
-                        user_id=user.id,
-                        billing_plan_id=free_plan.id,
-                        billing_period_start=period_start,
-                        billing_period_end=period_end,
-                        is_active=True,
-                        is_suspended=False,
-                    )
-                    UserDataManager(self.session).add_one(user_billing)
-                    self.session.commit()
-                    logger.info(f"Free billing plan assigned to new OAuth user: {user.email}")
-                else:
-                    logger.warning("No 'Free' billing plan found in database - user will have no billing plan")
-
-        except Exception as billing_error:
-            logger.error(f"Failed to assign billing plan to OAuth user {user.email}: {billing_error}")
-            # Continue even if billing assignment fails
-
-        # Create default project
-        try:
-            from budapp.auth.schemas import ResourceCreate
-            from budapp.commons.constants import ProjectStatusEnum, ProjectTypeEnum
-            from budapp.permissions.service import PermissionService
-            from budapp.project_ops.models import Project as ProjectModel
-
-            logger.info(f"Creating default project for user {user.email} (ID: {user.id})")
-
-            # Create default project for the client user
-            default_project = ProjectModel(
-                name="My First Project",
-                description="Welcome to your first project! Start by adding models and creating endpoints.",
-                created_by=user.id,
-                status=ProjectStatusEnum.ACTIVE,
-                benchmark=False,
-                project_type=ProjectTypeEnum.CLIENT_APP.value,
-            )
-
-            # Insert the project into database
-            UserDataManager(self.session).add_one(default_project)
-
-            # Associate the user with the project
-            default_project.users.append(user)
-            self.session.commit()
-
-            logger.info(
-                f"✅ Default project '{default_project.name}' (ID: {default_project.id}) created successfully for OAuth user: {user.email}"
-            )
-
-            # Create project permissions in database
-            import json
-
-            from budapp.commons.constants import PermissionEnum
-            from budapp.permissions.models import ProjectPermission
-
-            # Get all project-level permissions
-            project_permissions = PermissionEnum.get_project_level_scopes()
-
-            # Create a single ProjectPermission record with all scopes
-            project_permission = ProjectPermission(
-                project_id=default_project.id,
-                user_id=user.id,
-                auth_id=user.auth_id,
-                scopes=json.dumps(project_permissions),  # Store as JSON string
-            )
-            UserDataManager(self.session).add_one(project_permission)
-
-            self.session.commit()
-            logger.info(f"Project permissions added to database for user: {user.email}")
-
-            # Create permissions for the project in Keycloak
-            try:
-                permission_service = PermissionService(self.session)
-
-                # Create resource permission
-                payload = ResourceCreate(
-                    resource_id=str(default_project.id),
-                    resource_type="project",
-                    scopes=["view", "manage"],
-                )
-
-                # Use the user object directly to create permissions
-                # The service will get tenant and client internally
-                await permission_service.create_resource_permission_by_user(user, payload)
-
-                logger.info(f"Default project permissions created in Keycloak for user: {user.email}")
-
-            except Exception as perm_error:
-                logger.error(f"Failed to create project permissions in Keycloak: {perm_error}")
-                # Continue even if permission creation fails
-
-        except Exception as project_error:
-            logger.error(f"Failed to create default project for OAuth user {user.email}: {project_error}")
-            # Don't fail user creation if project creation fails
 
     async def _generate_tokens_for_user(
         self, user: User, tenant: Tenant, tenant_client: TenantClient

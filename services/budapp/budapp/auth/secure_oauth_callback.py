@@ -28,153 +28,19 @@ from budapp.auth.oauth_error_handler import OAuthError
 from budapp.auth.oauth_schemas import OAuthCallbackRequest
 from budapp.auth.oauth_services import OAuthService
 from budapp.auth.token_exchange_service import TokenExchangeService
+from budapp.auth.user_onboarding_service import UserOnboardingService
 from budapp.commons import logging
 from budapp.commons.config import app_settings
 from budapp.commons.dependencies import get_session
 from budapp.commons.exceptions import ClientException
 from budapp.user_ops.crud import UserDataManager
-from budapp.user_ops.models import Tenant, TenantClient, User
+from budapp.user_ops.models import User
 from budapp.user_ops.oauth_models import OAuthSession
 
 
 logger = logging.get_logger(__name__)
 
 secure_oauth_callback_router = APIRouter(tags=["oauth"])
-
-
-async def _setup_new_sso_user(session: Session, user_email: str) -> None:
-    """Set up billing plan and default project for new SSO users.
-
-    This function handles the post-creation setup for new SSO users,
-    including:
-    - Assigning free billing plan
-    - Creating default project
-    - Setting up project permissions
-
-    Args:
-        session: Database session
-        user_email: Email of the new user
-    """
-    try:
-        # Get the user
-        user = await UserDataManager(session).retrieve_by_fields(User, {"email": user_email}, missing_ok=True)
-
-        if not user:
-            logger.error(f"User not found for setup: {user_email}")
-            return
-
-        # Get default tenant
-        tenant = await UserDataManager(session).retrieve_by_fields(
-            Tenant, {"realm_name": app_settings.default_realm_name}, missing_ok=True
-        )
-
-        if not tenant:
-            logger.error("Default tenant not found for new user setup")
-            return
-
-        # Get tenant client
-        tenant_client = await UserDataManager(session).retrieve_by_fields(
-            TenantClient, {"tenant_id": tenant.id}, missing_ok=True
-        )
-
-        # Assign free billing plan for CLIENT users
-        if user.user_type == "CLIENT":
-            try:
-                from datetime import datetime, timezone
-                from uuid import UUID, uuid4
-
-                from budapp.billing_ops.models import UserBilling
-
-                # Calculate billing period (monthly)
-                now = datetime.now(timezone.utc)
-                billing_period_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-
-                # Get next month
-                if billing_period_start.month == 12:
-                    billing_period_end = billing_period_start.replace(year=billing_period_start.year + 1, month=1)
-                else:
-                    billing_period_end = billing_period_start.replace(month=billing_period_start.month + 1)
-
-                # Create user billing with free plan
-                user_billing = UserBilling(
-                    id=uuid4(),
-                    user_id=user.id,
-                    billing_plan_id=UUID("00000000-0000-0000-0000-000000000001"),  # Free plan ID
-                    billing_period_start=billing_period_start,
-                    billing_period_end=billing_period_end,
-                    is_active=True,
-                    is_suspended=False,
-                )
-
-                UserDataManager(session).add_one(user_billing)
-                session.commit()
-                logger.info(f"Free billing plan assigned to SSO user: {user.email}")
-
-            except Exception as billing_error:
-                logger.error(f"Failed to assign billing plan to SSO user {user.email}: {billing_error}")
-                # Don't fail if billing assignment fails
-
-            # Create a default project for CLIENT users
-            try:
-                from budapp.auth.schemas import ResourceCreate
-                from budapp.commons.constants import PermissionEnum, ProjectStatusEnum, ProjectTypeEnum
-                from budapp.permissions.schemas import PermissionList
-                from budapp.permissions.service import PermissionService
-                from budapp.project_ops.models import Project as ProjectModel
-                from budapp.project_ops.schemas import ProjectUserAdd
-
-                # Create default project for the client user
-                default_project = ProjectModel(
-                    name="My First Project",
-                    description="This is your default project.",
-                    created_by=user.id,
-                    status=ProjectStatusEnum.ACTIVE,
-                    benchmark=False,
-                    project_type=ProjectTypeEnum.CLIENT_APP.value,
-                )
-
-                # Insert the project into database
-                UserDataManager(session).add_one(default_project)
-                logger.info(f"Default project created for SSO user: {user.email}")
-
-                # Associate the user with the project
-                default_project.users.append(user)
-                session.commit()
-
-                # Create permissions for the project in Keycloak
-                if tenant_client:
-                    permission_service = PermissionService(session)
-                    payload = ResourceCreate(
-                        resource_id=str(default_project.id),
-                        resource_type="project",
-                        scopes=["view", "manage"],
-                    )
-
-                    await permission_service.create_resource(
-                        payload, str(user.auth_id), tenant.realm_name, tenant_client.client_id
-                    )
-
-                    # Grant permissions to the user
-                    project_users = ProjectUserAdd(
-                        project_id=default_project.id,
-                        user_id=user.id,
-                        permissions=[
-                            PermissionList(name=PermissionEnum.PROJECT_VIEW, has_permission=True),
-                            PermissionList(name=PermissionEnum.PROJECT_MANAGE, has_permission=True),
-                        ],
-                    )
-                    await permission_service.grant_permissions(
-                        project_users, str(user.auth_id), tenant.realm_name, tenant_client.client_id
-                    )
-                    logger.info(f"Default project permissions granted for SSO user: {user.email}")
-
-            except Exception as project_error:
-                logger.error(f"Failed to create default project for SSO user {user.email}: {project_error}")
-                # Don't fail if project creation fails
-
-    except Exception as e:
-        logger.error(f"Error in new SSO user setup for {user_email}: {e}")
-        # Don't propagate the error - allow login to continue
 
 
 @secure_oauth_callback_router.get(
@@ -271,7 +137,8 @@ async def secure_oauth_callback(
         # If this is a new user, set up billing and default project
         if response.is_new_user:
             try:
-                await _setup_new_sso_user(session, response.user_info.email)
+                onboarding_service = UserOnboardingService(session)
+                await onboarding_service.onboard_user_by_email(response.user_info.email)
             except Exception as e:
                 logger.error(f"Failed to complete new user setup for {response.user_info.email}: {e}")
                 # Don't fail the login if setup fails
@@ -306,7 +173,7 @@ async def secure_oauth_callback(
             raise ClientException("User not found after OAuth authentication")
 
         # Create exchange token
-        exchange_token = exchange_service.create_exchange_token(
+        exchange_token = await exchange_service.create_exchange_token(
             user_id=user.id,
             email=user_email,
             is_new_user=response.is_new_user,
