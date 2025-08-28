@@ -64,7 +64,7 @@ error_responses = {
     },
     description=f"""Add or generate a new credential for user. Valid credential types:
     {", ".join([value.value for value in ApiCredentialTypeEnum])}.
-    Project_id and expiry(None or 30, 60) are required.""",
+    Project_id and expiry(None, 0, 30, 60, or 90) are required. 0 or None means no expiry.""",
 )
 async def add_credential(
     request: Request,
@@ -184,7 +184,7 @@ async def delete_credential(
     },
     description=f"""Add or generate a new credential for proprietary models.
     Valid credential types: {", ".join([value.value for value in CredentialTypeEnum])}.
-    For budserve credential type, project_id, expiry(None or 30, 60) are required.""",
+    For budserve credential type, project_id, expiry(None, 0, 30, 60, or 90) are required. 0 or None means no expiry.""",
 )
 async def add_proprietary_credential(
     request: Request,

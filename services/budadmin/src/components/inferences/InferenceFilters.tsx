@@ -36,7 +36,7 @@ const InferenceFilters: React.FC<InferenceFiltersProps> = ({ projectId, onFilter
         limit: 100,
       });
     }
-  }, [projectId]);
+  }, [projectId, getEndPoints]);
 
   const handleFilterChange = (changedValues: any) => {
     // Handle date range

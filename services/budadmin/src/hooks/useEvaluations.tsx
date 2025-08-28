@@ -28,11 +28,11 @@ export interface GetExperimentsPayload {
 export interface ExperimentData {
   id: string;
   name?: string;
-  experimentName: string;
-  models: string;
-  traits: string;
-  tags: string[];
-  status: "Running" | "Completed" | "Failed";
+  experimentName?: string;
+  models: string | any[] | any;  // Can be string, array, or object
+  traits: string | any[] | any;  // Can be string, array, or object
+  tags: string[] | any[];
+  status: "Running" | "Completed" | "Failed" | string;
   createdDate: string;
 }
 

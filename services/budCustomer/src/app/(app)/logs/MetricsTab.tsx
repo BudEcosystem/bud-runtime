@@ -41,8 +41,44 @@ import GeoMapChart from '@/components/charts/GeoMapChart';
 import { Flex } from '@radix-ui/themes';
 import { useAggregatedMetrics } from '@/hooks/useAggregatedMetrics';
 import { useTheme } from '@/context/themeContext';
+import { LineChartOutlined } from '@ant-design/icons';
 
 const { Text } = Typography;
+
+// No data component
+function NoDataChart({ message = "No data available" }: { message?: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center h-full gap-2">
+      <LineChartOutlined style={{ fontSize: '32px', color: '#757575' }} />
+      <Text_12_400_B3B3B3 className="text-center !text-[var(--text-muted)]">
+        {message}
+      </Text_12_400_B3B3B3>
+    </div>
+  );
+}
+
+// Helper to check if chart data is empty
+function isChartDataEmpty(data: any): boolean {
+  if (!data) return true;
+
+  // For single series data
+  if (data.data) {
+    return !data.data || data.data.length === 0 || data.data.every((val: any) => val === 0 || val == null);
+  }
+
+  // For multi-series data
+  if (data.series) {
+    return !data.series || data.series.length === 0 ||
+           data.series.every((s: any) => !s.data || s.data.length === 0 || s.data.every((val: any) => val === 0 || val == null));
+  }
+
+  // For categories-based data
+  if (data.categories && data.data) {
+    return !data.data || data.data.length === 0 || data.data.every((val: any) => val === 0 || val == null);
+  }
+
+  return true;
+}
 
 // Custom chart component wrapper for consistent styling
 function ChartCard({ title, subtitle, children, height = '23.664375rem' }: { title: string; subtitle?: string; children: React.ReactNode; height?: string }) {
@@ -1433,10 +1469,10 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
             }}
           >
             <div className="flex items-center w-full flex-col mb-4">
-              <Text_19_600_EEEEEE className="w-full !text-[var(--text-primary)]">
+              <Text_19_600_EEEEEE className="mb-[1.3rem] w-full !text-[var(--text-primary)]">
                 Geographic Distribution
               </Text_19_600_EEEEEE>
-              <Text_13_400_757575 className='w-full mt-2 !text-[var(--text-muted)]'>
+              <Text_13_400_757575 className='w-full mb-4 !text-[var(--text-muted)]'>
                 Request origins by country
               </Text_13_400_757575>
             </div>
@@ -1472,7 +1508,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
                     })
                 }}
               />
-            ) : (
+            ) : metrics.latencyOverTime && metrics.latencyOverTime.length > 0 ? (
               <MultiSeriesLineChart
                 key={`latency-single-${metricsKey}`}
                 data={{
@@ -1496,6 +1532,8 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
                   ]
                 }}
               />
+            ) : (
+              <NoDataChart message="No data available" />
             )}
           </ChartCard>
         </Col>
@@ -1524,7 +1562,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
                     })
                 }}
               />
-            ) : (
+            ) : metrics.tokensOverTime && metrics.tokensOverTime.length > 0 ? (
               <MultiSeriesLineChart
                 data={{
                   categories: metrics.tokensOverTime.map(d => d.time),
@@ -1542,6 +1580,8 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ timeRange, inferences, isLoadin
                   ]
                 }}
               />
+            ) : (
+              <NoDataChart message="No data available" />
             )}
           </ChartCard>
         </Col>
