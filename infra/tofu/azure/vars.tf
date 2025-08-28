@@ -15,16 +15,6 @@ variable "prefix" {
   default     = "tofu"
 }
 
-variable "disk_size" {
-  description = "Disk size assosiated with vms"
-  # in GB
-  default = {
-    primary      = 64
-    primary_data = 128
-    ingress      = 32
-  }
-}
-
 variable "user" {
   type        = map(string)
   description = "User information"
@@ -50,5 +40,15 @@ variable "ingress_sku" {
     Standard_NC24ads_A100_v4   = 0 // NVIDIA A100
     Standard_NV12ads_A10_v5    = 0 // NVIDIA A10
     Standard_ND96isr_MI300X_v5 = 0 // AMD MI300
+  }
+}
+
+variable "disk_size" {
+  description = "Disk size assosiated with vms"
+  # in GB
+  default = {
+    primary      = 64
+    primary_data = 128
+    ingress      = 32
   }
 }
