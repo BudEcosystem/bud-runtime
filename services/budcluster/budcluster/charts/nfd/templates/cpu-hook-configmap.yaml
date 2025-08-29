@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nfd-cpu-hook
+  namespace: {{ .Values.global.namespace | default "node-feature-discovery" }}
+  labels:
+    app.kubernetes.io/name: node-feature-discovery
+    app.kubernetes.io/component: cpu-hook
+data:
+  cpu-model.sh: |
+    #!/bin/bash
+    # NFD Local Hook for CPU Model Detection
+
+    # Function to get CPU model from various sources
+    get_cpu_model() {
+        # Try lscpu first
+        if command -v lscpu > /dev/null 2>&1; then
+            model=$(lscpu | grep "Model name:" | sed 's/Model name:\s*//')
+            if [ -n "$model" ]; then
+                echo "$model"
+                return
+            fi
+        fi
+
+        # Fallback to /proc/cpuinfo
+        if [ -f /proc/cpuinfo ]; then
+            model=$(grep "model name" /proc/cpuinfo | head -1 | cut -d: -f2 | sed 's/^[ \t]*//')
+            if [ -n "$model" ]; then
+                echo "$model"
+                return
+            fi
+        fi
+
+        echo "Unknown"
+    }
+
+    # Main execution
+    CPU_MODEL=$(get_cpu_model)
+
+    # Output in NFD local source format
+    echo "feature.node.kubernetes.io/local-cpu.model=$CPU_MODEL"

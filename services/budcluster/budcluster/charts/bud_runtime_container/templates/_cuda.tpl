@@ -8,6 +8,8 @@
     - name: model-registry
       mountPath: /data/models-registry
       readOnly: false
+    - name: shm
+      mountPath: "/dev/shm"
   resources:
     requests:
       nvidia.com/gpu: {{ .device.tp_size }}
