@@ -1,0 +1,92 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: {{ .Values.env.SECRETSTORE_NAME }}
+  namespace: {{ .Values.namespace }}
+spec:
+  type: secretstores.kubernetes
+  version: v1
+  metadata: []
+---
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: pubsub-redis
+  namespace: {{ .Values.namespace }}
+spec:
+  type: pubsub.redis
+  version: v1
+  metadata:
+    - name: redisHost
+      value: {{ .Values.env.REDIS_URI }}
+    - name: redisPassword
+      secretKeyRef:
+        name: '{{ .Values.name }}-secret'
+        key: REDIS_PASSWORD
+    - name: consumerID
+      value: "{appID}"
+    - name: concurrency
+      value: "10"
+auth:
+  secretStore: {{ .Values.env.SECRETSTORE_NAME }}
+
+---
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: statestore
+  namespace: {{ .Values.namespace }}  # Use the namespace from values
+spec:
+  type: state.redis
+  version: v1
+  metadata:
+    - name: redisHost
+      value: {{ .Values.env.REDIS_URI }}
+    - name: redisPassword
+      secretKeyRef:
+        name: '{{ .Values.name }}-secret'
+        key: REDIS_PASSWORD
+    - name: actorStateStore
+      value: "true"
+    - name: keyPrefix
+      value: none
+auth:
+  secretStore: {{ .Values.env.SECRETSTORE_NAME }}
+
+---
+apiVersion: dapr.io/v2alpha1
+kind: Subscription
+metadata:
+  name: "{{ .Values.name }}-pubsub-subscription"
+  namespace: {{ .Values.namespace }}
+spec:
+  topic: "notificationMessages"
+  routes:
+    default: "/notifications"
+  pubsubname: pubsub-redis
+  deadLetterTopic: poisonMessages
+scopes:
+  - {{.Values.name}}
+  
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: bud-prompt-secret-reader-full
+rules:
+  - apiGroups: ["*"]
+    resources: ["*"]
+    verbs: ["*"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: bud-prompt-secret-access
+subjects:
+  - kind: ServiceAccount
+    name: default
+    namespace: {{ .Values.namespace }}
+roleRef:
+  kind: ClusterRole
+  name: bud-prompt-secret-reader-full
+  apiGroup: rbac.authorization.k8s.io
