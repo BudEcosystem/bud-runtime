@@ -69,7 +69,6 @@ export default function NewProject() {
           form.submit();
           return;
         }
-
         // Ensure tags are in the correct format (array of objects with name and color)
         const formattedTags = values.tags
           ? (Array.isArray(values.tags) ? values.tags : [])
