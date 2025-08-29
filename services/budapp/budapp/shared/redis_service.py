@@ -21,7 +21,7 @@ class RedisSingleton(metaclass=SingletonMeta):
     def __init__(self):
         """Initialize the Redis singleton."""
         if not self._redis_client:
-            pool = aioredis.ConnectionPool.from_url("redis://localhost:6379")
+            pool = aioredis.ConnectionPool.from_url(secrets_settings.redis_url)
             self._redis_client = aioredis.Redis.from_pool(pool)
 
     async def __aenter__(self):
