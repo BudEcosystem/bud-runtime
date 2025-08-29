@@ -43,10 +43,10 @@ in
           watch_paths = [
             "flake.nix"
             "flake.lock"
-            "nix/nixos/common"
-            "nix/nixos/azure"
-            "nix/nixos/budk8s"
-            "nix/nixos/primary"
+            "infra/nixos/common"
+            "infra/nixos/azure"
+            "infra/nixos/budk8s"
+            "infra/nixos/primary"
           ];
         }
         {
