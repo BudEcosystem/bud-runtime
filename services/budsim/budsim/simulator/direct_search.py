@@ -122,11 +122,19 @@ class DirectSearchOptimizer:
 
         # Valid TP sizes (powers of 2, starting from minimum required)
         self.valid_tp_sizes = []
-        tp = self.min_tp
-        while tp <= self.max_tp:
-            self.valid_tp_sizes.append(tp)
-            tp *= 2
 
+        # Handle edge case where min_tp is 0 (model cannot fit on this device)
+        if self.min_tp == 0 or self.max_tp == 0:
+            logger.warning(
+                f"Device cannot accommodate model {self.model}: min_tp={self.min_tp}, max_tp={self.max_tp}. "
+                f"Skipping this device configuration."
+            )
+            # Leave valid_tp_sizes empty to indicate this device cannot be used
+        else:
+            tp = self.min_tp
+            while tp <= self.max_tp:
+                self.valid_tp_sizes.append(tp)
+                tp *= 2
         # Valid PP sizes
         self.valid_pp_sizes = list(range(1, self.max_pp + 1))
 
