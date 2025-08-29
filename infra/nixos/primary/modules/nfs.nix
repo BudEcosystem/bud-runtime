@@ -8,7 +8,7 @@ in
   services.nfs.server = {
     enable = true;
     exports = ''
-      ${nfsDataPath}  ${primaryIp}/24(rw,sync,no_subtree_check,no_root_squash)
+      ${nfsDataPath}  ${primaryIp}/24(rw,sync,no_subtree_check,no_root_squash,fsid=0,insecure)
     '';
   };
 }
