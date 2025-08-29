@@ -32,6 +32,7 @@ export const AdapterDetail = () => {
         })
     }, [currentWorkflow])
 
+
     const handleNext = async () => {
         form.submit();
         const result = await updateAdapterDetailWorkflow(adapterWorkflow?.adapterName, projectId);
@@ -64,7 +65,9 @@ export const AdapterDetail = () => {
                             name="adapterName"
                             label="Adapter deployment name"
                             placeholder="Enter adapter deployment name"
-                            rules={[{ required: true, message: "Please enter deployment name" }]}
+                            rules={[
+                                { required: true, message: "Please enter deployment name" }
+                            ]}
                             ClassNames="mt-[.4rem]"
                             infoText="Enter a name for the deployment of the adapter"
                             onChange={(e) => setAdapterWorkflow({ ...adapterWorkflow, "adapterName": e })}
