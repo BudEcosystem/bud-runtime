@@ -4,7 +4,7 @@ import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
-import React, { use, useContext, useEffect, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
 import DrawerCard from "@/components/ui/bud/card/DrawerCard";
 import TextInput from "src/flows/components/TextInput";
@@ -26,16 +26,9 @@ function AddLocalModelForm() {
   const author = form.getFieldValue("author");
   const tags = form.getFieldValue("tags");
 
-
-  useEffect(() => {
-    setLocalModelDetails({
-      name,
-      uri,
-      author,
-      tags,
-      icon
-    })
-  }, [name, uri, author, tags, icon])
+  // Removed the useEffect that was causing infinite loop
+  // Form values are already managed by the form context
+  // and will be passed to handleNext when the form is submitted
 
   async function fetchList(tagname) {
     await axiosInstance(`${tempApiBaseUrl}/models/tags?page=1&limit=1000`).then((result) => {
@@ -50,14 +43,6 @@ function AddLocalModelForm() {
   useEffect(() => {
     fetchList("");
   }, []);
-  useEffect(() => {
-    console.log('localModelDetails', localModelDetails)
-  }, [localModelDetails]);
-
-  // useEffect(() => {
-  //   console.log(currentWorkflow)
-  //   console.log(currentWorkflow?.workflow_steps.provider.icon)
-  // }, [currentWorkflow]);
 
 
   return <BudWraperBox>
@@ -117,17 +102,14 @@ export default function AddLocalModel() {
   const [isMounted, setIsMounted] = useState(false);
 
   const handleNext = async () => {
-    console.log('values', values)
     const result = await updateModelDetailsLocal(values);
     if (result) {
       if (currentWorkflow?.workflow_steps?.provider?.type === "huggingface") {
-        console.log("trigger hug")
         return openDrawerWithStep('select-or-add-credentials')
       } else {
         setLoading(true)
         const result = await updateCredentialsLocal(null)
         if (result) {
-          console.log("trigger local")
           setLoading(false)
           return openDrawerWithStep('extracting-model-status')
         }

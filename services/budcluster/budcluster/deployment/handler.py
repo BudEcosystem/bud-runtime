@@ -183,7 +183,7 @@ class DeploymentHandler:
                 if not all(key in device for key in ("image", "replica", "memory", "type", "tp_size", "concurrency")):
                     raise ValueError(f"Device configuration is missing required keys: {device}")
                 device["args"]["port"] = app_settings.engine_container_port
-                # device["args"]["tensor-parallel-size"] = 1
+                device["args"]["gpu-memory-utilization"] = 0.95
                 device["args"]["max-loras"] = max_loras
                 device["args"]["max-lora-rank"] = 256
 

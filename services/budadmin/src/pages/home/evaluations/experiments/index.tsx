@@ -154,12 +154,12 @@ const ExperimentsTable = () => {
   const columns: ColumnsType<ExperimentData> = [
     {
       title: "Experiment name",
-      dataIndex: "name",
-      key: "name",
+      dataIndex: "experimentName",
+      key: "experimentName",
       render: (text) => <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>,
       sorter: true,
       sortOrder:
-        orderBy === "name"
+        orderBy === "experimentName"
           ? order === "-"
             ? "descend"
             : "ascend"
@@ -170,30 +170,63 @@ const ExperimentsTable = () => {
       title: "Models",
       dataIndex: "models",
       key: "models",
-      render: (text) => <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>,
+      render: (models) => {
+        // Handle both string and object/array formats
+        if (typeof models === 'string') {
+          return <Text_12_400_EEEEEE>{models}</Text_12_400_EEEEEE>;
+        } else if (Array.isArray(models)) {
+          // If it's an array of objects with name property
+          const modelNames = models.map(m => m.name || m).join(', ');
+          return <Text_12_400_EEEEEE>{modelNames}</Text_12_400_EEEEEE>;
+        } else if (models && typeof models === 'object') {
+          // If it's a single object with name property
+          return <Text_12_400_EEEEEE>{models.name || models.deployment_name || JSON.stringify(models)}</Text_12_400_EEEEEE>;
+        }
+        return <Text_12_400_EEEEEE>-</Text_12_400_EEEEEE>;
+      },
     },
     {
       title: "Traits",
       dataIndex: "traits",
       key: "traits",
-      render: (text) => <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>,
+      render: (traits) => {
+        // Handle both string and object/array formats
+        if (typeof traits === 'string') {
+          return <Text_12_400_EEEEEE>{traits}</Text_12_400_EEEEEE>;
+        } else if (Array.isArray(traits)) {
+          // If it's an array of objects with name property
+          const traitNames = traits.map(t => t.name || t).join(', ');
+          return <Text_12_400_EEEEEE>{traitNames}</Text_12_400_EEEEEE>;
+        } else if (traits && typeof traits === 'object') {
+          // If it's a single object with name property
+          return <Text_12_400_EEEEEE>{traits.name || JSON.stringify(traits)}</Text_12_400_EEEEEE>;
+        }
+        return <Text_12_400_EEEEEE>-</Text_12_400_EEEEEE>;
+      },
     },
     {
       title: "Tags",
       dataIndex: "tags",
       key: "tags",
-      render: (tags: string[]) => (
-        <div className="flex gap-1">
-          {tags.map((tag, index) => (
-            <Tags
-              key={index}
-              name={tag}
-              color="#D1B854"
-              classNames="text-center justify-center items-center"
-            />
-          ))}
-        </div>
-      ),
+      render: (tags) => {
+        // Ensure tags is an array
+        const tagsArray = Array.isArray(tags) ? tags : [];
+        if (tagsArray.length === 0) {
+          return <Text_12_400_EEEEEE>-</Text_12_400_EEEEEE>;
+        }
+        return (
+          <div className="flex gap-1">
+            {tagsArray.map((tag, index) => (
+              <Tags
+                key={index}
+                name={typeof tag === 'string' ? tag : tag.name || JSON.stringify(tag)}
+                color="#D1B854"
+                classNames="text-center justify-center items-center"
+              />
+            ))}
+          </div>
+        );
+      },
     },
     {
       title: "Status",
@@ -317,12 +350,12 @@ const ExperimentsTable = () => {
     if (key === "status") {
       setFilter({
         ...filter,
-        status: filter.status.filter((s) => s !== value),
+        status: filter.status?.filter((s) => s !== value) || [],
       });
     } else if (key === "tags") {
       setFilter({
         ...filter,
-        tags: filter.tags.filter((t) => t !== value),
+        tags: filter.tags?.filter((t) => t !== value) || [],
       });
     }
   };
@@ -330,9 +363,19 @@ const ExperimentsTable = () => {
   // Get unique tags from all experiments for filter options
   const availableTags = useMemo(() => {
     const tags = new Set<string>();
-    experimentsList.forEach((exp) => {
-      exp.tags.forEach((tag) => tags.add(tag));
-    });
+    if (Array.isArray(experimentsList)) {
+      experimentsList.forEach((exp) => {
+        if (Array.isArray(exp.tags)) {
+          exp.tags.forEach((tag: any) => {
+            if (typeof tag === 'string') {
+              tags.add(tag);
+            } else if (tag && typeof tag === 'object' && 'name' in tag) {
+              tags.add(tag.name);
+            }
+          });
+        }
+      });
+    }
     return Array.from(tags);
   }, [experimentsList]);
 

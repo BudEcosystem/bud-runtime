@@ -148,6 +148,7 @@ class UpdateModelTransferStatusRequest(DeploymentWorkflowRequest):
 
     main_workflow_id: UUID
     workflow_name: str
+    workflow_start_time: Optional[str] = None  # ISO format timestamp to track overall timeout
 
 
 class VerifyDeploymentHealthRequest(BaseModel):

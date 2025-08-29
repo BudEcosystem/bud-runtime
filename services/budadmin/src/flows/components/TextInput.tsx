@@ -25,74 +25,79 @@ export interface BudInputProps {
 }
 
 function TextInput(props: BudInputProps) {
+  const inputStyle = {
+    ...props.style,
+    paddingTop: ".75rem",
+    paddingBottom: ".75rem",
+    paddingLeft: ".5rem",
+    paddingRight: "1rem",
+  };
+
+  const inputClassName = `border border-[#757575] hover:!border-[#CFCFCF] hover:!bg-[#FFFFFF08] shadow-none !placeholder-[#808080] !placeholder:text-[#808080] !placeholder:font-[300] ${props.InputClasses}`;
+
   return (
-    <Form.Item
-      name={props.name}
-      rules={props.rules}
-      className={`${props.formItemClassnames}`}
-      hasFeedback
-    >
-      <div className={`floating-textarea ${props.ClassNames}`}>
-        {props.label ? (
-          <FloatLabel
-            label={
-              <InfoLabel
-                required={props.rules?.some((rule: any) => rule.required)}
-                text={props.label}
-                content={props.infoText || props.placeholder}
-              />
-            }
-          >
-            <Input
-              name={props.name}
-              placeholder={props.placeholder}
-              style={{
-                ...props.style,
-                paddingTop: ".75rem",
-                paddingBottom: ".75rem",
-                paddingLeft: ".5rem",
-                paddingRight: "1rem",
-              }}
-              disabled={props.disabled}
-              onChange={(e) => {
-                let newValue = e.target.value;
-                if (props.allowOnlyNumbers) {
-                  newValue = newValue.replace(/[^0-9]/g, "");
-                }
-                props.onChange?.(newValue);
-              }}
-              suffix={props.suffix}
-              type={props.type}
-              className={`border border-[#757575] hover:!border-[#CFCFCF] hover:!bg-[#FFFFFF08] shadow-none !placeholder-[#808080] !placeholder:text-[#808080] !placeholder:font-[300] ${props.InputClasses}`}
+    <div className={`floating-textarea ${props.ClassNames}`}>
+      {props.label && (
+        <FloatLabel
+          label={
+            <InfoLabel
+              required={props.rules?.some((rule: any) => rule.required)}
+              text={props.label}
+              content={props.infoText || props.placeholder}
             />
-          </FloatLabel>
-        ) : (
-          <Input
+          }
+        >
+          <Form.Item
             name={props.name}
-            placeholder={props.placeholder}
-            style={{
-              ...props.style,
-              paddingTop: ".75rem",
-              paddingBottom: ".75rem",
-              paddingLeft: ".5rem",
-              paddingRight: "1rem",
-            }}
-            disabled={props.disabled}
-            onChange={(e) => {
+            rules={props.rules}
+            className={`${props.formItemClassnames}`}
+            hasFeedback
+            getValueFromEvent={(e) => {
               let newValue = e.target.value;
               if (props.allowOnlyNumbers) {
                 newValue = newValue.replace(/[^0-9]/g, "");
               }
               props.onChange?.(newValue);
+              return newValue;
             }}
+          >
+            <Input
+              placeholder={props.placeholder}
+              style={inputStyle}
+              disabled={props.disabled}
+              suffix={props.suffix}
+              type={props.type}
+              className={inputClassName}
+            />
+          </Form.Item>
+        </FloatLabel>
+      )}
+      {!props.label && (
+        <Form.Item
+          name={props.name}
+          rules={props.rules}
+          className={`${props.formItemClassnames}`}
+          hasFeedback
+          getValueFromEvent={(e) => {
+            let newValue = e.target.value;
+            if (props.allowOnlyNumbers) {
+              newValue = newValue.replace(/[^0-9]/g, "");
+            }
+            props.onChange?.(newValue);
+            return newValue;
+          }}
+        >
+          <Input
+            placeholder={props.placeholder}
+            style={inputStyle}
+            disabled={props.disabled}
             suffix={props.suffix}
             type={props.type}
-            className={`border border-[#757575] hover:!border-[#CFCFCF] hover:!bg-[#FFFFFF08] shadow-none !placeholder-[#808080] !placeholder:text-[#808080] !placeholder:font-[300] ${props.InputClasses}`}
+            className={inputClassName}
           />
-        )}
-
-      </div>
-    </Form.Item>
+        </Form.Item>
+      )}
+    </div>
   );
 }
 

@@ -62,6 +62,7 @@ export interface BudFormProps extends FooterProps {
   children: React.ReactNode;
   title?: string;
   drawerLoading?: boolean;
+  onValuesChange?: (changedValues: any, allValues: any) => void;
 }
 
 
@@ -76,20 +77,25 @@ export function BudForm(props: BudFormProps) {
   useEffect(() => {
     // Only set form values if we have actual data (not empty object)
     if (props.data && Object.keys(props.data).length > 0) {
-      form.setFieldsValue(props.data);
+      // Get current form values
+      const currentValues = form.getFieldsValue();
 
-      // Also set after a delay in case fields aren't rendered yet
-      setTimeout(() => {
+      // Check if values are actually different
+      const hasChanges = Object.keys(props.data).some(key => {
+        // Using JSON.stringify for a simple deep comparison. This is safer than reference equality for objects/arrays.
+        // For complex cases, a library like `lodash.isEqual` would be more robust.
+        return JSON.stringify(props.data[key]) !== JSON.stringify(currentValues[key]);
+      });
+
+      // Only update if there are actual changes
+      if (hasChanges) {
         form.setFieldsValue(props.data);
-      }, 100);
+      }
     }
-  }, [props.data]);
+  }, [props.data, form]);
 
-  useEffect(() => {
-    return () => {
-      form.resetFields();
-    }
-  }, [form]);
+  // Don't reset fields on unmount - we want to preserve form data when navigating
+  // The form will be properly initialized with data prop when remounting
 
   useEffect(() => {
     if (cancelAlert) {
@@ -105,6 +111,7 @@ export function BudForm(props: BudFormProps) {
     // Blur logic
     className={`flex flex-col h-full  relative` }
     scrollToFirstError
+    onValuesChange={props.onValuesChange}
     feedbackIcons={() => {
       // return <FeedbackIcons status={status} errors={errors} warnings={warnings} />
       return {

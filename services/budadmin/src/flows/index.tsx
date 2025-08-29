@@ -111,6 +111,8 @@ import SelectModelForNewEvaluation from "./Evaluations/RunEvaluation/SelectModel
 import SelectTrait from "./Evaluations/RunEvaluation/SelectTrait";
 import SelectEvaluation from "./Evaluations/RunEvaluation/SelectEvaluation";
 import EvaluationSummary from "./Evaluations/RunEvaluation/EvaluationSummary";
+import RunEvaluationStatus from "./Evaluations/RunEvaluation/RunEvaluationStatus";
+import RunEvaluationSuccess from "./Evaluations/RunEvaluation/RunEvaluationSuccess";
 import NewExperimentSuccess from "./Evaluations/NewExperiment/newExperimentSuccess";
 import CreateBlockingRuleStep from "./blocking/CreateBlockingRuleStep";
 import BlockingRuleSuccess from "./blocking/BlockingRuleSuccess";
@@ -263,6 +265,8 @@ export const StepComponents = {
   // "view-eval-details": ViewEvalDetails,
   "view-eval-details": ViewEvalDetailscopy,
   "evaluation-summary": EvaluationSummary,
+  "run-evaluation-status": RunEvaluationStatus,
+  "run-evaluation-success": RunEvaluationSuccess,
   "create-blocking-rule": CreateBlockingRuleStep,
   "blocking-rule-success": BlockingRuleSuccess,
   "view-blocking-rule": ViewBlockingRuleDetails,

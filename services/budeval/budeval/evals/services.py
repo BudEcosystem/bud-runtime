@@ -71,9 +71,14 @@ class EvaluationOpsService:
             }
             logger.info(f"Engine arguments prepared: {engine_args}")
 
+            # Get current namespace from storage config
+            from budeval.commons.storage_config import StorageConfig
+
+            namespace = StorageConfig.get_current_namespace()
+
             # Deploy job with volumes
             logger.info(
-                "Deploying job with volumes - Shared datasets at /workspace/data, Output: 10Gi at /workspace/outputs"
+                f"Deploying job with volumes in namespace {namespace} - Shared datasets at /workspace/data, Output: 10Gi at /workspace/outputs"
             )
             ansible_orchestrator.run_job_with_volumes(
                 runner_type="kubernetes",
@@ -81,7 +86,7 @@ class EvaluationOpsService:
                 kubeconfig=evaluate_model_request.kubeconfig,
                 engine_args=engine_args,
                 docker_image=engine_metadata.docker_image_url,
-                namespace="budeval",
+                namespace=namespace,
                 ttl_seconds=7200,  # 2 hour TTL to allow extraction time
                 output_volume_size="10Gi",  # Testing
             )
@@ -90,7 +95,7 @@ class EvaluationOpsService:
             return {
                 "job_id": job_uuid,
                 "status": "deployed",
-                "namespace": "budeval",
+                "namespace": namespace,
                 "data_volume": f"{job_uuid}-data-pv",
                 "output_volume": f"{job_uuid}-output-pv",
             }
@@ -181,21 +186,26 @@ class EvaluationOpsService:
             logger.info(f"Creating job with UUID: {job_uuid}")
             logger.info(f"Using engine: {job_config.get('engine')}, Docker image: {job_config.get('image')}")
 
+            # Get current namespace from storage config
+            from budeval.commons.storage_config import StorageConfig
+
+            namespace = StorageConfig.get_current_namespace()
+
             # Deploy job with transformed configuration
-            logger.info("Deploying job with transformed configuration and volumes")
+            logger.info(f"Deploying job with transformed configuration and volumes in namespace {namespace}")
             ansible_orchestrator.run_job_with_generic_config(
                 runner_type="kubernetes",
                 uuid=job_uuid,
                 kubeconfig=evaluate_model_request.kubeconfig,
                 job_config=job_config,
-                namespace="budeval",
+                namespace=namespace,
             )
 
             logger.info(f"Successfully deployed evaluation job {job_uuid}")
             return {
                 "job_id": job_uuid,
                 "status": "deployed",
-                "namespace": "budeval",
+                "namespace": namespace,
                 "engine": job_config.get("engine"),
                 "output_volume": job_config.get("output_volume", {}).get("claimName"),
             }
@@ -205,9 +215,15 @@ class EvaluationOpsService:
             raise e
 
     @classmethod
-    async def get_job_status(cls, job_id: str, kubeconfig: Optional[str], namespace: str = "budeval") -> dict:
+    async def get_job_status(cls, job_id: str, kubeconfig: Optional[str], namespace: Optional[str] = None) -> dict:
         """Get the status of a deployed evaluation job."""
         logger.info(f"Getting status for job: {job_id}")
+
+        # Get current namespace if not provided
+        if namespace is None:
+            from budeval.commons.storage_config import StorageConfig
+
+            namespace = StorageConfig.get_current_namespace()
 
         try:
             from budeval.registry.orchestrator.ansible_orchestrator import AnsibleOrchestrator
@@ -230,9 +246,15 @@ class EvaluationOpsService:
             return {"job_id": job_id, "status": "error", "error": str(e)}
 
     @classmethod
-    async def cleanup_job(cls, job_id: str, kubeconfig: Optional[str], namespace: str = "budeval") -> dict:
+    async def cleanup_job(cls, job_id: str, kubeconfig: Optional[str], namespace: Optional[str] = None) -> dict:
         """Clean up a deployed evaluation job and its resources."""
         logger.info(f"Cleaning up job: {job_id}")
+
+        # Get current namespace if not provided
+        if namespace is None:
+            from budeval.commons.storage_config import StorageConfig
+
+            namespace = StorageConfig.get_current_namespace()
 
         try:
             from budeval.registry.orchestrator.ansible_orchestrator import AnsibleOrchestrator

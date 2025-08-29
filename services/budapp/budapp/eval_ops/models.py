@@ -145,6 +145,10 @@ class ExpDataset(Base, TimestampMixin):
         JSONB, nullable=True
     )  # {"advantages": ["str1"], "disadvantages": ["str2"]}
 
+    eval_types: Mapped[dict] = mapped_column(
+        JSONB, nullable=True
+    )  # Stores evaluation type configurations like {"gen": "demo_gsm8k_chat_gen", "ppl": "config_name"}
+
     # Relationships
     versions = relationship("ExpDatasetVersion", back_populates="dataset", cascade="all, delete-orphan")
     traits = relationship("ExpTrait", secondary="exp_traits_dataset_pivot", back_populates="datasets", lazy="select")
