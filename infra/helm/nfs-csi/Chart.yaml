@@ -1,0 +1,17 @@
+apiVersion: v2
+
+name: nfs-csi
+description: NFS StorageClass for Bud
+type: application
+version: 0.1.0
+
+maintainers:
+  - name: "sinanmohd"
+    email: "sinan@sinanmohd.com"
+    url: "https://www.sinanmohd.com"
+
+dependencies:
+  - name: csi-driver-nfs
+    version: 4.11.0
+    repository: https://raw.githubusercontent.com/kubernetes-csi/csi-driver-nfs/master/charts
+    condition: csi-driver-nfs.enabled
