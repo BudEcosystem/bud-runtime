@@ -76,16 +76,8 @@ class TestDynamicMaxModelLen:
 
         # We need to patch asyncio.run to capture the actual values
         with patch("budcluster.deployment.handler.asyncio.run") as mock_run:
-            captured_values = {}
-
-            def capture_values(coro):
-                # If it's the deploy_runtime call, capture the values
-                if hasattr(coro, "__name__") and "deploy_runtime" in str(coro):
-                    # This is a simplified approach - in real scenario we'd extract from coro
-                    return True, "http://test-url"
-                return True
-
-            mock_run.side_effect = capture_values
+            # The first call is apply_security_context, the second is deploy_runtime
+            mock_run.side_effect = [True, (True, "http://test-url")]
 
             # Execute deployment
             status, namespace, url, nodes, node_list_result = deployment_handler.deploy(

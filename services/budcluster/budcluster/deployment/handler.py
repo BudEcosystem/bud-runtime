@@ -177,9 +177,9 @@ class DeploymentHandler:
 
         max_loras = 1 if not adapters else max(1, len(adapters))
 
-        for node in node_list:
+        for idx, node in enumerate(node_list):
             node_values = {"name": node["name"], "devices": []}
-            for device in node["devices"]:
+            for dev_idx, device in enumerate(node["devices"]):
                 if not all(key in device for key in ("image", "replica", "memory", "type", "tp_size", "concurrency")):
                     raise ValueError(f"Device configuration is missing required keys: {device}")
                 device["args"]["port"] = app_settings.engine_container_port
@@ -193,8 +193,13 @@ class DeploymentHandler:
 
                 # Calculate max_model_len dynamically
                 if input_tokens and output_tokens:
-                    max_model_len = input_tokens + output_tokens
+                    max_model_len = int((input_tokens + output_tokens) * 1.1)  # Add 10% safety margin
                     device["args"].append(f"--max-model-len={max_model_len}")
+                else:
+                    device["args"].append("--max-model-len=8192")  # Default fallback
+
+                # Update the full_node_list with the modified args
+                full_node_list[idx]["devices"][dev_idx]["args"] = device["args"].copy()
 
                 thread_bind, core_count = self._get_cpu_affinity(device["tp_size"])
                 device["envs"]["VLLM_CPU_OMP_THREADS_BIND"] = thread_bind

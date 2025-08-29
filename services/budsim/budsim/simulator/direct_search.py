@@ -198,62 +198,42 @@ class DirectSearchOptimizer:
         return self._check_memory_requirements(tp_size, pp_size, concurrency)
 
     def _check_memory_requirements(self, tp_size: int, pp_size: int, concurrency: int) -> bool:
-        """Check if configuration fits in memory."""
-        device_config = self.device_config.copy()
-        # Clean device config for ModelAnalysis
-        for field in [
-            "cluster_id",
-            "node_id",
-            "node_name",
-            "node_devices",
-            "device_id",
-            "device_type",
-            "node_distribution",
-            "max_devices_per_node",
-            "cluster_topology",
-            "devices_by_node",
-            "total_devices",
-            "total_nodes_with_device",
-        ]:
-            device_config.pop(field, None)
-
+        """Check if configuration fits in memory using HeuristicCalculator."""
         try:
-            model_analysis = ModelAnalysis(
-                model=self.model,
-                device_config=device_config,
-                input_tokens=self.input_tokens,
-                output_tokens=self.output_tokens,
-                concurrency=concurrency,
-                tp_size=tp_size,
-                pp_size=pp_size,
-            )
+            # Initialize HeuristicCalculator if not already done
+            if not hasattr(self, "_heuristic_calc"):
+                self._heuristic_calc = HeuristicCalculator()
 
-            # Get total memory requirement
-            total_memory_gb = model_analysis.get_total_memory_requirement(bits=16)
-            if total_memory_gb is None:
-                return False
+            # Prepare model_params for validate_memory_requirements
+            model_params = {
+                "model": self.model,
+                "mean_input_tokens": self.input_tokens,
+                "mean_output_tokens": self.output_tokens,
+                "concurrent_requests": concurrency,
+                "tensor_parallel_size": tp_size,
+                "pipeline_parallel_size": pp_size,
+                "memory_in_GB": (
+                    self.device_config.get("mem_per_gpu_in_gb")
+                    or self.device_config.get("mem_per_GPU_in_GB")
+                    or self.device_config.get("memory")
+                    or self.device_config.get("memory_gb")
+                    or self.device_config.get("gpu_memory_gb")
+                ),
+                "quantization_bits": 16,  # Default to 16-bit
+            }
 
-            # Check per-device memory - try various field names
-            device_memory_gb = (
-                self.device_config.get("mem_per_gpu_in_gb")
-                or self.device_config.get("mem_per_GPU_in_GB")
-                or self.device_config.get("memory")
-                or self.device_config.get("memory_gb")
-                or self.device_config.get("gpu_memory_gb")
-                or 0
-            )
+            # Validate memory requirements
+            validation_result = self._heuristic_calc.validate_memory_requirements(model_params)
 
-            if device_memory_gb == 0:
-                return False
-
-            usable_memory_gb = device_memory_gb * 0.95  # 95% usable
-            memory_per_device = total_memory_gb  # Already per-device from get_total_memory_requirement()
-
-            fits = memory_per_device <= usable_memory_gb
+            fits = validation_result["valid"]
             logger.debug(
-                f"Memory check TP={tp_size}: memory_per_device={memory_per_device:.2f}GB, usable_memory={usable_memory_gb:.2f}GB, fits={fits}"
+                f"Memory check TP={tp_size}, PP={pp_size}, concurrency={concurrency}: "
+                f"required={validation_result['total_memory_gb']:.2f}GB, "
+                f"available={validation_result['available_memory_gb']:.2f}GB, "
+                f"fits={fits}, message={validation_result['message']}"
             )
             return fits
+
         except Exception as e:
             logger.debug(f"Memory check failed for TP={tp_size}, PP={pp_size}, concurrency={concurrency}: {e}")
             return False
