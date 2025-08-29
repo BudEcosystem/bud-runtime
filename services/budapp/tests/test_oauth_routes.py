@@ -145,11 +145,11 @@ class TestOAuthSecureCallbackRoute:
         with patch('budapp.auth.oauth_services.OAuthService') as mock_service, \
              patch('budapp.auth.token_exchange_service.TokenExchangeService') as mock_exchange, \
              patch('budapp.user_ops.crud.UserDataManager') as mock_user_manager:
-            
+
             # Mock OAuth service
             mock_oauth_instance = AsyncMock()
             mock_service.return_value = mock_oauth_instance
-            
+
             # Mock handle_oauth_callback to return a token response
             mock_oauth_instance.handle_oauth_callback.return_value = AsyncMock(
                 access_token="test-token",
@@ -165,7 +165,7 @@ class TestOAuthSecureCallbackRoute:
                 is_new_user=True,
                 requires_linking=False,
             )
-            
+
             # Mock UserDataManager to return a user when looking up by email
             mock_user = AsyncMock()
             mock_user.id = uuid4()
@@ -173,7 +173,7 @@ class TestOAuthSecureCallbackRoute:
             mock_user_manager_instance = AsyncMock()
             mock_user_manager.return_value = mock_user_manager_instance
             mock_user_manager_instance.retrieve_by_fields.return_value = mock_user
-            
+
             # Mock token exchange service
             mock_exchange_instance = AsyncMock()
             mock_exchange.return_value = mock_exchange_instance

@@ -211,8 +211,13 @@ class TestOAuthCallback:
                  "refresh_token": "test-refresh",
                  "expires_in": 3600,
              }), \
-             patch.object(oauth_service.keycloak_manager, 'create_user', return_value=str(uuid4())), \
-             patch.object(oauth_service.keycloak_manager, 'link_provider_account', return_value=True):
+             patch.object(oauth_service.keycloak_manager, 'create_user_with_permissions', return_value=str(uuid4())), \
+             patch('budapp.auth.oauth_services.UserOnboardingService') as mock_onboarding:
+
+            # Mock onboarding service
+            mock_onboarding_instance = AsyncMock()
+            mock_onboarding.return_value = mock_onboarding_instance
+            mock_onboarding_instance.setup_new_client_user = AsyncMock()
 
             request = OAuthCallbackRequest(
                 code="test-code",
