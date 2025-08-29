@@ -235,7 +235,7 @@ const UsageChart: React.FC<UsageChartProps> = ({
           />
           <Tooltip
             content={<CustomTooltip />}
-            cursor={{ fill: "rgba(124, 58, 237, 0.05)", radius: [3, 3, 0, 0] }}
+            cursor={{ fill: "rgba(124, 58, 237, 0.05)", radius: 3 }}
             wrapperStyle={{ outline: "none" }}
             isAnimationActive={false}
           />
