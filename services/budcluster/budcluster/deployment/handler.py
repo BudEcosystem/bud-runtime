@@ -187,12 +187,6 @@ class DeploymentHandler:
                 device["args"]["max-loras"] = max_loras
                 device["args"]["max-lora-rank"] = 256
 
-                # # Remove scheduler-delay-factor and chunked-prefill-enabled from args
-                # device["args"] = {
-                #     k: v
-                #     for k, v in device["args"].items()
-                #     if k not in ["scheduler-delay-factor", "enable-chunked-prefill"]
-                # }
                 device["args"] = self._prepare_args(device["args"])
                 device["args"].append(f"--served-model-name={namespace}")
                 device["args"].append("--enable-lora")
@@ -200,12 +194,7 @@ class DeploymentHandler:
                 # Calculate max_model_len dynamically
                 if input_tokens and output_tokens:
                     max_model_len = input_tokens + output_tokens
-                    # Add 10% safety margin for overhead
-                    max_model_len = int(max_model_len * 1.1)
-                else:
-                    max_model_len = 8192  # Fallback to default
-
-                device["args"].append(f"--max-model-len={max_model_len}")
+                    device["args"].append(f"--max-model-len={max_model_len}")
 
                 thread_bind, core_count = self._get_cpu_affinity(device["tp_size"])
                 device["envs"]["VLLM_CPU_OMP_THREADS_BIND"] = thread_bind
