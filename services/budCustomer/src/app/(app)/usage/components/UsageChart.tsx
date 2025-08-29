@@ -58,10 +58,10 @@ const UsageChart: React.FC<UsageChartProps> = ({
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload[0]) {
       // The label contains the original date from the data
-      const fullDate = payload[0].payload.date 
+      const fullDate = payload[0].payload.date
         ? dayjs(payload[0].payload.date).utc().format("MMM D, YYYY [UTC]")
         : label;
-      
+
       // Show different content based on whether there's data
       if (payload[0].payload.hasData === false) {
         return (
@@ -71,7 +71,7 @@ const UsageChart: React.FC<UsageChartProps> = ({
           </div>
         );
       }
-      
+
       return (
         <div className={styles.customTooltip}>
           <p className={styles.label}>{fullDate}</p>
@@ -95,11 +95,11 @@ const UsageChart: React.FC<UsageChartProps> = ({
     const barWidth = width * 0.8; // 80% of allocated width for bar
     const barX = x + (width - barWidth) / 2; // Center the bar
     const baselineY = y + height; // Bottom position
-    
+
     // Check if light theme
     const isLightTheme = document.documentElement.getAttribute('data-theme') === 'light';
     const baselineColor = isLightTheme ? '#d1d5db' : '#4a4a4a';
-    
+
     return (
       <g>
         {/* Baseline segment with gap */}
@@ -198,10 +198,10 @@ const UsageChart: React.FC<UsageChartProps> = ({
             horizontal={false}
           />
           {/* Top reference line with label */}
-          <ReferenceLine 
-            y={maxValue} 
-            stroke="#7c3aed" 
-            strokeDasharray="2 2" 
+          <ReferenceLine
+            y={maxValue}
+            stroke="#7c3aed"
+            strokeDasharray="2 2"
             strokeWidth={1}
             opacity={0.5}
             label={{
@@ -227,14 +227,14 @@ const UsageChart: React.FC<UsageChartProps> = ({
             axisLine={false}
             tickLine={false}
             width={45}
-            tickFormatter={(value) => {
+            tickFormatter={(value: number) => {
               if (type === "spend") return `$${value}`;
               if (value >= 1000) return `${(value / 1000).toFixed(0)}k`;
-              return value;
+              return value.toString();
             }}
           />
-          <Tooltip 
-            content={<CustomTooltip />} 
+          <Tooltip
+            content={<CustomTooltip />}
             cursor={{ fill: "rgba(124, 58, 237, 0.05)", radius: [3, 3, 0, 0] }}
             wrapperStyle={{ outline: "none" }}
             isAnimationActive={false}

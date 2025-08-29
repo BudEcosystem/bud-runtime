@@ -112,7 +112,7 @@ export default function UsagePage() {
       setIsLoading(true);
       const response = await AppRequest.Get("/billing/current");
       setBillingPlan(response.data.result);
-      
+
       // Calculate metrics with proper values
       const currentMetrics = response.data.result.usage;
       setMetrics({
@@ -149,20 +149,20 @@ export default function UsagePage() {
       const response = await AppRequest.Post("/billing/history", params);
       const data = response.data.result.data || [];
       setUsageData(data);
-      
+
       // Generate complete date range
       const allDates = generateDateRange(
-        params.start_date.split(' ')[0], 
+        params.start_date.split(' ')[0],
         params.end_date.split(' ')[0]
       );
-      
+
       // Create a map of existing data
       const dataMap = new Map();
       data.forEach((item: UsageData) => {
         const dateKey = dayjs(item.date).format('YYYY-MM-DD');
         dataMap.set(dateKey, item);
       });
-      
+
       // Fill in missing dates with zero values
       const completeData = allDates.map(date => {
         const existingData = dataMap.get(date);
@@ -186,7 +186,7 @@ export default function UsagePage() {
           };
         }
       });
-      
+
       setChartData(completeData);
     } catch (error) {
       console.error("Failed to fetch usage data:", error);
@@ -370,7 +370,7 @@ export default function UsagePage() {
                   : 0
               }
             />
-            
+
             {/* Current Plan Section */}
             <div className={styles.planSection}>
               <div className={styles.sectionHeader}>

@@ -4,12 +4,12 @@
   border-radius: 8px;
   padding: 1rem 1.25rem;
   margin-bottom: 1rem;
-  
+
   // Chart reference lines styling
   :global(.recharts-reference-line-line) {
     stroke-opacity: 0.4;
   }
-  
+
   :global(.recharts-reference-line-label) {
     fill-opacity: 0.6;
   }
@@ -121,14 +121,14 @@
   .chartContainer {
     background: #ffffff;
     border-color: #e5e7eb;
-    
+
     .chartHeader {
       .chartInfo {
         .chartLegend {
           .legendText {
             color: #6b7280;
           }
-          
+
           .legendValue {
             color: #111827;
             border-left-color: #e5e7eb;
@@ -136,7 +136,7 @@
         }
       }
     }
-    
+
     :global(.recharts-reference-line-line) {
       &[stroke*="purple"] {
         stroke: #7c3aed;
@@ -145,7 +145,7 @@
         stroke: #e5e7eb;
       }
     }
-    
+
     :global(.recharts-reference-line-label) {
       fill: #7c3aed;
     }
@@ -154,15 +154,15 @@
       background: #ffffff;
       border-color: #d1d5db;
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
-      
+
       .label {
         color: #6b7280;
       }
-      
+
       .value {
         color: #111827;
       }
-      
+
       .noDataText {
         color: #9ca3af;
       }

@@ -78,11 +78,11 @@
         font-size: 12px;
         padding: 0.25rem 0.5rem;
         border-radius: 6px;
-        
+
         &.positive {
           color: var(--color-success);
           background: rgba(71, 157, 95, 0.1);
-          
+
           .trendIcon {
             color: var(--color-success);
           }
@@ -91,7 +91,7 @@
         &.negative {
           color: var(--color-error);
           background: rgba(239, 68, 68, 0.1);
-          
+
           .trendIcon {
             color: var(--color-error);
           }

@@ -51,7 +51,7 @@
         background: transparent;
         border-bottom: 1px solid var(--border-color);
         padding: 12px 16px;
-        
+
         &::before {
           display: none;
         }
@@ -90,7 +90,7 @@
       .ant-pagination-item {
         background: transparent;
         border-color: var(--border-color);
-        
+
         a {
           color: var(--text-primary);
         }
@@ -98,7 +98,7 @@
         &-active {
           background: var(--color-purple);
           border-color: var(--color-purple);
-          
+
           a {
             color: white;
           }
@@ -162,7 +162,7 @@
       :global {
         .ant-pagination-item {
           border-color: #e5e7eb;
-          
+
           a {
             color: #111827;
           }

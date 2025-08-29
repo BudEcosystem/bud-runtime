@@ -48,20 +48,20 @@ const MetricCard: React.FC<MetricCardProps> = ({
               <Icon icon={icon} className={styles.icon} />
             )}
           </div>
-          
+
           <div className={styles.valueContainer}>
             <span className={styles.value}>{value}</span>
             {trend !== undefined && trend !== 0 && (
               <div className={`${styles.trend} ${trend > 0 ? styles.positive : styles.negative}`}>
-                <Icon 
-                  icon={trend > 0 ? "ph:trend-up" : "ph:trend-down"} 
+                <Icon
+                  icon={trend > 0 ? "ph:trend-up" : "ph:trend-down"}
                   className={styles.trendIcon}
                 />
                 <span>{Math.abs(trend).toFixed(1)}%</span>
               </div>
             )}
           </div>
-          
+
           {subtitle && (
             <span className={styles.subtitle}>{subtitle}</span>
           )}
