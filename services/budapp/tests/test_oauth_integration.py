@@ -216,7 +216,7 @@ class TestOAuthCallback:
                  "refresh_token": "test-refresh",
                  "expires_in": 3600,
              }):
-            
+
             # Mock UserDataManager for tenant and tenant_client retrieval
             mock_user_manager_instance = AsyncMock()
             mock_user_manager.return_value = mock_user_manager_instance
@@ -225,7 +225,7 @@ class TestOAuthCallback:
                 test_tenant,  # First call: retrieve Tenant
                 mock_tenant_client,  # Second call: retrieve TenantClient
             ])
-            
+
             # Mock user creation
             new_user = Mock()
             new_user.id = uuid4()
@@ -293,7 +293,7 @@ class TestOAuthCallback:
                  "refresh_token": "test-refresh",
                  "expires_in": 3600,
              }):
-            
+
             # Mock UserDataManager for tenant and tenant_client retrieval
             mock_user_manager_instance = AsyncMock()
             mock_user_manager.return_value = mock_user_manager_instance
@@ -326,7 +326,7 @@ class TestOAuthCallback:
             mock_user_manager_instance = AsyncMock()
             mock_user_manager.return_value = mock_user_manager_instance
             mock_user_manager_instance.retrieve_by_fields = AsyncMock(return_value=None)
-            
+
             request = OAuthCallbackRequest(
                 code="test-code",
                 state="invalid-state",
@@ -347,12 +347,13 @@ class TestOAuthCallback:
         """Test OAuth callback with expired session."""
         # Create expired OAuth session
         state = secrets.token_urlsafe(32)
+        expired_time = datetime.now(UTC) - timedelta(minutes=1)
         oauth_session = OAuthSession(
             provider=OAuthProviderEnum.GOOGLE.value,
             state=state,
             tenant_id=test_tenant.id,
-            expires_at=datetime.now(UTC) - timedelta(minutes=1),  # Expired
-            completed=False,
+            expires_at=expired_time,  # Expired
+            completed=False,  # Explicitly not completed
         )
         mock_session.add(oauth_session)
         mock_session.commit()
@@ -361,8 +362,24 @@ class TestOAuthCallback:
             # Mock UserDataManager to return the expired session
             mock_user_manager_instance = AsyncMock()
             mock_user_manager.return_value = mock_user_manager_instance
-            mock_user_manager_instance.retrieve_by_fields = AsyncMock(return_value=oauth_session)
-            
+
+            # Create a fresh copy of the session for each call to avoid state mutation
+            def return_expired_session(*args, **kwargs):
+                # Return the expired session only for OAuthSession queries
+                if args and args[0] == OAuthSession:
+                    # Create a fresh session object to avoid state mutation
+                    fresh_session = OAuthSession(
+                        provider=OAuthProviderEnum.GOOGLE.value,
+                        state=state,
+                        tenant_id=test_tenant.id,
+                        expires_at=expired_time,
+                        completed=False,
+                    )
+                    return fresh_session
+                return None
+
+            mock_user_manager_instance.retrieve_by_fields = AsyncMock(side_effect=return_expired_session)
+
             request = OAuthCallbackRequest(
                 code="test-code",
                 state=state,
@@ -408,7 +425,7 @@ class TestOAuthCallback:
              patch.object(oauth_service, '_get_user_info_from_provider', return_value=mock_user_info), \
              patch.object(oauth_service, '_find_existing_user', return_value=None), \
              patch.object(oauth_service, '_get_tenant_oauth_config', return_value=test_oauth_config):
-            
+
             # Mock UserDataManager for tenant and tenant_client retrieval
             mock_user_manager_instance = AsyncMock()
             mock_user_manager.return_value = mock_user_manager_instance
@@ -417,7 +434,7 @@ class TestOAuthCallback:
                 test_tenant,  # First call: retrieve Tenant
                 mock_tenant_client,  # Second call: retrieve TenantClient
             ])
-            
+
             request = OAuthCallbackRequest(
                 code="test-code",
                 state=state,
