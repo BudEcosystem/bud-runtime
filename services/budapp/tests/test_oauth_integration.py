@@ -205,19 +205,32 @@ class TestOAuthCallback:
             email_verified=True,
         )
 
-        with patch.object(oauth_service, '_get_user_info_from_provider', return_value=mock_user_info), \
+        with patch.object(oauth_service, '_validate_oauth_session', return_value=oauth_session), \
+             patch('budapp.user_ops.crud.UserDataManager') as mock_user_manager, \
+             patch.object(oauth_service, '_get_user_info_from_provider', return_value=mock_user_info), \
+             patch.object(oauth_service, '_find_existing_user', return_value=None), \
+             patch.object(oauth_service, '_get_tenant_oauth_config', return_value=test_oauth_config), \
+             patch.object(oauth_service, '_create_user_from_oauth') as mock_create_user, \
              patch.object(oauth_service, '_generate_tokens_for_user', return_value={
                  "access_token": "test-token",
                  "refresh_token": "test-refresh",
                  "expires_in": 3600,
-             }), \
-             patch.object(oauth_service.keycloak_manager, 'create_user_with_permissions', return_value=str(uuid4())), \
-             patch('budapp.auth.oauth_services.UserOnboardingService') as mock_onboarding:
-
-            # Mock onboarding service
-            mock_onboarding_instance = AsyncMock()
-            mock_onboarding.return_value = mock_onboarding_instance
-            mock_onboarding_instance.setup_new_client_user = AsyncMock()
+             }):
+            
+            # Mock UserDataManager for tenant and tenant_client retrieval
+            mock_user_manager_instance = AsyncMock()
+            mock_user_manager.return_value = mock_user_manager_instance
+            mock_tenant_client = Mock(client_id="test-client-id")
+            mock_user_manager_instance.retrieve_by_fields = AsyncMock(side_effect=[
+                test_tenant,  # First call: retrieve Tenant
+                mock_tenant_client,  # Second call: retrieve TenantClient
+            ])
+            
+            # Mock user creation
+            new_user = Mock()
+            new_user.id = uuid4()
+            new_user.email = "newuser@example.com"
+            mock_create_user.return_value = new_user
 
             request = OAuthCallbackRequest(
                 code="test-code",
@@ -270,12 +283,25 @@ class TestOAuthCallback:
             email_verified=True,
         )
 
-        with patch.object(oauth_service, '_get_user_info_from_provider', return_value=mock_user_info), \
+        with patch.object(oauth_service, '_validate_oauth_session', return_value=oauth_session), \
+             patch('budapp.user_ops.crud.UserDataManager') as mock_user_manager, \
+             patch.object(oauth_service, '_get_user_info_from_provider', return_value=mock_user_info), \
+             patch.object(oauth_service, '_find_existing_user', return_value=existing_user), \
+             patch.object(oauth_service, '_update_user_oauth_provider') as mock_update, \
              patch.object(oauth_service, '_generate_tokens_for_user', return_value={
                  "access_token": "test-token",
                  "refresh_token": "test-refresh",
                  "expires_in": 3600,
              }):
+            
+            # Mock UserDataManager for tenant and tenant_client retrieval
+            mock_user_manager_instance = AsyncMock()
+            mock_user_manager.return_value = mock_user_manager_instance
+            mock_tenant_client = Mock(client_id="test-client-id")
+            mock_user_manager_instance.retrieve_by_fields = AsyncMock(side_effect=[
+                test_tenant,  # First call: retrieve Tenant
+                mock_tenant_client,  # Second call: retrieve TenantClient
+            ])
 
             request = OAuthCallbackRequest(
                 code="test-code",
@@ -295,15 +321,21 @@ class TestOAuthCallback:
         mock_session,
     ):
         """Test OAuth callback with invalid state."""
-        request = OAuthCallbackRequest(
-            code="test-code",
-            state="invalid-state",
-        )
+        with patch('budapp.user_ops.crud.UserDataManager') as mock_user_manager:
+            # Mock UserDataManager to return None for invalid state
+            mock_user_manager_instance = AsyncMock()
+            mock_user_manager.return_value = mock_user_manager_instance
+            mock_user_manager_instance.retrieve_by_fields = AsyncMock(return_value=None)
+            
+            request = OAuthCallbackRequest(
+                code="test-code",
+                state="invalid-state",
+            )
 
-        with pytest.raises(OAuthError) as exc_info:
-            await oauth_service.handle_oauth_callback(request)
+            with pytest.raises(OAuthError) as exc_info:
+                await oauth_service.handle_oauth_callback(request)
 
-        assert exc_info.value.code == OAuthErrorCode.INVALID_STATE
+            assert exc_info.value.code == OAuthErrorCode.INVALID_STATE
 
     @pytest.mark.asyncio
     async def test_handle_oauth_callback_expired_session(
@@ -325,15 +357,21 @@ class TestOAuthCallback:
         mock_session.add(oauth_session)
         mock_session.commit()
 
-        request = OAuthCallbackRequest(
-            code="test-code",
-            state=state,
-        )
+        with patch('budapp.user_ops.crud.UserDataManager') as mock_user_manager:
+            # Mock UserDataManager to return the expired session
+            mock_user_manager_instance = AsyncMock()
+            mock_user_manager.return_value = mock_user_manager_instance
+            mock_user_manager_instance.retrieve_by_fields = AsyncMock(return_value=oauth_session)
+            
+            request = OAuthCallbackRequest(
+                code="test-code",
+                state=state,
+            )
 
-        with pytest.raises(OAuthError) as exc_info:
-            await oauth_service.handle_oauth_callback(request)
+            with pytest.raises(OAuthError) as exc_info:
+                await oauth_service.handle_oauth_callback(request)
 
-        assert exc_info.value.code == OAuthErrorCode.STATE_EXPIRED
+            assert exc_info.value.code == OAuthErrorCode.STATE_EXPIRED
 
     @pytest.mark.asyncio
     async def test_handle_oauth_callback_domain_not_allowed(
@@ -365,7 +403,21 @@ class TestOAuthCallback:
             email_verified=True,
         )
 
-        with patch.object(oauth_service, '_get_user_info_from_provider', return_value=mock_user_info):
+        with patch.object(oauth_service, '_validate_oauth_session', return_value=oauth_session), \
+             patch('budapp.user_ops.crud.UserDataManager') as mock_user_manager, \
+             patch.object(oauth_service, '_get_user_info_from_provider', return_value=mock_user_info), \
+             patch.object(oauth_service, '_find_existing_user', return_value=None), \
+             patch.object(oauth_service, '_get_tenant_oauth_config', return_value=test_oauth_config):
+            
+            # Mock UserDataManager for tenant and tenant_client retrieval
+            mock_user_manager_instance = AsyncMock()
+            mock_user_manager.return_value = mock_user_manager_instance
+            mock_tenant_client = Mock(client_id="test-client-id")
+            mock_user_manager_instance.retrieve_by_fields = AsyncMock(side_effect=[
+                test_tenant,  # First call: retrieve Tenant
+                mock_tenant_client,  # Second call: retrieve TenantClient
+            ])
+            
             request = OAuthCallbackRequest(
                 code="test-code",
                 state=state,
