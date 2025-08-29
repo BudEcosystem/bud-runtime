@@ -1,0 +1,4 @@
+nfsServer: 10.177.2.69
+
+csi-driver-nfs:
+  enabled: true

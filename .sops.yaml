@@ -1,40 +1,45 @@
 keys:
   # people
-  - &sinan  age1q5sfy74d53n6jxlgsc2zrsz4wcl9d830nxuagc3wfmdkrrp55ckq9ev6nv
-  - &ditto  age18xn7rqxu27kschgqs7u5x7af9evnpcp4sru34th6zhhwlwnwycpsajeeh9
-  - &adarsh age1h32pss4dc5qjzl8rqutmt647mfsy5t2szawkp8y473lnjwpm7uqs9q042c
+  - &admin_sinan  age1q5sfy74d53n6jxlgsc2zrsz4wcl9d830nxuagc3wfmdkrrp55ckq9ev6nv
+  - &admin_ditto  age18xn7rqxu27kschgqs7u5x7af9evnpcp4sru34th6zhhwlwnwycpsajeeh9
+  - &admin_adarsh age1h32pss4dc5qjzl8rqutmt647mfsy5t2szawkp8y473lnjwpm7uqs9q042c
   # machines
-  - &runner age1ueq3k22vcfet3y0uqu7wu385wd0pwx5nslqp2z30v4e3zf9stpesx7wjxr
-  - &budk8s age138ut93gvvwkaudl3wxtwn8z9e50ptuhe2yukg6vhwcgncxpplpsqtmhp7t
+  - &server_github_runner age1ueq3k22vcfet3y0uqu7wu385wd0pwx5nslqp2z30v4e3zf9stpesx7wjxr
+  - &server_budk8s_primary age138ut93gvvwkaudl3wxtwn8z9e50ptuhe2yukg6vhwcgncxpplpsqtmhp7t
+  - &server_budk8s_ingress age1v9papxpyyccg3esyzjsd7h0nwje0vry9ns29mh4njmlgylmyedzqr6a9gd
 
 creation_rules:
-  - path_regex: nix/nixos/master/.*
-    age: >-
-      age1q5sfy74d53n6jxlgsc2zrsz4wcl9d830nxuagc3wfmdkrrp55ckq9ev6nv,
-      age18xn7rqxu27kschgqs7u5x7af9evnpcp4sru34th6zhhwlwnwycpsajeeh9,
-      age138ut93gvvwkaudl3wxtwn8z9e50ptuhe2yukg6vhwcgncxpplpsqtmhp7t,
-      age1h32pss4dc5qjzl8rqutmt647mfsy5t2szawkp8y473lnjwpm7uqs9q042c
-  - path_regex: infra/helm/.*
-    age: >-
-      age1q5sfy74d53n6jxlgsc2zrsz4wcl9d830nxuagc3wfmdkrrp55ckq9ev6nv,
-      age18xn7rqxu27kschgqs7u5x7af9evnpcp4sru34th6zhhwlwnwycpsajeeh9,
-      age138ut93gvvwkaudl3wxtwn8z9e50ptuhe2yukg6vhwcgncxpplpsqtmhp7t,
-      age1h32pss4dc5qjzl8rqutmt647mfsy5t2szawkp8y473lnjwpm7uqs9q042c
-  - path_regex: infra/terraform/.*
-    age: >-
-      age1q5sfy74d53n6jxlgsc2zrsz4wcl9d830nxuagc3wfmdkrrp55ckq9ev6nv,
-      age18xn7rqxu27kschgqs7u5x7af9evnpcp4sru34th6zhhwlwnwycpsajeeh9,
-      age138ut93gvvwkaudl3wxtwn8z9e50ptuhe2yukg6vhwcgncxpplpsqtmhp7t,
-      age1h32pss4dc5qjzl8rqutmt647mfsy5t2szawkp8y473lnjwpm7uqs9q042c
+  # server_budk8s_primary
+  - path_regex: (infra/nixos/primary|infra/helm|infra/tofu)/.*
+    key_groups:
+      - age:
+        - *admin_sinan
+        - *admin_ditto
+        - *admin_adarsh
+        - *server_budk8s_primary
 
+  # server_budk8s_*
+  - path_regex: infra/nixos/budk8s/.*
+    key_groups:
+      - age:
+        - *admin_sinan
+        - *admin_ditto
+        - *admin_adarsh
+        - *server_budk8s_primary
+        - *server_budk8s_ingress
+
+  # server_github_runner
   - path_regex: nix/workflows/dockerhub_budcustomer/secrets.yaml
-    age: >-
-      age1q5sfy74d53n6jxlgsc2zrsz4wcl9d830nxuagc3wfmdkrrp55ckq9ev6nv,
-      age18xn7rqxu27kschgqs7u5x7af9evnpcp4sru34th6zhhwlwnwycpsajeeh9,
-      age1ueq3k22vcfet3y0uqu7wu385wd0pwx5nslqp2z30v4e3zf9stpesx7wjxr,
-      age1h32pss4dc5qjzl8rqutmt647mfsy5t2szawkp8y473lnjwpm7uqs9q042c
+    key_groups:
+      - age:
+        - *admin_sinan
+        - *admin_ditto
+        - *admin_adarsh
+        - *server_github_runner
 
-  - age: >-
-      age1q5sfy74d53n6jxlgsc2zrsz4wcl9d830nxuagc3wfmdkrrp55ckq9ev6nv,
-      age18xn7rqxu27kschgqs7u5x7af9evnpcp4sru34th6zhhwlwnwycpsajeeh9,
-      age1h32pss4dc5qjzl8rqutmt647mfsy5t2szawkp8y473lnjwpm7uqs9q042c
+  # default
+  - key_groups:
+      - age:
+        - *admin_sinan
+        - *admin_ditto
+        - *admin_adarsh
