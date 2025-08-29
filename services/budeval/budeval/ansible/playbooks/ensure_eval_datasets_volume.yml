@@ -10,7 +10,7 @@
     # Namespace will be provided by extravars from the app
     namespace: "{{ namespace }}"
     # PVC name will be provided by extravars
-    pvc_name: "{{ pvc_name | default('eval-datasets-pvc') }}"
+    pvc_name: "{{ pvc_name | default('panda-budeval-dataset') }}"
     # Dataset URL from environment
     opencompass_dataset_url: "{{ opencompass_dataset_url | default('https://github.com/open-compass/opencompass/releases/download/0.2.2.rc1/OpenCompassData-complete-20240207.zip') }}"
     # Extract filename from URL

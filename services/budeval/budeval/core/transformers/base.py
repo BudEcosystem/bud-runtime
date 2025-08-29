@@ -162,7 +162,7 @@ class BaseTransformer(ABC):
             output_volume={
                 "name": "output",
                 "type": "shared_pvc",
-                "claimName": "eval-datasets-pvc",
+                "claimName": "panda-budeval-dataset",
                 "subPath": f"results/{request.eval_request_id}",
                 "mountPath": "/workspace/outputs",
             },

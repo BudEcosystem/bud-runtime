@@ -1279,6 +1279,188 @@ class ExperimentService:
             page_size=page_size,
         )
 
+    # ------------------------ Experiment Evaluations Methods ------------------------
+
+    async def get_experiment_evaluations(self, experiment_id: uuid.UUID, user_id: uuid.UUID) -> dict:
+        """Get all evaluations for an experiment with model, trait, dataset details and scores.
+
+        Parameters:
+            experiment_id (uuid.UUID): ID of the experiment.
+            user_id (uuid.UUID): ID of the user.
+
+        Returns:
+            dict: Experiment with all evaluations and their details.
+
+        Raises:
+            HTTPException: If experiment not found or access denied.
+        """
+        # Get experiment
+        experiment = self.session.get(ExperimentModel, experiment_id)
+        if not experiment or experiment.created_by != user_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Experiment not found or access denied")
+
+        # Get all runs for the experiment
+        runs = (
+            self.session.query(RunModel)
+            .filter(RunModel.experiment_id == experiment_id, RunModel.status != RunStatusEnum.DELETED.value)
+            .order_by(RunModel.run_index)
+            .all()
+        )
+
+        # Fetch evaluation details for each run
+        evaluations = []
+        evaluation_job_ids = []
+
+        for run in runs:
+            # Get model details
+            model = self.get_model_details(run.model_id)
+
+            # Get traits with datasets
+            traits = self.get_traits_with_datasets_for_run(run.dataset_version_id)
+
+            # Extract evaluation job ID if exists (from config or metrics)
+            eval_job_id = run.config.get("evaluation_job_id") if run.config else None
+            if eval_job_id:
+                evaluation_job_ids.append((run.id, eval_job_id))
+
+            evaluations.append({"run": run, "model": model, "traits": traits, "evaluation_job_id": eval_job_id})
+
+        # Fetch scores from budeval in parallel
+        scores_map = {}
+        if evaluation_job_ids:
+            from budapp.eval_ops.budeval_client import BudEvalClient
+
+            client = BudEvalClient()
+
+            # Create a list of evaluation IDs
+            eval_ids = [job_id for _, job_id in evaluation_job_ids]
+            scores_map = await client.fetch_scores_batch(eval_ids)
+
+        # Build response
+        from budapp.eval_ops.schemas import (
+            DatasetInfo,
+            EvaluationScore,
+            ModelDetail,
+            RunWithEvaluations,
+            TraitWithDatasets,
+        )
+
+        evaluation_results = []
+        for eval_data in evaluations:
+            run = eval_data["run"]
+            eval_job_id = eval_data["evaluation_job_id"]
+
+            # Get scores if available
+            scores = None
+            if eval_job_id and eval_job_id in scores_map:
+                score_data = scores_map[eval_job_id]
+                if score_data:
+                    scores = EvaluationScore(
+                        status="completed" if score_data.get("overall_accuracy") is not None else "running",
+                        overall_accuracy=score_data.get("overall_accuracy"),
+                        datasets=score_data.get("datasets", []),
+                    )
+
+            evaluation_results.append(
+                RunWithEvaluations(
+                    run_id=run.id,
+                    run_index=run.run_index,
+                    status=run.status,
+                    model=eval_data["model"],
+                    traits=eval_data["traits"],
+                    evaluation_job_id=eval_job_id,
+                    scores=scores,
+                    created_at=run.created_at,
+                    updated_at=run.updated_at,
+                )
+            )
+
+        return {"experiment": ExperimentSchema.model_validate(experiment), "evaluations": evaluation_results}
+
+    def get_model_details(self, model_id: uuid.UUID) -> "ModelDetail":
+        """Get detailed model information.
+
+        Parameters:
+            model_id (uuid.UUID): ID of the model.
+
+        Returns:
+            ModelDetail: Model details with deployment information.
+        """
+        from budapp.endpoint_ops.models import Endpoint as EndpointModel
+        from budapp.eval_ops.schemas import ModelDetail
+
+        # Get model from models table
+        model = self.session.query(ModelTable).filter(ModelTable.id == model_id).first()
+        if not model:
+            # Return placeholder if model not found
+            return ModelDetail(id=model_id, name="Unknown Model", deployment_name=None)
+
+        # Try to get deployment name from endpoints
+        endpoint = self.session.query(EndpointModel).filter(EndpointModel.model_id == model_id).first()
+
+        return ModelDetail(id=model.id, name=model.name, deployment_name=endpoint.namespace if endpoint else None)
+
+    def get_traits_with_datasets_for_run(self, dataset_version_id: uuid.UUID) -> List["TraitWithDatasets"]:
+        """Get traits with their datasets for a specific run.
+
+        Parameters:
+            dataset_version_id (uuid.UUID): ID of the dataset version used in the run.
+
+        Returns:
+            List[TraitWithDatasets]: List of traits with their associated datasets.
+        """
+        from budapp.eval_ops.schemas import DatasetInfo, TraitWithDatasets
+
+        # Get the dataset version
+        dataset_version = self.session.get(ExpDatasetVersion, dataset_version_id)
+        if not dataset_version:
+            return []
+
+        # Get the dataset
+        dataset = dataset_version.dataset
+        if not dataset:
+            return []
+
+        # Get traits associated with this dataset through pivot table
+        traits_query = (
+            self.session.query(TraitModel)
+            .join(PivotModel, TraitModel.id == PivotModel.trait_id)
+            .filter(PivotModel.dataset_id == dataset.id)
+            .all()
+        )
+
+        # Build trait with datasets response
+        traits_with_datasets = []
+        for trait in traits_query:
+            # Get all datasets for this trait
+            datasets_for_trait = (
+                self.session.query(DatasetModel)
+                .join(PivotModel, DatasetModel.id == PivotModel.dataset_id)
+                .filter(PivotModel.trait_id == trait.id)
+                .all()
+            )
+
+            # Convert datasets to DatasetInfo
+            dataset_infos = []
+            for ds in datasets_for_trait:
+                # Get the version for this dataset
+                version = self.session.query(ExpDatasetVersion).filter(ExpDatasetVersion.dataset_id == ds.id).first()
+
+                dataset_infos.append(
+                    DatasetInfo(
+                        id=ds.id,
+                        name=ds.name,
+                        version=version.version if version else "1.0",
+                        description=ds.description,
+                    )
+                )
+
+            traits_with_datasets.append(
+                TraitWithDatasets(id=trait.id, name=trait.name, icon=trait.icon, datasets=dataset_infos)
+            )
+
+        return traits_with_datasets
+
 
 class ExperimentWorkflowService:
     """Service layer for Experiment Workflow operations."""
