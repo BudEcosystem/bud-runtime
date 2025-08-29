@@ -18,6 +18,7 @@ from budapp.eval_ops.schemas import (
     DeleteRunResponse,
     EvaluationWorkflowResponse,
     EvaluationWorkflowStepRequest,
+    ExperimentEvaluationsResponse,
     ExperimentWorkflowStepRequest,
     GetDatasetResponse,
     GetExperimentResponse,
@@ -817,3 +818,51 @@ async def get_evaluation_workflow_data(
     except Exception as e:
         logger.debug(f"Failed to get evaluation workflow data: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to get evaluation workflow data") from e
+
+
+@router.get(
+    "/{experiment_id}/evaluations",
+    response_model=ExperimentEvaluationsResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
+    },
+)
+async def get_experiment_evaluations(
+    experiment_id: Annotated[uuid.UUID, Path(..., description="ID of experiment to get evaluations for")],
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+):
+    """Get all evaluations for an experiment with models, traits, datasets, and scores from BudEval.
+
+    This endpoint retrieves comprehensive evaluation data for an experiment including:
+    - All runs with their current status
+    - Model details for each run
+    - Traits with their associated datasets (datasets nested under traits)
+    - Real-time evaluation scores from BudEval service (fetched in parallel)
+
+    The scores are fetched asynchronously from the BudEval service, so running evaluations
+    may not have scores available yet.
+
+    - **experiment_id**: UUID of the experiment to retrieve evaluations for
+    - **session**: Database session dependency
+    - **current_user**: The authenticated user requesting the evaluations
+
+    Returns an `ExperimentEvaluationsResponse` with experiment details and all evaluations.
+    """
+    try:
+        result = await ExperimentService(session).get_experiment_evaluations(experiment_id, current_user.id)
+
+        return ExperimentEvaluationsResponse(
+            code=status.HTTP_200_OK,
+            object="experiment.evaluations",
+            message="Successfully retrieved experiment evaluations",
+            experiment=result["experiment"],
+            evaluations=result["evaluations"],
+        )
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.debug(f"Failed to get experiment evaluations: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to get experiment evaluations") from e

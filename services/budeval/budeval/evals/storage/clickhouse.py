@@ -583,6 +583,64 @@ class ClickHouseStorage(StorageAdapter):
             logger.error(f"Failed to list results: {e}")
             return []
 
+    async def get_evaluation_scores(self, job_id: str) -> Optional[Dict]:
+        """Get evaluation scores for all datasets in a job.
+
+        Args:
+            job_id: Unique identifier for the evaluation job
+
+        Returns:
+            Dictionary with evaluation scores or None if not found
+        """
+        try:
+            async with self.get_connection() as conn, conn.cursor() as cursor:
+                # Get job-level information
+                job_query = """
+                    SELECT job_id, model_name, engine, overall_accuracy
+                    FROM budeval.evaluation_jobs
+                    WHERE job_id = %(job_id)s
+                    """
+                await cursor.execute(job_query, {"job_id": job_id})
+                job_row = await cursor.fetchone()
+
+                if not job_row:
+                    return None
+
+                # Get dataset-level results
+                dataset_query = """
+                    SELECT dataset_name, accuracy, total_examples, correct_examples
+                    FROM budeval.dataset_results
+                    WHERE job_id = %(job_id)s
+                    ORDER BY dataset_name
+                    """
+                await cursor.execute(dataset_query, {"job_id": job_id})
+                dataset_rows = await cursor.fetchall()
+
+                # Build response
+                result = {
+                    "evaluation_id": job_row[0],
+                    "model_name": job_row[1],
+                    "engine": job_row[2],
+                    "overall_accuracy": float(job_row[3]) if job_row[3] else 0.0,
+                    "datasets": [],
+                }
+
+                for row in dataset_rows:
+                    result["datasets"].append(
+                        {
+                            "dataset_name": row[0],
+                            "accuracy": float(row[1]) if row[1] else 0.0,
+                            "total_examples": row[2],
+                            "correct_examples": row[3],
+                        }
+                    )
+
+                return result
+
+        except Exception as e:
+            logger.error(f"Failed to get evaluation scores for job {job_id}: {e}")
+            return None
+
     async def exists(self, job_id: str) -> bool:
         """Check if results exist for a job.
 

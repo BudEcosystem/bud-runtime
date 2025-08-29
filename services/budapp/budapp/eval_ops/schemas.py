@@ -648,6 +648,64 @@ class EvaluationDatasetsData(BaseModel):
     evaluation_config: Optional[dict] = None
 
 
+# ------------------------ Experiment Evaluation Schemas ------------------------
+
+
+class ModelDetail(BaseModel):
+    """Detailed model information for evaluations."""
+
+    id: UUID4 = Field(..., description="Model UUID")
+    name: str = Field(..., description="Model name")
+    deployment_name: Optional[str] = Field(None, description="Deployment name/namespace if deployed")
+
+
+class DatasetInfo(BaseModel):
+    """Basic dataset information."""
+
+    id: UUID4 = Field(..., description="Dataset UUID")
+    name: str = Field(..., description="Dataset name")
+    version: str = Field(..., description="Dataset version")
+    description: Optional[str] = Field(None, description="Dataset description")
+
+
+class TraitWithDatasets(BaseModel):
+    """Trait information with associated datasets."""
+
+    id: UUID4 = Field(..., description="Trait UUID")
+    name: str = Field(..., description="Trait name")
+    icon: Optional[str] = Field(None, description="Trait icon")
+    datasets: List[DatasetInfo] = Field(default_factory=list, description="Datasets associated with this trait")
+
+
+class EvaluationScore(BaseModel):
+    """Evaluation score information from BudEval."""
+
+    status: str = Field(..., description="Evaluation job status (pending/running/completed/failed)")
+    overall_accuracy: Optional[float] = Field(None, description="Overall accuracy percentage (0-100)")
+    datasets: Optional[List[dict]] = Field(None, description="Individual dataset scores")
+
+
+class RunWithEvaluations(BaseModel):
+    """Run information with evaluation details and scores."""
+
+    run_id: UUID4 = Field(..., description="Run UUID")
+    run_index: int = Field(..., description="Run index within experiment")
+    status: str = Field(..., description="Run status")
+    model: ModelDetail = Field(..., description="Model details")
+    traits: List[TraitWithDatasets] = Field(..., description="Traits with their associated datasets")
+    evaluation_job_id: Optional[str] = Field(None, description="BudEval job ID if evaluation was triggered")
+    scores: Optional[EvaluationScore] = Field(None, description="Evaluation scores from BudEval")
+    created_at: Optional[datetime] = Field(None, description="Run creation timestamp")
+    updated_at: Optional[datetime] = Field(None, description="Run update timestamp")
+
+
+class ExperimentEvaluationsResponse(SuccessResponse):
+    """Response for getting experiment evaluations with scores."""
+
+    experiment: Experiment = Field(..., description="Experiment information")
+    evaluations: List[RunWithEvaluations] = Field(..., description="List of runs with evaluation details")
+
+
 # ------------------------ Run History Schemas ------------------------
 
 
