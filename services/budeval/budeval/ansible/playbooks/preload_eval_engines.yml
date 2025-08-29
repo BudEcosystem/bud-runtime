@@ -24,16 +24,6 @@
           Engines: {{ target_engines | map(attribute='name') | list }}
           Using kubeconfig: {{ kube_config != '' }}
 
-    - name: Ensure budeval namespace exists
-      kubernetes.core.k8s:
-        state: present
-        definition:
-          apiVersion: v1
-          kind: Namespace
-          metadata:
-            name: "{{ target_namespace }}"
-        kubeconfig: "{{ kube_config if kube_config != '' else omit }}"
-
     - name: Check if engines are already preloaded
       kubernetes.core.k8s_info:
         api_version: v1

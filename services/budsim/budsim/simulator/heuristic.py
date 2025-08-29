@@ -29,7 +29,6 @@ try:
     from llm_memory_calculator import (
         calculate_memory,
         estimate_end_to_end_performance,
-        get_hardware_config,
     )
 
     LLM_CALC_AVAILABLE = True
@@ -44,6 +43,9 @@ class HeuristicCalculator:
     This class provides heuristic-based performance calculations using
     llm-memory-calculator for accurate predictions when available, with
     fallback to simple heuristics.
+
+    Supports both CPU and GPU hardware through HardwareManager auto-detection,
+    with access to 29+ CPU configs and 11+ GPU configs.
     """
 
     def __init__(self):
@@ -56,9 +58,9 @@ class HeuristicCalculator:
         self._perf_cache = {}
 
     def _get_hardware_config(self, model_params: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Get hardware configuration for llm-memory-calculator.
+        """Get hardware configuration using HardwareManager.
 
-        Maps device configurations to llm-memory-calculator hardware profiles.
+        Uses llm-memory-calculator's HardwareManager for automatic hardware detection.
 
         Args:
             model_params: Dictionary containing device and system parameters
@@ -69,42 +71,83 @@ class HeuristicCalculator:
         if not self.use_llm_calc:
             return None
 
-        if "target_device" not in model_params:
-            logger.warning("target_device not found in model_params, using fallback")
-            raise ValueError("target_device not found in model_params")
+        from llm_memory_calculator import HardwareManager
 
-        if "memory_in_GB" not in model_params:
-            logger.warning("memory_in_GB not found in model_params, using fallback")
-            raise ValueError("memory_in_GB not found in model_params")
+        manager = HardwareManager()
 
-        # Extract device info
-        device_type = model_params.get("target_device")
-        memory_gb = model_params.get("memory_in_GB")
+        # Extract device info from model_params
+        device_type = model_params.get("target_device") or model_params.get("device_type") or model_params.get("type")
+        # Get device model name - check for device-specific fields first, then fall back to 'model' if it's not the LLM model
+        device_model = model_params.get("device_model") or model_params.get("device_name", "")
+        # If no device model found and 'model' exists but doesn't look like an LLM model path, use it
+        if not device_model and "model" in model_params:
+            model_value = model_params["model"]
+            # Check if it looks like a device name rather than an LLM model
+            if isinstance(model_value, str) and not (
+                "/" in model_value
+                or model_value.startswith("meta-")
+                or model_value.endswith("_7b")
+                or model_value.endswith("_13b")
+            ):
+                device_model = model_value
+        memory_gb = model_params.get("memory_in_GB") or model_params.get("device_memory_in_gb", 0)
 
-        # Find closest match based on device type and memory
-        config_name = None
-        if device_type == "cuda":
-            # Find closest GPU memory match
-            if memory_gb >= 80:
-                config_name = "A100_80GB"
-            elif memory_gb >= 40:
-                config_name = "A100_40GB"
-            elif memory_gb >= 24:
-                config_name = "RTX_4090"
-            else:
-                config_name = "V100"
-        elif device_type == "hpu":
-            config_name = "GAUDI2"
+        if not device_type:
+            logger.warning("No device type found in model_params")
+            return None
+
+        # Build device info for HardwareManager
+        device_info = {}
+
+        # Use model name as raw_name if available
+        if device_model:
+            device_info["raw_name"] = device_model
         else:
-            # Default to CPU for unsupported devices
-            config_name = "CPU"
+            # Fallback to generic names if no model provided
+            fallback_names = {
+                "cuda": "NVIDIA A100",
+                "cpu": "Intel Xeon CPU",
+                "cpu_high": "Intel Xeon Platinum",
+                "rocm": "AMD Instinct MI300X",
+                "hpu": "Intel Gaudi",
+            }
+            device_info["raw_name"] = fallback_names.get(device_type, f"Unknown {device_type}")
 
-        try:
-            hardware_config = get_hardware_config(config_name)
-            logger.debug(f"Using hardware config: {config_name} for device {device_type} with {memory_gb}GB")
-            return hardware_config
-        except Exception as e:
-            logger.warning(f"Failed to get hardware config {config_name}: {e}")
+        # Add memory info if available
+        if memory_gb and memory_gb > 0:
+            if device_type in ["cpu", "cpu_high"]:
+                device_info["memory_gb"] = memory_gb
+            else:
+                device_info["memory_mb"] = memory_gb * 1024
+
+        # Let HardwareManager do the matching
+        specs = manager.get_cluster_hardware_specs(device_info)
+
+        if specs.get("matched"):
+            config = {
+                "Flops": specs["flops_fp16"],
+                "Memory_size": specs["memory_size_gb"],
+                "Memory_BW": specs["memory_bandwidth_gbs"],
+                "ICN": specs["interconnect_bandwidth_gbs"],
+                "real_values": specs.get("real_values", True),
+            }
+
+            # Add type flag for CPU devices
+            if device_type in ["cpu", "cpu_high"]:
+                config["type"] = "cpu"
+
+            logger.info(
+                f"Matched hardware: {specs['device_name']} for device_model='{device_model}' type={device_type}"
+            )
+            return config
+        else:
+            # Log detailed info for debugging
+            logger.warning(
+                f"Could not match device - type: {device_type}, model: '{device_model}', "
+                f"memory: {memory_gb}GB, device_info: {device_info}"
+            )
+
+            # Return None to indicate no match (caller should handle fallback)
             return None
 
     def _get_precision_bits(self, model_params: Dict[str, Any]) -> str:

@@ -29,4 +29,4 @@
         kubeconfig: "{{ kubeconfig_path }}"
         validate_certs: "{{ validate_certs }}"
       register: model_transfer_status_configmap
-      failed_when: model_transfer_status_configmap.resources | length == 0
+      failed_when: false  # Don't fail if ConfigMap doesn't exist yet

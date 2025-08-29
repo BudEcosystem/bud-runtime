@@ -177,7 +177,7 @@ class DeploymentHandler:
                 if not all(key in device for key in ("image", "replica", "memory", "type", "tp_size", "concurrency")):
                     raise ValueError(f"Device configuration is missing required keys: {device}")
                 device["args"]["port"] = app_settings.engine_container_port
-                # device["args"]["tensor-parallel-size"] = 1
+                device["args"]["gpu-memory-utilization"] = 0.95
                 device["args"]["max-loras"] = max_loras
                 device["args"]["max-lora-rank"] = 256
 
@@ -190,7 +190,7 @@ class DeploymentHandler:
                 device["args"] = self._prepare_args(device["args"])
                 device["args"].append(f"--served-model-name={namespace}")
                 device["args"].append("--enable-lora")
-                device["args"].append("--max-model-len=8192")
+                device["args"].append("--max-model-len=2048")
 
                 thread_bind, core_count = self._get_cpu_affinity(device["tp_size"])
                 device["envs"]["VLLM_CPU_OMP_THREADS_BIND"] = thread_bind

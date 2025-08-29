@@ -181,19 +181,14 @@ class AnsibleOrchestrator:
         if not playbook:
             raise ValueError(f"Unsupported runner_type: {runner_type}")
 
-        # Generate YAML manifests for output PVC and Job (shared datasets use eval-datasets-pvc)
-        pvc_output_yaml = self._render_persistent_volume_claim_yaml(
-            f"{uuid}-output-pvc", f"{uuid}-output-pv", output_volume_size, namespace
-        )
+        # Generate YAML manifest for Job only (no separate output PVC needed)
         job_yaml = self._render_job_with_volumes_yaml(uuid, docker_image, engine_args, namespace, ttl_seconds)
 
         files = {
-            "pvc-output.yaml": pvc_output_yaml,
             "job.yaml": job_yaml,
         }
         extravars = {
             "job_name": uuid,
-            "pvc_output_template_path": "pvc-output.yaml",
             "job_template_path": "job.yaml",
             "namespace": namespace,
         }
@@ -241,15 +236,7 @@ class AnsibleOrchestrator:
         if not playbook:
             raise ValueError(f"Unsupported runner_type: {runner_type}")
 
-        # Generate YAML manifests from generic config
-        output_volume = job_config.get("output_volume", {})
-        pvc_output_yaml = self._render_persistent_volume_claim_yaml(
-            output_volume.get("claimName", f"{uuid}-output-pvc"),
-            f"{uuid}-output-pv",
-            output_volume.get("size", "10Gi"),
-            namespace,
-        )
-
+        # Generate YAML manifest for Job only (no separate output PVC needed)
         job_yaml = self._render_generic_job_yaml(uuid, job_config, namespace)
 
         # Enhanced debug logging
@@ -259,19 +246,16 @@ class AnsibleOrchestrator:
         logger.info(f"Job config args: {job_config.get('args')}")
         logger.info(f"Environment variables: {job_config.get('env_vars', {})}")
         logger.info(f"Data volumes: {job_config.get('data_volumes', [])}")
-        logger.info(f"Output volume: {job_config.get('output_volume', {})}")
         logger.info(f"Config volume: {job_config.get('config_volume', {})}")
         logger.info("=== Full Job YAML ===")
         logger.info(job_yaml)
         logger.info("=== End Debug ===")
 
         files = {
-            "pvc-output.yaml": pvc_output_yaml,
             "job.yaml": job_yaml,
         }
         extravars = {
             "job_name": uuid,
-            "pvc_output_template_path": "pvc-output.yaml",
             "job_template_path": "job.yaml",
             "namespace": namespace,
         }
@@ -685,14 +669,18 @@ spec:
     ) -> str:
         safe_args = json.dumps(args)
 
+        # Get PVC name from configuration
+        from budeval.commons.storage_config import StorageConfig
+
+        pvc_name = StorageConfig.get_eval_datasets_pvc_name()
+
         # Extract eval_request_id for ConfigMap mounting
         eval_request_id = args.get("eval_request_id", uuid)
         configmap_name = f"opencompass-config-{eval_request_id.lower()}"
 
-        # Extract datasets and append '_gen' suffix for OpenCompass
+        # Extract datasets to pass to OpenCompass
         datasets = args.get("datasets", ["mmlu"])
-        datasets_with_gen = [f"{dataset}_gen" for dataset in datasets]
-        datasets_arg = " ".join(datasets_with_gen)
+        datasets_arg = " ".join(datasets)
 
         # Model configuration is now handled via bud-model.py config file
 
@@ -740,8 +728,10 @@ spec:
               mountPath: /workspace/data
               subPath: data
               readOnly: true
-            - name: output-volume
+            - name: eval-datasets-results
               mountPath: /workspace/outputs
+              subPath: results/{uuid}
+              readOnly: false
             - name: opencompass-config
               mountPath: /workspace/configs
               readOnly: true
@@ -751,12 +741,12 @@ spec:
       volumes:
         - name: eval-datasets
           persistentVolumeClaim:
-            claimName: eval-datasets-pvc
+            claimName: {pvc_name}
             # Note: This PVC must exist in the same namespace as the job
-            # The eval-datasets PVC should be created in the job's namespace
-        - name: output-volume
+        - name: eval-datasets-results
           persistentVolumeClaim:
-            claimName: {uuid}-output-pvc
+            claimName: {pvc_name}
+            # Reusing same PVC for results output
         - name: opencompass-config
           configMap:
             name: {configmap_name}
@@ -842,10 +832,21 @@ spec:
 
         # Output volume
         if output_volume:
-            volume_mounts.append("""            - name: output
+            # Handle shared PVC with subPath for outputs
+            if output_volume.get("type") == "shared_pvc" and output_volume.get("subPath"):
+                volume_mounts.append(f"""            - name: output
+              mountPath: {output_volume.get("mountPath", "/workspace/outputs")}
+              subPath: {output_volume["subPath"]}""")
+
+                volumes.append(f"""        - name: output
+          persistentVolumeClaim:
+            claimName: {output_volume["claimName"]}""")
+            else:
+                # Legacy approach for backward compatibility
+                volume_mounts.append("""            - name: output
               mountPath: /workspace/outputs""")
 
-            volumes.append(f"""        - name: output
+                volumes.append(f"""        - name: output
           persistentVolumeClaim:
             claimName: {output_volume["claimName"]}""")
 

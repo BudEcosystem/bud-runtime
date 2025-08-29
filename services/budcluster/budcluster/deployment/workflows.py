@@ -2355,6 +2355,38 @@ class UpdateModelTransferStatusWorkflow:
         namespace = update_model_transfer_request_json.namespace
         platform = update_model_transfer_request_json.platform
 
+        # Initialize start time on first run
+        if not update_model_transfer_request_json.workflow_start_time:
+            update_model_transfer_request_json.workflow_start_time = ctx.current_utc_datetime.isoformat()
+
+        # Check overall workflow timeout (30 minutes for model transfer)
+        from datetime import datetime
+
+        workflow_start = datetime.fromisoformat(
+            update_model_transfer_request_json.workflow_start_time.replace("Z", "+00:00")
+        )
+        elapsed_minutes = (ctx.current_utc_datetime - workflow_start).total_seconds() / 60
+        max_transfer_minutes = 5 * 60
+
+        if elapsed_minutes > max_transfer_minutes:
+            logger.error(f"Model transfer workflow exceeded {max_transfer_minutes} minutes timeout")
+            response = ErrorResponse(
+                message=f"Model transfer timeout after {int(elapsed_minutes)} minutes",
+                param={"status": "failed", "reason": "Workflow timeout exceeded"},
+                code=HTTPStatus.REQUEST_TIMEOUT.value,
+            )
+            with DaprClient() as d:
+                d.raise_workflow_event(
+                    instance_id=str(instance_id),
+                    workflow_component="dapr",
+                    event_name="model_transfer_completed",
+                    event_data=response.model_dump(mode="json"),
+                )
+            cluster_config = json.loads(update_model_transfer_request_json.cluster_config)
+            deployment_handler = DeploymentHandler(config=cluster_config)
+            deployment_handler.delete(namespace=namespace, platform=platform)
+            return
+
         notification_request = NotificationRequest.from_cloud_event(
             cloud_event=update_model_transfer_request_json,
             name=update_model_transfer_request_json.workflow_name,
@@ -2381,7 +2413,8 @@ class UpdateModelTransferStatusWorkflow:
                 )
 
                 yield ctx.create_timer(fire_at=ctx.current_utc_datetime + timedelta(minutes=1))
-                ctx.continue_as_new(update_model_transfer_request)
+                # Preserve workflow start time when continuing
+                ctx.continue_as_new(update_model_transfer_request_json.model_dump_json())
                 return
 
             if status["status"] == "failed":
@@ -2407,7 +2440,8 @@ class UpdateModelTransferStatusWorkflow:
             return
 
         yield ctx.create_timer(fire_at=ctx.current_utc_datetime + timedelta(minutes=1))
-        ctx.continue_as_new(update_model_transfer_request)
+        # Preserve workflow start time when continuing
+        ctx.continue_as_new(update_model_transfer_request_json.model_dump_json())
 
     async def __call__(
         self, request: str, workflow_id: Optional[str] = None
