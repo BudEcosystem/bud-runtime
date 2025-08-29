@@ -137,16 +137,21 @@ class TestOAuthLoginRoute:
         assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS
 
 
-class TestOAuthCallbackRoute:
-    """Test OAuth callback route."""
+class TestOAuthSecureCallbackRoute:
+    """Test OAuth secure callback route."""
 
-    def test_oauth_callback_success(self, client: TestClient):
-        """Test successful OAuth callback."""
-        with patch('budapp.auth.oauth_services.OAuthService') as mock_service:
-            mock_instance = AsyncMock()
-            mock_service.return_value = mock_instance
-
-            mock_instance.handle_oauth_callback.return_value = AsyncMock(
+    def test_oauth_secure_callback_success(self, client: TestClient):
+        """Test successful OAuth secure callback."""
+        with patch('budapp.auth.oauth_services.OAuthService') as mock_service, \
+             patch('budapp.auth.token_exchange_service.TokenExchangeService') as mock_exchange, \
+             patch('budapp.user_ops.crud.UserDataManager') as mock_user_manager:
+            
+            # Mock OAuth service
+            mock_oauth_instance = AsyncMock()
+            mock_service.return_value = mock_oauth_instance
+            
+            # Mock handle_oauth_callback to return a token response
+            mock_oauth_instance.handle_oauth_callback.return_value = AsyncMock(
                 access_token="test-token",
                 refresh_token="test-refresh",
                 expires_in=3600,
@@ -154,28 +159,45 @@ class TestOAuthCallbackRoute:
                 user_info=AsyncMock(
                     provider="google",
                     email="user@example.com",
+                    external_id="google-123",
+                    name="Test User",
                 ),
                 is_new_user=True,
                 requires_linking=False,
             )
+            
+            # Mock UserDataManager to return a user when looking up by email
+            mock_user = AsyncMock()
+            mock_user.id = uuid4()
+            mock_user.email = "user@example.com"
+            mock_user_manager_instance = AsyncMock()
+            mock_user_manager.return_value = mock_user_manager_instance
+            mock_user_manager_instance.retrieve_by_fields.return_value = mock_user
+            
+            # Mock token exchange service
+            mock_exchange_instance = AsyncMock()
+            mock_exchange.return_value = mock_exchange_instance
+            mock_exchange_instance.create_exchange_token.return_value = "exchange-token-123"
 
+            # Test the secure callback route
             response = client.get(
-                "/api/v1/auth/oauth/callback",
+                "/api/v1/auth/oauth/secure-callback",
                 params={
                     "code": "test-code",
                     "state": "test-state",
                 },
             )
 
-        assert response.status_code == status.HTTP_200_OK
-        data = response.json()["data"]
-        assert data["accessToken"] == "test-token"
-        assert data["isNewUser"] is True
+        # Secure callback returns a redirect with exchange token
+        assert response.status_code == status.HTTP_302_FOUND
+        # Check redirect location contains exchange token
+        location = response.headers.get("location")
+        assert "exchange_token=exchange-token-123" in location
 
-    def test_oauth_callback_error_from_provider(self, client: TestClient):
-        """Test OAuth callback with error from provider."""
+    def test_oauth_secure_callback_error_from_provider(self, client: TestClient):
+        """Test OAuth secure callback with error from provider."""
         response = client.get(
-            "/api/v1/auth/oauth/callback",
+            "/api/v1/auth/oauth/secure-callback",
             params={
                 "state": "test-state",
                 "error": "access_denied",
@@ -183,9 +205,10 @@ class TestOAuthCallbackRoute:
             },
         )
 
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        error = response.json()
-        assert error["error"] == "authentication_failed"
+        # Secure callback returns a redirect to error page
+        assert response.status_code == status.HTTP_302_FOUND
+        location = response.headers.get("location")
+        assert "error=" in location
 
 
 class TestOAuthProvidersRoute:
