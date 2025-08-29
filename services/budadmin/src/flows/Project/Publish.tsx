@@ -12,7 +12,9 @@ import { useEndPoints } from "src/hooks/useEndPoint";
 import { useDrawer } from "src/hooks/useDrawer";
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import TextInput from "../components/TextInput";
+import CustomSelect from "../components/CustomSelect";
 import { useRouter } from "next/router";
+import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
 
 
 interface PricingHistoryItem {
@@ -74,30 +76,40 @@ const paginationStyle = `
 
 export default function Publish() {
   const { drawerProps, closeDrawer } = useDrawer()
-  const { clusterDetails, getPricingHistory, updateTokenPricing } = useEndPoints();
+  const { clusterDetails, getPricingHistory, publishEndpoint, getEndPoints } = useEndPoints();
   const [form] = Form.useForm();
-  const [disableNext, setDisableNext] = useState(true);
+  const [disableNext, setDisableNext] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [publishLoading, setPublishLoading] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [pricingHistory, setPricingHistory] = useState<PricingHistoryItem[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
   const [pageSize, setPageSize] = useState(5);
+  const [selectedTokenOption, setSelectedTokenOption] = useState<number>(1000);
   const router = useRouter();
   const { projectId } = router.query;
 
-  const handleFieldsChange = () => {
-    const fieldsValue = form.getFieldsValue(true);
-    const allFields = Object.keys(fieldsValue);
+  const tokenOptions = [
+    { value: 1000, label: '1K' },
+    { value: 5000, label: '5K' },
+    { value: 10000, label: '10K' },
+    { value: 50000, label: '50K' },
+    { value: 1000000, label: '1M' },
+    { value: 10000000, label: '10M' }
+  ];
 
-    const allTouched = allFields.every((field) => form.isFieldTouched(field));
+  const handleFieldsChange = () => {
+    const requiredFields = ['input_cost', 'output_cost'];
+
+    const allRequiredFieldsTouched = requiredFields.every((field) => form.isFieldTouched(field));
 
     const hasErrors = form
       .getFieldsError()
       .some(({ errors }) => errors.length > 0);
 
-    // Set button disabled state
-    setDisableNext(!allTouched || hasErrors);
+    // Set button disabled state - note that per_tokens is handled via selectedTokenOption state
+    setDisableNext(!allRequiredFieldsTouched || hasErrors || !selectedTokenOption);
   };
 
   const fetchPricingHistory = async (page: number = 1, limit: number = 5) => {
@@ -157,16 +169,51 @@ export default function Publish() {
   const handleSubmit = async () => {
     try {
       setLoading(true);
-      const values = await form.validateFields();
 
-      if (drawerProps?.endpoint?.id) {
-        await updateTokenPricing(drawerProps.endpoint.id, values, projectId as string);
+      if (drawerProps?.endpoint?.id && projectId) {
+        await publishEndpoint(drawerProps.endpoint.id, { action: "unpublish" });
+        // Refresh the endpoints list to update the is_published status
+        getEndPoints({
+          id: projectId as string,
+          page: 1,
+          limit: 1000,
+        });
         closeDrawer();
       }
     } catch (error) {
-      console.error('Failed to update token pricing:', error);
+      console.error('Failed to unpublish endpoint:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handlePublish = async () => {
+    try {
+      setPublishLoading(true);
+      const values = await form.validateFields();
+
+      if (drawerProps?.endpoint?.id && projectId) {
+        await publishEndpoint(drawerProps.endpoint.id, {
+          action: "publish",
+          pricing: {
+            input_cost: values.input_cost,
+            output_cost: values.output_cost,
+            currency: "USD",
+            per_tokens: selectedTokenOption
+          }
+        });
+        // Refresh the endpoints list to update the is_published status
+        getEndPoints({
+          id: projectId as string,
+          page: 1,
+          limit: 1000,
+        });
+        closeDrawer();
+      }
+    } catch (error) {
+      console.error('Failed to publish endpoint:', error);
+    } finally {
+      setPublishLoading(false);
     }
   };
 
@@ -176,12 +223,12 @@ export default function Publish() {
       <BudForm
       data={{}}
       onNext={handleSubmit}
-      nextText="Publish"
+      nextText="Un publish"
       onBack={() => {
         closeDrawer();
       }}
       backText="Close"
-      disableNext={disableNext || loading}
+      disableNext={loading}
     >
       <BudWraperBox>
         <BudDrawerLayout>
@@ -388,24 +435,31 @@ export default function Publish() {
                 <Text_14_400_EEEEEE className="pt-[.55rem]">
                   Price per token
                 </Text_14_400_EEEEEE>
-                <TextInput
-                  name="per_tokens"
-                  placeholder="Price per token"
-                  allowOnlyNumbers
-                  rules={[
-                    { required: true, message: "Enter price per token" },
-                    {
-                      validator: (_, value) => {
-                        if (value && value.trim().length === 0) {
-                          return Promise.reject("Price per token cannot be only whitespace");
-                        }
-                        return Promise.resolve();
-                      }
-                    }
-                  ]}
-                  ClassNames="mt-[.4rem] w-full"
-                  InputClasses="py-[.5rem]"
-                />
+                <div className="w-[41%]">
+                  <CustomSelect
+                    name="per_tokens"
+
+                    placeholder="Select token count"
+                    selectOptions={tokenOptions}
+                    value={selectedTokenOption.toString()}
+                    onChange={(value) => {
+                      setSelectedTokenOption(Number(value));
+                      // Trigger form validation
+                      form.setFieldsValue({ per_tokens: value });
+                      handleFieldsChange();
+                    }}
+                    ClassNames="mt-[.4rem]"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end items-start px-[1.4rem] pt-[0.85rem]">
+                  <PrimaryButton
+                    onClick={handlePublish}
+                    disabled={disableNext || publishLoading}
+                    loading={publishLoading}
+                  >
+                    Save
+                  </PrimaryButton>
               </div>
             </Form>
           </div>

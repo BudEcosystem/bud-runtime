@@ -62,6 +62,7 @@ export interface BudFormProps extends FooterProps {
   children: React.ReactNode;
   title?: string;
   drawerLoading?: boolean;
+  onValuesChange?: (changedValues: any, allValues: any) => void;
 }
 
 
@@ -93,11 +94,8 @@ export function BudForm(props: BudFormProps) {
     }
   }, [props.data, form]);
 
-  useEffect(() => {
-    return () => {
-      form.resetFields();
-    }
-  }, [form]);
+  // Don't reset fields on unmount - we want to preserve form data when navigating
+  // The form will be properly initialized with data prop when remounting
 
   useEffect(() => {
     if (cancelAlert) {
@@ -113,6 +111,7 @@ export function BudForm(props: BudFormProps) {
     // Blur logic
     className={`flex flex-col h-full  relative` }
     scrollToFirstError
+    onValuesChange={props.onValuesChange}
     feedbackIcons={() => {
       // return <FeedbackIcons status={status} errors={errors} warnings={warnings} />
       return {

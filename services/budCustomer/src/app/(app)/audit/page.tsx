@@ -66,12 +66,9 @@ enum AuditAction {
 
 enum ResourceType {
   API_KEY = "api_key",
-  MODEL = "model",
   PROJECT = "project",
-  BATCH = "batch",
   USER = "user",
-  SETTINGS = "settings",
-  LOGS = "logs",
+  SESSION = "session",
 }
 
 // Audit log interface
@@ -282,12 +279,9 @@ export default function AuditPage() {
   const getResourceIcon = (resourceType: ResourceType) => {
     const icons = {
       [ResourceType.API_KEY]: <KeyOutlined />,
-      [ResourceType.MODEL]: <Icon icon="ph:cpu" />,
       [ResourceType.PROJECT]: <Icon icon="ph:folder" />,
-      [ResourceType.BATCH]: <Icon icon="ph:stack" />,
       [ResourceType.USER]: <UserOutlined />,
-      [ResourceType.SETTINGS]: <Icon icon="ph:gear" />,
-      [ResourceType.LOGS]: <FileTextOutlined />,
+      [ResourceType.SESSION]: <Icon icon="ph:stack" />,
     };
     return icons[resourceType] || <DatabaseOutlined />;
   };
@@ -381,7 +375,7 @@ export default function AuditPage() {
         end_date: dateRange?.[1] ? formatDateString(dateRange[1]?.toDate(), true) : undefined
       }
       const response = await AppRequest.Get("/audit/records", {params});
-      setAuditLogs(response.data.data.map((item: any)=> ({...item, status: item.details.success ? 'success' : 'failed'})));
+      setAuditLogs(response.data.data.map((item: any)=> ({...item, status: item.details?.success === false ? 'failed' : 'success'})));
       setTotalNumber(response.data.total_record);
     } catch (error) {
       console.error("Failed to fetch usage data:", error);
@@ -687,10 +681,12 @@ export default function AuditPage() {
                 onChange={setSelectedAction}
                 className="w-48"
                 allowClear
-                options={Object.values(AuditAction).map((action) => ({
-                  label: getActionDisplay(action).label,
-                  value: action,
-                }))}
+                options={Object.values(AuditAction)
+                  .filter((action) => action !== AuditAction.REGENERATE && action !== AuditAction.LOGOUT)
+                  .map((action) => ({
+                    label: getActionDisplay(action).label,
+                    value: action === AuditAction.ACCESS ? "access_granted" : action === AuditAction.EXPORT ? "data_export" : action,
+                  }))}
               />
             </ConfigProvider>
             <ConfigProvider theme={themeConfig}>

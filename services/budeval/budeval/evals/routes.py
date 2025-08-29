@@ -188,7 +188,7 @@ async def get_configmap_info(eval_request_id: str, kubeconfig: str | None = None
     try:
         from budeval.evals.configmap_manager import ConfigMapManager
 
-        configmap_manager = ConfigMapManager(namespace="budeval")
+        configmap_manager = ConfigMapManager()  # Uses current namespace
         result = configmap_manager.get_configmap_info(eval_request_id, kubeconfig)
 
         if result is None:
@@ -216,7 +216,7 @@ async def delete_configmap(eval_request_id: str, kubeconfig: str | None = None):
     try:
         from budeval.evals.configmap_manager import ConfigMapManager
 
-        configmap_manager = ConfigMapManager(namespace="budeval")
+        configmap_manager = ConfigMapManager()  # Uses current namespace
         success = configmap_manager.delete_opencompass_config_map(eval_request_id, kubeconfig)
 
         if success:

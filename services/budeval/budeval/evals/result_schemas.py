@@ -56,6 +56,7 @@ class ProcessedEvaluationResults(BaseModel):
     job_id: str = Field(..., description="Unique job identifier")
     model_name: str = Field(..., description="Name of the evaluated model")
     engine: str = Field(..., description="Evaluation engine used")
+    experiment_id: Optional[str] = Field(None, description="Experiment ID this evaluation belongs to")
 
     # Results
     datasets: List[DatasetResult] = Field(..., description="Results for each dataset")

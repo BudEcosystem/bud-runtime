@@ -301,8 +301,8 @@ export default function UsagePage() {
 
   return (
     <DashboardLayout>
-      <div className="boardPageView">
-        <div className="boardMainContainer pt-[2.25rem]">
+      <div className="boardPageView pb-[2rem]">
+        <div className="boardMainContainer pt-[2.25rem] pb-[2rem]">
           {/* Header */}
           <Flex justify="space-between" align="center" className="mb-[2rem]">
             <div>
@@ -570,17 +570,20 @@ export default function UsagePage() {
           </Card>
 
           {/* Usage History Table */}
-          <Card className="bg-bud-bg-secondary border-bud-border rounded-[12px]">
+          <Card className="bg-bud-bg-secondary border-bud-border rounded-[12px] mb-[2rem]">
             <Text className="text-bud-text-primary font-semibold text-[15px] mb-[1.5rem] block">
               Usage History
             </Text>
-            <Table
-              dataSource={usageData}
-              columns={columns}
-              rowKey="date"
-              pagination={false}
-              className={styles.usageTable}
-            />
+            <div className="overflow-x-auto">
+              <Table
+                dataSource={usageData}
+                columns={columns}
+                rowKey="date"
+                pagination={false}
+                className={styles.usageTable}
+                scroll={{ y: 400 }}
+              />
+            </div>
           </Card>
 
           {/* Create Alert Modal */}

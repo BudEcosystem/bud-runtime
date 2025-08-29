@@ -1501,7 +1501,7 @@ const viewModel: DrawerFlowType = {
     {
       navigation: () => [
         "Model",
-        `${useModels.getState().selectedModel?.name}`,
+        `${useModels.getState().selectedModel?.endpoint_name}`,
       ],
       id: "view-model-details",
       confirmClose: false,
@@ -1544,11 +1544,16 @@ const editProject: DrawerFlowType = {
   totalSteps: 1,
   steps: [
     {
-      navigation: () => [
-        "Projects",
-        `${useProjects.getState().selectedProject?.project?.icon} ${useProjects.getState().selectedProject?.project?.name}`,
-        "Edit Project",
-      ],
+      navigation: () => {
+        const state = useProjects.getState();
+        const project = state.globalSelectedProject;
+        const projectName = (project as any)?.project?.name || (project as any)?.name || "Project";
+        return [
+          "Projects",
+          projectName,
+          "Edit Project",
+        ];
+      },
       id: "edit-project",
       confirmClose: false,
       step: 1,
