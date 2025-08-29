@@ -133,3 +133,5 @@ Dapr components are defined in `.dapr/components/` and configured via environmen
 - Check hardware type (CPU/CUDA/HPU) when deploying runtimes
 - Use workflows for long-running operations
 - Test with different cluster types (cloud/on-prem)
+- Model deployments now use dynamic `--max-model-len` based on `input_tokens + output_tokens` with 10% safety margin
+- Token parameters are optional and fallback to default (8192) when not provided

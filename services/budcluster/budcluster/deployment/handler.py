@@ -113,6 +113,8 @@ class DeploymentHandler:
         adapters: List[dict] = None,
         delete_on_failure: bool = True,
         podscaler: dict = None,
+        input_tokens: Optional[int] = None,
+        output_tokens: Optional[int] = None,
     ):
         """Deploy nodes using Helm.
 
@@ -125,6 +127,10 @@ class DeploymentHandler:
             platform (ClusterPlatformEnum, optional): Platform type for the cluster deployment.
             add_worker (bool, optional): Whether to add a worker node. Defaults to False.
             adapters (List[dict], optional): List of model adapters to deploy. Defaults to None.
+            delete_on_failure (bool, optional): Whether to delete resources on failure. Defaults to True.
+            podscaler (dict, optional): Pod autoscaling configuration. Defaults to None.
+            input_tokens (Optional[int], optional): Average input/context tokens. Defaults to None.
+            output_tokens (Optional[int], optional): Average output/sequence tokens. Defaults to None.
 
         Raises:
             ValueError: If the device configuration is missing required keys or if ingress_url is not provided.
@@ -181,16 +187,14 @@ class DeploymentHandler:
                 device["args"]["max-loras"] = max_loras
                 device["args"]["max-lora-rank"] = 256
 
-                # # Remove scheduler-delay-factor and chunked-prefill-enabled from args
-                # device["args"] = {
-                #     k: v
-                #     for k, v in device["args"].items()
-                #     if k not in ["scheduler-delay-factor", "enable-chunked-prefill"]
-                # }
                 device["args"] = self._prepare_args(device["args"])
                 device["args"].append(f"--served-model-name={namespace}")
                 device["args"].append("--enable-lora")
-                device["args"].append("--max-model-len=2048")
+
+                # Calculate max_model_len dynamically
+                if input_tokens and output_tokens:
+                    max_model_len = input_tokens + output_tokens
+                    device["args"].append(f"--max-model-len={max_model_len}")
 
                 thread_bind, core_count = self._get_cpu_affinity(device["tp_size"])
                 device["envs"]["VLLM_CPU_OMP_THREADS_BIND"] = thread_bind

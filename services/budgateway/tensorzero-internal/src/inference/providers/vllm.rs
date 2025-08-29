@@ -11,9 +11,9 @@ use url::Url;
 
 use super::helpers::inject_extra_request_data;
 use super::openai::{
-    get_chat_url, handle_openai_error, stream_openai, tensorzero_to_openai_messages,
-    OpenAIRequestMessage, OpenAIResponse, OpenAIResponseChoice, OpenAISystemRequestMessage,
-    StreamOptions,
+    get_chat_url, handle_openai_error, prepare_openai_tools, stream_openai,
+    tensorzero_to_openai_messages, OpenAIRequestMessage, OpenAIResponse, OpenAIResponseChoice,
+    OpenAISystemRequestMessage, OpenAITool, OpenAIToolChoice, StreamOptions,
 };
 use super::provider_trait::{InferenceProvider, TensorZeroEventError};
 use crate::cache::ModelProviderRequest;
@@ -118,8 +118,8 @@ impl VLLMCredentials {
 
 /// Key differences between vLLM and OpenAI inference:
 /// - vLLM supports guided decoding
-/// - vLLM only supports a specific tool and nothing else (and the implementation varies among LLMs)
-///   **Today, we can't support tools** so we are leaving it as an open issue (#169).
+/// - vLLM implements an OpenAI-compatible chat API. We forward tools and
+///   tool_choice fields using the same shapes as our OpenAI provider.
 impl InferenceProvider for VLLMProvider {
     async fn infer<'a>(
         &'a self,
@@ -346,6 +346,12 @@ struct VLLMRequest<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     mm_processor_kwargs: Option<&'a Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    tools: Option<Vec<OpenAITool<'a>>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tool_choice: Option<OpenAIToolChoice<'a>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    parallel_tool_calls: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     guided_json: Option<&'a Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     guided_regex: Option<&'a str>,
@@ -377,16 +383,8 @@ impl<'a> VLLMRequest<'a> {
             false => None,
         };
         let messages = prepare_vllm_messages(request)?;
-        // TODO (#169): Implement tool calling.
-        if request.tool_config.is_some() {
-            return Err(ErrorDetails::InferenceClient {
-                message: "TensorZero does not support tool use with vLLM. Please use a different provider.".to_string(),
-                status_code: Some(reqwest::StatusCode::BAD_REQUEST),
-                raw_request: None,
-                raw_response: None,
-                provider_type: PROVIDER_TYPE.to_string(),
-            }.into());
-        }
+        // Implement tool calling by converting TensorZero tool config to OpenAI-compatible fields
+        let (tools, tool_choice, parallel_tool_calls) = prepare_openai_tools(request);
 
         // Determine guided_json field: prefer explicit request.guided_json; otherwise derive from json_mode/output_schema
         let guided_json_field = if request.guided_json.is_some() {
@@ -414,6 +412,9 @@ impl<'a> VLLMRequest<'a> {
             chat_template: request.chat_template,
             chat_template_kwargs: request.chat_template_kwargs,
             mm_processor_kwargs: request.mm_processor_kwargs,
+            tools,
+            tool_choice,
+            parallel_tool_calls,
             guided_json: guided_json_field,
             guided_regex: request.guided_regex,
             guided_choice: request.guided_choice.as_ref(),
@@ -801,10 +802,10 @@ mod tests {
             ..Default::default()
         };
 
-        let err = VLLMRequest::new("llama-v3-8b", &request_with_tools).unwrap_err();
-        assert!(err
-            .to_string()
-            .contains("TensorZero does not support tool use with vLLM"));
+        let vllm_request = VLLMRequest::new("llama-v3-8b", &request_with_tools).unwrap();
+        // Ensure tools were mapped through for vLLM request
+        assert!(vllm_request.tools.is_some());
+        assert!(vllm_request.tool_choice.is_some());
     }
 
     #[test]
