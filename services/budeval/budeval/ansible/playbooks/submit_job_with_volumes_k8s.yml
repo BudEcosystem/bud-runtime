@@ -7,14 +7,6 @@
     - community.kubernetes
 
   tasks:
-    - name: Ensure namespace exists
-      community.kubernetes.k8s:
-        name: "{{ namespace }}"
-        api_version: v1
-        kind: Namespace
-        state: present
-        kubeconfig: "{{ kubeconfig_path | default(omit) }}"
-
     - name: Deploy evaluation job
       community.kubernetes.k8s:
         state: present

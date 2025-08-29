@@ -17,15 +17,6 @@
     opencompass_dataset_filename: "{{ opencompass_dataset_url | basename }}"
 
   tasks:
-    - name: Check if namespace exists
-      community.kubernetes.k8s_info:
-        api_version: v1
-        kind: Namespace
-        name: "{{ namespace }}"
-        kubeconfig: "{{ kubeconfig_path | default(omit) }}"
-      register: namespace_check
-      failed_when: namespace_check.resources | length == 0
-
     - name: Check if PVC exists
       community.kubernetes.k8s_info:
         api_version: v1
