@@ -1,3 +1,41 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Name }}-budeval-dataset
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 32Gi
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ .Release.Name }}-budeval
+rules:
+  - apiGroups: [""]
+    resources: ["pvc"]
+    verbs: ["get"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get", "delete"]
+  - apiGroups: [""]
+    resources: ["cm"]
+    verbs: ["create", "get", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ .Release.Name }}-budeval
+subjects:
+  - kind: ServiceAccount
+    name: default
+roleRef:
+  kind: Role
+  name: {{ .Release.Name }}-budeval
+  apiGroup: rbac.authorization.k8s.io
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -60,6 +98,8 @@ spec:
             value: "zstd"
           - name: CLICKHOUSE_SECURE
             value: "false"
+          - name: EVAL_DATASETS_PATH
+            value: {{ .Release.Name }}-budeval-dataset
         {{ $root := . }}
         {{- range $key, $value := .Values.microservices.budeval.env }}
           - name: {{ $key }}
