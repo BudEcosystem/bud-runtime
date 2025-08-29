@@ -316,6 +316,8 @@ class CreateDeploymentWorkflow:
                 platform=platform,
                 add_worker=add_worker,
                 podscaler=podscaler,
+                input_tokens=deploy_engine_request_json.input_tokens,
+                output_tokens=deploy_engine_request_json.output_tokens,
             )
             update_workflow_data_in_statestore(
                 str(workflow_id),

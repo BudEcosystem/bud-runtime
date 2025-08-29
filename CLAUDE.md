@@ -346,6 +346,14 @@ Key architecture patterns:
 
 Important: When working with deployment configurations, ensure heuristic-based configs only include optimized parameters, not engine defaults.
 
+### Dynamic Max Model Length Configuration (January 2025)
+
+The budcluster service now dynamically calculates the `--max-model-len` parameter based on user-specified token requirements:
+- Calculates as `(input_tokens + output_tokens) * 1.1` for a 10% safety margin
+- Falls back to default (8192) when tokens are not provided
+- Ensures optimal resource allocation for different model context sizes
+- Supports large context models (up to 200k+ tokens based on schema limits)
+
 ### Service Communication Patterns
 
 - **Dapr Workflows**: Long-running processes use Dapr workflows (budsim simulations, cluster provisioning)

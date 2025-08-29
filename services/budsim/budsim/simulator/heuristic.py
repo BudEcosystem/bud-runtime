@@ -191,22 +191,25 @@ class HeuristicCalculator:
         if not model_uri:
             raise ValueError("Model URI not provided in model_params")
         batch_size = model_params.get("concurrent_requests")
-        seq_length = model_params.get("mean_input_tokens") + model_params.get("mean_output_tokens")
-
-        # Calculate memory requirements
-        memory_report = calculate_memory(
-            model_id_or_config=model_uri,
-            batch_size=batch_size,
-            seq_length=seq_length,
-            precision=self._get_precision_bits(model_params),
-        )
+        # Add 10% safety margin to match deployment configuration
+        seq_length = int((model_params.get("mean_input_tokens") + model_params.get("mean_output_tokens")) * 1.1)
 
         # Account for parallelism
         tp_size = model_params.get("tensor_parallel_size", 1)
         pp_size = model_params.get("pipeline_parallel_size", 1)
 
-        # Memory per device after parallelism
-        total_memory_per_device_gb = memory_report.total_memory_gb / (tp_size * pp_size)
+        # Calculate memory requirements with tensor parallelism
+        # calculate_memory with tensor_parallel gives per-device memory
+        memory_report = calculate_memory(
+            model_id_or_config=model_uri,
+            batch_size=batch_size,
+            seq_length=seq_length,
+            precision=self._get_precision_bits(model_params),
+            tensor_parallel=tp_size,  # Pass TP to get per-device memory
+        )
+
+        # Memory per device - already calculated correctly by calculate_memory with TP
+        total_memory_per_device_gb = memory_report.total_memory_gb / pp_size
 
         # Available memory
         available_memory_gb = model_params.get("memory_in_GB")
@@ -221,9 +224,11 @@ class HeuristicCalculator:
             "total_memory_gb": total_memory_per_device_gb,
             "available_memory_gb": available_memory_gb,
             "breakdown": {
-                "weights": memory_report.weight_memory_gb / (tp_size * pp_size),
-                "kv_cache": memory_report.kv_cache_gb,
-                "activations": memory_report.activation_memory_gb,
+                "weights": memory_report.weight_memory_gb,  # Already per-device from calculate_memory with TP
+                "kv_cache": memory_report.kv_cache_gb,  # Already per-device from calculate_memory with TP
+                "activations": memory_report.activation_memory_gb / pp_size
+                if pp_size > 1
+                else memory_report.activation_memory_gb,  # PP divides activations
             },
             "message": (
                 f"Memory check passed: {total_memory_per_device_gb:.2f}GB < {available_memory_gb}GB"
