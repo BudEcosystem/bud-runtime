@@ -95,7 +95,7 @@ class TestOAuthLoginRoute:
             response = client.post(
                 "/oauth/login",
                 json={
-                    "provider": "GOOGLE",  # Use uppercase enum value
+                    "provider": "google",  # Use lowercase enum value
                     "tenantId": str(test_tenant_with_oauth.id),
                 },
             )
@@ -130,7 +130,7 @@ class TestOAuthLoginRoute:
             response = client.post(
                 "/oauth/login",
                 json={
-                    "provider": "LINKEDIN",  # Use uppercase enum value
+                    "provider": "linkedin",  # Use lowercase enum value
                     "tenantId": str(test_tenant_with_oauth.id),
                 },
             )
@@ -149,7 +149,7 @@ class TestOAuthLoginRoute:
             response = client.post(
                 "/oauth/login",
                 json={
-                    "provider": "GOOGLE",
+                    "provider": "google",
                     "tenantId": str(test_tenant_with_oauth.id),
                 },
             )
@@ -297,7 +297,7 @@ class TestOAuthAdminRoutes:
                     "/admin/oauth/configure",
                     json={
                         "tenantId": str(test_tenant_with_oauth.id),
-                        "provider": "MICROSOFT",
+                        "provider": "microsoft",
                         "clientId": "test-client",
                         "clientSecret": "test-secret",
                         "enabled": True,
