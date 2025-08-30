@@ -52,7 +52,7 @@ export function OAuthButtons({ onAuthStart, className }: OAuthButtonsProps) {
       }
     } catch (error) {
       console.error('Failed to fetch OAuth providers:', error);
-      // Silently fail - don't show OAuth buttons if we can't fetch providers
+      // Silently fail   - don't show OAuth buttons if we can't fetch providers
     } finally {
       setIsLoading(false);
     }
