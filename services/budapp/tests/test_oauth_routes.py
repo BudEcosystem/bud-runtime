@@ -81,16 +81,20 @@ class TestOAuthLoginRoute:
         test_tenant_with_oauth: Tenant,
     ):
         """Test successful OAuth login initiation."""
-        with patch('budapp.auth.oauth_services.OAuthService') as mock_oauth_service:
+        with patch('budapp.auth.oauth_routes.OAuthService') as mock_oauth_service:
             mock_instance = AsyncMock()
             mock_oauth_service.return_value = mock_instance
 
-            # Mock the initiate_oauth_login method
-            mock_instance.initiate_oauth_login.return_value = AsyncMock(
+            # Mock the initiate_oauth_login method to return a proper response object
+            from budapp.auth.oauth_schemas import OAuthLoginResponse
+            from datetime import datetime, timezone
+
+            mock_response = OAuthLoginResponse(
                 auth_url="https://oauth.provider.com/authorize",
                 state="test-state-123",
-                expires_at="2024-12-31T23:59:59Z"
+                expires_at=datetime.now(timezone.utc)
             )
+            mock_instance.initiate_oauth_login.return_value = mock_response
 
             response = client.post(
                 "/oauth/login",
@@ -116,7 +120,7 @@ class TestOAuthLoginRoute:
         test_tenant_with_oauth: Tenant,
     ):
         """Test OAuth login with unconfigured provider."""
-        with patch('budapp.auth.oauth_services.OAuthService') as mock_oauth_service:
+        with patch('budapp.auth.oauth_routes.OAuthService') as mock_oauth_service:
             mock_instance = AsyncMock()
             mock_oauth_service.return_value = mock_instance
 
@@ -144,18 +148,33 @@ class TestOAuthLoginRoute:
         test_tenant_with_oauth: Tenant,
     ):
         """Test OAuth login rate limiting."""
-        # Make multiple requests to trigger rate limit
-        for i in range(11):  # Rate limit is 10 per minute
-            response = client.post(
-                "/oauth/login",
-                json={
-                    "provider": "google",
-                    "tenantId": str(test_tenant_with_oauth.id),
-                },
-            )
+        with patch('budapp.auth.oauth_routes.OAuthService') as mock_oauth_service:
+            mock_instance = AsyncMock()
+            mock_oauth_service.return_value = mock_instance
 
-        # Last request should be rate limited
-        assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS
+            # Mock successful response for all requests
+            from budapp.auth.oauth_schemas import OAuthLoginResponse
+            from datetime import datetime, timezone
+
+            mock_response = OAuthLoginResponse(
+                auth_url="https://oauth.provider.com/authorize",
+                state="test-state-123",
+                expires_at=datetime.now(timezone.utc)
+            )
+            mock_instance.initiate_oauth_login.return_value = mock_response
+
+            # Make multiple requests to trigger rate limit
+            for i in range(11):  # Rate limit is 10 per minute
+                response = client.post(
+                    "/oauth/login",
+                    json={
+                        "provider": "google",
+                        "tenantId": str(test_tenant_with_oauth.id),
+                    },
+                )
+
+            # Last request should be rate limited
+            assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS
 
 
 class TestOAuthSecureCallbackRoute:
