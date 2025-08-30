@@ -74,7 +74,7 @@ export function OAuthButtons({ onAuthStart, className }: OAuthButtonsProps) {
       sessionStorage.setItem('oauth_state', state);
 
       // Build the SSO login URL for budapp
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8005';
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:8005';
       const redirectUri = `${window.location.origin}/auth/login`;
 
       // Construct the OAuth URL with query parameters
