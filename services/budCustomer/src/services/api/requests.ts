@@ -2,6 +2,45 @@ import axios from "axios";
 const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
 import { errorToast } from "@/components/toast";
 
+// OAuth Types
+interface OAuthCallbackResponse {
+  access_token: string;
+  refresh_token?: string;
+  user: {
+    id: string;
+    email: string;
+    name: string;
+    avatar?: string;
+  };
+}
+
+interface TokenExchangeResponse {
+  access_token: string;
+  refresh_token?: string;
+  user: {
+    id: string;
+    email: string;
+    name: string;
+    avatar?: string;
+  };
+}
+
+export interface OAuthProvider {
+  provider: string;
+  enabled: boolean;
+  display_name: string;
+  icon_url?: string;
+}
+
+export interface OAuthProvidersResponse {
+  success: boolean;
+  message: string;
+  result: {
+    providers: OAuthProvider[];
+    tenant_id: string;
+  };
+}
+
 export const axiosInstance = axios.create({
   baseURL: baseUrl,
 });
@@ -53,7 +92,11 @@ axiosInstance.interceptors.request.use(
       config.url?.includes("auth/login") ||
       config.url?.includes("auth/register") ||
       config.url?.includes("users/reset-password") ||
-      config.url?.includes("auth/refresh-token");
+      config.url?.includes("auth/refresh-token") ||
+      config.url?.includes("auth/oauth/callback") ||
+      config.url?.includes("auth/token/exchange") ||
+      config.url?.includes("oauth/internal/authorize") ||
+      config.url?.includes("oauth/providers");
 
     if (!Token && !isPublicEndpoint) {
       // Prevent redirect loop
@@ -236,10 +279,190 @@ const Put = (endPoint: string, payload: any) => {
   return axiosInstance.put(endPoint, payload);
 };
 
+// OAuth Methods
+const OAuth = {
+  /**
+   * Fetch available OAuth providers from backend
+   */
+  getProviders: async (tenantId?: string): Promise<OAuthProvidersResponse> => {
+    try {
+      const params = tenantId ? `?tenant_id=${tenantId}` : '';
+      const response = await Get(`/oauth/providers${params}`);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to fetch OAuth providers:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Initialize OAuth flow with a provider
+   */
+  initializeOAuth: (provider: string, redirectUri: string, state: string): string => {
+    const params = new URLSearchParams({
+      redirect_uri: redirectUri,
+      state: state,
+    });
+
+    return `${baseUrl}/oauth/internal/authorize/${provider}?${params.toString()}`;
+  },
+
+  /**
+   * Handle OAuth callback and exchange token
+   */
+  handleCallback: async (provider: string, code: string, state: string): Promise<OAuthCallbackResponse> => {
+    try {
+      // Validate state parameter
+      const storedState = sessionStorage.getItem('oauth_state');
+      if (!storedState || storedState !== state) {
+        throw new Error('Invalid state parameter - possible CSRF attack');
+      }
+
+      const response = await Post('/auth/oauth/callback', {
+        provider,
+        code,
+        state,
+      });
+
+      const data = response.data;
+
+      // Clear state from session storage
+      sessionStorage.removeItem('oauth_state');
+
+      return data;
+    } catch (error) {
+      console.error('OAuth callback error:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Exchange temporary token for actual authentication tokens
+   */
+  exchangeToken: async (exchangeToken: string): Promise<TokenExchangeResponse> => {
+    try {
+      const response = await Post('/auth/token/exchange', {
+        exchange_token: exchangeToken,
+      });
+
+      // Handle the wrapped response format
+      if (response.data.result) {
+        return response.data.result;
+      }
+      return response.data;
+    } catch (error) {
+      console.error('Token exchange error:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Poll for token exchange completion
+   */
+  pollTokenExchange: async (
+    exchangeToken: string,
+    maxAttempts = 12,
+    interval = 5000
+  ): Promise<TokenExchangeResponse> => {
+    let attempts = 0;
+
+    const poll = async (): Promise<TokenExchangeResponse> => {
+      try {
+        attempts++;
+        const result = await OAuth.exchangeToken(exchangeToken);
+        return result;
+      } catch (error: any) {
+        if (attempts >= maxAttempts) {
+          throw new Error('Token exchange timeout - please try again');
+        }
+
+        // If token not ready yet, continue polling
+        if (error.message?.includes('Token not ready') || error.message?.includes('pending')) {
+          await new Promise(resolve => setTimeout(resolve, interval));
+          return poll();
+        }
+
+        // For other errors, throw immediately
+        throw error;
+      }
+    };
+
+    return poll();
+  },
+
+  /**
+   * Handle OAuth error from callback
+   */
+  handleOAuthError: (error: string, errorDescription?: string): void => {
+    console.error('OAuth error:', error, errorDescription);
+
+    let message = 'Authentication failed';
+
+    switch (error) {
+      case 'access_denied':
+        message = 'Access was denied. Please try again.';
+        break;
+      case 'invalid_request':
+        message = 'Invalid request. Please try again.';
+        break;
+      case 'unauthorized_client':
+        message = 'This application is not authorized. Please contact support.';
+        break;
+      case 'unsupported_response_type':
+        message = 'Unsupported authentication method.';
+        break;
+      case 'invalid_scope':
+        message = 'Invalid permissions requested.';
+        break;
+      case 'server_error':
+        message = 'Server error occurred. Please try again later.';
+        break;
+      case 'temporarily_unavailable':
+        message = 'Service temporarily unavailable. Please try again later.';
+        break;
+      default:
+        message = errorDescription || 'Authentication failed. Please try again.';
+    }
+
+    errorToast(message);
+  },
+
+  /**
+   * Clear OAuth session data
+   */
+  clearOAuthSession: (): void => {
+    sessionStorage.removeItem('oauth_state');
+    sessionStorage.removeItem('oauth_provider');
+    sessionStorage.removeItem('oauth_exchange_token');
+  },
+
+  /**
+   * Validate OAuth provider
+   */
+  isValidProvider: (provider: string): boolean => {
+    const validProviders = ['microsoft', 'github', 'google', 'linkedin'];
+    return validProviders.includes(provider.toLowerCase());
+  },
+
+  /**
+   * Get provider display name
+   */
+  getProviderDisplayName: (provider: string): string => {
+    const providerNames: Record<string, string> = {
+      microsoft: 'Microsoft',
+      github: 'GitHub',
+      google: 'Google',
+      linkedin: 'LinkedIn',
+    };
+    return providerNames[provider.toLowerCase()] || provider;
+  },
+};
+
 export const AppRequest = {
   Get,
   Post,
   Put,
   Patch,
   Delete,
+  OAuth,
 };
