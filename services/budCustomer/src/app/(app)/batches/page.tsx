@@ -17,6 +17,7 @@ import { Typography } from "antd";
 const { Text, Title } = Typography;
 import { Icon } from "@iconify/react/dist/iconify.js";
 import styles from "./batches.module.scss";
+import Tags from "@/components/ui/Tags";
 
 interface BatchJob {
   id: string;
@@ -115,7 +116,7 @@ export default function BatchesPage() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "queued":
-        return "#E6C240";
+        return "#D1B854";
       case "processing":
         return "#4077E6";
       case "completed":
@@ -160,9 +161,9 @@ export default function BatchesPage() {
           <Text className="text-bud-text-primary text-[14px] font-medium">
             {text}
           </Text>
-          <Text className="mt-[0.25rem] text-bud-text-disabled text-[12px] block">
+          {/* <Text className="mt-[0.25rem] text-bud-text-disabled text-[12px] block">
             {record.id}
-          </Text>
+          </Text> */}
         </div>
       ),
     },
@@ -193,12 +194,10 @@ export default function BatchesPage() {
             className={`text-[1rem] ${status === "processing" ? "animate-spin" : ""}`}
             style={{ color: getStatusColor(status) }}
           />
-          <Tag
+          <Tags
             color={getStatusColor(status)}
-            className="border-0 px-[0.75rem] py-[0.25rem] text-[0.75rem] uppercase"
-          >
-            {status}
-          </Tag>
+            name={status}
+          />
         </Flex>
       ),
     },
@@ -211,8 +210,8 @@ export default function BatchesPage() {
       key: "progress",
       width: 200,
       render: (_: any, record: BatchJob) => (
-        <div>
-          <Flex justify="space-between" className="mb-[0.5rem]">
+        <div className="flex flex-col gap-[0] w-full">
+          <Flex justify="space-between" className="mb-[0rem]">
             <Text className="text-bud-text-muted text-[12px]">
               {record.completedRequests}/{record.totalRequests}
             </Text>
@@ -230,34 +229,34 @@ export default function BatchesPage() {
         </div>
       ),
     },
-    {
-      title: (
-        <Text className="text-bud-text-disabled text-[12px] uppercase">
-          REQUESTS
-        </Text>
-      ),
-      key: "requests",
-      render: (_: any, record: BatchJob) => (
-        <Flex gap={16}>
-          <Tooltip title="Completed">
-            <Flex align="center" gap={4}>
-              <Icon icon="ph:check" className="text-[#479D5F]" />
-              <Text className="text-bud-text-primary text-[13px]">
-                {record.completedRequests}
-              </Text>
-            </Flex>
-          </Tooltip>
-          <Tooltip title="Failed">
-            <Flex align="center" gap={4}>
-              <Icon icon="ph:x" className="text-[#EC7575]" />
-              <Text className="text-bud-text-primary text-[13px]">
-                {record.failedRequests}
-              </Text>
-            </Flex>
-          </Tooltip>
-        </Flex>
-      ),
-    },
+    // {
+    //   title: (
+    //     <Text className="text-bud-text-disabled text-[12px] uppercase">
+    //       REQUESTS
+    //     </Text>
+    //   ),
+    //   key: "requests",
+    //   render: (_: any, record: BatchJob) => (
+    //     <Flex gap={16}>
+    //       <Tooltip title="Completed">
+    //         <Flex align="center" gap={4}>
+    //           <Icon icon="ph:check" className="text-[#479D5F]" />
+    //           <Text className="text-bud-text-primary text-[13px]">
+    //             {record.completedRequests}
+    //           </Text>
+    //         </Flex>
+    //       </Tooltip>
+    //       <Tooltip title="Failed">
+    //         <Flex align="center" gap={4}>
+    //           <Icon icon="ph:x" className="text-[#EC7575]" />
+    //           <Text className="text-bud-text-primary text-[13px]">
+    //             {record.failedRequests}
+    //           </Text>
+    //         </Flex>
+    //       </Tooltip>
+    //     </Flex>
+    //   ),
+    // },
     {
       title: (
         <Text className="text-bud-text-disabled text-[12px] uppercase">
@@ -267,7 +266,7 @@ export default function BatchesPage() {
       dataIndex: "cost",
       key: "cost",
       render: (cost: number) => (
-        <Text className="text-bud-purple text-[13px]">${cost.toFixed(2)}</Text>
+        <Text className="text-[black] dark:text-[white] text-[13px]">${cost.toFixed(2)}</Text>
       ),
     },
     {
@@ -504,12 +503,11 @@ export default function BatchesPage() {
                     <Text className="text-bud-text-disabled text-[12px]">
                       Status
                     </Text>
-                    <Tag
+                    <Tags
                       color={getStatusColor(selectedBatch.status)}
-                      className="border-0 px-[0.75rem] py-[0.25rem] text-[0.75rem] uppercase mt-[0.25rem]"
-                    >
-                      {selectedBatch.status}
-                    </Tag>
+                      name={selectedBatch.status}
+                      // className="border-0 px-[0.75rem] py-[0.25rem] text-[0.75rem] uppercase mt-[0.25rem]"
+                    />
                   </div>
                 </div>
 

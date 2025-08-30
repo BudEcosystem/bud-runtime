@@ -207,7 +207,7 @@ export default function AddNewKey() {
         <BudDrawerLayout>
           <DrawerTitleCard
             title="New Key"
-            description="Create New key here"
+            description="Generate secure API credentials for accessing your project resources"
           />
           <div>
             <AddKeyForm setApiKeyData={setApiKeyData} />

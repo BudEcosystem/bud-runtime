@@ -248,7 +248,6 @@ export default function ApiKeysPage() {
               </Text_14_400_B3B3B3>
             </div>
             <PrimaryButton
-              icon={<Icon icon="ph:key" />}
               onClick={() => openDrawer("add-new-key")}
             >
               Create New Key
