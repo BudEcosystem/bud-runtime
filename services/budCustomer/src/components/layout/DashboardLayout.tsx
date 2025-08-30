@@ -92,8 +92,8 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
     {
       label: "Playground",
       route: "/playground",
-      icon: "/icons/playIcn.png",
-      iconWhite: "/icons/playWhite.png",
+      icon: "/icons/play.png",
+      iconWhite: "/icons/playIcn.png",
       shortcut: "1",
     },
     {
@@ -134,8 +134,8 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
     {
       label: "Projects",
       route: "/projects",
-      icon: "/icons/project.png",
-      iconWhite: "/icons/projectIconWhite.png",
+      icon: "/icons/projectIcon.png",
+      iconWhite: "/icons/projectsLight.png",
       shortcut: "7",
     },
   ];

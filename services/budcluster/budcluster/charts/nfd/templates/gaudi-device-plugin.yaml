@@ -1,0 +1,12 @@
+{{- if .Values.intelDevicePlugin.gaudiEnabled }}
+---
+apiVersion: deviceplugin.intel.com/v1
+kind: GaudiDevicePlugin
+metadata:
+  name: gaudi-device-plugin
+  namespace: intel-device-plugins-system
+  labels:
+    {{- include "nfd.labels" . | nindent 4 }}
+spec:
+  image: intel/intel-deviceplugin-gaudi:0.28.0
+{{- end }}

@@ -17,9 +17,11 @@
 """The models package, containing the database models for the user ops."""
 
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
 from sqlalchemy import ARRAY, Boolean, DateTime, Enum, ForeignKey, Integer, String, Uuid
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from budapp.cluster_ops.models import Cluster
@@ -30,6 +32,10 @@ from budapp.endpoint_ops.models import Endpoint
 from budapp.model_ops.models import Model
 from budapp.permissions.models import ProjectPermission
 from budapp.project_ops.models import Project, project_user_association
+
+
+if TYPE_CHECKING:
+    from budapp.user_ops.oauth_models import UserOAuthProvider
 
 
 class User(Base, TimestampMixin):
@@ -75,10 +81,16 @@ class User(Base, TimestampMixin):
         ),
         default=UserTypeEnum.CLIENT.value,
     )
+    auth_providers: Mapped[list[dict] | None] = mapped_column(
+        JSONB, default=list, nullable=True
+    )  # Track linked OAuth providers
 
     permission: Mapped["Permission"] = relationship(back_populates="user")  # one-to-one
     created_models: Mapped[list[Model]] = relationship(back_populates="created_user")
     tenant_mappings: Mapped[list["TenantUserMapping"]] = relationship(back_populates="user")
+    oauth_providers: Mapped[list["UserOAuthProvider"]] = relationship(
+        "UserOAuthProvider", back_populates="user", cascade="all, delete-orphan"
+    )
 
     # TODO: uncomment when implement individual fields
     benchmarks: Mapped[list["BenchmarkSchema"]] = relationship(back_populates="user")

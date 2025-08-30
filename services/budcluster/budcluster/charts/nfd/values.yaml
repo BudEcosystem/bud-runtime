@@ -1,0 +1,118 @@
+# Node Feature Discovery Configuration
+# This values file configures NFD for bud-stack hardware detection
+
+# Global settings
+global:
+  namespace: node-feature-discovery
+
+# NFD configuration
+nfd:
+  enabled: true
+
+# Master configuration
+master:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+# Worker configuration
+worker:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+  # Configuration for feature detection
+  config:
+    core:
+      labelSources:
+        - custom
+        - pci
+        - cpu
+        - kernel
+        - local
+        - memory
+        - network
+        - storage
+        - system
+        - usb
+
+      # Update interval
+      sleepInterval: 60s
+
+    sources:
+      # CPU feature detection
+      cpu:
+        cpuid:
+          attributeWhitelist:
+            - "AVX"
+            - "AVX2"
+            - "AVX512BF16"
+            - "AVX512F"
+            - "FMA3"
+            - "SSE4.2"
+            - "VNNI"
+            - "AMX"
+
+      # System feature detection for CPU model info
+      system:
+        osRelease:
+          id:
+            - "ID"
+            - "VERSION_ID"
+        name:
+          - "nodename"
+
+      # Local source for custom CPU detection rules
+      local:
+        hooksEnabled: true
+
+      # Kernel feature detection
+      kernel:
+        kconfigFile: "/host-boot/config"
+        configOpts:
+          - "NO_HZ"
+          - "X86_INTEL_PSTATE"
+          - "NVIDIA_UVM"
+
+      # PCI device detection
+      pci:
+        deviceClassWhitelist:
+          - "0300"  # VGA compatible controller
+          - "0302"  # 3D controller
+          - "0b40"  # Co-processor
+        deviceLabelFields:
+          - "vendor"
+          - "device"
+          - "class"
+          - "subsystem_vendor"
+          - "subsystem_device"
+
+# Topology updater (for NUMA awareness)
+topologyUpdater:
+  enable: true
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+
+# GPU Feature Discovery configuration
+# Deployed separately via GPU Operator
+gpuFeatureDiscovery:
+  enabled: false
+
+# Intel Device Plugin configuration
+# Deployed separately when Intel HPUs detected
+intelDevicePlugin:
+  enabled: false
