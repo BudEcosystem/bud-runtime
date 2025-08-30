@@ -379,6 +379,8 @@ class TestOAuthCallback:
                 return None
 
             mock_user_manager_instance.retrieve_by_fields = AsyncMock(side_effect=return_expired_session)
+            # Mock get_all_by_fields to return empty list for other queries
+            mock_user_manager_instance.get_all_by_fields = AsyncMock(return_value=[])
 
             request = OAuthCallbackRequest(
                 code="test-code",
