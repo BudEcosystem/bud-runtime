@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import AuthLayout from "@/components/auth/AuthLayout";
 import { useAuthNavigation, useLoader } from "@/context/authContext";
@@ -17,7 +17,7 @@ interface DataInterface {
   password?: string;
 }
 
-export default function Login() {
+function LoginContent() {
   const { activePage, setActivePage, setAuthError } = useAuthNavigation();
   const { showLoader, hideLoader } = useLoader();
   const router = useRouter();
@@ -259,5 +259,20 @@ export default function Login() {
         </AnimatePresence>
       </div>
     </AuthLayout>
+  );
+}
+
+export default function Login() {
+  return (
+    <Suspense fallback={
+      <AuthLayout>
+        <div className="flex flex-col justify-center items-center h-full">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-bud-purple"></div>
+          <p className="mt-4 text-sm text-bud-text-muted">Loading...</p>
+        </div>
+      </AuthLayout>
+    }>
+      <LoginContent />
+    </Suspense>
   );
 }
