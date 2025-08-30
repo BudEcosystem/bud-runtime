@@ -56,7 +56,7 @@ def upgrade() -> None:
         sa.Column("expires_at", sa.DateTime(), nullable=False),
         sa.Column("completed", sa.Boolean(), nullable=True),
         sa.Column("created_at", sa.DateTime(), nullable=True),
-        sa.Column("updated_at", sa.DateTime(), nullable=True),
+        sa.Column("modified_at", sa.DateTime(), nullable=True),
         sa.ForeignKeyConstraint(
             ["tenant_id"],
             ["tenant.id"],
@@ -83,7 +83,7 @@ def upgrade() -> None:
         sa.Column("auto_create_users", sa.Boolean(), nullable=True),
         sa.Column("config_data", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column("created_at", sa.DateTime(), nullable=True),
-        sa.Column("updated_at", sa.DateTime(), nullable=True),
+        sa.Column("modified_at", sa.DateTime(), nullable=True),
         sa.ForeignKeyConstraint(
             ["tenant_id"],
             ["tenant.id"],
@@ -106,7 +106,7 @@ def upgrade() -> None:
         sa.Column("provider_data", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column("linked_at", sa.DateTime(), nullable=True),
         sa.Column("created_at", sa.DateTime(), nullable=True),
-        sa.Column("updated_at", sa.DateTime(), nullable=True),
+        sa.Column("modified_at", sa.DateTime(), nullable=True),
         sa.ForeignKeyConstraint(
             ["user_id"],
             ["user.id"],
