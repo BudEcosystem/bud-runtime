@@ -87,7 +87,7 @@ class TestOAuthLoginRoute:
             )
 
             response = client.post(
-                "/api/v1/auth/oauth/login",
+                "/oauth/login",
                 json={
                     "provider": "google",
                     "tenantId": str(test_tenant_with_oauth.id),
@@ -107,7 +107,7 @@ class TestOAuthLoginRoute:
     ):
         """Test OAuth login with unconfigured provider."""
         response = client.post(
-            "/api/v1/auth/oauth/login",
+            "/oauth/login",
             json={
                 "provider": "linkedin",  # Not configured
                 "tenantId": str(test_tenant_with_oauth.id),
@@ -126,7 +126,7 @@ class TestOAuthLoginRoute:
         # Make multiple requests to trigger rate limit
         for i in range(11):  # Rate limit is 10 per minute
             response = client.post(
-                "/api/v1/auth/oauth/login",
+                "/oauth/login",
                 json={
                     "provider": "google",
                     "tenantId": str(test_tenant_with_oauth.id),
@@ -181,7 +181,7 @@ class TestOAuthSecureCallbackRoute:
 
             # Test the secure callback route
             response = client.get(
-                "/api/v1/auth/oauth/secure-callback",
+                "/oauth/secure-callback",
                 params={
                     "code": "test-code",
                     "state": "test-state",
@@ -197,7 +197,7 @@ class TestOAuthSecureCallbackRoute:
     def test_oauth_secure_callback_error_from_provider(self, client: TestClient):
         """Test OAuth secure callback with error from provider."""
         response = client.get(
-            "/api/v1/auth/oauth/secure-callback",
+            "/oauth/secure-callback",
             params={
                 "state": "test-state",
                 "error": "access_denied",
@@ -221,7 +221,7 @@ class TestOAuthProvidersRoute:
     ):
         """Test getting available OAuth providers."""
         response = client.get(
-            "/api/v1/auth/oauth/providers",
+            "/oauth/providers",
             params={"tenant_id": str(test_tenant_with_oauth.id)},
         )
 
@@ -242,7 +242,7 @@ class TestOAuthProvidersRoute:
             mock_instance._get_tenant.return_value = AsyncMock(id=uuid4())
             mock_instance.get_available_providers.return_value = []
 
-            response = client.get("/api/v1/auth/oauth/providers")
+            response = client.get("/oauth/providers")
 
         assert response.status_code == status.HTTP_200_OK
 
@@ -273,7 +273,7 @@ class TestOAuthAdminRoutes:
                 )
 
                 response = client.post(
-                    "/api/v1/auth/admin/oauth/configure",
+                    "/admin/oauth/configure",
                     json={
                         "tenantId": str(test_tenant_with_oauth.id),
                         "provider": "microsoft",
@@ -307,7 +307,7 @@ class TestOAuthAdminRoutes:
             mock_user.return_value = non_admin
 
             response = client.post(
-                "/api/v1/auth/admin/oauth/configure",
+                "/admin/oauth/configure",
                 json={
                     "tenantId": str(test_tenant_with_oauth.id),
                     "provider": "microsoft",
@@ -335,7 +335,7 @@ class TestOAuthAdminRoutes:
                 mock_instance.disable_oauth_provider.return_value = True
 
                 response = client.put(
-                    f"/api/v1/auth/admin/oauth/disable/{test_tenant_with_oauth.id}/google"
+                    f"/admin/oauth/disable/{test_tenant_with_oauth.id}/google"
                 )
 
         assert response.status_code == status.HTTP_200_OK
