@@ -358,7 +358,7 @@ class TestOAuthCallback:
         mock_session.add(oauth_session)
         mock_session.commit()
 
-        with patch('budapp.user_ops.crud.UserDataManager') as mock_user_manager:
+        with patch('budapp.auth.oauth_services.UserDataManager') as mock_user_manager:
             # Mock UserDataManager to return the expired session
             mock_user_manager_instance = AsyncMock()
             mock_user_manager.return_value = mock_user_manager_instance
