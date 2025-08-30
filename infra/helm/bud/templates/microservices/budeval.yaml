@@ -4,7 +4,7 @@ metadata:
   name: {{ .Release.Name }}-budeval-dataset
 spec:
   accessModes:
-    - ReadWriteMany
+    - ReadWriteOnce
   resources:
     requests:
       storage: 32Gi
