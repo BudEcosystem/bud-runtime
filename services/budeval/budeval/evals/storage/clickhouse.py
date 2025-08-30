@@ -522,14 +522,13 @@ class ClickHouseStorage(StorageAdapter):
             True if deleted successfully, False otherwise
         """
         try:
-            async with self.get_connection() as conn:
+            async with self.get_connection() as conn, conn.cursor() as cursor:
                 # Delete in reverse dependency order
                 tables = ["budeval.predictions", "budeval.dataset_results", "budeval.evaluation_jobs"]
 
                 for table in tables:
                     query = f"DELETE FROM {table} WHERE job_id = %(job_id)s"
-                    async with conn.cursor() as cursor:
-                        await cursor.execute(query, {"job_id": job_id})
+                    await cursor.execute(query, {"job_id": job_id})
 
                 logger.info(f"Successfully deleted results for job {job_id}")
                 return True
@@ -545,13 +544,12 @@ class ClickHouseStorage(StorageAdapter):
         Returns True on success, False on failure.
         """
         try:
-            async with self.get_connection() as conn:
+            async with self.get_connection() as conn, conn.cursor() as cursor:
                 tables = ["budeval.predictions", "budeval.dataset_results", "budeval.evaluation_jobs"]
 
                 for table in tables:
                     query = f"ALTER TABLE {table} DELETE WHERE 1"
-                    async with conn.cursor() as cursor:
-                        await cursor.execute(query)
+                    await cursor.execute(query)
 
             logger.info("Successfully purged all budeval records from ClickHouse")
             return True
@@ -567,17 +565,16 @@ class ClickHouseStorage(StorageAdapter):
             List of job IDs that have stored results
         """
         try:
-            async with self.get_connection() as conn:
+            async with self.get_connection() as conn, conn.cursor() as cursor:
                 query = """
                 SELECT DISTINCT job_id
                 FROM budeval.evaluation_jobs
                 ORDER BY created_at DESC
                 """
 
-                async with conn.cursor() as cursor:
-                    await cursor.execute(query)
-                    rows = await cursor.fetchall()
-                    return [row[0] for row in rows]
+                await cursor.execute(query)
+                rows = await cursor.fetchall()
+                return [row[0] for row in rows]
 
         except Exception as e:
             logger.error(f"Failed to list results: {e}")
@@ -651,17 +648,16 @@ class ClickHouseStorage(StorageAdapter):
             True if results exist, False otherwise
         """
         try:
-            async with self.get_connection() as conn:
+            async with self.get_connection() as conn, conn.cursor() as cursor:
                 query = """
                 SELECT 1 FROM budeval.evaluation_jobs
                 WHERE job_id = %(job_id)s
                 LIMIT 1
                 """
 
-                async with conn.cursor() as cursor:
-                    await cursor.execute(query, {"job_id": job_id})
-                    row = await cursor.fetchone()
-                    return row is not None
+                await cursor.execute(query, {"job_id": job_id})
+                row = await cursor.fetchone()
+                return row is not None
 
         except Exception as e:
             logger.error(f"Failed to check existence for job {job_id}: {e}")
