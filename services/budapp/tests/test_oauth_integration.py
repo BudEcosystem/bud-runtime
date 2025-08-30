@@ -460,13 +460,19 @@ class TestOAuthProviderConfiguration:
         mock_session,
     ):
         """Test getting available OAuth providers."""
-        providers = await oauth_service.get_available_providers(test_tenant.id)
+        # Mock UserDataManager to return the test_oauth_config
+        with patch('budapp.auth.oauth_services.UserDataManager') as mock_user_manager:
+            mock_user_manager_instance = AsyncMock()
+            mock_user_manager.return_value = mock_user_manager_instance
+            mock_user_manager_instance.get_all_by_fields = AsyncMock(return_value=[test_oauth_config])
 
-        assert len(providers) == 1
-        assert providers[0].provider == OAuthProviderEnum.GOOGLE.value
-        assert providers[0].enabled is True
-        assert providers[0].allowed_domains == ["example.com"]
-        assert providers[0].auto_create_users is True
+            providers = await oauth_service.get_available_providers(test_tenant.id)
+
+            assert len(providers) == 1
+            assert providers[0].provider == OAuthProviderEnum.GOOGLE.value
+            assert providers[0].enabled is True
+            assert providers[0].allowed_domains == ["example.com"]
+            assert providers[0].auto_create_users is True
 
     @pytest.mark.asyncio
     async def test_get_available_providers_empty(
@@ -476,9 +482,15 @@ class TestOAuthProviderConfiguration:
         mock_session,
     ):
         """Test getting available providers when none configured."""
-        providers = await oauth_service.get_available_providers(test_tenant.id)
+        # Mock UserDataManager to return empty list
+        with patch('budapp.auth.oauth_services.UserDataManager') as mock_user_manager:
+            mock_user_manager_instance = AsyncMock()
+            mock_user_manager.return_value = mock_user_manager_instance
+            mock_user_manager_instance.get_all_by_fields = AsyncMock(return_value=[])
 
-        assert len(providers) == 0
+            providers = await oauth_service.get_available_providers(test_tenant.id)
+
+            assert len(providers) == 0
 
 
 class TestOAuthErrorHandling:
