@@ -137,7 +137,7 @@ class InternalOAuthProxy:
 
         if error:
             raise OAuthError(
-                code=OAuthErrorCode.AUTHENTICATION_FAILED,
+                code=OAuthErrorCode.PROVIDER_ERROR,
                 message=error_description or "Authentication failed",
             )
 
@@ -264,7 +264,7 @@ class InternalOAuthProxy:
             "google": "openid email profile",
             "microsoft": "openid email profile User.Read",
             "github": "user:email",
-            "linkedin": "r_liteprofile r_emailaddress",
+            "linkedin": "openid profile email",
         }
         return scopes.get(provider.lower(), "openid email profile")
 

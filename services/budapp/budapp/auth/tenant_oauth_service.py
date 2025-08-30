@@ -151,8 +151,8 @@ class TenantOAuthService(SessionMixin):
                     # LinkedIn-specific OIDC configuration
                     "authorizationUrl": "https://www.linkedin.com/oauth/v2/authorization",
                     "tokenUrl": "https://www.linkedin.com/oauth/v2/accessToken",
-                    "userInfoUrl": "https://api.linkedin.com/v2/me",
-                    "defaultScope": "r_liteprofile r_emailaddress",
+                    "userInfoUrl": "https://api.linkedin.com/v2/userinfo",
+                    "defaultScope": "openid profile email",
                     "syncMode": "IMPORT",
                     "hideOnLoginPage": "false",
                     "trustEmail": "true",
@@ -254,7 +254,7 @@ class TenantOAuthService(SessionMixin):
         if enabled_only:
             filters["enabled"] = True
 
-        return await UserDataManager(self.session).retrieve_by_fields_all(TenantOAuthConfig, filters)
+        return await UserDataManager(self.session).get_all_by_fields(TenantOAuthConfig, filters)
 
     async def disable_oauth_provider(self, tenant_id: UUID, provider: OAuthProviderEnum) -> bool:
         """Disable OAuth provider for a tenant.
