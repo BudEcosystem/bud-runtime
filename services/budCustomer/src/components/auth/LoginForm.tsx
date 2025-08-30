@@ -13,6 +13,7 @@ import { CheckBoxInput } from "@/components/ui/input";
 import { PrimaryButton } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { getChromeColor } from "@/utils/getChromeColor";
+import { OAuthButtons } from "@/components/auth/OAuthButtons";
 
 type LoginPageModalProps = {
   onSubmit: (formData: { [key: string]: string }) => void;
@@ -278,6 +279,11 @@ const LoginForm = ({ onSubmit }: LoginPageModalProps) => {
         >
           Forgot password?
         </Text_12_400_EEEEEE>
+      </div>
+
+      {/* OAuth Login Section */}
+      <div className="w-[76.6%] mt-[1.5rem]">
+        <OAuthButtons />
       </div>
 
       <div className="mt-[1rem] flex justify-center items-center gap-1">
