@@ -364,9 +364,9 @@ class TestOAuthCallback:
             mock_user_manager.return_value = mock_user_manager_instance
 
             # Create a fresh copy of the session for each call to avoid state mutation
-            def return_expired_session(*args, **kwargs):
-                # Return the expired session only for OAuthSession queries
-                if args and args[0] == OAuthSession:
+            async def return_expired_session(model_class, filters, **kwargs):
+                # Return the expired session only for OAuthSession queries with state filter
+                if model_class == OAuthSession and filters.get("state") == state:
                     # Create a fresh session object to avoid state mutation
                     fresh_session = OAuthSession(
                         provider=OAuthProviderEnum.GOOGLE.value,
