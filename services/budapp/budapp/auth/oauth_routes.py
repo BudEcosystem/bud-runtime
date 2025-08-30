@@ -25,6 +25,7 @@ from typing_extensions import Annotated
 
 from budapp.auth.oauth_error_handler import OAuthError
 from budapp.commons import logging
+from budapp.commons.api_utils import get_oauth_base_url
 from budapp.commons.dependencies import get_current_user, get_session
 from budapp.commons.exceptions import ClientException
 from budapp.commons.rate_limiter import rate_limit
@@ -77,7 +78,7 @@ async def initiate_oauth_login(
         oauth_service = OAuthService(session)
 
         # Get base URL from request
-        base_url = str(request.base_url).rstrip("/")
+        base_url = get_oauth_base_url(request)
 
         # Use proxy by default to hide Keycloak URL
         response = await oauth_service.initiate_oauth_login(login_request, base_url, use_proxy=True)

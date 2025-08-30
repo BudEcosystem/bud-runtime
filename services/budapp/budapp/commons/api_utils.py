@@ -4,7 +4,10 @@ import asyncio
 from functools import wraps
 from typing import Any, Callable, Protocol, Tuple, Type, TypeVar, runtime_checkable
 
+from fastapi import Request
 from pydantic import BaseModel
+
+from .config import app_settings
 
 
 T = TypeVar("T")
@@ -40,3 +43,25 @@ def pubsub_api_endpoint(request_model: Type[BaseModel]) -> Callable[[Callable[..
         return wrapper  # type: ignore
 
     return decorator
+
+
+def get_oauth_base_url(request: Request) -> str:
+    """Get base URL for OAuth operations with HTTPS/HTTP logic.
+
+    Args:
+        request: FastAPI Request object
+
+    Returns:
+        str: Base URL with proper scheme (http/https)
+    """
+    base_url = str(request.base_url).rstrip("/")
+
+    # Check if we should force HTTP for OAuth operations
+    if app_settings.use_http_only_oauth:
+        # Replace https with http if present
+        base_url = base_url.replace("https://", "http://")
+    else:
+        # Default behavior: force HTTPS for OAuth security
+        base_url = base_url.replace("http://", "https://")
+
+    return base_url

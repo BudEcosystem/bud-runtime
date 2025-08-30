@@ -30,6 +30,7 @@ from budapp.auth.oauth_services import OAuthService
 from budapp.auth.token_exchange_service import TokenExchangeService
 from budapp.auth.user_onboarding_service import UserOnboardingService
 from budapp.commons import logging
+from budapp.commons.api_utils import get_oauth_base_url
 from budapp.commons.config import app_settings
 from budapp.commons.dependencies import get_session
 from budapp.commons.exceptions import ClientException
@@ -85,8 +86,8 @@ async def secure_oauth_callback(
         RedirectResponse to frontend with exchange token or error
     """
     # Default redirect URLs
-    default_success_url = str(request.base_url).rstrip("/") + "/auth/success"
-    default_error_url = str(request.base_url).rstrip("/") + "/auth/error"
+    default_success_url = get_oauth_base_url(request) + "/auth/success"
+    default_error_url = get_oauth_base_url(request) + "/auth/error"
 
     try:
         # Retrieve OAuth session to get redirect URLs
