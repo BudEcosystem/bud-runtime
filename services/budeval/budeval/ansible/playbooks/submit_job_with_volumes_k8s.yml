@@ -7,14 +7,6 @@
     - community.kubernetes
 
   tasks:
-    - name: Ensure namespace exists
-      community.kubernetes.k8s:
-        name: "{{ namespace }}"
-        api_version: v1
-        kind: Namespace
-        state: present
-        kubeconfig: "{{ kubeconfig_path | default(omit) }}"
-
     - name: Deploy evaluation job
       community.kubernetes.k8s:
         state: present
@@ -48,7 +40,7 @@
         msg: |
           Job {{ job_name }} has been deployed successfully.
           Status: {{ job_status.resources[0].status | default('Unknown') }}
-          Datasets: eval-datasets-pvc mounted at /workspace/data (read-only)
-          Output: eval-datasets-pvc/results/{{ job_name }} mounted at /workspace/outputs
+          Datasets: panda-budeval-dataset mounted at /workspace/data (read-only)
+          Output: panda-budeval-dataset/results/{{ job_name }} mounted at /workspace/outputs
           Cache: emptyDir mounted at /workspace/cache
           Configs: ConfigMap mounted at /workspace/configs (read-only)

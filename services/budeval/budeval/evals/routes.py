@@ -22,7 +22,7 @@ from fastapi import APIRouter, HTTPException, Query
 from budeval.evals.schemas import StartEvaluationRequest
 from budeval.evals.services import EvaluationOpsService, EvaluationService
 
-from .schemas import EvaluationRequest
+from .schemas import EvaluationRequest, EvaluationScoresResponse
 
 
 logger = logging.get_logger(__name__)
@@ -439,3 +439,67 @@ async def delete_evaluation_results(job_id: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete results: {str(e)}") from e
+
+
+@evals_routes.get("/evaluations/{evaluation_id}/scores", response_model=EvaluationScoresResponse)
+async def get_evaluation_scores(evaluation_id: str):
+    """Get dataset scores for a specific evaluation.
+
+    Args:
+        evaluation_id: The evaluation job ID
+
+    Returns:
+        EvaluationScoresResponse with model info and dataset scores
+
+    Raises:
+        404: If evaluation results are not found
+        500: If an error occurs while retrieving results
+    """
+    try:
+        from budeval.evals.storage.factory import get_storage_adapter, initialize_storage
+
+        # Get storage adapter based on configuration
+        storage = get_storage_adapter()
+
+        # Initialize if needed
+        if hasattr(storage, "initialize"):
+            await initialize_storage(storage)
+
+        # Check if we're using ClickHouse
+        if storage.__class__.__name__ != "ClickHouseStorage":
+            # Fallback for non-ClickHouse storage
+            results = await storage.get_results(evaluation_id)
+            if not results:
+                raise HTTPException(status_code=404, detail=f"Evaluation results not found for ID: {evaluation_id}")
+
+            # Transform to match response schema
+            response = EvaluationScoresResponse(
+                evaluation_id=evaluation_id,
+                model_name=results.get("model_name", "unknown"),
+                engine=results.get("engine", "opencompass"),
+                overall_accuracy=results.get("summary", {}).get("overall_accuracy", 0.0),
+                datasets=[
+                    {
+                        "dataset_name": ds.get("dataset_name"),
+                        "accuracy": ds.get("accuracy", 0.0),
+                        "total_examples": ds.get("total_examples", 0),
+                        "correct_examples": ds.get("correct_examples", 0),
+                    }
+                    for ds in results.get("datasets", [])
+                ],
+            )
+            return response
+
+        # For ClickHouse storage, use the optimized method
+        scores = await storage.get_evaluation_scores(evaluation_id)
+
+        if not scores:
+            raise HTTPException(status_code=404, detail=f"Evaluation results not found for ID: {evaluation_id}")
+
+        return EvaluationScoresResponse(**scores)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get evaluation scores for {evaluation_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve evaluation scores: {str(e)}") from e

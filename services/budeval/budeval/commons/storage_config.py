@@ -48,7 +48,7 @@ class StorageConfig:
         Returns:
             The PVC name to use for eval datasets
         """
-        return os.environ.get("EVAL_DATASETS_PVC_NAME", "eval-datasets-pvc")
+        return os.environ.get("EVAL_DATASETS_PATH", "panda-budeval-dataset")
 
     @staticmethod
     def get_storage_config() -> Dict[str, Any]:

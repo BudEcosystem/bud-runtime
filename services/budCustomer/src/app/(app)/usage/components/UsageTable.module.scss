@@ -1,0 +1,190 @@
+.tableContainer {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 1.5rem;
+
+  .tableHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+
+    .tableTitle {
+      font-size: 16px;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    .tableSubtitle {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+  }
+
+  .columnHeader {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .cellText {
+    font-size: 13px;
+    color: var(--text-primary);
+  }
+
+  .costText {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-purple);
+  }
+
+  .usageTable {
+    :global {
+      .ant-table {
+        background: transparent;
+      }
+
+      .ant-table-thead > tr > th {
+        background: transparent;
+        border-bottom: 1px solid var(--border-color);
+        padding: 12px 16px;
+
+        &::before {
+          display: none;
+        }
+      }
+
+      .ant-table-tbody > tr {
+        &:hover > td {
+          background: var(--bg-hover);
+        }
+
+        > td {
+          border-bottom: 1px solid var(--border-secondary);
+          padding: 12px 16px;
+          transition: background 0.2s ease;
+        }
+
+        &:last-child > td {
+          border-bottom: none;
+        }
+      }
+
+      .ant-empty {
+        .ant-empty-normal {
+          color: var(--text-muted);
+        }
+      }
+
+      .ant-table-pagination {
+        margin-top: 1.5rem;
+      }
+    }
+  }
+
+  .pagination {
+    :global {
+      .ant-pagination-item {
+        background: transparent;
+        border-color: var(--border-color);
+
+        a {
+          color: var(--text-primary);
+        }
+
+        &-active {
+          background: var(--color-purple);
+          border-color: var(--color-purple);
+
+          a {
+            color: white;
+          }
+        }
+      }
+
+      .ant-pagination-prev,
+      .ant-pagination-next {
+        .ant-pagination-item-link {
+          background: transparent;
+          border-color: var(--border-color);
+          color: var(--text-primary);
+        }
+      }
+
+      .ant-pagination-total-text {
+        color: var(--text-muted);
+        font-size: 12px;
+      }
+    }
+  }
+}
+
+// Light theme overrides
+[data-theme="light"] {
+  .tableContainer {
+    background: #ffffff;
+    border-color: #e5e7eb;
+
+    .columnHeader {
+      color: #6b7280;
+    }
+
+    .cellText {
+      color: #111827;
+    }
+
+    .costText {
+      color: #7c3aed;
+    }
+
+    .usageTable {
+      :global {
+        .ant-table-thead > tr > th {
+          border-bottom-color: #e5e7eb;
+        }
+
+        .ant-table-tbody > tr {
+          &:hover > td {
+            background: #f9fafb;
+          }
+
+          > td {
+            border-bottom-color: #f3f4f6;
+          }
+        }
+      }
+    }
+
+    .pagination {
+      :global {
+        .ant-pagination-item {
+          border-color: #e5e7eb;
+
+          a {
+            color: #111827;
+          }
+
+          &-active {
+            background: #7c3aed;
+            border-color: #7c3aed;
+          }
+        }
+
+        .ant-pagination-prev,
+        .ant-pagination-next {
+          .ant-pagination-item-link {
+            border-color: #e5e7eb;
+            color: #111827;
+          }
+        }
+
+        .ant-pagination-total-text {
+          color: #6b7280;
+        }
+      }
+    }
+  }
+}

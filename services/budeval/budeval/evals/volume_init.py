@@ -76,7 +76,7 @@ class VolumeInitializer:
         namespace = self.get_current_namespace()
 
         # Get PVC name from config or use default
-        pvc_name = os.environ.get("EVAL_DATASETS_PVC_NAME", "eval-datasets-pvc")
+        pvc_name = os.environ.get("EVAL_DATASETS_PVC_NAME", "panda-budeval-dataset")
 
         # Get dataset URL from environment
         dataset_url = os.environ.get(
@@ -173,7 +173,7 @@ class VolumeInitializer:
     #                     "--restart=Never",
     #                     "--image=busybox",
     #                     "--overrides",
-    #                     '{"spec":{"containers":[{"name":"dataset-verify","volumeMounts":[{"name":"data","mountPath":"/data"}]}],"volumes":[{"name":"data","persistentVolumeClaim":{"claimName":"eval-datasets-pvc"}}]}}',
+    #                     '{"spec":{"containers":[{"name":"dataset-verify","volumeMounts":[{"name":"data","mountPath":"/data"}]}],"volumes":[{"name":"data","persistentVolumeClaim":{"claimName":"panda-budeval-dataset"}}]}}',
     #                     "--",
     #                     "sh",
     #                     "-c",
