@@ -26,7 +26,6 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from budapp.auth.token import TokenService
 from budapp.commons import logging
 from budapp.commons.config import app_settings
 from budapp.commons.constants import UserRoleEnum, UserStatusEnum, UserTypeEnum
@@ -49,7 +48,6 @@ class TokenExchangeService:
 
     def __init__(self, session: Session):
         self.session = session
-        self.token_service = TokenService(session)
         self.keycloak_manager = KeycloakManager()
         self.dapr_service = DaprService()
 
@@ -193,14 +191,17 @@ class TokenExchangeService:
                 self.dapr_service.delete_state(store_name=app_settings.statestore_name, key=state_key)
             raise ClientException("Tenant client configuration not found")
 
-        # Generate tokens for OAuth users
-        # IMPORTANT: We use local token generation to avoid resetting passwords in Keycloak
-        # OAuth users authenticate through external providers and should not have their
-        # passwords reset in our system
+        # Generate tokens for OAuth users using Keycloak
+        # We'll set a secure random password for the OAuth user in Keycloak
+        # and use it to authenticate and get proper Keycloak-signed tokens
 
-        logger.info(f"Generating tokens for OAuth user {user.email} using local token service")
+        logger.info(f"Generating tokens for OAuth user {user.email} using Keycloak")
 
         try:
+            # Generate a secure random password for this OAuth session
+            # This password is only used internally and never exposed to the user
+            oauth_session_password = secrets.token_urlsafe(32)
+
             # Check if user needs to be created in Keycloak (for permission management)
             if not user.auth_id:
                 logger.info(f"User {user.email} has no auth_id, attempting to sync with Keycloak")
@@ -224,12 +225,11 @@ class TokenExchangeService:
                         user_permissions = user.permissions if user.permissions else []
 
                         # Create UserCreate object for Keycloak
-                        # Note: Password is random and will never be used since OAuth users
-                        # authenticate through external providers
+                        # Use the session password for this OAuth user
                         user_create_data = UserCreate(
                             name=user.name,
                             email=user.email,
-                            password=secrets.token_urlsafe(32),  # Random password that won't be used
+                            password=oauth_session_password,  # Use the session password
                             role=user.role or UserRoleEnum.DEVELOPER,
                             user_type=user.user_type or UserTypeEnum.CLIENT,
                             permissions=user_permissions,
@@ -249,18 +249,36 @@ class TokenExchangeService:
                 except Exception as keycloak_error:
                     # Non-critical error - user can still login even without Keycloak sync
                     logger.warning(f"Failed to sync user with Keycloak (non-critical): {keycloak_error}")
+                    raise ClientException(f"Failed to sync user with authentication service: {str(keycloak_error)}")
 
-            # Generate tokens using local token service
-            # This avoids any password operations in Keycloak
-            auth_token = await self.token_service.create_auth_token(str(user.id))
-            token_data = {
-                "access_token": auth_token.access_token,
-                "refresh_token": auth_token.refresh_token,
-                "expires_in": app_settings.access_token_expire_minutes * 60,
-                "token_type": auth_token.token_type,
-            }
+            # If user already has auth_id, update their password in Keycloak for this session
+            if user.auth_id:
+                logger.info(f"Updating password for OAuth user {user.email} in Keycloak")
+                await self.keycloak_manager.update_user_password(
+                    user_id=str(user.auth_id), password=oauth_session_password, realm_name=tenant.realm_name
+                )
 
-            logger.info(f"Successfully generated tokens for OAuth user {user.email}")
+            # Decrypt client secret for authentication
+            decrypted_secret = await tenant_client.get_decrypted_client_secret()
+            credentials = TenantClientSchema(
+                id=tenant_client.id,
+                client_id=tenant_client.client_id,
+                client_named_id=tenant_client.client_named_id,
+                client_secret=decrypted_secret,
+            )
+
+            # Authenticate with Keycloak using the session password to get proper tokens
+            token_data = await self.keycloak_manager.authenticate_user(
+                username=user.email,
+                password=oauth_session_password,
+                realm_name=tenant.realm_name,
+                credentials=credentials,
+            )
+
+            if not token_data:
+                raise ClientException("Failed to generate authentication tokens")
+
+            logger.info(f"Successfully generated Keycloak tokens for OAuth user {user.email}")
 
         except Exception as e:
             logger.error(f"Failed to generate tokens for user {user.email}: {e}")
@@ -278,7 +296,7 @@ class TokenExchangeService:
 
         logger.info(f"Successfully exchanged token for user {user.email}")
 
-        # Return tokens and user info
+        # Return Keycloak tokens and user info
         return {
             "access_token": token_data.get("access_token"),
             "refresh_token": token_data.get("refresh_token"),
