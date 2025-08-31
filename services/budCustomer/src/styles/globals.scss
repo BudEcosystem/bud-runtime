@@ -212,48 +212,6 @@ body {
   }
 }
 
-// Select styles for drawer
-.custom-select {
-  .ant-select-selector {
-    background: #161616 !important;
-    border: 1px solid #1F1F1F !important;
-    color: #EEEEEE !important;
-    height: 40px !important;
-    align-items: center;
-
-    &:hover {
-      border-color: #965CDE !important;
-    }
-  }
-
-  &.ant-select-focused .ant-select-selector {
-    border-color: #965CDE !important;
-    box-shadow: none !important;
-  }
-
-  .ant-select-arrow {
-    color: #757575;
-  }
-}
-
-.ant-select-dropdown {
-  background: var(--bg-tertiary) !important;
-  border: 1px solid var(--border-secondary) !important;
-
-  .ant-select-item {
-    color: var(--text-muted) !important;
-
-    &:hover {
-      background: var(--bg-hover) !important;
-    }
-
-    &.ant-select-item-option-selected {
-      background: rgba(150, 92, 222, 0.2) !important;
-      color: var(--text-primary) !important;
-    }
-  }
-}
-
 
 // styles for ant
 
@@ -342,8 +300,10 @@ body {
 
     // Light theme specific styles for tags
     [data-theme="light"] & {
+
       // React-select container styles
       .css-b62m3t-container {
+
         .css-13cymwt-control,
         .css-t3ipsp-control {
           background: transparent !important;
@@ -439,7 +399,7 @@ body {
     [data-theme="light"] & {
       background: linear-gradient(267.91deg, rgba(194, 219, 255, 0.15) 1.56%, rgba(194, 219, 255, 0.15) 67.03%, rgba(194, 219, 255, 0.075) 98.09%) !important;
       backdrop-filter: blur(8px);
-      border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+      border-bottom: 1px solid #0000004d;
     }
   }
 
@@ -565,7 +525,7 @@ body {
 
   // Light theme specific drawer body
   [data-theme="light"] & {
-    border: 1px solid #D8D8D8;
+    border: 1px solid #0000004d;
   }
 
   .drawerBackground {
@@ -596,8 +556,10 @@ body {
 
     // Light theme specific styles for tags
     [data-theme="light"] & {
+
       // React-select container styles
       .css-b62m3t-container {
+
         .css-13cymwt-control,
         .css-t3ipsp-control {
           background: transparent !important;
@@ -794,15 +756,111 @@ body {
     background: transparent;
     padding: 0 0.25rem;
     z-index: 10;
+  }
+}
 
-    &.label-float {
-      top: -0.5rem;
-      left: 0.5rem;
-      font-size: 0.75rem;
-      background: var(--bg-primary);
-      padding: 0 0.5rem;
+.floating-textarea {
+  .float-label {
+    position: relative;
+  }
+
+  .label {
+    top: 0;
+    display: block;
+    font-weight: 300;
+    position: absolute;
+    left: .75rem;
+    // top: -0.5rem;
+    transition: 0.2s ease all;
+    color: white;
+    padding: 0 0.025rem;
+    font-size: .75rem;
+    z-index: 1111;
+  }
+
+  .ant-input {
+    padding: 1.3rem 1rem;
+    background: transparent !important;
+    font-size: 0.75rem;
+    border: 0px solid #757575 !important;
+  }
+
+  .ant-input::placeholder {
+    color: #808080;
+  }
+}
+
+.ant-popover-inner {
+  padding: 0 !important;
+}
+
+.ant-input,
+.ant-input-outlined {
+  background: transparent !important;
+  // background: black !important;
+  border: 0.5px solid #757575 !important;
+  color: white;
+  border-radius: 6px !important;
+
+  &.drawerInp {
+    background: transparent !important;
+
+    &::placeholder {
+      color: #808080 !important;
+      font-weight: 300 !important;
     }
   }
+
+  &:focus {
+    border: 0.5px solid #EEEEEE !important;
+  }
+}
+
+.ant-input::placeholder {
+  color: #808080;
+  font-size: .75rem;
+}
+
+.ant-select-selection-placeholder {
+  color: #808080 !important;
+  font-weight: 300 !important;
+}
+
+
+.ant-input-affix-wrapper>input.ant-input {
+  background: transparent !important;
+  // background: black !important;
+  border: none !important;
+  color: white;
+}
+
+.ant-input-affix-wrapper>input.ant-input {
+  background: transparent !important;
+}
+
+.ant-input-affix-wrapper>input.ant-input::placeholder {
+  color: #808080;
+  font-weight: 300 !important;
+  text-indent: .5rem;
+  font-size: .75rem;
+}
+
+.ant-input-affix-wrapper>textarea.ant-input::placeholder {
+  color: #808080;
+  font-weight: 300 !important;
+  font-size: .75rem;
+}
+
+input.ant-input:-webkit-autofill {
+  background-color: transparent !important;
+  color: inherit !important;
+  box-shadow: 0 0 0px 1000px transparent inset !important;
+}
+
+.ant-select-single.ant-select-lg {
+  // min-height: 44px;
+  min-height: 2.5rem;
+  // min-height: 55px;
 }
 
 // Light theme specific float label styles
@@ -838,37 +896,6 @@ body {
   }
 }
 
-.floating-textarea {
-  .float-label {
-    position: relative;
-  }
-
-  .label {
-    top: 0;
-    display: block;
-    font-weight: 300;
-    position: absolute;
-    left: .75rem;
-    // top: -0.5rem;
-    transition: 0.2s ease all;
-    color: var(--text-primary);
-    padding: 0 0.25rem;
-    font-size: .75rem;
-    z-index: 1111;
-    background: var(--bg-primary);
-  }
-
-  .ant-input {
-    padding: 1.3rem 1rem;
-    background: transparent !important;
-    font-size: 0.75rem;
-    border: 0px solid #757575 !important;
-  }
-
-  .ant-input::placeholder {
-    color: #808080;
-  }
-}
 
 .ant-input,
 .ant-input-outlined {
@@ -939,6 +966,194 @@ input.ant-input:-webkit-autofill {
   // min-height: 55px;
 }
 
+.custom-select-two {
+  .ant-select-multiple.ant-select-lg .ant-select-selector {
+    align-items: start;
+  }
+
+  .ant-select {
+    border: 0.5px solid #757575 !important;
+    border-radius: 6px !important;
+
+    :hover {
+      .ant-select-selector {
+        border: 0.5px solid #EEEEEE !important;
+      }
+    }
+
+    :active {
+      .ant-select-selector {
+        border: 0.5px solid #EEEEEE !important;
+      }
+    }
+  }
+
+  .ant-select-selector {
+    box-shadow: none !important;
+    border: none !important;
+    background: transparent !important;
+    font-size: .75rem !important;
+    font-weight: 400 !important;
+    color: #EEEEEE !important;
+    border: transparent !important;
+    padding-top: 0rem !important;
+    padding-bottom: 0rem !important;
+
+    input::placeholder {
+      color: #808080 !important;
+      font-weight: 300 !important;
+    }
+
+    &:focus-visible {
+      outline: none;
+    }
+  }
+
+
+}
+[data-theme="light"] .ant-select-selector {
+    color: black !important;
+  }
+.ant-select-dropdown {
+  padding: 0 !important;
+  // max-height: 200px;
+  // overflow-y: auto;
+  background: #161616 !important;
+  backdrop-filter: blur(4px) !important;
+  border: 1px solid #1f1f1f !important;
+  border-radius: 6px;
+  min-width: 100px;
+  padding: 0.8rem 0.7rem !important;
+
+  .ant-select-selection-placeholder {
+    padding-left: 10px;
+    color: #cfcfcf40;
+    font-weight: 300 !important;
+  }
+
+  .ant-select-item-option-selected {
+    background: transparent !important;
+  }
+
+  .ant-select-selection-item {
+    color: white !important;
+  }
+
+  [data-theme="light"] .ant-select-selection-item {
+    color: black !important;
+  }
+
+
+  .ant-select {
+    color: #eeeeee !important;
+
+    .ant-select-arrow {
+      color: #eeeeee !important;
+    }
+  }
+
+  .ant-select-item {
+    color: white !important;
+    font-size: 0.75rem;
+    // line-height: 100%;
+  }
+
+  [data-theme="light"] .ant-select-item {
+    color: black !important;
+  }
+
+  .ant-select-item.ant-select-item-option-active {
+    background: #1f1f1f !important;
+  }
+}
+
+
+
+.floating-textarea {
+  .float-label {
+    position: relative;
+  }
+
+  .label {
+    top: 0;
+    display: block;
+    font-weight: 300;
+    position: absolute;
+    left: .75rem;
+    // top: -0.5rem;
+    transition: 0.2s ease all;
+    color: white;
+    padding: 0 0.025rem;
+    font-size: .75rem;
+    z-index: 1111;
+  }
+
+  .ant-input {
+    padding: 1.3rem 1rem;
+    background: transparent !important;
+    font-size: 0.75rem;
+    border: 0px solid #757575 !important;
+  }
+
+  .ant-input::placeholder {
+    color: #808080;
+  }
+}
+
+.ant-popover-inner {
+  padding: 0 !important;
+}
+
+
+.ant-input::placeholder {
+  color: #808080;
+  font-size: .75rem;
+}
+
+.ant-select-selection-placeholder {
+  color: #808080 !important;
+  font-weight: 300 !important;
+}
+
+
+.ant-input-affix-wrapper>input.ant-input {
+  background: transparent !important;
+  // background: black !important;
+  border: none !important;
+  color: white;
+}
+
+.ant-input-affix-wrapper>input.ant-input {
+  background: transparent !important;
+}
+
+.ant-input-affix-wrapper>input.ant-input::placeholder {
+  color: #808080;
+  font-weight: 300 !important;
+  text-indent: .5rem;
+  font-size: .75rem;
+}
+
+.ant-input-affix-wrapper>textarea.ant-input::placeholder {
+  color: #808080;
+  font-weight: 300 !important;
+  font-size: .75rem;
+}
+
+input.ant-input:-webkit-autofill {
+  background-color: transparent !important;
+  color: inherit !important;
+  box-shadow: 0 0 0px 1000px transparent inset !important;
+}
+
+.ant-select-single.ant-select-lg {
+  // min-height: 44px;
+  min-height: 2.5rem;
+  // min-height: 55px;
+}
+
+
+
 // Utility classes
 @layer utilities {
   .text-balance {
@@ -946,12 +1161,15 @@ input.ant-input:-webkit-autofill {
   }
 
   .no-scrollbar {
-    -ms-overflow-style: none; /* IE and Edge */
-    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none;
+    /* IE and Edge */
+    scrollbar-width: none;
+    /* Firefox */
   }
 
   .no-scrollbar::-webkit-scrollbar {
-    display: none; /* Chrome, Safari and Opera */
+    display: none;
+    /* Chrome, Safari and Opera */
   }
 }
 
@@ -978,82 +1196,30 @@ input.ant-input:-webkit-autofill {
   }
 }
 
-// Custom select styles
-.custom-select-two {
-  .ant-select-multiple.ant-select-lg .ant-select-selector {
-    align-items: start;
-  }
 
-  .ant-select {
-    border: 0.5px solid var(--text-disabled) !important;
-    border-radius: 6px !important;
-
-    :hover {
-      .ant-select-selector {
-        border: 0.5px solid var(--text-secondary) !important;
-      }
-    }
-
-    :active {
-      .ant-select-selector {
-        border: 0.5px solid var(--text-secondary) !important;
-      }
-    }
-  }
-
-  .ant-select-selector {
-    background: transparent !important;
-    font-size: .75rem !important;
-    font-weight: 400 !important;
-    color: var(--text-primary) !important;
-    border: transparent !important;
-    padding-top: 0.65rem !important;
-    padding-bottom: 0.45rem !important;
-    padding-left: 0.75rem !important;
-    min-height: 2.5rem !important;
-    height: auto !important;
-    display: flex !important;
-    align-items: center !important;
-  }
-
-  .ant-select-single .ant-select-selector {
-    height: 2.5rem !important;
-
-    .ant-select-selection-search {
-      display: flex !important;
-      align-items: center !important;
-      height: 100% !important;
-    }
-
-    .ant-select-selection-item,
-    .ant-select-selection-placeholder {
-      display: flex !important;
-      align-items: center !important;
-      height: 100% !important;
-      padding-top: 0 !important;
-      padding-bottom: 0 !important;
-    }
-  }
-
-  .ant-select-selection-item {
-    color: var(--text-primary) !important;
-    font-weight: 300 !important;
-  }
-
-  .ant-select-selection-placeholder {
-    color: #808080 !important;
-    font-weight: 300 !important;
-  }
-
-  .ant-select-arrow {
-    color: #757575 !important;
-    right: 0.75rem !important;
-  }
-}
 
 // Chart card styles
 .cardSetTwo {
   height: 425px;
+}
+
+// Dashboard Layout styles
+.rightWrap {
+  width: calc(100% - 17.7%);
+  flex: auto;
+  height: 100vh;
+}
+
+.rightDiv {
+  height: 100%;
+  width: 100%;
+  background-color: #020202;
+  border: 1px solid #181818;
+}
+
+[data-theme="light"] .rightDiv {
+  background-color: #ffffff;
+  border: 1px solid #e0e0e0;
 }
 
 // Responsive breakpoints

@@ -1,4 +1,3 @@
-import DrawerCard from "@/components/ui/bud/card/DrawerCard";
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
@@ -6,11 +5,10 @@ import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
 import React, { useContext, useState } from "react";
 import { Text_10_400_757575, Text_12_400_757575, Text_12_400_B3B3B3, Text_12_600_EEEEEE, Text_14_400_EEEEEE } from "@/components/ui/text";
 import { BudFormContext } from "@/components/ui/bud/context/BudFormContext";
-import { Select } from "antd";
-import { Icon } from "@iconify/react/dist/iconify.js";
+import { Select, Form, Input, ConfigProvider } from "antd";
 import { useDrawer } from "@/hooks/useDrawer";
-import { errorToast } from "@/components/toast";
-import Tags from "../components/DrawerTags";
+import ThemedLabel from "@/components/ui/bud/dataEntry/ThemedLabel";
+import FileInput from "../components/FileInput";
 
 interface BatchJobFile {
   name: string;
@@ -20,72 +18,13 @@ interface BatchJobFile {
 }
 
 export default function CreateBatchJob() {
-  useContext(BudFormContext); // Required for form context
+  const { form } = useContext(BudFormContext); // Required for form context
   const [batchJobData, setBatchJobData] = useState({
     name: "",
     model: "",
     file: null as BatchJobFile | null,
   });
   const { openDrawerWithStep } = useDrawer();
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
-
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      if (file.type !== "application/json" && !file.name.endsWith(".jsonl")) {
-        errorToast("Please upload a JSONL file");
-        return;
-      }
-
-      if (file.size > 100 * 1024 * 1024) { // 100MB limit
-        errorToast("File size must be less than 100MB");
-        return;
-      }
-
-      setBatchJobData({
-        ...batchJobData,
-        file: {
-          name: file.name,
-          size: file.size,
-          type: file.type,
-          file: file,
-        },
-      });
-    }
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    const file = e.dataTransfer.files?.[0];
-    if (file) {
-      if (file.type !== "application/json" && !file.name.endsWith(".jsonl")) {
-        errorToast("Please upload a JSONL file");
-        return;
-      }
-
-      if (file.size > 100 * 1024 * 1024) { // 100MB limit
-        errorToast("File size must be less than 100MB");
-        return;
-      }
-
-      setBatchJobData({
-        ...batchJobData,
-        file: {
-          name: file.name,
-          size: file.size,
-          type: file.type,
-          file: file,
-        },
-      });
-    }
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-  };
 
   const isFormValid = batchJobData.name && batchJobData.model && batchJobData.file;
 
@@ -104,117 +43,216 @@ export default function CreateBatchJob() {
         openDrawerWithStep(""); // Close drawer
       }}
     >
+      <style dangerouslySetInnerHTML={{ __html: `
+        /* Drawer title and description text colors for light theme */
+        [data-theme="light"] .text-sm {
+          color: #000000 !important;
+        }
+        [data-theme="light"] .text-xs {
+          color: #757575 !important;
+        }
+
+        /* Input border colors - #B1B1B1 for all themes */
+        input.drawerInp {
+          border: 0.5px solid #B1B1B1 !important;
+        }
+        input.drawerInp:hover {
+          border: 0.5px solid #757575 !important;
+        }
+        input.drawerInp:focus {
+          border: 0.5px solid #757575 !important;
+        }
+        /* Light theme text colors for inputs */
+        [data-theme="light"] input.drawerInp {
+          color: #000000 !important;
+        }
+        [data-theme="light"] input.drawerInp::placeholder {
+          color: #808080 !important;
+        }
+
+        /* Select component borders */
+        .model-select-wrapper .ant-select {
+          border: none !important;
+        }
+        .model-select-wrapper .ant-select .ant-select-selector {
+          border: 0.5px solid #B1B1B1 !important;
+          border-radius: 6px !important;
+          background-color: transparent !important;
+        }
+        .model-select-wrapper .ant-select:hover .ant-select-selector {
+          border: 0.5px solid #757575 !important;
+        }
+        .model-select-wrapper .ant-select-focused .ant-select-selector {
+          border: 0.5px solid #757575 !important;
+          box-shadow: none !important;
+        }
+        /* Fix Select placeholder font size to match input */
+        .model-select-wrapper .ant-select-selection-placeholder {
+          font-size: 0.75rem !important;
+        }
+        /* Light theme text colors for select */
+        [data-theme="light"] .model-select-wrapper .ant-select-selection-item {
+          color: #000000 !important;
+        }
+        [data-theme="light"] .model-select-wrapper .ant-select-selection-placeholder {
+          color: #808080 !important;
+        }
+        [data-theme="light"] .model-select-wrapper .ant-select-dropdown {
+          background-color: #FFFFFF !important;
+        }
+        [data-theme="light"] .model-select-wrapper .ant-select-item {
+          color: #000000 !important;
+        }
+        [data-theme="light"] .ant-select-dropdown .ant-select-item {
+          color: #000000 !important;
+        }
+        [data-theme="light"] .ant-select-dropdown .ant-select-item-option-selected {
+          background-color: #F0F0F0 !important;
+        }
+        [data-theme="light"] .ant-select-dropdown .ant-select-item:hover {
+          background-color: #F5F5F5 !important;
+        }
+
+        /* File upload border - #B1B1B1 */
+        .ant-upload-dragger {
+          border: 0.5px solid #B1B1B1 !important;
+          border-style: solid !important;
+        }
+        .ant-upload-dragger:hover {
+          border: 0.5px solid #757575 !important;
+          border-style: solid !important;
+        }
+        /* Light theme text colors for file upload */
+        [data-theme="light"] .ant-upload-dragger .ant-upload-text {
+          color: #000000 !important;
+        }
+        [data-theme="light"] .ant-upload-dragger .ant-upload-hint {
+          color: #808080 !important;
+        }
+        [data-theme="light"] .ant-upload-dragger p {
+          color: #000000 !important;
+        }
+        [data-theme="light"] .ant-upload-dragger span {
+          color: #000000 !important;
+        }
+      ` }} />
       <BudWraperBox>
         <BudDrawerLayout>
           <DrawerTitleCard
             title="Create Batch Job"
             description="Upload a JSONL file containing your batch requests"
           />
-          <DrawerCard classNames="pb-0">
-            <div className="pt-[.87rem]">
-              {/* Job Name Input */}
-              <div className="mb-[1.7rem]">
-                <Text_14_400_EEEEEE className="p-0 pt-[.3rem] m-0">
-                  Job Name
-                </Text_14_400_EEEEEE>
-                <Text_12_400_757575 className="pt-[.35rem] leading-[1.05rem] mb-[0.5rem]">
-                  Enter a descriptive name for your batch job
-                </Text_12_400_757575>
-                <input
-                  type="text"
-                  placeholder="e.g., Product Descriptions Generation"
-                  value={batchJobData.name}
-                  onChange={(e) => setBatchJobData({ ...batchJobData, name: e.target.value })}
-                  className="w-full bg-[#161616] border border-[#1F1F1F] text-[#EEEEEE] px-[0.75rem] py-[0.5rem] rounded-[6px] focus:outline-none focus:border-[#965CDE] transition-colors"
-                />
+          <div className="px-[1.4rem] py-[2.1rem] flex flex-col gap-[1.6rem]">
+            {/* Job Name Input */}
+            <Form.Item
+              hasFeedback
+              name={"name"}
+              rules={[{ required: true, message: "Please input job name!" }]}
+              className={`flex items-center rounded-[6px] relative !bg-[transparent] w-[100%] mb-[0]`}
+            >
+              <div className="w-full">
+                <ThemedLabel text="Job Name" info="Enter a descriptive name for your batch job" />
               </div>
+              <Input
+                placeholder="e.g., Product Descriptions Generation"
+                style={{
+                  backgroundColor: "transparent",
+                  color: "#EEEEEE",
+                  border: "0.5px solid #B1B1B1",
+                }}
+                size="large"
+                onChange={(e) => {
+                  form.setFieldsValue({ name: e.target.value });
+                  form.validateFields(["name"]);
+                  setBatchJobData({ ...batchJobData, name: e.target.value });
+                }}
+                className="drawerInp py-[.65rem] pt-[.8rem] pb-[.45rem] bg-transparent text-[#EEEEEE] font-[300] border-[0.5px] border-[#B1B1B1] rounded-[6px] hover:border-[#757575] focus:border-[#757575] active:border-[#757575] text-[.75rem] shadow-none w-full indent-[.4rem]"
+              />
+            </Form.Item>
 
-              {/* Model Selection */}
-              <div className="mb-[1.7rem]">
-                <Text_14_400_EEEEEE className="p-0 pt-[.3rem] m-0">
-                  Select Model
-                </Text_14_400_EEEEEE>
-                <Text_12_400_757575 className="pt-[.35rem] leading-[1.05rem] mb-[0.5rem]">
-                  Choose the model to process your batch requests
-                </Text_12_400_757575>
-                <Select
-                  placeholder="Select a model"
-                  value={batchJobData.model || undefined}
-                  onChange={(value) => setBatchJobData({ ...batchJobData, model: value })}
-                  className="w-full custom-select"
-                  style={{ height: "40px" }}
-                  options={[
-                    { value: "gpt-4", label: "GPT-4" },
-                    { value: "gpt-3.5-turbo", label: "GPT-3.5 Turbo" },
-                    { value: "claude-3-opus", label: "Claude 3 Opus" },
-                    { value: "claude-3-sonnet", label: "Claude 3 Sonnet" },
-                    { value: "claude-3.5-sonnet", label: "Claude 3.5 Sonnet" },
-                  ]}
-                />
+            {/* Model Selection */}
+            <Form.Item
+              hasFeedback
+              rules={[{ required: true, message: "Please select model!" }]}
+              name={"model"}
+              className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]`}
+            >
+              <div className="w-full">
+                <ThemedLabel text="Select Model" info="Choose the model to process your batch requests" />
               </div>
-
-              {/* File Upload */}
-              <div className="mb-[1.7rem]">
-                <Text_14_400_EEEEEE className="p-0 pt-[.3rem] m-0">
-                  Upload JSONL File
-                </Text_14_400_EEEEEE>
-                <Text_12_400_757575 className="pt-[.35rem] leading-[1.05rem] mb-[0.5rem]">
-                  Upload the JSONL file containing your batch requests
-                </Text_12_400_757575>
-
-                {batchJobData.file ? (
-                  <div className="flex justify-start items-center gap-2">
-                    <Tags
-                      tags={[batchJobData.file.name]}
-                      color="#D1B854"
-                      className="flex"
-                    />
-                    <button
-                      onClick={() => {
-                        setBatchJobData({
-                          ...batchJobData,
-                          file: null,
-                        });
-                        if (fileInputRef.current) {
-                          fileInputRef.current.value = "";
-                        }
-                      }}
-                      className="text-[#757575] hover:text-[#EEEEEE] text-[1.5rem] leading-none transition-colors"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ) : (
-                  <div
-                    className="border-2 border-dashed border-[#1F1F1F] hover:border-[#965CDE] rounded-[8px] p-[2rem] text-center cursor-pointer transition-colors bg-[#161616]"
-                    onClick={() => fileInputRef.current?.click()}
-                    onDrop={handleDrop}
-                    onDragOver={handleDragOver}
-                  >
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept=".jsonl,application/json"
-                      onChange={handleFileUpload}
-                      className="hidden"
-                    />
-                    <Icon
-                      icon="ph:upload-simple"
-                      className="text-[2rem] text-[#757575] mb-[0.5rem] mx-auto"
-                    />
-                    <div className="flex justify-center items-center w-[100%]">
-                      <Text_12_400_B3B3B3>Drag & Drop or </Text_12_400_B3B3B3>&nbsp;
-                      <Text_12_600_EEEEEE>Choose file</Text_12_600_EEEEEE>&nbsp;
-                      <Text_12_400_B3B3B3> to upload</Text_12_400_B3B3B3>
-                    </div>
-                    <Text_10_400_757575 className="mt-[0.5rem]">
-                      Supported format: JSONL (Maximum file size: 100MB)
-                    </Text_10_400_757575>
-                  </div>
-                )}
+              <div className="model-select-wrapper w-full">
+                <ConfigProvider
+                  theme={{
+                    token: {
+                      colorTextPlaceholder: "#808080",
+                      boxShadowSecondary: "none",
+                    },
+                  }}
+                >
+                  <Select
+                    variant="borderless"
+                    placeholder="Select a model"
+                    style={{
+                      backgroundColor: "transparent",
+                      color: "#EEEEEE",
+                      width: "100%",
+                      fontSize: ".75rem",
+                    }}
+                    size="large"
+                    className="!bg-[transparent] text-[#EEEEEE] font-[300] text-[.75rem] shadow-none w-full outline-0 h-[2.5rem] outline-none [&_.ant-select-selection-placeholder]:text-[.75rem]"
+                    options={[
+                      { value: "gpt-4", label: "GPT-4" },
+                      { value: "gpt-3.5-turbo", label: "GPT-3.5 Turbo" },
+                      { value: "claude-3-opus", label: "Claude 3 Opus" },
+                      { value: "claude-3-sonnet", label: "Claude 3 Sonnet" },
+                      { value: "claude-3.5-sonnet", label: "Claude 3.5 Sonnet" },
+                    ]}
+                    onChange={(value) => {
+                      form.setFieldsValue({ model: value });
+                      form.validateFields(["model"]);
+                      setBatchJobData({ ...batchJobData, model: value });
+                    }}
+                  />
+                </ConfigProvider>
               </div>
-            </div>
-          </DrawerCard>
+            </Form.Item>
+
+            {/* File Upload with FileInput component */}
+            <FileInput
+              name="jsonl_file"
+              acceptedFileTypes={['.jsonl', '.json']}
+              label="Upload JSONL File"
+              placeholder=""
+              infoText="Upload the JSONL file containing your batch requests"
+              required
+              text={
+                <div className="flex justify-center items-center w-[100%]">
+                  <Text_12_400_B3B3B3>Drag & Drop or </Text_12_400_B3B3B3>&nbsp;
+                  <Text_12_600_EEEEEE>Choose file</Text_12_600_EEEEEE>&nbsp;
+                  <Text_12_400_B3B3B3> to upload</Text_12_400_B3B3B3>
+                </div>
+              }
+              hint={
+                <>
+                  <Text_10_400_757575>Supported format: JSONL (Maximum file size: 100MB)</Text_10_400_757575>
+                </>
+              }
+              rules={[{ required: true, message: "Please upload a JSONL file" }]}
+              onChange={(value) => {
+                if (value) {
+                  setBatchJobData({
+                    ...batchJobData,
+                    file: {
+                      name: value.name,
+                      size: value.size,
+                      type: value.type,
+                      file: value,
+                    },
+                  });
+                }
+              }}
+            />
+          </div>
         </BudDrawerLayout>
       </BudWraperBox>
     </BudForm>

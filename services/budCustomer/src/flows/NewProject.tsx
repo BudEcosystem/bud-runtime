@@ -57,6 +57,51 @@ export default function NewProject() {
   }, [fetchList]);
 
   return (
+    <>
+      <style dangerouslySetInnerHTML={{ __html: `
+        /* Fix tags dropdown visibility in light theme */
+        [data-theme="light"] .ant-select-dropdown {
+          background-color: #FFFFFF !important;
+        }
+        [data-theme="light"] .ant-select-dropdown .ant-select-item {
+          color: #000000 !important;
+        }
+        [data-theme="light"] .ant-select-dropdown .ant-select-item-option-content {
+          color: #000000 !important;
+        }
+        [data-theme="light"] .ant-select-dropdown .ant-select-item-option-content span {
+          color: #000000 !important;
+        }
+        [data-theme="light"] .ant-select-dropdown .rc-virtual-list-holder-inner .ant-select-item {
+          color: #000000 !important;
+        }
+        [data-theme="light"] .ant-select-dropdown .rc-virtual-list-holder-inner .ant-select-item span {
+          color: #000000 !important;
+        }
+        [data-theme="light"] .ant-select-dropdown .ant-select-item-option-selected {
+          background-color: #F0F0F0 !important;
+          color: #000000 !important;
+        }
+        [data-theme="light"] .ant-select-dropdown .ant-select-item-option:hover {
+          background-color: #F5F5F5 !important;
+          color: #000000 !important;
+        }
+        /* Fix all text elements in dropdown */
+        [data-theme="light"] .ant-select-dropdown * {
+          color: #000000 !important;
+        }
+        /* Fix tag text visibility in light theme */
+        [data-theme="light"] .ant-tag {
+          color: #000000 !important;
+        }
+        /* Fix select input text in light theme */
+        [data-theme="light"] .ant-select-selection-item {
+          color: #000000 !important;
+        }
+        [data-theme="light"] .ant-select-selection-item span {
+          color: #000000 !important;
+        }
+      ` }} />
     <BudForm
       data={{
         name: "",
@@ -177,5 +222,6 @@ export default function NewProject() {
         </BudDrawerLayout>
       </BudWraperBox>
     </BudForm>
+    </>
   );
 }

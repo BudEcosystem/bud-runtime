@@ -21,7 +21,7 @@ function DrawerTitleCard({
 
   return (
     <div
-      className={`px-[1.4rem] rounded-ss-lg rounded-se-lg border-b-[.5px] border-b-[#1F1F1F] ${classNames}`}
+      className={`px-[1.4rem] rounded-ss-lg rounded-se-lg border-b-[.5px] border-b-[#B1B1B1] dark:border-b-[#1F1F1F] ${classNames}`}
       style={{
         paddingTop: "1.1rem",
         paddingBottom: ".9rem",
