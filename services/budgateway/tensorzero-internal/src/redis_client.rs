@@ -319,6 +319,7 @@ impl RedisClient {
         self.client.get_multiplexed_async_connection().await
     }
 
+
     /// Publish rate limit configuration updates for models with rate limits
     async fn publish_rate_limit_updates(models: &ModelTable, app_state: &AppStateData) {
         // Only publish if rate limiting is enabled
@@ -454,6 +455,9 @@ impl RedisClient {
                     message: format!("Failed to subscribe to redis: {e}"),
                 })
             })?;
+
+        // Subscribe to usage limit update channels
+
 
         let app_state = self.app_state.clone();
         let auth = self.auth.clone();

@@ -139,30 +139,151 @@ class BillingService(DataManagerUtils):
             "suspension_reason": user_billing.suspension_reason,
         }
 
-    async def check_usage_limits(self, user_id: UUID) -> Dict[str, Any]:
-        """Check if user has exceeded usage limits."""
+    async def check_usage_limits(self, user_id: UUID, use_cache: bool = True) -> Dict[str, Any]:
+        """Check if user has exceeded usage limits and publish to Redis."""
+        import json
+        from datetime import datetime, timezone
+
+        from budapp.shared.redis_service import RedisService
+
         usage = await self.get_current_usage(user_id)
 
-        if not usage.get("has_billing"):
-            return {"allowed": False, "reason": "No billing plan configured"}
+        # Get current usage values
+        tokens_used = usage["usage"]["tokens_used"] if usage.get("usage") else 0
+        cost_used = usage["usage"]["cost_used"] if usage.get("usage") else 0.0
+        tokens_quota = usage["usage"]["tokens_quota"] if usage.get("usage") else None
+        cost_quota = usage["usage"]["cost_quota"] if usage.get("usage") else None
 
-        if usage.get("is_suspended"):
-            return {"allowed": False, "reason": usage.get("suspension_reason", "Account suspended")}
+        # Get previous values from Redis (for delta calculation)
+        existing_data = None
+        try:
+            redis_service = RedisService()
+            key = f"usage_limit:{user_id}"
+            existing_data = await redis_service.get(key)
+            if existing_data:
+                existing = json.loads(existing_data)
+                prev_tokens_used = existing.get("tokens_used", 0)
+                prev_cost_used = existing.get("cost_used", 0.0)
+            else:
+                prev_tokens_used = 0
+                prev_cost_used = 0.0
+        except Exception:
+            prev_tokens_used = 0
+            prev_cost_used = 0.0
 
-        # Check token limit
-        if usage["usage"]["tokens_quota"] and usage["usage"]["tokens_used"] >= usage["usage"]["tokens_quota"]:
-            return {"allowed": False, "reason": "Monthly token quota exceeded"}
+        # Get billing cycle information
+        billing_cycle_start = None
+        billing_cycle_end = None
+        if usage.get("has_billing"):
+            # Get billing cycle from user billing record
+            from budapp.billing_ops.models import UserBilling
 
-        # Check cost limit
-        if usage["usage"]["cost_quota"] and usage["usage"]["cost_used"] >= usage["usage"]["cost_quota"]:
-            return {"allowed": False, "reason": "Monthly cost quota exceeded"}
+            user_billing = self.session.query(UserBilling).filter_by(user_id=user_id).first()
+            if user_billing:
+                # Calculate current billing cycle
+                from dateutil.relativedelta import relativedelta
 
-        return {
+                now = datetime.now(timezone.utc)
+
+                # Assuming monthly billing cycle
+                if user_billing.created_at:
+                    # Find the start of current billing cycle
+                    months_since_start = (now.year - user_billing.created_at.year) * 12 + (
+                        now.month - user_billing.created_at.month
+                    )
+                    cycle_start = user_billing.created_at + relativedelta(months=months_since_start)
+                    cycle_end = cycle_start + relativedelta(months=1)
+
+                    # If we've passed the cycle end, move to next cycle
+                    if now >= cycle_end:
+                        cycle_start = cycle_end
+                        cycle_end = cycle_start + relativedelta(months=1)
+
+                    billing_cycle_start = cycle_start.isoformat()
+                    billing_cycle_end = cycle_end.isoformat()
+
+        # Check if this is a new billing cycle
+        if existing_data and billing_cycle_start:
+            existing = json.loads(existing_data)
+            old_cycle_start = existing.get("billing_cycle_start")
+            if old_cycle_start != billing_cycle_start:
+                # New billing cycle detected - reset usage
+                tokens_used = 0
+                cost_used = 0.0
+                prev_tokens_used = 0
+                prev_cost_used = 0.0
+                logger.info(f"Billing cycle reset for user {user_id}: new cycle starts {billing_cycle_start}")
+
+        # Determine usage limit status with new format
+        usage_limit_info = {
+            "user_id": str(user_id),
             "allowed": True,
-            "remaining_tokens": usage["usage"]["tokens_quota"] - usage["usage"]["tokens_used"]
-            if usage["usage"]["tokens_quota"]
-            else None,
+            "status": "allowed",
+            "tokens_quota": tokens_quota,
+            "tokens_used": tokens_used,
+            "cost_quota": cost_quota,
+            "cost_used": cost_used,
+            "prev_tokens_used": prev_tokens_used,
+            "prev_cost_used": prev_cost_used,
+            "reason": None,
+            "reset_at": billing_cycle_end,
+            "last_updated": datetime.now(timezone.utc).isoformat(),
+            "billing_cycle_start": billing_cycle_start,
+            "billing_cycle_end": billing_cycle_end,
         }
+
+        if not usage.get("has_billing"):
+            # No billing plan means freemium user - allow with no limits
+            usage_limit_info.update(
+                {
+                    "allowed": True,
+                    "status": "no_billing_plan",
+                    "reason": "No billing plan - freemium user",
+                }
+            )
+        elif usage.get("is_suspended"):
+            usage_limit_info.update(
+                {
+                    "allowed": False,
+                    "status": "suspended",
+                    "reason": usage.get("suspension_reason", "Account suspended"),
+                }
+            )
+        elif tokens_quota and tokens_used >= tokens_quota:
+            usage_limit_info.update(
+                {
+                    "allowed": False,
+                    "status": "token_limit_exceeded",
+                    "reason": "Monthly token quota exceeded",
+                }
+            )
+        elif cost_quota and cost_used >= cost_quota:
+            usage_limit_info.update(
+                {
+                    "allowed": False,
+                    "status": "cost_limit_exceeded",
+                    "reason": "Monthly cost quota exceeded",
+                }
+            )
+        else:
+            # User is within limits
+            usage_limit_info.update(
+                {
+                    "allowed": True,
+                    "status": "allowed",
+                }
+            )
+
+        # Publish to Redis for gateway consumption
+        try:
+            redis_service = RedisService()
+            key = f"usage_limit:{user_id}"
+            # Store with 10 second TTL - will be refreshed by sync task
+            await redis_service.set(key, json.dumps(usage_limit_info), ex=10)
+        except Exception as e:
+            logger.warning(f"Failed to publish usage limit to Redis: {e}")
+
+        return usage_limit_info
 
     async def get_usage_history(
         self,
