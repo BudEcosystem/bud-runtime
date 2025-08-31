@@ -9,7 +9,7 @@ import { formatTimestamp } from '@/utils/formatDateNew';
 import { useRouter } from 'next/navigation';
 import { useInferences, InferenceListItem } from '@/stores/useInferences';
 import InferenceFilters from '@/components/inferences/InferenceFilters';
-import { Text_12_300_EEEEEE, Text_12_400_EEEEEE, Text_16_600_FFFFFF, Text_14_600_EEEEEE, Text_14_600_B3B3B3, Text_12_400_808080 } from '@/components/ui/text';
+import { Text_12_400_EEEEEE, Text_16_600_FFFFFF, Text_14_600_EEEEEE, Text_14_600_B3B3B3, Text_12_400_808080 } from '@/components/ui/text';
 import SearchHeaderInput from 'src/flows/components/SearchHeaderInput';
 import NoDataFount from '@/components/ui/noDataFount';
 import { PrimaryButton, SecondaryButton } from '@/components/ui/bud/form/Buttons';
@@ -249,9 +249,9 @@ export default function ObservabilityPage() {
       width: 350,
       render: (prompt: string) => (
         <Tooltip title={prompt}>
-          <Text_12_300_EEEEEE className="truncate max-w-[330px] !text-[var(--text-muted)]">
+          <Text_12_400_EEEEEE className="truncate max-w-[330px] !text-[var(--text-primary)]">
             {prompt}
-          </Text_12_300_EEEEEE>
+          </Text_12_400_EEEEEE>
         </Tooltip>
       ),
     },
@@ -1177,9 +1177,9 @@ export default function ObservabilityPage() {
                         <div style={{ color: 'var(--text-primary)' }}>
                           <SearchHeaderInput
                             placeholder={"Search by prompt or response"}
-                            value={searchValue}
-                            onChange={setSearchValue}
-                            className="theme-search-override"
+                            searchValue={searchValue}
+                            setSearchValue={setSearchValue}
+                            classNames="mr-[.6rem] theme-search-override"
                           />
                         </div>
                         <div style={{ color: 'var(--text-primary)' }}>

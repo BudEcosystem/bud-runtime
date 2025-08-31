@@ -272,8 +272,9 @@ const ProjectsListTable = () => {
             <div className="flex items-center justify-between">
               <SearchHeaderInput
                 placeholder="Search by name"
-                value={searchValue}
-                onChange={setSearchValue}
+                searchValue={searchValue}
+                setSearchValue={setSearchValue}
+                classNames="mr-[.6rem]"
               />
               <Popover
                 color="#161616"

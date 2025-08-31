@@ -169,7 +169,7 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
     <div className="flex h-screen bg-[#f2f2f2] dark:bg-bud-bg-primary">
       {/* Sidebar */}
       <div
-        className={`${isCollapsed ? "w-[80px]" : "w-[260px]"} bg-[#f2f2f2] dark:bg-bud-bg-primary border-r border-bud-border flex flex-col relative transition-all duration-300`}
+        className={`${isCollapsed ? "w-[80px]" : "w-[260px]"} bg-[#f2f2f2] dark:bg-bud-bg-primary flex flex-col relative transition-all duration-300`}
       >
         {/* Collapse/Expand Button */}
         <button
@@ -354,19 +354,21 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header */}
-        {headerItems && (
-          <div className="bg-bud-bg-primary border-b border-bud-border px-8 py-4">
-            {headerItems}
-          </div>
-        )}
+      {/* Main Content with rightWrap */}
+      <div className="rightWrap py-[0.75rem] pr-[0.6875rem]">
+        <div className="rightDiv rounded-[17px] overflow-hidden flex flex-col">
+          {/* Header */}
+          {headerItems && (
+            <div className="headerWrap border-b border-bud-border px-8 py-4">
+              {headerItems}
+            </div>
+          )}
 
-        {/* Page Content */}
-        <main className="flex-1 bg-bud-bg-primary overflow-auto">
-          {children}
-        </main>
+          {/* Page Content */}
+          <main className="flex-1 overflow-auto">
+            {children}
+          </main>
+        </div>
       </div>
     </div>
   );

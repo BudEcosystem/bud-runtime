@@ -18,6 +18,7 @@ const { Text, Title } = Typography;
 import { Icon } from "@iconify/react/dist/iconify.js";
 import styles from "./batches.module.scss";
 import Tags from "@/components/ui/Tags";
+import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
 
 interface BatchJob {
   id: string;
@@ -364,14 +365,12 @@ export default function BatchesPage() {
                 Process large volumes of requests asynchronously
               </Text>
             </div>
-            <Button
-              type="primary"
-              icon={<Icon icon="ph:plus" />}
-              className="bg-bud-purple border-bud-purple hover:bg-bud-purple-hover h-[2.5rem] px-[1.5rem]"
+            <PrimaryButton
+
               onClick={() => openDrawerWithStep("create-batch-job")}
             >
               Create Batch Job
-            </Button>
+            </PrimaryButton>
           </Flex>
 
           {/* Stats Cards */}
@@ -435,7 +434,7 @@ export default function BatchesPage() {
           </Flex>
 
           {/* Batch Jobs Table */}
-          <div className="bg-bud-bg-secondary border border-bud-border rounded-[12px] overflow-hidden">
+          <div className="bg-bud-bg-secondary border border-bud-border rounded-[12px] overflow-hidden mb-[2rem]">
             <Table
               dataSource={batches}
               columns={columns}

@@ -2061,7 +2061,7 @@ const addNewKey: DrawerFlowType = {
           title: "Success",
         },
       ],
-      confirmClose: true,
+      confirmClose: false,
     },
     {
       navigation: () => ["API Keys", "Success"],
@@ -3344,7 +3344,7 @@ const createBatchJob: DrawerFlowType = {
           title: "Success",
         },
       ],
-      confirmClose: true,
+      confirmClose: false,
     },
     {
       navigation: () => ["Batch Jobs", "Success"],
