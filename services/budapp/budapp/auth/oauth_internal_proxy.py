@@ -31,6 +31,7 @@ from budapp.auth.oauth_error_handler import OAuthError, OAuthErrorCode
 from budapp.auth.tenant_oauth_service import TenantOAuthService
 from budapp.auth.token_exchange_service import TokenExchangeService
 from budapp.commons import logging
+from budapp.commons.api_utils import get_oauth_base_url
 from budapp.commons.config import app_settings
 from budapp.commons.dependencies import get_session
 from budapp.commons.exceptions import ClientException
@@ -544,7 +545,7 @@ async def initiate_oauth(
             provider=provider,
             tenant_id=tenant_id,
             redirect_uri=redirect_uri,
-            app_redirect_uri=f"{str(request.base_url).rstrip('/')}/oauth/internal/callback",
+            app_redirect_uri=f"{get_oauth_base_url(request)}/oauth/internal/callback",
         )
 
         logger.info(f"Redirecting to {provider} for authentication")
@@ -553,12 +554,12 @@ async def initiate_oauth(
     except ClientException as ce:
         logger.error(f"Client error in OAuth: {ce}")
         error_params = urlencode({"error": "configuration_error", "error_description": str(ce)})
-        error_url = f"{str(request.base_url).rstrip('/')}/auth/error?{error_params}"
+        error_url = f"{get_oauth_base_url(request)}/auth/error?{error_params}"
         return RedirectResponse(url=error_url, status_code=status.HTTP_302_FOUND)
     except Exception as e:
         logger.exception(f"Failed to initiate OAuth for provider {provider} with error: {e}")
         error_params = urlencode({"error": "initialization_failed", "error_description": str(e)})
-        error_url = f"{str(request.base_url).rstrip('/')}/auth/error?{error_params}"
+        error_url = f"{get_oauth_base_url(request)}/auth/error?{error_params}"
         return RedirectResponse(url=error_url, status_code=status.HTTP_302_FOUND)
 
 
@@ -596,7 +597,7 @@ async def handle_oauth_callback(
         )
 
         # Build redirect URL with exchange token
-        redirect_uri = result.get("redirect_uri") or f"{str(request.base_url).rstrip('/')}/auth/success"
+        redirect_uri = result.get("redirect_uri") or f"{get_oauth_base_url(request)}/auth/success"
 
         params = {
             "exchange_token": result["exchange_token"],

@@ -143,6 +143,9 @@ class AppConfig(BaseAppConfig):
     # Frontend URL
     frontend_url: AnyUrl = Field(alias="FRONTEND_URL", default="http://localhost:3000")
 
+    # OAuth Settings
+    use_http_only_oauth: bool = Field(False, alias="USE_HTTP_ONLY_OAUTH")
+
     # Keycloak
     keycloak_server_url: str = Field(alias="KEYCLOAK_SERVER_URL")
     keycloak_admin_username: str = Field(alias="KEYCLOAK_ADMIN_USERNAME")
