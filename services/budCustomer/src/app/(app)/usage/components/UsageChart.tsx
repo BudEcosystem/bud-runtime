@@ -183,7 +183,7 @@ const UsageChart: React.FC<UsageChartProps> = ({
       <ResponsiveContainer width="100%" height={220}>
         <BarChart
           data={data}
-          margin={{ top: 15, right: 15, left: 5, bottom: 5 }}
+          margin={{ top: 15, right: 15, left: 25, bottom: 35 }}
           barCategoryGap={data.length > 30 ? "10%" : data.length > 14 ? "15%" : data.length > 7 ? "20%" : "25%"}
         >
           <defs>
@@ -215,23 +215,44 @@ const UsageChart: React.FC<UsageChartProps> = ({
           {/* Baseline - removed as we'll use custom lines */}
           <XAxis
             dataKey="displayDate"
-            tick={{ fill: "var(--text-muted)", fontSize: 11 }}
+            tick={{ fill: "var(--text-muted)", fontSize: 10 }}
             axisLine={false}
             tickLine={false}
-            height={35}
+            height={40}
             interval={data.length > 30 ? Math.floor(data.length / 10) : data.length > 14 ? 3 : data.length > 7 ? 1 : 0}
-            tickMargin={10}
+            tickMargin={15}
           />
           <YAxis
-            tick={{ fill: "var(--text-muted)", fontSize: 11 }}
+            tick={(props: any) => {
+              // Skip rendering the first (bottom) tick to avoid overlap with X-axis
+              if (props.index === 0) {
+                return <text />;
+              }
+
+              let formattedValue = props.payload.value.toString();
+              if (type === "spend") {
+                formattedValue = `$${props.payload.value}`;
+              } else if (props.payload.value >= 1000) {
+                formattedValue = `${(props.payload.value / 1000).toFixed(0)}k`;
+              }
+
+              return (
+                <text
+                  x={props.x}
+                  y={props.y}
+                  fill="var(--text-muted)"
+                  fontSize={10}
+                  textAnchor="end"
+                  dx={-8}
+                >
+                  {formattedValue}
+                </text>
+              );
+            }}
             axisLine={false}
             tickLine={false}
-            width={45}
-            tickFormatter={(value: number) => {
-              if (type === "spend") return `$${value}`;
-              if (value >= 1000) return `${(value / 1000).toFixed(0)}k`;
-              return value.toString();
-            }}
+            width={65}
+            tickMargin={8}
           />
           <Tooltip
             content={<CustomTooltip />}
