@@ -25,8 +25,6 @@ function EditClusterForm() {
       <DrawerCard classNames="pb-0">
         <ProjectNameInput
           placeholder="Enter Cluster Name"
-          onChangeName={(name) => form.setFieldsValue({ name })}
-          onChangeIcon={(icon) => form.setFieldsValue({ icon })}
           isEdit={true}
         />
         <div
