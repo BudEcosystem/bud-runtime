@@ -98,12 +98,6 @@ export default function ConfigureClusterDetails() {
             <div className="pt-[.87rem]">
               <ProjectNameInput
                 placeholder="Enter Cluster Name"
-                onChangeName={(name) =>
-                  setClusterValues({ ...clusterValues, name })
-                }
-                onChangeIcon={(icon) =>
-                  setClusterValues({ ...clusterValues, icon })
-                }
                 isEdit={true}
               />
 
