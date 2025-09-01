@@ -19,7 +19,7 @@
 from pathlib import Path
 
 from budmicroframe.commons.config import BaseAppConfig, BaseSecretsConfig, register_settings
-from pydantic import DirectoryPath
+from pydantic import DirectoryPath, Field
 
 from ..__about__ import __version__
 
@@ -34,40 +34,56 @@ class AppConfig(BaseAppConfig):
     base_dir: DirectoryPath = Path(__file__).parent.parent.parent.resolve()
 
     # Dataset Configuration
-    opencompass_dataset_url: str = (
-        "https://github.com/open-compass/opencompass/releases/download/0.2.2.rc1/OpenCompassData-complete-20240207.zip"
+    opencompass_dataset_url: str = Field(
+        default="https://github.com/open-compass/opencompass/releases/download/0.2.2.rc1/OpenCompassData-complete-20240207.zip",
+        alias="OPENCOMPASS_DATASET_URL",
     )
+    eval_datasets_pvc_name: str = Field(default="eval-datasets-pvc", alias="EVAL_DATASETS_PVC_NAME")
+    skip_volume_check: bool = Field(default=False, alias="SKIP_VOLUME_CHECK")
 
     # Eval Sync Configuration
-    eval_sync_enabled: bool = True
-    eval_sync_local_mode: bool = True  # Default to cloud mode like budapp
-    eval_manifest_url: str = "https://eval-datasets.bud.eco/v2/eval_manifest.json"
-    eval_sync_batch_size: int = 50  # Number of datasets to process per batch
-    eval_manifest_local_path: str = "budeval/data/eval_manifest_test.json"
-    eval_sync_interval_seconds: int = 3600  # Sync interval in seconds (default 1 hour like budapp)
+    eval_sync_enabled: bool = Field(default=True, alias="EVAL_SYNC_ENABLED")
+    eval_sync_local_mode: bool = Field(default=True, alias="EVAL_SYNC_LOCAL_MODE")
+    eval_manifest_url: str = Field(
+        default="https://eval-datasets.bud.eco/v2/eval_manifest.json", alias="EVAL_MANIFEST_URL"
+    )
+    eval_sync_batch_size: int = Field(default=50, alias="EVAL_SYNC_BATCH_SIZE")
+    eval_manifest_local_path: str = Field(
+        default="budeval/data/eval_manifest_test.json", alias="EVAL_MANIFEST_LOCAL_PATH"
+    )
+    eval_sync_interval_seconds: int = Field(default=3600, alias="EVAL_SYNC_INTERVAL_SECONDS")
+    eval_sync_use_bundles: bool = Field(default=False, alias="EVAL_SYNC_USE_BUNDLES")
+    eval_datasets_path: str = Field(default="bud-dev-budeval-dataset-rwx", alias="EVAL_DATASETS_PATH")
 
 
 class SecretsConfig(BaseSecretsConfig):
     name: str = __version__.split("@")[0]
     version: str = __version__.split("@")[-1]
 
+    # PostgreSQL Configuration
+    psql_user: str = Field(default="keycloak", alias="PSQL_USER")
+    psql_password: str = Field(default="keycloak_password", alias="PSQL_PASSWORD")
+    psql_db_name: str = Field(default="db22", alias="PSQL_DB_NAME")
+    psql_port: int = Field(default=5432, alias="PSQL_PORT")
+    psql_host: str = Field(default="100.84.162.116", alias="PSQL_HOST")
+
     # ClickHouse Configuration
-    clickhouse_host: str = "okb80nfy88.ap-southeast-1.aws.clickhouse.cloud"
-    clickhouse_port: int = 9440  # Secure native TCP port for ClickHouse Cloud
-    clickhouse_database: str = "budeval"
-    clickhouse_user: str = "default"
-    clickhouse_password: str = "N_8Bq67UGItUD"
+    clickhouse_host: str = Field(default="okb80nfy88.ap-southeast-1.aws.clickhouse.cloud", alias="CLICKHOUSE_HOST")
+    clickhouse_port: int = Field(default=9440, alias="CLICKHOUSE_PORT")
+    clickhouse_database: str = Field(default="budeval", alias="CLICKHOUSE_DATABASE")
+    clickhouse_user: str = Field(default="default", alias="CLICKHOUSE_USER")
+    clickhouse_password: str = Field(default="N_8Bq67UGItUD", alias="CLICKHOUSE_PASSWORD")
 
     # ClickHouse Performance Settings
-    clickhouse_batch_size: int = 1000
-    clickhouse_pool_min_size: int = 1
-    clickhouse_pool_max_size: int = 10
-    clickhouse_async_insert: bool = True
-    clickhouse_compression: str = "zstd"
-    clickhouse_secure: bool = True  # Use SSL for ClickHouse Cloud
+    clickhouse_batch_size: int = Field(default=1000, alias="CLICKHOUSE_BATCH_SIZE")
+    clickhouse_pool_min_size: int = Field(default=1, alias="CLICKHOUSE_POOL_MIN_SIZE")
+    clickhouse_pool_max_size: int = Field(default=10, alias="CLICKHOUSE_POOL_MAX_SIZE")
+    clickhouse_async_insert: bool = Field(default=True, alias="CLICKHOUSE_ASYNC_INSERT")
+    clickhouse_compression: str = Field(default="zstd", alias="CLICKHOUSE_COMPRESSION")
+    clickhouse_secure: bool = Field(default=True, alias="CLICKHOUSE_SECURE")
 
     # Storage Backend Selection
-    storage_backend: str = "clickhouse"  # "filesystem" or "clickhouse"
+    storage_backend: str = Field(default="clickhouse", alias="STORAGE_BACKEND")
 
 
 app_settings = AppConfig()  # type: ignore[reportCallIssue]

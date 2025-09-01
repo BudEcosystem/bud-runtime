@@ -3,6 +3,8 @@
 import os
 from typing import Any, Dict
 
+from budeval.commons.config import app_settings
+
 
 class StorageConfig:
     """Storage configuration based on environment."""
@@ -48,7 +50,7 @@ class StorageConfig:
         Returns:
             The PVC name to use for eval datasets
         """
-        return os.environ.get("EVAL_DATASETS_PATH", "panda-budeval-dataset")
+        return app_settings.eval_datasets_path
 
     @staticmethod
     def get_storage_config() -> Dict[str, Any]:
