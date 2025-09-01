@@ -23,6 +23,14 @@ $primary-color: var(--color-purple);
           font-size: 12px;
           text-transform: uppercase;
           letter-spacing: 0.5px;
+
+          // Remove any visual separators between headers
+          &::before,
+          &::after {
+            display: none !important;
+          }
+          border-right: none !important;
+          border-left: none !important;
         }
       }
 
