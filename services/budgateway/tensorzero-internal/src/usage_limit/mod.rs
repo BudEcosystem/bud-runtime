@@ -4,8 +4,6 @@ pub mod middleware;
 pub use limiter::{UsageLimiter, UsageLimitInfo, UsageLimiterConfig};
 pub use middleware::usage_limit_middleware;
 
-use serde::{Deserialize, Serialize};
-
 /// User usage limit status with usage tracking
 #[derive(Debug, Clone)]
 pub struct UsageLimitStatus {

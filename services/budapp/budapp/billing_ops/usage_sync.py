@@ -99,7 +99,7 @@ class UsageLimitSyncTask:
                 try:
                     # Check and publish usage limits
                     # This will update Redis with the latest usage status
-                    await service.check_usage_limits(user.id, use_cache=False)
+                    await service.check_usage_limits(user.id)
                 except Exception as e:
                     logger.warning(f"Failed to sync usage limits for user {user.id}: {e}")
 

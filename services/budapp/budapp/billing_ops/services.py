@@ -139,7 +139,7 @@ class BillingService(DataManagerUtils):
             "suspension_reason": user_billing.suspension_reason,
         }
 
-    async def check_usage_limits(self, user_id: UUID, use_cache: bool = True) -> Dict[str, Any]:
+    async def check_usage_limits(self, user_id: UUID) -> Dict[str, Any]:
         """Check if user has exceeded usage limits and publish to Redis."""
         import json
         from datetime import datetime, timezone
@@ -179,30 +179,11 @@ class BillingService(DataManagerUtils):
         if usage.get("has_billing"):
             # Get billing cycle from user billing record
             from budapp.billing_ops.models import UserBilling
+            from budapp.billing_ops.utils import calculate_billing_cycle
 
             user_billing = self.session.query(UserBilling).filter_by(user_id=user_id).first()
-            if user_billing:
-                # Calculate current billing cycle
-                from dateutil.relativedelta import relativedelta
-
-                now = datetime.now(timezone.utc)
-
-                # Assuming monthly billing cycle
-                if user_billing.created_at:
-                    # Find the start of current billing cycle
-                    months_since_start = (now.year - user_billing.created_at.year) * 12 + (
-                        now.month - user_billing.created_at.month
-                    )
-                    cycle_start = user_billing.created_at + relativedelta(months=months_since_start)
-                    cycle_end = cycle_start + relativedelta(months=1)
-
-                    # If we've passed the cycle end, move to next cycle
-                    if now >= cycle_end:
-                        cycle_start = cycle_end
-                        cycle_end = cycle_start + relativedelta(months=1)
-
-                    billing_cycle_start = cycle_start.isoformat()
-                    billing_cycle_end = cycle_end.isoformat()
+            if user_billing and user_billing.created_at:
+                billing_cycle_start, billing_cycle_end = calculate_billing_cycle(user_billing.created_at)
 
         # Check if this is a new billing cycle
         if existing_data and billing_cycle_start:

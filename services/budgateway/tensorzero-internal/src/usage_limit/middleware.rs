@@ -3,7 +3,6 @@ use axum::extract::{Request, State};
 use axum::http::StatusCode;
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
-use serde_json::Value;
 use std::sync::Arc;
 use tracing::{debug, warn};
 
