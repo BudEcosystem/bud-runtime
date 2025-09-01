@@ -222,7 +222,7 @@ const InferenceFilters: React.FC<InferenceFiltersProps> = ({ projectId, onFilter
             </Form.Item>
           </Col>
 
-          <Col span={4}>
+          <Col span={3}>
             <Form.Item
               label={<span className="text-[#B3B3B3]">Type</span>}
               name="endpointType"
@@ -232,7 +232,8 @@ const InferenceFilters: React.FC<InferenceFiltersProps> = ({ projectId, onFilter
                 placeholder="All Types"
                 allowClear
                 className="bg-[#1A1A1A]"
-                dropdownStyle={{ backgroundColor: '#1A1A1A' }}
+                dropdownStyle={{ backgroundColor: '#1A1A1A', color: '#FFFFFF' }}
+                popupClassName="[&_.ant-select-item]:!text-white [&_.ant-select-item-option-content]:!text-white"
               >
                 <Option value="chat">Chat</Option>
                 <Option value="embedding">Embedding</Option>
@@ -255,7 +256,8 @@ const InferenceFilters: React.FC<InferenceFiltersProps> = ({ projectId, onFilter
                 placeholder="All Deployments"
                 allowClear
                 className="bg-[#1A1A1A]"
-                dropdownStyle={{ backgroundColor: '#1A1A1A' }}
+                dropdownStyle={{ backgroundColor: '#1A1A1A', color: '#FFFFFF' }}
+                popupClassName="[&_.ant-select-item]:!text-white [&_.ant-select-item-option-content]:!text-white"
                 showSearch
                 filterOption={(input, option) =>
                   option?.children?.toString().toLowerCase().includes(input.toLowerCase()) ?? false
@@ -300,7 +302,7 @@ const InferenceFilters: React.FC<InferenceFiltersProps> = ({ projectId, onFilter
 
           <Col span={3}>
             <Form.Item
-              label={<span className="text-[#B3B3B3]">Max Latency (ms)</span>}
+              label={<span className="text-[#B3B3B3] whitespace-nowrap">Max Latency (ms)</span>}
               name="maxLatency"
             >
               <InputNumber

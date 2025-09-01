@@ -186,7 +186,7 @@ export const useEndPoints = create<{
       //   });
       set({ endPoints: listData.endpoints });
       set({ endPointsCount: listData.total_record });
-      successToast(response.message);
+      // successToast(response.message); // Removed to prevent success toast on every endpoint fetch
     } catch (error) {
       console.error("Error creating model:", error);
     } finally {
@@ -251,7 +251,7 @@ export const useEndPoints = create<{
 
       const listData = response.data;
       set({ adapters: listData.adapters });
-      successToast(response.message);
+      // successToast(response.message); // Removed to prevent success toast on adapter list fetch
     } catch (error) {
       console.error("Error creating model:", error);
     } finally {

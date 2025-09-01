@@ -22,11 +22,12 @@ export default function CreateBatchJob() {
   const [batchJobData, setBatchJobData] = useState({
     name: "",
     model: "",
+    completionWindow: "",
     file: null as BatchJobFile | null,
   });
   const { openDrawerWithStep } = useDrawer();
 
-  const isFormValid = batchJobData.name && batchJobData.model && batchJobData.file;
+  const isFormValid = batchJobData.name && batchJobData.model && batchJobData.completionWindow && batchJobData.file;
 
   return (
     <BudForm
@@ -166,7 +167,7 @@ export default function CreateBatchJob() {
                   form.validateFields(["name"]);
                   setBatchJobData({ ...batchJobData, name: e.target.value });
                 }}
-                className="drawerInp py-[.65rem] pt-[.8rem] pb-[.45rem] bg-transparent text-[#EEEEEE] font-[300] border-[0.5px] border-[#B1B1B1] rounded-[6px] hover:border-[#757575] focus:border-[#757575] active:border-[#757575] text-[.75rem] shadow-none w-full indent-[.4rem]"
+                className="drawerInp py-[.65rem] pt-[.8rem] pb-[.45rem] bg-transparent text-[black] dark:text-[#EEEEEE] font-[300] border-[0.5px] border-[#B1B1B1] rounded-[6px] hover:border-[#757575] focus:border-[#757575] active:border-[#757575] text-[.75rem] shadow-none w-full !indent-[0rem]"
               />
             </Form.Item>
 
@@ -217,6 +218,53 @@ export default function CreateBatchJob() {
               </div>
             </Form.Item>
 
+            {/* Completion Window Selection */}
+            <Form.Item
+              hasFeedback
+              rules={[{ required: true, message: "Please select completion window!" }]}
+              name={"completionWindow"}
+              className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]`}
+            >
+              <div className="w-full">
+                <ThemedLabel text="Completion Window" info="Choose the maximum time for batch processing" />
+              </div>
+              <div className="model-select-wrapper w-full">
+                <ConfigProvider
+                  theme={{
+                    token: {
+                      colorTextPlaceholder: "#808080",
+                      boxShadowSecondary: "none",
+                    },
+                  }}
+                >
+                  <Select
+                    variant="borderless"
+                    placeholder="Select completion window"
+                    style={{
+                      backgroundColor: "transparent",
+                      color: "#EEEEEE",
+                      width: "100%",
+                      fontSize: ".75rem",
+                    }}
+                    size="large"
+                    className="!bg-[transparent] text-[#EEEEEE] font-[300] text-[.75rem] shadow-none w-full outline-0 h-[2.5rem] outline-none [&_.ant-select-selection-placeholder]:text-[.75rem]"
+                    options={[
+                      { value: "1h", label: "1 hour" },
+                      { value: "5h", label: "5 hours" },
+                      { value: "10h", label: "10 hours" },
+                      { value: "20h", label: "20 hours" },
+                      { value: "24h", label: "24 hours" },
+                    ]}
+                    onChange={(value) => {
+                      form.setFieldsValue({ completionWindow: value });
+                      form.validateFields(["completionWindow"]);
+                      setBatchJobData({ ...batchJobData, completionWindow: value });
+                    }}
+                  />
+                </ConfigProvider>
+              </div>
+            </Form.Item>
+
             {/* File Upload with FileInput component */}
             <FileInput
               name="jsonl_file"
@@ -228,7 +276,7 @@ export default function CreateBatchJob() {
               text={
                 <div className="flex justify-center items-center w-[100%]">
                   <Text_12_400_B3B3B3>Drag & Drop or </Text_12_400_B3B3B3>&nbsp;
-                  <Text_12_600_EEEEEE>Choose file</Text_12_600_EEEEEE>&nbsp;
+                  <Text_12_600_EEEEEE className="text-[black] dark:text-[#EEEEE]">Choose file</Text_12_600_EEEEEE>&nbsp;
                   <Text_12_400_B3B3B3> to upload</Text_12_400_B3B3B3>
                 </div>
               }
