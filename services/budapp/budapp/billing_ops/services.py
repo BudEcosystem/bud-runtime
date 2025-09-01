@@ -156,20 +156,22 @@ class BillingService(DataManagerUtils):
 
         # Get previous values from Redis (for delta calculation)
         existing_data = None
+        prev_tokens_used = tokens_used  # Default to current values
+        prev_cost_used = cost_used
         try:
+            logger.info(f"usage sync for user {user_id}")
             redis_service = RedisService()
             key = f"usage_limit:{user_id}"
             existing_data = await redis_service.get(key)
             if existing_data:
                 existing = json.loads(existing_data)
-                prev_tokens_used = existing.get("tokens_used", 0)
-                prev_cost_used = existing.get("cost_used", 0.0)
-            else:
-                prev_tokens_used = 0
-                prev_cost_used = 0.0
-        except Exception:
-            prev_tokens_used = 0
-            prev_cost_used = 0.0
+                # Use the previous values stored in Redis for delta calculation
+                # These represent the last known state from the previous sync
+                prev_tokens_used = existing.get("tokens_used", tokens_used)
+                prev_cost_used = existing.get("cost_used", cost_used)
+        except Exception as e:
+            logger.warning(f"Failed to get previous usage from Redis: {e}")
+            # Keep the defaults (current values) if Redis fails
 
         # Get billing cycle information
         billing_cycle_start = None
@@ -207,11 +209,12 @@ class BillingService(DataManagerUtils):
             existing = json.loads(existing_data)
             old_cycle_start = existing.get("billing_cycle_start")
             if old_cycle_start != billing_cycle_start:
-                # New billing cycle detected - reset usage
+                # New billing cycle detected - reset current usage but keep previous values
+                # The prev_* values should be the last known values from the previous cycle
+                # This allows the gateway to calculate proper deltas
                 tokens_used = 0
                 cost_used = 0.0
-                prev_tokens_used = 0
-                prev_cost_used = 0.0
+                # prev_tokens_used and prev_cost_used already set from existing data above
                 logger.info(f"Billing cycle reset for user {user_id}: new cycle starts {billing_cycle_start}")
 
         # Determine usage limit status with new format
@@ -278,8 +281,8 @@ class BillingService(DataManagerUtils):
         try:
             redis_service = RedisService()
             key = f"usage_limit:{user_id}"
-            # Store with 10 second TTL - will be refreshed by sync task
-            await redis_service.set(key, json.dumps(usage_limit_info), ex=10)
+            # Store with 60 second TTL - ensures data availability between sync intervals (30s)
+            await redis_service.set(key, json.dumps(usage_limit_info), ex=60)
         except Exception as e:
             logger.warning(f"Failed to publish usage limit to Redis: {e}")
 

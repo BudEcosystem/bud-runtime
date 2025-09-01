@@ -47,8 +47,8 @@ pub struct UsageLimiterConfig {
 impl Default for UsageLimiterConfig {
     fn default() -> Self {
         Self {
-            cache_ttl_ms: 5000,     // 5 seconds cache
-            sync_interval_ms: 2000, // Sync every 2 seconds
+            cache_ttl_ms: 30000,    // 30 seconds cache (matches budapp sync interval)
+            sync_interval_ms: 2000, // Sync every 2 seconds from Redis
             redis_timeout_ms: 100,  // 100ms Redis timeout
             fail_open: true,        // Allow on errors
             max_cache_size: 10000,  // 10k entries max
@@ -151,6 +151,7 @@ impl UsageLimiter {
     /// Check usage limits for a user with optional consumption tracking
     pub async fn check_usage(&self, user_id: &str, tokens_to_consume: Option<i64>, cost_to_consume: Option<f64>) -> UsageLimitDecision {
         // Check local cache first
+
         if let Some(mut cached) = self.cache.get(user_id).await {
             self.metrics.record_cache_hit();
 
@@ -450,6 +451,10 @@ impl UsageLimiter {
                                                             // Use higher value (Redis or calculated)
                                                             cached.tokens_used = new_tokens.max(info.tokens_used);
                                                             cached.cost_used = f64::max(new_cost, info.cost_used);
+
+                                                            // Reset local consumption after applying it
+                                                            cached.local_tokens_consumed = 0;
+                                                            cached.local_cost_consumed = 0.0;
                                                         }
 
                                                         // Update other fields
