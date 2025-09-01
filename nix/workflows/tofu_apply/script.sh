@@ -3,7 +3,7 @@
 set -e
 
 repo_root="$(git rev-parse --show-toplevel)"
-tofu_path="$repo_root/infra/terraform/main"
+tofu_path="$repo_root/infra/tofu/budk8s"
 
 export_sops_secret_silent() {
 	k1="$1"
