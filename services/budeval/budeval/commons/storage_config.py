@@ -13,7 +13,7 @@ class StorageConfig:
     def get_environment() -> str:
         """Detect the current environment."""
         # Check for local development indicators
-        if os.path.exists("/home/ubuntu/bud-serve-eval/k3s.yaml"):
+        if os.path.exists("/mnt/HC_Volume_103274798/bud-runtime/services/budeval/k3s.yaml"):
             return "local"
 
         # Check for environment variable

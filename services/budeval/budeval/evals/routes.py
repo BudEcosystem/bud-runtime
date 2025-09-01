@@ -38,7 +38,7 @@ async def start_eval(request: EvaluationRequest):
         request (EvaluationRequest): The evaluation request.
 
     Returns:
-        dict: A simple hello world message
+        dict: evaluation workflow response
     """
     try:
         response = await EvaluationService().evaluate_model(StartEvaluationRequest(**request.model_dump()))

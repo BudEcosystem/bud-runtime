@@ -4,11 +4,11 @@
   connection: local
   gather_facts: no
   collections:
-    - community.kubernetes
+    - kubernetes.core
 
   tasks:
     - name: List Kubernetes namespaces to verify connectivity
-      community.kubernetes.k8s_info:
+      kubernetes.core.k8s_info:
         kind: Namespace
         kubeconfig: "{{ kubeconfig_path | default(omit) }}"
       register: ns

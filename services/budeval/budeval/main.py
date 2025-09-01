@@ -28,7 +28,6 @@ from fastapi import FastAPI
 
 from .commons.config import app_settings, secrets_settings
 from .commons.exceptions import SeederException
-from .evals.eval_sync.routes import router as eval_sync_router
 from .evals.routes import evals_routes
 
 
@@ -246,4 +245,3 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 app = configure_app(app_settings, secrets_settings, lifespan=lifespan)  # type: ignore[arg-type] # noqa: F841
 
 app.include_router(evals_routes)
-app.include_router(eval_sync_router)
