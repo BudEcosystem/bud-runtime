@@ -31,29 +31,38 @@ locals {
     [for _, ip in module.azure.ip.ingress.v4 : ip],
     [module.azure.ip.primary.v4]
   )
+  service_with_ipv4 = {
+    for tup in setproduct(local.services_with_envs, local.ingress_v4):
+    "${tup[0]}=${tup[1]}" => tup
+  }
+
   ingress_v6 = concat(
     [for _, ip in module.azure.ip.ingress.v6 : ip],
     [module.azure.ip.primary.v6]
   )
+  service_with_ipv6 = {
+    for tup in setproduct(local.services_with_envs, local.ingress_v6):
+    "${tup[0]}=${tup[1]}" => tup
+  }
 }
 
 resource "cloudflare_dns_record" "ipv4" {
-  for_each = setproduct(local.services_with_envs, local.ingress_v4)
+  for_each = local.service_with_ipv4
   zone_id  = var.zone_id
-  name     = each.key[0]
+  name     = each.value[0]
   ttl      = 3600
   type     = "A"
-  content  = each.key[1]
+  content  = each.value[1]
   proxied  = false
 }
 
 
 resource "cloudflare_dns_record" "ipv6" {
-  for_each = setproduct(local.services_with_envs, local.ingress_v6)
+  for_each = local.service_with_ipv6
   zone_id  = var.zone_id
-  name     = each.key[0]
+  name     = each.value[0]
   ttl      = 3600
   type     = "AAAA"
-  content  = each.key[1]
+  content  = each.value[1]
   proxied  = false
 }
