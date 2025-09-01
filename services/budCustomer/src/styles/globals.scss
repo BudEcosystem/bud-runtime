@@ -1152,7 +1152,20 @@ input.ant-input:-webkit-autofill {
   // min-height: 55px;
 }
 
+.custom-ant-input {
 
+  // border: .5px solid #757575 !important;
+  input::placeholder {
+    color: #757575 !important;
+    /* Your desired placeholder color */
+    opacity: 1;
+    /* Ensure it’s fully opaque */
+  }
+
+  .ant-input-suffix {
+    display: none !important;
+  }
+}
 
 // Utility classes
 @layer utilities {

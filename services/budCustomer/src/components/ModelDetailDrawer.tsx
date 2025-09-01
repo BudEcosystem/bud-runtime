@@ -636,7 +636,7 @@ fetch('${apiUrl}', {
             Placement="bottomLeft"
             buttonContent={
               <div className="cursor-pointer border border-[.5px] border-[#965CDE] rounded-[6px] bg-[#1E0C34] min-w-[4rem] min-h-[1.75rem] flex items-center justify-center px-[.6rem]">
-                <Text_12_600_EEEEEE className="cursor-pointer flex items-center justify-center text-gray-900 dark:text-[#EEEEEE]">
+                <Text_12_600_EEEEEE className="cursor-pointer flex items-center justify-center text-white dark:text-[#EEEEEE]">
                   {selectedCode.charAt(0).toUpperCase() + selectedCode.slice(1)}
                 </Text_12_600_EEEEEE>
                 <ChevronDown className="w-[1rem] text-[#EEEEEE] text-[.75rem] ml-[.15rem]" />
