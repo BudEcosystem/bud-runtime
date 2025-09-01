@@ -38,7 +38,7 @@ class AppConfig(BaseAppConfig):
         default="https://github.com/open-compass/opencompass/releases/download/0.2.2.rc1/OpenCompassData-complete-20240207.zip",
         alias="OPENCOMPASS_DATASET_URL",
     )
-    eval_datasets_pvc_name: str = Field(default="eval-datasets-pvc", alias="EVAL_DATASETS_PVC_NAME")
+    eval_datasets_pvc_name: str = Field(default="eval-datasets-pvc", alias="EVAL_DATASETS_PATH")
     skip_volume_check: bool = Field(default=False, alias="SKIP_VOLUME_CHECK")
 
     # Eval Sync Configuration

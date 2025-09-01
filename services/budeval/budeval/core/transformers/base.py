@@ -162,7 +162,7 @@ class BaseTransformer(ABC):
             output_volume={
                 "name": "output",
                 "type": "shared_pvc",
-                "claimName": "panda-budeval-dataset",
+                "claimName": "bud-dev-budeval-dataset-rwx",
                 "subPath": f"results/{request.eval_request_id}",
                 "mountPath": "/workspace/outputs",
             },
