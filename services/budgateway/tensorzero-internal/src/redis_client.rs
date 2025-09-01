@@ -246,6 +246,9 @@ impl RedisClient {
                     }
                 }
             }
+            k if k.starts_with("usage_limit:") => {
+                // Usage limit keys are handled by other components, ignore silently
+            }
             _ => {
                 tracing::info!("Received message from unknown key pattern: {key}");
             }
@@ -305,6 +308,9 @@ impl RedisClient {
             k if k == PUBLISHED_MODEL_INFO_KEY => {
                 auth.clear_published_model_info();
                 tracing::debug!("Cleared published model info");
+            }
+            k if k.starts_with("usage_limit:") => {
+                // Usage limit keys are handled by other components, ignore silently
             }
             _ => {
                 tracing::info!("Received message from unknown key pattern: {key}");
