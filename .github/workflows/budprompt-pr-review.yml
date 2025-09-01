@@ -1,0 +1,274 @@
+name: "BudPrompt: PR Review"
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'services/budprompt/**'
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./services/budprompt
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install bandit
+        run: |
+          python -m pip install --upgrade pip
+          pip install bandit[toml]
+
+      - name: Run bandit security scan
+        run: |
+          echo "::group::Running bandit security scan"
+          bandit -r budprompt/ -ll --skip B608 -f json -o bandit-report.json || true
+          bandit -r budprompt/ -ll --skip B608
+          echo "::endgroup::"
+
+      - name: Upload bandit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-security-report
+          path: bandit-report.json
+
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./services/budprompt
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-test-${{ hashFiles('**/requirements.txt', '**/requirements-test.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-test-
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-test.txt
+          pip install pytest-cov  # For coverage reporting
+
+      - name: Set up environment
+        run: |
+          cp .env.sample .env
+
+          # Database configuration
+          sed -i 's/PSQL_HOST=.*/PSQL_HOST=127.0.0.1/' .env
+          sed -i 's/PSQL_DB_NAME=.*/PSQL_DB_NAME=bud_prompt_test/' .env
+          # Add PSQL_USER and PSQL_PASSWORD (required by PostgreSQL container)
+          echo "PSQL_USER=postgres" >> .env
+          echo "PSQL_PASSWORD=postgres" >> .env
+
+          # Redis configuration
+          sed -i 's/REDIS_HOST=.*/REDIS_HOST=127.0.0.1/' .env
+          sed -i 's/SECRETS_REDIS_URI=.*/SECRETS_REDIS_URI=127.0.0.1:6379/' .env
+          sed -i 's/SECRETS_REDIS_PASSWORD=.*/SECRETS_REDIS_PASSWORD=redis_test_password/' .env
+          # Add REDIS_PORT (required by docker-compose)
+          echo "REDIS_PORT=6379" >> .env
+
+          # Database secrets (used by application)
+          sed -i 's/SECRETS_PSQL_USER=.*/SECRETS_PSQL_USER=postgres/' .env
+          sed -i 's/SECRETS_PSQL_PASSWORD=.*/SECRETS_PSQL_PASSWORD=postgres/' .env
+
+          # Dapr configuration
+          sed -i 's/DAPR_API_TOKEN=.*/DAPR_API_TOKEN=test_token/' .env
+
+          # Gateway configuration
+          sed -i 's|BUD_GATEWAY_BASE_URL=.*|BUD_GATEWAY_BASE_URL=http://20.66.97.208/v1|' .env
+          sed -i 's|BUD_DEFAULT_MODEL_NAME=.*|BUD_DEFAULT_MODEL_NAME=qwen3-32b|' .env
+
+          # Show environment file for debugging (without sensitive data)
+          echo "Environment file setup complete"
+          echo "Key variables set:"
+          grep -E "^(APP_NAME|PSQL_DB_NAME|REDIS_PORT|PSQL_USER)=" .env
+
+      - name: Start services with Docker Compose
+        run: |
+          echo "::group::Starting services with Docker Compose"
+          # Start all services in background
+          ./deploy/start_dev.sh -d --build
+
+          # Wait longer for build to complete
+          echo "Waiting for services to build and start..."
+          sleep 60
+
+          # Show all containers
+          echo "=== All containers status ==="
+          docker ps -a --format "table {{.Names}}\t{{.Status}}"
+
+          # Check if main container exists
+          MAIN_CONTAINER="budserve-development-budprompt"
+
+          if docker ps -a | grep -q $MAIN_CONTAINER; then
+            echo "Main container found. Checking status..."
+
+            # Get container logs to see why it failed
+            echo "=== Container logs ==="
+            docker logs --tail 200 $MAIN_CONTAINER 2>&1 || true
+
+            # Check if container exited
+            if ! docker ps | grep -q $MAIN_CONTAINER; then
+              echo "Container exited. Checking exit code..."
+              EXIT_CODE=$(docker inspect $MAIN_CONTAINER --format='{{.State.ExitCode}}')
+              echo "Exit code: $EXIT_CODE"
+
+              # Try to restart
+              echo "Attempting to restart container..."
+              docker start $MAIN_CONTAINER || true
+              sleep 10
+
+              # Check again
+              if ! docker ps | grep -q $MAIN_CONTAINER; then
+                echo "Container still not running after restart"
+                docker logs --tail 50 $MAIN_CONTAINER 2>&1 || true
+              fi
+            fi
+          else
+            echo "ERROR: Main container was not created. Build may have failed."
+            echo "Checking docker-compose output..."
+            cd ./deploy && docker-compose -f docker-compose-dev.yaml ps
+          fi
+
+          # Final check
+          if docker ps | grep -q $MAIN_CONTAINER; then
+            echo "SUCCESS: Main container is running!"
+            docker exec $MAIN_CONTAINER curl -f http://localhost:9088/health && echo "Health check passed!" || echo "Health check failed"
+          else
+            echo "WARNING: Main container is not running"
+            echo "Continuing anyway to gather more diagnostic information..."
+            # Don't exit with error to see more logs
+          fi
+          echo "::endgroup::"
+
+      - name: Run tests with coverage
+        run: |
+          echo "::group::Running pytest with coverage"
+          MAIN_CONTAINER="budserve-development-budprompt"
+
+          # Check if container is running before attempting tests
+          if docker ps | grep -q $MAIN_CONTAINER; then
+            # Install pytest-cov inside the container first
+            echo "Installing pytest-cov in container..."
+            docker exec $MAIN_CONTAINER pip install pytest-cov
+
+            # Run tests inside the Docker container
+            echo "Running tests..."
+            docker exec $MAIN_CONTAINER pytest tests/ \
+              --cov=budprompt \
+              --cov-report=xml \
+              --cov-report=html \
+              --cov-report=term-missing \
+              -v \
+              -x
+
+            # Copy coverage reports from container to host
+            docker cp $MAIN_CONTAINER:/app/coverage.xml ./coverage.xml || true
+            docker cp $MAIN_CONTAINER:/app/htmlcov ./htmlcov || true
+          else
+            echo "ERROR: Main container is not running. Cannot run tests."
+            echo "Checking container status..."
+            docker ps -a | grep budprompt || true
+            exit 1
+          fi
+          echo "::endgroup::"
+
+      - name: Stop services
+        if: always()
+        run: |
+          echo "Stopping Docker Compose services..."
+          ./deploy/stop_dev.sh || true
+
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            coverage.xml
+            htmlcov/
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+  dependency-check:
+    name: Check Dependencies
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./services/budprompt
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install pip-audit
+        run: |
+          python -m pip install --upgrade pip
+          pip install pip-audit
+
+      - name: Run dependency vulnerability scan
+        run: |
+          echo "::group::Checking for vulnerable dependencies"
+          pip-audit -r requirements.txt -r requirements-test.txt -r requirements-lint.txt
+          echo "::endgroup::"
+
+  pr-status:
+    name: PR Review Status
+    runs-on: ubuntu-latest
+    needs: [security, test, dependency-check]
+    if: always()
+
+    steps:
+      - name: Check job results
+        run: |
+          if [[ "${{ needs.security.result }}" == "failure" ]]; then
+            echo "❌ Security scan failed"
+            exit 1
+          fi
+          if [[ "${{ needs.test.result }}" == "failure" ]]; then
+            echo "❌ Tests failed"
+            exit 1
+          fi
+          if [[ "${{ needs.dependency-check.result }}" == "failure" ]]; then
+            echo "❌ Dependency check failed"
+            exit 1
+          fi
+          echo "✅ All checks passed!"
