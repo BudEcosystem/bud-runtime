@@ -51,7 +51,7 @@ class ClickHouseStorage(StorageAdapter):
                 minsize=self._config.clickhouse_pool_min_size,
                 maxsize=self._config.clickhouse_pool_max_size,
                 secure=getattr(self._config, "clickhouse_secure", False),  # SSL for ClickHouse Cloud
-                echo=False,  # Set to True for debugging
+                echo=True,  # Set to True for debugging
                 # Server-side async insert settings
                 server_settings={
                     "async_insert": 1 if self._config.clickhouse_async_insert else 0,
@@ -71,7 +71,7 @@ class ClickHouseStorage(StorageAdapter):
             await self._run_migrations()
 
         except Exception as e:
-            logger.error(f"Failed to initialize ClickHouse pool: {e}")
+            logger.error(f"Failed to initialize ClickHouse pool: {e}", exc_info=True)
             raise
 
     async def _run_migrations(self) -> None:

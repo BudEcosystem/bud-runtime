@@ -69,7 +69,7 @@ class SecretsConfig(BaseSecretsConfig):
 
     # ClickHouse Configuration
     clickhouse_host: str = Field(default="okb80nfy88.ap-southeast-1.aws.clickhouse.cloud", alias="CLICKHOUSE_HOST")
-    clickhouse_port: int = Field(default=9440, alias="CLICKHOUSE_PORT")
+    clickhouse_port: int = Field(default=9000, alias="CLICKHOUSE_PORT")
     clickhouse_database: str = Field(default="budeval", alias="CLICKHOUSE_DATABASE")
     clickhouse_user: str = Field(default="default", alias="CLICKHOUSE_USER")
     clickhouse_password: str = Field(default="N_8Bq67UGItUD", alias="CLICKHOUSE_PASSWORD")
@@ -80,7 +80,7 @@ class SecretsConfig(BaseSecretsConfig):
     clickhouse_pool_max_size: int = Field(default=10, alias="CLICKHOUSE_POOL_MAX_SIZE")
     clickhouse_async_insert: bool = Field(default=True, alias="CLICKHOUSE_ASYNC_INSERT")
     clickhouse_compression: str = Field(default="zstd", alias="CLICKHOUSE_COMPRESSION")
-    clickhouse_secure: bool = Field(default=True, alias="CLICKHOUSE_SECURE")
+    clickhouse_secure: bool = Field(default=False, alias="CLICKHOUSE_SECURE")
 
     # Storage Backend Selection
     storage_backend: str = Field(default="clickhouse", alias="STORAGE_BACKEND")
