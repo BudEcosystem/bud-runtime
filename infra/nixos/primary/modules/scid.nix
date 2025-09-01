@@ -37,7 +37,7 @@ in
             "nixos-rebuild"
             "switch"
             "--flake"
-            ".#master"
+            ".#primary"
             "-L"
           ];
           watch_paths = [
@@ -61,7 +61,7 @@ in
           watch_paths = [
             "flake.nix"
             "flake.lock"
-            "infra/terraform"
+            "infra/tofu"
             "nix/workflows/tofu_apply"
           ];
         }
