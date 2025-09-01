@@ -75,24 +75,12 @@ export function BudForm(props: BudFormProps) {
   const { form, isExpandedView } = useContext(BudFormContext);
 
   useEffect(() => {
-    // Only set form values if we have actual data (not empty object)
+    // Only set form values on initial mount
     if (props.data && Object.keys(props.data).length > 0) {
-      // Get current form values
-      const currentValues = form.getFieldsValue();
-
-      // Check if values are actually different
-      const hasChanges = Object.keys(props.data).some(key => {
-        // Using JSON.stringify for a simple deep comparison. This is safer than reference equality for objects/arrays.
-        // For complex cases, a library like `lodash.isEqual` would be more robust.
-        return JSON.stringify(props.data[key]) !== JSON.stringify(currentValues[key]);
-      });
-
-      // Only update if there are actual changes
-      if (hasChanges) {
-        form.setFieldsValue(props.data);
-      }
+      form.setFieldsValue(props.data);
     }
-  }, [props.data, form]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty dependency array - only run once on mount
 
   // Don't reset fields on unmount - we want to preserve form data when navigating
   // The form will be properly initialized with data prop when remounting

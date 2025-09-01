@@ -75,8 +75,6 @@ export default function NewProject() {
           <DrawerCard classNames="pb-0">
             <ProjectNameInput
               placeholder="Enter Project Name"
-              onChangeName={(name) => form.setFieldsValue({ name })}
-              onChangeIcon={(icon) => form.setFieldsValue({ icon })}
               isEdit={true}
             />
             <div className="flex justify-start items-center px-[.65rem] mb-[1.65rem]">

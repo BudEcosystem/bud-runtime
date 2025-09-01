@@ -76,16 +76,6 @@ export default function AddCluster() {
             <div className="pt-[.87rem]">
               <ProjectNameInput
                 placeholder="Enter Cluster Name"
-                onChangeName={(name) => {
-                  if (name !== clusterValues.name) {
-                    setClusterValues({ ...clusterValues, name });
-                  }
-                }}
-                onChangeIcon={(icon) => {
-                  if (icon !== clusterValues.icon) {
-                    setClusterValues({ ...clusterValues, icon });
-                  }
-                }}
                 isEdit={true}
               />
 

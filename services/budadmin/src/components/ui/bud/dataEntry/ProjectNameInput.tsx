@@ -1,6 +1,6 @@
 import { Button, Form, Image, Input, Popover } from "antd";
 import EmojiPicker, { Categories, EmojiStyle, Theme } from "emoji-picker-react";
-import React, { use, useContext, useEffect } from "react";
+import React, { useContext, useEffect } from "react";
 import { BudFormContext } from "../context/BudFormContext";
 import { pxToRem, Text_26_600_FFFFFF } from "../../text";
 import { assetBaseUrl } from "@/components/environment";
@@ -11,7 +11,6 @@ import IconRender from "src/flows/components/BudIconRender";
 interface Props {
   placeholder: string;
   onChangeIcon?: (value: string) => void;
-  onChangeName?: (value: string) => void;
   isEdit?: boolean;
 }
 
@@ -105,9 +104,8 @@ export function ModelNameInput({
 
   useEffect(() => {
     onChange && onChange(name);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [icon, name]);
-  const imageUrl = assetBaseUrl + icon;
-
   return (
     <div className="drawerNameInput flex flex-row items-start justify-between mb-[1rem]">
 
@@ -152,7 +150,7 @@ export function ModelNameInput({
         ]}
       >
         <Input
-          className="pl-2 rounded-[6px] !bg-transparent text-[#EEEEEE] placeholder-[#808080] !border-none outline-0 text-xl rw-full border-transparent focus:border-transparent focus:ring-0"
+          className="pl-2 rounded-[6px] !bg-transparent text-[#EEEEEE] placeholder-[#808080] !border-none outline-0 text-xl w-full border-transparent focus:border-transparent focus:ring-0"
           style={{ outline: 'none', border: 'none' }}
           type="text"
           placeholder={placeholder}
@@ -271,7 +269,7 @@ export function NameIconInput({
         ]}
       >
         <Input
-          className="pl-2 rounded-[6px] !bg-transparent text-[#EEEEEE] placeholder-[#808080] !border-none outline-0 text-xl rw-full border-transparent focus:border-transparent focus:ring-0"
+          className="pl-2 rounded-[6px] !bg-transparent text-[#EEEEEE] placeholder-[#808080] !border-none outline-0 text-xl w-full border-transparent focus:border-transparent focus:ring-0"
           style={{ outline: 'none', border: 'none' }}
           type="text"
           placeholder={placeholder}
@@ -285,17 +283,10 @@ export function NameIconInput({
 export default function ProjectNameInput({
   placeholder,
   onChangeIcon,
-  onChangeName,
   isEdit
 }: Props) {
   const { form } = useContext(BudFormContext);
   const icon = form.getFieldValue("icon");
-  const name = form.getFieldValue("name");
-
-  useEffect(() => {
-    onChangeIcon && onChangeIcon(icon);
-    onChangeName && onChangeName(name);
-  }, [icon, name]);
 
   return (
     <NameIconInput
@@ -303,6 +294,7 @@ export default function ProjectNameInput({
       icon={icon}
       onChangeIcon={(emoji) => {
         form.setFieldsValue({ icon: emoji });
+        onChangeIcon && onChangeIcon(emoji);
       }}
       disabled={false}
       isEdit={isEdit}
