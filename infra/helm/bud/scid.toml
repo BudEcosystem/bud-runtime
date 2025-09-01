@@ -1,3 +1,3 @@
-release_name = "panda"
-namespace = "nixcd-dev-bud"
+release_name = "bud-dev"
+namespace = "bud-dev"
 sops_value_paths = [ "values.enc.yaml" ]
