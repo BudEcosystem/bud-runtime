@@ -87,6 +87,9 @@ class ClickHouseStorage(StorageAdapter):
             ]
             migrations_dir = Path(__file__).parent.parent.parent.parent / "migrations"
 
+            # Collect all commands first so we can run them over a single connection
+            all_commands: list[str] = []
+
             for migration_filename in migration_files:
                 migration_file = migrations_dir / migration_filename
 
@@ -98,25 +101,20 @@ class ClickHouseStorage(StorageAdapter):
                 with open(migration_file, "r") as f:
                     migration_sql = f.read()
 
-                # Split migration into individual statements (excluding comments and empty lines)
-                statements = []
-                for line in migration_sql.split("\n"):
-                    line = line.strip()
-                    if line and not line.startswith("--"):
-                        statements.append(line)
+                # Parse SQL into executable commands (strip comments, respect quotes)
+                commands = self._split_sql_commands(migration_sql)
+                all_commands.extend(commands)
 
-                # Join and split by semicolon
-                full_sql = " ".join(statements)
-                commands = [cmd.strip() for cmd in full_sql.split(";") if cmd.strip()]
-
+            # Execute all migration commands using a single connection from the pool
+            if all_commands:
                 async with self.get_connection() as conn, conn.cursor() as cursor:
-                    for command in commands:
+                    for command in all_commands:
                         try:
-                            logger.debug(f"Executing migration command: {command[:50]}...")
+                            logger.debug(f"Executing migration command: {command[:80]}...")
                             await cursor.execute(command)
                         except Exception as e:
                             # Log error but continue with other commands (some may already exist)
-                            logger.warning(f"Migration command failed (might already exist): {str(e)[:100]}")
+                            logger.warning(f"Migration command failed (might already exist): {str(e)[:200]}")
                             continue
 
             logger.info("ClickHouse database migrations completed successfully")
@@ -124,6 +122,81 @@ class ClickHouseStorage(StorageAdapter):
         except Exception as e:
             logger.error(f"Failed to run ClickHouse migrations: {e}")
             # Don't raise - allow app to continue even if migrations fail
+
+    def _split_sql_commands(self, sql_text: str) -> list[str]:
+        """Split a .sql file into individual statements.
+
+        - Removes line comments ("-- ...") and block comments ("/* ... */").
+        - Preserves content inside single/double quoted strings.
+        - Splits on semicolons that are not inside quotes.
+        """
+        result_commands: list[str] = []
+        current: list[str] = []
+        i = 0
+        length = len(sql_text)
+        in_single = False
+        in_double = False
+        in_block_comment = False
+
+        while i < length:
+            ch = sql_text[i]
+
+            # Handle start/end of block comments
+            if not in_single and not in_double:
+                if not in_block_comment and i + 1 < length and sql_text[i : i + 2] == "/*":
+                    in_block_comment = True
+                    i += 2
+                    continue
+                if in_block_comment and i + 1 < length and sql_text[i : i + 2] == "*/":
+                    in_block_comment = False
+                    i += 2
+                    continue
+
+            if in_block_comment:
+                i += 1
+                continue
+
+            # Handle line comments -- ... (skip until end of line)
+            if not in_single and not in_double and i + 1 < length and sql_text[i : i + 2] == "--":
+                # Skip to end of line
+                while i < length and sql_text[i] != "\n":
+                    i += 1
+                # Retain the newline to avoid gluing tokens together
+                current.append("\n")
+                i += 1
+                continue
+
+            # Toggle quotes
+            if ch == "'" and not in_double:
+                in_single = not in_single
+                current.append(ch)
+                i += 1
+                continue
+            if ch == '"' and not in_single:
+                in_double = not in_double
+                current.append(ch)
+                i += 1
+                continue
+
+            # Split on semicolon outside quotes
+            if ch == ";" and not in_single and not in_double:
+                command = "".join(current).strip()
+                if command:
+                    result_commands.append(command)
+                current = []
+                i += 1
+                continue
+
+            current.append(ch)
+            i += 1
+
+        # Flush last command
+        tail = "".join(current).strip()
+        if tail:
+            result_commands.append(tail)
+
+        # Drop any empty commands
+        return [cmd for cmd in (c.strip() for c in result_commands) if cmd]
 
     async def close(self) -> None:
         """Close the connection pool."""
