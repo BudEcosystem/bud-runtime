@@ -3,6 +3,7 @@ kind: PersistentVolumeClaim
 metadata:
   name: {{ .Release.Name }}-budeval-dataset
 spec:
+  storageClassName: {{ .Values.microservices.budeval.storageClassName }}
   accessModes:
     - ReadWriteMany
   resources:
@@ -102,7 +103,7 @@ spec:
           - name: CLICKHOUSE_SECURE
             value: "false"
           - name: EVAL_DATASETS_PATH
-            value: {{ .Release.Name }}-budeval-dataset
+            value: {{ .Release.Name }}-budeval-dataset-rwx
         {{ $root := . }}
         {{- range $key, $value := .Values.microservices.budeval.env }}
           - name: {{ $key }}

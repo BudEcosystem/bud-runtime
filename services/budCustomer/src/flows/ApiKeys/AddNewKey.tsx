@@ -4,14 +4,14 @@ import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
 import React, { useContext, useEffect, useState } from "react";
 import { useDrawer } from "@/hooks/useDrawer";
-import { Input, Form, Select, ConfigProvider } from "antd";
 import { AppRequest } from "@/services/api/requests";
 import { BudFormContext } from "@/components/ui/bud/context/BudFormContext";
 import { useProjects } from "@/hooks/useProjects";
 import { errorToast } from "@/components/toast";
-import ThemedLabel from "@/components/ui/bud/dataEntry/ThemedLabel";
+import TextInput from "@/components/ui/bud/dataEntry/TextInput";
+import CustomSelect from "@/components/ui/bud/dataEntry/CustomSelect";
 
-function AddKeyForm({ setApiKeyData }: { setApiKeyData: (data: any) => void }) {
+function AddKeyForm({ setApiKeyData, apiKeyData }: { setApiKeyData: (data: any) => void; apiKeyData: any }) {
   const { form } = useContext(BudFormContext);
   const [projectData, setProjectData] = useState<any>([]);
   const { projects, getProjects } = useProjects();
@@ -31,124 +31,61 @@ function AddKeyForm({ setApiKeyData }: { setApiKeyData: (data: any) => void }) {
 
   return (
     <div className="px-[1.4rem] py-[2.1rem] flex flex-col gap-[1.6rem]">
-      <Form.Item
-        hasFeedback
-        name={"name"}
+      <TextInput
+        name="name"
+        label="Credential Name"
+        placeholder="Enter name"
+        infoText="This is the name"
         rules={[{ required: true, message: "Please input name!" }]}
-        className={`flex items-center rounded-[6px] relative !bg-[transparent] w-[100%] mb-[0]`}
-      >
-        <div className="w-full">
-          <ThemedLabel text="Credential Name" info="This is the name" />
-        </div>
-        <Input
-          placeholder="Enter name"
-          style={{
-            backgroundColor: "transparent",
-            color: "#EEEEEE",
-            border: "0.5px solid #757575",
-          }}
-          size="large"
-          onChange={(e) => {
-            form.setFieldsValue({ name: e.target.value });
-            form.validateFields(["name"]);
-            setApiKeyData((prev: any) => ({
-              ...prev,
-              name: e.target.value,
-            }));
-          }}
-          className="drawerInp py-[.65rem] pt-[.8rem] pb-[.45rem] bg-transparent text-[#EEEEEE] font-[300] border-[0.5px] border-[#757575] rounded-[6px] hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] text-[.75rem] shadow-none w-full indent-[.4rem]"
-        />
-      </Form.Item>
-      <Form.Item
-        hasFeedback
-        rules={[{ required: true, message: "Please select project!" }]}
-        name={"project"}
-        className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]`}
-      >
-        <div className="w-full">
-          <ThemedLabel text="Project" info="This is the project" />
-        </div>
-        <div className="custom-select-two w-full rounded-[6px] relative">
-          <ConfigProvider
-            theme={{
-              token: {
-                colorTextPlaceholder: "#808080",
-                boxShadowSecondary: "none",
-              },
-            }}
-          >
-            <Select
-              variant="borderless"
-              placeholder="Select project"
-              style={{
-                backgroundColor: "transparent",
-                color: "#EEEEEE",
-                border: "0.5px solid #757575",
-                width: "100%",
-              }}
-              size="large"
-              className="drawerInp !bg-[transparent] text-[#EEEEEE] font-[300] text-[.75rem] shadow-none w-full border-0 outline-0 hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] h-[2.5rem] outline-none"
-              options={projectData}
-              onChange={(value) => {
-                form.setFieldsValue({ project: value });
-                form.validateFields(["project"]);
-                setApiKeyData((prev: any) => ({
-                  ...prev,
-                  project_id: value,
-                }));
-              }}
-            />
-          </ConfigProvider>
-        </div>
-      </Form.Item>
-
-      <Form.Item
-        hasFeedback
-        rules={[{ required: true, message: "Please select Set Expiry!" }]}
-        name={"SetExpiry"}
-        className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]`}
-      >
-        <div className="w-full">
-          <ThemedLabel text="Set Expiry" info="This is the Set Expiry" />
-        </div>
-        <div className="custom-select-two w-full rounded-[6px] relative">
-          <ConfigProvider
-            theme={{
-              token: {
-                colorTextPlaceholder: "#808080",
-                boxShadowSecondary: "none",
-              },
-            }}
-          >
-            <Select
-              variant="borderless"
-              placeholder="Select Expiry"
-              style={{
-                backgroundColor: "transparent",
-                color: "#EEEEEE",
-                border: "0.5px solid #757575",
-                width: "100%",
-              }}
-              size="large"
-              className="drawerInp !bg-[transparent] text-[#EEEEEE] font-[300] text-[.75rem] shadow-none w-full border-0 outline-0 hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] h-[2.5rem] outline-none"
-              options={[
-                { label: "30 days", value: "30" },
-                { label: "60 days", value: "60" },
-                { label: "90 days", value: "90" },
-                { label: "Never", value: "0" },
-              ]}
-              onChange={(value) => {
-                form.setFieldsValue({ SetExpiry: value });
-                form.validateFields(["SetExpiry"]);
-                setApiKeyData((prev: any) => ({
-                  ...prev,
-                  expiry: value,
-                }));
-              }}
-            />
-          </ConfigProvider>
-        </div>
-      </Form.Item>
+        ClassNames="mt-[.1rem] mb-[0rem]"
+        InputClasses="py-[.5rem]"
+        formItemClassnames="mb-[0]"
+        onChange={(value) => {
+          form.setFieldsValue({ name: value });
+          form.validateFields(["name"]);
+          setApiKeyData((prev: any) => ({
+            ...prev,
+            name: value,
+          }));
+        }}
+      />
+      <CustomSelect
+        name="project"
+        label="Project"
+        info="This is the project"
+        placeholder="Select project"
+        value={apiKeyData.project_id}
+        selectOptions={projectData}
+        onChange={(value) => {
+          form.setFieldsValue({ project: value });
+          form.validateFields(["project"]);
+          setApiKeyData((prev: any) => ({
+            ...prev,
+            project_id: value,
+          }));
+        }}
+      />
+      <CustomSelect
+        name="SetExpiry"
+        label="Set Expiry"
+        info="This is the Set Expiry"
+        placeholder="Select Expiry"
+        value={apiKeyData.expiry}
+        selectOptions={[
+          { label: "30 days", value: "30" },
+          { label: "60 days", value: "60" },
+          { label: "90 days", value: "90" },
+          { label: "Never", value: "0" },
+        ]}
+        onChange={(value) => {
+          form.setFieldsValue({ SetExpiry: value });
+          form.validateFields(["SetExpiry"]);
+          setApiKeyData((prev: any) => ({
+            ...prev,
+            expiry: value,
+          }));
+        }}
+      />
     </div>
   );
 }
@@ -207,10 +144,10 @@ export default function AddNewKey() {
         <BudDrawerLayout>
           <DrawerTitleCard
             title="New Key"
-            description="Create New key here"
+            description="Generate secure API credentials for accessing your project resources"
           />
           <div>
-            <AddKeyForm setApiKeyData={setApiKeyData} />
+            <AddKeyForm setApiKeyData={setApiKeyData} apiKeyData={apiKeyData} />
           </div>
         </BudDrawerLayout>
       </BudWraperBox>

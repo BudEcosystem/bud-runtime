@@ -48,14 +48,6 @@ function EditProjectForm() {
       <DrawerCard classNames="pb-0">
         <ProjectNameInput
           placeholder="Enter Project Name"
-          onChangeIcon={(icon) => setProjectValues({
-            ...projectValues,
-            icon: icon
-          })}
-          onChangeName={(name) => setProjectValues({
-            ...projectValues,
-            name: name
-          })}
         />
         <div className="mt-[.5rem]">
           <div>

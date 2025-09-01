@@ -8,7 +8,7 @@
   coreutils,
   gnused,
   gnugrep,
-  findutils
+  findutils,
 }:
 let
   port = 3000;

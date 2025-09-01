@@ -8,7 +8,7 @@
 
   vars:
       k8s_namespace: "{{ namespace | default('nixcd-dev-bud') }}"
-      pvc_name: "{{ pvc_name | default('panda-budeval-dataset') }}"
+      pvc_name: "{{ pvc_name | default('bud-dev-budeval-dataset-rwx') }}"
       opencompass_dataset_url: "{{ opencompass_dataset_url | default('https://github.com/open-compass/opencompass/releases/download/0.2.2.rc1/OpenCompassData-complete-20240207.zip') }}"
       opencompass_dataset_filename: "{{ opencompass_dataset_url | basename }}"
 
@@ -52,12 +52,46 @@
                 {% endif %}
                 Access Modes: {{ pvc_check.resources[0].spec.accessModes | join(', ') }}
 
-      - name: Warn if PVC is not bound
-        when: pvc_check.resources | length > 0 and pvc_check.resources[0].status.phase != "Bound"
+      # Check if PVC is using WaitForFirstConsumer mode
+      - name: Check StorageClass binding mode
+        kubernetes.core.k8s_info:
+            api_version: storage.k8s.io/v1
+            kind: StorageClass
+            name: "{{ pvc_check.resources[0].spec.storageClassName | default('') }}"
+        register: storageclass_check
+        when: pvc_check.resources | length > 0 and pvc_check.resources[0].spec.storageClassName is defined
+
+      - name: Set PVC readiness flag
+        set_fact:
+            pvc_ready_for_pods: >-
+                {{
+                    pvc_check.resources | length > 0 and (
+                        pvc_check.resources[0].status.phase == "Bound" or
+                        (
+                            pvc_check.resources[0].status.phase == "Pending" and
+                            storageclass_check.resources is defined and
+                            storageclass_check.resources | length > 0 and
+                            storageclass_check.resources[0].volumeBindingMode | default('Immediate') == 'WaitForFirstConsumer'
+                        )
+                    )
+                }}
+
+      - name: Display PVC readiness status
         debug:
             msg: |
-                WARNING: PVC '{{ pvc_name }}' exists but is not bound (status: {{ pvc_check.resources[0].status.phase }}).
-                Pod creation will be skipped until the claim is Bound.
+                PVC is ready for pod creation: {{ pvc_ready_for_pods }}
+                {% if pvc_check.resources[0].status.phase == "Pending" and pvc_ready_for_pods %}
+                Note: PVC is in WaitForFirstConsumer mode and will bind when the first pod is created.
+                {% endif %}
+        when: pvc_check.resources | length > 0
+
+      - name: Warn if PVC is not ready
+        when: pvc_check.resources | length > 0 and not pvc_ready_for_pods
+        debug:
+            msg: |
+                WARNING: PVC '{{ pvc_name }}' exists but is not ready (status: {{ pvc_check.resources[0].status.phase }}).
+                This doesn't appear to be a WaitForFirstConsumer case.
+                Pod creation will be skipped.
 
       # ---- Guard: ensure this SA may create pods in the target namespace ----
       - name: SSAR - can this in-cluster identity create pods in target namespace?
@@ -79,11 +113,9 @@
                 - ssar.result.status.allowed | default(false)
             fail_msg: "Current pod's ServiceAccount cannot create pods in namespace '{{ k8s_namespace }}'."
 
-      # ---- Create checker pod only when PVC is Bound ----
+      # ---- Create checker pod when PVC is ready (Bound or WaitForFirstConsumer) ----
       - name: Check if datasets are already initialized (create checker pod)
-        when: >
-            pvc_check.resources | length > 0 and
-            (pvc_check.resources[0].status.phase | default('')) == 'Bound'
+        when: pvc_ready_for_pods
         kubernetes.core.k8s:
             state: present
             namespace: "{{ k8s_namespace }}"
@@ -125,9 +157,7 @@
         until: check_pod_created is succeeded
 
       - name: Wait for dataset check to complete
-        when: >
-            pvc_check.resources | length > 0 and
-            (pvc_check.resources[0].status.phase | default('')) == 'Bound'
+        when: pvc_ready_for_pods and check_pod_created is defined
         kubernetes.core.k8s_info:
             api_version: v1
             kind: Pod
@@ -141,8 +171,8 @@
       # ---- Initialize datasets if the check pod failed (meaning not initialized) ----
       - name: Initialize datasets if needed (create init pod)
         when: >
-            pvc_check.resources | length > 0 and
-            (pvc_check.resources[0].status.phase | default('')) == 'Bound' and
+            pvc_ready_for_pods and
+            check_pod_status is defined and
             check_pod_status.resources | length > 0 and
             check_pod_status.resources[0].status.phase == "Failed"
         kubernetes.core.k8s:
@@ -207,11 +237,11 @@
                                 mountPath: /datasets
                           resources:
                               requests:
-                                  memory: "2Gi"
-                                  cpu: "1"
+                                  memory: "512Mi"
+                                  cpu: "200m"
                               limits:
-                                  memory: "4Gi"
-                                  cpu: "2"
+                                  memory: "1Gi"
+                                  cpu: "500m"
                     volumes:
                         - name: data
                           persistentVolumeClaim:
@@ -243,6 +273,25 @@
                 Dataset initialization failed. Please check the pod logs:
                 kubectl logs {{ pvc_name }}-init-datasets -n {{ k8s_namespace }}
 
+      # ---- Check final PVC status after pod creation ----
+      - name: Check final PVC status
+        when: pvc_ready_for_pods
+        kubernetes.core.k8s_info:
+            api_version: v1
+            kind: PersistentVolumeClaim
+            name: "{{ pvc_name }}"
+            namespace: "{{ k8s_namespace }}"
+        register: pvc_final_check
+
+      - name: Display final PVC binding status
+        when: pvc_ready_for_pods and pvc_final_check.resources | length > 0
+        debug:
+            msg: |
+                Final PVC status: {{ pvc_final_check.resources[0].status.phase }}
+                {% if pvc_final_check.resources[0].status.phase == "Bound" %}
+                PVC successfully bound to volume.
+                {% endif %}
+
       # ---- Clean up temporary pods (if they were created) ----
       - name: Clean up temporary pods
         kubernetes.core.k8s:
@@ -263,8 +312,8 @@
                 PVC: {{ pvc_name }}
                 Namespace: {{ k8s_namespace }}
                 Datasets location: /datasets/data/
-                {% if pvc_check.resources | length > 0 and pvc_check.resources[0].status.phase != "Bound" %}
-                NOTE: PVC is not Bound ({{ pvc_check.resources[0].status.phase }}); pods were skipped.
+                {% if not pvc_ready_for_pods %}
+                NOTE: PVC is not ready ({{ pvc_check.resources[0].status.phase }}); pods were skipped.
                 {% elif init_pod_created is defined and init_pod_created.changed and init_pod_status.resources | length > 0 and init_pod_status.resources[0].status.phase == "Succeeded" %}
                 Datasets were downloaded and initialized.
                 {% elif check_pod_status is defined and check_pod_status.resources | length > 0 and check_pod_status.resources[0].status.phase == "Succeeded" %}

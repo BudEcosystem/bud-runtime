@@ -63,8 +63,6 @@ function LoginContent() {
             localStorage.setItem("refresh_token", result.refresh_token);
           }
 
-          successToast("Login successful!");
-
           // Get user data
           try {
             const { getUser } = useUser.getState();
@@ -99,8 +97,6 @@ function LoginContent() {
           if (result.refresh_token) {
             localStorage.setItem("refresh_token", result.refresh_token);
           }
-
-          successToast("Login successful!");
 
           // Get user data
           try {
@@ -172,7 +168,6 @@ function LoginContent() {
         );
 
         setAuthError("");
-        successToast("Login successful!");
 
         // Get user data - commenting out for now as it causes 404 errors
         // TODO: Fix the /users/me endpoint or handle the error gracefully
@@ -197,7 +192,6 @@ function LoginContent() {
       } else if (response.data) {
         // Handle case where login is successful but no token (shouldn't happen normally)
         setAuthError("");
-        successToast("Login successful!");
         router.push("/models");
       }
 

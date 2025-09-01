@@ -61,10 +61,10 @@ function ShortCutComponent({
   }
 
   return (
-    <div className="flex inline-flex justify-center items-center text-[0.625rem] py-0.5 bg-bud-bg-secondary rounded-sm text-bud-text-muted h-5 w-8 uppercase opacity-0 group-hover:opacity-100 transition-opacity">
+    <div className="flex inline-flex justify-center items-center text-[0.625rem] py-0.5 bg-bud-bg-secondary rounded-sm text-bud-text-muted h-5 w-8 uppercase">
       <Icon
         icon="ph:command"
-        className="text-[0.625rem] mr-0.5 text-bud-text-muted group-hover:text-bud-text-primary"
+        className="text-[0.625rem] mr-0.5 text-bud-text-muted"
       />
       {cmd}
     </div>
@@ -166,10 +166,10 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
   }, [user])
 
   return (
-    <div className="flex h-screen bg-bud-bg-primary">
+    <div className="flex h-screen bg-[#f2f2f2] dark:bg-bud-bg-primary">
       {/* Sidebar */}
       <div
-        className={`${isCollapsed ? "w-[80px]" : "w-[260px]"} bg-bud-bg-primary border-r border-bud-border flex flex-col relative transition-all duration-300`}
+        className={`${isCollapsed ? "w-[80px]" : "w-[260px]"} bg-[#f2f2f2] dark:bg-bud-bg-primary flex flex-col relative transition-all duration-300`}
       >
         {/* Collapse/Expand Button */}
         <button
@@ -222,7 +222,7 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
           )} */}
 
           {/* Notifications */}
-        <BudIsland />
+        {/* <BudIsland /> */}
 
             <div className="bg-bud-bg-secondary rounded-lg p-3 mb-1 cursor-pointer hover:bg-bud-bg-tertiary transition-colors hidden">
               <Badge
@@ -354,19 +354,21 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header */}
-        {headerItems && (
-          <div className="bg-bud-bg-primary border-b border-bud-border px-8 py-4">
-            {headerItems}
-          </div>
-        )}
+      {/* Main Content with rightWrap */}
+      <div className="rightWrap py-[0.75rem] pr-[0.6875rem]">
+        <div className="rightDiv rounded-[17px] overflow-hidden flex flex-col">
+          {/* Header */}
+          {headerItems && (
+            <div className="headerWrap border-b border-bud-border px-8 py-4">
+              {headerItems}
+            </div>
+          )}
 
-        {/* Page Content */}
-        <main className="flex-1 bg-bud-bg-primary overflow-auto">
-          {children}
-        </main>
+          {/* Page Content */}
+          <main className="flex-1 overflow-auto">
+            {children}
+          </main>
+        </div>
       </div>
     </div>
   );

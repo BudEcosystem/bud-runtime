@@ -50,9 +50,9 @@ class AnsibleOrchestrator:
         extravars = {}
 
         # For Testing: Load from local yaml file if no kubeconfig provided
-        if kubeconfig is None and Path("/home/ubuntu/bud-serve-eval/k3s.yaml").exists():
+        if kubeconfig is None and Path("/mnt/HC_Volume_103274798/bud-runtime/services/budeval/k3s.yaml").exists():
             # Read the local k3s.yaml file
-            with open("/home/ubuntu/bud-serve-eval/k3s.yaml", "r") as f:
+            with open("/mnt/HC_Volume_103274798/bud-runtime/services/budeval/k3s.yaml", "r") as f:
                 kubeconfig_yaml_content = f.read()
             # Since it's already YAML, we don't need to parse/convert it
             files = {f"{temp_id}_kubeconfig.yaml": kubeconfig_yaml_content}
@@ -70,8 +70,8 @@ class AnsibleOrchestrator:
             except json.JSONDecodeError as e:
                 logger.warning(f"Invalid kubeconfig JSON provided: {e}. Falling back to local k3s.yaml if available.")
                 # Fall back to local k3s.yaml if available
-                if Path("/home/ubuntu/bud-serve-eval/k3s.yaml").exists():
-                    with open("/home/ubuntu/bud-serve-eval/k3s.yaml", "r") as f:
+                if Path("/mnt/HC_Volume_103274798/bud-runtime/services/budeval/k3s.yaml").exists():
+                    with open("/mnt/HC_Volume_103274798/bud-runtime/services/budeval/k3s.yaml", "r") as f:
                         kubeconfig_yaml_content = f.read()
                     files = {f"{temp_id}_kubeconfig.yaml": kubeconfig_yaml_content}
                     extravars = {"kubeconfig_path": f"{temp_id}_kubeconfig.yaml"}
@@ -79,8 +79,29 @@ class AnsibleOrchestrator:
                     # Use in-cluster config as last resort
                     extravars = {"use_in_cluster_config": True}
         else:
-            # Use in-cluster config - don't pass kubeconfig_path
-            extravars = {"use_in_cluster_config": True}
+            # Try environment-based kubeconfig discovery
+            env_kubeconfig = os.environ.get("KUBECONFIG")
+            home_kubeconfig = str(Path.home() / ".kube" / "config")
+
+            if env_kubeconfig and Path(env_kubeconfig).exists():
+                try:
+                    kubeconfig_yaml_content = Path(env_kubeconfig).read_text()
+                    files = {f"{temp_id}_kubeconfig.yaml": kubeconfig_yaml_content}
+                    extravars = {"kubeconfig_path": f"{temp_id}_kubeconfig.yaml"}
+                except Exception as e:
+                    logger.warning(f"Failed to read KUBECONFIG at {env_kubeconfig}: {e}. Falling back further.")
+                    extravars = {"use_in_cluster_config": True}
+            elif Path(home_kubeconfig).exists():
+                try:
+                    kubeconfig_yaml_content = Path(home_kubeconfig).read_text()
+                    files = {f"{temp_id}_kubeconfig.yaml": kubeconfig_yaml_content}
+                    extravars = {"kubeconfig_path": f"{temp_id}_kubeconfig.yaml"}
+                except Exception as e:
+                    logger.warning(f"Failed to read ~/.kube/config: {e}. Using in-cluster config.")
+                    extravars = {"use_in_cluster_config": True}
+            else:
+                # Use in-cluster config - don't pass kubeconfig_path
+                extravars = {"use_in_cluster_config": True}
 
         return files, extravars
 
@@ -410,6 +431,10 @@ class AnsibleOrchestrator:
             "PATH": f"{venv_bin}:{current_path}",
         }
 
+        # If kubeconfig file path is present, also export KUBECONFIG for modules honoring env var
+        if "kubeconfig_path" in extravars:
+            envvars["KUBECONFIG"] = extravars["kubeconfig_path"]
+
         logger.info(f"Running Ansible playbook: {playbook} with extravars: {extravars}")
         logger.info(f"Using Python interpreter: {sys.executable}")
         logger.info(f"PATH environment: {envvars['PATH']}")
@@ -487,6 +512,10 @@ class AnsibleOrchestrator:
             "ANSIBLE_HOST_KEY_CHECKING": "False",
             "PATH": f"{venv_bin}:{current_path}",
         }
+
+        # If kubeconfig file path is present, also export KUBECONFIG for modules honoring env var
+        if "kubeconfig_path" in extravars:
+            envvars["KUBECONFIG"] = extravars["kubeconfig_path"]
 
         logger.info(f"Running Ansible playbook: {playbook} with extravars: {extravars}")
         logger.info(f"Using Python interpreter: {sys.executable}")

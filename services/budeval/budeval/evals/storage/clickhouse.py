@@ -51,7 +51,7 @@ class ClickHouseStorage(StorageAdapter):
                 minsize=self._config.clickhouse_pool_min_size,
                 maxsize=self._config.clickhouse_pool_max_size,
                 secure=getattr(self._config, "clickhouse_secure", False),  # SSL for ClickHouse Cloud
-                echo=False,  # Set to True for debugging
+                echo=True,  # Set to True for debugging
                 # Server-side async insert settings
                 server_settings={
                     "async_insert": 1 if self._config.clickhouse_async_insert else 0,
@@ -71,7 +71,7 @@ class ClickHouseStorage(StorageAdapter):
             await self._run_migrations()
 
         except Exception as e:
-            logger.error(f"Failed to initialize ClickHouse pool: {e}")
+            logger.error(f"Failed to initialize ClickHouse pool: {e}", exc_info=True)
             raise
 
     async def _run_migrations(self) -> None:
@@ -87,6 +87,9 @@ class ClickHouseStorage(StorageAdapter):
             ]
             migrations_dir = Path(__file__).parent.parent.parent.parent / "migrations"
 
+            # Collect all commands first so we can run them over a single connection
+            all_commands: list[str] = []
+
             for migration_filename in migration_files:
                 migration_file = migrations_dir / migration_filename
 
@@ -98,25 +101,20 @@ class ClickHouseStorage(StorageAdapter):
                 with open(migration_file, "r") as f:
                     migration_sql = f.read()
 
-                # Split migration into individual statements (excluding comments and empty lines)
-                statements = []
-                for line in migration_sql.split("\n"):
-                    line = line.strip()
-                    if line and not line.startswith("--"):
-                        statements.append(line)
+                # Parse SQL into executable commands (strip comments, respect quotes)
+                commands = self._split_sql_commands(migration_sql)
+                all_commands.extend(commands)
 
-                # Join and split by semicolon
-                full_sql = " ".join(statements)
-                commands = [cmd.strip() for cmd in full_sql.split(";") if cmd.strip()]
-
+            # Execute all migration commands using a single connection from the pool
+            if all_commands:
                 async with self.get_connection() as conn, conn.cursor() as cursor:
-                    for command in commands:
+                    for command in all_commands:
                         try:
-                            logger.debug(f"Executing migration command: {command[:50]}...")
+                            logger.debug(f"Executing migration command: {command[:80]}...")
                             await cursor.execute(command)
                         except Exception as e:
                             # Log error but continue with other commands (some may already exist)
-                            logger.warning(f"Migration command failed (might already exist): {str(e)[:100]}")
+                            logger.warning(f"Migration command failed (might already exist): {str(e)[:200]}")
                             continue
 
             logger.info("ClickHouse database migrations completed successfully")
@@ -124,6 +122,81 @@ class ClickHouseStorage(StorageAdapter):
         except Exception as e:
             logger.error(f"Failed to run ClickHouse migrations: {e}")
             # Don't raise - allow app to continue even if migrations fail
+
+    def _split_sql_commands(self, sql_text: str) -> list[str]:
+        """Split a .sql file into individual statements.
+
+        - Removes line comments ("-- ...") and block comments ("/* ... */").
+        - Preserves content inside single/double quoted strings.
+        - Splits on semicolons that are not inside quotes.
+        """
+        result_commands: list[str] = []
+        current: list[str] = []
+        i = 0
+        length = len(sql_text)
+        in_single = False
+        in_double = False
+        in_block_comment = False
+
+        while i < length:
+            ch = sql_text[i]
+
+            # Handle start/end of block comments
+            if not in_single and not in_double:
+                if not in_block_comment and i + 1 < length and sql_text[i : i + 2] == "/*":
+                    in_block_comment = True
+                    i += 2
+                    continue
+                if in_block_comment and i + 1 < length and sql_text[i : i + 2] == "*/":
+                    in_block_comment = False
+                    i += 2
+                    continue
+
+            if in_block_comment:
+                i += 1
+                continue
+
+            # Handle line comments -- ... (skip until end of line)
+            if not in_single and not in_double and i + 1 < length and sql_text[i : i + 2] == "--":
+                # Skip to end of line
+                while i < length and sql_text[i] != "\n":
+                    i += 1
+                # Retain the newline to avoid gluing tokens together
+                current.append("\n")
+                i += 1
+                continue
+
+            # Toggle quotes
+            if ch == "'" and not in_double:
+                in_single = not in_single
+                current.append(ch)
+                i += 1
+                continue
+            if ch == '"' and not in_single:
+                in_double = not in_double
+                current.append(ch)
+                i += 1
+                continue
+
+            # Split on semicolon outside quotes
+            if ch == ";" and not in_single and not in_double:
+                command = "".join(current).strip()
+                if command:
+                    result_commands.append(command)
+                current = []
+                i += 1
+                continue
+
+            current.append(ch)
+            i += 1
+
+        # Flush last command
+        tail = "".join(current).strip()
+        if tail:
+            result_commands.append(tail)
+
+        # Drop any empty commands
+        return [cmd for cmd in (c.strip() for c in result_commands) if cmd]
 
     async def close(self) -> None:
         """Close the connection pool."""
@@ -522,14 +595,13 @@ class ClickHouseStorage(StorageAdapter):
             True if deleted successfully, False otherwise
         """
         try:
-            async with self.get_connection() as conn:
+            async with self.get_connection() as conn, conn.cursor() as cursor:
                 # Delete in reverse dependency order
                 tables = ["budeval.predictions", "budeval.dataset_results", "budeval.evaluation_jobs"]
 
                 for table in tables:
                     query = f"DELETE FROM {table} WHERE job_id = %(job_id)s"
-                    async with conn.cursor() as cursor:
-                        await cursor.execute(query, {"job_id": job_id})
+                    await cursor.execute(query, {"job_id": job_id})
 
                 logger.info(f"Successfully deleted results for job {job_id}")
                 return True
@@ -545,13 +617,12 @@ class ClickHouseStorage(StorageAdapter):
         Returns True on success, False on failure.
         """
         try:
-            async with self.get_connection() as conn:
+            async with self.get_connection() as conn, conn.cursor() as cursor:
                 tables = ["budeval.predictions", "budeval.dataset_results", "budeval.evaluation_jobs"]
 
                 for table in tables:
                     query = f"ALTER TABLE {table} DELETE WHERE 1"
-                    async with conn.cursor() as cursor:
-                        await cursor.execute(query)
+                    await cursor.execute(query)
 
             logger.info("Successfully purged all budeval records from ClickHouse")
             return True
@@ -567,17 +638,16 @@ class ClickHouseStorage(StorageAdapter):
             List of job IDs that have stored results
         """
         try:
-            async with self.get_connection() as conn:
+            async with self.get_connection() as conn, conn.cursor() as cursor:
                 query = """
                 SELECT DISTINCT job_id
                 FROM budeval.evaluation_jobs
                 ORDER BY created_at DESC
                 """
 
-                async with conn.cursor() as cursor:
-                    await cursor.execute(query)
-                    rows = await cursor.fetchall()
-                    return [row[0] for row in rows]
+                await cursor.execute(query)
+                rows = await cursor.fetchall()
+                return [row[0] for row in rows]
 
         except Exception as e:
             logger.error(f"Failed to list results: {e}")
@@ -651,17 +721,16 @@ class ClickHouseStorage(StorageAdapter):
             True if results exist, False otherwise
         """
         try:
-            async with self.get_connection() as conn:
+            async with self.get_connection() as conn, conn.cursor() as cursor:
                 query = """
                 SELECT 1 FROM budeval.evaluation_jobs
                 WHERE job_id = %(job_id)s
                 LIMIT 1
                 """
 
-                async with conn.cursor() as cursor:
-                    await cursor.execute(query, {"job_id": job_id})
-                    row = await cursor.fetchone()
-                    return row is not None
+                await cursor.execute(query, {"job_id": job_id})
+                row = await cursor.fetchone()
+                return row is not None
 
         except Exception as e:
             logger.error(f"Failed to check existence for job {job_id}: {e}")
