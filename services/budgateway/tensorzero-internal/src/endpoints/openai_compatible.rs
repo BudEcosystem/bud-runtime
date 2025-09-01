@@ -145,6 +145,7 @@ pub async fn inference_handler(
         kafka_connection_info,
         authentication_info: _,
         model_credential_store,
+        usage_limiter,
         ..
     }): AppState,
     headers: HeaderMap,
@@ -268,6 +269,53 @@ pub async fn inference_handler(
 
             let mut openai_compatible_response =
                 OpenAICompatibleResponse::from((response.clone(), original_model_name.clone()));
+
+            // Track usage consumption if usage limiter is enabled
+            if let Some(usage_limiter) = &usage_limiter {
+                // Extract user_id from headers (set by auth middleware)
+                if let Some(user_id) = headers
+                    .get("x-tensorzero-user-id")
+                    .and_then(|v| v.to_str().ok())
+                {
+                    // Calculate tokens to consume
+                    let tokens_to_consume = openai_compatible_response.usage.total_tokens as i64;
+
+                    // Calculate cost using the same logic as in inference.rs
+                    let cost_to_consume = if openai_compatible_response.usage.total_tokens > 0 {
+                        let cost = if let Some(write_info) = &write_info {
+                            if let Some(pricing) = &write_info.model_pricing {
+                                // Convert tokens to the pricing unit (e.g., if per_tokens is 1000, divide by 1000)
+                                let input_multiplier = openai_compatible_response.usage.prompt_tokens as f64 / pricing.per_tokens as f64;
+                                let output_multiplier = openai_compatible_response.usage.completion_tokens as f64 / pricing.per_tokens as f64;
+
+                                (input_multiplier * pricing.input_cost) + (output_multiplier * pricing.output_cost)
+                            } else {
+                                // Fallback to default pricing if not configured
+                                // Using reasonable defaults: $0.01 per 1K input tokens, $0.03 per 1K output tokens
+                                (openai_compatible_response.usage.prompt_tokens as f64 * 0.00001) +
+                                (openai_compatible_response.usage.completion_tokens as f64 * 0.00003)
+                            }
+                        } else {
+                            // No write_info, use default pricing
+                            (openai_compatible_response.usage.prompt_tokens as f64 * 0.00001) +
+                            (openai_compatible_response.usage.completion_tokens as f64 * 0.00003)
+                        };
+                        // Round to 4 decimal places for consistent precision
+                        (cost * 10000.0).round() / 10000.0
+                    } else {
+                        0.0
+                    };
+
+                    // Record the consumption (fire and forget - don't block response)
+                    let usage_limiter_clone = usage_limiter.clone();
+                    let user_id_clone = user_id.to_string();
+                    tokio::spawn(async move {
+                        let _result = usage_limiter_clone
+                            .check_usage(&user_id_clone, Some(tokens_to_consume), Some(cost_to_consume))
+                            .await;
+                    });
+                }
+            }
 
             if logprobs_requested {
                 // Try to fetch real logprobs from the original provider response (if available)
