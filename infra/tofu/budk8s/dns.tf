@@ -27,42 +27,60 @@ locals {
     ]
   ]))
 
-  ingress_v4 = concat(
+  ingress_ipv4 = { for ip in toset(concat(
     [for _, ip in module.azure.ip.ingress.v4 : ip],
     [module.azure.ip.primary.v4]
-  )
-  service_with_ipv4 = {
-    for tup in setproduct(local.services_with_envs, local.ingress_v4):
-    "${tup[0]}=${tup[1]}" => tup
-  }
-
-  ingress_v6 = concat(
+  )) : ip => ip }
+  ingress_ipv6 = { for ip in toset(concat(
     [for _, ip in module.azure.ip.ingress.v6 : ip],
     [module.azure.ip.primary.v6]
-  )
-  service_with_ipv6 = {
-    for tup in setproduct(local.services_with_envs, local.ingress_v6):
-    "${tup[0]}=${tup[1]}" => tup
+    )) : ip => ip
   }
+
+  ingress_domain = "ingress.k8s.${var.zone_domain}"
 }
 
-resource "cloudflare_dns_record" "ipv4" {
-  for_each = local.service_with_ipv4
+resource "cloudflare_dns_record" "primary_ipv4" {
+  zone_id = var.zone_id
+  name    = "primary.k8s.${var.zone_domain}"
+  ttl     = 3600
+  type    = "A"
+  content = module.azure.ip.primary.v4
+  proxied = false
+}
+resource "cloudflare_dns_record" "primary_ipv6" {
+  zone_id = var.zone_id
+  name    = "primary.k8s.${var.zone_domain}"
+  ttl     = 3600
+  type    = "AAAA"
+  content = module.azure.ip.primary.v6
+  proxied = false
+}
+
+resource "cloudflare_dns_record" "ingress_ipv4" {
+  for_each = local.ingress_ipv4
   zone_id  = var.zone_id
-  name     = each.value[0]
+  name     = local.ingress_domain
   ttl      = 3600
   type     = "A"
-  content  = each.value[1]
+  content  = each.key
   proxied  = false
 }
-
-
-resource "cloudflare_dns_record" "ipv6" {
-  for_each = local.service_with_ipv6
+resource "cloudflare_dns_record" "ingerss_ipv6" {
+  for_each = local.ingress_ipv6
   zone_id  = var.zone_id
-  name     = each.value[0]
+  name     = local.ingress_domain
   ttl      = 3600
   type     = "AAAA"
-  content  = each.value[1]
+  content  = each.key
+  proxied  = false
+}
+resource "cloudflare_dns_record" "services" {
+  for_each = local.services_with_envs
+  zone_id  = var.zone_id
+  name     = each.key
+  ttl      = 3600
+  type     = "CNAME"
+  content  = local.ingress_domain
   proxied  = false
 }

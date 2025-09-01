@@ -9,7 +9,7 @@ resource "tls_private_key" "ssh" {
 module "azure" {
   source = "../azure"
 
-  prefix = "budk8stest"
+  prefix = "budk8s"
   user = {
     name    = local.install_user
     ssh_key = tls_private_key.ssh.public_key_openssh
