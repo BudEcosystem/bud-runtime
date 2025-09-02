@@ -126,17 +126,21 @@ class TestProjectCreationHappyPath:
     """Test successful project creation scenarios."""
 
     @pytest.mark.asyncio
-    async def test_create_project_with_minimal_fields(self, mock_session, mock_user, mock_project, minimal_project_data):
+    async def test_create_project_with_minimal_fields(
+        self, mock_session, mock_user, mock_project, minimal_project_data
+    ):
         """Test creating a project with only required fields."""
         # Arrange
         service = ProjectService(mock_session)
 
-        with patch.object(ProjectDataManager, 'retrieve_by_fields', new_callable=AsyncMock) as mock_retrieve:
-            with patch.object(ProjectDataManager, 'insert_one', new_callable=AsyncMock) as mock_insert:
-                with patch('budapp.project_ops.services.UserDataManager') as mock_user_manager:
-                    with patch('budapp.project_ops.services.KeycloakManager') as mock_keycloak:
-                        with patch('budapp.project_ops.services.PermissionService') as mock_permission:
-                            with patch.object(service, 'add_users_to_project', new_callable=AsyncMock) as mock_add_users:
+        with patch.object(ProjectDataManager, "retrieve_by_fields", new_callable=AsyncMock) as mock_retrieve:
+            with patch.object(ProjectDataManager, "insert_one", new_callable=AsyncMock) as mock_insert:
+                with patch("budapp.project_ops.services.UserDataManager") as mock_user_manager:
+                    with patch("budapp.project_ops.services.KeycloakManager") as mock_keycloak:
+                        with patch("budapp.project_ops.services.PermissionService") as mock_permission:
+                            with patch.object(
+                                service, "add_users_to_project", new_callable=AsyncMock
+                            ) as mock_add_users:
                                 # Configure mocks
                                 mock_retrieve.return_value = None  # No existing project
                                 mock_project.name = minimal_project_data["name"]
@@ -149,7 +153,9 @@ class TestProjectCreationHappyPath:
 
                                 # Configure PermissionService mock
                                 mock_permission_instance = MagicMock()
-                                mock_permission_instance.create_resource_permission_by_user = AsyncMock(return_value=None)
+                                mock_permission_instance.create_resource_permission_by_user = AsyncMock(
+                                    return_value=None
+                                )
                                 mock_permission.return_value = mock_permission_instance
 
                                 # Configure add_users_to_project mock
@@ -170,12 +176,14 @@ class TestProjectCreationHappyPath:
         # Arrange
         service = ProjectService(mock_session)
 
-        with patch.object(ProjectDataManager, 'retrieve_by_fields', new_callable=AsyncMock) as mock_retrieve:
-            with patch.object(ProjectDataManager, 'insert_one', new_callable=AsyncMock) as mock_insert:
-                with patch('budapp.project_ops.services.UserDataManager') as mock_user_manager:
-                    with patch('budapp.project_ops.services.KeycloakManager') as mock_keycloak:
-                        with patch('budapp.project_ops.services.PermissionService') as mock_permission:
-                            with patch.object(service, 'add_users_to_project', new_callable=AsyncMock) as mock_add_users:
+        with patch.object(ProjectDataManager, "retrieve_by_fields", new_callable=AsyncMock) as mock_retrieve:
+            with patch.object(ProjectDataManager, "insert_one", new_callable=AsyncMock) as mock_insert:
+                with patch("budapp.project_ops.services.UserDataManager") as mock_user_manager:
+                    with patch("budapp.project_ops.services.KeycloakManager") as mock_keycloak:
+                        with patch("budapp.project_ops.services.PermissionService") as mock_permission:
+                            with patch.object(
+                                service, "add_users_to_project", new_callable=AsyncMock
+                            ) as mock_add_users:
                                 # Configure mocks
                                 mock_retrieve.return_value = None  # No existing project
                                 mock_project.name = valid_project_data["name"]
@@ -191,7 +199,9 @@ class TestProjectCreationHappyPath:
 
                                 # Configure PermissionService mock
                                 mock_permission_instance = MagicMock()
-                                mock_permission_instance.create_resource_permission_by_user = AsyncMock(return_value=None)
+                                mock_permission_instance.create_resource_permission_by_user = AsyncMock(
+                                    return_value=None
+                                )
                                 mock_permission.return_value = mock_permission_instance
 
                                 # Configure add_users_to_project mock
@@ -217,12 +227,14 @@ class TestProjectCreationHappyPath:
             "project_type": ProjectTypeEnum.ADMIN_APP,
         }
 
-        with patch.object(ProjectDataManager, 'retrieve_by_fields', new_callable=AsyncMock) as mock_retrieve:
-            with patch.object(ProjectDataManager, 'insert_one', new_callable=AsyncMock) as mock_insert:
-                with patch('budapp.project_ops.services.UserDataManager') as mock_user_manager:
-                    with patch('budapp.project_ops.services.KeycloakManager') as mock_keycloak:
-                        with patch('budapp.project_ops.services.PermissionService') as mock_permission:
-                            with patch.object(service, 'add_users_to_project', new_callable=AsyncMock) as mock_add_users:
+        with patch.object(ProjectDataManager, "retrieve_by_fields", new_callable=AsyncMock) as mock_retrieve:
+            with patch.object(ProjectDataManager, "insert_one", new_callable=AsyncMock) as mock_insert:
+                with patch("budapp.project_ops.services.UserDataManager") as mock_user_manager:
+                    with patch("budapp.project_ops.services.KeycloakManager") as mock_keycloak:
+                        with patch("budapp.project_ops.services.PermissionService") as mock_permission:
+                            with patch.object(
+                                service, "add_users_to_project", new_callable=AsyncMock
+                            ) as mock_add_users:
                                 # Configure mocks
                                 mock_retrieve.return_value = None
                                 mock_project.project_type = ProjectTypeEnum.ADMIN_APP.value
@@ -234,7 +246,9 @@ class TestProjectCreationHappyPath:
 
                                 # Configure PermissionService mock
                                 mock_permission_instance = MagicMock()
-                                mock_permission_instance.create_resource_permission_by_user = AsyncMock(return_value=None)
+                                mock_permission_instance.create_resource_permission_by_user = AsyncMock(
+                                    return_value=None
+                                )
                                 mock_permission.return_value = mock_permission_instance
 
                                 # Configure add_users_to_project mock
@@ -256,12 +270,14 @@ class TestProjectCreationHappyPath:
             "benchmark": True,
         }
 
-        with patch.object(ProjectDataManager, 'retrieve_by_fields', new_callable=AsyncMock) as mock_retrieve:
-            with patch.object(ProjectDataManager, 'insert_one', new_callable=AsyncMock) as mock_insert:
-                with patch('budapp.project_ops.services.UserDataManager') as mock_user_manager:
-                    with patch('budapp.project_ops.services.KeycloakManager') as mock_keycloak:
-                        with patch('budapp.project_ops.services.PermissionService') as mock_permission:
-                            with patch.object(service, 'add_users_to_project', new_callable=AsyncMock) as mock_add_users:
+        with patch.object(ProjectDataManager, "retrieve_by_fields", new_callable=AsyncMock) as mock_retrieve:
+            with patch.object(ProjectDataManager, "insert_one", new_callable=AsyncMock) as mock_insert:
+                with patch("budapp.project_ops.services.UserDataManager") as mock_user_manager:
+                    with patch("budapp.project_ops.services.KeycloakManager") as mock_keycloak:
+                        with patch("budapp.project_ops.services.PermissionService") as mock_permission:
+                            with patch.object(
+                                service, "add_users_to_project", new_callable=AsyncMock
+                            ) as mock_add_users:
                                 # Configure mocks
                                 mock_retrieve.return_value = None
                                 mock_project.benchmark = True
@@ -273,7 +289,9 @@ class TestProjectCreationHappyPath:
 
                                 # Configure PermissionService mock
                                 mock_permission_instance = MagicMock()
-                                mock_permission_instance.create_resource_permission_by_user = AsyncMock(return_value=None)
+                                mock_permission_instance.create_resource_permission_by_user = AsyncMock(
+                                    return_value=None
+                                )
                                 mock_permission.return_value = mock_permission_instance
 
                                 # Configure add_users_to_project mock
@@ -296,7 +314,7 @@ class TestProjectCreationValidation:
         service = ProjectService(mock_session)
         project_data = {"name": "Duplicate Project"}
 
-        with patch.object(ProjectDataManager, 'retrieve_by_fields', new_callable=AsyncMock) as mock_retrieve:
+        with patch.object(ProjectDataManager, "retrieve_by_fields", new_callable=AsyncMock) as mock_retrieve:
             # Configure mock to return existing project
             mock_retrieve.return_value = mock_project  # Project already exists
 
@@ -305,6 +323,58 @@ class TestProjectCreationValidation:
                 await service.create_project(project_data, mock_user.id)
 
             assert "Project already exist with same name" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_client_project_name_validation_user_specific(self, mock_session, mock_user):
+        """Test that CLIENT_APP projects check name uniqueness only within user's projects."""
+        # Arrange
+        service = ProjectService(mock_session)
+        project_data = {"name": "My Project", "project_type": ProjectTypeEnum.CLIENT_APP.value}
+
+        with (
+            patch.object(
+                ProjectDataManager, "check_duplicate_name_for_user_projects", new_callable=AsyncMock
+            ) as mock_check_user,
+            patch.object(ProjectDataManager, "retrieve_by_fields", new_callable=AsyncMock) as mock_retrieve,
+        ):
+            # User already has a project with this name
+            mock_check_user.return_value = True
+
+            # Act & Assert
+            with pytest.raises(ClientException) as exc_info:
+                await service.create_project(project_data, mock_user.id)
+
+            assert "Project already exist with same name" in str(exc_info.value)
+            # Should check user-specific projects for CLIENT_APP
+            mock_check_user.assert_called_once_with("My Project", mock_user.id, ProjectTypeEnum.CLIENT_APP.value)
+            # Should NOT check globally for CLIENT_APP
+            mock_retrieve.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_admin_project_name_validation_global(self, mock_session, mock_superuser):
+        """Test that ADMIN_APP projects check name uniqueness globally."""
+        # Arrange
+        service = ProjectService(mock_session)
+        project_data = {"name": "Admin Project", "project_type": ProjectTypeEnum.ADMIN_APP.value}
+
+        with (
+            patch.object(
+                ProjectDataManager, "check_duplicate_name_for_user_projects", new_callable=AsyncMock
+            ) as mock_check_user,
+            patch.object(ProjectDataManager, "retrieve_by_fields", new_callable=AsyncMock) as mock_retrieve,
+        ):
+            # Global check finds a duplicate
+            mock_retrieve.return_value = Mock()  # Project exists globally
+
+            # Act & Assert
+            with pytest.raises(ClientException) as exc_info:
+                await service.create_project(project_data, mock_superuser.id)
+
+            assert "Project already exist with same name" in str(exc_info.value)
+            # Should NOT check user-specific for ADMIN_APP
+            mock_check_user.assert_not_called()
+            # Should check globally for ADMIN_APP
+            mock_retrieve.assert_called_once()
 
     def test_empty_project_name_validation(self):
         """Test that empty project names are rejected."""
@@ -328,17 +398,14 @@ class TestProjectCreationValidation:
         with pytest.raises(ValueError):
             ProjectCreateRequest(
                 name="Test Project",
-                project_type="invalid_type"  # Invalid enum value
+                project_type="invalid_type",  # Invalid enum value
             )
 
     def test_invalid_icon_format_validation(self):
         """Test that invalid icon formats are rejected."""
         # Icon validation happens at the service level, not schema level
         # The schema accepts any string for icon
-        project = ProjectCreateRequest(
-            name="Test Project",
-            icon="not_a_valid_base64_icon"
-        )
+        project = ProjectCreateRequest(name="Test Project", icon="not_a_valid_base64_icon")
         # Invalid icon is accepted by schema but would be rejected by service
         assert project.icon == "not_a_valid_base64_icon"
 
@@ -351,10 +418,7 @@ class TestProjectCreationValidation:
         ]
 
         # Act
-        project = ProjectCreateRequest(
-            name="Test Project",
-            tags=valid_tags
-        )
+        project = ProjectCreateRequest(name="Test Project", tags=valid_tags)
 
         # Assert
         assert len(project.tags) == 2
@@ -404,12 +468,14 @@ class TestProjectCreationAuthorization:
         service = ProjectService(mock_session)
         project_data = {"name": "Superuser Project"}
 
-        with patch.object(ProjectDataManager, 'retrieve_by_fields', new_callable=AsyncMock) as mock_retrieve:
-            with patch.object(ProjectDataManager, 'insert_one', new_callable=AsyncMock) as mock_insert:
-                with patch('budapp.project_ops.services.UserDataManager') as mock_user_manager:
-                    with patch('budapp.project_ops.services.KeycloakManager') as mock_keycloak:
-                        with patch('budapp.project_ops.services.PermissionService') as mock_permission:
-                            with patch.object(service, 'add_users_to_project', new_callable=AsyncMock) as mock_add_users:
+        with patch.object(ProjectDataManager, "retrieve_by_fields", new_callable=AsyncMock) as mock_retrieve:
+            with patch.object(ProjectDataManager, "insert_one", new_callable=AsyncMock) as mock_insert:
+                with patch("budapp.project_ops.services.UserDataManager") as mock_user_manager:
+                    with patch("budapp.project_ops.services.KeycloakManager") as mock_keycloak:
+                        with patch("budapp.project_ops.services.PermissionService") as mock_permission:
+                            with patch.object(
+                                service, "add_users_to_project", new_callable=AsyncMock
+                            ) as mock_add_users:
                                 # Configure mocks
                                 mock_retrieve.return_value = None
                                 mock_insert.return_value = mock_project
@@ -420,7 +486,9 @@ class TestProjectCreationAuthorization:
 
                                 # Configure PermissionService mock
                                 mock_permission_instance = MagicMock()
-                                mock_permission_instance.create_resource_permission_by_user = AsyncMock(return_value=None)
+                                mock_permission_instance.create_resource_permission_by_user = AsyncMock(
+                                    return_value=None
+                                )
                                 mock_permission.return_value = mock_permission_instance
 
                                 # Configure add_users_to_project mock
@@ -443,7 +511,7 @@ class TestProjectCreationErrorHandling:
         service = ProjectService(mock_session)
         project_data = {"name": "Test Project"}
 
-        with patch.object(ProjectDataManager, 'retrieve_by_fields', new_callable=AsyncMock) as mock_retrieve:
+        with patch.object(ProjectDataManager, "retrieve_by_fields", new_callable=AsyncMock) as mock_retrieve:
             # Configure mock to raise database error
             mock_retrieve.side_effect = Exception("Database connection failed")
 
@@ -460,12 +528,14 @@ class TestProjectCreationErrorHandling:
         service = ProjectService(mock_session)
         project_data = {"name": "Test Project"}
 
-        with patch.object(ProjectDataManager, 'retrieve_by_fields', new_callable=AsyncMock) as mock_retrieve:
-            with patch.object(ProjectDataManager, 'insert_one', new_callable=AsyncMock) as mock_insert:
-                with patch('budapp.project_ops.services.UserDataManager') as mock_user_manager:
-                    with patch('budapp.project_ops.services.KeycloakManager') as mock_keycloak:
-                        with patch('budapp.project_ops.services.PermissionService') as mock_permission:
-                            with patch.object(service, 'add_users_to_project', new_callable=AsyncMock) as mock_add_users:
+        with patch.object(ProjectDataManager, "retrieve_by_fields", new_callable=AsyncMock) as mock_retrieve:
+            with patch.object(ProjectDataManager, "insert_one", new_callable=AsyncMock) as mock_insert:
+                with patch("budapp.project_ops.services.UserDataManager") as mock_user_manager:
+                    with patch("budapp.project_ops.services.KeycloakManager") as mock_keycloak:
+                        with patch("budapp.project_ops.services.PermissionService") as mock_permission:
+                            with patch.object(
+                                service, "add_users_to_project", new_callable=AsyncMock
+                            ) as mock_add_users:
                                 # Configure mocks
                                 mock_retrieve.return_value = None
                                 mock_insert.return_value = mock_project
@@ -483,7 +553,9 @@ class TestProjectCreationErrorHandling:
 
                                 # Configure PermissionService mock
                                 mock_permission_instance = MagicMock()
-                                mock_permission_instance.create_resource_permission_by_user = AsyncMock(return_value=None)
+                                mock_permission_instance.create_resource_permission_by_user = AsyncMock(
+                                    return_value=None
+                                )
                                 mock_permission.return_value = mock_permission_instance
 
                                 # Configure add_users_to_project mock
@@ -518,8 +590,8 @@ class TestProjectCreationErrorHandling:
         service = ProjectService(mock_session)
         project_data = {"name": "Test Project"}
 
-        with patch.object(ProjectDataManager, 'retrieve_by_fields', new_callable=AsyncMock) as mock_retrieve:
-            with patch.object(ProjectDataManager, 'insert_one', new_callable=AsyncMock) as mock_insert:
+        with patch.object(ProjectDataManager, "retrieve_by_fields", new_callable=AsyncMock) as mock_retrieve:
+            with patch.object(ProjectDataManager, "insert_one", new_callable=AsyncMock) as mock_insert:
                 # Configure mocks
                 mock_retrieve.return_value = None
                 mock_insert.side_effect = Exception("Insert failed")
@@ -550,12 +622,14 @@ class TestProjectCreationIntegration:
             "tags": [{"name": "integration", "color": "#0000FF"}],
         }
 
-        with patch.object(ProjectDataManager, 'retrieve_by_fields', new_callable=AsyncMock) as mock_retrieve:
-            with patch.object(ProjectDataManager, 'insert_one', new_callable=AsyncMock) as mock_insert:
-                with patch('budapp.project_ops.services.UserDataManager') as mock_user_manager:
-                    with patch('budapp.project_ops.services.KeycloakManager') as mock_keycloak:
-                        with patch('budapp.project_ops.services.PermissionService') as mock_permission:
-                            with patch.object(service, 'add_users_to_project', new_callable=AsyncMock) as mock_add_users:
+        with patch.object(ProjectDataManager, "retrieve_by_fields", new_callable=AsyncMock) as mock_retrieve:
+            with patch.object(ProjectDataManager, "insert_one", new_callable=AsyncMock) as mock_insert:
+                with patch("budapp.project_ops.services.UserDataManager") as mock_user_manager:
+                    with patch("budapp.project_ops.services.KeycloakManager") as mock_keycloak:
+                        with patch("budapp.project_ops.services.PermissionService") as mock_permission:
+                            with patch.object(
+                                service, "add_users_to_project", new_callable=AsyncMock
+                            ) as mock_add_users:
                                 # Configure all mocks for successful flow
                                 mock_retrieve.return_value = None
                                 mock_project.name = project_data["name"]
@@ -571,7 +645,9 @@ class TestProjectCreationIntegration:
                                 mock_keycloak.return_value = mock_keycloak_instance
 
                                 mock_permission_instance = MagicMock()
-                                mock_permission_instance.create_resource_permission_by_user = AsyncMock(return_value=None)
+                                mock_permission_instance.create_resource_permission_by_user = AsyncMock(
+                                    return_value=None
+                                )
                                 mock_permission.return_value = mock_permission_instance
 
                                 # Configure add_users_to_project mock
@@ -596,25 +672,29 @@ class TestProjectCreationIntegration:
         service = ProjectService(mock_session)
         project_data = {"name": "Concurrent Project"}
 
-        with patch.object(ProjectDataManager, 'retrieve_by_fields', new_callable=AsyncMock) as mock_retrieve:
-            with patch.object(ProjectDataManager, 'insert_one', new_callable=AsyncMock) as mock_insert:
+        with patch.object(ProjectDataManager, "retrieve_by_fields", new_callable=AsyncMock) as mock_retrieve:
+            with patch.object(ProjectDataManager, "insert_one", new_callable=AsyncMock) as mock_insert:
                 # First call returns None, second call returns existing project
                 mock_retrieve.side_effect = [None, mock_project]
 
                 # First insert succeeds, second should not be called
                 mock_insert.return_value = mock_project
 
-                with patch('budapp.project_ops.services.UserDataManager') as mock_user_manager:
-                    with patch('budapp.project_ops.services.KeycloakManager') as mock_keycloak:
-                        with patch('budapp.project_ops.services.PermissionService') as mock_permission:
-                            with patch.object(service, 'add_users_to_project', new_callable=AsyncMock) as mock_add_users:
+                with patch("budapp.project_ops.services.UserDataManager") as mock_user_manager:
+                    with patch("budapp.project_ops.services.KeycloakManager") as mock_keycloak:
+                        with patch("budapp.project_ops.services.PermissionService") as mock_permission:
+                            with patch.object(
+                                service, "add_users_to_project", new_callable=AsyncMock
+                            ) as mock_add_users:
                                 mock_user_manager_instance = MagicMock()
                                 mock_user_manager_instance.retrieve_by_fields = AsyncMock(return_value=mock_user)
                                 mock_user_manager.return_value = mock_user_manager_instance
 
                                 # Configure PermissionService mock
                                 mock_permission_instance = MagicMock()
-                                mock_permission_instance.create_resource_permission_by_user = AsyncMock(return_value=None)
+                                mock_permission_instance.create_resource_permission_by_user = AsyncMock(
+                                    return_value=None
+                                )
                                 mock_permission.return_value = mock_permission_instance
 
                                 # Configure add_users_to_project mock
@@ -667,10 +747,7 @@ class TestProjectSchemaValidation:
             Tag(name="production", color="#FF0000"),
             Tag(name="backend", color="#00FF00"),
         ]
-        project = ProjectCreateRequest(
-            name="Tagged Project",
-            tags=tags
-        )
+        project = ProjectCreateRequest(name="Tagged Project", tags=tags)
 
         # Assert
         assert len(project.tags) == 2
@@ -733,12 +810,14 @@ class TestPerformanceAndScalability:
         service = ProjectService(mock_session)
         project_data = {"name": "Performance Test Project"}
 
-        with patch.object(ProjectDataManager, 'retrieve_by_fields', new_callable=AsyncMock) as mock_retrieve:
-            with patch.object(ProjectDataManager, 'insert_one', new_callable=AsyncMock) as mock_insert:
-                with patch('budapp.project_ops.services.UserDataManager') as mock_user_manager:
-                    with patch('budapp.project_ops.services.KeycloakManager') as mock_keycloak:
-                        with patch('budapp.project_ops.services.PermissionService') as mock_permission:
-                            with patch.object(service, 'add_users_to_project', new_callable=AsyncMock) as mock_add_users:
+        with patch.object(ProjectDataManager, "retrieve_by_fields", new_callable=AsyncMock) as mock_retrieve:
+            with patch.object(ProjectDataManager, "insert_one", new_callable=AsyncMock) as mock_insert:
+                with patch("budapp.project_ops.services.UserDataManager") as mock_user_manager:
+                    with patch("budapp.project_ops.services.KeycloakManager") as mock_keycloak:
+                        with patch("budapp.project_ops.services.PermissionService") as mock_permission:
+                            with patch.object(
+                                service, "add_users_to_project", new_callable=AsyncMock
+                            ) as mock_add_users:
                                 # Configure mocks
                                 mock_retrieve.return_value = None
                                 mock_insert.return_value = mock_project
@@ -749,7 +828,9 @@ class TestPerformanceAndScalability:
 
                                 # Configure PermissionService mock
                                 mock_permission_instance = MagicMock()
-                                mock_permission_instance.create_resource_permission_by_user = AsyncMock(return_value=None)
+                                mock_permission_instance.create_resource_permission_by_user = AsyncMock(
+                                    return_value=None
+                                )
                                 mock_permission.return_value = mock_permission_instance
 
                                 # Configure add_users_to_project mock
@@ -771,10 +852,7 @@ class TestPerformanceAndScalability:
         large_description = "A" * 10000  # 10KB of text
 
         # Act
-        project = ProjectCreateRequest(
-            name="Large Description Project",
-            description=large_description
-        )
+        project = ProjectCreateRequest(name="Large Description Project", description=large_description)
 
         # Assert
         assert len(project.description) == 10000
@@ -785,10 +863,7 @@ class TestPerformanceAndScalability:
         max_tags = [Tag(name=f"tag{i}", color=f"#00{i:02d}00") for i in range(100)]
 
         # Act
-        project = ProjectCreateRequest(
-            name="Many Tags Project",
-            tags=max_tags
-        )
+        project = ProjectCreateRequest(name="Many Tags Project", tags=max_tags)
 
         # Assert
         assert len(project.tags) == 100
@@ -868,12 +943,14 @@ class TestSecurityConsiderations:
         service = ProjectService(mock_session)
         project_data = {"name": "Isolated Project"}
 
-        with patch.object(ProjectDataManager, 'retrieve_by_fields', new_callable=AsyncMock) as mock_retrieve:
-            with patch.object(ProjectDataManager, 'insert_one', new_callable=AsyncMock) as mock_insert:
-                with patch('budapp.project_ops.services.UserDataManager') as mock_user_manager:
-                    with patch('budapp.project_ops.services.KeycloakManager') as mock_keycloak:
-                        with patch('budapp.project_ops.services.PermissionService') as mock_permission:
-                            with patch.object(service, 'add_users_to_project', new_callable=AsyncMock) as mock_add_users:
+        with patch.object(ProjectDataManager, "retrieve_by_fields", new_callable=AsyncMock) as mock_retrieve:
+            with patch.object(ProjectDataManager, "insert_one", new_callable=AsyncMock) as mock_insert:
+                with patch("budapp.project_ops.services.UserDataManager") as mock_user_manager:
+                    with patch("budapp.project_ops.services.KeycloakManager") as mock_keycloak:
+                        with patch("budapp.project_ops.services.PermissionService") as mock_permission:
+                            with patch.object(
+                                service, "add_users_to_project", new_callable=AsyncMock
+                            ) as mock_add_users:
                                 # Configure mocks
                                 mock_retrieve.return_value = None
 
@@ -890,7 +967,9 @@ class TestSecurityConsiderations:
 
                                 # Configure PermissionService mock
                                 mock_permission_instance = MagicMock()
-                                mock_permission_instance.create_resource_permission_by_user = AsyncMock(return_value=None)
+                                mock_permission_instance.create_resource_permission_by_user = AsyncMock(
+                                    return_value=None
+                                )
                                 mock_permission.return_value = mock_permission_instance
 
                                 # Configure add_users_to_project mock
