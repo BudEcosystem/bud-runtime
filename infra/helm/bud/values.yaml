@@ -124,6 +124,7 @@ microservices:
     budmodel:
         image: budstudio/budmodel:nightly
         daprid: budmodel
+        storageClassName: nfs-csi
         env:
             LOG_LEVEL: INFO
 

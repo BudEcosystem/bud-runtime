@@ -20,7 +20,7 @@ module "azure" {
   }
   disk_size = {
     primary      = 512
-    primary_data = 1024
+    primary_data = 4095
     ingress      = 128
   }
 }

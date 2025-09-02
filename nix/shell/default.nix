@@ -2,6 +2,7 @@
   self,
   mkShell,
   nixfmt-rfc-style,
+  markdownlint-cli,
 
   sops,
   age,
@@ -66,6 +67,7 @@ mkShell {
     pyright
     bud_wg
     pnpm
+    markdownlint-cli
   ];
 
   shellHook = ''
