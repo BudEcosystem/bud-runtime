@@ -23,7 +23,7 @@ spec:
       containers:
       - name: budnotify
         image: {{ .Values.microservices.budnotify.image }}
-        imagePullPolicy: Always
+        imagePullPolicy: {{ .Values.imagePullPolicy }}
         command: ["sh", "-c", "uvicorn notify.main:app --host 0.0.0.0 --port 3000"]
         ports:
         - containerPort: 3000

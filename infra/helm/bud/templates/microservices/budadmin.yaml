@@ -19,7 +19,7 @@ spec:
       containers:
       - name: {{ .Release.Name }}-budadmin
         image: {{ .Values.microservices.budadmin.image }}
-        imagePullPolicy: Always
+        imagePullPolicy: {{ .Values.imagePullPolicy }}
         ports:
         - containerPort: 3000
         env:

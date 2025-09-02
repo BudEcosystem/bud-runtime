@@ -65,7 +65,7 @@ spec:
       containers:
       - name: {{ .Release.Name }}-budeval
         image: {{ .Values.microservices.budeval.image }}
-        imagePullPolicy: Always
+        imagePullPolicy: {{ .Values.imagePullPolicy }}
         command: ["sh", "-c", "alembic -c ./alembic.ini upgrade head && uvicorn budeval.main:app --host 0.0.0.0 --port 3003"]
         ports:
         - containerPort: 3003
