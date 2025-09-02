@@ -89,7 +89,8 @@ const UsageChart: React.FC<UsageChartProps> = ({
 
   // Calculate days with usage and total value with proper memoization
   const daysWithUsage = useMemo(() => {
-    return data.filter(d => d.hasData !== false).length;
+    const count = data.filter(d => d.hasData === true).length;
+    return count;
   }, [data]); // Recalculates when data changes
 
   const totalValue = useMemo(() => {
