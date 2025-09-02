@@ -24,9 +24,8 @@ from budmicroframe.commons.constants import WorkflowStatus
 from budmicroframe.commons.schemas import NotificationContent, NotificationRequest
 
 from budprompt.prompt.schemas import (
-    PromptConfigurationRequest,
+    PromptSchemaRequest,
     SchemaBase,
-    ModelSettings,
 )
 from budprompt.prompt.services import PromptConfigurationService
 
@@ -87,15 +86,13 @@ class TestValidateSchema:
     def test_validate_schema_with_both_schemas_success(
         self, mock_dapr_workflow, mock_sleep, mock_notification_request, valid_simple_schema
     ):
-        """Test successful validation with both input and output schemas."""
+        """Test successful validation with input schema."""
         # Arrange
         workflow_id = str(uuid.uuid4())
 
-        # Create request with both schemas
-        request = PromptConfigurationRequest(
-            deployment_name="test-deployment",
-            model_settings=ModelSettings(),
-            input_schema=SchemaBase(
+        # Create request for input schema
+        request = PromptSchemaRequest(
+            schema=SchemaBase(
                 schema=valid_simple_schema,
                 validations={
                     "InputSchema": {
@@ -104,15 +101,7 @@ class TestValidateSchema:
                     }
                 }
             ),
-            output_schema=SchemaBase(
-                schema=valid_simple_schema,
-                validations={
-                    "OutputSchema": {
-                        "name": "Name should be capitalized",
-                        "email": "Email must be valid format",
-                    }
-                }
-            ),
+            type="input",
         )
 
         # Act
@@ -145,18 +134,16 @@ class TestValidateSchema:
     def test_validate_schema_with_only_input_schema(
         self, mock_dapr_workflow, mock_sleep, mock_notification_request, valid_simple_schema
     ):
-        """Test validation with only input schema (output_schema is None)."""
+        """Test validation with input schema."""
         # Arrange
         workflow_id = str(uuid.uuid4())
 
-        request = PromptConfigurationRequest(
-            deployment_name="test-deployment",
-            model_settings=ModelSettings(),
-            input_schema=SchemaBase(
+        request = PromptSchemaRequest(
+            schema=SchemaBase(
                 schema=valid_simple_schema,
                 validations={}
             ),
-            output_schema=None,
+            type="input",
         )
 
         # Act
@@ -175,18 +162,16 @@ class TestValidateSchema:
     def test_validate_schema_with_only_output_schema(
         self, mock_dapr_workflow, mock_sleep, mock_notification_request, valid_simple_schema
     ):
-        """Test validation with only output schema (input_schema is None)."""
+        """Test validation with output schema."""
         # Arrange
         workflow_id = str(uuid.uuid4())
 
-        request = PromptConfigurationRequest(
-            deployment_name="test-deployment",
-            model_settings=ModelSettings(),
-            input_schema=None,
-            output_schema=SchemaBase(
+        request = PromptSchemaRequest(
+            schema=SchemaBase(
                 schema=valid_simple_schema,
                 validations={}
             ),
+            type="output",
         )
 
         # Act
@@ -209,10 +194,8 @@ class TestValidateSchema:
         # Arrange
         workflow_id = str(uuid.uuid4())
 
-        request = PromptConfigurationRequest(
-            deployment_name="test-deployment",
-            model_settings=ModelSettings(),
-            input_schema=SchemaBase(
+        request = PromptSchemaRequest(
+            schema=SchemaBase(
                 schema=valid_simple_schema,
                 validations={
                     "InputSchema": {
@@ -220,7 +203,7 @@ class TestValidateSchema:
                     }
                 }
             ),
-            output_schema=None,
+            type="input",
         )
 
         # Act & Assert
@@ -253,14 +236,12 @@ class TestValidateSchema:
             }
         }
 
-        request = PromptConfigurationRequest(
-            deployment_name="test-deployment",
-            model_settings=ModelSettings(),
-            input_schema=SchemaBase(
+        request = PromptSchemaRequest(
+            schema=SchemaBase(
                 schema=flexible_schema,
                 validations={}
             ),
-            output_schema=None,
+            type="input",
         )
 
         # Act - Should not raise an exception, the function is robust
@@ -283,10 +264,8 @@ class TestValidateSchema:
         # Arrange
         workflow_id = str(uuid.uuid4())
 
-        request = PromptConfigurationRequest(
-            deployment_name="test-deployment",
-            model_settings=ModelSettings(),
-            input_schema=SchemaBase(
+        request = PromptSchemaRequest(
+            schema=SchemaBase(
                 schema=valid_nested_schema,
                 validations={
                     "InputSchema": {
@@ -295,7 +274,7 @@ class TestValidateSchema:
                     }
                 }
             ),
-            output_schema=None,
+            type="input",
         )
 
         # Act
@@ -320,17 +299,12 @@ class TestValidateSchema:
         # Arrange
         workflow_id = str(uuid.uuid4())
 
-        request = PromptConfigurationRequest(
-            deployment_name="test-deployment",
-            model_settings=ModelSettings(),
-            input_schema=SchemaBase(
+        request = PromptSchemaRequest(
+            schema=SchemaBase(
                 schema=valid_simple_schema,
                 validations={}  # Empty validations
             ),
-            output_schema=SchemaBase(
-                schema=valid_simple_schema,
-                validations={}  # Empty validations
-            ),
+            type="input",
         )
 
         # Act
@@ -353,11 +327,9 @@ class TestValidateSchema:
         # Arrange
         workflow_id = str(uuid.uuid4())
 
-        request = PromptConfigurationRequest(
-            deployment_name="test-deployment",
-            model_settings=ModelSettings(),
-            input_schema=None,
-            output_schema=None,
+        request = PromptSchemaRequest(
+            schema=None,
+            type="input",
         )
 
         # Act
@@ -381,14 +353,12 @@ class TestValidateSchema:
         # Arrange
         workflow_id = str(uuid.uuid4())
 
-        request = PromptConfigurationRequest(
-            deployment_name="test-deployment",
-            model_settings=ModelSettings(),
-            input_schema=SchemaBase(
+        request = PromptSchemaRequest(
+            schema=SchemaBase(
                 schema=valid_simple_schema,
                 validations={}
             ),
-            output_schema=None,
+            type="input",
         )
 
         # Act
@@ -430,10 +400,8 @@ class TestGenerateValidationCodes:
         # Arrange
         workflow_id = str(uuid.uuid4())
 
-        request = PromptConfigurationRequest(
-            deployment_name="test-deployment",
-            model_settings=ModelSettings(),
-            input_schema=SchemaBase(
+        request = PromptSchemaRequest(
+            schema=SchemaBase(
                 schema={
                     "type": "object",
                     "properties": {
@@ -448,7 +416,7 @@ class TestGenerateValidationCodes:
                     }
                 }
             ),
-            output_schema=None,
+            type="input",
         )
 
         # Act - This will make actual LLM calls
@@ -464,48 +432,30 @@ class TestGenerateValidationCodes:
 
         # Verify result structure
         assert result is not None
-        assert "input" in result
-        assert "InputSchema" in result["input"]
-        assert "name" in result["input"]["InputSchema"]
-        assert "age" in result["input"]["InputSchema"]
-        assert "prompt" in result["input"]["InputSchema"]["name"]
-        assert "code" in result["input"]["InputSchema"]["name"]
+        assert "InputSchema" in result
+        assert "name" in result["InputSchema"]
+        assert "age" in result["InputSchema"]
+        assert "prompt" in result["InputSchema"]["name"]
+        assert "code" in result["InputSchema"]["name"]
 
         # Verify the actual LLM generated code contains meaningful validation logic
-        name_code = result["input"]["InputSchema"]["name"]["code"]
-        age_code = result["input"]["InputSchema"]["age"]["code"]
+        name_code = result["InputSchema"]["name"]["code"]
+        age_code = result["InputSchema"]["age"]["code"]
 
         # The LLM should generate actual validation functions, not just return True
         assert "def validate_name" in name_code
         assert "def validate_age" in age_code
 
     @patch('budprompt.prompt.services.dapr_workflow')
-    def test_generate_validation_codes_with_input_and_output(
+    def test_generate_validation_codes_with_output_schema(
         self, mock_dapr_workflow, mock_notification_request
     ):
-        """Test validation code generation with both input and output schemas using actual LLM."""
+        """Test validation code generation with output schema using actual LLM."""
         # Arrange
         workflow_id = str(uuid.uuid4())
 
-        request = PromptConfigurationRequest(
-            deployment_name="test-deployment",
-            model_settings=ModelSettings(),
-            input_schema=SchemaBase(
-                schema={
-                    "type": "object",
-                    "properties": {
-                        "email": {"type": "string"},
-                        "password": {"type": "string"},
-                    },
-                },
-                validations={
-                    "InputSchema": {
-                        "email": "Email must be a valid email address format",
-                        "password": "Password must be at least 8 characters with at least one uppercase, one lowercase, and one number",
-                    }
-                }
-            ),
-            output_schema=SchemaBase(
+        request = PromptSchemaRequest(
+            schema=SchemaBase(
                 schema={
                     "type": "object",
                     "properties": {
@@ -520,6 +470,7 @@ class TestGenerateValidationCodes:
                     }
                 }
             ),
+            type="output",
         )
 
         # Act - This will make actual LLM calls
@@ -529,34 +480,23 @@ class TestGenerateValidationCodes:
             request=request,
         )
 
+        print(result, "===============")
+
         # Assert
         # Should publish start and completion notifications
         assert mock_dapr_workflow.publish_notification.call_count == 2
 
-        # Verify result structure for both input and output
+        # Verify result structure for output
         assert result is not None
-        assert "input" in result
-        assert "output" in result
-
-        # Verify input validations
-        assert "InputSchema" in result["input"]
-        assert "email" in result["input"]["InputSchema"]
-        assert "password" in result["input"]["InputSchema"]
-
-        # Verify output validations
-        assert "OutputSchema" in result["output"]
-        assert "token" in result["output"]["OutputSchema"]
-        assert "expires_in" in result["output"]["OutputSchema"]
+        assert "OutputSchema" in result
+        assert "token" in result["OutputSchema"]
+        assert "expires_in" in result["OutputSchema"]
 
         # Get the generated code
-        email_code = result["input"]["InputSchema"]["email"]["code"]
-        password_code = result["input"]["InputSchema"]["password"]["code"]
-        token_code = result["output"]["OutputSchema"]["token"]["code"]
-        expires_code = result["output"]["OutputSchema"]["expires_in"]["code"]
+        token_code = result["OutputSchema"]["token"]["code"]
+        expires_code = result["OutputSchema"]["expires_in"]["code"]
 
         # Verify functions are properly named
-        assert "def validate_email" in email_code
-        assert "def validate_password" in password_code
         assert "def validate_token" in token_code
         assert "def validate_expires_in" in expires_code
 
@@ -568,14 +508,12 @@ class TestGenerateValidationCodes:
         # Arrange
         workflow_id = str(uuid.uuid4())
 
-        request = PromptConfigurationRequest(
-            deployment_name="test-deployment",
-            model_settings=ModelSettings(),
-            input_schema=SchemaBase(
+        request = PromptSchemaRequest(
+            schema=SchemaBase(
                 schema={"type": "object", "properties": {}},
                 validations={}
             ),
-            output_schema=None,
+            type="input",
         )
 
         # Act

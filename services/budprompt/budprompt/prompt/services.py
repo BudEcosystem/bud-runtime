@@ -41,7 +41,7 @@ from ..commons.exceptions import ClientException
 from .executors import SimplePromptExecutor
 from .revised_code.dynamic_model_creation import json_schema_to_pydantic_model
 from .revised_code.field_validation import generate_validation_function
-from .schemas import PromptConfigurationRequest, PromptConfigurationResponse, PromptExecuteRequest
+from .schemas import PromptExecuteRequest, PromptSchemaRequest, PromptSchemaResponse
 from .utils import clean_model_cache
 
 
@@ -188,18 +188,18 @@ class PromptConfigurationService:
 
     @staticmethod
     async def _generate_codes_async(
-        request: PromptConfigurationRequest, max_concurrent: int = 10
-    ) -> Dict[str, Dict[str, Dict[str, Dict[str, str]]]]:
+        request: PromptSchemaRequest, max_concurrent: int = 10
+    ) -> Dict[str, Dict[str, Dict[str, str]]]:
         """Generate validation codes asynchronously for all fields.
 
         Args:
-            request: The prompt configuration request
+            request: The prompt schema request
             max_concurrent: Maximum number of concurrent LLM calls
 
         Returns:
             Dictionary with validation codes structure
         """
-        result = {"input": {}, "output": {}}
+        result = {}
         tasks = []
         task_metadata = []  # To track which task belongs to which field
 
@@ -211,23 +211,17 @@ class PromptConfigurationService:
             async with semaphore:
                 return await generate_validation_function(field_name, prompt)
 
-        # Process input validations
-        if request.input_schema and request.input_schema.validations:
-            for model_name, field_validations in request.input_schema.validations.items():
-                result["input"][model_name] = {}
-                for field_name, validation_prompt in field_validations.items():
-                    task = generate_with_semaphore(field_name, validation_prompt)
-                    tasks.append(task)
-                    task_metadata.append(("input", model_name, field_name, validation_prompt))
+        # Process validations based on schema type
+        if request.schema and request.schema.validations:
+            schema_type = request.type
+            model_name = f"{schema_type.capitalize()}Schema"
 
-        # Process output validations
-        if request.output_schema and request.output_schema.validations:
-            for model_name, field_validations in request.output_schema.validations.items():
-                result["output"][model_name] = {}
+            for model_name, field_validations in request.schema.validations.items():
+                result[model_name] = {}
                 for field_name, validation_prompt in field_validations.items():
                     task = generate_with_semaphore(field_name, validation_prompt)
                     tasks.append(task)
-                    task_metadata.append(("output", model_name, field_name, validation_prompt))
+                    task_metadata.append((model_name, field_name, validation_prompt))
 
         # Execute all tasks in parallel
         if tasks:
@@ -236,14 +230,8 @@ class PromptConfigurationService:
 
             # Map results back to the structure
             for i, code in enumerate(generated_codes):
-                schema_type, model_name, field_name, prompt = task_metadata[i]
-                result[schema_type][model_name][field_name] = {"prompt": prompt, "code": code}
-
-        # Clean up empty dictionaries
-        if not result["input"]:
-            del result["input"]
-        if not result["output"]:
-            del result["output"]
+                model_name, field_name, prompt = task_metadata[i]
+                result[model_name][field_name] = {"prompt": prompt, "code": code}
 
         return result
 
@@ -251,11 +239,11 @@ class PromptConfigurationService:
     def generate_validation_codes(
         workflow_id: str,
         notification_request: NotificationRequest,
-        request: PromptConfigurationRequest,
+        request: PromptSchemaRequest,
         target_topic_name: Optional[str] = None,
         target_name: Optional[str] = None,
         max_concurrent: int = 10,
-    ) -> Optional[Dict[str, Dict[str, Dict[str, Dict[str, str]]]]]:
+    ) -> Optional[Dict[str, Dict[str, Dict[str, str]]]]:
         """Generate validation code for all fields using LLM in parallel.
 
         Args:
@@ -269,16 +257,9 @@ class PromptConfigurationService:
         Returns:
             Dictionary with structure:
             {
-                "input": {
-                    "ModelName": {
-                        "field1": {"prompt": "...", "code": "..."},
-                        "field2": {"prompt": "...", "code": "..."}
-                    }
-                },
-                "output": {
-                    "ModelName": {
-                        "field1": {"prompt": "...", "code": "..."}
-                    }
+                "ModelName": {
+                    "field1": {"prompt": "...", "code": "..."},
+                    "field2": {"prompt": "...", "code": "..."}
                 }
             }
 
@@ -302,9 +283,7 @@ class PromptConfigurationService:
         try:
             # Run the async code generation only if there are validations
             validation_codes = None
-            if (request.input_schema and request.input_schema.validations) or (
-                request.output_schema and request.output_schema.validations
-            ):
+            if request.schema and request.schema.validations:
                 validation_codes = asyncio.run(
                     PromptConfigurationService._generate_codes_async(request, max_concurrent)
                 )
@@ -322,6 +301,22 @@ class PromptConfigurationService:
             )
 
             if validation_codes:
+                """Validation code structure after generation
+                {
+                    "InputSchema": {
+                        "email": {
+                            "prompt": "Email must be a valid email address format",
+                            "code": "def validate_email(value):"
+                        },
+                    },
+                    "OutputSchema": {
+                        "token": {
+                            "prompt": "Token must be a non-empty string with at least 20 characters",
+                            "code": "def validate_token(value):"
+                        },
+                    }
+                }
+                """
                 logger.debug("Generated validation codes for %d schemas", len(validation_codes))
 
             return validation_codes
@@ -345,10 +340,10 @@ class PromptConfigurationService:
     def validate_schema(
         workflow_id: str,
         notification_request: NotificationRequest,
-        request: PromptConfigurationRequest,
+        request: PromptSchemaRequest,
         target_topic_name: Optional[str] = None,
         target_name: Optional[str] = None,
-    ) -> Optional[Dict[str, Dict[str, Dict[str, Dict[str, str]]]]]:
+    ) -> Optional[Dict[str, Dict[str, Dict[str, str]]]]:
         """Validate prompt configuration schemas and their field validations.
 
         Returns:
@@ -370,24 +365,15 @@ class PromptConfigurationService:
         )
 
         try:
-            # Validate input schema if present
-            if request.input_schema is not None:
-                input_model = asyncio.run(json_schema_to_pydantic_model(request.input_schema.schema, "InputSchema"))
+            # Validate schema if present
+            if request.schema is not None:
+                model_name = f"{request.type.capitalize()}Schema"
+                model = asyncio.run(json_schema_to_pydantic_model(request.schema.schema, model_name))
 
                 # Validate field references in validations
-                if request.input_schema.validations:
+                if request.schema.validations:
                     PromptConfigurationService._validate_field_references(
-                        input_model, request.input_schema.validations, "input"
-                    )
-
-            # Validate output schema if present
-            if request.output_schema is not None:
-                output_model = asyncio.run(json_schema_to_pydantic_model(request.output_schema.schema, "OutputSchema"))
-
-                # Validate field references in validations
-                if request.output_schema.validations:
-                    PromptConfigurationService._validate_field_references(
-                        output_model, request.output_schema.validations, "output"
+                        model, request.schema.validations, request.type
                     )
 
             # Added sleep to avoid workflow registration failure
@@ -422,17 +408,15 @@ class PromptConfigurationService:
             )
             raise e
 
-    def __call__(
-        self, request: PromptConfigurationRequest, workflow_id: Optional[str] = None
-    ) -> PromptConfigurationResponse:
-        """Execute the prompt configuration validation process.
+    def __call__(self, request: PromptSchemaRequest, workflow_id: Optional[str] = None) -> PromptSchemaResponse:
+        """Execute the prompt schema validation process.
 
-        This method validates the input and output schemas along with their field-level
+        This method validates the schema along with field-level
         validation prompts for structured prompt execution.
 
         Args:
-            request (PromptConfigurationRequest): The prompt configuration request containing
-                input/output schemas and validation prompts.
+            request (PromptSchemaRequest): The prompt schema request containing
+                schema and validation prompts.
             workflow_id (Optional[str]): An optional workflow ID for tracking the
                 validation process.
 
@@ -440,13 +424,13 @@ class PromptConfigurationService:
             ValueError: If schema validation fails or field references are invalid.
 
         Returns:
-            PromptConfigurationResponse: The validation response containing the
+            PromptSchemaResponse: The validation response containing the
                 workflow ID and timestamp.
         """
         if not workflow_id:
             workflow_id = str(uuid.uuid4())
 
-        workflow_name = "prompt_configuration"
+        workflow_name = "prompt_schema"
         notification_request = NotificationRequest.from_cloud_event(
             cloud_event=request,
             name=workflow_name,
@@ -463,7 +447,7 @@ class PromptConfigurationService:
         )
 
         # Generate validation codes after successful validation
-        validation_codes = self.generate_validation_codes(
+        self.generate_validation_codes(
             workflow_id,
             notification_request,
             request,
@@ -471,16 +455,12 @@ class PromptConfigurationService:
             request.source,
         )
 
-        # Store validation codes for later use (could be added to response if needed)
-        if validation_codes:
-            logger.info("Validation codes generated for workflow %s", workflow_id)
-
-        response = PromptConfigurationResponse(workflow_id=workflow_id)
+        response = PromptSchemaResponse(workflow_id=workflow_id)
 
         notification_request.payload.event = "results"
         notification_request.payload.content = NotificationContent(
-            title="Prompt Configuration Results",
-            message="The prompt configuration is complete",
+            title="Prompt Schema Validation Results",
+            message="The prompt schema validation is complete",
             result=response.model_dump(),
             status=WorkflowStatus.COMPLETED,
         )

@@ -276,3 +276,63 @@ class PromptConfigurationResponse(ResponseBase):
     object: lowercase_string = "prompt_configuration"
     workflow_id: UUID
     created: int = Field(default_factory=lambda: int(time.time()))
+
+
+class PromptSchemaRequest(CloudEventBase):
+    """Schema for prompt schema validation request.
+
+    This request model supports structured schemas with validation prompts.
+    The type field specifies whether this is an input or output schema.
+    """
+
+    schema: Optional[SchemaBase] = Field(
+        None, description="JSON schema for structured input/output (None for unstructured)"
+    )
+    type: Literal["input", "output"] = Field(..., description="Type of schema - either 'input' or 'output'")
+
+
+class PromptSchemaResponse(ResponseBase):
+    """Response schema for prompt schema validation."""
+
+    object: lowercase_string = "prompt_schema"
+    workflow_id: UUID
+    created: int = Field(default_factory=lambda: int(time.time()))
+
+
+class PromptConfigurationData(BaseModel):
+    """TODO: Add description."""
+
+    deployment_name: Optional[str] = Field(None, description="Model deployment name")
+    model_settings: Optional[ModelSettings] = Field(None, description="Model settings")
+    stream: Optional[bool] = Field(None, description="Enable streaming response")
+    input_schema: Optional[Dict[str, Any]] = Field(
+        None, description="JSON schema for structured input (None for unstructured)"
+    )
+    input_validation: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Generated validation codes for input schema",
+    )
+    output_schema: Optional[Dict[str, Any]] = Field(
+        None, description="JSON schema for structured output (None for unstructured)"
+    )
+    output_validation: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Generated validation codes for output schema",
+    )
+    messages: Optional[List[Message]] = Field(
+        None, description="Conversation messages (can include system/developer messages)"
+    )
+    llm_retry_limit: Optional[int] = Field(
+        None, description="Number of LLM retries when validation fails (non-streaming only)"
+    )
+    enable_tools: Optional[bool] = Field(
+        None, description="Enable tool calling capability (requires allow_multiple_calls=true)"
+    )
+    allow_multiple_calls: Optional[bool] = Field(
+        None,
+        description="Allow multiple LLM calls for retries and tool usage. When false, only a single LLM call is made",
+    )
+    system_prompt_role: Optional[Literal["system", "developer", "user"]] = Field(
+        None,
+        description="Role for system prompts in OpenAI models. 'developer' only works with compatible models (not o1-mini)",
+    )
