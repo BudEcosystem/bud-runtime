@@ -76,7 +76,7 @@ const paginationStyle = `
 
 export default function Publish() {
   const { drawerProps, closeDrawer } = useDrawer()
-  const { clusterDetails, getPricingHistory, publishEndpoint, getEndPoints } = useEndPoints();
+  const { clusterDetails, getPricingHistory, publishEndpoint, getEndPoints, updateEndpointPricing } = useEndPoints();
   const [form] = Form.useForm();
   const [disableNext, setDisableNext] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -187,31 +187,44 @@ export default function Publish() {
     }
   };
 
+  // New publish handler using the pricing API
   const handlePublish = async () => {
     try {
       setPublishLoading(true);
       const values = await form.validateFields();
 
       if (drawerProps?.endpoint?.id && projectId) {
-        await publishEndpoint(drawerProps.endpoint.id, {
-          action: "publish",
-          pricing: {
+        // Call the new pricing API endpoint
+        await updateEndpointPricing(
+          drawerProps.endpoint.id,
+          {
             input_cost: values.input_cost,
             output_cost: values.output_cost,
-            currency: "USD",
             per_tokens: selectedTokenOption
-          }
-        });
-        // Refresh the endpoints list to update the is_published status
+          },
+          projectId as string
+        );
+
+        // Clear form fields after successful update
+        form.resetFields();
+        setSelectedTokenOption(1000); // Reset to default
+
+        // Refresh pricing history to show the new entry
+        // Reset to first page to see the latest entry
+        setCurrentPage(1);
+        await fetchPricingHistory(1, pageSize);
+
+        // Also refresh the endpoints list to update any status
         getEndPoints({
           id: projectId as string,
           page: 1,
           limit: 1000,
         });
-        closeDrawer();
+
+        // Don't close the drawer - keep it open to show updated history
       }
     } catch (error) {
-      console.error('Failed to publish endpoint:', error);
+      console.error('Failed to update endpoint pricing:', error);
     } finally {
       setPublishLoading(false);
     }
@@ -223,7 +236,7 @@ export default function Publish() {
       <BudForm
       data={{}}
       onNext={handleSubmit}
-      nextText="Un publish"
+      nextText="Unpublish"
       onBack={() => {
         closeDrawer();
       }}
@@ -386,7 +399,7 @@ export default function Publish() {
               }}
             >
               <div className="flex justify-between items-start px-[1.4rem] pt-[0.85rem] pb-[1.35rem]">
-                <Text_14_400_EEEEEE className="pt-[.55rem]">
+                <Text_14_400_EEEEEE className="pt-[.55rem] whitespace-nowrap mr-4">
                   Input cost
                 </Text_14_400_EEEEEE>
                 <TextInput
@@ -409,7 +422,7 @@ export default function Publish() {
                 />
               </div>
               <div className="flex justify-between items-start px-[1.4rem] pt-[0.85rem] pb-[1.35rem]">
-                <Text_14_400_EEEEEE className="pt-[.55rem]">
+                <Text_14_400_EEEEEE className="pt-[.55rem] whitespace-nowrap mr-4">
                   Output Cost
                 </Text_14_400_EEEEEE>
                 <TextInput
@@ -458,7 +471,7 @@ export default function Publish() {
                     disabled={disableNext || publishLoading}
                     loading={publishLoading}
                   >
-                    Save
+                    Publish
                   </PrimaryButton>
               </div>
             </Form>
