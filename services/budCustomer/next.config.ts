@@ -2,10 +2,6 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: false,
-  experimental: {
-    // Ensure consistent CSS class generation
-    esmExternals: 'loose',
-  },
   webpack: (config) => {
     // Ignore the optional memcpy module that bytebuffer tries to load
     config.resolve.fallback = {
