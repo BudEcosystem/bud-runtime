@@ -109,7 +109,9 @@ class TestValidateSchema:
         result = PromptConfigurationService.validate_schema(
             workflow_id=workflow_id,
             notification_request=mock_notification_request,
-            request=request,
+            schema=request.schema.schema,
+            validations=request.schema.validations,
+            schema_type=request.type,
         )
 
         # Assert
@@ -152,7 +154,9 @@ class TestValidateSchema:
         PromptConfigurationService.validate_schema(
             workflow_id=workflow_id,
             notification_request=mock_notification_request,
-            request=request,
+            schema=request.schema.schema,
+            validations=request.schema.validations,
+            schema_type=request.type,
         )
 
         # Assert
@@ -181,7 +185,9 @@ class TestValidateSchema:
         PromptConfigurationService.validate_schema(
             workflow_id=workflow_id,
             notification_request=mock_notification_request,
-            request=request,
+            schema=request.schema.schema,
+            validations=request.schema.validations,
+            schema_type=request.type,
         )
 
         # Assert
@@ -215,7 +221,9 @@ class TestValidateSchema:
             PromptConfigurationService.validate_schema(
                 workflow_id=workflow_id,
                 notification_request=mock_notification_request,
-                request=request,
+                schema=request.schema.schema,
+                validations=request.schema.validations,
+                schema_type=request.type,
             )
 
         assert "Field 'non_existent_field' not found" in str(exc_info.value)
@@ -253,7 +261,9 @@ class TestValidateSchema:
         PromptConfigurationService.validate_schema(
             workflow_id=workflow_id,
             notification_request=mock_notification_request,
-            request=request,
+            schema=request.schema.schema,
+            validations=request.schema.validations,
+            schema_type=request.type,
         )
 
         # Assert - Should complete successfully
@@ -287,7 +297,9 @@ class TestValidateSchema:
         result = PromptConfigurationService.validate_schema(
             workflow_id=workflow_id,
             notification_request=mock_notification_request,
-            request=request,
+            schema=request.schema.schema,
+            validations=request.schema.validations,
+            schema_type=request.type,
         )
 
         # Assert
@@ -318,7 +330,9 @@ class TestValidateSchema:
         PromptConfigurationService.validate_schema(
             workflow_id=workflow_id,
             notification_request=mock_notification_request,
-            request=request,
+            schema=request.schema.schema,
+            validations=request.schema.validations,
+            schema_type=request.type,
         )
 
         # Assert
@@ -344,7 +358,9 @@ class TestValidateSchema:
         PromptConfigurationService.validate_schema(
             workflow_id=workflow_id,
             notification_request=mock_notification_request,
-            request=request,
+            schema=None,
+            validations=None,
+            schema_type=request.type,
         )
 
         # Assert
@@ -374,7 +390,9 @@ class TestValidateSchema:
         PromptConfigurationService.validate_schema(
             workflow_id=workflow_id,
             notification_request=mock_notification_request,
-            request=request,
+            schema=request.schema.schema,
+            validations=request.schema.validations,
+            schema_type=request.type,
         )
 
         # Assert
@@ -433,7 +451,7 @@ class TestGenerateValidationCodes:
         result = PromptConfigurationService.generate_validation_codes(
             workflow_id=workflow_id,
             notification_request=mock_notification_request,
-            request=request,
+            validations=request.schema.validations,
         )
 
         # Assert
@@ -488,7 +506,7 @@ class TestGenerateValidationCodes:
         result = PromptConfigurationService.generate_validation_codes(
             workflow_id=workflow_id,
             notification_request=mock_notification_request,
-            request=request,
+            validations=request.schema.validations,
         )
 
         print(result, "===============")
@@ -532,7 +550,7 @@ class TestGenerateValidationCodes:
         result = PromptConfigurationService.generate_validation_codes(
             workflow_id=workflow_id,
             notification_request=mock_notification_request,
-            request=request,
+            validations=request.schema.validations,
         )
 
         # Assert

@@ -101,7 +101,9 @@ class PromptSchemaWorkflow:
             input={
                 "workflow_id": workflow_id,
                 "notification_request": notification_request_dict,
-                "request": request,
+                "schema": request.schema.schema,
+                "validations": request.schema.validations,
+                "schema_type": request.type,
                 "target_topic_name": request.source_topic,
                 "target_name": request.source,
             },
@@ -113,7 +115,7 @@ class PromptSchemaWorkflow:
             input={
                 "workflow_id": workflow_id,
                 "notification_request": notification_request_dict,
-                "request": request,
+                "validations": request.schema.validations,
                 "target_topic_name": request.source_topic,
                 "target_name": request.source,
             },
@@ -125,7 +127,9 @@ class PromptSchemaWorkflow:
             input={
                 "workflow_id": workflow_id,
                 "notification_request": notification_request_dict,
-                "request": request,
+                "prompt_id": request.prompt_id,
+                "schema": request.schema.schema,
+                "schema_type": request.type,
                 "validation_codes": validation_codes,
                 "target_topic_name": request.source_topic,
                 "target_name": request.source,

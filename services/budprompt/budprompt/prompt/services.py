@@ -194,12 +194,12 @@ class PromptConfigurationService:
 
     @staticmethod
     async def _generate_codes_async(
-        request: PromptSchemaRequest, max_concurrent: int = 10
+        validations: Dict[str, Dict[str, str]], max_concurrent: int = 10
     ) -> Dict[str, Dict[str, Dict[str, str]]]:
         """Generate validation codes asynchronously for all fields.
 
         Args:
-            request: The prompt schema request
+            validations: Field validation prompts by model name
             max_concurrent: Maximum number of concurrent LLM calls
 
         Returns:
@@ -217,12 +217,9 @@ class PromptConfigurationService:
             async with semaphore:
                 return await generate_validation_function(field_name, prompt)
 
-        # Process validations based on schema type
-        if request.schema and request.schema.validations:
-            schema_type = request.type
-            model_name = f"{schema_type.capitalize()}Schema"
-
-            for model_name, field_validations in request.schema.validations.items():
+        # Process validations
+        if validations:
+            for model_name, field_validations in validations.items():
                 result[model_name] = {}
                 for field_name, validation_prompt in field_validations.items():
                     task = generate_with_semaphore(field_name, validation_prompt)
@@ -245,7 +242,7 @@ class PromptConfigurationService:
     def generate_validation_codes(
         workflow_id: str,
         notification_request: NotificationRequest,
-        request: PromptSchemaRequest,
+        validations: Optional[Dict[str, Dict[str, str]]],
         target_topic_name: Optional[str] = None,
         target_name: Optional[str] = None,
         max_concurrent: int = 10,
@@ -255,7 +252,7 @@ class PromptConfigurationService:
         Args:
             workflow_id: Workflow identifier for tracking
             notification_request: Notification request for status updates
-            request: The prompt configuration request
+            validations: Field validation prompts by model name
             target_topic_name: Optional target topic for notifications
             target_name: Optional target name for notifications
             max_concurrent: Maximum number of concurrent LLM calls
@@ -289,8 +286,10 @@ class PromptConfigurationService:
         try:
             # Run the async code generation only if there are validations
             validation_codes = None
-            if request.schema and request.schema.validations:
-                validation_codes = run_async(PromptConfigurationService._generate_codes_async(request, max_concurrent))
+            if validations:
+                validation_codes = run_async(
+                    PromptConfigurationService._generate_codes_async(validations, max_concurrent)
+                )
 
             notification_req.payload.content = NotificationContent(
                 title="Successfully generated validation codes",
@@ -344,7 +343,9 @@ class PromptConfigurationService:
     def store_prompt_configuration(
         workflow_id: str,
         notification_request: NotificationRequest,
-        request: PromptSchemaRequest,
+        prompt_id: str,
+        schema: Optional[Dict[str, Any]],
+        schema_type: str,
         validation_codes: Optional[Dict[str, Dict[str, Dict[str, str]]]] = None,
         target_topic_name: Optional[str] = None,
         target_name: Optional[str] = None,
@@ -352,12 +353,14 @@ class PromptConfigurationService:
         """Store prompt configuration data in Redis.
 
         This method stores/updates prompt configuration data including schemas and
-        validation codes based on the request type (input/output).
+        validation codes based on the schema type (input/output).
 
         Args:
             workflow_id: Workflow identifier for tracking
             notification_request: Notification request for status updates
-            request: The prompt schema request containing schema and type
+            prompt_id: Unique identifier for the prompt configuration
+            schema: The JSON schema to store (None for unstructured)
+            schema_type: Type of schema ('input' or 'output')
             validation_codes: Generated validation codes for the schema
             target_topic_name: Optional target topic for notifications
             target_name: Optional target name for notifications
@@ -384,7 +387,7 @@ class PromptConfigurationService:
             redis_service = RedisService()
 
             # Construct Redis key
-            redis_key = f"prompt:{request.prompt_id}"
+            redis_key = f"prompt:{prompt_id}"
 
             # Fetch existing data if it exists
             existing_data_json = run_async(redis_service.get(redis_key))
@@ -395,19 +398,19 @@ class PromptConfigurationService:
                 config_data = PromptConfigurationData()
 
             # Update configuration based on type
-            if request.type == "input":
+            if schema_type == "input":
                 # Store input schema
-                if request.schema:
-                    config_data.input_schema = request.schema.schema
+                if schema:
+                    config_data.input_schema = schema
 
                 # Store input validation codes
                 if validation_codes:
                     config_data.input_validation = validation_codes
 
-            elif request.type == "output":
+            elif schema_type == "output":
                 # Store output schema
-                if request.schema:
-                    config_data.output_schema = request.schema.schema
+                if schema:
+                    config_data.output_schema = schema
 
                 # Store output validation codes
                 if validation_codes:
@@ -417,7 +420,7 @@ class PromptConfigurationService:
             config_json = config_data.model_dump_json(exclude_none=True, exclude_unset=True)
             run_async(redis_service.set(redis_key, config_json))
 
-            logger.debug(f"Stored prompt configuration for prompt_id: {request.prompt_id}, type: {request.type}")
+            logger.debug(f"Stored prompt configuration for prompt_id: {prompt_id}, type: {schema_type}")
 
             notification_req.payload.content = NotificationContent(
                 title="Successfully stored prompt configuration",
@@ -434,10 +437,10 @@ class PromptConfigurationService:
             return None
 
         except json.JSONDecodeError as e:
-            logger.exception(f"Failed to parse existing Redis data for prompt_id {request.prompt_id}: {str(e)}")
+            logger.exception(f"Failed to parse existing Redis data for prompt_id {prompt_id}: {str(e)}")
             notification_req.payload.content = NotificationContent(
                 title="Failed to store prompt configuration",
-                message=f"Invalid data format in Redis for prompt_id {request.prompt_id}",
+                message=f"Invalid data format in Redis for prompt_id {prompt_id}",
                 status=WorkflowStatus.FAILED,
             )
             dapr_workflow.publish_notification(
@@ -467,14 +470,25 @@ class PromptConfigurationService:
     def validate_schema(
         workflow_id: str,
         notification_request: NotificationRequest,
-        request: PromptSchemaRequest,
+        schema: Optional[Dict[str, Any]],
+        validations: Optional[Dict[str, Dict[str, str]]],
+        schema_type: str,
         target_topic_name: Optional[str] = None,
         target_name: Optional[str] = None,
-    ) -> Optional[Dict[str, Dict[str, Dict[str, str]]]]:
+    ) -> None:
         """Validate prompt configuration schemas and their field validations.
 
+        Args:
+            workflow_id: Workflow identifier for tracking
+            notification_request: Notification request for status updates
+            schema: The JSON schema to validate (None for unstructured)
+            validations: Field validation prompts by model name
+            schema_type: Type of schema ('input' or 'output')
+            target_topic_name: Optional target topic for notifications
+            target_name: Optional target name for notifications
+
         Returns:
-            Dictionary with generated validation codes or None if no validations
+            None - validation only
         """
         notification_req = notification_request.model_copy(deep=True)
         notification_req.payload.event = "validation"
@@ -493,15 +507,13 @@ class PromptConfigurationService:
 
         try:
             # Validate schema if present
-            if request.schema is not None:
-                model_name = f"{request.type.capitalize()}Schema"
-                model = run_async(json_schema_to_pydantic_model(request.schema.schema, model_name))
+            if schema is not None:
+                model_name = f"{schema_type.capitalize()}Schema"
+                model = run_async(json_schema_to_pydantic_model(schema, model_name))
 
                 # Validate field references in validations
-                if request.schema.validations:
-                    PromptConfigurationService._validate_field_references(
-                        model, request.schema.validations, request.type
-                    )
+                if validations:
+                    PromptConfigurationService._validate_field_references(model, validations, schema_type)
 
             # Added sleep to avoid workflow registration failure
             time.sleep(3)
@@ -570,7 +582,9 @@ class PromptConfigurationService:
         self.validate_schema(
             workflow_id,
             notification_request,
-            request,
+            request.schema.schema,
+            request.schema.validations,
+            request.type,
             request.source_topic,
             request.source,
         )
@@ -579,7 +593,7 @@ class PromptConfigurationService:
         validation_codes = self.generate_validation_codes(
             workflow_id,
             notification_request,
-            request,
+            request.schema.validations,
             request.source_topic,
             request.source,
         )
@@ -588,7 +602,9 @@ class PromptConfigurationService:
         self.store_prompt_configuration(
             workflow_id,
             notification_request,
-            request,
+            request.prompt_id,
+            request.schema.schema,
+            request.type,
             validation_codes,
             request.source_topic,
             request.source,
