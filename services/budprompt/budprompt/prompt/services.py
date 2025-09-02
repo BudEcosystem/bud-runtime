@@ -367,7 +367,7 @@ class PromptConfigurationService:
             RedisException: If Redis operation fails
         """
         notification_req = notification_request.model_copy(deep=True)
-        notification_req.payload.event = "redis_storage"
+        notification_req.payload.event = "save_prompt_configuration"
         notification_req.payload.content = NotificationContent(
             title="Storing prompt configuration",
             message="Storing prompt configuration in Redis",

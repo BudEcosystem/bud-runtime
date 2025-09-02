@@ -290,6 +290,7 @@ class PromptSchemaRequest(CloudEventBase):
         None, description="JSON schema for structured input/output (None for unstructured)"
     )
     type: Literal["input", "output"] = Field(..., description="Type of schema - either 'input' or 'output'")
+    deployment_name: Optional[str] = Field(None, min_length=1, description="Model deployment name")
 
 
 class PromptSchemaResponse(ResponseBase):
@@ -301,7 +302,7 @@ class PromptSchemaResponse(ResponseBase):
 
 
 class PromptConfigurationData(BaseModel):
-    """TODO: Add description."""
+    """Schema for prompt configuration."""
 
     deployment_name: Optional[str] = Field(None, description="Model deployment name")
     model_settings: Optional[ModelSettings] = Field(None, description="Model settings")

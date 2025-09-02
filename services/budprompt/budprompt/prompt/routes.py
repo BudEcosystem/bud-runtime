@@ -17,15 +17,18 @@
 """API routes for the prompt module."""
 
 import logging
+import uuid
 from typing import Union
 
-from budmicroframe.commons.schemas import ErrorResponse
-from fastapi import APIRouter, status
+from budmicroframe.commons.api_utils import pubsub_api_endpoint
+from budmicroframe.commons.schemas import ErrorResponse, SuccessResponse
+from fastapi import APIRouter, Response, status
 from fastapi.responses import StreamingResponse
 
 from ..commons.exceptions import ClientException
-from .schemas import PromptExecuteRequest, PromptExecuteResponse
-from .services import PromptExecutorService
+from .schemas import PromptExecuteRequest, PromptExecuteResponse, PromptSchemaRequest
+from .services import PromptConfigurationService, PromptExecutorService
+from .workflows import PromptSchemaWorkflow
 
 
 logger = logging.getLogger(__name__)
@@ -107,3 +110,32 @@ async def execute_prompt(
             code=500,
             message="An unexpected error occurred during prompt execution",
         ).to_http_response()
+
+
+@prompt_router.post("/schema", tags=["Prompt Schema"])
+@pubsub_api_endpoint(request_model=PromptSchemaRequest)
+async def perform_prompt_schema(request: PromptSchemaRequest) -> Response:
+    """Run a prompt schema validation workflow.
+
+    This endpoint processes the prompt schema request, validates the schema,
+    generates validation codes, and stores the configuration in Redis.
+
+    Args:
+        request (PromptSchemaRequest): The prompt schema request
+        containing schema and validation prompts.
+
+    Returns:
+        HTTP response containing the prompt schema validation results.
+    """
+    response: Union[SuccessResponse, ErrorResponse]
+    if request.debug:
+        try:
+            logger.info("Running prompt schema validation in debug mode", request.model_dump())
+            response = PromptConfigurationService().__call__(request, workflow_id=str(uuid.uuid4()))
+        except Exception as e:
+            logger.exception("Error running prompt schema validation: %s", str(e))
+            response = ErrorResponse(message="Error running prompt schema validation", code=500)
+    else:
+        response = await PromptSchemaWorkflow().__call__(request)
+
+    return response.to_http_response()
