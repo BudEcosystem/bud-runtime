@@ -112,6 +112,15 @@ class AnsibleOrchestrator:
 
         files, extravars = self._parse_kubeconfig(kubeconfig, temp_id)
 
+        # Ensure namespace is provided to the playbook
+        try:
+            from budeval.commons.storage_config import StorageConfig
+
+            extravars["namespace"] = StorageConfig.get_current_namespace()
+        except Exception:
+            # Fallback to 'default' if storage config is unavailable
+            extravars.setdefault("namespace", "default")
+
         try:
             self._run_ansible_playbook(playbook, temp_id, files, extravars)
             logger.info("::: EVAL Ansible ::: Ansible-based cluster verification succeeded for %s", temp_id)
