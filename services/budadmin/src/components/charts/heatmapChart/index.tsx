@@ -1,6 +1,6 @@
-import { Box } from '@radix-ui/themes';
-import * as echarts from 'echarts';
-import React, { useEffect, useRef, useState } from 'react';
+import { Box } from "@radix-ui/themes";
+import * as echarts from "echarts";
+import React, { useEffect, useRef, useState } from "react";
 
 interface HeatmapChartProps {
   data: {
@@ -32,19 +32,19 @@ const HeatmapChart: React.FC<HeatmapChartProps> = ({ data }) => {
       }
 
       const myChart = echarts.init(chartRef.current, null, {
-        renderer: 'canvas',
+        renderer: "canvas",
         useDirtyRect: false,
       });
 
       const option = {
-        backgroundColor: 'transparent',
+        backgroundColor: "transparent",
         tooltip: {
-          position: 'top',
-          backgroundColor: 'rgba(0,0,0,0.75)',
-          borderColor: '#1F1F1F',
+          position: "top",
+          backgroundColor: "rgba(0,0,0,0.75)",
+          borderColor: "#1F1F1F",
           borderWidth: 1,
           textStyle: {
-            color: '#EEEEEE',
+            color: "#EEEEEE",
             fontSize: 12,
             fontWeight: 400,
           },
@@ -62,19 +62,19 @@ const HeatmapChart: React.FC<HeatmapChartProps> = ({ data }) => {
           },
         },
         grid: {
-          left: '0%',
-          right: '0%',
-          bottom: '10px',
-          top: '10px',
+          left: "0%",
+          right: "0%",
+          bottom: "10px",
+          top: "10px",
           containLabel: true,
         },
         xAxis: {
-          type: 'category',
+          type: "category",
           data: heatmapData.xAxis,
           splitArea: {
             show: true,
             areaStyle: {
-              color: ['#1A1A1A', '#1F1F1F'],
+              color: ["#1A1A1A", "#1F1F1F"],
             },
           },
           axisTick: {
@@ -84,7 +84,7 @@ const HeatmapChart: React.FC<HeatmapChartProps> = ({ data }) => {
             show: false,
           },
           axisLabel: {
-            color: '#FFFFFF',
+            color: "#FFFFFF",
             fontSize: 14,
             fontWeight: 600,
             interval: 0,
@@ -92,12 +92,12 @@ const HeatmapChart: React.FC<HeatmapChartProps> = ({ data }) => {
           },
         },
         yAxis: {
-          type: 'category',
+          type: "category",
           data: heatmapData.yAxis,
           splitArea: {
             show: true,
             areaStyle: {
-              color: ['#1A1A1A', '#1F1F1F'],
+              color: ["#1A1A1A", "#1F1F1F"],
             },
           },
           axisTick: {
@@ -107,7 +107,7 @@ const HeatmapChart: React.FC<HeatmapChartProps> = ({ data }) => {
             show: false,
           },
           axisLabel: {
-            color: '#FFFFFF',
+            color: "#FFFFFF",
             fontSize: 14,
             fontWeight: 600,
           },
@@ -118,36 +118,36 @@ const HeatmapChart: React.FC<HeatmapChartProps> = ({ data }) => {
           max: heatmapData.max || 100,
           inRange: {
             color: heatmapData.colorRange || [
-              '#201C2D',  // Dark purple (lowest values)
-              '#201C2D',
-              '#5B4C81',  // Medium purple
-              '#5B4C81',
-              '#8C73C2',  // Light purple (highest values)
-              '#8C73C2',
+              "#201C2D", // Dark purple (lowest values)
+              "#201C2D",
+              "#5B4C81", // Medium purple
+              "#5B4C81",
+              "#8C73C2", // Light purple (highest values)
+              "#8C73C2",
             ],
           },
         },
         series: [
           {
-            name: 'Heatmap',
-            type: 'heatmap',
+            name: "Heatmap",
+            type: "heatmap",
             data: heatmapData.data,
             label: {
               show: true,
-              color: '#FFFFFF',
+              color: "#FFFFFF",
               fontSize: 10,
               fontWeight: 400,
             },
             emphasis: {
               itemStyle: {
                 shadowBlur: 10,
-                shadowColor: 'rgba(126, 87, 194, 0.5)',
+                shadowColor: "rgba(126, 87, 194, 0.5)",
               },
             },
             itemStyle: {
               borderRadius: 8,
               borderWidth: 3,
-              borderColor: '#0A0A0A',
+              borderColor: "#0A0A0A",
             },
           },
         ],
@@ -159,10 +159,10 @@ const HeatmapChart: React.FC<HeatmapChartProps> = ({ data }) => {
         myChart.resize();
       };
 
-      window.addEventListener('resize', handleResize);
+      window.addEventListener("resize", handleResize);
 
       return () => {
-        window.removeEventListener('resize', handleResize);
+        window.removeEventListener("resize", handleResize);
         myChart.dispose();
       };
     }
@@ -170,7 +170,7 @@ const HeatmapChart: React.FC<HeatmapChartProps> = ({ data }) => {
 
   return (
     <Box className="relative h-full w-full">
-      <div ref={chartRef} style={{ width: '100%', height: '100%' }} />
+      <div ref={chartRef} style={{ width: "100%", height: "100%" }} />
     </Box>
   );
 };

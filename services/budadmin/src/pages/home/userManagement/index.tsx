@@ -69,7 +69,7 @@ export default function UserManagement() {
   const totalItems = 100;
 
   // Separate states for admin and client users
-  const [activeTab, setActiveTab] = useState<'client' | 'admin'>('client');
+  const [activeTab, setActiveTab] = useState<'client' | 'admin'>('admin');
   const [adminCurrentPage, setAdminCurrentPage] = useState(1);
   const [clientCurrentPage, setClientCurrentPage] = useState(1);
 
@@ -412,16 +412,7 @@ export default function UserManagement() {
           <div className="pt-4 px-[3.5rem]">
             {/* Tab Navigation */}
             <div className="flex mb-4 border-b border-[#1F1F1F]">
-              <button
-                onClick={() => setActiveTab('client')}
-                className={`px-4 py-2 text-sm font-medium transition-colors ${
-                  activeTab === 'client'
-                    ? 'text-[#EEEEEE] border-b-2 border-[#EEEEEE]'
-                    : 'text-[#757575] hover:text-[#EEEEEE]'
-                }`}
-              >
-                Client Users
-              </button>
+
               <button
                 onClick={() => setActiveTab('admin')}
                 className={`px-4 py-2 text-sm font-medium transition-colors ${
@@ -432,6 +423,17 @@ export default function UserManagement() {
               >
                 Admin Users
               </button>
+              <button
+                onClick={() => setActiveTab('client')}
+                className={`px-4 py-2 text-sm font-medium transition-colors ${
+                  activeTab === 'client'
+                    ? 'text-[#EEEEEE] border-b-2 border-[#EEEEEE]'
+                    : 'text-[#757575] hover:text-[#EEEEEE]'
+                }`}
+              >
+                Client Users
+              </button>
+
             </div>
 
             {/* User Count Display */}
@@ -463,7 +465,16 @@ export default function UserManagement() {
                     onClick: async event => {
                       event.stopPropagation();
                       if (hasPermission(PermissionEnum.UserManage) && record.status == "active") {
-                        openUserPermissions(record)
+                        // For client users, open the usage drawer
+                        if (activeTab === 'client') {
+                          const user = await getUsersDetails(record.id);
+                          if (user) {
+                            openDrawer('user-usage');
+                          }
+                        } else {
+                          // For admin users, open the permissions drawer
+                          openUserPermissions(record);
+                        }
                       }
                     }
                   }
