@@ -104,7 +104,7 @@
   }
   /* Fix Secondary Button */
   button[class*="bg-\[\#1F1F1F\]"] {
-    background: var(--bg-secondary) !important;
+    background: var(--bg-secondary) ;
     border-color: var(--border-secondary) !important;
   }
   button[class*="bg-\[\#1F1F1F\]"]:hover {
