@@ -210,9 +210,21 @@ class SimulationWorkflows:
             return list(results)
 
         except Exception as e:
+            # Extract meaningful error message from exception
+            error_detail = str(e)
+            if "cannot run on any of the" in error_detail and "available device(s)" in error_detail:
+                # Model doesn't fit on any device
+                fix_message = "Fix: Use a smaller model or add devices with more memory"
+            elif "No valid configurations found" in error_detail:
+                fix_message = "Fix: Model requires more memory than available on devices"
+            else:
+                fix_message = (
+                    f"Fix: {error_detail[:100]}" if len(error_detail) < 100 else "Fix: Check logs for details"
+                )
+
             notification_req.payload.content = NotificationContent(
                 title="Failed to generate best configurations",
-                message="Fix: Retry the simulation",
+                message=fix_message,
                 status=WorkflowStatus.FAILED,
                 primary_action="retry",
             )
