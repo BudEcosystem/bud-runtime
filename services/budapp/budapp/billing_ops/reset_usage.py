@@ -41,13 +41,9 @@ class UsageResetService:
                 return False
 
             # Calculate new billing cycle
-            from dateutil.relativedelta import relativedelta
+            from budapp.billing_ops.utils import get_new_billing_cycle
 
-            now = datetime.now(timezone.utc)
-
-            # Start new cycle from now
-            billing_cycle_start = now.isoformat()
-            billing_cycle_end = (now + relativedelta(months=1)).isoformat()
+            billing_cycle_start, billing_cycle_end = get_new_billing_cycle()
 
             # Create reset usage data
             usage_limit_info = {
@@ -116,7 +112,7 @@ class UsageResetService:
             Number of users reset
         """
         try:
-            from dateutil.relativedelta import relativedelta
+            from budapp.billing_ops.utils import calculate_billing_cycle
 
             now = datetime.now(timezone.utc)
             reset_count = 0
@@ -126,18 +122,20 @@ class UsageResetService:
 
             for billing in active_billings:
                 if billing.created_at:
-                    # Calculate if cycle should be reset
-                    months_since_start = (now.year - billing.created_at.year) * 12 + (
-                        now.month - billing.created_at.month
-                    )
-                    cycle_start = billing.created_at + relativedelta(months=months_since_start)
-                    cycle_end = cycle_start + relativedelta(months=1)
+                    # Calculate current billing cycle
+                    cycle_start_str, cycle_end_str = calculate_billing_cycle(billing.created_at)
 
-                    # Check if we need to reset (past cycle end)
-                    if now >= cycle_end:
-                        if await self.reset_user_usage(billing.user_id, "Automatic cycle reset"):
-                            reset_count += 1
-                            await asyncio.sleep(0.01)
+                    if cycle_end_str:
+                        # Parse the cycle end date
+                        from datetime import datetime
+
+                        cycle_end = datetime.fromisoformat(cycle_end_str)
+
+                        # Check if we need to reset (past cycle end)
+                        if now >= cycle_end:
+                            if await self.reset_user_usage(billing.user_id, "Automatic cycle reset"):
+                                reset_count += 1
+                                await asyncio.sleep(0.01)
 
             if reset_count > 0:
                 logger.info(f"Automatically reset {reset_count} expired billing cycles")
