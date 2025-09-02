@@ -16,10 +16,13 @@
 
 """Pydantic schemas for the prompt module."""
 
+import time
 from typing import Any, Dict, List, Literal, Optional, Union
+from uuid import UUID
 
-from budmicroframe.commons.schemas import SuccessResponse
-from pydantic import BaseModel, Field
+from budmicroframe.commons.schemas import CloudEventBase, ResponseBase, SuccessResponse
+from budmicroframe.commons.types import lowercase_string
+from pydantic import BaseModel, Field, field_validator
 
 
 class ModelSettings(BaseModel):
@@ -181,3 +184,95 @@ class PromptExecuteResponse(SuccessResponse):
     data: Optional[Any] = Field(
         None, description="Generated output (can be any supported type: dict, str, int, float, bool, list)"
     )
+
+
+# Revised schemas
+
+
+class SchemaBase(BaseModel):
+    """Base schema for input/output with validations."""
+
+    schema: Dict[str, Any] = Field(..., description="JSON schema representation")
+    validations: Dict[str, Dict[str, str]] = Field(
+        default_factory=dict,
+        description="Validation prompts by model and field. Format: {ModelName: {field_name: validation_prompt}}",
+    )
+
+    @field_validator("validations")
+    @classmethod
+    def validate_validations_structure(cls, v: Dict[str, Dict[str, str]]) -> Dict[str, Dict[str, str]]:
+        """Validate that validations have proper nested structure."""
+        if not isinstance(v, dict):
+            raise ValueError("Validations must be a dictionary")
+
+        for model_name, fields in v.items():
+            if not isinstance(model_name, str) or not model_name.strip():
+                raise ValueError(f"Model name must be a non-empty string, got: {model_name}")
+
+            if not isinstance(fields, dict):
+                raise ValueError(f"Validations for model '{model_name}' must be a dictionary of fields")
+
+            for field_name, prompt in fields.items():
+                if not isinstance(field_name, str) or not field_name.strip():
+                    raise ValueError(f"Field name in model '{model_name}' must be a non-empty string")
+
+                if not isinstance(prompt, str) or not prompt.strip():
+                    raise ValueError(f"Validation prompt for '{model_name}.{field_name}' must be a non-empty string")
+
+        return v
+
+
+class PromptConfigurationRequest(CloudEventBase):
+    """Schema for prompt configuration stored in prompt_schema field.
+
+    This request model supports structured schemas with validation prompts:
+    - input_schema: Contains schema and validations for input data
+    - output_schema: Contains schema and validations for output data
+    - validations format: {ModelName: {field_name: validation_prompt}}
+
+    Example validations structure:
+        {
+            "RootModel": {
+                "field_1": "validation prompt for field_1",
+                "field_2": "validation prompt for field_2"
+            },
+            "NestedModel": {
+                "field_1": "validation prompt for nested field_1"
+            }
+        }
+    """
+
+    deployment_name: str = Field(..., min_length=1, description="Model deployment name")
+    model_settings: ModelSettings = Field(default_factory=ModelSettings)
+    stream: bool = Field(default=False, description="Enable streaming response")
+    input_schema: Optional[SchemaBase] = Field(
+        None, description="JSON schema for structured input (None for unstructured)"
+    )
+    output_schema: Optional[SchemaBase] = Field(
+        None, description="JSON schema for structured output (None for unstructured)"
+    )
+    messages: List[Message] = Field(
+        default_factory=list, description="Conversation messages (can include system/developer messages)"
+    )
+    llm_retry_limit: Optional[int] = Field(
+        default=3, ge=0, description="Number of LLM retries when validation fails (non-streaming only)"
+    )
+    enable_tools: bool = Field(
+        default=False, description="Enable tool calling capability (requires allow_multiple_calls=true)"
+    )
+    allow_multiple_calls: bool = Field(
+        default=True,
+        description="Allow multiple LLM calls for retries and tool usage. When false, only a single LLM call is made",
+    )
+    system_prompt_role: Optional[Literal["system", "developer", "user"]] = Field(
+        None,
+        description="Role for system prompts in OpenAI models. 'developer' only works with compatible models (not o1-mini)",
+    )
+
+
+class PromptConfigurationResponse(ResponseBase):
+    """Response schema for prompt configurations."""
+
+    object: lowercase_string = "prompt_configuration"
+    workflow_id: UUID
+    created: int = Field(default_factory=lambda: int(time.time()))

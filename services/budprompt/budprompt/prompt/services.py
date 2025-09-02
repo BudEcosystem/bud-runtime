@@ -16,10 +16,19 @@
 
 """Services for the prompt module."""
 
+import asyncio
 import json
 import logging
-from typing import Any, AsyncGenerator, Dict, Union
+import time
+import uuid
+from typing import Any, AsyncGenerator, Dict, Optional, Union
 
+from budmicroframe.commons.constants import WorkflowStatus
+from budmicroframe.commons.schemas import (
+    NotificationContent,
+    NotificationRequest,
+)
+from budmicroframe.shared.dapr_workflow import DaprWorkflow
 from pydantic import ValidationError
 
 from budprompt.commons.exceptions import (
@@ -30,11 +39,15 @@ from budprompt.commons.exceptions import (
 
 from ..commons.exceptions import ClientException
 from .executors import SimplePromptExecutor
-from .schemas import PromptExecuteRequest
+from .revised_code.dynamic_model_creation import json_schema_to_pydantic_model
+from .revised_code.field_validation import generate_validation_function
+from .schemas import PromptConfigurationRequest, PromptConfigurationResponse, PromptExecuteRequest
 from .utils import clean_model_cache
 
 
 logger = logging.getLogger(__name__)
+
+dapr_workflow = DaprWorkflow()
 
 
 class PromptExecutorService:
@@ -142,3 +155,341 @@ class PromptExecutorService:
         finally:
             # Always clean up temporary modules
             clean_model_cache()
+
+
+class PromptConfigurationService:
+    """Service for validating and processing prompt configuration schemas.
+
+    This service handles validation of JSON schemas and their associated
+    field-level validation prompts for structured prompt execution.
+    """
+
+    @staticmethod
+    def _validate_field_references(model: Any, validations: Dict[str, Dict[str, str]], schema_type: str) -> None:
+        """Validate that field names in validations exist in the model.
+
+        Args:
+            model: The Pydantic model to validate against
+            validations: Dictionary of model names to field validations
+            schema_type: Type of schema ('input' or 'output') for error messages
+
+        Raises:
+            ValueError: If a field is not found in the model
+        """
+        for model_name, field_validations in validations.items():
+            # Check if this model exists (could be nested)
+            if hasattr(model, "model_fields"):
+                model_fields = set(model.model_fields.keys())
+                for field_name in field_validations:
+                    if field_name not in model_fields:
+                        raise ValueError(
+                            f"{schema_type.capitalize()} schema: Field '{field_name}' not found in model '{model_name}'"
+                        )
+
+    @staticmethod
+    async def _generate_codes_async(
+        request: PromptConfigurationRequest, max_concurrent: int = 10
+    ) -> Dict[str, Dict[str, Dict[str, Dict[str, str]]]]:
+        """Generate validation codes asynchronously for all fields.
+
+        Args:
+            request: The prompt configuration request
+            max_concurrent: Maximum number of concurrent LLM calls
+
+        Returns:
+            Dictionary with validation codes structure
+        """
+        result = {"input": {}, "output": {}}
+        tasks = []
+        task_metadata = []  # To track which task belongs to which field
+
+        # Create semaphore for concurrent limit
+        semaphore = asyncio.Semaphore(max_concurrent)
+
+        async def generate_with_semaphore(field_name: str, prompt: str):
+            """Generate validation code with semaphore limit."""
+            async with semaphore:
+                return await generate_validation_function(field_name, prompt)
+
+        # Process input validations
+        if request.input_schema and request.input_schema.validations:
+            for model_name, field_validations in request.input_schema.validations.items():
+                result["input"][model_name] = {}
+                for field_name, validation_prompt in field_validations.items():
+                    task = generate_with_semaphore(field_name, validation_prompt)
+                    tasks.append(task)
+                    task_metadata.append(("input", model_name, field_name, validation_prompt))
+
+        # Process output validations
+        if request.output_schema and request.output_schema.validations:
+            for model_name, field_validations in request.output_schema.validations.items():
+                result["output"][model_name] = {}
+                for field_name, validation_prompt in field_validations.items():
+                    task = generate_with_semaphore(field_name, validation_prompt)
+                    tasks.append(task)
+                    task_metadata.append(("output", model_name, field_name, validation_prompt))
+
+        # Execute all tasks in parallel
+        if tasks:
+            # Use gather to run all tasks - if any fails, all fail
+            generated_codes = await asyncio.gather(*tasks)
+
+            # Map results back to the structure
+            for i, code in enumerate(generated_codes):
+                schema_type, model_name, field_name, prompt = task_metadata[i]
+                result[schema_type][model_name][field_name] = {"prompt": prompt, "code": code}
+
+        # Clean up empty dictionaries
+        if not result["input"]:
+            del result["input"]
+        if not result["output"]:
+            del result["output"]
+
+        return result
+
+    @staticmethod
+    def generate_validation_codes(
+        workflow_id: str,
+        notification_request: NotificationRequest,
+        request: PromptConfigurationRequest,
+        target_topic_name: Optional[str] = None,
+        target_name: Optional[str] = None,
+        max_concurrent: int = 10,
+    ) -> Optional[Dict[str, Dict[str, Dict[str, Dict[str, str]]]]]:
+        """Generate validation code for all fields using LLM in parallel.
+
+        Args:
+            workflow_id: Workflow identifier for tracking
+            notification_request: Notification request for status updates
+            request: The prompt configuration request
+            target_topic_name: Optional target topic for notifications
+            target_name: Optional target name for notifications
+            max_concurrent: Maximum number of concurrent LLM calls
+
+        Returns:
+            Dictionary with structure:
+            {
+                "input": {
+                    "ModelName": {
+                        "field1": {"prompt": "...", "code": "..."},
+                        "field2": {"prompt": "...", "code": "..."}
+                    }
+                },
+                "output": {
+                    "ModelName": {
+                        "field1": {"prompt": "...", "code": "..."}
+                    }
+                }
+            }
+
+        Raises:
+            Exception: If any LLM call fails
+        """
+        notification_req = notification_request.model_copy(deep=True)
+        notification_req.payload.event = "code_generation"
+        notification_req.payload.content = NotificationContent(
+            title="Generating validation codes",
+            message="Generating LLM-based validation functions for fields",
+            status=WorkflowStatus.STARTED,
+        )
+        dapr_workflow.publish_notification(
+            workflow_id=workflow_id,
+            notification=notification_req,
+            target_topic_name=target_topic_name,
+            target_name=target_name,
+        )
+
+        try:
+            # Run the async code generation only if there are validations
+            validation_codes = None
+            if (request.input_schema and request.input_schema.validations) or (
+                request.output_schema and request.output_schema.validations
+            ):
+                validation_codes = asyncio.run(
+                    PromptConfigurationService._generate_codes_async(request, max_concurrent)
+                )
+
+            notification_req.payload.content = NotificationContent(
+                title="Successfully generated validation codes",
+                message="All validation functions have been generated",
+                status=WorkflowStatus.COMPLETED,
+            )
+            dapr_workflow.publish_notification(
+                workflow_id=workflow_id,
+                notification=notification_req,
+                target_topic_name=target_topic_name,
+                target_name=target_name,
+            )
+
+            if validation_codes:
+                logger.debug("Generated validation codes for %d schemas", len(validation_codes))
+
+            return validation_codes
+
+        except Exception as e:
+            logger.exception(f"Failed to generate validation code: {str(e)}")
+            notification_req.payload.content = NotificationContent(
+                title="Failed to generate validation codes",
+                message=f"LLM code generation failed: {str(e)}",
+                status=WorkflowStatus.FAILED,
+            )
+            dapr_workflow.publish_notification(
+                workflow_id=workflow_id,
+                notification=notification_req,
+                target_topic_name=target_topic_name,
+                target_name=target_name,
+            )
+            raise e
+
+    @staticmethod
+    def validate_schema(
+        workflow_id: str,
+        notification_request: NotificationRequest,
+        request: PromptConfigurationRequest,
+        target_topic_name: Optional[str] = None,
+        target_name: Optional[str] = None,
+    ) -> Optional[Dict[str, Dict[str, Dict[str, Dict[str, str]]]]]:
+        """Validate prompt configuration schemas and their field validations.
+
+        Returns:
+            Dictionary with generated validation codes or None if no validations
+        """
+        notification_req = notification_request.model_copy(deep=True)
+        notification_req.payload.event = "validation"
+
+        notification_req.payload.content = NotificationContent(
+            title="Validating prompt configuration schemas",
+            message="Validating input/output schemas and field validations",
+            status=WorkflowStatus.STARTED,
+        )
+        dapr_workflow.publish_notification(
+            workflow_id=workflow_id,
+            notification=notification_req,
+            target_topic_name=target_topic_name,
+            target_name=target_name,
+        )
+
+        try:
+            # Validate input schema if present
+            if request.input_schema is not None:
+                input_model = asyncio.run(json_schema_to_pydantic_model(request.input_schema.schema, "InputSchema"))
+
+                # Validate field references in validations
+                if request.input_schema.validations:
+                    PromptConfigurationService._validate_field_references(
+                        input_model, request.input_schema.validations, "input"
+                    )
+
+            # Validate output schema if present
+            if request.output_schema is not None:
+                output_model = asyncio.run(json_schema_to_pydantic_model(request.output_schema.schema, "OutputSchema"))
+
+                # Validate field references in validations
+                if request.output_schema.validations:
+                    PromptConfigurationService._validate_field_references(
+                        output_model, request.output_schema.validations, "output"
+                    )
+
+            # Added sleep to avoid workflow registration failure
+            time.sleep(3)
+
+            notification_req.payload.content = NotificationContent(
+                title="Successfully validated schemas",
+                message="All prompt configuration schemas are valid",
+                status=WorkflowStatus.COMPLETED,
+            )
+            dapr_workflow.publish_notification(
+                workflow_id=workflow_id,
+                notification=notification_req,
+                target_topic_name=target_topic_name,
+                target_name=target_name,
+            )
+
+            return None  # No validation codes generated in validate_schema
+
+        except Exception as e:
+            logger.exception("Error validating schemas: %s", str(e))
+            notification_req.payload.content = NotificationContent(
+                title="Failed to validate schemas",
+                message="Fix: Check the schema structure and field references",
+                status=WorkflowStatus.FAILED,
+            )
+            dapr_workflow.publish_notification(
+                workflow_id=workflow_id,
+                notification=notification_req,
+                target_topic_name=target_topic_name,
+                target_name=target_name,
+            )
+            raise e
+
+    def __call__(
+        self, request: PromptConfigurationRequest, workflow_id: Optional[str] = None
+    ) -> PromptConfigurationResponse:
+        """Execute the prompt configuration validation process.
+
+        This method validates the input and output schemas along with their field-level
+        validation prompts for structured prompt execution.
+
+        Args:
+            request (PromptConfigurationRequest): The prompt configuration request containing
+                input/output schemas and validation prompts.
+            workflow_id (Optional[str]): An optional workflow ID for tracking the
+                validation process.
+
+        Raises:
+            ValueError: If schema validation fails or field references are invalid.
+
+        Returns:
+            PromptConfigurationResponse: The validation response containing the
+                workflow ID and timestamp.
+        """
+        if not workflow_id:
+            workflow_id = str(uuid.uuid4())
+
+        workflow_name = "prompt_configuration"
+        notification_request = NotificationRequest.from_cloud_event(
+            cloud_event=request,
+            name=workflow_name,
+            workflow_id=workflow_id,
+        )
+
+        # Validate schema
+        self.validate_schema(
+            workflow_id,
+            notification_request,
+            request,
+            request.source_topic,
+            request.source,
+        )
+
+        # Generate validation codes after successful validation
+        validation_codes = self.generate_validation_codes(
+            workflow_id,
+            notification_request,
+            request,
+            request.source_topic,
+            request.source,
+        )
+
+        # Store validation codes for later use (could be added to response if needed)
+        if validation_codes:
+            logger.info("Validation codes generated for workflow %s", workflow_id)
+
+        response = PromptConfigurationResponse(workflow_id=workflow_id)
+
+        notification_request.payload.event = "results"
+        notification_request.payload.content = NotificationContent(
+            title="Prompt Configuration Results",
+            message="The prompt configuration is complete",
+            result=response.model_dump(),
+            status=WorkflowStatus.COMPLETED,
+        )
+
+        dapr_workflow.publish_notification(
+            workflow_id=workflow_id,
+            notification=notification_request,
+            target_topic_name=request.source_topic,
+            target_name=request.source,
+        )
+
+        return response
