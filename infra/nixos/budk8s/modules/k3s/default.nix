@@ -30,6 +30,7 @@
     extraFlags = [
       "--write-kubeconfig-group users"
       "--write-kubeconfig-mode 0640"
+      "--disable local-storage"
     ];
   };
 }
