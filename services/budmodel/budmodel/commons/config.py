@@ -103,7 +103,7 @@ class AppConfig(BaseAppConfig):
     )  # 50 MB/s initial (increased for dynamic throttling)
 
     # Feature Flags
-    use_aria2_for_huggingface: bool = Field(True, alias="USE_ARIA2_FOR_HUGGINGFACE")  # Start disabled for safety
+    use_aria2_for_huggingface: bool = Field(True, alias="USE_ARIA2_FOR_HUGGINGFACE")  # Enabled by default for high-performance downloads
     aria2_max_concurrent_downloads: int = Field(3, alias="ARIA2_MAX_CONCURRENT_DOWNLOADS")
     aria2_max_connection_per_server: int = Field(10, alias="ARIA2_MAX_CONNECTION_PER_SERVER")
     aria2_split: int = Field(10, alias="ARIA2_SPLIT")  # Number of parallel connections per file
