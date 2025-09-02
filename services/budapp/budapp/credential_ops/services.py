@@ -823,7 +823,11 @@ class ProprietaryCredentialService(SessionMixin):
         # Insert credential in to database
         credential_data = credential.model_dump()
         # Convert enum to string value for database
-        credential_data['type'] = credential_data['type'].value if hasattr(credential_data['type'], 'value') else credential_data['type']
+        credential_data['type'] = (
+            credential_data['type'].value 
+            if hasattr(credential_data['type'], 'value') 
+            else credential_data['type']
+        )
         credential_model = ProprietaryCredentialModel(**credential_data, user_id=user_id)
         db_credential = await ProprietaryCredentialDataManager(self.session).create_credential(credential_model)
         logger.info(f"Proprietary Credential inserted to database: {db_credential.id}")
