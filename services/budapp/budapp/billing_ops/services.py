@@ -130,10 +130,10 @@ class BillingService(DataManagerUtils):
                 # Create a virtual Free plan if it doesn't exist in DB
                 free_plan = self._get_default_free_plan()
 
-            # Calculate billing period for Free plan users
+            # For Free plan users, we still need dates for ClickHouse query but return None in response
             now = datetime.now(timezone.utc)
             billing_period_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-            # Calculate end of month
+            # Calculate end of month for internal use
             if billing_period_start.month == 12:
                 billing_period_end = billing_period_start.replace(
                     year=billing_period_start.year + 1, month=1
@@ -160,8 +160,8 @@ class BillingService(DataManagerUtils):
 
             return {
                 "has_billing": True,  # We're treating free plan as having billing
-                "billing_period_start": billing_period_start.isoformat(),
-                "billing_period_end": billing_period_end.isoformat(),
+                "billing_period_start": None,  # Return None for Free plan users
+                "billing_period_end": None,    # Return None for Free plan users
                 "plan_name": free_plan.get("name", "Free"),
                 "base_monthly_price": float(free_plan.get("base_monthly_price", 0)),
                 "usage": {
