@@ -147,32 +147,32 @@ class TestProjectCreationHappyPath:
                                     # Configure mocks
                                     mock_check_dup.return_value = False  # No duplicate for user
                                     mock_retrieve.return_value = None  # No existing project
-                                mock_project.name = minimal_project_data["name"]
-                                mock_project.project_type = ProjectTypeEnum.CLIENT_APP.value
-                                mock_insert.return_value = mock_project
+                                    mock_project.name = minimal_project_data["name"]
+                                    mock_project.project_type = ProjectTypeEnum.CLIENT_APP.value
+                                    mock_insert.return_value = mock_project
 
-                                mock_user_manager_instance = MagicMock()
-                                mock_user_manager_instance.retrieve_by_fields = AsyncMock(return_value=mock_user)
-                                mock_user_manager.return_value = mock_user_manager_instance
+                                    mock_user_manager_instance = MagicMock()
+                                    mock_user_manager_instance.retrieve_by_fields = AsyncMock(return_value=mock_user)
+                                    mock_user_manager.return_value = mock_user_manager_instance
 
-                                # Configure PermissionService mock
-                                mock_permission_instance = MagicMock()
-                                mock_permission_instance.create_resource_permission_by_user = AsyncMock(
-                                    return_value=None
-                                )
-                                mock_permission.return_value = mock_permission_instance
+                                    # Configure PermissionService mock
+                                    mock_permission_instance = MagicMock()
+                                    mock_permission_instance.create_resource_permission_by_user = AsyncMock(
+                                        return_value=None
+                                    )
+                                    mock_permission.return_value = mock_permission_instance
 
-                                # Configure add_users_to_project mock
-                                mock_add_users.return_value = mock_project
+                                    # Configure add_users_to_project mock
+                                    mock_add_users.return_value = mock_project
 
-                                # Act
-                                result = await service.create_project(minimal_project_data, mock_user.id)
+                                    # Act
+                                    result = await service.create_project(minimal_project_data, mock_user.id)
 
-                                # Assert
-                                assert result.id == mock_project.id
-                                assert result.name == minimal_project_data["name"]
-                                assert result.project_type == ProjectTypeEnum.CLIENT_APP.value
-                                mock_insert.assert_called_once()
+                                    # Assert
+                                    assert result.id == mock_project.id
+                                    assert result.name == minimal_project_data["name"]
+                                    assert result.project_type == ProjectTypeEnum.CLIENT_APP.value
+                                    mock_insert.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_create_project_with_all_fields(self, mock_session, mock_user, mock_project, valid_project_data):
@@ -194,35 +194,35 @@ class TestProjectCreationHappyPath:
                                     # Configure mocks
                                     mock_check_dup.return_value = False  # No duplicate for user
                                     mock_retrieve.return_value = None  # No existing project
-                                mock_project.name = valid_project_data["name"]
-                                mock_project.description = valid_project_data["description"]
-                                mock_project.tags = valid_project_data["tags"]
-                                mock_project.icon = valid_project_data["icon"]
-                                mock_project.benchmark = valid_project_data["benchmark"]
-                                mock_insert.return_value = mock_project
+                                    mock_project.name = valid_project_data["name"]
+                                    mock_project.description = valid_project_data["description"]
+                                    mock_project.tags = valid_project_data["tags"]
+                                    mock_project.icon = valid_project_data["icon"]
+                                    mock_project.benchmark = valid_project_data["benchmark"]
+                                    mock_insert.return_value = mock_project
 
-                                mock_user_manager_instance = MagicMock()
-                                mock_user_manager_instance.retrieve_by_fields = AsyncMock(return_value=mock_user)
-                                mock_user_manager.return_value = mock_user_manager_instance
+                                    mock_user_manager_instance = MagicMock()
+                                    mock_user_manager_instance.retrieve_by_fields = AsyncMock(return_value=mock_user)
+                                    mock_user_manager.return_value = mock_user_manager_instance
 
-                                # Configure PermissionService mock
-                                mock_permission_instance = MagicMock()
-                                mock_permission_instance.create_resource_permission_by_user = AsyncMock(
-                                    return_value=None
-                                )
-                                mock_permission.return_value = mock_permission_instance
+                                    # Configure PermissionService mock
+                                    mock_permission_instance = MagicMock()
+                                    mock_permission_instance.create_resource_permission_by_user = AsyncMock(
+                                        return_value=None
+                                    )
+                                    mock_permission.return_value = mock_permission_instance
 
-                                # Configure add_users_to_project mock
-                                mock_add_users.return_value = mock_project
+                                    # Configure add_users_to_project mock
+                                    mock_add_users.return_value = mock_project
 
-                                # Act
-                                result = await service.create_project(valid_project_data, mock_user.id)
+                                    # Act
+                                    result = await service.create_project(valid_project_data, mock_user.id)
 
-                                # Assert
-                                assert result.id == mock_project.id
-                                assert result.name == valid_project_data["name"]
-                                assert result.description == valid_project_data["description"]
-                                assert result.benchmark == valid_project_data["benchmark"]
+                                    # Assert
+                                    assert result.id == mock_project.id
+                                    assert result.name == valid_project_data["name"]
+                                    assert result.description == valid_project_data["description"]
+                                    assert result.benchmark == valid_project_data["benchmark"]
                                 mock_insert.assert_called_once()
 
     @pytest.mark.asyncio
@@ -292,28 +292,28 @@ class TestProjectCreationHappyPath:
                                     # Configure mocks
                                     mock_check_dup.return_value = False  # No duplicate for user
                                     mock_retrieve.return_value = None
-                                mock_project.benchmark = True
-                                mock_insert.return_value = mock_project
+                                    mock_project.benchmark = True
+                                    mock_insert.return_value = mock_project
 
-                                mock_user_manager_instance = MagicMock()
-                                mock_user_manager_instance.retrieve_by_fields = AsyncMock(return_value=mock_user)
-                                mock_user_manager.return_value = mock_user_manager_instance
+                                    mock_user_manager_instance = MagicMock()
+                                    mock_user_manager_instance.retrieve_by_fields = AsyncMock(return_value=mock_user)
+                                    mock_user_manager.return_value = mock_user_manager_instance
 
-                                # Configure PermissionService mock
-                                mock_permission_instance = MagicMock()
-                                mock_permission_instance.create_resource_permission_by_user = AsyncMock(
-                                    return_value=None
-                                )
-                                mock_permission.return_value = mock_permission_instance
+                                    # Configure PermissionService mock
+                                    mock_permission_instance = MagicMock()
+                                    mock_permission_instance.create_resource_permission_by_user = AsyncMock(
+                                        return_value=None
+                                    )
+                                    mock_permission.return_value = mock_permission_instance
 
-                                # Configure add_users_to_project mock
-                                mock_add_users.return_value = mock_project
+                                    # Configure add_users_to_project mock
+                                    mock_add_users.return_value = mock_project
 
-                                # Act
-                                result = await service.create_project(project_data, mock_user.id)
+                                    # Act
+                                    result = await service.create_project(project_data, mock_user.id)
 
-                                # Assert
-                                assert result.benchmark is True
+                                    # Assert
+                                    assert result.benchmark is True
 
 
 class TestProjectCreationValidation:
@@ -496,25 +496,27 @@ class TestProjectCreationAuthorization:
                                     mock_retrieve.return_value = None
                                     mock_insert.return_value = mock_project
 
-                                mock_user_manager_instance = MagicMock()
-                                mock_user_manager_instance.retrieve_by_fields = AsyncMock(return_value=mock_superuser)
-                                mock_user_manager.return_value = mock_user_manager_instance
+                                    mock_user_manager_instance = MagicMock()
+                                    mock_user_manager_instance.retrieve_by_fields = AsyncMock(
+                                        return_value=mock_superuser
+                                    )
+                                    mock_user_manager.return_value = mock_user_manager_instance
 
-                                # Configure PermissionService mock
-                                mock_permission_instance = MagicMock()
-                                mock_permission_instance.create_resource_permission_by_user = AsyncMock(
-                                    return_value=None
-                                )
-                                mock_permission.return_value = mock_permission_instance
+                                    # Configure PermissionService mock
+                                    mock_permission_instance = MagicMock()
+                                    mock_permission_instance.create_resource_permission_by_user = AsyncMock(
+                                        return_value=None
+                                    )
+                                    mock_permission.return_value = mock_permission_instance
 
-                                # Configure add_users_to_project mock
-                                mock_add_users.return_value = mock_project
+                                    # Configure add_users_to_project mock
+                                    mock_add_users.return_value = mock_project
 
-                                # Act
-                                result = await service.create_project(project_data, mock_superuser.id)
+                                    # Act
+                                    result = await service.create_project(project_data, mock_superuser.id)
 
-                                # Assert
-                                assert result.id == mock_project.id
+                                    # Assert
+                                    assert result.id == mock_project.id
 
 
 class TestProjectCreationErrorHandling:
@@ -672,14 +674,14 @@ class TestProjectCreationIntegration:
                                 # Act
                                 result = await service.create_project(project_data, mock_user.id)
 
-                            # Assert
-                            assert result.id == mock_project.id
-                            assert result.name == project_data["name"]
-                            assert result.description == project_data["description"]
+                                # Assert
+                                assert result.id == mock_project.id
+                                assert result.name == project_data["name"]
+                                assert result.description == project_data["description"]
 
-                            # Verify all services were called
-                            mock_retrieve.assert_called_once()
-                            mock_insert.assert_called_once()
+                                # Verify all services were called
+                                mock_retrieve.assert_called_once()
+                                mock_insert.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_concurrent_project_creation_handling(self, mock_session, mock_user, mock_project):
@@ -847,11 +849,11 @@ class TestPerformanceAndScalability:
                                     mock_retrieve.return_value = None
                                     mock_insert.return_value = mock_project
 
-                                mock_user_manager_instance = MagicMock()
-                                mock_user_manager_instance.retrieve_by_fields = AsyncMock(return_value=mock_user)
-                                mock_user_manager.return_value = mock_user_manager_instance
+                                    mock_user_manager_instance = MagicMock()
+                                    mock_user_manager_instance.retrieve_by_fields = AsyncMock(return_value=mock_user)
+                                    mock_user_manager.return_value = mock_user_manager_instance
 
-                                # Configure PermissionService mock
+                                    # Configure PermissionService mock
                                 mock_permission_instance = MagicMock()
                                 mock_permission_instance.create_resource_permission_by_user = AsyncMock(
                                     return_value=None
