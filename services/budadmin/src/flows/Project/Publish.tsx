@@ -471,7 +471,7 @@ export default function Publish() {
                     disabled={disableNext || publishLoading}
                     loading={publishLoading}
                   >
-                    Publish
+                    Save
                   </PrimaryButton>
               </div>
             </Form>

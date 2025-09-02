@@ -469,7 +469,8 @@ getAdapters: async (params: GetAdapterParams, projectId?) => {
       };
 
       const response: any = await AppRequest.Put(url, payload);
-      successToast(response.message || "Endpoint published successfully");
+      console.log('Publish response:', response);
+      successToast(response.data.message || "Endpoint published successfully");
       return response.data;
     } catch (error) {
       console.error("Error publishing endpoint:", error);
