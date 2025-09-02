@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 
 from asynch.pool import Pool
 
-from budeval.commons.config import secrets_settings
+from budeval.commons.config import app_settings
 from budeval.commons.logging import logging
 
 from .base import StorageAdapter
@@ -32,7 +32,7 @@ class ClickHouseStorage(StorageAdapter):
     def __init__(self):
         """Initialize ClickHouse storage adapter."""
         self._pool: Optional[Pool] = None
-        self._config = secrets_settings
+        self._config = app_settings
 
     async def initialize(self) -> None:
         """Initialize connection pool and run migrations if needed."""

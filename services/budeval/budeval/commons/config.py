@@ -55,19 +55,7 @@ class AppConfig(BaseAppConfig):
     eval_sync_use_bundles: bool = Field(default=False, alias="EVAL_SYNC_USE_BUNDLES")
     eval_datasets_path: str = Field(default="bud-dev-budeval-dataset-rwx", alias="EVAL_DATASETS_PATH")
 
-
-class SecretsConfig(BaseSecretsConfig):
-    name: str = __version__.split("@")[0]
-    version: str = __version__.split("@")[-1]
-
-    # PostgreSQL Configuration
-    psql_user: str = Field(default="keycloak", alias="PSQL_USER")
-    psql_password: str = Field(default="keycloak_password", alias="PSQL_PASSWORD")
-    psql_db_name: str = Field(default="db22", alias="PSQL_DB_NAME")
-    psql_port: int = Field(default=5432, alias="PSQL_PORT")
-    psql_host: str = Field(default="100.84.162.116", alias="PSQL_HOST")
-
-    # ClickHouse Configuration
+    # ClickHouse Configuration (moved from SecretsConfig)
     clickhouse_host: str = Field(default="okb80nfy88.ap-southeast-1.aws.clickhouse.cloud", alias="CLICKHOUSE_HOST")
     clickhouse_port: int = Field(default=9000, alias="CLICKHOUSE_PORT")
     clickhouse_database: str = Field(default="budeval", alias="CLICKHOUSE_DATABASE")
@@ -84,6 +72,20 @@ class SecretsConfig(BaseSecretsConfig):
 
     # Storage Backend Selection
     storage_backend: str = Field(default="clickhouse", alias="STORAGE_BACKEND")
+
+
+class SecretsConfig(BaseSecretsConfig):
+    name: str = __version__.split("@")[0]
+    version: str = __version__.split("@")[-1]
+
+    # PostgreSQL Configuration
+    psql_user: str = Field(alias="PSQL_USER")
+    psql_password: str = Field(alias="PSQL_PASSWORD")
+    psql_db_name: str = Field(alias="PSQL_DB_NAME")
+    psql_port: int = Field(default=5432, alias="PSQL_PORT")
+    psql_host: str = Field(alias="PSQL_HOST")
+
+    # (ClickHouse settings moved to AppConfig)
 
 
 app_settings = AppConfig()  # type: ignore[reportCallIssue]
