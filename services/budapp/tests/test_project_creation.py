@@ -647,48 +647,53 @@ class TestProjectCreationIntegration:
             "tags": [{"name": "integration", "color": "#0000FF"}],
         }
 
-        with patch.object(ProjectDataManager, "retrieve_by_fields", new_callable=AsyncMock) as mock_retrieve:
-            with patch.object(ProjectDataManager, "insert_one", new_callable=AsyncMock) as mock_insert:
-                with patch("budapp.project_ops.services.UserDataManager") as mock_user_manager:
-                    with patch("budapp.project_ops.services.KeycloakManager") as mock_keycloak:
-                        with patch("budapp.project_ops.services.PermissionService") as mock_permission:
-                            with patch.object(
-                                service, "add_users_to_project", new_callable=AsyncMock
-                            ) as mock_add_users:
-                                # Configure all mocks for successful flow
-                                mock_retrieve.return_value = None
-                                mock_project.name = project_data["name"]
-                                mock_project.description = project_data["description"]
-                                mock_insert.return_value = mock_project
+        with patch.object(
+            ProjectDataManager, "check_duplicate_name_for_user_projects", new_callable=AsyncMock, return_value=False
+        ) as mock_check_dup:
+            with patch.object(ProjectDataManager, "retrieve_by_fields", new_callable=AsyncMock) as mock_retrieve:
+                with patch.object(ProjectDataManager, "insert_one", new_callable=AsyncMock) as mock_insert:
+                    with patch("budapp.project_ops.services.UserDataManager") as mock_user_manager:
+                        with patch("budapp.project_ops.services.KeycloakManager") as mock_keycloak:
+                            with patch("budapp.project_ops.services.PermissionService") as mock_permission:
+                                with patch.object(
+                                    service, "add_users_to_project", new_callable=AsyncMock
+                                ) as mock_add_users:
+                                    # Configure all mocks for successful flow
+                                    mock_retrieve.return_value = None
+                                    mock_project.name = project_data["name"]
+                                    mock_project.description = project_data["description"]
+                                    mock_insert.return_value = mock_project
 
-                                mock_user_manager_instance = MagicMock()
-                                mock_user_manager_instance.retrieve_by_fields = AsyncMock(return_value=mock_user)
-                                mock_user_manager.return_value = mock_user_manager_instance
+                                    mock_user_manager_instance = MagicMock()
+                                    mock_user_manager_instance.retrieve_by_fields = AsyncMock(return_value=mock_user)
+                                    mock_user_manager.return_value = mock_user_manager_instance
 
-                                mock_keycloak_instance = MagicMock()
-                                mock_keycloak_instance.assign_user_roles = AsyncMock()
-                                mock_keycloak.return_value = mock_keycloak_instance
+                                    mock_keycloak_instance = MagicMock()
+                                    mock_keycloak_instance.assign_user_roles = AsyncMock()
+                                    mock_keycloak.return_value = mock_keycloak_instance
 
-                                mock_permission_instance = MagicMock()
-                                mock_permission_instance.create_resource_permission_by_user = AsyncMock(
-                                    return_value=None
-                                )
-                                mock_permission.return_value = mock_permission_instance
+                                    mock_permission_instance = MagicMock()
+                                    mock_permission_instance.create_resource_permission_by_user = AsyncMock(
+                                        return_value=None
+                                    )
+                                    mock_permission.return_value = mock_permission_instance
 
-                                # Configure add_users_to_project mock
-                                mock_add_users.return_value = mock_project
+                                    # Configure add_users_to_project mock
+                                    mock_add_users.return_value = mock_project
 
-                                # Act
-                                result = await service.create_project(project_data, mock_user.id)
+                                    # Act
+                                    result = await service.create_project(project_data, mock_user.id)
 
-                                # Assert
-                                assert result.id == mock_project.id
-                                assert result.name == project_data["name"]
-                                assert result.description == project_data["description"]
+                                    # Assert
+                                    assert result.id == mock_project.id
+                                    assert result.name == project_data["name"]
+                                    assert result.description == project_data["description"]
 
-                                # Verify all services were called
-                                mock_retrieve.assert_called_once()
-                                mock_insert.assert_called_once()
+                                    # Verify duplicate check was called for CLIENT_APP
+                                    mock_check_dup.assert_called_once_with(
+                                        "Integration Test Project", mock_user.id, ProjectTypeEnum.CLIENT_APP.value
+                                    )
+                                    mock_insert.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_concurrent_project_creation_handling(self, mock_session, mock_user, mock_project):
@@ -976,40 +981,43 @@ class TestSecurityConsiderations:
         service = ProjectService(mock_session)
         project_data = {"name": "Isolated Project"}
 
-        with patch.object(ProjectDataManager, "retrieve_by_fields", new_callable=AsyncMock) as mock_retrieve:
-            with patch.object(ProjectDataManager, "insert_one", new_callable=AsyncMock) as mock_insert:
-                with patch("budapp.project_ops.services.UserDataManager") as mock_user_manager:
-                    with patch("budapp.project_ops.services.KeycloakManager") as mock_keycloak:
-                        with patch("budapp.project_ops.services.PermissionService") as mock_permission:
-                            with patch.object(
-                                service, "add_users_to_project", new_callable=AsyncMock
-                            ) as mock_add_users:
-                                # Configure mocks
-                                mock_retrieve.return_value = None
+        with patch.object(
+            ProjectDataManager, "check_duplicate_name_for_user_projects", new_callable=AsyncMock, return_value=False
+        ) as mock_check_dup:
+            with patch.object(ProjectDataManager, "retrieve_by_fields", new_callable=AsyncMock) as mock_retrieve:
+                with patch.object(ProjectDataManager, "insert_one", new_callable=AsyncMock) as mock_insert:
+                    with patch("budapp.project_ops.services.UserDataManager") as mock_user_manager:
+                        with patch("budapp.project_ops.services.KeycloakManager") as mock_keycloak:
+                            with patch("budapp.project_ops.services.PermissionService") as mock_permission:
+                                with patch.object(
+                                    service, "add_users_to_project", new_callable=AsyncMock
+                                ) as mock_add_users:
+                                    # Configure mocks
+                                    mock_retrieve.return_value = None
 
-                                def create_project_with_user_id(project_model):
-                                    # Verify that created_by matches the current user
-                                    assert project_model.created_by == user1.id
-                                    return project_model
+                                    def create_project_with_user_id(project_model):
+                                        # Verify that created_by matches the current user
+                                        assert project_model.created_by == user1.id
+                                        return project_model
 
-                                mock_insert.side_effect = create_project_with_user_id
+                                    mock_insert.side_effect = create_project_with_user_id
 
-                                mock_user_manager_instance = MagicMock()
-                                mock_user_manager_instance.retrieve_by_fields = AsyncMock(return_value=user1)
-                                mock_user_manager.return_value = mock_user_manager_instance
+                                    mock_user_manager_instance = MagicMock()
+                                    mock_user_manager_instance.retrieve_by_fields = AsyncMock(return_value=user1)
+                                    mock_user_manager.return_value = mock_user_manager_instance
 
-                                # Configure PermissionService mock
-                                mock_permission_instance = MagicMock()
-                                mock_permission_instance.create_resource_permission_by_user = AsyncMock(
-                                    return_value=None
-                                )
-                                mock_permission.return_value = mock_permission_instance
+                                    # Configure PermissionService mock
+                                    mock_permission_instance = MagicMock()
+                                    mock_permission_instance.create_resource_permission_by_user = AsyncMock(
+                                        return_value=None
+                                    )
+                                    mock_permission.return_value = mock_permission_instance
 
-                                # Configure add_users_to_project mock
-                                mock_add_users.return_value = Mock(id=uuid4())
+                                    # Configure add_users_to_project mock
+                                    mock_add_users.return_value = Mock(id=uuid4())
 
-                                # Act
-                                await service.create_project(project_data, user1.id)
+                                    # Act
+                                    await service.create_project(project_data, user1.id)
 
-                                # Assert - The assertion is in the side_effect function
-                                mock_insert.assert_called_once()
+                                    # Assert - The assertion is in the side_effect function
+                                    mock_insert.assert_called_once()
