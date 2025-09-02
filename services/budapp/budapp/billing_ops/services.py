@@ -161,7 +161,7 @@ class BillingService(DataManagerUtils):
             return {
                 "has_billing": True,  # We're treating free plan as having billing
                 "billing_period_start": None,  # Return None for Free plan users
-                "billing_period_end": None,    # Return None for Free plan users
+                "billing_period_end": None,  # Return None for Free plan users
                 "plan_name": free_plan.get("name", "Free"),
                 "base_monthly_price": float(free_plan.get("base_monthly_price", 0)),
                 "usage": {
