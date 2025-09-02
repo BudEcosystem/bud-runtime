@@ -134,7 +134,7 @@ class TestProjectCreationHappyPath:
         service = ProjectService(mock_session)
 
         with patch.object(
-            ProjectDataManager, "check_duplicate_name_for_user_projects", new_callable=AsyncMock
+            ProjectDataManager, "check_duplicate_name_for_user_projects", new_callable=AsyncMock, return_value=False
         ) as mock_check_dup:
             with patch.object(ProjectDataManager, "retrieve_by_fields", new_callable=AsyncMock) as mock_retrieve:
                 with patch.object(ProjectDataManager, "insert_one", new_callable=AsyncMock) as mock_insert:
@@ -145,7 +145,6 @@ class TestProjectCreationHappyPath:
                                     service, "add_users_to_project", new_callable=AsyncMock
                                 ) as mock_add_users:
                                     # Configure mocks
-                                    mock_check_dup.return_value = False  # No duplicate for user
                                     mock_retrieve.return_value = None  # No existing project
                                     mock_project.name = minimal_project_data["name"]
                                     mock_project.project_type = ProjectTypeEnum.CLIENT_APP.value
@@ -181,7 +180,7 @@ class TestProjectCreationHappyPath:
         service = ProjectService(mock_session)
 
         with patch.object(
-            ProjectDataManager, "check_duplicate_name_for_user_projects", new_callable=AsyncMock
+            ProjectDataManager, "check_duplicate_name_for_user_projects", new_callable=AsyncMock, return_value=False
         ) as mock_check_dup:
             with patch.object(ProjectDataManager, "retrieve_by_fields", new_callable=AsyncMock) as mock_retrieve:
                 with patch.object(ProjectDataManager, "insert_one", new_callable=AsyncMock) as mock_insert:
@@ -192,7 +191,6 @@ class TestProjectCreationHappyPath:
                                     service, "add_users_to_project", new_callable=AsyncMock
                                 ) as mock_add_users:
                                     # Configure mocks
-                                    mock_check_dup.return_value = False  # No duplicate for user
                                     mock_retrieve.return_value = None  # No existing project
                                     mock_project.name = valid_project_data["name"]
                                     mock_project.description = valid_project_data["description"]
@@ -279,7 +277,7 @@ class TestProjectCreationHappyPath:
         }
 
         with patch.object(
-            ProjectDataManager, "check_duplicate_name_for_user_projects", new_callable=AsyncMock
+            ProjectDataManager, "check_duplicate_name_for_user_projects", new_callable=AsyncMock, return_value=False
         ) as mock_check_dup:
             with patch.object(ProjectDataManager, "retrieve_by_fields", new_callable=AsyncMock) as mock_retrieve:
                 with patch.object(ProjectDataManager, "insert_one", new_callable=AsyncMock) as mock_insert:
@@ -290,7 +288,6 @@ class TestProjectCreationHappyPath:
                                     service, "add_users_to_project", new_callable=AsyncMock
                                 ) as mock_add_users:
                                     # Configure mocks
-                                    mock_check_dup.return_value = False  # No duplicate for user
                                     mock_retrieve.return_value = None
                                     mock_project.benchmark = True
                                     mock_insert.return_value = mock_project
@@ -345,13 +342,10 @@ class TestProjectCreationValidation:
 
         with (
             patch.object(
-                ProjectDataManager, "check_duplicate_name_for_user_projects", new_callable=AsyncMock
+                ProjectDataManager, "check_duplicate_name_for_user_projects", new_callable=AsyncMock, return_value=True
             ) as mock_check_user,
             patch.object(ProjectDataManager, "retrieve_by_fields", new_callable=AsyncMock) as mock_retrieve,
         ):
-            # User already has a project with this name
-            mock_check_user.return_value = True
-
             # Act & Assert
             with pytest.raises(ClientException) as exc_info:
                 await service.create_project(project_data, mock_user.id)
@@ -371,13 +365,15 @@ class TestProjectCreationValidation:
 
         with (
             patch.object(
-                ProjectDataManager, "check_duplicate_name_for_user_projects", new_callable=AsyncMock
+                ProjectDataManager,
+                "check_duplicate_name_for_user_projects",
+                new_callable=AsyncMock,
+                return_value=False,
             ) as mock_check_user,
-            patch.object(ProjectDataManager, "retrieve_by_fields", new_callable=AsyncMock) as mock_retrieve,
+            patch.object(
+                ProjectDataManager, "retrieve_by_fields", new_callable=AsyncMock, return_value=Mock()
+            ) as mock_retrieve,
         ):
-            # Global check finds a duplicate
-            mock_retrieve.return_value = Mock()  # Project exists globally
-
             # Act & Assert
             with pytest.raises(ClientException) as exc_info:
                 await service.create_project(project_data, mock_superuser.id)
@@ -481,7 +477,7 @@ class TestProjectCreationAuthorization:
         project_data = {"name": "Superuser Project"}
 
         with patch.object(
-            ProjectDataManager, "check_duplicate_name_for_user_projects", new_callable=AsyncMock
+            ProjectDataManager, "check_duplicate_name_for_user_projects", new_callable=AsyncMock, return_value=False
         ) as mock_check_dup:
             with patch.object(ProjectDataManager, "retrieve_by_fields", new_callable=AsyncMock) as mock_retrieve:
                 with patch.object(ProjectDataManager, "insert_one", new_callable=AsyncMock) as mock_insert:
@@ -492,7 +488,6 @@ class TestProjectCreationAuthorization:
                                     service, "add_users_to_project", new_callable=AsyncMock
                                 ) as mock_add_users:
                                     # Configure mocks
-                                    mock_check_dup.return_value = False  # No duplicate for user
                                     mock_retrieve.return_value = None
                                     mock_insert.return_value = mock_project
 
@@ -691,7 +686,7 @@ class TestProjectCreationIntegration:
         project_data = {"name": "Concurrent Project"}
 
         with patch.object(
-            ProjectDataManager, "check_duplicate_name_for_user_projects", new_callable=AsyncMock
+            ProjectDataManager, "check_duplicate_name_for_user_projects", new_callable=AsyncMock, return_value=False
         ) as mock_check_dup:
             with patch.object(ProjectDataManager, "retrieve_by_fields", new_callable=AsyncMock) as mock_retrieve:
                 with patch.object(ProjectDataManager, "insert_one", new_callable=AsyncMock) as mock_insert:
@@ -834,7 +829,7 @@ class TestPerformanceAndScalability:
         project_data = {"name": "Performance Test Project"}
 
         with patch.object(
-            ProjectDataManager, "check_duplicate_name_for_user_projects", new_callable=AsyncMock
+            ProjectDataManager, "check_duplicate_name_for_user_projects", new_callable=AsyncMock, return_value=False
         ) as mock_check_dup:
             with patch.object(ProjectDataManager, "retrieve_by_fields", new_callable=AsyncMock) as mock_retrieve:
                 with patch.object(ProjectDataManager, "insert_one", new_callable=AsyncMock) as mock_insert:
@@ -845,7 +840,6 @@ class TestPerformanceAndScalability:
                                     service, "add_users_to_project", new_callable=AsyncMock
                                 ) as mock_add_users:
                                     # Configure mocks
-                                    mock_check_dup.return_value = False  # No duplicate for user
                                     mock_retrieve.return_value = None
                                     mock_insert.return_value = mock_project
 
