@@ -10,7 +10,7 @@ different from the one that created the pool.
 import threading
 from typing import TYPE_CHECKING, Optional
 
-from budeval.commons.config import secrets_settings
+from budeval.commons.config import app_settings
 from budeval.commons.logging import logging
 
 from .base import StorageAdapter
@@ -45,7 +45,7 @@ def get_storage_adapter(backend: Optional[str] = None) -> StorageAdapter:
     global _clickhouse_storage_by_thread
 
     # Use provided backend or fall back to configuration
-    storage_backend = backend or secrets_settings.storage_backend
+    storage_backend = backend or app_settings.storage_backend
 
     logger.info(f"Creating storage adapter for backend: {storage_backend}")
 
@@ -105,7 +105,7 @@ def get_storage_info() -> dict:
     Returns:
         Dictionary with storage configuration details
     """
-    backend = secrets_settings.storage_backend
+    backend = app_settings.storage_backend
 
     info = {"backend": backend, "available_backends": ["filesystem", "clickhouse"]}
 
@@ -116,12 +116,12 @@ def get_storage_info() -> dict:
     elif backend == "clickhouse":
         info.update(
             {
-                "host": secrets_settings.clickhouse_host,
-                "port": secrets_settings.clickhouse_port,
-                "database": secrets_settings.clickhouse_database,
-                "user": secrets_settings.clickhouse_user,
-                "batch_size": secrets_settings.clickhouse_batch_size,
-                "async_insert": secrets_settings.clickhouse_async_insert,
+                "host": app_settings.clickhouse_host,
+                "port": app_settings.clickhouse_port,
+                "database": app_settings.clickhouse_database,
+                "user": app_settings.clickhouse_user,
+                "batch_size": app_settings.clickhouse_batch_size,
+                "async_insert": app_settings.clickhouse_async_insert,
                 "description": "ClickHouse database storage with optimized schema",
             }
         )
