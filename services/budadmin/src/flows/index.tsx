@@ -62,6 +62,7 @@ import EditUser from "./user/EditUser";
 import ResetPassword from "./user/ResetPassword";
 import AddUser from "./user/AddUser";
 import AddUserDetails from "./user/AddUserDetails";
+import UserUsageDrawer from "./user/UserUsageDrawer";
 import AddBenchmark from "./Benchmark/AddBenchmark";
 import Datasets from "./Benchmark/Datasets";
 import Configuration from "./Benchmark/Configuration";
@@ -212,6 +213,7 @@ export const StepComponents = {
   "reset-password": ResetPassword,
   "add-user": AddUser,
   "add-user-details": AddUserDetails,
+  "user-usage": UserUsageDrawer,
   "model_benchmark": AddBenchmark,
   "Datasets": Datasets,
   "Configuration": Configuration,

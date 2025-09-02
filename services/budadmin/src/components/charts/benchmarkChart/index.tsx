@@ -1,6 +1,6 @@
-import React, { useEffect, useRef } from 'react';
-import * as echarts from 'echarts';
-import { Box } from '@radix-ui/themes';
+import React, { useEffect, useRef } from "react";
+import * as echarts from "echarts";
+import { Box } from "@radix-ui/themes";
 
 interface BenchmarkChartProps {
   data: {
@@ -13,7 +13,7 @@ const BenchmarkChart: React.FC<BenchmarkChartProps> = ({ data }) => {
   const chartRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    console.log('BenchmarkChart data', data);
+    console.log("BenchmarkChart data", data);
     if (chartRef.current) {
       const containerWidth = chartRef.current.clientWidth;
       const containerHeight = chartRef.current.clientHeight;
@@ -24,29 +24,29 @@ const BenchmarkChart: React.FC<BenchmarkChartProps> = ({ data }) => {
       }
 
       const myChart = echarts.init(chartRef.current, null, {
-        renderer: 'canvas',
+        renderer: "canvas",
         useDirtyRect: false,
       });
 
       const formatLegendText = (text: string) => {
         return text
-          .replace(/[^a-zA-Z0-9]/g, ' ')
-          .replace(/\b\w/g, char => char.toUpperCase());
+          .replace(/[^a-zA-Z0-9]/g, " ")
+          .replace(/\b\w/g, (char) => char.toUpperCase());
       };
 
       const option = {
-        backgroundColor: 'transparent',
+        backgroundColor: "transparent",
         legend: {
           show: true,
-          orient: 'horizontal',
-          left: '0%',
-          top: '0',
+          orient: "horizontal",
+          left: "0%",
+          top: "0",
           textStyle: {
-            color: '#ffffff',
+            color: "#ffffff",
             fontSize: 13,
             fontWeight: 400,
           },
-          icon: 'square',
+          icon: "square",
           itemWidth: 11,
           itemHeight: 11,
           itemStyle: {
@@ -55,17 +55,17 @@ const BenchmarkChart: React.FC<BenchmarkChartProps> = ({ data }) => {
           formatter: formatLegendText,
         },
         grid: {
-          right: '1%',
-          left: '6%',
-          top: '32%',
-          bottom: '9.5%',
+          right: "1%",
+          left: "6%",
+          top: "32%",
+          bottom: "9.5%",
         },
         tooltip: {
-          trigger: 'axis',
-          backgroundColor: 'rgba(44, 44, 44, .6)',
+          trigger: "axis",
+          backgroundColor: "rgba(44, 44, 44, .6)",
           borderWidth: 0,
           textStyle: {
-            color: '#ffffff',
+            color: "#ffffff",
             fontSize: 12,
           },
           padding: 0,
@@ -77,18 +77,18 @@ const BenchmarkChart: React.FC<BenchmarkChartProps> = ({ data }) => {
                    <span style="display:inline-block;width:10px;height:10px;background-color:${item.color};margin-right:15px;border-radius:2px;font-size:13px;"></span>
                    <span style="margin-right: 15px;display:inline-block;min-width:50px;">${item.value[item.seriesName]}%</span>
                    ${item.seriesName}
-                 </div>`
+                 </div>`,
             );
             return `<div style="text-align:left; padding: 20px;position:relative;overflow:hidden;">
                       <img style="position:absolute;bottom:0;right:0;z-index:0;" src="/images/tooltip-pattern.svg"></img>
                       <div style="font-weight:bold;margin-bottom:10px;font-size:15px;font-weight:600;padding:0 10px;">
                       <img style="display:inline-block;height:20px;width:20px;margin-right:5px;" src="/images/drawer/cloud.png"></img>
                       ${params[0].axisValue}</div>
-                      <div style="background-color: #161616;padding: 10px;border-radius:6px;position:relative;z-index:1;">${seriesData.join('')}</div>
+                      <div style="background-color: #161616;padding: 10px;border-radius:6px;position:relative;z-index:1;">${seriesData.join("")}</div>
                     </div>`;
           },
           axisPointer: {
-            type: 'none', // Disable axis pointer highlight
+            type: "none", // Disable axis pointer highlight
           },
         },
         dataset: {
@@ -96,20 +96,22 @@ const BenchmarkChart: React.FC<BenchmarkChartProps> = ({ data }) => {
           source: data.source,
         },
         xAxis: {
-          type: 'category',
+          type: "category",
 
           axisLine: {
             lineStyle: {
-              color: '#2d2d2d',
+              color: "#2d2d2d",
             },
           },
           axisLabel: {
-            color: '#6A6E76',
+            color: "#6A6E76",
             fontSize: 13,
             fontWeight: 300,
             formatter: (value) => {
               const maxLength = 5;
-              return value.length > maxLength ? value.slice(0, maxLength) + '...' : value;
+              return value.length > maxLength
+                ? value.slice(0, maxLength) + "..."
+                : value;
             },
           },
           axisTick: {
@@ -119,55 +121,55 @@ const BenchmarkChart: React.FC<BenchmarkChartProps> = ({ data }) => {
         yAxis: {
           splitLine: {
             lineStyle: {
-              type: 'solid',
-              color: '#171717',
+              type: "solid",
+              color: "#171717",
             },
           },
           axisLine: {
             lineStyle: {
-              color: '#2d2d2d',
+              color: "#2d2d2d",
             },
           },
           axisLabel: {
-            color: '#6A6E76',
+            color: "#6A6E76",
             fontSize: 12,
             fontWeight: 300,
           },
         },
         series: [
           {
-            type: 'bar',
+            type: "bar",
             barWidth: 8,
-            barGap: '0%',
+            barGap: "0%",
             itemStyle: {
-              color: '#FF895E',
+              color: "#FF895E",
               borderRadius: [5, 5, 0, 0],
             },
           },
           {
-            type: 'bar',
+            type: "bar",
             barWidth: 8,
-            barGap: '0%',
+            barGap: "0%",
             itemStyle: {
-              color: '#479D5F',
+              color: "#479D5F",
               borderRadius: [5, 5, 0, 0],
             },
           },
           {
-            type: 'bar',
+            type: "bar",
             barWidth: 8,
-            barGap: '0%',
+            barGap: "0%",
             itemStyle: {
-              color: '#4077E6',
+              color: "#4077E6",
               borderRadius: [5, 5, 0, 0],
             },
           },
           {
-            type: 'bar',
+            type: "bar",
             barWidth: 8,
-            barGap: '0%',
+            barGap: "0%",
             itemStyle: {
-              color: '#D1B854',
+              color: "#D1B854",
               borderRadius: [5, 5, 0, 0],
             },
           },
@@ -180,18 +182,18 @@ const BenchmarkChart: React.FC<BenchmarkChartProps> = ({ data }) => {
         myChart.resize();
       };
 
-      window.addEventListener('resize', handleResize);
+      window.addEventListener("resize", handleResize);
 
       return () => {
-        window.removeEventListener('resize', handleResize);
+        window.removeEventListener("resize", handleResize);
         myChart.dispose();
       };
     }
   }, [data]);
 
   return (
-    <Box className='relative h-full'>
-      <div ref={chartRef} style={{ width: '100%', height: '100%' }} />
+    <Box className="relative h-full">
+      <div ref={chartRef} style={{ width: "100%", height: "100%" }} />
     </Box>
   );
 };

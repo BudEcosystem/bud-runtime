@@ -23,14 +23,14 @@ const ContactAdmin = ({ onSubmit }: ContactAdminKeyProps) => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const [isValid, setIsValid] = useState(true);
   const [formData, setFormData] = useState<{ [key: string]: string }>({});
-  const [isTouched, setIsTouched] = useState(false);  // Add state for tracking touch
+  const [isTouched, setIsTouched] = useState(false); // Add state for tracking touch
   const { setActivePage } = useAuthNavigation();
   const [showWarning, setShowWarning] = useState(false);
 
   const handleChange = (name: string, value: string) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
     if (name === "email") {
-      setShowWarning(false)
+      setShowWarning(false);
       setIsValid(emailRegex.test(value));
     }
   };
@@ -77,8 +77,9 @@ const ContactAdmin = ({ onSubmit }: ContactAdminKeyProps) => {
             <Form.Control asChild>
               <input
                 placeholder="Enter email"
-                className={`${formData["email"] ? "border-[#CFCFCF]" : "border-[#757575]"
-                  } h-10 w-full placeholder:text-xs text-xs text-[#EEEEEE] hover:bg-white hover:bg-opacity-[3%] placeholder:text-[#808080] font-light outline-none bg-transparent border rounded-[5px] py-2 px-2.5`}
+                className={`${
+                  formData["email"] ? "border-[#CFCFCF]" : "border-[#757575]"
+                } h-10 w-full placeholder:text-xs text-xs text-[#EEEEEE] hover:bg-white hover:bg-opacity-[3%] placeholder:text-[#808080] font-light outline-none bg-transparent border rounded-[5px] py-2 px-2.5`}
                 type="email"
                 value={formData["email"]}
                 onChange={(e) => handleChange("email", e.target.value)}
@@ -143,10 +144,11 @@ const ContactAdmin = ({ onSubmit }: ContactAdminKeyProps) => {
             height={25}
             className="!w-[1.37rem] !h-[1.35rem]"
           />
-          <Text_12_300_EEEEEE className="ml-2 tracking-[.035em]"
-          onClick={() => {
-            setAuthError("");
-          }}
+          <Text_12_300_EEEEEE
+            className="ml-2 tracking-[.035em]"
+            onClick={() => {
+              setAuthError("");
+            }}
           >
             Back to Log In
           </Text_12_300_EEEEEE>
@@ -155,14 +157,18 @@ const ContactAdmin = ({ onSubmit }: ContactAdminKeyProps) => {
       {authError && (
         <motion.div
           initial={{ opacity: 0, y: -10 }} // Start slightly above and transparent
-          animate={{ opacity: 1, y: 0 }}   // Move down and appear
+          animate={{ opacity: 1, y: 0 }} // Move down and appear
           transition={{ duration: 0.5, ease: "easeIn" }} // Smooth transition
           className="border-[1px] border-[#EC7575] rounded-[6px] px-[.5rem] py-[1rem] flex justify-center items-center w-[76.6%] mt-[1.5rem]"
           style={{
             backgroundColor: getChromeColor("#EC7575"),
           }}
         >
-          <Text_12_400_EEEEEE className="text-[#EC7575]">{authError.includes('Cannot read properties') ? 'Something went wrong, please try again later.' : authError}</Text_12_400_EEEEEE>
+          <Text_12_400_EEEEEE className="text-[#EC7575]">
+            {authError.includes("Cannot read properties")
+              ? "Something went wrong, please try again later."
+              : authError}
+          </Text_12_400_EEEEEE>
         </motion.div>
       )}
     </>

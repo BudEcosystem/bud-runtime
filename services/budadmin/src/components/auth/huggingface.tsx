@@ -65,7 +65,13 @@ const HuggingfaceKeyPage = ({ onSubmit }: HuggingfaceKeyProps) => {
         <Text_32_400_FFFFFF className="tracking-[.02em] leading-[100%] text-center mr-[.2rem]">
           Add Huggingface key
         </Text_32_400_FFFFFF>
-        <Image alt="" src="/gifs/smiley.gif" width={40} height={40} style={{ width: "2.6rem", height: "auto" }} />
+        <Image
+          alt=""
+          src="/gifs/smiley.gif"
+          width={40}
+          height={40}
+          style={{ width: "2.6rem", height: "auto" }}
+        />
       </Flex>
       <Text_12_400_B3B3B3 className="text-center mt-[.8rem]">
         Please add your Huggingface key
@@ -137,7 +143,12 @@ const HuggingfaceKeyPage = ({ onSubmit }: HuggingfaceKeyProps) => {
             <Text_12_400_EEEEEE className="mr-2 cursor-pointer">
               Skip
             </Text_12_400_EEEEEE>
-            <Image src="/icons/right-circle.svg" width={15} height={15} alt="right-arrow-circle" />
+            <Image
+              src="/icons/right-circle.svg"
+              width={15}
+              height={15}
+              alt="right-arrow-circle"
+            />
           </Flex>
         </Form.Root>
       </Flex>

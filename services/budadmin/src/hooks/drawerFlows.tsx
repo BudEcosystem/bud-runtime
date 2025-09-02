@@ -2369,6 +2369,22 @@ const addUser: DrawerFlowType = {
     },
   ],
 };
+
+const userUsage: DrawerFlowType = {
+  title: "Usage Values",
+  description: "Description for usage values...",
+  totalSteps: 1,
+  steps: [
+    {
+      navigation: () => ["User Management", "Usage Values"],
+      id: "user-usage",
+      confirmClose: false,
+      step: 1,
+      component: StepComponents["user-usage"],
+      progress: [],
+    },
+  ],
+};
 const addBenchmark: DrawerFlowType = {
   title: "Add Benchmark",
   description: "Add Benchmark",
@@ -4126,6 +4142,7 @@ const flows = {
   "edit-user": editUser,
   "reset-password": resetPassword,
   "add-user": addUser,
+  "user-usage": userUsage,
   "model_benchmark": addBenchmark,
   "add-quantization": addQuantizationFlow,
   "add-new-cloud-provider": addNewCloudProvider,

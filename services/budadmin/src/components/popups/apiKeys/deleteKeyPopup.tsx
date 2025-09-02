@@ -1,11 +1,7 @@
 // components/DeleteDialog.tsx
-import React from 'react';
-import {
-  Button,
-  Dialog,
-  Flex,
-} from "@radix-ui/themes";
-import { Cross1Icon } from '@radix-ui/react-icons';
+import React from "react";
+import { Button, Dialog, Flex } from "@radix-ui/themes";
+import { Cross1Icon } from "@radix-ui/react-icons";
 
 interface DeleteDialogProps {
   isOpen: boolean;
@@ -14,23 +10,46 @@ interface DeleteDialogProps {
   itemName: string;
 }
 
-const DeleteDialog: React.FC<DeleteDialogProps> = ({ isOpen, onClose, onDelete, itemName }) => {
+const DeleteDialog: React.FC<DeleteDialogProps> = ({
+  isOpen,
+  onClose,
+  onDelete,
+  itemName,
+}) => {
   return (
     <Dialog.Root open={isOpen}>
-      <Dialog.Content maxWidth="370px" className="w-[29%] p-[1.125rem] bg-[#111113] border-0 shadow-none">
+      <Dialog.Content
+        maxWidth="370px"
+        className="w-[29%] p-[1.125rem] bg-[#111113] border-0 shadow-none"
+      >
         <Flex justify="between" align="center">
-          <Dialog.Title className="text-base block p-0 pt-1 m-0 font-semibold">Delete {itemName} API Key</Dialog.Title>
+          <Dialog.Title className="text-base block p-0 pt-1 m-0 font-semibold">
+            Delete {itemName} API Key
+          </Dialog.Title>
           <Dialog.Close onClick={onClose}>
-            <Button className="m-0 p-0 pt-[.1rem] bg-[transparent] h-[1.1rem]" size="1">
-              <Cross1Icon className='text-[#787B83]'/>
+            <Button
+              className="m-0 p-0 pt-[.1rem] bg-[transparent] h-[1.1rem]"
+              size="1"
+            >
+              <Cross1Icon className="text-[#787B83]" />
             </Button>
           </Dialog.Close>
         </Flex>
-        <Dialog.Description className="text-xs text-[#787B83] pt-2 font-normal" mb="4">
-        You’re about to delete a the {itemName} key. the deployed projects may incur some issues.
+        <Dialog.Description
+          className="text-xs text-[#787B83] pt-2 font-normal"
+          mb="4"
+        >
+          You’re about to delete a the {itemName} key. the deployed projects may
+          incur some issues.
         </Dialog.Description>
         <Flex gap="3" mt="4" justify="center">
-          <Button size="1" className="h-[1.75rem] w-full text-xs font-normal" onClick={onDelete}>Delete</Button>
+          <Button
+            size="1"
+            className="h-[1.75rem] w-full text-xs font-normal"
+            onClick={onDelete}
+          >
+            Delete
+          </Button>
         </Flex>
       </Dialog.Content>
     </Dialog.Root>

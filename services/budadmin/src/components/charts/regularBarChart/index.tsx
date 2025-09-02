@@ -1,6 +1,6 @@
-import React, { useEffect, useRef } from 'react';
-import * as echarts from 'echarts';
-import { Box, Text } from '@radix-ui/themes';
+import React, { useEffect, useRef } from "react";
+import * as echarts from "echarts";
+import { Box, Text } from "@radix-ui/themes";
 
 interface RegularBarChartProps {
   data: {
@@ -25,37 +25,39 @@ const RegularBarChart: React.FC<RegularBarChartProps> = ({ data }) => {
           return;
         }
         const myChart = echarts.init(chartRef.current, null, {
-          renderer: 'canvas',
+          renderer: "canvas",
           useDirtyRect: false,
         });
 
         const option = {
-          backgroundColor: 'transparent',
+          backgroundColor: "transparent",
           xAxis: {
-            type: 'category',
+            type: "category",
             data: data?.categories,
             axisTick: {
               show: false, // Remove the tick marks from the x-axis
             },
             axisLabel: {
-              color: '#6A6E76', // Set x-axis label color to white for better visibility
+              color: "#6A6E76", // Set x-axis label color to white for better visibility
               fontSize: 10,
               formatter: (value: string) => {
                 const maxLength = 5;
-                return value.length > maxLength ? value.slice(0, maxLength) + '...' : value;
+                return value.length > maxLength
+                  ? value.slice(0, maxLength) + "..."
+                  : value;
               },
             },
           },
           yAxis: {
             splitLine: {
               lineStyle: {
-                type: 'dashed',
-                color: '#212225', // Set y-axis split line color to grey
+                type: "dashed",
+                color: "#212225", // Set y-axis split line color to grey
               },
             },
             axisLine: {
               lineStyle: {
-                color: '#6A6E76', // Set y-axis line color to white for better visibility
+                color: "#6A6E76", // Set y-axis line color to white for better visibility
               },
             },
           },
@@ -65,23 +67,23 @@ const RegularBarChart: React.FC<RegularBarChartProps> = ({ data }) => {
                 value,
                 itemStyle: {
                   borderRadius: [5, 5, 0, 0], // Top-left and top-right corners rounded
-                  color: index % 2 === 0 ? '#3F8EF7' : '#D45453',
+                  color: index % 2 === 0 ? "#3F8EF7" : "#D45453",
                 },
               })),
-              type: 'bar',
+              type: "bar",
               barWidth: 22, // Set the width of the bars
-              barGap: '0%', // Set the space between bars to 0
+              barGap: "0%", // Set the space between bars to 0
             },
           ],
           tooltip: {
-            trigger: 'item',
-            backgroundColor: 'rgba(0,0,0,.75)',
-            borderColor: '#1F1F1F',
+            trigger: "item",
+            backgroundColor: "rgba(0,0,0,.75)",
+            borderColor: "#1F1F1F",
             borderWidth: 1,
             textStyle: {
-              color: '#EEEEEE',
+              color: "#EEEEEE",
               fontSize: 12,
-              fontWeight: 400
+              fontWeight: 400,
             },
             extraCssText: `backdrop-filter: blur(10px);border-radius:4px;`,
             formatter: (params) => {
@@ -100,21 +102,29 @@ const RegularBarChart: React.FC<RegularBarChartProps> = ({ data }) => {
           myChart.resize();
         };
 
-        window.addEventListener('resize', handleResize);
+        window.addEventListener("resize", handleResize);
 
         return () => {
-          window.removeEventListener('resize', handleResize);
+          window.removeEventListener("resize", handleResize);
           myChart.dispose();
         };
       }
-    }, 100)
+    }, 100);
   }, [data]);
 
   return (
-    <Box className='relative h-full'>
-      <Text className='block absolute -rotate-90 origin-top-left	 top-[50%] left-[.8rem] mt-[1.8rem] p-0 text-xs text-[#6A6E76] font-light h-[1rem] leading-[100%]'>{data?.label1}</Text>
-      <div ref={chartRef} style={{ width: '100%', height: '105%' }} className='pl-[.7rem] borderbox' />
-      <Text className='block absolute m-auto bottom-3 left-[50%] top-auto p-0 text-xs text-[#6A6E76] font-light h-[1rem] leading-[100%]'>{data?.label2}</Text>
+    <Box className="relative h-full">
+      <Text className="block absolute -rotate-90 origin-top-left	 top-[50%] left-[.8rem] mt-[1.8rem] p-0 text-xs text-[#6A6E76] font-light h-[1rem] leading-[100%]">
+        {data?.label1}
+      </Text>
+      <div
+        ref={chartRef}
+        style={{ width: "100%", height: "105%" }}
+        className="pl-[.7rem] borderbox"
+      />
+      <Text className="block absolute m-auto bottom-3 left-[50%] top-auto p-0 text-xs text-[#6A6E76] font-light h-[1rem] leading-[100%]">
+        {data?.label2}
+      </Text>
     </Box>
   );
 };

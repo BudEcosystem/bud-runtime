@@ -1,8 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { Card, Select, Button, Row, Col, Form, ConfigProvider } from 'antd';
-import { FilterOutlined, ClearOutlined } from '@ant-design/icons';
-import { BlockingRuleType, BlockingRuleStatus } from '@/stores/useBlockingRules';
-import { RULE_TYPE_VALUES, RULE_TYPE_LABELS } from '@/constants/blockingRules';
+import React, { useState, useEffect } from "react";
+import { Card, Select, Button, Row, Col, Form, ConfigProvider } from "antd";
+import { FilterOutlined, ClearOutlined } from "@ant-design/icons";
+import {
+  BlockingRuleType,
+  BlockingRuleStatus,
+} from "@/stores/useBlockingRules";
+import { RULE_TYPE_VALUES, RULE_TYPE_LABELS } from "@/constants/blockingRules";
 
 const { Option } = Select;
 
@@ -11,7 +14,7 @@ interface BlockingRulesFiltersProps {
 }
 
 const BlockingRulesFilters: React.FC<BlockingRulesFiltersProps> = ({
-  onFiltersChange
+  onFiltersChange,
 }) => {
   const [form] = Form.useForm();
   const [filters, setFiltersState] = useState<any>({});
@@ -21,13 +24,17 @@ const BlockingRulesFilters: React.FC<BlockingRulesFiltersProps> = ({
 
     // Handle filters
     const filterMap: Record<string, string> = {
-      ruleType: 'rule_type',
-      status: 'status',
+      ruleType: "rule_type",
+      status: "status",
     };
 
     Object.keys(changedValues).forEach((key) => {
       if (filterMap[key]) {
-        if (changedValues[key] === undefined || changedValues[key] === null || changedValues[key] === '') {
+        if (
+          changedValues[key] === undefined ||
+          changedValues[key] === null ||
+          changedValues[key] === ""
+        ) {
           delete newFilters[filterMap[key]];
         } else {
           newFilters[filterMap[key]] = changedValues[key];
@@ -49,35 +56,35 @@ const BlockingRulesFilters: React.FC<BlockingRulesFiltersProps> = ({
     <ConfigProvider
       theme={{
         token: {
-          colorPrimary: '#965CDE',
-          colorPrimaryHover: '#a873e5',
-          colorPrimaryActive: '#8348c7',
+          colorPrimary: "#965CDE",
+          colorPrimaryHover: "#a873e5",
+          colorPrimaryActive: "#8348c7",
         },
         components: {
           Card: {
-            colorBgContainer: '#101010',
-            colorBorder: '#1F1F1F',
-            colorText: '#EEEEEE',
-            colorTextHeading: '#EEEEEE',
+            colorBgContainer: "#101010",
+            colorBorder: "#1F1F1F",
+            colorText: "#EEEEEE",
+            colorTextHeading: "#EEEEEE",
           },
           Select: {
-            colorBgContainer: '#1A1A1A',
-            colorBorder: '#1F1F1F',
-            colorText: '#EEEEEE',
-            colorTextPlaceholder: '#666666',
-            colorBgElevated: '#1A1A1A',
-            controlItemBgHover: '#2F2F2F',
-            optionSelectedBg: '#2A1F3D',
+            colorBgContainer: "#1A1A1A",
+            colorBorder: "#1F1F1F",
+            colorText: "#EEEEEE",
+            colorTextPlaceholder: "#666666",
+            colorBgElevated: "#1A1A1A",
+            controlItemBgHover: "#2F2F2F",
+            optionSelectedBg: "#2A1F3D",
           },
           Button: {
-            colorBgContainer: '#1F1F1F',
-            colorBorder: '#1F1F1F',
-            colorText: '#EEEEEE',
-            colorPrimaryBg: '#1F1F1F',
-            colorPrimaryText: '#EEEEEE',
+            colorBgContainer: "#1F1F1F",
+            colorBorder: "#1F1F1F",
+            colorText: "#EEEEEE",
+            colorPrimaryBg: "#1F1F1F",
+            colorPrimaryText: "#EEEEEE",
           },
           Form: {
-            labelColor: '#B3B3B3',
+            labelColor: "#B3B3B3",
           },
         },
       }}
@@ -86,8 +93,11 @@ const BlockingRulesFilters: React.FC<BlockingRulesFiltersProps> = ({
         size="small"
         className="bg-[#101010] border-[#1F1F1F]"
         title={
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <FilterOutlined className="text-[#EEEEEE]" style={{ fontSize: '14px', display: 'flex' }} />
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <FilterOutlined
+              className="text-[#EEEEEE]"
+              style={{ fontSize: "14px", display: "flex" }}
+            />
             <span className="text-[#EEEEEE]">Filters</span>
           </div>
         }
@@ -103,17 +113,13 @@ const BlockingRulesFilters: React.FC<BlockingRulesFiltersProps> = ({
         }
         styles={{
           header: {
-            borderBottom: '1px solid #1F1F1F',
-            paddingTop: '8px',
-            paddingBottom: '8px'
-          }
+            borderBottom: "1px solid #1F1F1F",
+            paddingTop: "8px",
+            paddingBottom: "8px",
+          },
         }}
       >
-        <Form
-          form={form}
-          layout="vertical"
-          onValuesChange={handleFilterChange}
-        >
+        <Form form={form} layout="vertical" onValuesChange={handleFilterChange}>
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item
@@ -121,11 +127,11 @@ const BlockingRulesFilters: React.FC<BlockingRulesFiltersProps> = ({
                 name="ruleType"
               >
                 <Select
-                  style={{ width: '100%' }}
+                  style={{ width: "100%" }}
                   placeholder="All Types"
                   allowClear
                   className="bg-[#1A1A1A]"
-                  dropdownStyle={{ backgroundColor: '#1A1A1A' }}
+                  dropdownStyle={{ backgroundColor: "#1A1A1A" }}
                 >
                   {Object.entries(RULE_TYPE_VALUES).map(([key, value]) => (
                     <Option key={value} value={value}>
@@ -142,11 +148,11 @@ const BlockingRulesFilters: React.FC<BlockingRulesFiltersProps> = ({
                 name="status"
               >
                 <Select
-                  style={{ width: '100%' }}
+                  style={{ width: "100%" }}
                   placeholder="All Status"
                   allowClear
                   className="bg-[#1A1A1A]"
-                  dropdownStyle={{ backgroundColor: '#1A1A1A' }}
+                  dropdownStyle={{ backgroundColor: "#1A1A1A" }}
                 >
                   <Option value="ACTIVE">Active</Option>
                   <Option value="INACTIVE">Inactive</Option>
