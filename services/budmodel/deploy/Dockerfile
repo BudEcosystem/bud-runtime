@@ -19,11 +19,8 @@ RUN mkdir -p /var/run/clamav && \
 COPY clamd.conf.example /etc/clamav/clamd.conf
 
 WORKDIR /app
-COPY . .
 
-RUN pip install --upgrade pip
-RUN pip install -r ./requirements.txt
-RUN pip install .
+COPY requirements.txt .
 
 RUN pip install --upgrade pip
 RUN pip install -r ./requirements.txt
@@ -33,6 +30,11 @@ RUN playwright install
 
 # Install playwright browsers
 RUN playwright install-deps
+
+COPY . .
+
+RUN pip install .
+
 
 # Install dependencies for playwright
 # RUN apt-get install -y libgtk-3-0 libx11-xcb1 libxcomposite1 libxcursor1 libxdamage1 libxi6 libxtst6 libnss3 libxrandr2 libasound2 libpangocairo-1.0-0 libatk1.0-0 libatk-bridge2.0-0 libepoxy0 libgbm-dev libxshmfence1

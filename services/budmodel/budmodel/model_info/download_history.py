@@ -1,8 +1,13 @@
+from budmicroframe.commons import logging
 from sqlalchemy import func
 
 from ..commons.config import app_settings
 from ..commons.constants import ModelDownloadStatus
+from .exceptions import SpaceNotAvailableException
 from .models import ModelDownloadHistory, ModelDownloadHistoryCRUD
+
+
+logger = logging.get_logger(__name__)
 
 
 class DownloadHistory:
@@ -20,6 +25,69 @@ class DownloadHistory:
             )
 
     @staticmethod
+    def atomic_space_reservation(path: str, required_size: float) -> bool:
+        """Atomically check and reserve space for download.
+
+        Args:
+            path: The download path identifier
+            required_size: Required size in bytes
+
+        Returns:
+            bool: True if space was successfully reserved
+
+        Raises:
+            SpaceNotAvailableException: If not enough space available
+        """
+        with ModelDownloadHistoryCRUD() as crud:
+            try:
+                # Start a transaction
+                # Check available space within the transaction (only count RUNNING and COMPLETED)
+                used_space = (
+                    crud.session.query(func.sum(ModelDownloadHistory.size))
+                    .filter(
+                        ModelDownloadHistory.status.in_([ModelDownloadStatus.RUNNING, ModelDownloadStatus.COMPLETED])
+                    )
+                    .scalar()
+                    or 0
+                )
+                available_space = app_settings.model_download_dir_max_size - used_space
+
+                logger.debug(
+                    f"Atomic space check - Required: {required_size}, Available: {available_space}, Used: {used_space}"
+                )
+
+                if required_size > available_space:
+                    logger.error(f"Space not available. Required: {required_size}, Available: {available_space}")
+                    raise SpaceNotAvailableException(
+                        f"Space not available. Required: {required_size} bytes, Available: {available_space} bytes"
+                    )
+
+                # Reserve the space by creating the record
+                crud.insert(
+                    {
+                        "path": path,
+                        "size": required_size,
+                        "status": ModelDownloadStatus.RUNNING,
+                    },
+                    raise_on_error=True,
+                )
+
+                # Commit the transaction
+                crud.session.commit()
+                logger.info(f"Successfully reserved {required_size} bytes for {path}")
+                return True
+
+            except SpaceNotAvailableException:
+                # Rollback on space error
+                crud.session.rollback()
+                raise
+            except Exception as e:
+                # Rollback on any other error
+                crud.session.rollback()
+                logger.error(f"Error during atomic space reservation: {e}")
+                raise
+
+    @staticmethod
     def update_download_status(path: str, status: ModelDownloadStatus):
         """Update the download status for a given path."""
         with ModelDownloadHistoryCRUD() as crud:
@@ -33,12 +101,110 @@ class DownloadHistory:
 
     @staticmethod
     def get_total_space_usage():
-        """Get total space usage of all downloaded models."""
+        """Get total space usage of all downloaded models (excluding uploaded ones)."""
         with ModelDownloadHistoryCRUD() as crud:
-            return crud.session.query(func.sum(ModelDownloadHistory.size)).scalar() or 0
+            # Only count RUNNING and COMPLETED records, not UPLOADED
+            return (
+                crud.session.query(func.sum(ModelDownloadHistory.size))
+                .filter(ModelDownloadHistory.status.in_([ModelDownloadStatus.RUNNING, ModelDownloadStatus.COMPLETED]))
+                .scalar()
+                or 0
+            )
 
     @staticmethod
     def get_available_space():
         """Get available space remaining for model downloads."""
         used_space = DownloadHistory.get_total_space_usage()
         return app_settings.model_download_dir_max_size - used_space
+
+    @staticmethod
+    def check_existing_download(model_uri: str):
+        """Check if a download already exists for the given model URI.
+
+        Args:
+            model_uri: The model URI/path to check
+
+        Returns:
+            Object with directory_name and status if found, None otherwise
+        """
+        with ModelDownloadHistoryCRUD() as crud:
+            # Extract directory name from model_uri (e.g., "Qwen/Qwen2.5-0.5B" -> "Qwen_Qwen2.5-0.5B")
+            directory_name = model_uri.replace("/", "_")
+            path = directory_name  # In our case, path is the directory name
+
+            record = crud.session.query(ModelDownloadHistory).filter(ModelDownloadHistory.path == path).first()
+
+            if record:
+                # Create an object with the expected attributes
+                class ExistingDownload:
+                    def __init__(self, directory_name, status):
+                        self.directory_name = directory_name
+                        self.status = status
+
+                return ExistingDownload(directory_name, record.status)
+            return None
+
+    @staticmethod
+    def is_download_active(directory_name: str) -> bool:
+        """Check if a download is actively running (recently updated).
+
+        Args:
+            directory_name: The directory name to check
+
+        Returns:
+            True if download is active (updated within last 5 minutes), False otherwise
+        """
+        from datetime import datetime, timedelta
+
+        with ModelDownloadHistoryCRUD() as crud:
+            record = (
+                crud.session.query(ModelDownloadHistory)
+                .filter(
+                    ModelDownloadHistory.path == directory_name,
+                    ModelDownloadHistory.status == ModelDownloadStatus.RUNNING,
+                )
+                .first()
+            )
+
+            if record and record.modified_at:
+                # Check if updated within last 5 minutes
+                cutoff_time = datetime.utcnow() - timedelta(minutes=5)
+                return record.modified_at > cutoff_time
+            return False
+
+    @staticmethod
+    def get_download_by_directory(directory_name: str):
+        """Get download record by directory name.
+
+        Args:
+            directory_name: The directory name to lookup
+
+        Returns:
+            Object with status if found, None otherwise
+        """
+        with ModelDownloadHistoryCRUD() as crud:
+            record = (
+                crud.session.query(ModelDownloadHistory).filter(ModelDownloadHistory.path == directory_name).first()
+            )
+
+            if record:
+
+                class DownloadRecord:
+                    def __init__(self, status):
+                        self.status = status
+
+                return DownloadRecord(record.status)
+            return None
+
+    @staticmethod
+    def mark_download_failed(directory_name: str):
+        """Mark a download as failed.
+
+        Args:
+            directory_name: The directory name to mark as failed
+        """
+        with ModelDownloadHistoryCRUD() as crud:
+            crud.update(
+                {"status": ModelDownloadStatus.FAILED}, conditions={"path": directory_name}, raise_on_error=False
+            )
+            logger.warning(f"Marked download as failed: {directory_name}")
