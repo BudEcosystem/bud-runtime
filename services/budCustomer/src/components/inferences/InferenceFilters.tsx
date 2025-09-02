@@ -171,7 +171,7 @@ const InferenceFilters: React.FC<InferenceFiltersProps> = ({ projectId, onFilter
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <FilterOutlined className="text-[#EEEEEE]" style={{ fontSize: '14px', display: 'flex' }} />
-            <span className="text-[#EEEEEE]">Filters</span>
+            <span className="text-[black] dark:text-[#EEEEEE]">Filters</span>
           </div>
         }
         extra={
@@ -206,7 +206,7 @@ const InferenceFilters: React.FC<InferenceFiltersProps> = ({ projectId, onFilter
           endpointType: filters.endpoint_type,
         }}
       >
-        <Row gutter={16}>
+        <Row gutter={16} className='w-full'>
           <Col span={7}>
             <Form.Item
               label={<span className="text-[#B3B3B3]">Date Range</span>}
@@ -300,7 +300,7 @@ const InferenceFilters: React.FC<InferenceFiltersProps> = ({ projectId, onFilter
             </Form.Item>
           </Col>
 
-          <Col span={3}>
+          <Col span={4}>
             <Form.Item
               label={<span className="text-[#B3B3B3] whitespace-nowrap">Max Latency (ms)</span>}
               name="maxLatency"
@@ -330,7 +330,7 @@ const InferenceFilters: React.FC<InferenceFiltersProps> = ({ projectId, onFilter
               ))}
 
               <div style={{ marginLeft: '16px', display: 'inline-flex', alignItems: 'center' }}>
-                <span className="text-[#EEEEEE]" style={{ marginRight: '8px' }}>Show only successful:</span>
+                <span className="text-[black] dark:text-[#EEEEEE]" style={{ marginRight: '8px' }}>Show only successful:</span>
                 <Form.Item name="isSuccess" valuePropName="checked" noStyle>
                   <Switch className="bg-[#1F1F1F]" />
                 </Form.Item>

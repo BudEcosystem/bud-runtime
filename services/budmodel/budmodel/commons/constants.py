@@ -27,6 +27,8 @@ LOCAL_MIN_SIZE_GB = 1
 class ModelDownloadStatus(StrEnum):
     RUNNING = auto()
     COMPLETED = auto()
+    UPLOADED = auto()
+    FAILED = auto()
 
 
 # Crawler Type

@@ -97,6 +97,8 @@ class LicenseInfoSchema(PSQLBase):
 
     model_info = relationship("ModelInfoSchema", back_populates="license")
 
+    __table_args__ = (UniqueConstraint("license_id", "url", name="uq_license_info_license_id_url"),)
+
     def __repr__(self):
         """Return string representation of LicenseInfo."""
         return f"<LicenseInfo(id={self.id}, license_id={self.license_id}, name={self.name}, url={self.url})>"

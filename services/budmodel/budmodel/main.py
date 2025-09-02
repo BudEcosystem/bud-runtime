@@ -31,6 +31,7 @@ from .commons.config import app_settings, secrets_settings
 from .leaderboard.routes import leaderboard_router
 from .leaderboard.workflows import LeaderboardCronWorkflows
 from .model_info.routes import model_info_router
+from .shared.aria2_daemon import ensure_aria2_daemon_running, get_aria2_daemon_manager
 
 
 logger = logging.get_logger(__name__)
@@ -75,6 +76,15 @@ async def dapr_lifespan(app: FastAPI) -> AsyncIterator[None]:
     task = asyncio.create_task(schedule_secrets_and_config_sync())
     leaderboard_cron_task = asyncio.create_task(execute_leaderboard_cron_workflow())
 
+    # Start aria2 daemon for I/O-aware downloads
+    try:
+        if ensure_aria2_daemon_running():
+            logger.info("Aria2 daemon started successfully for I/O-aware downloads")
+        else:
+            logger.warning("Failed to start aria2 daemon - downloads may use standard method")
+    except Exception as e:
+        logger.error(f"Error starting aria2 daemon: {e}")
+
     if app_settings.enable_seeder:
         logger.info("Seeding pre-defined data...")
         for seeder_name, seeder in seeders.items():
@@ -89,6 +99,15 @@ async def dapr_lifespan(app: FastAPI) -> AsyncIterator[None]:
     try:
         task.cancel()
         leaderboard_cron_task.cancel()
+
+        # Stop aria2 daemon on shutdown
+        try:
+            daemon_manager = get_aria2_daemon_manager()
+            if daemon_manager.stop_daemon():
+                logger.info("Aria2 daemon stopped successfully")
+        except Exception as e:
+            logger.warning(f"Failed to stop aria2 daemon: {e}")
+
     except asyncio.CancelledError:
         logger.exception("Failed to cleanup config & store sync.")
 
