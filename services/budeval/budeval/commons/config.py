@@ -79,11 +79,11 @@ class SecretsConfig(BaseSecretsConfig):
     version: str = __version__.split("@")[-1]
 
     # PostgreSQL Configuration
-    psql_user: str = Field(default="keycloak", alias="PSQL_USER")
-    psql_password: str = Field(default="keycloak_password", alias="PSQL_PASSWORD")
-    psql_db_name: str = Field(default="db22", alias="PSQL_DB_NAME")
+    psql_user: str = Field(alias="PSQL_USER")
+    psql_password: str = Field(alias="PSQL_PASSWORD")
+    psql_db_name: str = Field(alias="PSQL_DB_NAME")
     psql_port: int = Field(default=5432, alias="PSQL_PORT")
-    psql_host: str = Field(default="100.84.162.116", alias="PSQL_HOST")
+    psql_host: str = Field(alias="PSQL_HOST")
 
     # (ClickHouse settings moved to AppConfig)
 

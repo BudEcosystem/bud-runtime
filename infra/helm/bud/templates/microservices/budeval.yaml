@@ -87,9 +87,9 @@ spec:
           - name: CLICKHOUSE_DATABASE
             value: "budeval"
           - name: CLICKHOUSE_USER
-            value: "budeval"
+            value: "{{ .Values.clickhouse.auth.username }}"
           - name: CLICKHOUSE_PASSWORD
-            value: "budeval"
+            value: "{{ .Values.clickhouse.auth.password }}"
           - name: CLICKHOUSE_BATCH_SIZE
             value: "1000"
           - name: CLICKHOUSE_POOL_MIN_SIZE
