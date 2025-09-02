@@ -38,7 +38,12 @@ const ApiKeySuccess = () => {
   };
 
   return (
-    <BudForm data={{}}>
+    <BudForm
+      data={{}}
+      nextText="Ok"
+      onNext={() => {
+        closeDrawer();
+      }}>
       <BudWraperBox center={true}>
         <BudDrawerLayout>
           <div className="flex flex-col justify-start items-center p-[2.5rem]">
@@ -53,7 +58,7 @@ const ApiKeySuccess = () => {
             </div>
 
             <div className="max-w-[84%] mt-[1rem] mb-[2rem] flex flex-col items-center justify-center">
-              <Text_24_600_EEEEEE className="text-center leading-[2rem] mb-[1.2rem]">
+              <Text_24_600_EEEEEE className="text-[black] dark:text-[#EEEEEE]text-center leading-[2rem] mb-[1.2rem]">
                 API Key Created Successfully!
               </Text_24_600_EEEEEE>
             </div>

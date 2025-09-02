@@ -1890,6 +1890,27 @@ const publish: DrawerFlowType = {
   ],
 };
 
+const publishEndpoint: DrawerFlowType = {
+  title: "Publish Endpoint",
+  description: "Publish endpoint with pricing",
+  totalSteps: 1,
+  steps: [
+    {
+      navigation: () => ["Projects", "Publish Endpoint"],
+      id: "publish-endpoint",
+      confirmClose: false,
+      step: 1,
+      component: StepComponents["publish-endpoint"],
+      progress: [
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Add Token Pricing",
+        },
+      ],
+    },
+  ],
+};
+
 const deleteCluster: DrawerFlowType = {
   title: "Delete Cluster",
   description: "Delete a cluster",
@@ -4087,6 +4108,7 @@ const flows = {
   "worker-details": workerDetails,
   "use-model": useModel,
   "publish": publish,
+  "publish-endpoint": publishEndpoint,
   "delete-cluster": deleteCluster,
   "delete-project": deleteProject,
   "deleting-endpoint": deletingEndpoint,

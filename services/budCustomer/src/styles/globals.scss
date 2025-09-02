@@ -395,6 +395,16 @@ body {
     border-top-right-radius: 17px;
     border-top-left-radius: 17px;
 
+    // Remove hover effects from breadcrumb items
+    .ant-breadcrumb-link:hover {
+      color: inherit !important;
+    }
+
+    .ant-breadcrumb a:hover {
+      color: inherit !important;
+      background-color: transparent !important;
+    }
+
     // Light theme specific breadcrumb
     [data-theme="light"] & {
       background: linear-gradient(267.91deg, rgba(194, 219, 255, 0.15) 1.56%, rgba(194, 219, 255, 0.15) 67.03%, rgba(194, 219, 255, 0.075) 98.09%) !important;
@@ -468,6 +478,35 @@ body {
         }
       }
     }
+  }
+
+  // hover color
+  .ant-popover-inner {
+    background-color: #1F1F1F !important;
+  }
+
+  .ant-popover-arrow {
+    &::before {
+      background-color: #1F1F1F !important;
+    }
+  }
+
+  .antPopoverArrow {
+    .ant-popover-arrow::before {
+      background-color: #202020 !important;
+    }
+  }
+
+  .antPopoverArrow.Darker {
+    .ant-popover-arrow::before {
+      background-color: #161616 !important;
+    }
+  }
+
+  .ant-popover-inner {
+    padding: .5rem !important;
+    padding-left: 15rem;
+
   }
 
   .drawerSelect {
@@ -1009,11 +1048,11 @@ input.ant-input:-webkit-autofill {
     }
   }
 
-
-}
-[data-theme="light"] .ant-select-selector {
+  [data-theme="light"] .ant-select-selector {
     color: black !important;
   }
+}
+
 .ant-select-dropdown {
   padding: 0 !important;
   // max-height: 200px;
@@ -1104,6 +1143,33 @@ input.ant-input:-webkit-autofill {
   padding: 0 !important;
 }
 
+.popover {
+  position: relative;
+  z-index: 50;
+  display: flex;
+  max-height: min(var(--popover-available-height, 300px), 300px);
+  flex-direction: column;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border-radius: 0.5rem;
+  border-width: 1px;
+  border-style: solid;
+  border-color: hsl(204 20% 88%);
+  background-color: white;
+  padding: 0.5rem;
+  color: black;
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+.popover:where(.dark, .dark *) {
+  border-color: hsl(204 4% 24%);
+  background-color: hsl(204 4% 16%);
+  color: white;
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.25),
+    0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
 
 .ant-input::placeholder {
   color: #808080;
@@ -1233,6 +1299,40 @@ input.ant-input:-webkit-autofill {
 [data-theme="light"] .rightDiv {
   background-color: #ffffff;
   border: 1px solid #e0e0e0;
+}
+
+// switch
+.ant-switch {
+  background-color: #333;
+}
+
+.ant-switch:hover:not(.ant-switch-disabled) {
+  background-color: #444;
+}
+
+.ant-switch {
+  border: 1px solid #6f46ab !important;
+  width: 1.75rem !important;
+  min-width: 1.75rem !important;
+  height: 1.1rem !important;
+
+  .ant-switch-handle {
+    width: .75rem !important;
+    height: .75rem !important;
+    top: 0;
+  }
+
+  &.ant-switch .ant-switch-handle {
+    inset-inline-start: 0px;
+  }
+
+  &.ant-switch-checked .ant-switch-handle {
+    inset-inline-start: calc(100% - .75rem) !important;
+  }
+}
+
+.ant-switch-checked {
+  background: #965cde !important;
 }
 
 // Responsive breakpoints

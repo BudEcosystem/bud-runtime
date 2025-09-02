@@ -50,7 +50,7 @@ spec:
       containers:
         - name: budproxy
           image: {{ .Values.microservices.budproxy.image }}
-          imagePullPolicy: Always
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
           command: ["gateway"]
           args:
             - --config-file=/app/config/tensorzero.toml

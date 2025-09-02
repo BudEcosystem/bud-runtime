@@ -23,7 +23,7 @@ spec:
       containers:
       - name: {{ .Release.Name}}-budapp
         image: {{ .Values.microservices.budapp.image }}
-        imagePullPolicy: Always
+        imagePullPolicy: {{ .Values.imagePullPolicy }}
         command: ["sh", "-c", "alembic -c ./budapp/alembic.ini upgrade head && uvicorn budapp.main:app --host 0.0.0.0 --port 9082"]
         ports:
         - containerPort: 9082

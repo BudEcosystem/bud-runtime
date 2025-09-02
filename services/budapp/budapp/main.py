@@ -200,6 +200,32 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             # Sleep for 5 minutes (300 seconds)
             await asyncio.sleep(300)
 
+    async def schedule_usage_limit_sync() -> None:
+        """Schedule periodic synchronization of usage limits to Redis."""
+        from .billing_ops.usage_sync import start_usage_sync, stop_usage_sync
+
+        # Wait for services to be ready
+        await asyncio.sleep(10)
+
+        try:
+            logger.info("Starting usage limit sync task")
+            await start_usage_sync()
+        except Exception as e:
+            logger.error("Failed to start usage limit sync: %s", e)
+
+    async def schedule_billing_cycle_reset() -> None:
+        """Schedule periodic check for expired billing cycles."""
+        from .billing_ops.reset_usage import start_billing_reset_task, stop_billing_reset_task
+
+        # Wait for services to be ready
+        await asyncio.sleep(15)
+
+        try:
+            logger.info("Starting billing cycle reset task")
+            await start_billing_reset_task()
+        except Exception as e:
+            logger.error("Failed to start billing cycle reset task: %s", e)
+
     task = asyncio.create_task(schedule_secrets_and_config_sync())
 
     for seeder_name, seeder in seeders.items():
@@ -221,6 +247,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Start the credential usage sync scheduler
     credential_usage_task = asyncio.create_task(schedule_credential_usage_sync())
 
+    # Start the usage limit sync scheduler
+    usage_limit_task = asyncio.create_task(schedule_usage_limit_sync())
+
+    # Start the billing cycle reset scheduler
+    billing_reset_task = asyncio.create_task(schedule_billing_cycle_reset())
+
     yield
 
     try:
@@ -229,6 +261,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         eval_sync_task.cancel()
         blocking_stats_task.cancel()
         credential_usage_task.cancel()
+        usage_limit_task.cancel()
+        billing_reset_task.cancel()
+
+        # Stop the background tasks
+        from .billing_ops.reset_usage import stop_billing_reset_task
+        from .billing_ops.usage_sync import stop_usage_sync
+
+        await stop_usage_sync()
+        await stop_billing_reset_task()
     except asyncio.CancelledError:
         logger.exception("Failed to cleanup config & store sync.")
 

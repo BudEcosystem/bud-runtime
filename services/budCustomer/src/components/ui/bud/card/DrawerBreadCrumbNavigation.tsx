@@ -58,7 +58,7 @@ export function CustomBreadcrumb({
                 className={
                   isLast || !hasUrl
                     ? "cursor-default text-black dark:text-[#EEEEEE]"
-                    : "hover:cursor-pointer text-black dark:text-[#787B83] hover:text-gray-700 dark:hover:text-[#EEEEEE]"
+                    : "cursor-pointer text-black dark:text-[#787B83]"
                 }
               >
                 {item}

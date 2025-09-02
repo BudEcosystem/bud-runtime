@@ -38,6 +38,7 @@ from minio.error import S3Error
 from ..commons.async_utils import validate_url_exists
 from ..commons.config import app_settings
 from ..commons.constants import LICENSE_MINIO_OBJECT_NAME, ModelExtractionStatus
+from ..commons.constants import ModelDownloadStatus as DownloadStatus
 from ..commons.exceptions import (
     CompressionException,
     InvalidUriException,
@@ -102,8 +103,8 @@ class ModelExtractionService:
         hf_token: Optional[str] = None,
         target_topic_name: Optional[str] = None,
         target_name: Optional[str] = None,
-    ) -> None:
-        """Validate the model URI."""
+    ) -> bool:
+        """Validate the model URI. Returns True if valid, raises exception if not."""
         notification_req = notification_request.model_copy(deep=True)
         notification_req.payload.event = "validation"
 
@@ -173,6 +174,7 @@ class ModelExtractionService:
                 target_topic_name=target_topic_name,
                 target_name=target_name,
             )
+            return True  # Return True for successful validation
         except InvalidUriException as e:
             logger.exception("Error validating model uri: %s", str(e))
             notification_req.payload.content = NotificationContent(
@@ -200,12 +202,15 @@ class ModelExtractionService:
                 target_topic_name=target_topic_name,
                 target_name=target_name,
             )
-            raise e
+            raise e  # Let the exception propagate for now
         except Exception as e:
             logger.exception("Error validating model uri: %s", str(e))
+            error_message = str(e)
             notification_req.payload.content = NotificationContent(
                 title="Failed to validate model uri",
-                message="Fix: Check the model uri and permissions",
+                message=f"{error_message}. Fix: Check the model uri and permissions"
+                if error_message
+                else "Fix: Check the model uri and permissions",
                 status=WorkflowStatus.FAILED,
             )
             dapr_workflow.publish_notification(
@@ -245,27 +250,230 @@ class ModelExtractionService:
                 target_name=target_name,
             )
 
-            logger.info("Downloading the model from the given URI: %s", model_uri)
-            sanitized_model_name = sanitize_name(model_name)
-            dir_name = generate_unique_name(sanitized_model_name)
+            logger.info("Downloading the model from the given URI: %s (workflow: %s)", model_uri, workflow_id)
+
+            # Check if a download for this model is already in progress
+            # This prevents duplicate downloads when workflows are retried or replayed
+            existing_download = DownloadHistory.check_existing_download(model_uri)
+            if existing_download:
+                logger.info(
+                    "Found existing download record for model %s, directory: %s, status: %s",
+                    model_uri,
+                    existing_download.directory_name,
+                    existing_download.status,
+                )
+
+                # Return the existing directory name if download is in progress
+                if existing_download.status == DownloadStatus.RUNNING:
+                    # Check if the download is still active (files being written)
+                    is_active = DownloadHistory.is_download_active(existing_download.directory_name)
+
+                    if is_active:
+                        logger.info(
+                            "Download is still actively running for %s, waiting for completion: %s",
+                            model_uri,
+                            existing_download.directory_name,
+                        )
+                        notification_req.payload.content = NotificationContent(
+                            title="Waiting for existing download to complete",
+                            message=f"Model {model_name} download already in progress, waiting for completion",
+                            status=WorkflowStatus.STARTED,
+                        )
+                        dapr_workflow.publish_notification(
+                            workflow_id=workflow_id,
+                            notification=notification_req,
+                            target_topic_name=target_topic_name,
+                            target_name=target_name,
+                        )
+
+                        # Wait for the download to complete by checking status periodically
+                        import time
+
+                        max_wait_time = 7200  # 2 hours max wait
+                        check_interval = 10  # Check every 10 seconds
+                        elapsed_time = 0
+
+                        while elapsed_time < max_wait_time:
+                            time.sleep(check_interval)
+                            elapsed_time += check_interval
+
+                            # Re-check the download status
+                            current_download = DownloadHistory.get_download_by_directory(
+                                existing_download.directory_name
+                            )
+
+                            if current_download and current_download.status == DownloadStatus.COMPLETED:
+                                logger.info(
+                                    "Download completed for %s after waiting %d seconds: %s",
+                                    model_uri,
+                                    elapsed_time,
+                                    existing_download.directory_name,
+                                )
+                                notification_req.payload.content = NotificationContent(
+                                    title="Download completed",
+                                    message=f"Model {model_name} download completed after waiting",
+                                    status=WorkflowStatus.COMPLETED,
+                                )
+                                dapr_workflow.publish_notification(
+                                    workflow_id=workflow_id,
+                                    notification=notification_req,
+                                    target_topic_name=target_topic_name,
+                                    target_name=target_name,
+                                )
+                                return existing_download.directory_name
+
+                            elif current_download and current_download.status == DownloadStatus.FAILED:
+                                logger.error(
+                                    "Download failed for %s after waiting %d seconds", model_uri, elapsed_time
+                                )
+                                # Continue with new download below
+                                break
+
+                            # Check if download is still active
+                            if not DownloadHistory.is_download_active(existing_download.directory_name):
+                                logger.warning(
+                                    "Download appears stale for %s after waiting %d seconds", model_uri, elapsed_time
+                                )
+                                DownloadHistory.mark_download_failed(existing_download.directory_name)
+                                # Continue with new download below
+                                break
+
+                            # Log progress every minute
+                            if elapsed_time % 60 == 0:
+                                logger.info(
+                                    "Still waiting for download to complete for %s (waited %d seconds)",
+                                    model_uri,
+                                    elapsed_time,
+                                )
+
+                        if elapsed_time >= max_wait_time:
+                            logger.error(
+                                "Download wait timeout exceeded for %s after %d seconds", model_uri, max_wait_time
+                            )
+                            DownloadHistory.mark_download_failed(existing_download.directory_name)
+                            # Continue with new download below
+                    else:
+                        # Download appears stale, mark as failed and proceed with new download
+                        logger.warning(
+                            "Existing download for %s appears stale (no recent activity), marking as failed", model_uri
+                        )
+                        DownloadHistory.mark_download_failed(existing_download.directory_name)
+                        # Continue with new download below
+
+                # If completed, verify files exist before using
+                elif existing_download.status == DownloadStatus.COMPLETED:
+                    logger.info("Model marked as downloaded, verifying files: %s", existing_download.directory_name)
+
+                    # Verify that the download is actually complete with files present
+                    download_path = os.path.join(app_settings.model_download_dir, existing_download.directory_name)
+
+                    if not os.path.exists(download_path):
+                        logger.warning("Download directory does not exist despite COMPLETED status: %s", download_path)
+                        # Mark as failed and continue with new download
+                        DownloadHistory.mark_download_failed(existing_download.directory_name)
+                        # Continue with new download below
+                    else:
+                        # Check if directory has files
+                        files_in_dir = []
+                        for root, _dirs, files in os.walk(download_path):
+                            # Skip .cache directories
+                            if ".cache" in root:
+                                continue
+                            files_in_dir.extend(files)
+
+                        # Check for minimum expected files
+                        has_config = any(f == "config.json" for f in files_in_dir)
+                        has_weights = any(f.endswith((".safetensors", ".bin", ".pt", ".pth")) for f in files_in_dir)
+
+                        if not files_in_dir or not has_config or not has_weights:
+                            logger.warning(
+                                "Download marked COMPLETED but files are missing (files: %d, config: %s, weights: %s): %s",
+                                len(files_in_dir),
+                                has_config,
+                                has_weights,
+                                download_path,
+                            )
+                            # Mark as failed and continue with new download
+                            DownloadHistory.mark_download_failed(existing_download.directory_name)
+                            # Continue with new download below
+                        else:
+                            logger.info(
+                                "Verified %d files in completed download, using existing: %s",
+                                len(files_in_dir),
+                                existing_download.directory_name,
+                            )
+                            notification_req.payload.content = NotificationContent(
+                                title="Using existing download",
+                                message=f"Model {model_name} was already downloaded ({len(files_in_dir)} files verified)",
+                                status=WorkflowStatus.COMPLETED,
+                            )
+                            dapr_workflow.publish_notification(
+                                workflow_id=workflow_id,
+                                notification=notification_req,
+                                target_topic_name=target_topic_name,
+                                target_name=target_name,
+                            )
+                            return existing_download.directory_name
+
+            # First, try to get existing directory from state store (for workflow replay scenarios)
+            dir_name = None
+            dapr_service = None
+            try:
+                state_store_key = f"eta_{workflow_id}"
+                dapr_service = DaprService()
+                state_data = dapr_service.get_state(
+                    store_name=app_settings.statestore_name,
+                    key=state_store_key,
+                ).json()
+
+                if (
+                    state_data
+                    and "steps_data" in state_data
+                    and "model_download" in state_data["steps_data"]
+                    and "directory_name" in state_data["steps_data"]["model_download"]
+                ):
+                    dir_name = state_data["steps_data"]["model_download"]["directory_name"]
+                    logger.info(f"Reusing directory from state store for workflow {workflow_id}: {dir_name}")
+            except Exception:
+                logger.debug(f"No existing state found for workflow {workflow_id}, will generate new directory name")
+
+            # Only generate new name if not found in state store
+            if not dir_name:
+                sanitized_model_name = sanitize_name(model_name)
+                dir_name = generate_unique_name(sanitized_model_name)
+                logger.info(f"Generated new directory name for workflow {workflow_id}: {dir_name}")
 
             # Update current step in state store
             try:
                 state_store_key = f"eta_{workflow_id}"
-                dapr_service = DaprService()
-                state_store_data = dapr_service.get_state(
-                    store_name=app_settings.statestore_name,
-                    key=state_store_key,
-                ).json()
+                if not dapr_service:
+                    dapr_service = DaprService()
+
+                # Get current state or create new
+                try:
+                    state_store_data = dapr_service.get_state(
+                        store_name=app_settings.statestore_name,
+                        key=state_store_key,
+                    ).json()
+                except Exception:
+                    state_store_data = {"steps_data": {"model_download": {}}}
+
                 state_store_data["current_step"] = "model_download"
+                if "steps_data" not in state_store_data:
+                    state_store_data["steps_data"] = {}
+                if "model_download" not in state_store_data["steps_data"]:
+                    state_store_data["steps_data"]["model_download"] = {}
+
                 state_store_data["steps_data"]["model_download"]["start_time"] = datetime.now(timezone.utc).isoformat()
                 state_store_data["steps_data"]["model_download"]["directory_name"] = dir_name
+
                 dapr_service.save_to_statestore(
                     store_name=app_settings.statestore_name,
                     key=state_store_key,
                     value=state_store_data,
                     ttl=86400,
                 )
+                logger.debug(f"Saved directory name {dir_name} to state store for workflow {workflow_id}")
             except Exception as e:
                 logger.exception("Error updating workflow eta in state store: %s", e)
 
@@ -304,9 +512,11 @@ class ModelExtractionService:
         except SpaceNotAvailableException as e:
             logger.exception("Error downloading the model: %s", str(e))
             notification_req.payload.event = "model_download"
+            # Include the actual space requirements in the notification
+            error_details = str(e)
             notification_req.payload.content = NotificationContent(
-                title=f"Space not available to download {model_name}",
-                message="Fix: Free up space or choose a smaller model",
+                title=f"Insufficient disk space for {model_name}",
+                message=error_details if error_details else "Fix: Free up space or choose a smaller model",
                 status=WorkflowStatus.FAILED,
                 primary_action="retry",
             )
@@ -316,7 +526,7 @@ class ModelExtractionService:
                 target_topic_name=target_topic_name,
                 target_name=target_name,
             )
-            raise e
+            raise e  # Let the exception propagate for now
         except CompressionException as e:
             logger.exception("Error extracting zip file: %s", str(e))
             notification_req.payload.event = "model_download"
@@ -336,9 +546,25 @@ class ModelExtractionService:
         except (Exception, HubDownloadException, ModelDownloadException) as e:
             logger.exception("Error downloading the model: %s", str(e))
             notification_req.payload.event = "model_download"
+
+            # Extract the actual error message to include in the notification
+            error_message = str(e)
+            if "Space not available" in error_message:
+                # For space errors, use the detailed message
+                title = f"Insufficient disk space for {model_name}"
+                message = error_message
+            else:
+                # For other errors, include the error details in the message
+                title = "Failed to download the model"
+                message = (
+                    f"{error_message}. Fix: Retry the model download"
+                    if error_message
+                    else "Fix: Retry the model download"
+                )
+
             notification_req.payload.content = NotificationContent(
-                title="Failed to download the model",
-                message="Fix: Retry the model download",
+                title=title,
+                message=message,
                 status=WorkflowStatus.FAILED,
                 primary_action="retry",
             )
@@ -400,6 +626,14 @@ class ModelExtractionService:
             if not store_client.upload_folder(prefix=model_path):
                 raise SaveRegistryException("Error uploading the model to the registry")
 
+            # TODO: Update download history status to UPLOADED once migration is done
+            # try:
+            #     DownloadHistory.update_download_status(model_path, ModelDownloadStatus.UPLOADED)
+            #     logger.info("Updated download history status to UPLOADED for %s", model_path)
+            # except Exception as e:
+            #     logger.warning("Failed to update download history status to UPLOADED: %s", e)
+            #     # Non-critical error, continue
+
             # Complete model download
             notification_req.payload.content = NotificationContent(
                 title="Saved the model to the registry",
@@ -423,9 +657,12 @@ class ModelExtractionService:
             DownloadHistory.delete_download_history(model_path)
 
             notification_req.payload.event = "save_model"
+            error_message = str(e)
             notification_req.payload.content = NotificationContent(
                 title="Failed to save the model to the registry",
-                message="Fix: Retry saving the model",
+                message=f"{error_message}. Fix: Retry saving the model"
+                if error_message
+                else "Fix: Retry saving the model",
                 status=WorkflowStatus.FAILED,
                 primary_action="retry",
             )
@@ -613,9 +850,12 @@ class ModelExtractionService:
             safe_delete(downloaded_model_path)
             DownloadHistory.delete_download_history(model_path)
 
+            error_message = str(e)
             notification_req.payload.content = NotificationContent(
                 title="Failed to extract the model",
-                message="Fix: Retry the model extraction",
+                message=f"{error_message}. Fix: Retry the model extraction"
+                if error_message
+                else "Fix: Retry the model extraction",
                 status=WorkflowStatus.FAILED,
                 primary_action="retry",
             )
@@ -1201,9 +1441,12 @@ class ModelSecurityScanService:
         except Exception as e:
             logger.exception("Unexpected error in security scan: %s", str(e))
             notification_req.payload.event = "security_scan"
+            error_message = str(e)
             notification_req.payload.content = NotificationContent(
                 title="Failed to perform security scan",
-                message="Fix: Retry the security scan",
+                message=f"{error_message}. Fix: Retry the security scan"
+                if error_message
+                else "Fix: Retry the security scan",
                 status=WorkflowStatus.FAILED,
                 primary_action="retry",
             )
@@ -1498,9 +1741,12 @@ class LicenseFAQService:
         except Exception as e:
             logger.exception("Error fetching license FAQs: %s", str(e))
             notification_req.payload.event = "fetch_license_faqs"
+            error_message = str(e)
             notification_req.payload.content = NotificationContent(
                 title="Failed to Fetch License FAQs",
-                message="Fix: Ensure the license source is correct and retry",
+                message=f"{error_message}. Fix: Ensure the license source is correct and retry"
+                if error_message
+                else "Fix: Ensure the license source is correct and retry",
                 status=WorkflowStatus.FAILED,
                 primary_action="retry",
             )
@@ -1592,6 +1838,12 @@ class ModelExtractionETAObserver:
         unarchive_eta = state_store_data["steps_data"]["model_download"]["extraction_eta"]
 
         if provider_type == "hugging_face":
+            # Check if output_path is None (can happen after download failure)
+            if output_path is None:
+                logger.warning("Output path is None in ETA calculation, using fallback eta")
+                eta = state_store_data["steps_data"]["model_download"]["eta"] + remaining_steps_eta
+                return math.ceil(eta)
+
             current_size = get_size_in_bytes(os.path.join(app_settings.model_download_dir, output_path))
             current_time = datetime.now(timezone.utc)
             time_diff_seconds = (current_time - start_time).total_seconds()

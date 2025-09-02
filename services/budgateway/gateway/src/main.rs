@@ -31,6 +31,7 @@ use tensorzero_internal::observability::{self, LogFormat, RouterExt};
 use tensorzero_internal::rate_limit::{
     early_extract::early_model_extraction, middleware::rate_limit_middleware,
 };
+use tensorzero_internal::usage_limit::usage_limit_middleware;
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
@@ -317,6 +318,21 @@ async fn main() {
             openai_routes.layer(axum::middleware::from_fn_with_state(
                 rate_limiter.clone(),
                 rate_limit_middleware,
+            ))
+        } else {
+            openai_routes
+        }
+    } else {
+        openai_routes
+    };
+
+    // Apply usage limiting middleware if enabled (runs after rate limiting)
+    let openai_routes = if let Some(ref usage_limiter) = app_state.usage_limiter {
+        if let AuthenticationInfo::Enabled(ref auth) = &app_state.authentication_info {
+            tracing::info!("Applying usage limiting middleware to OpenAI routes");
+            openai_routes.layer(axum::middleware::from_fn_with_state(
+                (auth.clone(), usage_limiter.clone()),
+                usage_limit_middleware,
             ))
         } else {
             openai_routes
