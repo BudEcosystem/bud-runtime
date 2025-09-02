@@ -865,24 +865,24 @@ class TestPerformanceAndScalability:
                                     mock_user_manager.return_value = mock_user_manager_instance
 
                                     # Configure PermissionService mock
-                                mock_permission_instance = MagicMock()
-                                mock_permission_instance.create_resource_permission_by_user = AsyncMock(
-                                    return_value=None
-                                )
-                                mock_permission.return_value = mock_permission_instance
+                                    mock_permission_instance = MagicMock()
+                                    mock_permission_instance.create_resource_permission_by_user = AsyncMock(
+                                        return_value=None
+                                    )
+                                    mock_permission.return_value = mock_permission_instance
 
-                                # Configure add_users_to_project mock
-                                mock_add_users.return_value = mock_project
+                                    # Configure add_users_to_project mock
+                                    mock_add_users.return_value = mock_project
 
-                                # Act
-                                start_time = time.time()
-                                result = await service.create_project(project_data, mock_user.id)
-                                end_time = time.time()
+                                    # Act
+                                    start_time = time.time()
+                                    result = await service.create_project(project_data, mock_user.id)
+                                    end_time = time.time()
 
-                                # Assert
-                                execution_time = end_time - start_time
-                                assert execution_time < 5.0  # Should complete within 5 seconds
-                                assert result is not None
+                                    # Assert
+                                    execution_time = end_time - start_time
+                                    assert execution_time < 5.0  # Should complete within 5 seconds
+                                    assert result is not None
 
     def test_large_description_handling(self):
         """Test handling of large description text."""
