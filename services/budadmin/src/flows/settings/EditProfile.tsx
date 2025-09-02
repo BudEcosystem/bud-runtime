@@ -58,8 +58,6 @@ export default function EditProfile() {
           <DrawerCard classNames="pb-0">
             <ProjectNameInput
               placeholder="Enter Name"
-              onChangeName={(name) => form.setFieldsValue({ name })}
-              onChangeIcon={(icon) => form.setFieldsValue({ icon })}
               isEdit={true}
             />
             <div className="mt-[1.5rem] w-[full%] flex flex-col gap-[1.3rem]">

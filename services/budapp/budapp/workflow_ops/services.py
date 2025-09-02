@@ -128,6 +128,7 @@ class WorkflowService(SessionMixin):
             delete_endpoint_events = required_data.get(BudServeWorkflowStepEventName.DELETE_ENDPOINT_EVENTS.value)
             delete_worker_events = required_data.get(BudServeWorkflowStepEventName.DELETE_WORKER_EVENTS.value)
             model_extraction_events = required_data.get(BudServeWorkflowStepEventName.MODEL_EXTRACTION_EVENTS.value)
+            evaluation_events = required_data.get(BudServeWorkflowStepEventName.EVALUATION_EVENTS.value)
             bud_serve_cluster_events = required_data.get(BudServeWorkflowStepEventName.BUDSERVE_CLUSTER_EVENTS.value)
             model_security_scan_events = required_data.get(
                 BudServeWorkflowStepEventName.MODEL_SECURITY_SCAN_EVENTS.value
@@ -290,6 +291,7 @@ class WorkflowService(SessionMixin):
                 author=author if author else None,
                 tags=tags if tags else None,
                 model_extraction_events=model_extraction_events if model_extraction_events else None,
+                evaluation_events=evaluation_events if evaluation_events else None,
                 description=description if description else None,
                 security_scan_result_id=security_scan_result_id if security_scan_result_id else None,
                 model_security_scan_events=model_security_scan_events if model_security_scan_events else None,
@@ -446,6 +448,9 @@ class WorkflowService(SessionMixin):
                 "credential_id",
                 "user_confirmation",
                 "run_as_simulation",
+            ],
+            "evaluation": [
+                BudServeWorkflowStepEventName.EVALUATION_EVENTS.value,
             ],
             "add_adapter": [
                 "adapter_model_id",

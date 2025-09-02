@@ -117,6 +117,7 @@ class EvalDataSyncService:
             "modalities": ["text"],  # Default to text, can be extended based on metadata
             "sample_questions_answers": {"sample_count": dataset.sample_count} if dataset.sample_count else None,
             "advantages_disadvantages": None,
+            "eval_types": dataset.eval_type if hasattr(dataset, "eval_type") and dataset.eval_type else None,
         }
 
         # Extract creator info and links from original_data if available

@@ -59,13 +59,11 @@ models = [
             str: The dataset configuration content
         """
         # Simple dataset configuration that works with OpenCompass
-        # We'll use the _gen suffix for generation-based evaluation
+        # Use dataset names as provided without modification
         dataset_list = []
         for dataset in datasets:
             dataset_name = dataset.lower()
-            # Add _gen suffix if not already present
-            if not dataset_name.endswith("_gen"):
-                dataset_name = f"{dataset_name}_gen"
+            # Use dataset name as-is without adding suffixes
             dataset_list.append(f"'{dataset_name}'")
 
         config_content = f"""# Dataset configuration

@@ -94,13 +94,88 @@ class BillingService(DataManagerUtils):
         stmt = select(BillingPlan).where(BillingPlan.id == plan_id)
         return self.session.execute(stmt).scalar_one_or_none()
 
+    def get_free_billing_plan(self) -> Optional[Dict[str, Any]]:
+        """Get the Free billing plan from database."""
+        stmt = select(BillingPlan).where(BillingPlan.name.ilike("%free%"), BillingPlan.is_active)
+        free_plan = self.session.execute(stmt).scalar_one_or_none()
+        if free_plan:
+            return {
+                "name": free_plan.name,
+                "base_monthly_price": free_plan.base_monthly_price,
+                "monthly_token_quota": free_plan.monthly_token_quota,
+                "monthly_cost_quota": free_plan.monthly_cost_quota,
+                "max_projects": free_plan.max_projects,
+                "max_endpoints_per_project": free_plan.max_endpoints_per_project,
+            }
+        return None
+
+    def _get_default_free_plan(self) -> Dict[str, Any]:
+        """Get default Free plan configuration when not in database."""
+        return {
+            "name": "Free",
+            "base_monthly_price": 0,
+            "monthly_token_quota": 100000,  # 100K tokens
+            "monthly_cost_quota": None,  # No cost limit for free tier
+            "max_projects": 2,
+            "max_endpoints_per_project": 3,
+        }
+
     async def get_current_usage(self, user_id: UUID) -> Dict[str, Any]:
         """Get current billing period usage for a user."""
         user_billing = self.get_user_billing(user_id)
         if not user_billing:
+            # Try to get the Free plan as default
+            free_plan = self.get_free_billing_plan()
+            if not free_plan:
+                # Create a virtual Free plan if it doesn't exist in DB
+                free_plan = self._get_default_free_plan()
+
+            # For Free plan users, we still need dates for ClickHouse query but return None in response
+            now = datetime.now(timezone.utc)
+            billing_period_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            # Calculate end of month for internal use
+            if billing_period_start.month == 12:
+                billing_period_end = billing_period_start.replace(
+                    year=billing_period_start.year + 1, month=1
+                ) - timedelta(seconds=1)
+            else:
+                billing_period_end = billing_period_start.replace(month=billing_period_start.month + 1) - timedelta(
+                    seconds=1
+                )
+
+            # Get actual usage from ClickHouse even for Free plan users
+            usage_data = await self.get_usage_from_clickhouse(
+                user_id=user_id,
+                start_date=billing_period_start,
+                end_date=billing_period_end,
+            )
+
+            # Get Free plan quotas
+            token_quota = free_plan.get("monthly_token_quota", 100000)  # Default 100K tokens for free
+            cost_quota = free_plan.get("monthly_cost_quota", None)  # No cost limit for free tier
+
+            # Calculate usage percentages
+            token_usage_percent = (usage_data["total_tokens"] / token_quota * 100) if token_quota else 0
+            cost_usage_percent = (Decimal(str(usage_data["total_cost"])) / cost_quota * 100) if cost_quota else 0
+
             return {
-                "error": "No billing information found for user",
-                "has_billing": False,
+                "has_billing": True,  # We're treating free plan as having billing
+                "billing_period_start": None,  # Return None for Free plan users
+                "billing_period_end": None,  # Return None for Free plan users
+                "plan_name": free_plan.get("name", "Free"),
+                "base_monthly_price": float(free_plan.get("base_monthly_price", 0)),
+                "usage": {
+                    "tokens_used": usage_data["total_tokens"],
+                    "tokens_quota": token_quota,
+                    "tokens_usage_percent": float(token_usage_percent),
+                    "cost_used": usage_data["total_cost"],
+                    "cost_quota": float(cost_quota) if cost_quota else None,
+                    "cost_usage_percent": float(cost_usage_percent),
+                    "request_count": usage_data["request_count"],
+                    "success_rate": usage_data["success_rate"],
+                },
+                "is_suspended": False,
+                "suspension_reason": None,
             }
 
         # Get usage from ClickHouse for current billing period
@@ -140,29 +215,149 @@ class BillingService(DataManagerUtils):
         }
 
     async def check_usage_limits(self, user_id: UUID) -> Dict[str, Any]:
+        """Check if user has exceeded usage limits and publish to Redis."""
+        import json
+        from datetime import datetime, timezone
+
+        from budapp.shared.redis_service import RedisService
+
         """Check if user has exceeded usage limits."""
         usage = await self.get_current_usage(user_id)
 
-        if not usage.get("has_billing"):
-            return {"allowed": False, "reason": "No billing plan configured"}
-
+        # Now all users have billing (at least Free plan)
         if usage.get("is_suspended"):
             return {"allowed": False, "reason": usage.get("suspension_reason", "Account suspended")}
 
         # Check token limit
         if usage["usage"]["tokens_quota"] and usage["usage"]["tokens_used"] >= usage["usage"]["tokens_quota"]:
-            return {"allowed": False, "reason": "Monthly token quota exceeded"}
+            plan_name = usage.get("plan_name", "your plan")
+            return {"allowed": False, "reason": f"Monthly token quota exceeded for {plan_name}"}
 
-        # Check cost limit
+        # Check cost limit (Free plan has no cost limit)
         if usage["usage"]["cost_quota"] and usage["usage"]["cost_used"] >= usage["usage"]["cost_quota"]:
             return {"allowed": False, "reason": "Monthly cost quota exceeded"}
 
-        return {
+        # Get current usage values
+        tokens_used = usage["usage"]["tokens_used"] if usage.get("usage") else 0
+        cost_used = usage["usage"]["cost_used"] if usage.get("usage") else 0.0
+        tokens_quota = usage["usage"]["tokens_quota"] if usage.get("usage") else None
+        cost_quota = usage["usage"]["cost_quota"] if usage.get("usage") else None
+
+        # Get previous values from Redis (for delta calculation)
+        existing_data = None
+        prev_tokens_used = tokens_used  # Default to current values
+        prev_cost_used = cost_used
+        try:
+            logger.info(f"usage sync for user {user_id}")
+            redis_service = RedisService()
+            key = f"usage_limit:{user_id}"
+            existing_data = await redis_service.get(key)
+            if existing_data:
+                existing = json.loads(existing_data)
+                # Use the previous values stored in Redis for delta calculation
+                # These represent the last known state from the previous sync
+                prev_tokens_used = existing.get("tokens_used", tokens_used)
+                prev_cost_used = existing.get("cost_used", cost_used)
+        except Exception as e:
+            logger.warning(f"Failed to get previous usage from Redis: {e}")
+            # Keep the defaults (current values) if Redis fails
+
+        # Get billing cycle information
+        billing_cycle_start = None
+        billing_cycle_end = None
+        if usage.get("has_billing"):
+            # Get billing cycle from user billing record
+            from budapp.billing_ops.models import UserBilling
+            from budapp.billing_ops.utils import calculate_billing_cycle
+
+            user_billing = self.session.query(UserBilling).filter_by(user_id=user_id).first()
+            if user_billing and user_billing.created_at:
+                billing_cycle_start, billing_cycle_end = calculate_billing_cycle(user_billing.created_at)
+
+        # Check if this is a new billing cycle
+        if existing_data and billing_cycle_start:
+            existing = json.loads(existing_data)
+            old_cycle_start = existing.get("billing_cycle_start")
+            if old_cycle_start != billing_cycle_start:
+                # New billing cycle detected - reset current usage but keep previous values
+                # The prev_* values should be the last known values from the previous cycle
+                # This allows the gateway to calculate proper deltas
+                tokens_used = 0
+                cost_used = 0.0
+                # prev_tokens_used and prev_cost_used already set from existing data above
+                logger.info(f"Billing cycle reset for user {user_id}: new cycle starts {billing_cycle_start}")
+
+        # Determine usage limit status with new format
+        usage_limit_info = {
+            "user_id": str(user_id),
             "allowed": True,
-            "remaining_tokens": usage["usage"]["tokens_quota"] - usage["usage"]["tokens_used"]
-            if usage["usage"]["tokens_quota"]
-            else None,
+            "status": "allowed",
+            "tokens_quota": tokens_quota,
+            "tokens_used": tokens_used,
+            "cost_quota": cost_quota,
+            "cost_used": cost_used,
+            "prev_tokens_used": prev_tokens_used,
+            "prev_cost_used": prev_cost_used,
+            "reason": None,
+            "reset_at": billing_cycle_end,
+            "last_updated": datetime.now(timezone.utc).isoformat(),
+            "billing_cycle_start": billing_cycle_start,
+            "billing_cycle_end": billing_cycle_end,
+            "plan_name": usage.get("plan_name", "Free"),
         }
+
+        if not usage.get("has_billing"):
+            # No billing plan means freemium user - allow with no limits
+            usage_limit_info.update(
+                {
+                    "allowed": True,
+                    "status": "no_billing_plan",
+                    "reason": "No billing plan - freemium user",
+                }
+            )
+        elif usage.get("is_suspended"):
+            usage_limit_info.update(
+                {
+                    "allowed": False,
+                    "status": "suspended",
+                    "reason": usage.get("suspension_reason", "Account suspended"),
+                }
+            )
+        elif tokens_quota and tokens_used >= tokens_quota:
+            usage_limit_info.update(
+                {
+                    "allowed": False,
+                    "status": "token_limit_exceeded",
+                    "reason": "Monthly token quota exceeded",
+                }
+            )
+        elif cost_quota and cost_used >= cost_quota:
+            usage_limit_info.update(
+                {
+                    "allowed": False,
+                    "status": "cost_limit_exceeded",
+                    "reason": "Monthly cost quota exceeded",
+                }
+            )
+        else:
+            # User is within limits
+            usage_limit_info.update(
+                {
+                    "allowed": True,
+                    "status": "allowed",
+                }
+            )
+
+        # Publish to Redis for gateway consumption
+        try:
+            redis_service = RedisService()
+            key = f"usage_limit:{user_id}"
+            # Store with 60 second TTL - ensures data availability between sync intervals (30s)
+            await redis_service.set(key, json.dumps(usage_limit_info), ex=60)
+        except Exception as e:
+            logger.warning(f"Failed to publish usage limit to Redis: {e}")
+
+        return usage_limit_info
 
     async def get_usage_history(
         self,
@@ -170,6 +365,7 @@ class BillingService(DataManagerUtils):
         start_date: datetime,
         end_date: datetime,
         granularity: str = "daily",
+        project_id: Optional[UUID] = None,
     ) -> Dict[str, Any]:
         """Get historical usage data with specified granularity."""
         try:
@@ -181,6 +377,9 @@ class BillingService(DataManagerUtils):
                     "end_date": end_date.isoformat(),
                     "granularity": granularity,
                 }
+
+                if project_id:
+                    params["project_id"] = str(project_id)
 
                 response = await client.get(
                     f"{self.budmetrics_base_url}/observability/usage/history",

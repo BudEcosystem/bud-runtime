@@ -22,6 +22,12 @@ interface ProjectTag {
 }
 
 interface Project {
+  credentials: {
+    id: string;
+    last_used_at: string;
+    name: string;
+  }[];
+  credentials_count: number;
   id: string;
   name: string;
   description: string;
@@ -50,29 +56,31 @@ export const ProjectDetailContent: React.FC<{ projectId: string; onClose: () => 
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const fetchProjectDetails = async () => {
+      try {
+        setLoading(true);
+        const response = await AppRequest.Get(`/projects/${projectId}`);
+        if (response.data?.project) {
+          setProject({
+            ...response.data.project,
+            endpoints_count: response.data.endpoints_count || 0,
+            models_count: response.data.models_count || 0,
+            clusters_count: response.data.clusters_count || 0,
+            credentials_count: response.data.credentials_count || 0,
+            credentials: response.data.credentials || [],
+          });
+        }
+      } catch (error) {
+        console.error("Failed to fetch project details:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     if (projectId) {
       fetchProjectDetails();
     }
   }, [projectId]);
-
-  const fetchProjectDetails = async () => {
-    try {
-      setLoading(true);
-      const response = await AppRequest.Get(`/projects/${projectId}`);
-      if (response.data?.project) {
-        setProject({
-          ...response.data.project,
-          endpoints_count: response.data.endpoints_count || 0,
-          models_count: response.data.models_count || 0,
-          clusters_count: response.data.clusters_count || 0,
-        });
-      }
-    } catch (error) {
-      console.error("Failed to fetch project details:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -187,45 +195,31 @@ export const ProjectDetailContent: React.FC<{ projectId: string; onClose: () => 
                 </Col>
 
                 <Col span={24} className="mb-[1rem]">
-                  <div className="flex items-center justify-between">
-                    <Text className="text-gray-400">Endpoints</Text>
-                    <Text className="text-white">{project.endpoints_count || 0}</Text>
+                  <div className="flex items-center justify-start">
+                    <Text className="text-gray-400">Api Keys: &nbsp;</Text>
+                    <Text className="text-white">{project.credentials_count || 0}</Text>
                   </div>
                 </Col>
 
-                {project.created_at && (
-                  <Col span={24}>
-                    <div className="flex items-center justify-between">
-                      <Text className="text-gray-400">Created</Text>
-                      <Text className="text-white">
-                        {dayjs(project.created_at).format("MMM DD, YYYY")}
-                      </Text>
+                {project.credentials && project.credentials.length > 0 && (
+                  <Col span={24} className="mb-[1.5rem]">
+                    <div className="bg-[#1F1F1F50] rounded-lg p-3">
+                      <Text className="text-gray-400 text-xs mb-2 block">Available API Keys</Text>
+                      {project.credentials.map((credential) => (
+                        <div key={credential.id} className="flex items-center justify-between py-2 border-b border-[#2a2a3e] last:border-0">
+                          <Text className="text-white text-sm">{credential.name}</Text>
+                          <Text className="text-gray-500 text-xs">
+                            {credential.last_used_at
+                              ? `Last used: ${dayjs(credential.last_used_at).format("MMM DD, YYYY HH:mm")}`
+                              : "Never used"}
+                          </Text>
+                        </div>
+                      ))}
                     </div>
                   </Col>
                 )}
 
-                {project.updated_at && (
-                  <Col span={24}>
-                    <div className="flex items-center justify-between">
-                      <Text className="text-gray-400">Last Updated</Text>
-                      <Text className="text-white">
-                        {dayjs(project.updated_at).format("MMM DD, YYYY")}
-                      </Text>
-                    </div>
-                  </Col>
-                )}
 
-                {project.owner && (
-                  <Col span={24}>
-                    <div className="flex items-center justify-between">
-                      <Text className="text-gray-400">Owner</Text>
-                      <Space>
-                        <UserOutlined className="text-gray-400" />
-                        <Text className="text-white">{project.owner}</Text>
-                      </Space>
-                    </div>
-                  </Col>
-                )}
               </Row>
             </div>
           </div>

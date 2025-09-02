@@ -13,11 +13,12 @@ kind: PersistentVolumeClaim
 metadata:
   name: {{ .Release.Name }}-bud-models-registry
 spec:
+  storageClassName: {{ .Values.microservices.budmodel.storageClassName }}
   accessModes:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 20Gi
+      storage: 1024Gi
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim

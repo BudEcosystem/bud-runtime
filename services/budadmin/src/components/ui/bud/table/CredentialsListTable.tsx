@@ -171,6 +171,7 @@ const CredentialsListTable = () => {
                 <Image src={`${assetBaseUrl}${record.provider_icon}`}
                   preview={false}
                   style={{ width: '0.875rem' }}
+                  alt={`${record.type} icon`}
                 />
               </div>
               <Text_12_300_EEEEEE className='flex-auto truncate max-w-[90%]' style={{ marginLeft: 10 }}>{record.type}</Text_12_300_EEEEEE>

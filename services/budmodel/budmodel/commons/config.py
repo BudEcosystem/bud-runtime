@@ -68,6 +68,48 @@ class AppConfig(BaseAppConfig):
     Aria2p_host: str = Field("http://localhost", alias="ARIA2P_HOST")
     Aria2p_port: int = Field(6800, alias="ARIA2P_PORT")
 
+    # I/O Monitoring and Throttling Config
+    enable_io_monitoring: bool = Field(True, alias="ENABLE_IO_MONITORING")
+    io_check_interval: float = Field(5.0, alias="IO_CHECK_INTERVAL")  # seconds
+
+    # Dynamic Throttling Detection (NEW - recommended)
+    enable_dynamic_throttling: bool = Field(True, alias="ENABLE_DYNAMIC_THROTTLING")
+
+    # Legacy Static Thresholds (deprecated when using dynamic throttling)
+    iowait_threshold: float = Field(30.0, alias="IOWAIT_THRESHOLD")  # % CPU waiting for I/O
+    write_rate_threshold: float = Field(100 * 1024 * 1024, alias="WRITE_RATE_THRESHOLD")  # 100 MB/s
+    disk_usage_threshold: float = Field(90.0, alias="DISK_USAGE_THRESHOLD")  # % disk usage
+
+    # Volume-Specific I/O Monitoring
+    enable_volume_specific_monitoring: bool = Field(True, alias="ENABLE_VOLUME_SPECIFIC_MONITORING")
+    network_storage_latency_threshold: float = Field(100.0, alias="NETWORK_STORAGE_LATENCY_THRESHOLD")  # ms
+    volume_cache_ttl: float = Field(30.0, alias="VOLUME_CACHE_TTL")  # seconds to cache volume info
+
+    # Aria2 Speed Limits (configured in Mbps, converted to bytes/sec internally)
+    @property
+    def aria2_min_speed(self) -> int:
+        """Minimum download speed in bytes/sec (converted from ARIA2_MIN_SPEED_MBPS)."""
+        mbps = int(os.getenv("ARIA2_MIN_SPEED_MBPS", "1"))
+        return mbps * 1024 * 1024
+
+    @property
+    def aria2_max_speed(self) -> int:
+        """Maximum download speed in bytes/sec (converted from ARIA2_MAX_SPEED_MBPS)."""
+        mbps = int(os.getenv("ARIA2_MAX_SPEED_MBPS", "0"))
+        return mbps * 1024 * 1024 if mbps > 0 else 0  # 0 means unlimited
+
+    aria2_initial_speed: int = Field(
+        50 * 1024 * 1024, alias="ARIA2_INITIAL_SPEED"
+    )  # 50 MB/s initial (increased for dynamic throttling)
+
+    # Feature Flags
+    use_aria2_for_huggingface: bool = Field(
+        True, alias="USE_ARIA2_FOR_HUGGINGFACE"
+    )  # Enabled by default for high-performance downloads
+    aria2_max_concurrent_downloads: int = Field(3, alias="ARIA2_MAX_CONCURRENT_DOWNLOADS")
+    aria2_max_connection_per_server: int = Field(10, alias="ARIA2_MAX_CONNECTION_PER_SERVER")
+    aria2_split: int = Field(10, alias="ARIA2_SPLIT")  # Number of parallel connections per file
+
     # Bud LLM Base URL
     bud_llm_base_url: Optional[str] = Field(None, alias="BUD_LLM_BASE_URL")
     bud_llm_model: str = Field("Qwen/QwQ-32B", alias="BUD_LLM_MODEL")

@@ -54,6 +54,7 @@ def mock_catalog_items():
             "provider_icon": "openai_icon.png",
             "published_date": datetime.utcnow().isoformat(),
             "endpoint_id": str(uuid4()),
+            "endpoint_name": "GPT-4 Production Endpoint",
             "supported_endpoints": ["text-generation", "chat-completion"],
             "pricing": {
                 "input_cost": 0.03,
@@ -80,6 +81,7 @@ def mock_catalog_items():
             "provider_icon": "anthropic_icon.png",
             "published_date": datetime.utcnow().isoformat(),
             "endpoint_id": str(uuid4()),
+            "endpoint_name": "Claude-3 Production Endpoint",
             "supported_endpoints": ["text-generation", "chat-completion"],
             "pricing": {
                 "input_cost": 0.015,

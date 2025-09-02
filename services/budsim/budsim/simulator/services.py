@@ -145,6 +145,19 @@ class SimulationService:
                     device_type = device["type"]
                     available_count = device["available_count"]
 
+                    # Handle backward compatibility: map generic 'gpu' to specific type
+                    if device_type == "gpu":
+                        # Try to determine specific type from vendor if available
+                        vendor = device.get("vendor", "").lower()
+                        if "amd" in vendor or "ati" in vendor:
+                            device_type = "rocm"
+                        elif "intel" in vendor:
+                            device_type = "hpu"
+                        else:
+                            # Default to cuda for generic GPU (most common)
+                            device_type = "cuda"
+                        logger.info(f"Mapped generic 'gpu' type to '{device_type}' based on vendor: {vendor}")
+
                     logger.debug(
                         f"Processing device {device.get('name', 'unknown')} in node {node_id}: "
                         f"type={device_type}, available_count={available_count}"
@@ -156,6 +169,15 @@ class SimulationService:
                             f"Skipping device {device.get('name', 'unknown')} in node {node_id}: "
                             f"available_count = {available_count}"
                         )
+                        continue
+
+                    # Skip CPU devices as they're not supported for LLM inference
+                    if device_type in ["cpu", "cpu_high"]:
+                        device_name = device.get("name", "unknown")
+                        if device_type == "cpu_high":
+                            logger.info(f"Skipping CPU_HIGH device {device_name}: CPU inference not supported")
+                        else:
+                            logger.info(f"Skipping CPU device {device_name}: CPU inference not supported")
                         continue
 
                     # Initialize device group if not exists
@@ -550,6 +572,16 @@ class SimulationService:
                 engine_name,
                 device_config.get("device_type") or device_config.get("type"),
                 str(e),
+            )
+            # Return error result instead of None so it can be properly handled
+            return ensure_json_serializable(
+                {
+                    "top_k_configs": [],
+                    "engine": engine_name,
+                    "engine_image": engine_image,
+                    "device_config": device_config,
+                    "error": f"Simulation failed: {str(e)}",
+                }
             )
 
     @staticmethod
@@ -1149,9 +1181,21 @@ class SimulationService:
             return results
 
         except Exception as e:
+            # Extract meaningful error message from exception
+            error_detail = str(e)
+            if "cannot run on any of the" in error_detail and "available device(s)" in error_detail:
+                # Model doesn't fit on any device
+                fix_message = "Fix: Use a smaller model or add devices with more memory"
+            elif "No valid configurations found" in error_detail:
+                fix_message = "Fix: Model requires more memory than available on devices"
+            else:
+                fix_message = (
+                    f"Fix: {error_detail[:100]}" if len(error_detail) < 100 else "Fix: Check logs for details"
+                )
+
             notification_req.payload.content = NotificationContent(
                 title="Failed to generate best configurations",
-                message="Fix: Retry the simulation",
+                message=fix_message,
                 status=WorkflowStatus.FAILED,
                 primary_action="retry",
             )
@@ -1236,10 +1280,22 @@ class SimulationService:
                 )
                 for result in invalid_results:
                     device_info = result.get("device_config", {})
-                    logger.warning(
-                        f"  - Device: {device_info.get('device_name', 'Unknown')} "
-                        f"(Memory: {device_info.get('mem_per_GPU_in_GB', 0):.2f}GB)"
+                    # Try multiple fields to get device identification
+                    device_name = (
+                        device_info.get("device_name")
+                        or device_info.get("model")
+                        or device_info.get("name")
+                        or device_info.get("id", "Unknown")
                     )
+                    # Handle memory in MB or GB
+                    memory_gb = device_info.get("mem_per_GPU_in_GB", 0)
+                    if memory_gb == 0 and "memory" in device_info:
+                        # Convert from MB to GB if needed
+                        memory_mb = device_info.get("memory", 0)
+                        memory_gb = memory_mb / 1024.0 if memory_mb > 0 else 0
+
+                    error_msg = result.get("error", "Model cannot fit in device memory")
+                    logger.warning(f"  - Device: {device_name} (Memory: {memory_gb:.2f}GB) - {error_msg}")
 
             records = []
             for result in valid_results:
@@ -1325,9 +1381,21 @@ class SimulationService:
 
             return recommendations
         except Exception as e:
+            # Extract meaningful error message from exception
+            error_detail = str(e)
+            if "cannot run on any of the" in error_detail and "available device(s)" in error_detail:
+                # Model doesn't fit on any device
+                fix_message = "Fix: Use a smaller model or add devices with more memory"
+            elif "No valid simulation results" in error_detail:
+                fix_message = "Fix: Check hardware requirements and model compatibility"
+            else:
+                fix_message = (
+                    f"Fix: {error_detail[:100]}" if len(error_detail) < 100 else "Fix: Check logs for details"
+                )
+
             notification_req.payload.content = NotificationContent(
                 title="Failed to rank the clusters" if cluster_id is None else "Failed to rank the configurations",
-                message="Fix: Retry the simulation",
+                message=fix_message,
                 status=WorkflowStatus.FAILED,
                 primary_action="retry",
             )
@@ -1436,6 +1504,7 @@ class SimulationService:
         query_time = time.time() - start_time
         logger.info("Database query took %.3f seconds for workflow %s", query_time, workflow_id)
         logger.info("Found %s/%s deployment configurations", len(results), total_count)
+        logger.info("topk_cluster_recommendations Results: %s", results)
 
         recommendations = {}
 
@@ -1486,7 +1555,7 @@ class SimulationService:
                     > deployment_config.cost_per_million_tokens
                 ):
                     recommendations[recommendation.cluster_id] = recommendation
-
+        logger.info("topk_cluster_recommendations Recommendations: %s", recommendations)
         return PaginatedResponse(
             object="cluster_recommendations",
             items=sorted(recommendations.values(), key=lambda x: x.metrics.cost_per_million_tokens),

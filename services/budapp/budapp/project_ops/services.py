@@ -759,7 +759,7 @@ class ProjectService(SessionMixin):
 
         # Cannot remove all users from project
         if len(existing_user_ids) == len(user_ids):
-            raise ClientException(detail="Cannot remove all users from project")
+            raise ClientException(message="Cannot remove all users from project")
 
         # Initialize permission service
         permission_service = PermissionService(self.session)

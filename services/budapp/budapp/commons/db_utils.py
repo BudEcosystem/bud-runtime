@@ -133,6 +133,7 @@ class SQLAlchemyMixin(SessionMixin):
         try:
             return self.session.execute(stmt).scalar_one_or_none()
         except (Exception, SQLAlchemyError) as e:
+            self.session.rollback()  # Ensure rollback on error
             logger.exception(f"Failed to get one model from database: {e}")
             raise DatabaseException("Unable to get model from database") from e
 
@@ -196,6 +197,7 @@ class SQLAlchemyMixin(SessionMixin):
         try:
             return self.session.scalars(stmt).all()
         except (Exception, SQLAlchemyError) as e:
+            self.session.rollback()  # Ensure rollback on error
             logger.exception(f"Failed to execute statement: {e}")
             raise DatabaseException("Unable to execute statement") from e
 
@@ -216,6 +218,7 @@ class SQLAlchemyMixin(SessionMixin):
         try:
             return self.session.execute(stmt).all()
         except (Exception, SQLAlchemyError) as e:
+            self.session.rollback()  # Ensure rollback on error
             logger.exception(f"Failed to execute statement: {e}")
             raise DatabaseException("Unable to execute statement") from e
 
@@ -236,6 +239,7 @@ class SQLAlchemyMixin(SessionMixin):
         try:
             return self.session.scalar(stmt)
         except (Exception, SQLAlchemyError) as e:
+            self.session.rollback()  # Ensure rollback on error
             logger.exception(f"Failed to execute scalar statement: {e}")
             raise DatabaseException("Unable to execute scalar statement") from e
 
@@ -244,6 +248,7 @@ class SQLAlchemyMixin(SessionMixin):
             self.session.execute(stmt)
             self.session.commit()
         except (Exception, SQLAlchemyError) as e:
+            self.session.rollback()  # Ensure rollback on error
             logger.exception(f"Failed to execute statement: {e}")
             raise DatabaseException("Unable to execute statement") from e
 

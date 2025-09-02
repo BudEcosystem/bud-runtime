@@ -184,12 +184,14 @@ class ModelAnalysis:
 
         try:
             # Use calculate_memory to get model memory report
+            # Add 10% safety margin to match deployment configuration
+            seq_length = int((self.input_tokens + self.output_tokens) * 1.1)
             memory_report = calculate_memory(
                 model_id_or_config=self.model,
                 batch_size=1,  # Use 1 for parameter counting
-                seq_length=self.input_tokens + self.output_tokens,
+                seq_length=seq_length,
                 precision="bf16",  # Default to BF16
-                tensor_parallel=self.tp_size,
+                tensor_parallel=self.tp_size,  # Pass TP for correct per-device calculations
             )
 
             # Extract parameter count from memory report
@@ -236,12 +238,14 @@ class ModelAnalysis:
 
             # Calculate memory requirements using calculate_memory
             # Use actual concurrency for accurate KV cache calculation
+            # Add 10% safety margin to match deployment configuration
+            seq_length = int((self.input_tokens + self.output_tokens) * 1.1)
             memory_report = calculate_memory(
                 model_id_or_config=self.model,
                 batch_size=self.concurrency,  # Use actual concurrency for total KV cache
-                seq_length=self.input_tokens + self.output_tokens,
+                seq_length=seq_length,
                 precision=precision,
-                tensor_parallel=self.tp_size,
+                tensor_parallel=self.tp_size,  # Pass TP for correct per-device calculations
             )
 
             # Extract model weight and KV cache from memory report
@@ -342,12 +346,14 @@ class ModelAnalysis:
                 precision = "bf16"
 
             # Calculate total memory requirements
+            # Add 10% safety margin to match deployment configuration
+            seq_length = int((self.input_tokens + self.output_tokens) * 1.1)
             memory_report = calculate_memory(
                 model_id_or_config=self.model,
                 batch_size=self.concurrency,
-                seq_length=self.input_tokens + self.output_tokens,
+                seq_length=seq_length,
                 precision=precision,
-                tensor_parallel=self.tp_size,
+                tensor_parallel=self.tp_size,  # Pass TP for correct per-device calculations
             )
 
             # Return total memory in GB

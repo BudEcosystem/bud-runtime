@@ -240,7 +240,8 @@ class DeploymentService(SessionMixin):
             response = await DeleteDeploymentWorkflow().__call__(delete_deployment_request)
         except Exception as e:
             logger.error(f"Error deleting deployment: {e}")
-            raise ErrorResponse(message=str(e)) from e
+            # Return ErrorResponse instead of raising it since it's not an Exception
+            return ErrorResponse(message=str(e))
         return response
 
     @staticmethod
@@ -551,7 +552,8 @@ class QuantizationService(SessionMixin):
             response = await DeployQuantizationWorkflow().__call__(deploy_quantization_request)
         except Exception as e:
             logger.error(f"Error deploying quantization: {e}")
-            raise ErrorResponse(message=str(e)) from e
+            # Return ErrorResponse instead of raising it since it's not an Exception
+            return ErrorResponse(message=str(e))
         return response
 
     @staticmethod
@@ -728,7 +730,8 @@ class AdapterService(SessionMixin):
                 response = await DeleteAdapterWorkflow().__call__(adapter_request)
         except Exception as e:
             logger.error(f"Error deploying adapter: {e}")
-            raise ErrorResponse(message=str(e)) from e
+            # Return ErrorResponse instead of raising it since it's not an Exception
+            return ErrorResponse(message=str(e))
         return response
 
     @staticmethod

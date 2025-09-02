@@ -38,6 +38,7 @@ pub mod redis_client; // redis client
 pub mod responses; // OpenAI-compatible Responses API
 mod testing;
 pub mod tool; // types and methods for working with TensorZero tools
+pub mod usage_limit; // usage limiting
 mod uuid_util; // utilities for working with UUIDs
 pub mod variant; // types and methods for working with TensorZero variants // authentication
 

@@ -175,8 +175,8 @@ import os
 models = [
     dict(
         type=OpenAISDK,
-        abbr=os.environ.get('MODEL_NAME', 'qwen3-4b'),
-        path=os.environ.get('MODEL_NAME', 'qwen3-4b'),  # Actual model name for API
+        abbr=os.environ.get('MODEL_NAME', 'qwen3-32b'),
+        path=os.environ.get('MODEL_NAME', 'qwen3-32b'),  # Actual model name for API
         key=os.environ.get('OPENAI_API_KEY'),
         openai_api_base=os.environ.get('OPENAI_API_BASE'),
         query_per_second={int(request.model.extra_params.get("query_per_second", "10"))},
@@ -193,7 +193,7 @@ cd /workspace
 # Run OpenCompass evaluation with model config and datasets via CLI
 python /workspace/run.py \\
     --models bud_model \\
-    --datasets demo_gsm8k_chat_gen \\
+    --datasets {datasets_str} \\
     --work-dir /workspace/outputs \\
     --max-num-workers {request.num_workers} --debug
 """
@@ -211,12 +211,17 @@ python /workspace/run.py \\
 
     def get_volume_mounts(self) -> List[Dict[str, Any]]:
         """Get volume mounts for OpenCompass."""
+        # Get PVC name from configuration
+        from budeval.commons.storage_config import StorageConfig
+
+        pvc_name = StorageConfig.get_eval_datasets_pvc_name()
+
         return [
             {
                 "name": "datasets",
                 "mountPath": "/workspace/data",
                 "readOnly": True,
-                "claimName": "eval-datasets-pvc",
+                "claimName": pvc_name,
             },
             {
                 "name": "cache",

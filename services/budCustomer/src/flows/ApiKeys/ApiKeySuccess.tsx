@@ -38,7 +38,12 @@ const ApiKeySuccess = () => {
   };
 
   return (
-    <BudForm data={{}}>
+    <BudForm
+      data={{}}
+      nextText="Ok"
+      onNext={() => {
+        closeDrawer();
+      }}>
       <BudWraperBox center={true}>
         <BudDrawerLayout>
           <div className="flex flex-col justify-start items-center p-[2.5rem]">
@@ -53,7 +58,7 @@ const ApiKeySuccess = () => {
             </div>
 
             <div className="max-w-[84%] mt-[1rem] mb-[2rem] flex flex-col items-center justify-center">
-              <Text_24_600_EEEEEE className="text-center leading-[2rem] mb-[1.2rem]">
+              <Text_24_600_EEEEEE className="text-[black] dark:text-[#EEEEEE]text-center leading-[2rem] mb-[1.2rem]">
                 API Key Created Successfully!
               </Text_24_600_EEEEEE>
             </div>
@@ -70,7 +75,7 @@ const ApiKeySuccess = () => {
                   </Text_13_400_EEEEEE>
                 </div>
 
-                <div className="bg-[#1F1F1F] border border-[#2F2F2F] rounded-[8px] p-[1rem] flex items-center justify-between w-full max-w-[500px] mb-[2rem]">
+                <div className="bg-[#1F1F1F] border border-[#2F2F2F] rounded-[8px] p-[1rem] flex items-center justify-between w-full max-w-[500px]">
                   <code className="text-[#EEEEEE] text-[0.875rem] break-all flex-1">
                     {apiKey}
                   </code>
@@ -88,19 +93,6 @@ const ApiKeySuccess = () => {
                 </div>
               </>
             )}
-
-            <PrimaryButton
-              onClick={() => {
-                closeDrawer();
-              }}
-            >
-              <div className="flex items-center justify-center gap-2">
-                <Icon icon="ph:check-circle" className="text-[1rem]" />
-                <Text_12_300_EEEEEE>
-                  I&apos;ve saved this key
-                </Text_12_300_EEEEEE>
-              </div>
-            </PrimaryButton>
           </div>
         </BudDrawerLayout>
       </BudWraperBox>
