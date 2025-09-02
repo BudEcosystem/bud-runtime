@@ -85,9 +85,19 @@ class AppConfig(BaseAppConfig):
     network_storage_latency_threshold: float = Field(100.0, alias="NETWORK_STORAGE_LATENCY_THRESHOLD")  # ms
     volume_cache_ttl: float = Field(30.0, alias="VOLUME_CACHE_TTL")  # seconds to cache volume info
 
-    # Aria2 Speed Limits
-    aria2_min_speed: int = Field(1 * 1024 * 1024, alias="ARIA2_MIN_SPEED")  # 1 MB/s minimum
-    aria2_max_speed: int = Field(0, alias="ARIA2_MAX_SPEED")  # 0 = unlimited (no cap, uses all available bandwidth)
+    # Aria2 Speed Limits (configured in Mbps, converted to bytes/sec internally)
+    @property
+    def aria2_min_speed(self) -> int:
+        """Minimum download speed in bytes/sec (converted from ARIA2_MIN_SPEED_MBPS)."""
+        mbps = int(os.getenv("ARIA2_MIN_SPEED_MBPS", "1"))
+        return mbps * 1024 * 1024
+
+    @property
+    def aria2_max_speed(self) -> int:
+        """Maximum download speed in bytes/sec (converted from ARIA2_MAX_SPEED_MBPS)."""
+        mbps = int(os.getenv("ARIA2_MAX_SPEED_MBPS", "0"))
+        return mbps * 1024 * 1024 if mbps > 0 else 0  # 0 means unlimited
+
     aria2_initial_speed: int = Field(
         50 * 1024 * 1024, alias="ARIA2_INITIAL_SPEED"
     )  # 50 MB/s initial (increased for dynamic throttling)

@@ -23,6 +23,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Deque, Dict, Optional
 
+import numpy as np
 import psutil
 from budmicroframe.commons import logging
 
@@ -333,9 +334,10 @@ class ThrottleDetector:
         if len(history) < self.busy_time_duration:
             return False
 
-        # Check last N seconds
+        # Check last N seconds - optimized with numpy
         recent_samples = list(history)[-int(self.busy_time_duration) :]
-        high_busy_count = sum(1 for m in recent_samples if m.busy_percent > self.busy_time_threshold)
+        busy_percentages = np.array([m.busy_percent for m in recent_samples])
+        high_busy_count = np.sum(busy_percentages > self.busy_time_threshold)
 
         return high_busy_count >= len(recent_samples) * 0.8  # 80% of samples
 
@@ -368,15 +370,21 @@ class ThrottleDetector:
         if len(history) < 5:
             return False
 
-        # Compare recent vs older samples
+        # Compare recent vs older samples - optimized with numpy
         recent = history[-3:]
         older = history[-6:-3]
 
-        recent_avg_latency = sum(m.avg_write_latency_ms for m in recent) / len(recent)
-        older_avg_latency = sum(m.avg_write_latency_ms for m in older) / len(older)
+        recent_latencies = np.array([m.avg_write_latency_ms for m in recent])
+        older_latencies = np.array([m.avg_write_latency_ms for m in older])
 
-        recent_avg_rate = sum(m.write_rate_mbps for m in recent) / len(recent)
-        older_avg_rate = sum(m.write_rate_mbps for m in older) / len(older)
+        recent_rates = np.array([m.write_rate_mbps for m in recent])
+        older_rates = np.array([m.write_rate_mbps for m in older])
+
+        recent_avg_latency = np.mean(recent_latencies)
+        older_avg_latency = np.mean(older_latencies)
+
+        recent_avg_rate = np.mean(recent_rates)
+        older_avg_rate = np.mean(older_rates)
 
         # Stall if latency increased significantly but throughput didn't
         if older_avg_latency > 0 and older_avg_rate > 0:

@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 from budmicroframe.commons import logging
 from sqlalchemy import func
 
@@ -8,6 +10,21 @@ from .models import ModelDownloadHistory, ModelDownloadHistoryCRUD
 
 
 logger = logging.get_logger(__name__)
+
+
+@dataclass
+class ExistingDownload:
+    """Represents an existing download record."""
+
+    directory_name: str
+    status: ModelDownloadStatus
+
+
+@dataclass
+class DownloadRecord:
+    """Represents a download record status."""
+
+    status: ModelDownloadStatus
 
 
 class DownloadHistory:
@@ -135,13 +152,7 @@ class DownloadHistory:
             record = crud.session.query(ModelDownloadHistory).filter(ModelDownloadHistory.path == path).first()
 
             if record:
-                # Create an object with the expected attributes
-                class ExistingDownload:
-                    def __init__(self, directory_name, status):
-                        self.directory_name = directory_name
-                        self.status = status
-
-                return ExistingDownload(directory_name, record.status)
+                return ExistingDownload(directory_name=directory_name, status=record.status)
             return None
 
     @staticmethod
@@ -188,12 +199,7 @@ class DownloadHistory:
             )
 
             if record:
-
-                class DownloadRecord:
-                    def __init__(self, status):
-                        self.status = status
-
-                return DownloadRecord(record.status)
+                return DownloadRecord(status=record.status)
             return None
 
     @staticmethod
