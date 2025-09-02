@@ -35,7 +35,10 @@ from budapp.user_ops.schemas import User, UserInfo
 def mock_session():
     """Create a mock database session."""
     session = Mock(spec=Session)
-    session.execute = Mock()
+    # Mock execute to return an object with scalar_one_or_none method
+    mock_result = Mock()
+    mock_result.scalar_one_or_none = Mock(return_value=0)  # Return 0 count by default (no duplicates)
+    session.execute = Mock(return_value=mock_result)
     session.commit = Mock()
     session.rollback = Mock()
     session.refresh = Mock()
