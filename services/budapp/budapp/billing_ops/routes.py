@@ -59,6 +59,8 @@ async def get_current_usage(
     try:
         service = BillingService(db)
         usage = await service.get_current_usage(current_user.id)
+
+        # Now the service always returns valid billing data (Free plan as default)
         return SingleResponse(
             result=CurrentUsageSchema(**usage),
             message="Current usage retrieved successfully",
@@ -127,6 +129,7 @@ async def get_user_current_usage(
         service = BillingService(db)
         usage = await service.get_current_usage(user_id)
 
+        # Now the service always returns valid billing data (Free plan as default)
         return SingleResponse(
             result=CurrentUsageSchema(**usage),
             message="User usage retrieved successfully",
