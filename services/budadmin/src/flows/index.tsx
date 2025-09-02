@@ -118,6 +118,7 @@ import CreateBlockingRuleStep from "./blocking/CreateBlockingRuleStep";
 import BlockingRuleSuccess from "./blocking/BlockingRuleSuccess";
 import ViewBlockingRuleDetails from "./blocking/ViewBlockingRuleDetails";
 import Publish from "./Project/Publish";
+import PublishEndpoint from "./Project/PublishEndpoint";
 import ViewEvalDetailscopy from "./Evaluations/RunEvaluation/ViewEvalDetail";
 import SelectProvider from "./GuardRails/SelectProvider";
 import PolitenessDetection from "./GuardRails/PolitenessDetection";
@@ -190,6 +191,7 @@ export const StepComponents = {
   "worker-details": WorkerDetails,
   "use-model": UseModel,
   "publish": Publish,
+  "publish-endpoint": PublishEndpoint,
   "delete-cluster": DeleteCluster,
   "deploy-model-success": DeployModelSuccess,
   "delete-cluster-status": ClusterDeleteStatus,
