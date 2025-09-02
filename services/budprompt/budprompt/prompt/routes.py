@@ -112,7 +112,7 @@ async def execute_prompt(
         ).to_http_response()
 
 
-@prompt_router.post("/schema", tags=["Prompt Schema"])
+@prompt_router.post("/schema")
 @pubsub_api_endpoint(request_model=PromptSchemaRequest)
 async def perform_prompt_schema(request: PromptSchemaRequest) -> Response:
     """Run a prompt schema validation workflow.

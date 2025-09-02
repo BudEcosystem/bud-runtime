@@ -38,6 +38,7 @@ from budprompt.commons.exceptions import (
 )
 
 from ..commons.exceptions import ClientException
+from ..commons.helpers import run_async
 from ..shared.redis_service import RedisService
 from .executors import SimplePromptExecutor
 from .revised_code.dynamic_model_creation import json_schema_to_pydantic_model
@@ -289,9 +290,7 @@ class PromptConfigurationService:
             # Run the async code generation only if there are validations
             validation_codes = None
             if request.schema and request.schema.validations:
-                validation_codes = asyncio.run(
-                    PromptConfigurationService._generate_codes_async(request, max_concurrent)
-                )
+                validation_codes = run_async(PromptConfigurationService._generate_codes_async(request, max_concurrent))
 
             notification_req.payload.content = NotificationContent(
                 title="Successfully generated validation codes",
@@ -388,7 +387,7 @@ class PromptConfigurationService:
             redis_key = f"prompt:{request.prompt_id}"
 
             # Fetch existing data if it exists
-            existing_data_json = asyncio.run(redis_service.get(redis_key))
+            existing_data_json = run_async(redis_service.get(redis_key))
             if existing_data_json:
                 existing_data = json.loads(existing_data_json)
                 config_data = PromptConfigurationData.model_validate(existing_data)
@@ -416,7 +415,7 @@ class PromptConfigurationService:
 
             # Convert to JSON and store in Redis
             config_json = config_data.model_dump_json(exclude_none=True, exclude_unset=True)
-            asyncio.run(redis_service.set(redis_key, config_json))
+            run_async(redis_service.set(redis_key, config_json))
 
             logger.debug(f"Stored prompt configuration for prompt_id: {request.prompt_id}, type: {request.type}")
 
@@ -496,7 +495,7 @@ class PromptConfigurationService:
             # Validate schema if present
             if request.schema is not None:
                 model_name = f"{request.type.capitalize()}Schema"
-                model = asyncio.run(json_schema_to_pydantic_model(request.schema.schema, model_name))
+                model = run_async(json_schema_to_pydantic_model(request.schema.schema, model_name))
 
                 # Validate field references in validations
                 if request.schema.validations:
