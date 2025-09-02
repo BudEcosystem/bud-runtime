@@ -15,6 +15,11 @@ from budapp.project_ops.services import ProjectService
 def mock_session():
     """Create a mock database session."""
     session = Mock()
+    # Mock execute to return an object with scalar_one_or_none method
+    mock_result = Mock()
+    mock_result.scalar_one_or_none = Mock(return_value=0)  # Return 0 count by default
+    session.execute = Mock(return_value=mock_result)
+    session.rollback = Mock()
     return session
 
 
@@ -37,13 +42,16 @@ class TestClientProjectNameValidation:
     """Test suite for CLIENT_APP project name validation."""
 
     @pytest.mark.asyncio
-    async def test_client_project_duplicate_name_within_user_projects(self, project_service, mock_user):
+    async def test_client_project_duplicate_name_within_user_projects(self, project_service, mock_user, mock_session):
         """Test that CLIENT_APP projects check name uniqueness only within user's projects."""
         project_data = {
             "name": "My Project",
             "description": "Test project",
             "project_type": ProjectTypeEnum.CLIENT_APP.value,
         }
+
+        # Configure session to return count > 0 (duplicate exists)
+        mock_session.execute.return_value.scalar_one_or_none.return_value = 1
 
         # Mock the data manager methods
         with patch("budapp.project_ops.services.ProjectDataManager") as MockDataManager:
@@ -61,13 +69,16 @@ class TestClientProjectNameValidation:
             )
 
     @pytest.mark.asyncio
-    async def test_client_project_allows_same_name_for_different_users(self, project_service, mock_user):
+    async def test_client_project_allows_same_name_for_different_users(self, project_service, mock_user, mock_session):
         """Test that CLIENT_APP projects allow the same name for different users."""
         project_data = {
             "name": "My Project",
             "description": "Test project",
             "project_type": ProjectTypeEnum.CLIENT_APP.value,
         }
+
+        # Configure session to return count = 0 (no duplicate)
+        mock_session.execute.return_value.scalar_one_or_none.return_value = 0
 
         # Mock the data manager methods
         with (
@@ -108,13 +119,16 @@ class TestClientProjectNameValidation:
             mock_dm_instance.retrieve_by_fields.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_admin_project_checks_name_globally(self, project_service, mock_user):
+    async def test_admin_project_checks_name_globally(self, project_service, mock_user, mock_session):
         """Test that ADMIN_APP projects check name uniqueness globally."""
         project_data = {
             "name": "Admin Project",
             "description": "Admin test project",
             "project_type": ProjectTypeEnum.ADMIN_APP.value,
         }
+
+        # Configure session - not needed for ADMIN_APP as it uses retrieve_by_fields
+        mock_session.execute.return_value.scalar_one_or_none.return_value = 0
 
         # Mock the data manager methods
         with patch("budapp.project_ops.services.ProjectDataManager") as MockDataManager:
@@ -134,13 +148,16 @@ class TestClientProjectNameValidation:
             mock_dm_instance.retrieve_by_fields.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_default_project_type_is_client_app(self, project_service, mock_user):
+    async def test_default_project_type_is_client_app(self, project_service, mock_user, mock_session):
         """Test that projects default to CLIENT_APP type when not specified."""
         project_data = {
             "name": "Default Type Project",
             "description": "Test project without explicit type",
             # No project_type specified
         }
+
+        # Configure session to return count = 0 (no duplicate)
+        mock_session.execute.return_value.scalar_one_or_none.return_value = 0
 
         # Mock the data manager methods
         with (
@@ -178,8 +195,11 @@ class TestClientProjectNameValidation:
             mock_dm_instance.retrieve_by_fields.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_same_name_different_project_types_allowed(self, project_service, mock_user):
+    async def test_same_name_different_project_types_allowed(self, project_service, mock_user, mock_session):
         """Test that the same user can have projects with the same name but different types."""
+        # Configure session to return count = 0 (no duplicate)
+        mock_session.execute.return_value.scalar_one_or_none.return_value = 0
+
         # First, create a CLIENT_APP project
         client_project_data = {
             "name": "My Project",
