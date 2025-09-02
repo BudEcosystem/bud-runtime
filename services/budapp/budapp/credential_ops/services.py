@@ -15,6 +15,7 @@ from budapp.commons.constants import (
     ApiCredentialTypeEnum,
     AuditActionEnum,
     AuditResourceTypeEnum,
+    CredentialTypeEnum,
     EndpointStatusEnum,
     ModelProviderTypeEnum,
     NotificationCategory,
@@ -797,7 +798,7 @@ class ProprietaryCredentialService(SessionMixin):
             user_id=current_user_id,
             details={
                 "credential_name": db_credential.name,
-                "credential_type": db_credential.type,
+                "credential_type": db_credential.type if isinstance(db_credential.type, str) else db_credential.type.value,
             },
             request=request,
             success=True,
@@ -805,7 +806,7 @@ class ProprietaryCredentialService(SessionMixin):
 
         credential_response = ProprietaryCredentialResponse(
             name=db_credential.name,
-            type=db_credential.type,
+            type=CredentialTypeEnum(db_credential.type) if isinstance(db_credential.type, str) else db_credential.type,
             id=db_credential.id,
             other_provider_creds=db_credential.other_provider_creds,
         )
@@ -828,8 +829,14 @@ class ProprietaryCredentialService(SessionMixin):
             credential.provider_id = db_provider.id
 
         # Insert credential in to database
-        credential_model = ProprietaryCredentialModel(**credential.model_dump(), user_id=user_id)
-        credential_model.type = credential_model.type.value
+        credential_data = credential.model_dump()
+        # Convert enum to string value for database
+        credential_data['type'] = (
+            credential_data['type'].value 
+            if hasattr(credential_data['type'], 'value') 
+            else credential_data['type']
+        )
+        credential_model = ProprietaryCredentialModel(**credential_data, user_id=user_id)
         db_credential = await ProprietaryCredentialDataManager(self.session).create_credential(credential_model)
         logger.info(f"Proprietary Credential inserted to database: {db_credential.id}")
 
@@ -882,7 +889,7 @@ class ProprietaryCredentialService(SessionMixin):
             result.append(
                 ProprietaryCredentialResponseList(
                     name=db_credential.name,
-                    type=db_credential.type,
+                    type=CredentialTypeEnum(db_credential.type) if isinstance(db_credential.type, str) else db_credential.type,
                     other_provider_creds=db_credential.other_provider_creds,
                     id=db_credential.id,
                     created_at=db_credential.created_at,
@@ -1001,13 +1008,18 @@ class ProprietaryCredentialService(SessionMixin):
                 "credential_name": db_credential.name,
             },
             details={
-                "credential_type": db_credential.type,
+                "credential_type": db_credential.type if isinstance(db_credential.type, str) else db_credential.type.value,
             },
             request=request,
             success=True,
         )
 
-        return db_credential
+        return ProprietaryCredentialResponse(
+            name=db_credential.name,
+            type=CredentialTypeEnum(db_credential.type) if isinstance(db_credential.type, str) else db_credential.type,
+            id=db_credential.id,
+            other_provider_creds=db_credential.other_provider_creds,
+        )
 
     async def delete_credential(self, credential_id: UUID, current_user_id: UUID, request: Optional[Request] = None):
         """Delete the proprietary credential from the database."""
@@ -1090,7 +1102,7 @@ class ProprietaryCredentialService(SessionMixin):
                     )
             return ProprietaryCredentialDetailedView(
                 name=db_credential.name,
-                type=db_credential.type,
+                type=CredentialTypeEnum(db_credential.type) if isinstance(db_credential.type, str) else db_credential.type,
                 other_provider_creds=db_credential.other_provider_creds,
                 id=db_credential.id,
                 created_at=db_credential.created_at,
