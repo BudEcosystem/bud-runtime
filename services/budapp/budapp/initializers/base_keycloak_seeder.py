@@ -181,7 +181,7 @@ class BaseKeycloakSeeder(BaseSeeder):
                     first_login=True,
                     status=UserStatusEnum.ACTIVE.value,
                     role=UserRoleEnum.SUPER_ADMIN.value,
-                    user_type=UserTypeEnum.ADMIN.value
+                    user_type=UserTypeEnum.ADMIN.value,
                 )
                 db_user = await UserDataManager(session).insert_one(db_user)
                 logger.info(f"::KEYCLOAK::User created in DB with ID {db_user.id}")
