@@ -215,6 +215,12 @@ class BillingService(DataManagerUtils):
         }
 
     async def check_usage_limits(self, user_id: UUID) -> Dict[str, Any]:
+        """Check if user has exceeded usage limits and publish to Redis."""
+        import json
+        from datetime import datetime, timezone
+
+        from budapp.shared.redis_service import RedisService
+
         """Check if user has exceeded usage limits."""
         usage = await self.get_current_usage(user_id)
 
@@ -231,13 +237,127 @@ class BillingService(DataManagerUtils):
         if usage["usage"]["cost_quota"] and usage["usage"]["cost_used"] >= usage["usage"]["cost_quota"]:
             return {"allowed": False, "reason": "Monthly cost quota exceeded"}
 
-        return {
+        # Get current usage values
+        tokens_used = usage["usage"]["tokens_used"] if usage.get("usage") else 0
+        cost_used = usage["usage"]["cost_used"] if usage.get("usage") else 0.0
+        tokens_quota = usage["usage"]["tokens_quota"] if usage.get("usage") else None
+        cost_quota = usage["usage"]["cost_quota"] if usage.get("usage") else None
+
+        # Get previous values from Redis (for delta calculation)
+        existing_data = None
+        prev_tokens_used = tokens_used  # Default to current values
+        prev_cost_used = cost_used
+        try:
+            logger.info(f"usage sync for user {user_id}")
+            redis_service = RedisService()
+            key = f"usage_limit:{user_id}"
+            existing_data = await redis_service.get(key)
+            if existing_data:
+                existing = json.loads(existing_data)
+                # Use the previous values stored in Redis for delta calculation
+                # These represent the last known state from the previous sync
+                prev_tokens_used = existing.get("tokens_used", tokens_used)
+                prev_cost_used = existing.get("cost_used", cost_used)
+        except Exception as e:
+            logger.warning(f"Failed to get previous usage from Redis: {e}")
+            # Keep the defaults (current values) if Redis fails
+
+        # Get billing cycle information
+        billing_cycle_start = None
+        billing_cycle_end = None
+        if usage.get("has_billing"):
+            # Get billing cycle from user billing record
+            from budapp.billing_ops.models import UserBilling
+            from budapp.billing_ops.utils import calculate_billing_cycle
+
+            user_billing = self.session.query(UserBilling).filter_by(user_id=user_id).first()
+            if user_billing and user_billing.created_at:
+                billing_cycle_start, billing_cycle_end = calculate_billing_cycle(user_billing.created_at)
+
+        # Check if this is a new billing cycle
+        if existing_data and billing_cycle_start:
+            existing = json.loads(existing_data)
+            old_cycle_start = existing.get("billing_cycle_start")
+            if old_cycle_start != billing_cycle_start:
+                # New billing cycle detected - reset current usage but keep previous values
+                # The prev_* values should be the last known values from the previous cycle
+                # This allows the gateway to calculate proper deltas
+                tokens_used = 0
+                cost_used = 0.0
+                # prev_tokens_used and prev_cost_used already set from existing data above
+                logger.info(f"Billing cycle reset for user {user_id}: new cycle starts {billing_cycle_start}")
+
+        # Determine usage limit status with new format
+        usage_limit_info = {
+            "user_id": str(user_id),
             "allowed": True,
-            "remaining_tokens": usage["usage"]["tokens_quota"] - usage["usage"]["tokens_used"]
-            if usage["usage"]["tokens_quota"]
-            else None,
+            "status": "allowed",
+            "tokens_quota": tokens_quota,
+            "tokens_used": tokens_used,
+            "cost_quota": cost_quota,
+            "cost_used": cost_used,
+            "prev_tokens_used": prev_tokens_used,
+            "prev_cost_used": prev_cost_used,
+            "reason": None,
+            "reset_at": billing_cycle_end,
+            "last_updated": datetime.now(timezone.utc).isoformat(),
+            "billing_cycle_start": billing_cycle_start,
+            "billing_cycle_end": billing_cycle_end,
             "plan_name": usage.get("plan_name", "Free"),
         }
+
+        if not usage.get("has_billing"):
+            # No billing plan means freemium user - allow with no limits
+            usage_limit_info.update(
+                {
+                    "allowed": True,
+                    "status": "no_billing_plan",
+                    "reason": "No billing plan - freemium user",
+                }
+            )
+        elif usage.get("is_suspended"):
+            usage_limit_info.update(
+                {
+                    "allowed": False,
+                    "status": "suspended",
+                    "reason": usage.get("suspension_reason", "Account suspended"),
+                }
+            )
+        elif tokens_quota and tokens_used >= tokens_quota:
+            usage_limit_info.update(
+                {
+                    "allowed": False,
+                    "status": "token_limit_exceeded",
+                    "reason": "Monthly token quota exceeded",
+                }
+            )
+        elif cost_quota and cost_used >= cost_quota:
+            usage_limit_info.update(
+                {
+                    "allowed": False,
+                    "status": "cost_limit_exceeded",
+                    "reason": "Monthly cost quota exceeded",
+                }
+            )
+        else:
+            # User is within limits
+            usage_limit_info.update(
+                {
+                    "allowed": True,
+                    "status": "allowed",
+                }
+            )
+
+        # Publish to Redis for gateway consumption
+        try:
+            redis_service = RedisService()
+            key = f"usage_limit:{user_id}"
+            # Store with 60 second TTL - ensures data availability between sync intervals (30s)
+            await redis_service.set(key, json.dumps(usage_limit_info), ex=60)
+        except Exception as e:
+            logger.warning(f"Failed to publish usage limit to Redis: {e}")
+
+        return usage_limit_info
 
     async def get_usage_history(
         self,

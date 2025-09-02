@@ -246,6 +246,9 @@ impl RedisClient {
                     }
                 }
             }
+            k if k.starts_with("usage_limit:") => {
+                // Usage limit keys are handled by other components, ignore silently
+            }
             _ => {
                 tracing::info!("Received message from unknown key pattern: {key}");
             }
@@ -306,6 +309,9 @@ impl RedisClient {
                 auth.clear_published_model_info();
                 tracing::debug!("Cleared published model info");
             }
+            k if k.starts_with("usage_limit:") => {
+                // Usage limit keys are handled by other components, ignore silently
+            }
             _ => {
                 tracing::info!("Received message from unknown key pattern: {key}");
             }
@@ -318,6 +324,7 @@ impl RedisClient {
     pub async fn get_connection(&self) -> Result<MultiplexedConnection, redis::RedisError> {
         self.client.get_multiplexed_async_connection().await
     }
+
 
     /// Publish rate limit configuration updates for models with rate limits
     async fn publish_rate_limit_updates(models: &ModelTable, app_state: &AppStateData) {
@@ -454,6 +461,9 @@ impl RedisClient {
                     message: format!("Failed to subscribe to redis: {e}"),
                 })
             })?;
+
+        // Subscribe to usage limit update channels
+
 
         let app_state = self.app_state.clone();
         let auth = self.auth.clone();
