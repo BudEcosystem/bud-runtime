@@ -86,13 +86,24 @@ class ProjectService(SessionMixin):
         # Permission check
         permission_service = PermissionService(self.session)
 
-        if await ProjectDataManager(self.session).retrieve_by_fields(
-            ProjectModel,
-            {"name": project_data["name"], "status": ProjectStatusEnum.ACTIVE},
-            missing_ok=True,
-            case_sensitive=False,
-        ):
-            raise ClientException("Project already exist with same name")
+        # Check for duplicate project name
+        project_type = project_data.get("project_type", ProjectTypeEnum.CLIENT_APP.value)
+
+        if project_type == ProjectTypeEnum.CLIENT_APP.value:
+            # For CLIENT_APP projects, check only within user's associated projects
+            if await ProjectDataManager(self.session).check_duplicate_name_for_user_projects(
+                project_data["name"], current_user_id, project_type
+            ):
+                raise ClientException("Project already exist with same name")
+        else:
+            # For ADMIN_APP projects, check globally across all projects
+            if await ProjectDataManager(self.session).retrieve_by_fields(
+                ProjectModel,
+                {"name": project_data["name"], "project_type": project_type, "status": ProjectStatusEnum.ACTIVE},
+                missing_ok=True,
+                case_sensitive=False,
+            ):
+                raise ClientException("Project already exist with same name")
 
         project_data["created_by"] = current_user_id
         project_model = ProjectModel(**project_data)
