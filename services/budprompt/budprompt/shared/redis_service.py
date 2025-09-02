@@ -9,7 +9,7 @@ from ..commons.exceptions import RedisException
 from .singleton import SingletonMeta
 
 
-logger = logging.get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class RedisSingleton(metaclass=SingletonMeta):

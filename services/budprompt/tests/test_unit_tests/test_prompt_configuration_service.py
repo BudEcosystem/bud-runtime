@@ -92,6 +92,7 @@ class TestValidateSchema:
 
         # Create request for input schema
         request = PromptSchemaRequest(
+            prompt_id="test_prompt_1",
             schema=SchemaBase(
                 schema=valid_simple_schema,
                 validations={
@@ -139,6 +140,7 @@ class TestValidateSchema:
         workflow_id = str(uuid.uuid4())
 
         request = PromptSchemaRequest(
+            prompt_id="test_prompt_2",
             schema=SchemaBase(
                 schema=valid_simple_schema,
                 validations={}
@@ -167,6 +169,7 @@ class TestValidateSchema:
         workflow_id = str(uuid.uuid4())
 
         request = PromptSchemaRequest(
+            prompt_id="test_prompt_3",
             schema=SchemaBase(
                 schema=valid_simple_schema,
                 validations={}
@@ -195,6 +198,7 @@ class TestValidateSchema:
         workflow_id = str(uuid.uuid4())
 
         request = PromptSchemaRequest(
+            prompt_id="test_prompt_4",
             schema=SchemaBase(
                 schema=valid_simple_schema,
                 validations={
@@ -237,6 +241,7 @@ class TestValidateSchema:
         }
 
         request = PromptSchemaRequest(
+            prompt_id="test_prompt_5",
             schema=SchemaBase(
                 schema=flexible_schema,
                 validations={}
@@ -265,6 +270,7 @@ class TestValidateSchema:
         workflow_id = str(uuid.uuid4())
 
         request = PromptSchemaRequest(
+            prompt_id="test_prompt_6",
             schema=SchemaBase(
                 schema=valid_nested_schema,
                 validations={
@@ -300,6 +306,7 @@ class TestValidateSchema:
         workflow_id = str(uuid.uuid4())
 
         request = PromptSchemaRequest(
+            prompt_id="test_prompt_7",
             schema=SchemaBase(
                 schema=valid_simple_schema,
                 validations={}  # Empty validations
@@ -328,6 +335,7 @@ class TestValidateSchema:
         workflow_id = str(uuid.uuid4())
 
         request = PromptSchemaRequest(
+            prompt_id="test_prompt_8",
             schema=None,
             type="input",
         )
@@ -354,6 +362,7 @@ class TestValidateSchema:
         workflow_id = str(uuid.uuid4())
 
         request = PromptSchemaRequest(
+            prompt_id="test_prompt_9",
             schema=SchemaBase(
                 schema=valid_simple_schema,
                 validations={}
@@ -401,6 +410,7 @@ class TestGenerateValidationCodes:
         workflow_id = str(uuid.uuid4())
 
         request = PromptSchemaRequest(
+            prompt_id="test_prompt_gen_1",
             schema=SchemaBase(
                 schema={
                     "type": "object",
@@ -455,6 +465,7 @@ class TestGenerateValidationCodes:
         workflow_id = str(uuid.uuid4())
 
         request = PromptSchemaRequest(
+            prompt_id="test_prompt_gen_2",
             schema=SchemaBase(
                 schema={
                     "type": "object",
@@ -509,6 +520,7 @@ class TestGenerateValidationCodes:
         workflow_id = str(uuid.uuid4())
 
         request = PromptSchemaRequest(
+            prompt_id="test_prompt_gen_3",
             schema=SchemaBase(
                 schema={"type": "object", "properties": {}},
                 validations={}

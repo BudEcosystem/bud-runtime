@@ -38,10 +38,11 @@ from budprompt.commons.exceptions import (
 )
 
 from ..commons.exceptions import ClientException
+from ..shared.redis_service import RedisService
 from .executors import SimplePromptExecutor
 from .revised_code.dynamic_model_creation import json_schema_to_pydantic_model
 from .revised_code.field_validation import generate_validation_function
-from .schemas import PromptExecuteRequest, PromptSchemaRequest, PromptSchemaResponse
+from .schemas import PromptConfigurationData, PromptExecuteRequest, PromptSchemaRequest, PromptSchemaResponse
 from .utils import clean_model_cache
 
 
@@ -163,6 +164,10 @@ class PromptConfigurationService:
     This service handles validation of JSON schemas and their associated
     field-level validation prompts for structured prompt execution.
     """
+
+    def __init__(self):
+        """Initialize the PromptConfigurationService."""
+        self.redis_service = RedisService()
 
     @staticmethod
     def _validate_field_references(model: Any, validations: Dict[str, Dict[str, str]], schema_type: str) -> None:
@@ -337,6 +342,129 @@ class PromptConfigurationService:
             raise e
 
     @staticmethod
+    def store_prompt_configuration(
+        workflow_id: str,
+        notification_request: NotificationRequest,
+        request: PromptSchemaRequest,
+        validation_codes: Optional[Dict[str, Dict[str, Dict[str, str]]]] = None,
+        target_topic_name: Optional[str] = None,
+        target_name: Optional[str] = None,
+    ) -> None:
+        """Store prompt configuration data in Redis.
+
+        This method stores/updates prompt configuration data including schemas and
+        validation codes based on the request type (input/output).
+
+        Args:
+            workflow_id: Workflow identifier for tracking
+            notification_request: Notification request for status updates
+            request: The prompt schema request containing schema and type
+            validation_codes: Generated validation codes for the schema
+            target_topic_name: Optional target topic for notifications
+            target_name: Optional target name for notifications
+
+        Raises:
+            RedisException: If Redis operation fails
+        """
+        notification_req = notification_request.model_copy(deep=True)
+        notification_req.payload.event = "redis_storage"
+        notification_req.payload.content = NotificationContent(
+            title="Storing prompt configuration",
+            message="Storing prompt configuration in Redis",
+            status=WorkflowStatus.STARTED,
+        )
+        dapr_workflow.publish_notification(
+            workflow_id=workflow_id,
+            notification=notification_req,
+            target_topic_name=target_topic_name,
+            target_name=target_name,
+        )
+
+        try:
+            # Create Redis service instance
+            redis_service = RedisService()
+
+            # Construct Redis key
+            redis_key = f"prompt:{request.prompt_id}"
+
+            # Fetch existing data if it exists
+            existing_data_json = asyncio.run(redis_service.get(redis_key))
+            if existing_data_json:
+                existing_data = json.loads(existing_data_json)
+                config_data = PromptConfigurationData.model_validate(existing_data)
+            else:
+                config_data = PromptConfigurationData()
+
+            # Update configuration based on type
+            if request.type == "input":
+                # Store input schema
+                if request.schema:
+                    config_data.input_schema = request.schema.schema
+
+                # Store input validation codes
+                if validation_codes:
+                    config_data.input_validation = validation_codes
+
+            elif request.type == "output":
+                # Store output schema
+                if request.schema:
+                    config_data.output_schema = request.schema.schema
+
+                # Store output validation codes
+                if validation_codes:
+                    config_data.output_validation = validation_codes
+
+            # Convert to JSON and store in Redis
+            config_json = config_data.model_dump_json(exclude_none=True, exclude_unset=True)
+            asyncio.run(redis_service.set(redis_key, config_json))
+
+            logger.debug(f"Stored prompt configuration for prompt_id: {request.prompt_id}, type: {request.type}")
+
+            notification_req.payload.content = NotificationContent(
+                title="Successfully stored prompt configuration",
+                message="Prompt configuration has been stored in Redis",
+                status=WorkflowStatus.COMPLETED,
+            )
+            dapr_workflow.publish_notification(
+                workflow_id=workflow_id,
+                notification=notification_req,
+                target_topic_name=target_topic_name,
+                target_name=target_name,
+            )
+
+            return None
+
+        except json.JSONDecodeError as e:
+            logger.exception(f"Failed to parse existing Redis data for prompt_id {request.prompt_id}: {str(e)}")
+            notification_req.payload.content = NotificationContent(
+                title="Failed to store prompt configuration",
+                message=f"Invalid data format in Redis for prompt_id {request.prompt_id}",
+                status=WorkflowStatus.FAILED,
+            )
+            dapr_workflow.publish_notification(
+                workflow_id=workflow_id,
+                notification=notification_req,
+                target_topic_name=target_topic_name,
+                target_name=target_name,
+            )
+            raise e
+
+        except Exception as e:
+            logger.exception(f"Failed to store prompt configuration in Redis: {str(e)}")
+            notification_req.payload.content = NotificationContent(
+                title="Failed to store prompt configuration",
+                message=f"Redis storage failed: {str(e)}",
+                status=WorkflowStatus.FAILED,
+            )
+            dapr_workflow.publish_notification(
+                workflow_id=workflow_id,
+                notification=notification_req,
+                target_topic_name=target_topic_name,
+                target_name=target_name,
+            )
+            raise e
+
+    @staticmethod
     def validate_schema(
         workflow_id: str,
         notification_request: NotificationRequest,
@@ -412,7 +540,8 @@ class PromptConfigurationService:
         """Execute the prompt schema validation process.
 
         This method validates the schema along with field-level
-        validation prompts for structured prompt execution.
+        validation prompts for structured prompt execution and stores
+        the configuration in Redis.
 
         Args:
             request (PromptSchemaRequest): The prompt schema request containing
@@ -422,6 +551,7 @@ class PromptConfigurationService:
 
         Raises:
             ValueError: If schema validation fails or field references are invalid.
+            RedisException: If storing to Redis fails.
 
         Returns:
             PromptSchemaResponse: The validation response containing the
@@ -447,10 +577,20 @@ class PromptConfigurationService:
         )
 
         # Generate validation codes after successful validation
-        self.generate_validation_codes(
+        validation_codes = self.generate_validation_codes(
             workflow_id,
             notification_request,
             request,
+            request.source_topic,
+            request.source,
+        )
+
+        # Store prompt configuration in Redis
+        self.store_prompt_configuration(
+            workflow_id,
+            notification_request,
+            request,
+            validation_codes,
             request.source_topic,
             request.source,
         )

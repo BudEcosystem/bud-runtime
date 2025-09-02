@@ -285,6 +285,7 @@ class PromptSchemaRequest(CloudEventBase):
     The type field specifies whether this is an input or output schema.
     """
 
+    prompt_id: str = Field(..., description="Unique identifier for the prompt configuration")
     schema: Optional[SchemaBase] = Field(
         None, description="JSON schema for structured input/output (None for unstructured)"
     )
