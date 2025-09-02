@@ -122,6 +122,7 @@ createEndPoint: (data: any) => Promise<any>;
   getPricingHistory: (endpointId: string, page?: number, limit?: number) => Promise<any>;
   updateTokenPricing: (endpointId: string, pricing: any, projectId?: string) => Promise<any>;
   publishEndpoint: (endpointId: string, publishData: any) => Promise<any>;
+  updateEndpointPricing: (endpointId: string, pricingData: any, projectId?: string) => Promise<any>;
 }>((set, get) => ({
   pageSource: "",
   clusterDetails: undefined,
@@ -468,10 +469,39 @@ getAdapters: async (params: GetAdapterParams, projectId?) => {
       };
 
       const response: any = await AppRequest.Put(url, payload);
-      successToast(response.message || "Endpoint published successfully");
+      console.log('Publish response:', response);
+      successToast(response.data.message || "Endpoint published successfully");
       return response.data;
     } catch (error) {
       console.error("Error publishing endpoint:", error);
+      throw error;
+    }
+  },
+
+  updateEndpointPricing: async (endpointId: string, pricingData: any, projectId?: string): Promise<any> => {
+    try {
+      const url = `${tempApiBaseUrl}/endpoints/${endpointId}/pricing`;
+      const payload = {
+        input_cost: parseFloat(pricingData.input_cost || 0),
+        output_cost: parseFloat(pricingData.output_cost || 0),
+        currency: "USD",
+        per_tokens: parseInt(pricingData.per_tokens || 1000)
+      };
+
+      const response: any = await AppRequest.Put(
+        url,
+        payload,
+        projectId ? {
+          headers: {
+            "x-resource-type": "project",
+            "x-entity-id": projectId,
+          },
+        } : {}
+      );
+      successToast(response.message || "Pricing updated successfully");
+      return response.data;
+    } catch (error) {
+      console.error("Error updating endpoint pricing:", error);
       throw error;
     }
   }
