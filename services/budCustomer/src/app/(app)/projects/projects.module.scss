@@ -130,3 +130,13 @@ $primary-color: var(--color-purple);
     background: linear-gradient(90deg, #757575, #8a8a8a);
   }
 }
+
+.loadingBar {
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--border-secondary),
+    transparent
+  );
+}

@@ -829,7 +829,7 @@ export default function AuditPage() {
         </Card>
 
         {/* Audit Table */}
-        <Card className="bg-bud-bg-secondary border-bud-border">
+        <div className="bg-bud-bg-secondary border border-bud-border rounded-[12px] overflow-hidden mb-[2rem]">
           <div className="space-y-6">
             {/* {Object.entries(groupedLogs).map(([group, logs]) => {
               if (logs.length === 0) return null;
@@ -874,7 +874,7 @@ export default function AuditPage() {
                     }
                   />
                   {/* Pagination */}
-                  <div className="flex justify-end mt-4 CommonCustomPagination">
+                  <div className="flex justify-end my-4 px-3  CommonCustomPagination">
                     <Pagination
                       className='small-pagination'
                       current={currentPage}
@@ -897,7 +897,7 @@ export default function AuditPage() {
               />
             )} */}
           </div>
-        </Card>
+        </div>
       </div>
     </DashboardLayout>
   );
