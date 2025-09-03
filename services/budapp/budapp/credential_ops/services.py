@@ -797,7 +797,7 @@ class ProprietaryCredentialService(SessionMixin):
             user_id=current_user_id,
             details={
                 "credential_name": db_credential.name,
-                "credential_type": db_credential.type,
+                "credential_type": db_credential.type.value,
             },
             request=request,
             success=True,
@@ -1001,7 +1001,7 @@ class ProprietaryCredentialService(SessionMixin):
                 "credential_name": db_credential.name,
             },
             details={
-                "credential_type": db_credential.type,
+                "credential_type": db_credential.type.value,
             },
             request=request,
             success=True,
@@ -1034,7 +1034,7 @@ class ProprietaryCredentialService(SessionMixin):
 
         # Store credential details before deletion
         credential_name = db_credential.name
-        credential_type = db_credential.type
+        credential_type = db_credential.type.value
 
         # Delete the credential from the database
         await ProprietaryCredentialDataManager(self.session).delete_credential(db_credential)
