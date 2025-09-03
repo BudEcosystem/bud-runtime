@@ -431,7 +431,7 @@ class TestBillingServiceNotifications:
         mock_db.execute.return_value.scalars.return_value.all.return_value = [mock_alert_1, mock_alert_2]
 
         # Execute
-        service.reset_user_alerts(mock_user.id)
+        service.reset_user_alerts(mock_user_billing.id)
 
         # Verify all tracking fields were reset
         assert mock_alert_1.last_triggered_at is None
