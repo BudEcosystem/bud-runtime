@@ -128,7 +128,7 @@ function subscribeTokenRefresh(cb: (token: string) => void) {
   refreshSubscribers.push(cb);
 }
 
-function onRrefreshed(token: string) {
+function onRefreshed(token: string) {
   refreshSubscribers.map((cb) => cb(token));
 }
 
@@ -145,7 +145,7 @@ axiosInstance.interceptors.response.use(
         .then((newToken) => {
           console.log("Token refresh successful");
           isRefreshing = false;
-          onRrefreshed(newToken);
+          onRefreshed(newToken);
           refreshSubscribers = [];
           return axiosInstance({
             ...err.config,
@@ -155,38 +155,89 @@ axiosInstance.interceptors.response.use(
             },
           });
         })
-        .catch((refreshErr) => {
-          console.error("Token refresh failed:", refreshErr);
+        .catch((err) => {
+          console.log("Token refresh failed", err);
           isRefreshing = false;
           refreshSubscribers = [];
-
+          // ✅ Don't rethrow if redirect already happened
+          if (!isRedirecting) {
+            return Promise.reject(err);
+          }
+          // If redirect already in progress, halt further processing
+          return new Promise(() => {}); // Keeps the Promise pending
+        });
+    } else if (status === 401 && isRefreshing) {
+      return new Promise((resolve) => {
+        if (err.config?.url == "auth/refresh-token") {
           if (!isRedirecting) {
             isRedirecting = true;
             localStorage.clear();
             window.location.replace("/auth/login");
           }
-
-          return Promise.reject(refreshErr);
-        });
-    } else if (status === 401) {
-      return new Promise((resolve) => {
-        subscribeTokenRefresh((token: string) => {
-          const originalRequest = err.config;
-          originalRequest.headers.Authorization = `Bearer ${token}`;
-          resolve(axiosInstance(originalRequest));
+          return;
+        }
+        subscribeTokenRefresh((newToken: string) => {
+          err.config.headers.Authorization = `Bearer ${newToken}`;
+          resolve(axiosInstance(err.config));
         });
       });
-    } else if (status) {
-      const errorMsg =
-        err.response?.data?.message ||
-        err.response?.data?.error ||
-        err.message ||
-        "An error occurred";
-      errorToast(errorMsg);
     }
-    return Promise.reject(err);
+    return handleErrorResponse(err);
   },
 );
+
+const handleErrorResponse = (err: any) => {
+  console.log("err.config?.url", err.config?.url);
+  if (
+    err.response &&
+    err.response.status === 401 &&
+    err.config?.url !== "auth/refresh-token"
+  ) {
+    if (!isRedirecting) {
+      isRedirecting = true;
+      localStorage.clear();
+      window.location.replace("/auth/login");
+    }
+    return false;
+  }
+  if (err.response && err.response.status === 401) {
+    if (!isRedirecting) {
+      isRedirecting = true;
+      localStorage.clear();
+      window.location.replace("/auth/login");
+      return false;
+    }
+  }
+  if (err.response && err.response.status === 403) {
+    console.log("403", err);
+    if (err.config.url.includes("auth/refresh-token")) {
+      localStorage.clear();
+    } else {
+      errorToast(err.response?.data?.message || err.response?.data?.detail);
+    }
+    return false;
+  } else if (err.response && err.response.code === 500) {
+    window.location.reload();
+    return false;
+  } else if (err.response && err.response.status === 500) {
+    return Promise.reject(err);
+  } else if (err.response && err.response.status === 422) {
+    return Promise.reject(err);
+  } else if (
+    err.response &&
+    err.response.status == 400 &&
+    err.response.request.responseURL.includes("/login")
+  ) {
+    return Promise.reject(err.response.data);
+  } else {
+    console.log(err);
+    if (err && localStorage.getItem("access_token")) {
+      console.log(err.response?.data?.message);
+      errorToast(err.response?.data?.message);
+    }
+    return false;
+  }
+};
 
 const refreshToken = async () => {
   try {
@@ -286,11 +337,11 @@ const OAuth = {
    */
   getProviders: async (tenantId?: string): Promise<OAuthProvidersResponse> => {
     try {
-      const params = tenantId ? `?tenant_id=${tenantId}` : '';
+      const params = tenantId ? `?tenant_id=${tenantId}` : "";
       const response = await Get(`/oauth/providers${params}`);
       return response.data;
     } catch (error) {
-      console.error('Failed to fetch OAuth providers:', error);
+      console.error("Failed to fetch OAuth providers:", error);
       throw error;
     }
   },
@@ -298,7 +349,11 @@ const OAuth = {
   /**
    * Initialize OAuth flow with a provider
    */
-  initializeOAuth: (provider: string, redirectUri: string, state: string): string => {
+  initializeOAuth: (
+    provider: string,
+    redirectUri: string,
+    state: string,
+  ): string => {
     const params = new URLSearchParams({
       redirect_uri: redirectUri,
       state: state,
@@ -310,15 +365,19 @@ const OAuth = {
   /**
    * Handle OAuth callback and exchange token
    */
-  handleCallback: async (provider: string, code: string, state: string): Promise<OAuthCallbackResponse> => {
+  handleCallback: async (
+    provider: string,
+    code: string,
+    state: string,
+  ): Promise<OAuthCallbackResponse> => {
     try {
       // Validate state parameter
-      const storedState = sessionStorage.getItem('oauth_state');
+      const storedState = sessionStorage.getItem("oauth_state");
       if (!storedState || storedState !== state) {
-        throw new Error('Invalid state parameter - possible CSRF attack');
+        throw new Error("Invalid state parameter - possible CSRF attack");
       }
 
-      const response = await Post('/auth/oauth/callback', {
+      const response = await Post("/auth/oauth/callback", {
         provider,
         code,
         state,
@@ -327,11 +386,11 @@ const OAuth = {
       const data = response.data;
 
       // Clear state from session storage
-      sessionStorage.removeItem('oauth_state');
+      sessionStorage.removeItem("oauth_state");
 
       return data;
     } catch (error) {
-      console.error('OAuth callback error:', error);
+      console.error("OAuth callback error:", error);
       throw error;
     }
   },
@@ -339,9 +398,11 @@ const OAuth = {
   /**
    * Exchange temporary token for actual authentication tokens
    */
-  exchangeToken: async (exchangeToken: string): Promise<TokenExchangeResponse> => {
+  exchangeToken: async (
+    exchangeToken: string,
+  ): Promise<TokenExchangeResponse> => {
     try {
-      const response = await Post('/auth/token/exchange', {
+      const response = await Post("/auth/token/exchange", {
         exchange_token: exchangeToken,
       });
 
@@ -351,7 +412,7 @@ const OAuth = {
       }
       return response.data;
     } catch (error) {
-      console.error('Token exchange error:', error);
+      console.error("Token exchange error:", error);
       throw error;
     }
   },
@@ -362,7 +423,7 @@ const OAuth = {
   pollTokenExchange: async (
     exchangeToken: string,
     maxAttempts = 12,
-    interval = 5000
+    interval = 5000,
   ): Promise<TokenExchangeResponse> => {
     let attempts = 0;
 
@@ -373,12 +434,15 @@ const OAuth = {
         return result;
       } catch (error: any) {
         if (attempts >= maxAttempts) {
-          throw new Error('Token exchange timeout - please try again');
+          throw new Error("Token exchange timeout - please try again");
         }
 
         // If token not ready yet, continue polling
-        if (error.message?.includes('Token not ready') || error.message?.includes('pending')) {
-          await new Promise(resolve => setTimeout(resolve, interval));
+        if (
+          error.message?.includes("Token not ready") ||
+          error.message?.includes("pending")
+        ) {
+          await new Promise((resolve) => setTimeout(resolve, interval));
           return poll();
         }
 
@@ -394,34 +458,35 @@ const OAuth = {
    * Handle OAuth error from callback
    */
   handleOAuthError: (error: string, errorDescription?: string): void => {
-    console.error('OAuth error:', error, errorDescription);
+    console.error("OAuth error:", error, errorDescription);
 
-    let message = 'Authentication failed';
+    let message = "Authentication failed";
 
     switch (error) {
-      case 'access_denied':
-        message = 'Access was denied. Please try again.';
+      case "access_denied":
+        message = "Access was denied. Please try again.";
         break;
-      case 'invalid_request':
-        message = 'Invalid request. Please try again.';
+      case "invalid_request":
+        message = "Invalid request. Please try again.";
         break;
-      case 'unauthorized_client':
-        message = 'This application is not authorized. Please contact support.';
+      case "unauthorized_client":
+        message = "This application is not authorized. Please contact support.";
         break;
-      case 'unsupported_response_type':
-        message = 'Unsupported authentication method.';
+      case "unsupported_response_type":
+        message = "Unsupported authentication method.";
         break;
-      case 'invalid_scope':
-        message = 'Invalid permissions requested.';
+      case "invalid_scope":
+        message = "Invalid permissions requested.";
         break;
-      case 'server_error':
-        message = 'Server error occurred. Please try again later.';
+      case "server_error":
+        message = "Server error occurred. Please try again later.";
         break;
-      case 'temporarily_unavailable':
-        message = 'Service temporarily unavailable. Please try again later.';
+      case "temporarily_unavailable":
+        message = "Service temporarily unavailable. Please try again later.";
         break;
       default:
-        message = errorDescription || 'Authentication failed. Please try again.';
+        message =
+          errorDescription || "Authentication failed. Please try again.";
     }
 
     errorToast(message);
@@ -431,16 +496,16 @@ const OAuth = {
    * Clear OAuth session data
    */
   clearOAuthSession: (): void => {
-    sessionStorage.removeItem('oauth_state');
-    sessionStorage.removeItem('oauth_provider');
-    sessionStorage.removeItem('oauth_exchange_token');
+    sessionStorage.removeItem("oauth_state");
+    sessionStorage.removeItem("oauth_provider");
+    sessionStorage.removeItem("oauth_exchange_token");
   },
 
   /**
    * Validate OAuth provider
    */
   isValidProvider: (provider: string): boolean => {
-    const validProviders = ['microsoft', 'github', 'google', 'linkedin'];
+    const validProviders = ["microsoft", "github", "google", "linkedin"];
     return validProviders.includes(provider.toLowerCase());
   },
 
@@ -449,10 +514,10 @@ const OAuth = {
    */
   getProviderDisplayName: (provider: string): string => {
     const providerNames: Record<string, string> = {
-      microsoft: 'Microsoft',
-      github: 'GitHub',
-      google: 'Google',
-      linkedin: 'LinkedIn',
+      microsoft: "Microsoft",
+      github: "GitHub",
+      google: "Google",
+      linkedin: "LinkedIn",
     };
     return providerNames[provider.toLowerCase()] || provider;
   },

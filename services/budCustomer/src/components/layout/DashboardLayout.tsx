@@ -146,24 +146,29 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
     logout();
   };
 
-
   const getUser = async () => {
-    // showLoader();
     try {
       const userData: any = await fetchUser();
-      console.log(userData)
+      if (!userData && pathname !== "/login") {
+        return router.push("/login");
+      }
+      if (
+        userData?.data?.result?.status === "invited" &&
+        pathname !== "/login"
+      ) {
+        console.log("User needs to complete registration");
+        return router.push("/login");
+      }
     } catch (error) {
-      console.error("Error  fetching user", error);
+      console.error("Error fetching user", error);
       return router.push("/login");
-    } finally {
-      // hideLoader();
     }
   };
   useEffect(() => {
     if (!user?.id) {
       getUser();
     }
-  }, [user])
+  }, [pathname]); // Re-run on pathname change like budadmin
 
   return (
     <div className="flex h-screen bg-[#f2f2f2] dark:bg-bud-bg-primary">
@@ -366,9 +371,7 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
           )}
 
           {/* Page Content */}
-          <main className="flex-1 overflow-auto">
-            {children}
-          </main>
+          <main className="flex-1 overflow-auto">{children}</main>
         </div>
       </div>
     </div>
