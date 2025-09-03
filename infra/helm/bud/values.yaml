@@ -263,6 +263,12 @@ valkey:
     architecture: standalone
     auth:
         password: bud
+        commonConfiguration: |-
+            notify-keyspace-events KEA
+
+            # default values from chart
+            appendonly yes
+            save ""
 clickhouse:
     enabled: true
     replicaCount: 1
