@@ -25,10 +25,13 @@ from uuid import UUID
 
 from fastapi import status
 
+from ..auth.schemas import RefreshTokenRequest
 from ..commons import logging
+from ..commons.config import app_settings
 from ..commons.constants import EndpointStatusEnum, ProjectStatusEnum, ProjectTypeEnum, UserTypeEnum
 from ..commons.db_utils import SessionMixin
 from ..commons.exceptions import ClientException
+from ..commons.keycloak import KeycloakManager
 from ..commons.security import hash_token
 from ..credential_ops.crud import CredentialDataManager
 from ..credential_ops.models import Credential as CredentialModel
@@ -40,7 +43,9 @@ from ..project_ops.models import Project as ProjectModel
 from ..project_ops.services import ProjectService
 from ..shared.redis_service import RedisService
 from ..user_ops.crud import UserDataManager
+from ..user_ops.models import Tenant, TenantClient
 from ..user_ops.models import User as UserModel
+from ..user_ops.schemas import TenantClientSchema
 from .crud import ChatSessionDataManager, ChatSettingDataManager, MessageDataManager, NoteDataManager
 from .models import ChatSession, ChatSetting, Message, Note
 from .schemas import (
@@ -199,130 +204,213 @@ class PlaygroundService(SessionMixin):
         # Use same pattern as CredentialModel.set_hashed_key()
         return hash_token(f"bud-{jwt}")
 
-    async def initialize_session(
-        self, jwt_token: str, user_id: UUID, jwt_expiry: Optional[int] = None
-    ) -> PlaygroundInitializeResponse:
-        """Initialize playground session with JWT authentication.
+    async def initialize_session_with_refresh_token(self, refresh_token: str) -> PlaygroundInitializeResponse:
+        """Initialize playground session with refresh token authentication.
 
         This method:
-        1. Hashes the JWT token for Redis storage
-        2. Fetches user's available endpoints/deployments for Redis cache
-        3. Stores data in Redis with appropriate TTL (same structure as API keys)
-        4. Returns simple initialization response (without endpoint details)
+        1. Verifies the refresh token and generates new access/refresh tokens
+        2. Hashes the new access token for Redis storage
+        3. Fetches user's available endpoints/deployments for Redis cache
+        4. Stores data in Redis with appropriate TTL (same structure as API keys)
+        5. Returns initialization response with new token details
 
         Args:
-            jwt_token: The JWT token to use for authentication
-            user_id: The user ID extracted from the JWT
-            jwt_expiry: Optional JWT expiry timestamp (unix timestamp)
+            refresh_token: The refresh token to verify and exchange for new tokens
 
         Returns:
-            PlaygroundInitializeResponse with session info
+            PlaygroundInitializeResponse with session info and new tokens
         """
-        # Get user details
-        db_user = await UserDataManager(self.session).retrieve_by_fields(UserModel, {"id": user_id})
+        try:
+            # Step 1: Use refresh token to get new access and refresh tokens
+            # Get default tenant with realm_name
+            tenant = await UserDataManager(self.session).retrieve_by_fields(
+                Tenant, {"realm_name": app_settings.default_realm_name}, missing_ok=True
+            )
+            if not tenant:
+                raise ClientException("Default tenant not found")
 
-        # Get user's accessible projects
-        project_service = ProjectService(self.session)
+            # Get tenant client credentials
+            tenant_client = await UserDataManager(self.session).retrieve_by_fields(
+                TenantClient, {"tenant_id": tenant.id}, missing_ok=True
+            )
+            if not tenant_client:
+                raise ClientException("Tenant client configuration not found")
 
-        # CLIENT users see published models, ADMIN users see all
-        filter_published_only = db_user.user_type == UserTypeEnum.CLIENT
+            # Initialize Keycloak manager and refresh tokens
+            keycloak_manager = KeycloakManager()
 
-        # Get project IDs based on user type
-        if filter_published_only:
-            # CLIENT users: Get their first active project for metadata
-            user_projects, _ = await project_service.get_all_active_projects(
-                current_user=db_user,
-                offset=0,
-                limit=1,  # Just need one for metadata
+            # Decrypt client secret for use
+            decrypted_secret = await tenant_client.get_decrypted_client_secret()
+            credentials = TenantClientSchema(
+                id=tenant_client.id,
+                client_id=tenant_client.client_id,
+                client_named_id=tenant_client.client_named_id,
+                client_secret=decrypted_secret,
             )
 
-            if not user_projects:
-                raise ClientException(
-                    status_code=status.HTTP_404_NOT_FOUND, message="No active projects found for user"
-                )
-
-            project = user_projects[0]
-            project_ids = None  # CLIENT users see all published endpoints
-        else:
-            # ADMIN users: Get ALL their active projects
-            all_projects, total_count = await project_service.get_all_active_projects(
-                current_user=db_user,
-                offset=0,
-                limit=1000,  # Get all projects (reasonable upper limit)
+            # Refresh Token to get new access/refresh token pair
+            token_data = await keycloak_manager.refresh_token(
+                realm_name=tenant.realm_name,
+                credentials=credentials,
+                refresh_token=refresh_token,
             )
 
-            if not all_projects:
-                raise ClientException(
-                    status_code=status.HTTP_404_NOT_FOUND, message="No active projects found for user"
+            if not token_data or not token_data.get("access_token"):
+                raise ClientException(status_code=status.HTTP_401_UNAUTHORIZED, message="Invalid refresh token")
+
+            # Step 2: Extract auth_id (Keycloak user ID) from the new access token
+            import jwt
+
+            try:
+                # Decode without verification to get user info (already verified by Keycloak)
+                decoded = jwt.decode(token_data["access_token"], options={"verify_signature": False})
+                auth_id = decoded.get("sub")
+                if not auth_id:
+                    raise ClientException(
+                        status_code=status.HTTP_401_UNAUTHORIZED, message="No subject found in access token"
+                    )
+            except jwt.DecodeError as e:
+                logger.error(f"Failed to decode access token: {e}")
+                raise ClientException(status_code=status.HTTP_401_UNAUTHORIZED, message="Invalid access token format")
+
+            # Step 3: Get user details using auth_id (Keycloak user ID)
+            db_user = await UserDataManager(self.session).retrieve_by_fields(
+                UserModel, {"auth_id": auth_id}, missing_ok=True
+            )
+
+            if not db_user:
+                logger.error(f"User not found for auth_id: {auth_id}")
+                raise ClientException(status_code=status.HTTP_404_NOT_FOUND, message="User not found")
+
+            # Step 4: Get user's accessible projects
+            project_service = ProjectService(self.session)
+
+            # CLIENT users see published models, ADMIN users see all
+            filter_published_only = db_user.user_type == UserTypeEnum.CLIENT
+
+            # Get project IDs based on user type
+            if filter_published_only:
+                # CLIENT users: Get their first active project for metadata
+                user_projects, _ = await project_service.get_all_active_projects(
+                    current_user=db_user,
+                    offset=0,
+                    limit=1,  # Just need one for metadata
                 )
 
-            project = all_projects[0]  # Use first project for metadata
-            # Extract all project IDs for ADMIN users
-            project_ids = [p.project.id for p in all_projects]
+                if not user_projects:
+                    raise ClientException(
+                        status_code=status.HTTP_404_NOT_FOUND, message="No active projects found for user"
+                    )
 
-        # Hash the JWT token for Redis storage
-        hashed_jwt = await self.hash_jwt_token(jwt_token)
+                project = user_projects[0]
+                project_ids = None  # CLIENT users see all published endpoints
+            else:
+                # ADMIN users: Get ALL their active projects
+                all_projects, total_count = await project_service.get_all_active_projects(
+                    current_user=db_user,
+                    offset=0,
+                    limit=1000,  # Get all projects (reasonable upper limit)
+                )
 
-        # Prepare filters for endpoint retrieval
-        endpoint_filters = {"status": EndpointStatusEnum.RUNNING}
-        if filter_published_only:
-            endpoint_filters["is_published"] = True
+                if not all_projects:
+                    raise ClientException(
+                        status_code=status.HTTP_404_NOT_FOUND, message="No active projects found for user"
+                    )
 
-        # Get endpoints - CLIENT users get all published, ADMIN users get from all their projects
-        db_endpoints, _ = await EndpointDataManager(self.session).get_all_playground_deployments(
-            project_ids=project_ids,  # None for CLIENT (all published), list of IDs for ADMIN
-            offset=0,
-            limit=1000,  # Increased limit to get more endpoints
-            filters=endpoint_filters,
-            order_by=[],
-            search=False,
-        )
+                project = all_projects[0]  # Use first project for metadata
+                # Extract all project IDs for ADMIN users
+                project_ids = [p.project.id for p in all_projects]
 
-        # Prepare cache data (same structure as API keys)
-        cache_data = {}
+            # Step 5: Hash the new access token for Redis storage
+            hashed_access_token = await self.hash_jwt_token(token_data["access_token"])
 
-        for db_endpoint_tuple in db_endpoints:
-            endpoint, input_cost, output_cost, context_length = db_endpoint_tuple
+            # Step 6: Prepare filters for endpoint retrieval
+            endpoint_filters = {"status": EndpointStatusEnum.RUNNING}
+            if filter_published_only:
+                endpoint_filters["is_published"] = True
 
-            # Prepare cache data (same structure as API keys)
-            cache_data[endpoint.name] = {
-                "endpoint_id": str(endpoint.id),
-                "model_id": str(endpoint.model.id),
-                "project_id": str(endpoint.project_id),
+            # Get endpoints - CLIENT users get all published, ADMIN users get from all their projects
+            db_endpoints, _ = await EndpointDataManager(self.session).get_all_playground_deployments(
+                project_ids=project_ids,  # None for CLIENT (all published), list of IDs for ADMIN
+                offset=0,
+                limit=1000,  # Increased limit to get more endpoints
+                filters=endpoint_filters,
+                order_by=[],
+                search=False,
+            )
+
+            # Step 7: Prepare cache data (same structure as API keys)
+            cache_data = {}
+
+            for db_endpoint_tuple in db_endpoints:
+                endpoint, input_cost, output_cost, context_length = db_endpoint_tuple
+
+                # Prepare cache data (same structure as API keys)
+                cache_data[endpoint.name] = {
+                    "endpoint_id": str(endpoint.id),
+                    "model_id": str(endpoint.model.id),
+                    "project_id": str(endpoint.project_id),
+                }
+
+            # Add metadata to cache
+            cache_data["__metadata__"] = {
+                "api_key_id": None,  # Not applicable for JWT
+                "user_id": str(db_user.id),
+                "api_key_project_id": str(project.project.id),
             }
 
-        # Add metadata to cache
-        cache_data["__metadata__"] = {
-            "api_key_id": None,  # Not applicable for JWT
-            "user_id": str(user_id),
-            "api_key_project_id": str(project.project.id),
-        }
+            # Step 8: Calculate TTL based on access token expiry
+            ttl = None
+            expires_in = token_data.get("expires_in")
+            if expires_in:
+                ttl = expires_in  # Use expires_in from token response
+            else:
+                # Fallback: try to get expiry from token
+                try:
+                    access_token_expiry = decoded.get("exp")
+                    if access_token_expiry:
+                        current_time = int(time.time())
+                        ttl = max(access_token_expiry - current_time, 0)
+                except Exception:
+                    ttl = 3600  # Default 1 hour if unable to determine expiry
 
-        # Calculate TTL based on JWT expiry
-        ttl = None
-        if jwt_expiry:
-            current_time = int(time.time())
-            ttl = max(jwt_expiry - current_time, 0)
+            # Step 9: Store in Redis with same key format as API keys
+            redis_service = RedisService()
+            redis_key = f"api_key:{hashed_access_token}"
 
-            # Don't cache if token is already expired
-            if ttl == 0:
-                raise ClientException(status_code=status.HTTP_401_UNAUTHORIZED, message="JWT token has expired")
+            await redis_service.set(
+                redis_key,
+                json.dumps(cache_data),
+                ex=ttl,  # Set expiry if TTL is provided
+            )
 
-        # Store in Redis with same key format as API keys
-        redis_service = RedisService()
-        redis_key = f"api_key:{hashed_jwt}"
+            logger.info(
+                f"Initialized playground session for user {db_user.id} with {len(db_endpoints)} endpoints cached"
+            )
 
-        await redis_service.set(
-            redis_key,
-            json.dumps(cache_data),
-            ex=ttl,  # Set expiry if TTL is provided
-        )
+            # Step 10: Return response with new tokens
+            return PlaygroundInitializeResponse(
+                user_id=db_user.id,
+                initialization_status="success",
+                ttl=ttl,
+                message="Playground session initialized successfully with new tokens",
+                access_token=token_data["access_token"],
+                refresh_token=token_data.get(
+                    "refresh_token", refresh_token
+                ),  # Use new refresh token or fallback to original
+                token_type=token_data.get("token_type", "Bearer"),
+                expires_in=expires_in,
+            )
 
-        logger.info(f"Initialized playground session for user {user_id} with {len(db_endpoints)} endpoints cached")
-
-        return PlaygroundInitializeResponse(
-            user_id=user_id, initialization_status="success", ttl=ttl, message="JWT session initialized successfully"
-        )
+        except ClientException:
+            # Re-raise client exceptions as-is
+            raise
+        except Exception as e:
+            logger.error(f"Failed to initialize playground session with refresh token: {e}")
+            raise ClientException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message=f"Failed to initialize playground session: {str(e)}",
+            )
 
 
 class ChatSessionService(SessionMixin):

@@ -21,10 +21,10 @@ export default function ChatPage() {
   const [isSingleChat, setIsSingleChat] = useState(false);
   const [selectedModel, setSelectedModel] = useState("");
 
-  const checkAccessKey = async (accessKey: string) => {
-    const isLoginSuccessful = await login("", accessKey);
+  const checkRefreshToken = async (refreshToken: string) => {
+    const isLoginSuccessful = await login("", refreshToken);
     if(isLoginSuccessful) {
-      console.log('Login successful');
+      console.log('Login successful with refresh token');
       // router.replace(`chat`);
     } else {
       // setIsInvalidApiKey(true);
@@ -80,12 +80,12 @@ export default function ChatPage() {
   useEffect(() => {
 
     const params = new URLSearchParams(window.location.search);
-    const accessKey = params.get('access_token');
+    const refreshToken = params.get('refresh_token');
     const isSingleChat = params.get('is_single_chat');
     const model = params.get('model');
     const baseUrl = params.get('base_url');
-    if(accessKey) {
-      checkAccessKey(accessKey);
+    if(refreshToken) {
+      checkRefreshToken(refreshToken);
     } else {
       hideLoader();
     }
@@ -96,7 +96,7 @@ export default function ChatPage() {
       setSelectedModel(model);
     }
 
-  }, [checkAccessKey, hideLoader]);
+  }, [checkRefreshToken, hideLoader]);
 
   return (
     <div

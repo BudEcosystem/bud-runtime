@@ -11,6 +11,9 @@ interface AuthContextType {
   login: (key?: string, accessKey?: string) => Promise<boolean>;
   logout: () => void;
   isJWTAuth: boolean;  // Indicates if accessKey is a JWT token
+  accessToken: string | null;  // New access token from refresh token flow
+  refreshToken: string | null;  // Refresh token for re-initialization
+  isSessionValid: boolean;  // Indicates if the current session is valid
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -27,6 +30,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [isInitializing, setIsInitializing] = useState(false);
   const hasInitialized = useRef(false);
 
+  // New state for token refresh management
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [refreshToken, setRefreshToken] = useState<string | null>(null);
+  const [isSessionValid, setIsSessionValid] = useState(false);
+  const [refreshTimeoutId, setRefreshTimeoutId] = useState<NodeJS.Timeout | null>(null);
+  const [sessionData, setSessionData] = useState<any>(null);
+
   const { getEndPoints } = useEndPoints();
 
   // Helper function to check if a string looks like a JWT
@@ -36,41 +46,134 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     return parts.length === 3;
   };
 
-  // Initialize session with JWT
-  const initializeWithJWT = async (jwt: string): Promise<boolean> => {
+  // Function to schedule automatic re-initialization
+  const scheduleRefresh = (refreshTime: number) => {
+    // Clear any existing timeout
+    if (refreshTimeoutId) {
+      clearTimeout(refreshTimeoutId);
+    }
+
+    console.log(`Scheduling session refresh in ${refreshTime / 1000} seconds`);
+
+    const timeoutId = setTimeout(async () => {
+      if (refreshToken && isSessionValid) {
+        console.log('Automatically refreshing session...');
+        await refreshSession();
+      }
+    }, refreshTime);
+
+    setRefreshTimeoutId(timeoutId);
+  };
+
+  // Function to refresh the session using stored refresh token
+  const refreshSession = async (): Promise<boolean> => {
+    if (!refreshToken) {
+      console.error('No refresh token available for session refresh');
+      setIsSessionValid(false);
+      return false;
+    }
+
+    try {
+      console.log('Refreshing session with refresh token...');
+      const response = await axios.post('/api/initialize', { refresh_token: refreshToken });
+
+      if (response.data && response.data.initialization_status === 'success') {
+        const newSessionData = response.data;
+
+        // Update tokens
+        setAccessToken(newSessionData.access_token);
+        setRefreshToken(newSessionData.refresh_token);
+        setSessionData(newSessionData);
+        setIsSessionValid(true);
+
+        // Store updated tokens
+        localStorage.setItem('access_token', newSessionData.access_token);
+        localStorage.setItem('refresh_token', newSessionData.refresh_token);
+        localStorage.setItem('session_data', JSON.stringify(newSessionData));
+
+        // Schedule next refresh
+        if (newSessionData.refresh_time) {
+          scheduleRefresh(newSessionData.refresh_time);
+        }
+
+        console.log('Session refreshed successfully');
+        return true;
+      }
+
+      console.error('Session refresh failed: Invalid response');
+      setIsSessionValid(false);
+      return false;
+    } catch (error) {
+      console.error('Failed to refresh session:', error);
+      setIsSessionValid(false);
+      return false;
+    }
+  };
+
+  // Initialize session with refresh token
+  const initializeWithRefreshToken = async (refreshTokenValue: string): Promise<boolean> => {
     // Prevent multiple simultaneous initialization attempts
     if (isInitializing) {
-      console.log('JWT initialization already in progress, skipping...');
+      console.log('Refresh token initialization already in progress, skipping...');
       return false;
     }
 
     setIsInitializing(true);
 
     try {
-      console.log('Initializing JWT session...');
-      // Call the initialization API
-      const response = await axios.post('/api/initialize', { jwt_token: jwt });
+      console.log('Initializing session with refresh token...');
+      // Call the initialization API with refresh token
+      const response = await axios.post('/api/initialize', { refresh_token: refreshTokenValue });
 
       if (response.data && response.data.initialization_status === 'success') {
-        // Store JWT as token (not access_key)
-        setApiKey(jwt);
+        const initData = response.data;
+
+        // Store all token information
+        setAccessToken(initData.access_token);
+        setRefreshToken(initData.refresh_token);
+        setSessionData(initData);
+        setIsSessionValid(true);
         setIsJWTAuth(true);
-        localStorage.setItem('token', jwt);
+
+        // Store in localStorage
+        localStorage.setItem('access_token', initData.access_token);
+        localStorage.setItem('refresh_token', initData.refresh_token);
+        localStorage.setItem('session_data', JSON.stringify(initData));
         localStorage.setItem('is_jwt_auth', 'true');
-        console.log('JWT session initialized successfully');
+
+        // Use access token as the main token for API requests
+        setApiKey(initData.access_token);
+        localStorage.setItem('token', initData.access_token);
+
+        // Schedule automatic refresh based on TTL
+        if (initData.refresh_time) {
+          scheduleRefresh(initData.refresh_time);
+        }
+
+        console.log('Session initialized successfully with tokens');
         return true;
       }
-      console.error('JWT initialization failed: Invalid response');
+      console.error('Session initialization failed: Invalid response');
       return false;
     } catch (error) {
-      console.error('Failed to initialize JWT session:', error);
-      // Don't store invalid JWT
-      localStorage.removeItem('access_key');
+      console.error('Failed to initialize session:', error);
+      // Clean up on failure
+      setIsSessionValid(false);
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+      localStorage.removeItem('session_data');
       localStorage.removeItem('is_jwt_auth');
       return false;
     } finally {
       setIsInitializing(false);
     }
+  };
+
+  // Legacy function - now redirects to refresh token flow
+  const initializeWithJWT = async (jwt: string): Promise<boolean> => {
+    // For backward compatibility, treat JWT as refresh token
+    console.log('Legacy JWT initialization - treating as refresh token');
+    return await initializeWithRefreshToken(jwt);
   };
 
   useEffect(() => {
@@ -89,38 +192,47 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       // Mark as initialized immediately to prevent race conditions
       hasInitialized.current = true;
 
-      // Check for access_key in query parameters
+      // Check for refresh_token or access_key in query parameters
       const urlParams = new URLSearchParams(window.location.search);
+      const refreshTokenFromQuery = urlParams.get('refresh_token');
       const accessKeyFromQuery = urlParams.get('access_key');
 
-      if (accessKeyFromQuery) {
-        // Check if it's a JWT token
-        if (isJWT(accessKeyFromQuery)) {
-          // Initialize with JWT
-          const success = await initializeWithJWT(accessKeyFromQuery);
+      // Prioritize refresh_token over access_key for new flow
+      const tokenFromQuery = refreshTokenFromQuery || accessKeyFromQuery;
+      const paramToRemove = refreshTokenFromQuery ? 'refresh_token' : 'access_key';
 
-          // Always remove access_key from URL to prevent re-initialization
+      if (tokenFromQuery) {
+        // Check if it's a JWT/refresh token
+        if (isJWT(tokenFromQuery)) {
+          // Initialize with refresh token
+          const success = await initializeWithRefreshToken(tokenFromQuery);
+
+          // Always remove token parameter from URL to prevent re-initialization
           const newUrl = new URL(window.location.href);
-          newUrl.searchParams.delete('access_key');
+          newUrl.searchParams.delete(paramToRemove);
           window.history.replaceState({}, '', newUrl.toString());
 
           if (!success) {
-            // Clear any stored invalid JWT
+            // Clear any stored invalid tokens
             localStorage.removeItem('token');
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('refresh_token');
+            localStorage.removeItem('session_data');
             localStorage.removeItem('is_jwt_auth');
             setApiKey(null);
             setIsJWTAuth(false);
+            setIsSessionValid(false);
           }
         } else {
-          // Regular access key
-          setAccessKey(accessKeyFromQuery);
+          // Regular access key (legacy support)
+          setAccessKey(tokenFromQuery);
           setIsJWTAuth(false);
-          localStorage.setItem('access_key', accessKeyFromQuery);
+          localStorage.setItem('access_key', tokenFromQuery);
           localStorage.setItem('is_jwt_auth', 'false');
 
           // Remove from URL after processing
           const newUrl = new URL(window.location.href);
-          newUrl.searchParams.delete('access_key');
+          newUrl.searchParams.delete(paramToRemove);
           window.history.replaceState({}, '', newUrl.toString());
         }
         setIsLoading(false);
@@ -129,9 +241,46 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         const storedToken = localStorage.getItem('token');
         const storedAccessKey = localStorage.getItem('access_key');
         const storedIsJWT = localStorage.getItem('is_jwt_auth') === 'true';
+        const storedAccessToken = localStorage.getItem('access_token');
+        const storedRefreshToken = localStorage.getItem('refresh_token');
+        const storedSessionData = localStorage.getItem('session_data');
 
-        if (storedToken) {
-          // Check if it's a JWT or API key
+        // Check if we have a complete token-based session
+        if (storedAccessToken && storedRefreshToken && storedSessionData) {
+          try {
+            const sessionData = JSON.parse(storedSessionData);
+
+            // Restore session state
+            setAccessToken(storedAccessToken);
+            setRefreshToken(storedRefreshToken);
+            setSessionData(sessionData);
+            setIsSessionValid(true);
+            setIsJWTAuth(true);
+            setApiKey(storedAccessToken); // Use access token for API calls
+
+            // Check if session needs refresh based on stored TTL
+            if (sessionData.initialized_at && sessionData.refresh_time) {
+              const timeElapsed = Date.now() - sessionData.initialized_at;
+              const remainingTime = sessionData.refresh_time - timeElapsed;
+
+              if (remainingTime > 0) {
+                // Schedule refresh for remaining time
+                console.log(`Restoring refresh schedule with ${remainingTime / 1000} seconds remaining`);
+                scheduleRefresh(remainingTime);
+              } else {
+                // Token should have been refreshed already, refresh now
+                console.log('Session expired during offline time, refreshing...');
+                refreshSession();
+              }
+            }
+          } catch (error) {
+            console.error('Failed to restore session data:', error);
+            // Clear corrupted session data
+            localStorage.removeItem('session_data');
+            setIsSessionValid(false);
+          }
+        } else if (storedToken) {
+          // Legacy token handling
           if (storedIsJWT && isJWT(storedToken)) {
             // It's a JWT token
             setApiKey(storedToken);
@@ -161,29 +310,41 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const login = async (key?: string, accessKeyParam?: string) => {
     // Clear all auth data
+    if (refreshTimeoutId) {
+      clearTimeout(refreshTimeoutId);
+      setRefreshTimeoutId(null);
+    }
+
     localStorage.removeItem('token');
     localStorage.removeItem('access_key');
     localStorage.removeItem('is_jwt_auth');
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    localStorage.removeItem('session_data');
+
     setApiKey(null);
     setAccessKey(null);
     setIsJWTAuth(false);
+    setAccessToken(null);
+    setRefreshToken(null);
+    setIsSessionValid(false);
+    setSessionData(null);
 
-    // Check if accessKey is a JWT and initialize if needed
+    // Check if accessKey is a JWT/refresh token and initialize if needed
     if (accessKeyParam && isJWT(accessKeyParam)) {
-      const success = await initializeWithJWT(accessKeyParam);
+      const success = await initializeWithRefreshToken(accessKeyParam);
       if (success) {
-        // For JWT auth, skip endpoint verification since JWT is already validated
-        // and cached during initialization
+        // For token-based auth, the initialization already set up everything
         if(key) {
-          setApiKey(key);
-          localStorage.setItem('token', key);
+          // If additional API key provided, store it but access token takes precedence
+          localStorage.setItem('api_key', key);
         }
         return true;
       }
       return false;
     }
 
-    // Regular login flow
+    // Regular login flow (for API keys)
     const endpointResult = await getEndPoints({
       page: 1,
       limit: 25,
@@ -208,12 +369,29 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   };
 
   const logout = () => {
+    // Clear refresh timeout
+    if (refreshTimeoutId) {
+      clearTimeout(refreshTimeoutId);
+      setRefreshTimeoutId(null);
+    }
+
+    // Clear all localStorage items
     localStorage.removeItem('token');
     localStorage.removeItem('access_key');
     localStorage.removeItem('is_jwt_auth');
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    localStorage.removeItem('session_data');
+    localStorage.removeItem('api_key');
+
+    // Reset all state
     setApiKey(null);
     setAccessKey(null);
     setIsJWTAuth(false);
+    setAccessToken(null);
+    setRefreshToken(null);
+    setIsSessionValid(false);
+    setSessionData(null);
   };
 
   return (
@@ -223,7 +401,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       login,
       logout,
       isLoading,
-      isJWTAuth
+      isJWTAuth,
+      accessToken,
+      refreshToken,
+      isSessionValid
     }}>
       {children}
     </AuthContext.Provider>

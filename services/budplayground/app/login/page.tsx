@@ -19,14 +19,14 @@ export default function Login() {
     const [isInvalidApiKey, setIsInvalidApiKey] = useState(false);
     const [key, setKey] = useState("");
 
-    const handleAdd = async (accessKey?: string) => {
-        if(!accessKey) {
+    const handleAdd = async (refreshToken?: string) => {
+        if(!refreshToken) {
           form.submit();
         }
-        const keyToValidate = accessKey || key;
+        const keyToValidate = refreshToken || key;
         if(!keyToValidate) return;
         showLoader();
-        const isLoginSuccessful = await login(key, accessKey);
+        const isLoginSuccessful = await login(key, refreshToken);
         if(isLoginSuccessful) {
             router.replace(`chat`);
         } else {
@@ -36,14 +36,14 @@ export default function Login() {
     }
 
     useEffect(() => {
-        // Get access_key from URL parameters
+        // Get refresh_token from URL parameters
         const params = new URLSearchParams(window.location.search);
-        const accessKey = params.get('access_token');
+        const refreshToken = params.get('refresh_token');
 
-        if (accessKey) {
-            // setKey(accessKey);
-            // Automatically validate the access key
-            handleAdd(accessKey);
+        if (refreshToken) {
+            // setKey(refreshToken);
+            // Automatically validate the refresh token
+            handleAdd(refreshToken);
         } else {
           hideLoader();
         }
