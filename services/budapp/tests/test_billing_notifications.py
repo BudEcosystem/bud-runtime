@@ -195,8 +195,9 @@ class TestBillingServiceNotifications:
 
         # Setup mocks
         mock_db.execute.return_value.scalar_one_or_none.side_effect = [
-            mock_user_billing,  # get_user_billing
+            mock_user_billing,  # get_user_billing (first call in check_and_trigger_alerts)
             mock_user,  # get user for email
+            mock_user_billing,  # get_user_billing (second call in get_billing_alerts)
         ]
         mock_db.execute.return_value.scalars.return_value.all.return_value = [mock_billing_alert]
 
@@ -254,8 +255,9 @@ class TestBillingServiceNotifications:
 
         # Setup mocks
         mock_db.execute.return_value.scalar_one_or_none.side_effect = [
-            mock_user_billing,  # get_user_billing
+            mock_user_billing,  # get_user_billing (first call in check_and_trigger_alerts)
             mock_user,  # get user for email
+            mock_user_billing,  # get_user_billing (second call in get_billing_alerts)
         ]
         mock_db.execute.return_value.scalars.return_value.all.return_value = [mock_billing_alert]
 
@@ -303,8 +305,9 @@ class TestBillingServiceNotifications:
 
         # Setup mocks
         mock_db.execute.return_value.scalar_one_or_none.side_effect = [
-            mock_user_billing,  # get_user_billing
-            mock_user,  # get user for email (shouldn't be called)
+            mock_user_billing,  # get_user_billing (first call in check_and_trigger_alerts)
+            mock_user,  # get user for email
+            mock_user_billing,  # get_user_billing (second call in get_billing_alerts)
         ]
         mock_db.execute.return_value.scalars.return_value.all.return_value = [mock_billing_alert]
 
@@ -364,8 +367,9 @@ class TestBillingServiceNotifications:
 
         # Setup mocks
         mock_db.execute.return_value.scalar_one_or_none.side_effect = [
-            mock_user_billing,  # get_user_billing
+            mock_user_billing,  # get_user_billing (first call in check_and_trigger_alerts)
             mock_user,  # get user for email
+            mock_user_billing,  # get_user_billing (second call in get_billing_alerts)
         ]
         mock_db.execute.return_value.scalars.return_value.all.return_value = [mock_alert_75, mock_alert_90]
 
