@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo } from "react";
 import {
   BarChart,
   Bar,
@@ -84,6 +84,11 @@ const UsageChart: React.FC<UsageChartProps> = ({
     return null;
   };
 
+  const getDayFilterSelected = useMemo(() => {
+    const match = timeRange.match(/^(\d+)d$/);
+    return match ? parseInt(match[1], 10) : 30;
+  }, [timeRange]);
+  
   const maxValue = useMemo(() => {
     if (!data || data.length === 0) return 0;
     return Math.max(...data.map((item) => item[chartConfig.dataKey] || 0));
@@ -169,7 +174,7 @@ const UsageChart: React.FC<UsageChartProps> = ({
           <div className={styles.chartLegend}>
             <span className={styles.legendDot} style={{ background: chartConfig.color }} />
             <span className={styles.legendText}>
-              {data.filter(d => d.hasData !== false).length} {type === "requests" ? "requests" : "days with usage"}
+              {type === "requests" ? `${data.filter(d => d.hasData !== false).length} requests` : `${getDayFilterSelected} day${getDayFilterSelected > 1 ? 's' : ''} with usage`}
             </span>
             <span className={styles.legendValue}>
               {chartConfig.formatter(
