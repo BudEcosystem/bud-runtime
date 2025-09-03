@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 
 from budapp.commons import logging
 from budapp.commons.config import app_settings
-from budapp.commons.constants import UserColorEnum, UserRoleEnum, UserStatusEnum
+from budapp.commons.constants import UserColorEnum, UserRoleEnum, UserStatusEnum, UserTypeEnum
 from budapp.commons.database import engine
 from budapp.commons.keycloak import KeycloakManager
 from budapp.initializers.base_seeder import BaseSeeder
