@@ -370,7 +370,7 @@ const InferenceFilters: React.FC<InferenceFiltersProps> = ({
                   </span>
                   <div className="[&_.ant-switch]:!bg-gray-300 dark:[&_.ant-switch]:!bg-gray-600 [&_.ant-switch-checked]:!bg-blue-500 dark:[&_.ant-switch-checked]:!bg-blue-500">
                     <Form.Item name="isSuccess" valuePropName="checked" noStyle>
-                      <Switch className="bg-[#1F1F1F]" />
+                      <Switch className="!bg-[#2f2f2f]" />
                     </Form.Item>
                   </div>
                 </div>
