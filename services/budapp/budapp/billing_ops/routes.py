@@ -13,6 +13,7 @@ from budapp.billing_ops.schemas import (
     CreateUserBillingRequest,
     CurrentUsageSchema,
     UpdateBillingPlanRequest,
+    UpdateNotificationPreferencesRequest,
     UsageHistoryRequest,
     UserBillingSchema,
 )
@@ -292,6 +293,15 @@ async def update_billing_plan(
                 detail="No billing information found for this user",
             )
 
+        # Check if quotas or plan are being changed
+        quota_changed = False
+        if user_billing.billing_plan_id != request.billing_plan_id:
+            quota_changed = True  # Plan change affects base quotas
+        if request.custom_token_quota is not None and user_billing.custom_token_quota != request.custom_token_quota:
+            quota_changed = True
+        if request.custom_cost_quota is not None and user_billing.custom_cost_quota != request.custom_cost_quota:
+            quota_changed = True
+
         # Update billing plan
         user_billing.billing_plan_id = request.billing_plan_id
         if request.custom_token_quota is not None:
@@ -301,6 +311,11 @@ async def update_billing_plan(
 
         db.commit()
         db.refresh(user_billing)
+
+        # Reset alerts if quotas were changed
+        if quota_changed:
+            service.reset_user_alerts(user_billing.id)
+            logger.info(f"Reset billing alerts for user {request.user_id} due to quota update")
 
         return SingleResponse(
             result=UserBillingSchema.from_orm(user_billing),
@@ -400,6 +415,46 @@ async def check_and_trigger_alerts(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to check alerts",
+        )
+
+
+@router.put("/notification-preferences", response_model=SingleResponse[UserBillingSchema])
+async def update_notification_preferences(
+    request: UpdateNotificationPreferencesRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_session),
+) -> SingleResponse[UserBillingSchema]:
+    """Update notification preferences for the authenticated user."""
+    try:
+        service = BillingService(db)
+        user_billing = service.get_user_billing(current_user.id)
+
+        if not user_billing:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No billing information found for this user",
+            )
+
+        # Update notification preferences
+        if request.enable_email_notifications is not None:
+            user_billing.enable_email_notifications = request.enable_email_notifications
+        if request.enable_in_app_notifications is not None:
+            user_billing.enable_in_app_notifications = request.enable_in_app_notifications
+
+        db.commit()
+        db.refresh(user_billing)
+
+        return SingleResponse(
+            result=UserBillingSchema.from_orm(user_billing),
+            message="Notification preferences updated successfully",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating notification preferences: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update notification preferences",
         )
 
 
