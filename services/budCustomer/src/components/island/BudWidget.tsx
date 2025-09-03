@@ -3,9 +3,13 @@ import React, { useEffect, useState } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
 import { useDeployModel } from "src/stores/useDeployModel";
 import { WorkflowListItem, WorkflowType } from "src/stores/useWorkflow";
-import { Text_10_400_757575, Text_10_400_B3B3B3, Text_12_400_A4A4A9, Text_14_600_EEEEEE } from "../ui/text";
+import {
+  Text_10_400_757575,
+  Text_10_400_B3B3B3,
+  Text_12_400_A4A4A9,
+  Text_14_600_EEEEEE,
+} from "../ui/text";
 import { capitalize, formdateDateTime } from "@/lib/utils";
-import Tags from "src/flows/components/DrawerTags";
 import drawerFlows, { DrawerFlowType, DrawerStepType, flowMapping, inProgressSteps } from "src/hooks/drawerFlows";
 import { useProjects } from "src/hooks/useProjects";
 import { useModels } from "src/hooks/useModels";
@@ -14,8 +18,7 @@ import { errorToast } from "../toast";
 import { FormProgressStatus } from "../ui/bud/progress/FormProgress";
 import { calculateEta } from "src/flows/utils/calculateETA";
 import IconRender from "src/flows/components/BudIconRender";
-import { useTheme } from "../../context/themeContext";
-import "./island-themes.css";
+import Tags from "@/flows/components/DrawerTags";
 
 export function getFailedStep(data: WorkflowListItem) {
     return data?.progress?.steps?.find((step) => step.payload?.content?.status === 'FAILED');
@@ -51,7 +54,6 @@ export function BudWidget({ data, index }: { data?: WorkflowListItem | any , ind
     const { getWorkflow, setProviderType, setSelectedTemplate, setSelectedProvider, setSelectedModel, getWorkflowCloud, setDeploymentSpecification, setLocalModelDetails, setCloudModelDetails, setDeploymentCluster, setSelectedCredentials } = useDeployModel();
     const { openDrawerWithStep } = useDrawer();
     const { close } = useIsland();
-    const { effectiveTheme } = useTheme();
     const [loading, setLoading] = useState(false);
 
     const flowId = flowMapping[data.workflow_type];
@@ -144,87 +146,99 @@ export function BudWidget({ data, index }: { data?: WorkflowListItem | any , ind
         // openDrawerWithStep(currentStepId);
     }
 
-    return <div
-        className="item rounded-[1rem] px-[1.45rem] py-[1.45rem] box-border width-full cursor-pointer transition-all duration-300 overflow-hidden item island-widget island-theme-aware"
-        onClick={openWidget}>
-        {<Spin
-            className="z-[999999]"
-            spinning={loading}
-            fullscreen
-        />}
-        <div className="flex justify-between items-start">
-            <div className="flex justify-start items-center">
-                <IconRender icon={data?.icon} size={38} imageSize={24} />
-                <div className="pt-[.3rem] ml-[.55rem]">
-                    <div className="tracking-[-.01rem] text-xs" style={{ color: 'var(--island-text-muted)' }}>
-                        {data?.title || flow?.title}
-                    </div>
-                    <div className="tracking-[-.01rem] text-sm font-semibold" style={{ color: 'var(--island-text-primary)' }}>
-                        {`${flow?.title} ${faiedStep ? 'Failed' : 'In Progress'}`}
-                    </div>
-                </div>
-            </div>
-            <div className="flex flex-col items-end justify-start">
-                {faiedStep ? <div className="relative mb-[1.4rem]">
-                    <Text_10_400_757575 className="absolute top-[-.1rem] right-[0] text-nowrap">
-                        {formdateDateTime(new Date(data?.modified_at))}
-                    </Text_10_400_757575>
-                </div> : <div className="relative mb-[1.4rem]">
-                    <Text_10_400_757575 className="absolute top-[-.1rem] right-[0] text-nowrap !text-[#B3B3B3]">
-                        {formdateDateTime(new Date(data?.modified_at))}
-                    </Text_10_400_757575>
-                </div>}
-                {data.tag && <Tags
-                    tags={data.tag} //confirm this
-                    color={faiedStep && '#EC7575'}
-                />}
-            </div>
-        </div>
-        {data?.current_step && data?.total_steps && <div className="mt-[1.5rem]">
-            <div className="relative bg-[transparent] mb-1">
-                <Progress strokeLinecap="butt" percent={
-                    (data?.current_step / data?.total_steps) * 100
-                } showInfo={false} size={{ height: 3 }} strokeColor={faiedStep ? '#C94444' : '#965CDE'} trailColor={'#1F1F1F'} />
-                <div className="absolute top-[100%] left-[2px]"
-                    style={{
-                        transform: "translateY(-7px)",
-                        width: `${(data?.current_step / data?.total_steps) * 100 - 1}%`,
-                        backgroundColor: faiedStep ? '#C94444' : '#965CDE',
-                        boxShadow: `0 0 15px 2px ${faiedStep ? '#C94444' : '#965CDE'}`,
-                        borderRadius: "4px",
-                    }}
-                ></div>
-            </div>
-            <div className="flex justify-between items-center pt-[0.2rem]">
+    return (
+        <div
+            className="item rounded-[1rem] px-[1.45rem] py-[1.45rem] box-border	bg-[#101010] width-full cursor-pointer hover:bg-[#161616] transition-all duration-300 overflow-hidden item"
+            onClick={openWidget}
+        >
+            {<Spin className="z-[999999]" spinning={loading} fullscreen />}
+            <div className="flex justify-between items-start">
                 <div className="flex justify-start items-center">
-                    {faiedStep &&
-                        <div className=" w-[.75rem] h-[.75rem] mr-[0.4rem] shrink-0 grow-0 flex justify-center items-center">
-                            <Image
-                                preview={false}
-                                src="/images/drawer/xCut.png"
-                                alt="info"
-                                style={{ width: '.75rem' }}
-                            />
-                        </div>
-                    }
-                    <Text_10_400_B3B3B3>
-                        {title}
-                    </Text_10_400_B3B3B3>
+                    <IconRender icon={data?.icon} size={38} imageSize={24} />
+                    <div className="pt-[.3rem] ml-[.55rem]">
+                        <Text_12_400_A4A4A9 className="tracking-[-.01rem]">
+                            {/* #{index + 1}  */}
+                            {data?.title || flow?.title}
+                        </Text_12_400_A4A4A9>
+                        {/* <Text_14_600_EEEEEE className="tracking-[-.01rem]">{currentStep?.description || `${flow?.title} In Progress`}</Text_14_600_EEEEEE> */}
+                        <Text_14_600_EEEEEE className="tracking-[-.01rem]">{`${flow?.title} ${faiedStep ? "Failed" : "In Progress"}`}</Text_14_600_EEEEEE>
+                    </div>
                 </div>
-                <Text_10_400_B3B3B3>Step {data.current_step}/{data.total_steps}</Text_10_400_B3B3B3>
+                <div className="flex flex-col items-end justify-start">
+                    {faiedStep ? (
+                        <div className="relative mb-[1.4rem]">
+                            <Text_10_400_757575 className="absolute top-[-.1rem] right-[0] text-nowrap">
+                                {formdateDateTime(new Date(data?.modified_at))}
+                            </Text_10_400_757575>
+                        </div>
+                    ) : (
+                        <div className="relative mb-[1.4rem]">
+                            <Text_10_400_757575 className="absolute top-[-.1rem] right-[0] text-nowrap !text-[#B3B3B3]">
+                                {formdateDateTime(new Date(data?.modified_at))}
+                            </Text_10_400_757575>
+                        </div>
+                    )}
+                    {data.tag && <Tags name={data.tag} color={faiedStep && "#EC7575"} />}
+                </div>
             </div>
-        </div>}
-        {faiedStep && <div className="flex justify-start items-center border border-[#361519] bg-[#952F2F26] backdrop-blur-[4px] rounded-[6px] mt-[1.5rem] px-[.3rem] pl-[.8rem]  py-[.4rem]">
-            <Image
-                preview={false}
-                src="/images/drawer/danger.png"
-                alt="info"
-                width={'1rem'}
-                height={'1rem'}
-            />
-            <div className="ml-[.75rem] text-[.75rem] text-[#E82E2E] font-[300] truncate w-[90%]">
-                {faiedStep?.payload?.content?.title || faiedStep?.payload?.content?.message || 'Failed'}
-            </div>
-        </div>}
-    </div>
+            {data?.current_step && data?.total_steps && (
+                <div className="mt-[1.5rem]">
+                    <div className="relative bg-[transparent] mb-1">
+                        <Progress
+                            strokeLinecap="butt"
+                            percent={(data?.current_step / data?.total_steps) * 100}
+                            showInfo={false}
+                            size={{ height: 3 }}
+                            strokeColor={faiedStep ? "#C94444" : "#965CDE"}
+                            trailColor={"#1F1F1F"}
+                        />
+                        <div
+                            className="absolute top-[100%] left-[2px]"
+                            style={{
+                                transform: "translateY(-7px)",
+                                width: `${(data?.current_step / data?.total_steps) * 100 - 1}%`,
+                                backgroundColor: faiedStep ? "#C94444" : "#965CDE",
+                                boxShadow: `0 0 15px 2px ${faiedStep ? "#C94444" : "#965CDE"}`,
+                                borderRadius: "4px",
+                            }}
+                        ></div>
+                    </div>
+                    <div className="flex justify-between items-center pt-[0.2rem]">
+                        <div className="flex justify-start items-center">
+                            {faiedStep && (
+                                <div className=" w-[.75rem] h-[.75rem] mr-[0.4rem] shrink-0 grow-0 flex justify-center items-center">
+                                    <Image
+                                        preview={false}
+                                        src="/images/drawer/xCut.png"
+                                        alt="info"
+                                        style={{ width: ".75rem" }}
+                                    />
+                                </div>
+                            )}
+                            <Text_10_400_B3B3B3>{title}</Text_10_400_B3B3B3>
+                        </div>
+                        <Text_10_400_B3B3B3>
+                            Step {data.current_step}/{data.total_steps}
+                        </Text_10_400_B3B3B3>
+                    </div>
+                </div>
+            )}
+            {faiedStep && (
+                <div className="flex justify-start items-center border border-[#361519] bg-[#952F2F26] backdrop-blur-[4px] rounded-[6px] mt-[1.5rem] px-[.3rem] pl-[.8rem]  py-[.4rem]">
+                    <Image
+                        preview={false}
+                        src="/images/drawer/danger.png"
+                        alt="info"
+                        width={"1rem"}
+                        height={"1rem"}
+                    />
+                    <div className="ml-[.75rem] text-[.75rem] text-[#E82E2E] font-[300] truncate w-[90%]">
+                        {faiedStep?.payload?.content?.title ||
+                            faiedStep?.payload?.content?.message ||
+                            "Failed"}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
 }

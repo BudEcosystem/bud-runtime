@@ -1,15 +1,12 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import { Modal, Tooltip } from "antd";
 import { useIsland } from "src/hooks/useIsland";
 import { Image } from "antd";
-import { Text_10_400_B3B3B3 } from "../ui/text";
-import ComingSoon from "../ui/comingSoon";
+import { Text_10_400_B3B3B3, Text_14_400_B3B3B3 } from "../ui/text";
 import { IMessage, useFetchNotifications, useSocket } from "@novu/notification-center";
 import { useUser } from "@/stores/useUser";
 import { useWorkflow } from "src/stores/useWorkflow";
 import { useDrawer } from "src/hooks/useDrawer";
-import { useTheme } from "../../context/themeContext";
-import IslandIcon from "./IslandIcon";
 import { BudWidget } from "./BudWidget";
 import { NotificationsWidget } from "./BudNotification";
 // import BudChat from "../chat/BudChat";
@@ -39,7 +36,6 @@ type NotificationPayload = {
 
 const BudIsland: React.FC = () => {
     const { user } = useUser();
-    const { effectiveTheme } = useTheme();
     const { isDrawerOpen, minmizedProcessList, openDrawerWithStep, showMinimizedItem } = useDrawer();
     const { socket } = useSocket();
     const { workflowList, getWorkflowList } = useWorkflow();
@@ -53,9 +49,10 @@ const BudIsland: React.FC = () => {
             limit: 100,
         }
     });
-    const allNotifications = useMemo(() => data?.pages?.flatMap((page: any) => page?.data), [data]);
+    const allNotifications = useMemo(() => data?.pages?.flatMap((page) => page?.data), [data]);
 
     const { isOpen, close, open } = useIsland();
+    const timeoutRef = useRef<NodeJS.Timeout | null>(null);
     const { x } = useSpring({
         from: { x: 0 },
         x: lastNotification ? 1 : 0,
@@ -77,7 +74,7 @@ const BudIsland: React.FC = () => {
                     createdAt: notification.createdAt,
                 } as NotificationPayload;
             })
-            ?.map((notification: any) => {
+            ?.map((notification) => {
                 const notificationDate = new Date(notification.createdAt);
                 return {
                     title: notification?.content.title,
@@ -90,19 +87,19 @@ const BudIsland: React.FC = () => {
             });
     }, [allNotifications]);
 
-    const loadNotifications = async () => {
-        await refetch();
-    }
+    const loadNotifications = useCallback(() => {
+        refetch();
+    }, [refetch]);
 
     useEffect(() => {
         if (socket) {
-            socket.on("notification_received", async (data: any) => {
+            socket.on("notification_received", async (data) => {
                 // Temporarily refetch the notifications
                 loadNotifications();
                 setLastNotification(data.message);
             });
         }
-    }, [socket]);
+    }, [socket, loadNotifications]);
 
     useEffect(() => {
         if (!user) return;
@@ -110,27 +107,31 @@ const BudIsland: React.FC = () => {
         getWorkflowList();
     }, [isOpen, user]);
 
-    let timeout: any;
     // Hide the minimized item after 5 seconds
     useEffect(() => {
-
         if (lastNotification) {
-            if (timeout) {
-                clearTimeout(timeout);
+            if (timeoutRef.current) {
+                clearTimeout(timeoutRef.current);
             }
-            timeout = setTimeout(() => {
+            timeoutRef.current = setTimeout(() => {
                 setLastNotification(undefined);
             }, 3000);
         }
+
+        return () => {
+            if (timeoutRef.current) {
+                clearTimeout(timeoutRef.current);
+            }
+        };
     }, [lastNotification])
 
 
     const recentlyMinimized = minmizedProcessList?.[minmizedProcessList?.length - 1];
-    const recentlyMinimizedStep: any = recentlyMinimized?.step?.progress?.find((step) => step?.status === FormProgressStatus.inProgress);
+    const recentlyMinimizedStep = recentlyMinimized?.step?.progress?.find((step) => step?.status === FormProgressStatus.inProgress);
     const totalSteps = recentlyMinimized?.step?.progress?.length;
     const currentStep = recentlyMinimized?.step?.progress?.findIndex((step) => step?.status === FormProgressStatus.inProgress) + 1;
 
-    let title = "Notifications";
+    let title = "Task Island";
     let statusRender = <></>
 
     if (lastNotification && inAppNotifications?.[0]) {
@@ -138,18 +139,18 @@ const BudIsland: React.FC = () => {
         title = inAppNotifications?.[0].message;
     }
     else if (inProgressSteps?.includes(recentlyMinimized?.step?.id) && (lastNotification || showMinimizedItem)) {
-        title = recentlyMinimizedStep.title;
+        title = recentlyMinimizedStep?.title || "Task Island";
     } else if (recentlyMinimized?.step?.id && (lastNotification || showMinimizedItem)) {
         console.log('recentlyMinimized', recentlyMinimized);
         console.log('recentlyMinimized', recentlyMinimizedStep);
-        title = `Minmize ${recentlyMinimizedStep?.title}`;
+        title = `Minmize ${recentlyMinimizedStep?.title || ''}`;
         statusRender = <p className="text-[#EEEEEE] text-nowrap max-w-[70%] overflow-hidden overflow-ellipsis text-[0.625rem] p-0 m-0">
             Step {currentStep} / {totalSteps}
         </p>
-    } else if (inAppNotifications && inAppNotifications?.length > 0) {
+    } else if (inAppNotifications && inAppNotifications.length > 0) {
         title = `${inAppNotifications.length} Notifications`;
     } else {
-        title = "Notifications";
+        title = "Task Island";
     }
 
     // if (inProgressSteps?.includes(recentlyMinimized?.id)) {
@@ -197,7 +198,7 @@ const BudIsland: React.FC = () => {
     return (
         <>
             <animated.button
-                className="flex justify-start items-center rounded-[6.4px] mt-[0rem] cursor-pointer w-full hover:shadow-md p-[.35rem] island-theme-aware island-trigger-button"
+                className="flex justify-start items-center rounded-[6.4px] mt-[0rem]  bg-[#FFFFFF08] cursor-pointer w-full hover:bg-[#161616] hover:border-[#FFFFFF1A]  hover:shadow-md border border-[1px] border-[transparent] hover:border-[#e5e7eb]  p-[.35rem] py-[.564rem]"
                 type="button"
                 onMouseEnter={onMouseEnter}
                 onClick={() => {
@@ -232,41 +233,34 @@ const BudIsland: React.FC = () => {
                     />
                 </div>
                 <div className="flex flex-row items-center justify-between w-full">
-                    <Tooltip
-                        title={title}
-                        color={effectiveTheme === 'dark' ? "#161616" : "#ffffff"}
-                        placement="topLeft"
-                    >
-                        <span
-                            className="pl-[1rem] text-sm text-nowrap max-w-[70%] overflow-hidden overflow-ellipsis"
-                            style={{ color: 'var(--island-text-muted)' }}
-                        >
+                    <Tooltip title={title} color="#161616" placement="topLeft">
+                        <Text_14_400_B3B3B3 className="pl-[1rem] pt-[.3rem] text-nowrap max-w-[70%] overflow-hidden overflow-ellipsis">
                             {title}
-                        </span>
+                        </Text_14_400_B3B3B3>
                     </Tooltip>
                     {statusRender}
                 </div>
             </animated.button >
             <Modal
-                className="bg-transparent flex flex-col shadow-none w-full border relative island-theme-aware"
+                className=" bg-transparent flex  flex-col shadow-none w-full border relative"
                 closeIcon={null}
                 // transitionName="ant-modal-zoom"
                 classNames={{
-                    wrapper: 'isLandWrapper overflow-hidden transition-all duration-500 ease-in-out island-theme-aware',
-                    mask: `island-modal-mask ${!isDrawerOpen ? '' : 'bg-transparent'} transition-all duration-500 ease-in-out`,
-                    body: 'islandBody rounded-[1rem] flex justify-end items-start relative w-full h-[100vh] gap-[1rem] pl-[2.25rem] pr-[2.45rem] pt-[4.6rem] pb-[.7rem] island-theme-aware',
-                    content: 'p-0 h-full bg-transparent border-none island-modal-content',
+                    wrapper: "isLandWrapper overflow-hidden transition-all duration-500 ease-in-out",
+                    mask: `${!isDrawerOpen ? "bg-[#060607] opacity-90" : "bg-transparent"} transition-all duration-500 ease-in-out`,
+                    body: "islandBody rounded-[1rem] flex justify-end items-start relative w-full h-[100vh] gap-[1rem] pl-[2.25rem] pr-[2.45rem] pt-[4.6rem] pb-[.7rem]",
+                    content: "p-0 h-full bg-transparent border-none",
                 }}
                 open={isOpen && !isDrawerOpen}
                 style={{
-                    maxWidth: '100%',
-                    margin: '0',
+                    maxWidth: "100%",
+                    margin: "0",
                     top: 0,
-                    height: '100%',
-                    width: '100%',
-                    border: 'none',
-                    opacity: isDrawerOpen ? '0' : '1',
-                    transition: 'opacity 0.5s ease-in-out',
+                    height: "100%",
+                    width: "100%",
+                    border: "none",
+                    opacity: isDrawerOpen ? "0" : "1",
+                    transition: "opacity 0.5s ease-in-out",
                     padding: 0,
                 }}
                 onCancel={() => {
@@ -275,7 +269,7 @@ const BudIsland: React.FC = () => {
                 footer={null}
             >
                 <div
-                    className="absolute custom-border w-[2rem] h-[2rem] flex justify-center items-center backdrop-blur-[34.40000534057617px] right-[2.05rem] top-[2.05rem] border-[1px]"
+                    className="absolute custom-border w-[2rem] h-[2rem] flex justify-center items-center backdrop-blur-[34.40000534057617px] right-[2.05rem] top-[2.05rem] border-[1px] rounded-full"
                     onClick={() => {
                         close();
                     }}
@@ -284,33 +278,27 @@ const BudIsland: React.FC = () => {
                         preview={false}
                         src="/images/drawer/close.png"
                         alt="info"
-                        style={{ height: '.0.8rem' }}
+                        style={{ height: ".0.8rem" }}
                     />
                 </div>
-                <div className="flex justify-end items-top gap-[1rem] w-full h-[100%] island-theme-aware">
-                    <div className="w-[50%] overflow-y-auto">
-                        <div className="grid grid-cols-2 gap-x-[1rem] gap-y-[1rem] island-theme-aware">
+                <div className="flex justify-end items-top gap-[1rem] w-full h-[100%]">
+                    <div className="w-[100%] overflow-y-auto noScrollbar">
+                        <div className={`grid grid-cols-3 gap-x-[1.5rem] gap-y-[1.5rem] `}>
                             <NotificationsWidget
                                 notifications={inAppNotifications}
                                 loadNotifications={loadNotifications}
                                 loading={isLoading || isRefetching}
                             />
-                            {workflowList.map((workflow, index) => (
-                                {
-                                    workflow, index
-                                }
-                            ))
+                            {workflowList
+                                .map((workflow, index) => ({
+                                    workflow,
+                                    index,
+                                }))
                                 ?.map(({ workflow, index }) => (
                                     <BudWidget data={workflow} index={index} key={index} />
                                 ))}
                         </div>
                     </div>
-                    <div className={` h-full overflow-hidden relative w-[50%]`}>
-                        {/* <ComingSoon shrink={true} scaleValue={.9} comingYpos='30%' /> */}
-                        {/* <BudChat /> */}
-                        {/* <EmbeddedIframe /> */}
-                    </div>
-
                 </div>
             </Modal>
         </>
