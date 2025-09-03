@@ -103,7 +103,6 @@ class EvaluationWorkflow:
                 num_workers=1,
                 timeout_minutes=30,
                 kubeconfig=evaluate_model_request_json.kubeconfig,
-                namespace="budeval",
                 debug=True,
             )
 
@@ -114,9 +113,11 @@ class EvaluationWorkflow:
             transformed = transformer.transform_request(generic_request)
 
             # Create ConfigMap with transformed configuration
+            from budeval.commons.storage_config import StorageConfig
+
             from .configmap_manager import ConfigMapManager
 
-            configmap_manager = ConfigMapManager(namespace="budeval")
+            configmap_manager = ConfigMapManager(namespace=StorageConfig.get_current_namespace())
 
             configmap_result = configmap_manager.create_generic_config_map(
                 eval_request_id=str(generic_request.eval_request_id),
