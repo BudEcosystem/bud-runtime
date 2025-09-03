@@ -60,3 +60,5 @@ Debug/
 
 # Screts
 secrets.json
+app.yaml
+k3s.yaml
