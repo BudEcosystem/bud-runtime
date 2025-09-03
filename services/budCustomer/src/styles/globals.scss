@@ -1335,6 +1335,13 @@ input.ant-input:-webkit-autofill {
   background: #965cde !important;
 }
 
+.noScrollbar {
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
+}
+
 // Responsive breakpoints
 @media (min-width: 1680px) {
   .cardSetTwo {
