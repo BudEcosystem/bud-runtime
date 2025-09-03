@@ -10,8 +10,12 @@ data:
     [gateway.rate_limits]
     enabled = true
 
+    [gateway.blocking]
+    enabled = true
+
     [gateway.analytics]
     enabled = true
+    geoip_db_path = "/app/geo/GeoLite2-City.mmdb"
 
     [gateway.observability.kafka]
     enabled = true
