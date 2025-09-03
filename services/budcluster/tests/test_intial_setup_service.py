@@ -78,17 +78,15 @@ async def test_initial_setup():
     #     assert status == "successful"
     #     mock_kube_config.assert_called_once()
     #     handler.ansible_executor.run_playbook.assert_called_once_with(
-    #         playbook="NODE_INFO_COLLECTOR",
+    #         playbook="DEPLOY_NFD",  # Updated to use NFD
     #         extra_vars={
     #             "kubeconfig_content": config_dict,
-    #             "node_info_collector_image_cpu": handler.config,
-    #             "node_info_collector_image_cuda": handler.config,
-    #             "node_info_collector_image_hpu": handler.config,
-    #             "node_labeler_image": handler.config,
     #             "image_pull_secrets": handler.get_image_pull_secret(),
     #             "platform": handler.platform,
-    #             "prometheus_remote_write_url": handler.config,
+    #             "prometheus_url": handler.config + "/api/v1/write",
     #             "prometheus_namespace": "bud-system",
-    #             "cluster_name": str(cluster_id)
+    #             "cluster_name": str(cluster_id),
+    #             "namespace": "bud-runtime",
+    #             "enable_nfd": True,
     #         }
     #     )

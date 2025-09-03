@@ -10,57 +10,60 @@ const CopyQuery = ({ Data, RenderItem, triggerClassNames }: any) => {
     const modelName = Data?.endpoint?.model?.name || "";
 
     // Default to chat endpoint
-    let endpoint = 'v1/chat/completions';
+    let endpoint = "v1/chat/completions";
     let payloadExample: any = {
       model: modelName,
       max_tokens: 256,
-      messages: [{"role": "user", "content": "Summarize the given text"}]
+      messages: [{ role: "user", content: "Summarize the given text" }],
     };
 
     if (supportedEndpoints) {
       // Check for embedding endpoint
       if (supportedEndpoints.embedding?.enabled) {
-        endpoint = supportedEndpoints.embedding.path || 'v1/embeddings';
+        endpoint = supportedEndpoints.embedding.path || "v1/embeddings";
         payloadExample = {
           model: modelName,
-          input: "Your text to embed"
+          input: "Your text to embed",
         };
       }
       // Check for audio transcription endpoint
       else if (supportedEndpoints.audio_transcription?.enabled) {
-        endpoint = supportedEndpoints.audio_transcription.path || 'v1/audio/transcriptions';
+        endpoint =
+          supportedEndpoints.audio_transcription.path ||
+          "v1/audio/transcriptions";
         payloadExample = {
           model: modelName,
           file: "@/path/to/audio.mp3",
-          response_format: "json"
+          response_format: "json",
         };
       }
       // Check for text-to-speech endpoint
       else if (supportedEndpoints.audio_speech?.enabled) {
-        endpoint = supportedEndpoints.audio_speech.path || 'v1/audio/speech';
+        endpoint = supportedEndpoints.audio_speech.path || "v1/audio/speech";
         payloadExample = {
           model: modelName,
           input: "Text to convert to speech",
-          voice: "alloy"
+          voice: "alloy",
         };
       }
       // Check for image generation endpoint
       else if (supportedEndpoints.image_generation?.enabled) {
-        endpoint = supportedEndpoints.image_generation.path || 'v1/images/generations';
+        endpoint =
+          supportedEndpoints.image_generation.path || "v1/images/generations";
         payloadExample = {
           model: modelName,
           prompt: "A cute baby sea otter",
           n: 1,
-          size: "1024x1024"
+          size: "1024x1024",
         };
       }
       // Check for completion endpoint
       else if (supportedEndpoints.completion?.enabled) {
-        endpoint = supportedEndpoints.completion.path || 'v1/completions';
+        endpoint = supportedEndpoints.completion.path || "v1/completions";
         payloadExample = {
           model: modelName,
           prompt: "Once upon a time",
-          max_tokens: 256
+          max_tokens: 256,
         };
       }
     }
@@ -71,13 +74,16 @@ const CopyQuery = ({ Data, RenderItem, triggerClassNames }: any) => {
   const handleSelect = async (value: string) => {
     const { endpoint, payloadExample } = getEndpointConfig();
     // Use the base URL without any endpoint path appended
-    const baseUrl = process.env.NEXT_PUBLIC_COPY_CODE_API_BASE_URL || process.env.NEXT_PUBLIC_BASE_URL || '';
+    const baseUrl =
+      process.env.NEXT_PUBLIC_COPY_CODE_API_BASE_URL ||
+      process.env.NEXT_PUBLIC_BASE_URL ||
+      "";
     const apiUrl = `${baseUrl}${endpoint}`;
 
     let curl: string, python: string, js: string;
 
     // Special handling for audio transcription (file upload)
-    if (endpoint.includes('audio/transcriptions')) {
+    if (endpoint.includes("audio/transcriptions")) {
       curl = `curl --location '${apiUrl}' \\
                   --header 'Authorization: Bearer {API_KEY_HERE}' \\
                   --form 'file=@"/path/to/audio.mp3"' \\

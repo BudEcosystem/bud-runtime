@@ -18,7 +18,7 @@
 
 import os
 import time
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 import aria2p
 from aria2p.api import OptionsType
@@ -28,6 +28,8 @@ from budmicroframe.commons import logging
 
 from ..commons.config import app_settings
 from ..commons.exceptions import Aria2Exception
+from .aria2_daemon import ensure_aria2_daemon_running, get_aria2_daemon_manager
+from .io_monitor import get_io_monitor
 
 
 logger = logging.get_logger(__name__)
@@ -38,16 +40,57 @@ class Aria2Downloader:
         self,
         host: str = app_settings.Aria2p_host,
         port: int = app_settings.Aria2p_port,
+        enable_io_monitoring: bool = True,
+        io_check_interval: float = 5.0,
+        min_speed: int = 1 * 1024 * 1024,  # 1 MB/s minimum
+        max_speed: int = 0,  # 0 = unlimited (no cap)
     ):
         """Initialize Aria2 downloader.
 
         Args:
             host: Aria2 RPC host
             port: Aria2 RPC port
-            secret: Aria2 RPC secret token
+            enable_io_monitoring: Whether to enable I/O-based speed control
+            io_check_interval: Interval in seconds to check I/O metrics
+            min_speed: Minimum download speed in bytes/sec
+            max_speed: Maximum download speed in bytes/sec (0 = unlimited)
         """
+        # Get max speed from environment or use default (0 = unlimited)
+        env_max_speed = os.getenv("ARIA2_MAX_SPEED_MBPS")
+        if env_max_speed is not None:
+            max_speed = int(env_max_speed) * 1024 * 1024 if int(env_max_speed) > 0 else 0
+
+        # Get min speed from environment or use default
+        env_min_speed = os.getenv("ARIA2_MIN_SPEED_MBPS")
+        if env_min_speed is not None:
+            min_speed = int(env_min_speed) * 1024 * 1024
+        # Ensure daemon is running
+        if not ensure_aria2_daemon_running():
+            raise Aria2Exception("Failed to start aria2 daemon")
+
         # NOTE: Secret removed since helm does not support secrets
-        self.aria2 = aria2p.API(aria2p.Client(host=host, port=port))
+        # Handle both cases: with and without http:// prefix
+        aria2_host = host if host.startswith("http") else f"http://{host}"
+        self.aria2 = aria2p.API(aria2p.Client(host=aria2_host, port=port))
+
+        # I/O monitoring settings
+        self.enable_io_monitoring = enable_io_monitoring
+        self.io_check_interval = io_check_interval
+        self.min_speed = min_speed
+        self.max_speed = max_speed
+
+        logger.info(
+            "Aria2 downloader initialized with speed limits - Min: %.1f MB/s, Max: %s",
+            self.min_speed / (1024 * 1024),
+            "Unlimited" if self.max_speed == 0 else f"{self.max_speed / (1024 * 1024):.1f} MB/s",
+        )
+
+        # Get I/O monitor and daemon manager instances
+        self.io_monitor = get_io_monitor() if enable_io_monitoring else None
+        self.daemon_manager = get_aria2_daemon_manager()
+
+        # Track last speed adjustment time
+        self._last_speed_adjustment = 0.0
 
     def download_from_any_url(self, url: str, options: Optional[OptionsType] = None) -> List[Download]:
         """Download from any URL.
@@ -102,8 +145,65 @@ class Aria2Downloader:
         """
         return self.aria2.add_uris(urls, options=options)
 
+    def adjust_speed_based_on_io(self) -> Tuple[int, float]:
+        """Adjust download speed based on current I/O metrics.
+
+        Returns:
+            Tuple of (new_speed_bytes_per_sec, stress_level)
+        """
+        if not self.enable_io_monitoring or not self.io_monitor:
+            # If monitoring disabled, return max_speed (which could be 0 for unlimited)
+            return self.max_speed, 0.0
+
+        # Get current I/O metrics
+        metrics = self.io_monitor.get_current_metrics(str(app_settings.model_download_dir))
+
+        # Calculate recommended speed
+        recommended_speed, stress_level = self.io_monitor.calculate_download_speed_limit(
+            current_metrics=metrics,
+            min_speed=self.min_speed,
+            max_speed=self.max_speed,
+            disk_path=str(app_settings.model_download_dir),
+        )
+
+        # Update global speed limit in aria2
+        self.daemon_manager.update_global_speed_limit(recommended_speed)
+
+        return recommended_speed, stress_level
+
+    def should_pause_for_io(self) -> bool:
+        """Check if downloads should be paused due to I/O stress.
+
+        Returns:
+            True if downloads should be paused
+        """
+        if not self.enable_io_monitoring or not self.io_monitor:
+            return False
+
+        # Check using the download directory path
+        download_path = str(app_settings.model_download_dir)
+        return self.io_monitor.should_pause_downloads(disk_path=download_path)
+
+    def wait_for_io_recovery(self, target_stress: float = 0.5, max_wait: float = 60.0) -> bool:
+        """Wait for I/O stress to recover.
+
+        Args:
+            target_stress: Target stress level to wait for
+            max_wait: Maximum time to wait in seconds
+
+        Returns:
+            True if recovered, False if timeout
+        """
+        if not self.enable_io_monitoring or not self.io_monitor:
+            return True
+
+        return self.io_monitor.wait_for_io_recovery(
+            target_stress_level=target_stress,
+            max_wait_time=max_wait,
+        )
+
     def listen_to_download(self, download: Download, timeout_seconds: int = 5) -> Download:
-        """Listen to download events.
+        """Listen to download events with I/O monitoring.
 
         Args:
             download: Download to listen to
@@ -112,6 +212,8 @@ class Aria2Downloader:
         Returns:
             Download
         """
+        last_io_check = time.time()
+
         while True:
             download.update()
 
@@ -128,6 +230,33 @@ class Aria2Downloader:
                 self.purge_download(download)
                 raise Aria2Exception("Download removed")
             else:
+                # Check and adjust I/O throttling
+                current_time = time.time()
+                if self.enable_io_monitoring and current_time - last_io_check >= self.io_check_interval:
+                    # Check if we should pause
+                    if self.should_pause_for_io():
+                        logger.warning("Pausing download due to high I/O stress")
+                        self.pause_download(download)
+
+                        # Wait for recovery
+                        if self.wait_for_io_recovery():
+                            logger.info("I/O stress recovered, resuming download")
+                            self.resume_download(download)
+                        else:
+                            logger.warning("I/O recovery timeout, resuming anyway")
+                            self.resume_download(download)
+                    else:
+                        # Adjust speed based on I/O
+                        new_speed, stress_level = self.adjust_speed_based_on_io()
+                        logger.debug(
+                            "Adjusted download speed to %.1f MB/s (stress: %.2f)",
+                            new_speed / (1024 * 1024),
+                            stress_level,
+                        )
+
+                    last_io_check = current_time
+
+                # Log download progress
                 logger.debug(f"Downloading {download.name}")
                 logger.debug(f"Download status: {download_status}")
                 logger.debug(f"Download total size: {download.total_length_string()}")

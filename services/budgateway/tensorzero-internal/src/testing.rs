@@ -25,6 +25,7 @@ pub fn get_unit_test_app_state_data(
             std::collections::HashMap::new(),
         )),
         rate_limiter: None,
+        usage_limiter: None,
         geoip_service: None,
         ua_parser: None,
         blocking_manager: None,

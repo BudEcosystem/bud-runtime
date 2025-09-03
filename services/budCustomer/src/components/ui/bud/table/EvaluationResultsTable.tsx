@@ -198,8 +198,9 @@ function EvaluationResultsTable() {
             <div className="flex items-center justify-between gap-x-[.4rem]">
               <SearchHeaderInput
                 placeholder={"Search by name"}
-                value={searchValue}
-                onChange={setSearchValue}
+                searchValue={searchValue}
+                setSearchValue={setSearchValue}
+                classNames="mr-[.6rem]"
               />
               {hasPermission(PermissionEnum.ModelManage) && (
                 <PrimaryButton

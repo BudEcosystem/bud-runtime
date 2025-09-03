@@ -75,16 +75,12 @@ export function BudForm(props: BudFormProps) {
   const { form, isExpandedView } = useContext(BudFormContext);
 
   useEffect(() => {
-    // Only set form values if we have actual data (not empty object)
+    // Only set form values on initial mount
     if (props.data && Object.keys(props.data).length > 0) {
       form.setFieldsValue(props.data);
-
-      // Also set after a delay in case fields aren't rendered yet
-      setTimeout(() => {
-        form.setFieldsValue(props.data);
-      }, 100);
     }
-  }, [JSON.stringify(props.data), form]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty dependency array - only run once on mount
 
   // Don't reset fields on unmount - we want to preserve form data when navigating
   // The form will be properly initialized with data prop when remounting

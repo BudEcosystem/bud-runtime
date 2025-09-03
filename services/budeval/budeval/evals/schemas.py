@@ -172,3 +172,39 @@ class Job(BaseModel):
                 ],
             }
         }
+
+
+# Response schemas for evaluation results API
+class DatasetScore(BaseModel):
+    """Individual dataset score information."""
+
+    dataset_name: str = Field(..., description="Name of the dataset")
+    accuracy: float = Field(..., description="Accuracy score (0-100)")
+    total_examples: int = Field(..., description="Total number of examples in the dataset")
+    correct_examples: int = Field(..., description="Number of correctly predicted examples")
+
+
+class EvaluationScoresResponse(BaseModel):
+    """Response schema for evaluation scores endpoint."""
+
+    evaluation_id: str = Field(..., description="Evaluation job ID")
+    model_name: str = Field(..., description="Name of the evaluated model")
+    engine: str = Field(..., description="Evaluation engine used")
+    overall_accuracy: float = Field(..., description="Overall accuracy across all datasets")
+    datasets: List[DatasetScore] = Field(..., description="List of dataset scores")
+
+    class Config:
+        """Configuration for the EvaluationScoresResponse model."""
+
+        json_schema_extra = {
+            "example": {
+                "evaluation_id": "eval-123e4567-e89b-12d3-a456-426614174000",
+                "model_name": "gpt-4",
+                "engine": "opencompass",
+                "overall_accuracy": 75.5,
+                "datasets": [
+                    {"dataset_name": "mmlu", "accuracy": 85.5, "total_examples": 200, "correct_examples": 171},
+                    {"dataset_name": "gsm8k", "accuracy": 65.5, "total_examples": 100, "correct_examples": 65},
+                ],
+            }
+        }

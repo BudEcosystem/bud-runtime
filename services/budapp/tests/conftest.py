@@ -1,9 +1,12 @@
 import os
 import sys
-from typing import Any
+from typing import Any, AsyncGenerator
 
 import pytest
 from unittest import mock
+from fastapi.testclient import TestClient
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import sessionmaker
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, project_root)
@@ -65,3 +68,27 @@ def mock_env_vars():
     # Clean up after tests
     for key in test_env_vars.keys():
         os.environ.pop(key, None)
+
+
+@pytest.fixture
+async def async_session():
+    """Create a mock async database session for testing."""
+    from unittest.mock import AsyncMock, Mock
+
+    session = AsyncMock(spec=AsyncSession)
+    session.add = Mock()
+    session.commit = AsyncMock()
+    session.rollback = AsyncMock()
+    session.close = AsyncMock()
+
+    return session
+
+
+@pytest.fixture
+def client():
+    """Create a test client for the FastAPI app."""
+    # Import here to avoid circular imports and ensure env vars are set
+    from budapp.main import app
+
+    with TestClient(app) as test_client:
+        yield test_client

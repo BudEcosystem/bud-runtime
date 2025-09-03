@@ -1541,7 +1541,7 @@ const viewModel: DrawerFlowType = {
 const editProject: DrawerFlowType = {
   title: "Edit Project",
   description: "Edit an existing project",
-  totalSteps: 1,
+  totalSteps: 2,
   steps: [
     {
       navigation: () => {
@@ -1562,6 +1562,36 @@ const editProject: DrawerFlowType = {
         {
           status: FormProgressStatus.inProgress,
           title: "Edit Project",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Success",
+        },
+      ],
+    },
+    {
+      navigation: () => {
+        const state = useProjects.getState();
+        const project = state.globalSelectedProject;
+        const projectName = (project as any)?.project?.name || (project as any)?.name || "Project";
+        return [
+          "Projects",
+          projectName,
+          "Success",
+        ];
+      },
+      id: "project-edit-success",
+      confirmClose: false,
+      step: 2,
+      component: StepComponents["project-edit-success"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Edit Project",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Success",
         },
       ],
     },
@@ -2061,7 +2091,7 @@ const addNewKey: DrawerFlowType = {
           title: "Success",
         },
       ],
-      confirmClose: true,
+      confirmClose: false,
     },
     {
       navigation: () => ["API Keys", "Success"],
@@ -3344,7 +3374,7 @@ const createBatchJob: DrawerFlowType = {
           title: "Success",
         },
       ],
-      confirmClose: true,
+      confirmClose: false,
     },
     {
       navigation: () => ["Batch Jobs", "Success"],

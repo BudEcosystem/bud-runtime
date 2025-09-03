@@ -12,8 +12,13 @@
     "bundle_size_mb": null
   },
   "version_info": {
-    "current_version": "2025.01.04",
+    "current_version": "2025.01.05",
     "previous_versions": [
+      {
+        "version": "2025.01.04",
+        "deprecated": false,
+        "migration_required": false
+      },
       {
         "version": "2024.01.01",
         "deprecated": false,
@@ -1159,6 +1164,9 @@
           "traits": [
             "Math"
           ],
+          "eval_type": {
+            "gen": "demo_gsm8k_chat_gen"
+          },
           "metadata": {
             "format": "jsonl",
             "language": "en",
@@ -23106,6 +23114,10 @@
   },
   "migration": null,
   "changelog": {
+    "2025.01.05": [
+      "Added eval_type support for datasets to specify evaluation configurations",
+      "GSM8K dataset now includes gen evaluation type configuration"
+    ],
     "2025.01.04": [
       "Added GSM8K dataset for mathematical reasoning",
       "Added HumanEval dataset for code generation",

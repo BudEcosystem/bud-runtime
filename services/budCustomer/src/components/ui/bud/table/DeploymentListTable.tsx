@@ -329,8 +329,9 @@ function DeploymentListTable() {
               <div className="flex items-center justify-between gap-x-[.8rem]">
                 <SearchHeaderInput
                   placeholder={"Search by name"}
-                  value={searchValue}
-                  onChange={setSearchValue}
+                  searchValue={searchValue}
+                  setSearchValue={setSearchValue}
+                  classNames="mr-[.6rem]"
                 />
                 {(hasPermission(PermissionEnum.ProjectManage) ||
                   hasProjectPermission(

@@ -36,10 +36,10 @@ export default function CreateBatchJobSuccess(props: Props) {
               />
             </div>
             <div className="max-w-[75%] mt-[1.3rem] pb-[1.6rem]">
-              <Text_24_600_EEEEEE className="text-center leading-[2rem] mb-[1.2rem]">
+              <Text_24_600_EEEEEE className="text-[black] dark:text-[#EEEEE] text-center leading-[2rem] mb-[1.2rem]">
                 Batch Job Successfully<br /> Created
               </Text_24_600_EEEEEE>
-              <Text_12_400_B3B3B3 className="text-center">
+              <Text_12_400_B3B3B3 className="text-center text-[black] dark:text-[#EEEEE]">
                 Your batch job has been queued for processing. You can monitor its progress in the batch jobs dashboard.
               </Text_12_400_B3B3B3>
             </div>

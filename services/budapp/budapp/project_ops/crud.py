@@ -838,6 +838,36 @@ class ProjectDataManager(DataManagerUtils):
         count = self.scalar_one_or_none(stmt)
         return count > 0 if count is not None else False
 
+    async def check_duplicate_name_for_user_projects(
+        self, project_name: str, user_id: UUID, project_type: str
+    ) -> bool:
+        """Check if a project with the same name and type exists for the user's associated projects.
+
+        Args:
+            project_name: The project name to check
+            user_id: The user ID
+            project_type: The project type to check
+
+        Returns:
+            True if a duplicate project name exists, False otherwise
+        """
+        stmt = (
+            select(func.count())
+            .select_from(Project)
+            .join(
+                project_user_association,
+                Project.id == project_user_association.c.project_id,
+            )
+            .where(
+                project_user_association.c.user_id == user_id,
+                func.lower(Project.name) == func.lower(project_name),
+                Project.project_type == project_type,
+                Project.status == ProjectStatusEnum.ACTIVE,
+            )
+        )
+        count = self.scalar_one_or_none(stmt)
+        return count > 0 if count is not None else False
+
     async def get_all_projects(
         self,
         offset: int,

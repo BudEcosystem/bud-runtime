@@ -1,11 +1,12 @@
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Table, Button, Flex } from "antd";
+import { Table, Flex, Pagination, Skeleton } from "antd";
 import { useDrawer } from "@/hooks/useDrawer";
 import { AppRequest } from "@/services/api/requests";
 import { errorToast, successToast } from "@/components/toast";
 import BudDrawer from "@/components/ui/bud/drawer/BudDrawer";
+import { motion } from "framer-motion";
 import {
   Text_12_400_B3B3B3,
   Text_12_400_EEEEEE,
@@ -16,6 +17,7 @@ import {
 import { Icon } from "@iconify/react/dist/iconify.js";
 import { formatDate } from "@/utils/formatDate";
 import styles from "./api-keys.module.scss";
+import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
 
 interface ApiKey {
   id: string;
@@ -201,6 +203,41 @@ export default function ApiKeysPage() {
 
   return (
     <DashboardLayout>
+      <style dangerouslySetInnerHTML={{ __html: `
+        /* Theme-aware table styling for API Keys */
+        .theme-aware-table .ant-table {
+          background: transparent !important;
+        }
+        .theme-aware-table .ant-table-thead > tr > th {
+          background: var(--bg-secondary) !important;
+          color: var(--text-primary) !important;
+          border-bottom: 1px solid var(--border-color) !important;
+        }
+        .theme-aware-table .ant-table-tbody > tr > td {
+          background: var(--bg-card) !important;
+          color: var(--text-primary) !important;
+          border-bottom: 1px solid var(--border-color) !important;
+        }
+        .theme-aware-table .ant-table-tbody > tr:hover > td {
+          background: var(--bg-hover) !important;
+        }
+        /* Light theme specific */
+        [data-theme="light"] .theme-aware-table .ant-table-thead > tr > th {
+          background: #fafafa !important;
+          color: #000000 !important;
+        }
+        [data-theme="light"] .theme-aware-table .ant-table-tbody > tr > td {
+          background: #ffffff !important;
+          color: #000000 !important;
+        }
+        [data-theme="light"] .theme-aware-table .ant-table-tbody > tr:hover > td {
+          background: #f5f5f5 !important;
+        }
+        /* Dark theme specific */
+        [data-theme="dark"] .theme-aware-table .ant-table-tbody > tr:hover > td {
+          background: #1f1f1f !important;
+        }
+      ` }} />
       <div className="boardPageView">
         <div className="boardMainContainer pt-[2.25rem]">
           {/* Header */}
@@ -211,14 +248,11 @@ export default function ApiKeysPage() {
                 Manage your API keys for programmatic access
               </Text_14_400_B3B3B3>
             </div>
-            <Button
-              type="primary"
-              icon={<Icon icon="ph:key" />}
-              className="bg-[#965CDE] border-[#965CDE] h-[2.5rem] px-[1.5rem]"
+            <PrimaryButton
               onClick={() => openDrawer("add-new-key")}
             >
               Create New Key
-            </Button>
+            </PrimaryButton>
           </Flex>
 
           {/* Security Notice */}
@@ -239,8 +273,23 @@ export default function ApiKeysPage() {
           </div>
 
           {/* API Keys Table */}
-          <div className='pb-[60px] pt-[.4rem] CommonCustomPagination'>
-            <Table<ApiKey>
+          <div className='pb-[60px] pt-[.4rem]'>
+            {loading ? (
+              <div className={styles.loadingContainer}>
+                <motion.div
+                  className={styles.loadingBar}
+                  initial={{ width: "0%" }}
+                  animate={{ width: "100%" }}
+                  transition={{
+                    duration: 1.5,
+                    ease: "easeInOut",
+                    repeat: Infinity,
+                  }}
+                />
+              </div>
+            ) : (
+              <>
+              <Table<ApiKey>
               onChange={(_pagination, _filters, sorter: any) => {
                 if (sorter && sorter.field) {
                   setOrder(sorter.order === 'ascend' ? '' : '-');
@@ -248,33 +297,51 @@ export default function ApiKeysPage() {
                 }
               }}
               columns={columns}
-              pagination={{
-                className: 'small-pagination',
-                current: currentPage,
-                pageSize: pageSize,
-                total: totalKeys,
-                onChange: handlePageChange,
-                showSizeChanger: true,
-                pageSizeOptions: ['5', '10', '20', '50'],
-              }}
               dataSource={apiKeys}
-              bordered={false}
-              loading={loading}
               rowKey="id"
-              showSorterTooltip={false}
-              className={styles.apiKeysTable}
+              loading={loading}
+              pagination={false}
+              virtual
+              bordered={false}
+              scroll={{ x: 1100 }}
+              showSorterTooltip={true}
+              className="theme-aware-table"
               style={{
                 background: "transparent"
               }}
               onRow={(record) => ({
                 onClick: () => {
-                  // Store the selected API key in localStorage for the drawer to access
                   localStorage.setItem('selected_api_key', JSON.stringify(record));
                   openDrawer("view-api-key");
                 },
-                style: { cursor: 'pointer' }
+                className: 'cursor-pointer hover:bg-gray-900 dark:hover:bg-gray-900',
+                style: {
+                  background: 'var(--bg-card)',
+                  color: 'var(--text-primary)'
+                }
               })}
+              locale={{
+                emptyText: (
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <p className="text-gray-400 dark:text-gray-500 text-sm">No API keys found</p>
+                  </div>
+                ),
+              }}
             />
+            {/* Pagination */}
+            <div className="flex justify-end mt-4 CommonCustomPagination">
+              <Pagination
+                className='small-pagination'
+                current={currentPage}
+                pageSize={pageSize}
+                total={totalKeys}
+                onChange={handlePageChange}
+                showSizeChanger
+                pageSizeOptions={['5', '10', '20', '50']}
+              />
+            </div>
+            </>
+            )}
           </div>
         </div>
       </div>

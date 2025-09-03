@@ -59,6 +59,8 @@ async def get_current_usage(
     try:
         service = BillingService(db)
         usage = await service.get_current_usage(current_user.id)
+
+        # Now the service always returns valid billing data (Free plan as default)
         return SingleResponse(
             result=CurrentUsageSchema(**usage),
             message="Current usage retrieved successfully",
@@ -127,6 +129,7 @@ async def get_user_current_usage(
         service = BillingService(db)
         usage = await service.get_current_usage(user_id)
 
+        # Now the service always returns valid billing data (Free plan as default)
         return SingleResponse(
             result=CurrentUsageSchema(**usage),
             message="User usage retrieved successfully",
@@ -397,4 +400,112 @@ async def check_and_trigger_alerts(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to check alerts",
+        )
+
+
+@router.post("/reset/{user_id}", response_model=SingleResponse)
+async def reset_user_usage(
+    user_id: UUID,
+    reason: str = "Manual reset",
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_session),
+) -> SingleResponse:
+    """Reset a user's usage (admin only)."""
+    try:
+        # Check if current user is admin
+        if current_user.user_type != UserTypeEnum.ADMIN:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only administrators can reset user usage",
+            )
+
+        from budapp.billing_ops.reset_usage import UsageResetService
+
+        service = UsageResetService(db)
+        success = await service.reset_user_usage(user_id, reason)
+
+        if success:
+            return SingleResponse(
+                result={"user_id": str(user_id), "reset": True},
+                message=f"Successfully reset usage for user {user_id}",
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"User {user_id} not found or has no billing plan",
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error resetting user usage: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to reset user usage",
+        )
+
+
+@router.post("/reset-all", response_model=SingleResponse)
+async def reset_all_users_usage(
+    reason: str = "System reset",
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_session),
+) -> SingleResponse:
+    """Reset all users' usage (admin only)."""
+    try:
+        # Check if current user is admin
+        if current_user.user_type != UserTypeEnum.ADMIN:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only administrators can reset all users' usage",
+            )
+
+        from budapp.billing_ops.reset_usage import UsageResetService
+
+        service = UsageResetService(db)
+        count = await service.reset_all_users(reason)
+
+        return SingleResponse(
+            result={"users_reset": count},
+            message=f"Successfully reset usage for {count} users",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error resetting all users' usage: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to reset all users' usage",
+        )
+
+
+@router.post("/reset-expired", response_model=SingleResponse)
+async def reset_expired_cycles(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_session),
+) -> SingleResponse:
+    """Reset expired billing cycles (admin only)."""
+    try:
+        # Check if current user is admin
+        if current_user.user_type != UserTypeEnum.ADMIN:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only administrators can reset expired cycles",
+            )
+
+        from budapp.billing_ops.reset_usage import UsageResetService
+
+        service = UsageResetService(db)
+        count = await service.reset_expired_cycles()
+
+        return SingleResponse(
+            result={"cycles_reset": count},
+            message=f"Successfully reset {count} expired billing cycles",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error resetting expired cycles: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to reset expired cycles",
         )

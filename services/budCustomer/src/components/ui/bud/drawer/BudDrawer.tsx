@@ -43,7 +43,7 @@ const BudDrawer: React.FC = () => {
   return (
     <Drawer
       id="bud-drawer"
-      className="drawerRoot bg-transparent flex  flex-col shadow-none w-full border relative visible-drawer pr-[.6rem]"
+      className="drawerRoot bg-transparent flex  flex-col shadow-none w-full relative visible-drawer pr-[.6rem]"
       closeIcon={null}
       classNames={{
         wrapper:
@@ -93,7 +93,7 @@ const BudDrawer: React.FC = () => {
       {expandedStep?.component && (
         <>
           <div
-            className="border-gradient border-gradient-purple drawerBackground"
+            className="drawerBackground"
             style={{
               width,
               height: "100%",

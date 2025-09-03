@@ -58,7 +58,7 @@
             scid.nixosModules.scid
             nixos-facter-modules.nixosModules.facter
 
-            ./nix/nixos/${host}/configuration.nix
+            ./infra/nixos/${host}/configuration.nix
           ];
         };
     in
@@ -160,7 +160,8 @@
           );
 
       nixosConfigurations = lib.genAttrs [
-        "master"
+        "primary"
+        "ingress"
       ] (host: makeNixos host "x86_64-linux");
     };
 }

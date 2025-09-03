@@ -60,7 +60,7 @@ export const colourStyles = (
       ...styles,
       backgroundColor: "transparent",
       borderWidth: 1,
-      borderColor: isLight ? "#d0d0d0" : "#757575",
+      borderColor: isLight ? "#B1B1B1" : "#757575",
       boxShadow: "none",
       padding: ".75rem 0",
       "&:hover": {

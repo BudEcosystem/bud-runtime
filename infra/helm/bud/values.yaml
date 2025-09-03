@@ -1,3 +1,5 @@
+imagePullPolicy: "Always"
+
 ingress:
     enabled: true
     # used to derive public urls for frontend services
@@ -46,22 +48,22 @@ microservices:
             - "http://localhost:3000"
             - "http://localhost:3001"
         env:
-            APP_CONFIG: '{}'
+            APP_CONFIG: "{}"
             STATIC_DIR: /data/static-dir
 
-            PSQL_HOST: '{{ $.Release.Name }}-postgresql'
+            PSQL_HOST: "{{ $.Release.Name }}-postgresql"
             PSQL_PORT: "5432"
             PSQL_USER: budapp
             PSQL_PASSWORD: budapp
             PSQL_DB_NAME: budapp
 
             GRAFANA_SCHEME: http
-            GRAFANA_URL: '{{ $.Release.Name }}-grafana'
+            GRAFANA_URL: "{{ $.Release.Name }}-grafana"
 
             KEYCLOAK_SERVER_URL: http://{{ $.Release.Name }}-keycloak/
-            KEYCLOAK_REALM_NAME: '{{ .Values.keycloak.adminRealm }}'
-            KEYCLOAK_ADMIN_USERNAME: '{{ .Values.keycloak.auth.adminUser }}'
-            KEYCLOAK_ADMIN_PASSWORD: '{{ .Values.keycloak.auth.adminPassword }}'
+            KEYCLOAK_REALM_NAME: "{{ .Values.keycloak.adminRealm }}"
+            KEYCLOAK_ADMIN_USERNAME: "{{ .Values.keycloak.auth.adminUser }}"
+            KEYCLOAK_ADMIN_PASSWORD: "{{ .Values.keycloak.auth.adminPassword }}"
             KEYCLOAK_VERIFY_SSL: "false"
             DEFAULT_REALM_NAME: bud-keycloak
 
@@ -73,18 +75,18 @@ microservices:
         image: budstudio/budcluster:nightly
         daprid: budcluster
         env:
-            APP_CONFIG: '{}'
+            APP_CONFIG: "{}"
             LOG_LEVEL: INFO
             RSA_KEY_NAME: rsa-private-key.pem
             VOLUME_TYPE: nfs
 
-            NOTIFY_SERVICE_NAME: '{{ .Release.Name }}-budnotify'
+            NOTIFY_SERVICE_NAME: "{{ .Release.Name }}-budnotify"
             NOTIFY_SERVICE_TOPIC: notificationMessages
 
-            CONFIGSTORE_NAME: '{{ .Release.Name }}-configstore'
-            SECRETSTORE_SECRET_NAME: '{{ .Release.Name }}-secretstore'
+            CONFIGSTORE_NAME: "{{ .Release.Name }}-configstore"
+            SECRETSTORE_SECRET_NAME: "{{ .Release.Name }}-secretstore"
 
-            PSQL_HOST: '{{ $.Release.Name }}-postgresql'
+            PSQL_HOST: "{{ $.Release.Name }}-postgresql"
             PSQL_PORT: "5432"
             PSQL_USER: budcluster
             PSQL_PASSWORD: budcluster
@@ -101,7 +103,7 @@ microservices:
             LITELLM_PROXY_SERVER_IMAGE: ghcr.io/berriai/litellm:main-latest
 
             MINIO_BUCKET: models-registry
-            MINIO_ENDPOINT: '{{ .Release.Name }}-minio:{{ .Values.minio.service.ports.api }}'
+            MINIO_ENDPOINT: "{{ .Release.Name }}-minio:{{ .Values.minio.service.ports.api }}"
             MINIO_SECURE: "false"
     budmetrics:
         daprid: budmetrics
@@ -110,24 +112,25 @@ microservices:
             #deadlink
             INFERENCE_URL: http://172.184.137.177:8502/classify
 
-            PSQL_HOST: '{{ $.Release.Name }}-postgresql'
+            PSQL_HOST: "{{ $.Release.Name }}-postgresql"
             PSQL_PORT: "5432"
             PSQL_USER: budmetrics
             PSQL_PASSWORD: budmetrics
             PSQL_DB_NAME: budmetrics
 
-            CLICKHOUSE_HOST: '{{ .Release.Name }}-clickhouse'
+            CLICKHOUSE_HOST: "{{ .Release.Name }}-clickhouse"
             CLICKHOUSE_PORT: "9000"
             CLICKHOUSE_DB_NAME: budproxy
-            SECRETS_CLICKHOUSE_USER: '{{ .Values.clickhouse.auth.username }}'
-            SECRETS_CLICKHOUSE_PASSWORD: '{{ .Values.clickhouse.auth.password }}'
+            SECRETS_CLICKHOUSE_USER: "{{ .Values.clickhouse.auth.username }}"
+            SECRETS_CLICKHOUSE_PASSWORD: "{{ .Values.clickhouse.auth.password }}"
     budmodel:
         image: budstudio/budmodel:nightly
         daprid: budmodel
+        storageClassName: nfs-csi
         env:
             LOG_LEVEL: INFO
 
-            PSQL_HOST: '{{ $.Release.Name }}-postgresql'
+            PSQL_HOST: "{{ $.Release.Name }}-postgresql"
             PSQL_PORT: "5432"
             PSQL_USER: budmodel
             PSQL_PASSWORD: budmodel
@@ -135,8 +138,9 @@ microservices:
     budeval:
         image: budstudio/budeval:nightly
         daprid: budeval
+        storageClassName: nfs-csi
         env:
-            PSQL_HOST: '{{ $.Release.Name }}-postgresql'
+            PSQL_HOST: "{{ $.Release.Name }}-postgresql"
             PSQL_PORT: "5432"
             PSQL_USER: budeval
             PSQL_PASSWORD: budeval
@@ -147,7 +151,7 @@ microservices:
         env:
             LOG_LEVEL: INFO
 
-            PSQL_HOST: '{{ $.Release.Name }}-postgresql'
+            PSQL_HOST: "{{ $.Release.Name }}-postgresql"
             PSQL_PORT: "5432"
             PSQL_USER: budsim
             PSQL_PASSWORD: budsim
@@ -177,7 +181,7 @@ microservices:
             NOVU_API_BASE_URL: http://{{ .Release.Name }}-api:3000
             ADD_MODEL_DIR: /datadisk/add_model_dir
             API_CONTEXT_PATH: ""
-            APP_CONFIG: '{}'
+            APP_CONFIG: "{}"
             APP_NAME: budapp
             APP_PORT_BUDAPP: "9082"
             APP_PORT_BUDPROXY: "3000"
@@ -186,9 +190,9 @@ microservices:
             BUD_CONNECT_URL: https://budconnect.bud.studio
             BUD_LLM_MODEL: qwen3-32b
             CI: "true"
-            CLICKHOUSE_USER: '{{ .Values.clickhouse.auth.username }}'
-            CLICKHOUSE_PASSWORD: '{{ .Values.clickhouse.auth.password }}'
-            CONFIGSTORE_NAME: '{{ .Release.Name }}-configstore'
+            CLICKHOUSE_USER: "{{ .Values.clickhouse.auth.username }}"
+            CLICKHOUSE_PASSWORD: "{{ .Values.clickhouse.auth.password }}"
+            CONFIGSTORE_NAME: "{{ .Release.Name }}-configstore"
             DISABLE_USER_REGISTRATION: "false"
             DOCKER_REDIS_SERVICE_PORT: "6379"
             ENGINE_CONTAINER_PORT: "8000"
@@ -201,11 +205,11 @@ microservices:
             IS_TOPIC_NOTIFICATION_ENABLED: "true"
             LITELLM_PROXY_SERVER_IMAGE: ghcr.io/berriai/litellm:main-latest
             LOG_LEVEL: INFO
-            MINIO_ACCESS_KEY: '{{ .Values.minio.auth.rootUser }}'
+            MINIO_ACCESS_KEY: "{{ .Values.minio.auth.rootUser }}"
             MINIO_BUCKET: models-registry
-            MINIO_ENDPOINT: '{{ .Release.Name }}-minio:{{ .Values.minio.service.ports.api }}'
+            MINIO_ENDPOINT: "{{ .Release.Name }}-minio:{{ .Values.minio.service.ports.api }}"
             MINIO_MODEL_BUCKET: model-info
-            MINIO_SECRET_KEY: '{{ .Values.minio.auth.rootPassword }}'
+            MINIO_SECRET_KEY: "{{ .Values.minio.auth.rootPassword }}"
             MINIO_SECURE: "false"
             MODEL_DOWNLOAD_DIR: /data/models-registry
             MODEL_DOWNLOAD_DIR_MAX_SIZE: "500"
@@ -231,17 +235,17 @@ microservices:
             REDIS_CACHE_SERVICE_HOST: ""
             REDIS_CACHE_SERVICE_PORT: "6379"
             REDIS_DB_INDEX: "5"
-            REDIS_HOST: '{{ .Release.Name }}-valkey-primary'
-            REDIS_PASSWORD: '{{ .Values.valkey.auth.password }}'
-            REDIS_PASSWORD_BUDAPP: '{{ .Values.valkey.auth.password }}'
+            REDIS_HOST: "{{ .Release.Name }}-valkey-primary"
+            REDIS_PASSWORD: "{{ .Values.valkey.auth.password }}"
+            REDIS_PASSWORD_BUDAPP: "{{ .Values.valkey.auth.password }}"
             REDIS_PORT: "6379"
-            REDIS_URI: '{{ .Release.Name }}-valkey-primary:6379'
+            REDIS_URI: "{{ .Release.Name }}-valkey-primary:6379"
             REGISTRY_SERVER: https://budimages.azurecr.io
             S3_BUCKET_NAME: novu-local
             S3_REGION: us-east-1
             # TODO
-            SECRETSTORE_NAME: '{{ .Release.Name}}-secretstore'
-            SECRETSTORE_SECRET_NAME: '{{ .Release.Name }}-secretstore'
+            SECRETSTORE_NAME: "{{ .Release.Name}}-secretstore"
+            SECRETSTORE_SECRET_NAME: "{{ .Release.Name }}-secretstore"
             # TODO
             SENTRY_DSN: ""
             TENSORZERO_REDIS_URL: redis://default:{{ .Values.valkey.auth.password}}@{{ .Release.Name }}-valkey-primary:6379/2
@@ -259,6 +263,12 @@ valkey:
     architecture: standalone
     auth:
         password: bud
+        commonConfiguration: |-
+            notify-keyspace-events KEA
+
+            # default values from chart
+            appendonly yes
+            save ""
 clickhouse:
     enabled: true
     replicaCount: 1
@@ -305,7 +315,7 @@ keycloak:
     postgresql:
         enabled: false
     externalDatabase:
-        host: '{{ $.Release.Name }}-postgresql'
+        host: "{{ $.Release.Name }}-postgresql"
         user: keycloak
         password: keycloak
         database: keycloak
@@ -348,15 +358,15 @@ novu:
     store:
         encryption-key: bud-Kf9yLjGPLOz939Y1GM0nJckVoVyF
     externalDatabase:
-        host: '{{ $.Release.Name }}-mongodb'
+        host: "{{ $.Release.Name }}-mongodb"
         username: novu_user
         password: novu_password
         database: novu_db
     externalRedis:
-        host: '{{ $.Release.Name }}-valkey-primary'
-        existingSecret: '{{ $.Release.Name }}-novu-externalredis'
+        host: "{{ $.Release.Name }}-valkey-primary"
+        existingSecret: "{{ $.Release.Name }}-novu-externalredis"
     externalS3:
-        existingSecret: '{{ $.Release.Name }}-novu-externals3'
+        existingSecret: "{{ $.Release.Name }}-novu-externals3"
 minio:
     enabled: true
     resources:

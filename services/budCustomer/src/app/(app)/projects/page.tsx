@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Card, Row, Col, Flex, Input, Dropdown, Button, Spin } from "antd";
+import { Card, Row, Col, Flex, Dropdown, Button, Spin } from "antd";
 import { Typography } from "antd";
 import { PlusOutlined, MoreOutlined } from "@ant-design/icons";
 import { PrimaryButton } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { type Project as ContextProject } from "@/context/projectContext";
 import { useProjects } from "@/hooks/useProjects";
 import { useDrawer } from "@/hooks/useDrawer";
 import BudDrawer from "@/components/ui/bud/drawer/BudDrawer";
+import SearchHeaderInput from "@/flows/components/SearchHeaderInput";
 
 const { Text, Title } = Typography;
 
@@ -134,23 +135,23 @@ export default function ProjectsPage() {
     useProjects();
 
   const { openDrawer } = useDrawer();
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchValue, setSearchValue] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(10);
 
   // Fetch projects from API on mount
   useEffect(() => {
-    getGlobalProjects(currentPage, pageSize, searchTerm);
-  }, [currentPage, pageSize, searchTerm, getGlobalProjects]);
+    getGlobalProjects(currentPage, pageSize, searchValue);
+  }, [currentPage, pageSize, searchValue, getGlobalProjects]);
 
   // Debounced search
   useEffect(() => {
     const timer = setTimeout(() => {
-      getGlobalProjects(1, pageSize, searchTerm);
+      getGlobalProjects(1, pageSize, searchValue);
       setCurrentPage(1);
     }, 500);
     return () => clearTimeout(timer);
-  }, [searchTerm, pageSize, getGlobalProjects]);
+  }, [searchValue, pageSize, getGlobalProjects]);
 
   // Convert API projects to context format
   const projects: ContextProject[] = globalProjects.map((p) => {
@@ -256,17 +257,13 @@ export default function ProjectsPage() {
               </Text>
             </div>
             <Flex gap={16} align="center">
-              <Input
+              <SearchHeaderInput
                 placeholder="Search projects..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-[280px] text-bud-text-primary placeholder:text-bud-text-disabled"
-                prefix={
-                  <Icon
-                    icon="ph:magnifying-glass"
-                    className="text-bud-text-disabled"
-                  />
-                }
+                searchValue={searchValue}
+                setSearchValue={(value) => {
+                  setSearchValue(value);
+                  setCurrentPage(1);
+                }}
               />
               <PrimaryButton onClick={handleCreateProject}>
                 <PlusOutlined className="mr-2" />
@@ -306,24 +303,15 @@ export default function ProjectsPage() {
               <Spin />
             </div>
           )}
-
           {/* Empty State */}
           {!loading && activeProjects.length === 0 && (
             <div className="text-center py-16">
-              <Icon
-                icon="ph:folder-plus"
-                className="text-6xl text-bud-text-disabled mb-4"
-              />
               <Text className="text-bud-text-primary text-lg mb-2 block">
                 No projects found
               </Text>
               <Text className="text-bud-text-muted mb-6 block">
                 Create your first project to start organizing your AI resources
               </Text>
-              <PrimaryButton onClick={handleCreateProject}>
-                <PlusOutlined className="mr-2" />
-                <span>Create Your First Project</span>
-              </PrimaryButton>
             </div>
           )}
         </div>

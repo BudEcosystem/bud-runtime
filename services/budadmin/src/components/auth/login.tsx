@@ -58,12 +58,10 @@ const LoginPage = ({ onSubmit }: LoginPageModalProps) => {
     });
   }, [form]);
 
-
   if (!mounted) {
     // Return null or skeleton UI during SSR
     return null;
   }
-
 
   return (
     <>
@@ -91,19 +89,28 @@ const LoginPage = ({ onSubmit }: LoginPageModalProps) => {
         feedbackIcons={({ status, errors, warnings }) => {
           // return <FeedbackIcons status={status} errors={errors} warnings={warnings} />
           return {
-            error: <Image src="/icons/warning.svg" alt="error" width={"1rem"} height={"1rem"} />,
+            error: (
+              <Image
+                src="/icons/warning.svg"
+                alt="error"
+                width={"1rem"}
+                height={"1rem"}
+              />
+            ),
             success: <div />,
             warning: <div />,
             "": <div />,
-          }
+          };
         }}
-        className="w-[76.6%] mt-[1.6em]" form={form}>
+        className="w-[76.6%] mt-[1.6em]"
+        form={form}
+      >
         <Form.Item
           hasFeedback
           className="mb-[1.8rem]"
           name="email"
           // validateDebounce={500}
-          validateTrigger={['onBlur']}
+          validateTrigger={["onBlur"]}
           rules={[
             // {
             //   required: true,
@@ -116,7 +123,7 @@ const LoginPage = ({ onSubmit }: LoginPageModalProps) => {
             {
               validator: (_, value) => {
                 if (!value) {
-                  return Promise.reject('Please input your email!');
+                  return Promise.reject("Please input your email!");
                 }
                 if (value.length < 3) {
                   // Don't show error if fewer than 3 characters (return resolved promise)
@@ -124,7 +131,7 @@ const LoginPage = ({ onSubmit }: LoginPageModalProps) => {
                 }
                 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
                 if (!emailRegex.test(value)) {
-                  return Promise.reject('Please enter a valid email');
+                  return Promise.reject("Please enter a valid email");
                 }
                 return Promise.resolve();
               },
@@ -148,11 +155,11 @@ const LoginPage = ({ onSubmit }: LoginPageModalProps) => {
                 }
                 // form.validateFields(["email"]);
                 if (!value) {
-                  setAuthError('')
+                  setAuthError("");
                 }
               }}
               onBlur={() => {
-                form.validateFields(['email']);
+                form.validateFields(["email"]);
               }}
             />
           </div>
@@ -176,18 +183,22 @@ const LoginPage = ({ onSubmit }: LoginPageModalProps) => {
             {
               validator: (_, value) => {
                 if (!value) {
-                  return Promise.reject('Please input your password!');
+                  return Promise.reject("Please input your password!");
                 }
                 if (value.length < 8) {
                   // Don't show error if fewer than 3 characters (return resolved promise)
-                  return Promise.reject('Password must be at least 8 characters long!');
+                  return Promise.reject(
+                    "Password must be at least 8 characters long!",
+                  );
                 }
                 return Promise.resolve();
               },
             },
           ]}
         >
-          <div className={`flex items-center border rounded-[6px] relative !bg-[transparent]`}>
+          <div
+            className={`flex items-center border rounded-[6px] relative !bg-[transparent]`}
+          >
             <div className="">
               <Text_12_300_EEEEEE className="absolute px-1.5 bg-black -top-1.5 left-1.5 inline-block tracking-[.035rem] z-10">
                 Password
@@ -220,7 +231,7 @@ const LoginPage = ({ onSubmit }: LoginPageModalProps) => {
                   form.validateFields(["password"]);
                 }
                 if (!value) {
-                  setAuthError('')
+                  setAuthError("");
                 }
               }}
             />
@@ -255,10 +266,12 @@ const LoginPage = ({ onSubmit }: LoginPageModalProps) => {
       </Form>
 
       <div className="mt-[2.2rem] flex justify-center">
-        <Text_12_400_EEEEEE className="cursor-pointer"
+        <Text_12_400_EEEEEE
+          className="cursor-pointer"
           onClick={() => {
             setActivePage(4);
-          }}>
+          }}
+        >
           Forgot password?
         </Text_12_400_EEEEEE>
         {/* <Text_12_400_EEEEEE
@@ -273,14 +286,18 @@ const LoginPage = ({ onSubmit }: LoginPageModalProps) => {
       {authError && (
         <motion.div
           initial={{ opacity: 0, y: -10 }} // Start slightly above and transparent
-          animate={{ opacity: 1, y: 0 }}   // Move down and appear
+          animate={{ opacity: 1, y: 0 }} // Move down and appear
           transition={{ duration: 0.5, ease: "easeIn" }} // Smooth transition
           className="border-[1px] border-[#EC7575] rounded-[6px] px-[.5rem] py-[1rem] flex justify-center items-center w-[76.6%] mt-[1.5rem]"
           style={{
             backgroundColor: getChromeColor("#EC7575"),
           }}
         >
-          <Text_12_400_EEEEEE className="text-[#EC7575]">{authError.includes('Cannot read properties') ? 'Something went wrong, please try again later.' : authError}</Text_12_400_EEEEEE>
+          <Text_12_400_EEEEEE className="text-[#EC7575]">
+            {authError.includes("Cannot read properties")
+              ? "Something went wrong, please try again later."
+              : authError}
+          </Text_12_400_EEEEEE>
         </motion.div>
       )}
     </>

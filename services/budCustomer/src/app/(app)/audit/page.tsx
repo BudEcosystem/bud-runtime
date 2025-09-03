@@ -16,6 +16,7 @@ import {
   Badge,
   Empty,
   ConfigProvider,
+  Pagination,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
@@ -43,6 +44,7 @@ import isToday from "dayjs/plugin/isToday";
 import isYesterday from "dayjs/plugin/isYesterday";
 import styles from "./audit.module.scss";
 import { AppRequest } from "@/services/api/requests";
+import Tags from "@/components/ui/Tags";
 
 dayjs.extend(relativeTime);
 dayjs.extend(isToday);
@@ -66,12 +68,9 @@ enum AuditAction {
 
 enum ResourceType {
   API_KEY = "api_key",
-  MODEL = "model",
   PROJECT = "project",
-  BATCH = "batch",
   USER = "user",
-  SETTINGS = "settings",
-  LOGS = "logs",
+  SESSION = "session",
 }
 
 // Audit log interface
@@ -282,12 +281,9 @@ export default function AuditPage() {
   const getResourceIcon = (resourceType: ResourceType) => {
     const icons = {
       [ResourceType.API_KEY]: <KeyOutlined />,
-      [ResourceType.MODEL]: <Icon icon="ph:cpu" />,
       [ResourceType.PROJECT]: <Icon icon="ph:folder" />,
-      [ResourceType.BATCH]: <Icon icon="ph:stack" />,
       [ResourceType.USER]: <UserOutlined />,
-      [ResourceType.SETTINGS]: <Icon icon="ph:gear" />,
-      [ResourceType.LOGS]: <FileTextOutlined />,
+      [ResourceType.SESSION]: <Icon icon="ph:stack" />,
     };
     return icons[resourceType] || <DatabaseOutlined />;
   };
@@ -381,7 +377,7 @@ export default function AuditPage() {
         end_date: dateRange?.[1] ? formatDateString(dateRange[1]?.toDate(), true) : undefined
       }
       const response = await AppRequest.Get("/audit/records", {params});
-      setAuditLogs(response.data.data.map((item: any)=> ({...item, status: item.details.success ? 'success' : 'failed'})));
+      setAuditLogs(response.data.data.map((item: any)=> ({...item, status: item.details?.success === false ? 'failed' : 'success'})));
       setTotalNumber(response.data.total_record);
     } catch (error) {
       console.error("Failed to fetch usage data:", error);
@@ -449,13 +445,11 @@ export default function AuditPage() {
       render: (action: AuditAction, record: AuditLog) => {
         const display = getActionDisplay(action);
         return (
-          <Tag
-            icon={display.icon}
+          <Tags
+            // icon={display.icon}
             color={record.status === "failed" ? "error" : display.color}
-            className="flex items-center gap-1 w-fit"
-          >
-            {display.label}
-          </Tag>
+            name={display.label}
+          />
         );
       },
     },
@@ -510,17 +504,9 @@ export default function AuditPage() {
       key: "status",
       width: 100,
       render: (status: string) => (
-        <Badge
-          status={status === "success" ? "success" : "error"}
-          text={
-            <Text
-              className={
-                status === "success" ? "text-green-500" : "text-red-500"
-              }
-            >
-              {status?.charAt(0).toUpperCase() + status?.slice(1)}
-            </Text>
-          }
+        <Tags
+          color={status === "success" ? "#3EC564" : "#EC7575"}
+          name={status?.charAt(0).toUpperCase() + status?.slice(1)}
         />
       ),
     },
@@ -587,6 +573,111 @@ export default function AuditPage() {
 
   return (
     <DashboardLayout>
+      <style dangerouslySetInnerHTML={{ __html: `
+        /* Custom pagination text color styling for audit page */
+        .CommonCustomPagination .ant-pagination-item a {
+          color: #ffffff !important;
+        }
+        .CommonCustomPagination .ant-pagination-item-active a {
+          color: #000000 !important;
+        }
+        .CommonCustomPagination .ant-pagination-prev,
+        .CommonCustomPagination .ant-pagination-next {
+          opacity: 1 !important;
+          visibility: visible !important;
+          display: inline-block !important;
+        }
+        .CommonCustomPagination .ant-pagination-prev .ant-pagination-item-link,
+        .CommonCustomPagination .ant-pagination-next .ant-pagination-item-link {
+          color: #ffffff !important;
+          opacity: 1 !important;
+          visibility: visible !important;
+          display: block !important;
+        }
+        .CommonCustomPagination .ant-pagination-prev button,
+        .CommonCustomPagination .ant-pagination-next button {
+          opacity: 1 !important;
+          visibility: visible !important;
+          color: #ffffff !important;
+        }
+        .CommonCustomPagination .ant-pagination-prev .ant-pagination-item-link svg,
+        .CommonCustomPagination .ant-pagination-next .ant-pagination-item-link svg {
+          fill: #ffffff !important;
+          opacity: 1 !important;
+        }
+        .CommonCustomPagination .ant-pagination-prev:not(.ant-pagination-disabled),
+        .CommonCustomPagination .ant-pagination-next:not(.ant-pagination-disabled) {
+          opacity: 1 !important;
+        }
+        .CommonCustomPagination .ant-pagination-disabled .ant-pagination-item-link {
+          color: #666666 !important;
+          opacity: 0.5 !important;
+          visibility: visible !important;
+        }
+        .CommonCustomPagination .ant-pagination-options {
+          color: #ffffff !important;
+        }
+        .CommonCustomPagination .ant-select-selector {
+          color: #ffffff !important;
+        }
+        .CommonCustomPagination .ant-select-arrow {
+          color: #ffffff !important;
+        }
+        .CommonCustomPagination .ant-pagination-item:hover a {
+          color: #965CDE !important;
+        }
+        /* Light theme specific - keep numbers white */
+        [data-theme="light"] .CommonCustomPagination .ant-pagination-item a {
+          color: #ffffff !important;
+        }
+        [data-theme="light"] .CommonCustomPagination .ant-pagination-item-active a {
+          color: #000000 !important;
+        }
+        [data-theme="light"] .CommonCustomPagination .ant-pagination-prev,
+        [data-theme="light"] .CommonCustomPagination .ant-pagination-next {
+          opacity: 1 !important;
+          visibility: visible !important;
+          display: inline-block !important;
+        }
+        [data-theme="light"] .CommonCustomPagination .ant-pagination-prev .ant-pagination-item-link,
+        [data-theme="light"] .CommonCustomPagination .ant-pagination-next .ant-pagination-item-link {
+          color: #000000 !important;
+          opacity: 1 !important;
+          visibility: visible !important;
+          display: block !important;
+        }
+        [data-theme="light"] .CommonCustomPagination .ant-pagination-prev:hover .ant-pagination-item-link,
+        [data-theme="light"] .CommonCustomPagination .ant-pagination-next:hover .ant-pagination-item-link {
+          color: #965CDE !important;
+        }
+        [data-theme="light"] .CommonCustomPagination .ant-pagination-prev button,
+        [data-theme="light"] .CommonCustomPagination .ant-pagination-next button {
+          opacity: 1 !important;
+          visibility: visible !important;
+          color: #000000 !important;
+        }
+        [data-theme="light"] .CommonCustomPagination .ant-pagination-prev .ant-pagination-item-link svg,
+        [data-theme="light"] .CommonCustomPagination .ant-pagination-next .ant-pagination-item-link svg {
+          fill: #000000 !important;
+          opacity: 1 !important;
+        }
+        [data-theme="light"] .CommonCustomPagination .ant-pagination-prev:hover .ant-pagination-item-link svg,
+        [data-theme="light"] .CommonCustomPagination .ant-pagination-next:hover .ant-pagination-item-link svg {
+          fill: #965CDE !important;
+        }
+        [data-theme="light"] .CommonCustomPagination .ant-pagination-prev:not(.ant-pagination-disabled),
+        [data-theme="light"] .CommonCustomPagination .ant-pagination-next:not(.ant-pagination-disabled) {
+          opacity: 1 !important;
+        }
+        [data-theme="light"] .CommonCustomPagination .ant-pagination-disabled .ant-pagination-item-link {
+          color: #666666 !important;
+          opacity: 0.5 !important;
+          visibility: visible !important;
+        }
+        [data-theme="light"] .CommonCustomPagination .ant-select-selector {
+          color: #ffffff !important;
+        }
+      ` }} />
       <div className="p-8 bg-bud-bg-primary min-h-full">
         {/* Header */}
         <div className="mb-6">
@@ -771,15 +862,7 @@ export default function AuditPage() {
                     columns={columns}
                     dataSource={auditLogs}
                     rowKey="id"
-                    pagination={{
-                      className: 'small-pagination',
-                      current: currentPage,
-                      pageSize: pageSize,
-                      total: totalNumber,
-                      onChange: handlePageChange,
-                      showSizeChanger: true,
-                      pageSizeOptions: ['5', '10', '20', '50'],
-                    }}
+                    pagination={false}
                     size="small"
                     className={styles.auditTable}
                     rowSelection={{
@@ -790,6 +873,18 @@ export default function AuditPage() {
                       record.status === "failed" ? "bg-red-500/5" : ""
                     }
                   />
+                  {/* Pagination */}
+                  <div className="flex justify-end mt-4 CommonCustomPagination">
+                    <Pagination
+                      className='small-pagination'
+                      current={currentPage}
+                      pageSize={pageSize}
+                      total={totalNumber}
+                      onChange={handlePageChange}
+                      showSizeChanger
+                      pageSizeOptions={['5', '10', '20', '50']}
+                    />
+                  </div>
                 </div>
 
             {/* {filteredLogs.length === 0 && (

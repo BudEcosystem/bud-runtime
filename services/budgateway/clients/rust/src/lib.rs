@@ -298,6 +298,7 @@ impl ClientBuilder {
                                     std::sync::RwLock::new(std::collections::HashMap::new()),
                                 ),
                                 rate_limiter: None,
+                                usage_limiter: None,
                                 geoip_service: None,
                                 ua_parser: None,
                                 blocking_manager: None,

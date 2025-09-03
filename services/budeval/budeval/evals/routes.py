@@ -14,7 +14,7 @@
 #  limitations under the License.
 #  -----------------------------------------------------------------------------
 
-from typing import List, Optional
+from typing import Optional
 
 from budmicroframe.commons import logging
 from fastapi import APIRouter, HTTPException, Query
@@ -22,7 +22,7 @@ from fastapi import APIRouter, HTTPException, Query
 from budeval.evals.schemas import StartEvaluationRequest
 from budeval.evals.services import EvaluationOpsService, EvaluationService
 
-from .schemas import EvaluationRequest
+from .schemas import EvaluationRequest, EvaluationScoresResponse
 
 
 logger = logging.get_logger(__name__)
@@ -38,7 +38,7 @@ async def start_eval(request: EvaluationRequest):
         request (EvaluationRequest): The evaluation request.
 
     Returns:
-        dict: A simple hello world message
+        dict: evaluation workflow response
     """
     try:
         response = await EvaluationService().evaluate_model(StartEvaluationRequest(**request.model_dump()))
@@ -87,148 +87,6 @@ async def cleanup_job(
         return response
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to cleanup job: {str(e)}") from e
-
-
-@evals_routes.post("/init-volume")
-async def init_volume():
-    """Manually initialize the eval-datasets volume."""
-    try:
-        from budeval.evals.volume_init import VolumeInitializer
-
-        volume_init = VolumeInitializer()
-        await volume_init.ensure_eval_datasets_volume()
-
-        return {"status": "success", "message": "Volume initialization completed"}
-    except Exception as e:
-        logger.error(f"Failed to initialize volume: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to initialize volume: {str(e)}") from e
-
-
-@evals_routes.post("/preload-engines")
-async def preload_engines(engine_names: Optional[List[str]] = None):
-    """Manually preload evaluation engine Docker images.
-
-    Args:
-        engine_names (Optional[List[str]]): Specific engine names to preload. If None, preloads all engines.
-
-    Returns:
-        dict: Engine preloading result
-    """
-    try:
-        from budeval.evals.engine_preloader import EnginePreloader
-
-        engine_preloader = EnginePreloader()
-
-        if engine_names:
-            await engine_preloader.preload_specific_engines(engine_names)
-            message = f"Specific engines preloaded: {engine_names}"
-        else:
-            await engine_preloader.preload_all_engines()
-            message = "All evaluation engines preloaded"
-
-        return {
-            "status": "success",
-            "message": message,
-            "preloaded_engines": list(EnginePreloader.get_preloaded_engines()),
-        }
-    except Exception as e:
-        logger.error(f"Failed to preload engines: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to preload engines: {str(e)}") from e
-
-
-@evals_routes.get("/engine-status")
-async def get_engine_status():
-    """Get the status of engine preloading.
-
-    Returns:
-        dict: Engine preloading status information
-    """
-    try:
-        from budeval.evals.engine_preloader import EnginePreloader
-        from budeval.registry.engines.core import EngineRegistry
-
-        # Get all registered engines
-        registered_engines = EngineRegistry.list_engines()
-
-        # Get preloaded engines
-        preloaded_engines = EnginePreloader.get_preloaded_engines()
-
-        # Calculate status
-        engine_status = {}
-        for engine_name, metadata in registered_engines.items():
-            engine_status[engine_name] = {
-                "preloaded": EnginePreloader.is_engine_preloaded(engine_name),
-                "docker_image": metadata.docker_image_url,
-                "version": metadata.version,
-                "description": metadata.description,
-            }
-
-        return {
-            "initialized": EnginePreloader.is_initialized(),
-            "total_engines": len(registered_engines),
-            "preloaded_count": len(preloaded_engines),
-            "engines": engine_status,
-        }
-    except Exception as e:
-        logger.error(f"Failed to get engine status: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to get engine status: {str(e)}") from e
-
-
-@evals_routes.get("/configmap/{eval_request_id}")
-async def get_configmap_info(eval_request_id: str, kubeconfig: str | None = None):
-    """Get information about a ConfigMap for an evaluation request.
-
-    Args:
-        eval_request_id (str): The evaluation request ID.
-        kubeconfig (str): Optional kubeconfig content.
-
-    Returns:
-        dict: ConfigMap information
-    """
-    try:
-        from budeval.evals.configmap_manager import ConfigMapManager
-
-        configmap_manager = ConfigMapManager(namespace="budeval")
-        result = configmap_manager.get_configmap_info(eval_request_id, kubeconfig)
-
-        if result is None:
-            raise HTTPException(status_code=404, detail=f"ConfigMap not found for eval request: {eval_request_id}")
-
-        return {"status": "success", "data": result}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get ConfigMap info: {str(e)}") from e
-
-
-@evals_routes.delete("/configmap/{eval_request_id}")
-async def delete_configmap(eval_request_id: str, kubeconfig: str | None = None):
-    """Delete ConfigMap for an evaluation request.
-
-    Args:
-        eval_request_id (str): The evaluation request ID.
-        kubeconfig (str): Optional kubeconfig content.
-
-    Returns:
-        dict: Deletion result
-    """
-    try:
-        from budeval.evals.configmap_manager import ConfigMapManager
-
-        configmap_manager = ConfigMapManager(namespace="budeval")
-        success = configmap_manager.delete_opencompass_config_map(eval_request_id, kubeconfig)
-
-        if success:
-            return {
-                "status": "success",
-                "message": f"ConfigMap deleted successfully for eval request: {eval_request_id}",
-            }
-        else:
-            return {"status": "error", "message": f"Failed to delete ConfigMap for eval request: {eval_request_id}"}
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to delete ConfigMap: {str(e)}") from e
 
 
 @evals_routes.get("/results/{job_id}")
@@ -439,3 +297,67 @@ async def delete_evaluation_results(job_id: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete results: {str(e)}") from e
+
+
+@evals_routes.get("/evaluations/{evaluation_id}/scores", response_model=EvaluationScoresResponse)
+async def get_evaluation_scores(evaluation_id: str):
+    """Get dataset scores for a specific evaluation.
+
+    Args:
+        evaluation_id: The evaluation job ID
+
+    Returns:
+        EvaluationScoresResponse with model info and dataset scores
+
+    Raises:
+        404: If evaluation results are not found
+        500: If an error occurs while retrieving results
+    """
+    try:
+        from budeval.evals.storage.factory import get_storage_adapter, initialize_storage
+
+        # Get storage adapter based on configuration
+        storage = get_storage_adapter()
+
+        # Initialize if needed
+        if hasattr(storage, "initialize"):
+            await initialize_storage(storage)
+
+        # Check if we're using ClickHouse
+        if storage.__class__.__name__ != "ClickHouseStorage":
+            # Fallback for non-ClickHouse storage
+            results = await storage.get_results(evaluation_id)
+            if not results:
+                raise HTTPException(status_code=404, detail=f"Evaluation results not found for ID: {evaluation_id}")
+
+            # Transform to match response schema
+            response = EvaluationScoresResponse(
+                evaluation_id=evaluation_id,
+                model_name=results.get("model_name", "unknown"),
+                engine=results.get("engine", "opencompass"),
+                overall_accuracy=results.get("summary", {}).get("overall_accuracy", 0.0),
+                datasets=[
+                    {
+                        "dataset_name": ds.get("dataset_name"),
+                        "accuracy": ds.get("accuracy", 0.0),
+                        "total_examples": ds.get("total_examples", 0),
+                        "correct_examples": ds.get("correct_examples", 0),
+                    }
+                    for ds in results.get("datasets", [])
+                ],
+            )
+            return response
+
+        # For ClickHouse storage, use the optimized method
+        scores = await storage.get_evaluation_scores(evaluation_id)
+
+        if not scores:
+            raise HTTPException(status_code=404, detail=f"Evaluation results not found for ID: {evaluation_id}")
+
+        return EvaluationScoresResponse(**scores)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get evaluation scores for {evaluation_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve evaluation scores: {str(e)}") from e
