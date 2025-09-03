@@ -558,4 +558,51 @@ class TestGenerateValidationCodes:
         assert mock_dapr_workflow.publish_notification.call_count == 2  # Start and completion
         assert result is None  # No validation codes generated
 
+class TestPromptIdGeneration:
+    """Test cases for prompt_id auto-generation."""
+
+    def test_prompt_id_auto_generated_when_not_provided(self):
+        """Test that prompt_id is auto-generated when not provided."""
+        # Create request without prompt_id
+        request_data = {
+            "schema": {
+                "schema": {"type": "object", "properties": {"name": {"type": "string"}}},
+                "validations": {}
+            },
+            "type": "input"
+        }
+
+        # Create the request - prompt_id should be auto-generated
+        request = PromptSchemaRequest(**request_data)
+
+        # Assert prompt_id exists and is a valid UUID
+        assert request.prompt_id is not None
+        assert len(request.prompt_id) == 36  # UUID4 string length
+
+        # Verify it's a valid UUID
+        import uuid
+        try:
+            uuid.UUID(request.prompt_id)
+        except ValueError:
+            assert False, "prompt_id is not a valid UUID"
+
+    def test_prompt_id_preserved_when_provided(self):
+        """Test that provided prompt_id is preserved."""
+        # Create request with explicit prompt_id
+        provided_prompt_id = "custom-prompt-id-123"
+        request_data = {
+            "prompt_id": provided_prompt_id,
+            "schema": {
+                "schema": {"type": "object", "properties": {"name": {"type": "string"}}},
+                "validations": {}
+            },
+            "type": "input"
+        }
+
+        # Create the request
+        request = PromptSchemaRequest(**request_data)
+
+        # Assert the provided prompt_id is preserved
+        assert request.prompt_id == provided_prompt_id
+
 # docker exec -it budserve-development-budprompt bash -c "PYTHONPATH=/app pytest tests/test_unit_tests/test_prompt_configuration_service.py -v"

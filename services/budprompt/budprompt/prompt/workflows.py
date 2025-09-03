@@ -137,7 +137,7 @@ class PromptSchemaWorkflow:
             retry_policy=retry_policy,
         )
 
-        response = PromptSchemaResponse(workflow_id=workflow_id)
+        response = PromptSchemaResponse(workflow_id=workflow_id, prompt_id=request.prompt_id)
 
         notification_request.payload.event = "results"
         notification_request.payload.content = NotificationContent(

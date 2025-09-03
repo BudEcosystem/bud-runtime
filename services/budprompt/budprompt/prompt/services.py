@@ -416,9 +416,9 @@ class PromptConfigurationService:
                 if validation_codes:
                     config_data.output_validation = validation_codes
 
-            # Convert to JSON and store in Redis
+            # Convert to JSON and store in Redis with 24-hour TTL
             config_json = config_data.model_dump_json(exclude_none=True, exclude_unset=True)
-            run_async(redis_service.set(redis_key, config_json))
+            run_async(redis_service.set(redis_key, config_json, ex=86400))  # 24 hours = 86400 seconds
 
             logger.debug(f"Stored prompt configuration for prompt_id: {prompt_id}, type: {schema_type}")
 
@@ -610,7 +610,7 @@ class PromptConfigurationService:
             request.source,
         )
 
-        response = PromptSchemaResponse(workflow_id=workflow_id)
+        response = PromptSchemaResponse(workflow_id=workflow_id, prompt_id=request.prompt_id)
 
         notification_request.payload.event = "results"
         notification_request.payload.content = NotificationContent(
