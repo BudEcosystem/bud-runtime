@@ -1,13 +1,13 @@
 """Billing notification service for sending usage alerts."""
 
-import json
 import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from budapp.commons.dapr import dapr_invoker
-from budapp.shared.notification_service import NotificationService
+from budapp.commons.config import app_settings
+from budapp.commons.constants import NotificationCategory, NotificationStatus
+from budapp.shared.notification_service import BudNotifyService, NotificationBuilder
 
 
 logger = logging.getLogger(__name__)
@@ -18,7 +18,23 @@ class BillingNotificationService:
 
     def __init__(self):
         """Initialize the billing notification service."""
-        self.notification_service = NotificationService()
+        self.notify_service = BudNotifyService()
+
+    def _get_priority_by_threshold(self, threshold_percent: int) -> str:
+        """Determine notification priority based on threshold percentage.
+
+        Args:
+            threshold_percent: The threshold percentage (50, 75, 90, 100)
+
+        Returns:
+            Priority level: "high" for >= 90%, "medium" for >= 75%, "low" otherwise
+        """
+        if threshold_percent >= 90:
+            return "high"
+        elif threshold_percent >= 75:
+            return "medium"
+        else:
+            return "low"
 
     async def send_usage_alert(
         self,
@@ -66,6 +82,9 @@ class BillingNotificationService:
                 billing_period_end=billing_period_end,
             )
 
+            # Determine priority based on threshold
+            priority = self._get_priority_by_threshold(threshold_percent)
+
             results = {
                 "success": False,
                 "channels_sent": [],
@@ -81,6 +100,7 @@ class BillingNotificationService:
                         message=alert_message,
                         alert_type=alert_type,
                         threshold_percent=threshold_percent,
+                        priority=priority,
                     )
                     results["channels_sent"].append("in_app")
                 except Exception as e:
@@ -95,6 +115,8 @@ class BillingNotificationService:
                         title=alert_title,
                         message=alert_message,
                         alert_type=alert_type,
+                        threshold_percent=threshold_percent,
+                        priority=priority,
                     )
                     results["channels_sent"].append("email")
                 except Exception as e:
@@ -188,35 +210,51 @@ You have reached the {threshold_percent}% threshold you configured for {usage_ty
         message: str,
         alert_type: str,
         threshold_percent: int,
+        priority: str,
     ) -> None:
-        """Send in-app notification via budnotify service."""
-        try:
-            # Prepare notification payload for budnotify
-            notification_data = {
-                "user_id": str(user_id),
-                "notification_type": "billing_alert",
-                "title": title,
-                "message": message,
-                "metadata": {
-                    "alert_type": alert_type,
-                    "threshold_percent": threshold_percent,
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                },
-                "priority": "high" if threshold_percent >= 90 else "medium",
-            }
+        """Send in-app notification via budnotify service.
 
-            # Send via Dapr service invocation to budnotify
-            response = await dapr_invoker.invoke_service(
-                app_id="budnotify",
-                method_name="notifications/in-app",
-                data=notification_data,
-                http_verb="POST",
+        Args:
+            user_id: User's UUID
+            title: Notification title
+            message: Notification message
+            alert_type: Type of alert
+            threshold_percent: Threshold percentage
+            priority: Notification priority (high/medium/low)
+        """
+        try:
+            # Determine notification status based on priority
+            status = NotificationStatus.WARNING if priority == "high" else NotificationStatus.COMPLETED
+
+            # Build notification using NotificationBuilder
+            notification = (
+                NotificationBuilder()
+                .set_content(
+                    title=title,
+                    message=message,
+                    status=status,
+                    icon="alert-circle" if priority == "high" else "bell",
+                    tag=f"billing-{alert_type}",
+                    result={
+                        "alert_type": alert_type,
+                        "threshold_percent": threshold_percent,
+                        "priority": priority,
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                    },
+                )
+                .set_payload(
+                    category=NotificationCategory.INAPP,
+                    type="billing_alert",
+                    source=app_settings.source_topic,
+                )
+                .set_notification_request(subscriber_ids=str(user_id))
+                .build()
             )
 
-            if response.status_code != 200:
-                raise Exception(f"Failed to send in-app notification: {response.text}")
+            # Send notification using BudNotifyService
+            await self.notify_service.send_notification(notification)
 
-            logger.info(f"In-app notification sent successfully for user {user_id}")
+            logger.info(f"In-app notification sent successfully for user {user_id} with priority {priority}")
 
         except Exception as e:
             logger.error(f"Error sending in-app notification: {e}")
@@ -228,34 +266,54 @@ You have reached the {threshold_percent}% threshold you configured for {usage_ty
         title: str,
         message: str,
         alert_type: str,
+        threshold_percent: int,
+        priority: str,
     ) -> None:
-        """Send email notification via budnotify service."""
-        try:
-            # Prepare email notification payload
-            email_data = {
-                "to": email,
-                "subject": title,
-                "body": message,
-                "template": "billing_alert",
-                "template_data": {
-                    "alert_type": alert_type,
-                    "message": message,
-                },
-                "priority": "high",
-            }
+        """Send email notification via budnotify service.
 
-            # Send via Dapr service invocation to budnotify
-            response = await dapr_invoker.invoke_service(
-                app_id="budnotify",
-                method_name="notifications/email",
-                data=email_data,
-                http_verb="POST",
+        Args:
+            email: Recipient email address
+            title: Email subject
+            message: Email body
+            alert_type: Type of alert
+            threshold_percent: Threshold percentage
+            priority: Notification priority (high/medium/low)
+        """
+        try:
+            # Determine notification status based on priority
+            status = NotificationStatus.WARNING if priority == "high" else NotificationStatus.COMPLETED
+
+            # Build notification using NotificationBuilder for email
+            # Note: Using INTERNAL category for email notifications as EMAIL category may not be available
+            notification = (
+                NotificationBuilder()
+                .set_content(
+                    title=title,
+                    message=message,
+                    status=status,
+                    icon="mail" if priority != "high" else "alert-triangle",
+                    tag=f"billing-{alert_type}-email",
+                    result={
+                        "alert_type": alert_type,
+                        "threshold_percent": threshold_percent,
+                        "priority": priority,
+                        "email": email,
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                    },
+                )
+                .set_payload(
+                    category=NotificationCategory.INTERNAL,  # Using INTERNAL for email notifications
+                    type="billing_alert_email",
+                    source=app_settings.source_topic,
+                )
+                .set_notification_request(subscriber_ids=email)  # Using email as subscriber ID for email notifications
+                .build()
             )
 
-            if response.status_code != 200:
-                raise Exception(f"Failed to send email notification: {response.text}")
+            # Send notification using BudNotifyService
+            await self.notify_service.send_notification(notification)
 
-            logger.info(f"Email notification sent successfully to {email}")
+            logger.info(f"Email notification sent successfully to {email} with priority {priority}")
 
         except Exception as e:
             logger.error(f"Error sending email notification: {e}")
