@@ -40,6 +40,7 @@ from ..commons.constants import (
     ModelProviderTypeEnum,
     ModelStatusEnum,
     ProjectStatusEnum,
+    UserTypeEnum,
 )
 from ..endpoint_ops.crud import EndpointDataManager
 from ..endpoint_ops.models import Endpoint as EndpointModel
@@ -960,6 +961,11 @@ class BudMetricService(SessionMixin):
             )
             user_project_ids = [str(project.project.id) for project in user_projects]
             request_params["project_ids"] = ",".join(user_project_ids)
+        finally:
+            # For CLIENT users, rename project_ids to api_key_project_id
+            if current_user.user_type == UserTypeEnum.CLIENT and "project_ids" in request_params:
+                request_params["api_key_project_id"] = request_params["project_ids"]
+                del request_params["project_ids"]
 
     async def _enrich_aggregated_metrics_response(self, response_data: Dict[str, Any]) -> None:
         """Enrich aggregated metrics response with entity names."""
