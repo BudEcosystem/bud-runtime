@@ -23,7 +23,7 @@
 
   environment = {
     variables.KUBECONFIG = "/etc/rancher/k3s/k3s.yaml";
-    systemPackages = [ pkgs.kubernets-helm ];
+    systemPackages = [ pkgs.kubernetes-helm ];
   };
 
   services.k3s = {
