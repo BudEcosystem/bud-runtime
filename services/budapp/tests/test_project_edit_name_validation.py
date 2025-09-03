@@ -7,6 +7,7 @@ import pytest
 
 from budapp.commons.constants import ProjectStatusEnum, ProjectTypeEnum
 from budapp.commons.exceptions import ClientException
+from budapp.project_ops.crud import ProjectDataManager
 from budapp.project_ops.models import Project as ProjectModel
 from budapp.project_ops.services import ProjectService
 
