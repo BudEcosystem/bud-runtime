@@ -226,19 +226,6 @@ class BillingService(DataManagerUtils):
         """Check if user has exceeded usage limits."""
         usage = await self.get_current_usage(user_id)
 
-        # Now all users have billing (at least Free plan)
-        if usage.get("is_suspended"):
-            return {"allowed": False, "reason": usage.get("suspension_reason", "Account suspended")}
-
-        # Check token limit
-        if usage["usage"]["tokens_quota"] and usage["usage"]["tokens_used"] >= usage["usage"]["tokens_quota"]:
-            plan_name = usage.get("plan_name", "your plan")
-            return {"allowed": False, "reason": f"Monthly token quota exceeded for {plan_name}"}
-
-        # Check cost limit (Free plan has no cost limit)
-        if usage["usage"]["cost_quota"] and usage["usage"]["cost_used"] >= usage["usage"]["cost_quota"]:
-            return {"allowed": False, "reason": "Monthly cost quota exceeded"}
-
         # Get current usage values
         tokens_used = usage["usage"]["tokens_used"] if usage.get("usage") else 0
         cost_used = usage["usage"]["cost_used"] if usage.get("usage") else 0.0
