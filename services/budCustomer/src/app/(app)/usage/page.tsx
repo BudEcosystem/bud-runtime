@@ -167,13 +167,15 @@ export default function UsagePage() {
       const completeData = allDates.map(date => {
         const existingData = dataMap.get(date);
         if (existingData) {
+          // Only mark as hasData: true if there's actual usage (cost > 0)
+          const hasUsage = existingData.cost > 0 || existingData.tokens > 0 || existingData.requests > 0;
           return {
             date: existingData.date,
             displayDate: dayjs(existingData.date).format("MMM DD"),
-            cost: existingData.cost,
-            tokens: existingData.tokens,
-            requests: existingData.requests,
-            hasData: true,
+            cost: existingData.cost || 0,
+            tokens: existingData.tokens || 0,
+            requests: existingData.requests || 0,
+            hasData: hasUsage,
           };
         } else {
           return {

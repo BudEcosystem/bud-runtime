@@ -1,7 +1,8 @@
 import React from "react";
-import { Form, FormRule, Input } from "antd";
+import { Form, FormRule, Input, Image } from "antd";
 import FloatLabel from "@/components/ui/bud/dataEntry/FloatLabel";
-import InfoLabel from "@/components/ui/bud/dataEntry/InfoLabel";
+import CustomPopover from "@/flows/components/customPopover";
+import { useTheme } from "@/context/themeContext";
 
 export interface BudInputProps {
   onClick?: () => void;
@@ -25,6 +26,9 @@ export interface BudInputProps {
 }
 
 function TextInput(props: BudInputProps) {
+  const { effectiveTheme } = useTheme();
+  const isLight = effectiveTheme === "light";
+
   return (
     <Form.Item
       name={props.name}
@@ -34,15 +38,28 @@ function TextInput(props: BudInputProps) {
     >
       <div className={`floating-textarea ${props.ClassNames}`}>
         {props.label ? (
-          <FloatLabel
-            label={
-              <InfoLabel
-                required={props.rules?.some((rule: any) => rule.required)}
-                text={props.label}
-                content={props.infoText || props.placeholder}
-              />
-            }
-          >
+          <div className="relative">
+            <div
+              className={`absolute px-[.2rem] left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap text-[.75rem] font-[400] h-[3px] pl-[.35rem] pr-[.55rem]`}
+              style={{
+                background: isLight ? "#ffffff" : "#0d0d0d",
+                color: isLight ? "#1a1a1a" : "#EEEEEE",
+                top: "-2px",
+              }}
+            >
+              {props.label} {props.rules?.some((rule: any) => rule.required) && <b className="text-[#FF4D4F]">*</b>}
+              {props.infoText && (
+                <CustomPopover title={props.infoText}>
+                  <Image
+                    className="mt-[.1rem] cursor-pointer"
+                    preview={false}
+                    src="/images/drawer/info.png"
+                    alt="info"
+                    style={{ width: ".75rem", pointerEvents: "auto" }}
+                  />
+                </CustomPopover>
+              )}
+            </div>
             <Input
               name={props.name}
               placeholder={props.placeholder}
@@ -65,7 +82,7 @@ function TextInput(props: BudInputProps) {
               type={props.type}
               className={`text-[black] dark:text-[#EEEEEE] border border-[#B1B1B1] dark:border-[#757575] hover:!border-[#CFCFCF] hover:!bg-[#FFFFFF08] shadow-none !placeholder-[#808080] !placeholder:text-[#808080] !placeholder:font-[300] ${props.InputClasses}`}
             />
-          </FloatLabel>
+          </div>
         ) : (
           <Input
             name={props.name}

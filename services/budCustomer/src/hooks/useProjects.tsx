@@ -165,7 +165,6 @@ export const useProjects = create<{
   createProject: async (data: any): Promise<any> => {
     try {
       const response: any = await AppRequest.Post("/projects/", data);
-      successToast(response.data.message || "Project created successfully");
       return response.data.project;
     } catch (error) {
       console.error("Error creating project:", error);
@@ -192,7 +191,6 @@ export const useProjects = create<{
   updateProject: async (projectId: string, data: any) => {
     try {
       const response: any = await AppRequest.Patch(`/projects/${projectId}`, data);
-      successToast(response.data.message || "Project updated successfully");
       return response.data.project;
     } catch (error) {
       console.error("Error updating project:", error);

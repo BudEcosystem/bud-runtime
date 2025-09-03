@@ -33,7 +33,7 @@ export default function EditProject() {
     projectTags,
     globalSelectedProject,
   } = useProjects();
-  const { closeDrawer } = useDrawer();
+  const { closeDrawer, openDrawerWithStep } = useDrawer();
   const { form, submittable } = useContext(BudFormContext);
   const [options, setOptions] = useState<{ name: string; color: string }[]>([]);
 
@@ -179,10 +179,12 @@ export default function EditProject() {
         apiUpdateProject(currentProject.id, projectData)
           .then((result) => {
             if (result) {
+              // Store project name temporarily for success screen
+              localStorage.setItem("temp_edited_project_name", values.name);
               // Refresh projects list
               getGlobalProjects(1, 10);
-              // Navigate to success or close drawer
-              closeDrawer();
+              // Navigate to success screen
+              openDrawerWithStep("project-edit-success");
             }
           })
           .catch((error) => {
