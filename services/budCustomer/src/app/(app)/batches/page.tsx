@@ -151,7 +151,7 @@ export default function BatchesPage() {
   const columns = [
     {
       title: (
-        <Text className="text-bud-text-disabled text-[12px] uppercase">
+        <Text className="text-bud-text-primary text-[12px] uppercase">
           BATCH NAME
         </Text>
       ),
@@ -170,7 +170,7 @@ export default function BatchesPage() {
     },
     {
       title: (
-        <Text className="text-bud-text-disabled text-[12px] uppercase">
+        <Text className="text-bud-text-primary text-[12px] uppercase">
           MODEL
         </Text>
       ),
@@ -182,7 +182,7 @@ export default function BatchesPage() {
     },
     {
       title: (
-        <Text className="text-bud-text-disabled text-[12px] uppercase">
+        <Text className="text-bud-text-primary text-[12px] uppercase">
           STATUS
         </Text>
       ),
@@ -204,7 +204,7 @@ export default function BatchesPage() {
     },
     {
       title: (
-        <Text className="text-bud-text-disabled text-[12px] uppercase">
+        <Text className="text-bud-text-primary text-[12px] uppercase">
           PROGRESS
         </Text>
       ),
@@ -260,7 +260,7 @@ export default function BatchesPage() {
     // },
     {
       title: (
-        <Text className="text-bud-text-disabled text-[12px] uppercase">
+        <Text className="text-bud-text-primary text-[12px] uppercase">
           COST
         </Text>
       ),
@@ -272,7 +272,7 @@ export default function BatchesPage() {
     },
     {
       title: (
-        <Text className="text-bud-text-disabled text-[12px] uppercase">
+        <Text className="text-bud-text-primary text-[12px] uppercase">
           TIME
         </Text>
       ),
@@ -299,7 +299,7 @@ export default function BatchesPage() {
     },
     {
       title: (
-        <Text className="text-bud-text-disabled text-[12px] uppercase">
+        <Text className="text-bud-text-primary text-[12px] uppercase">
           ACTIONS
         </Text>
       ),
