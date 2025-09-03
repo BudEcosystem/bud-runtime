@@ -163,6 +163,7 @@ class BillingService(DataManagerUtils):
                 "billing_period_start": None,  # Return None for Free plan users
                 "billing_period_end": None,  # Return None for Free plan users
                 "plan_name": free_plan.get("name", "Free"),
+                "billing_plan_id": None,  # Return None for Free plan users
                 "base_monthly_price": float(free_plan.get("base_monthly_price", 0)),
                 "usage": {
                     "tokens_used": usage_data["total_tokens"],
@@ -199,6 +200,7 @@ class BillingService(DataManagerUtils):
             "billing_period_start": user_billing.billing_period_start.isoformat(),
             "billing_period_end": user_billing.billing_period_end.isoformat(),
             "plan_name": billing_plan.name,
+            "billing_plan_id": user_billing.billing_plan_id,
             "base_monthly_price": float(billing_plan.base_monthly_price),
             "usage": {
                 "tokens_used": usage_data["total_tokens"],
