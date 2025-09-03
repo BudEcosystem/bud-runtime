@@ -146,24 +146,30 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
     logout();
   };
 
-
   const getUser = async () => {
-    // showLoader();
     try {
       const userData: any = await fetchUser();
-      console.log(userData)
+      if (!userData && pathname !== "/login") {
+        return router.push("/login");
+      }
+      if (
+        userData?.data?.result?.status === "invited" &&
+        pathname !== "/login"
+      ) {
+        console.log("User needs to complete registration");
+        return router.push("/login");
+      }
     } catch (error) {
-      console.error("Error  fetching user", error);
+      console.error("Error fetching user", error);
       return router.push("/login");
-    } finally {
-      // hideLoader();
     }
   };
-  useEffect(()=> {
-    if(!user?.id) {
+
+  useEffect(() => {
+    if (!user?.id) {
       getUser();
     }
-  }, [user])
+  }, [pathname]); // Re-run on pathname change like budadmin
 
   return (
     <div className="flex h-screen bg-[#f2f2f2] dark:bg-bud-bg-primary">
@@ -222,34 +228,38 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
           )} */}
 
           {/* Notifications */}
-        {/* <BudIsland /> */}
+          {/* <BudIsland /> */}
 
-            <div className="bg-bud-bg-secondary rounded-lg p-3 mb-1 cursor-pointer hover:bg-bud-bg-tertiary transition-colors hidden">
-              <Badge
-                count={88}
-                offset={isCollapsed ? [0, -10] : [50, -10]}
-                style={{ backgroundColor: "#965CDE" }}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`${
-                      isCollapsed ? "w-6 h-6" : "w-8 h-8"
-                    } bg-bud-purple rounded flex items-center justify-center`}>
-                    <Icon
-                      icon="heroicons-outline:bell"
-                      className="text-white text-lg"
-                    />
-                  </div>
-                  {!isCollapsed && (<div>
+          <div className="bg-bud-bg-secondary rounded-lg p-3 mb-1 cursor-pointer hover:bg-bud-bg-tertiary transition-colors hidden">
+            <Badge
+              count={88}
+              offset={isCollapsed ? [0, -10] : [50, -10]}
+              style={{ backgroundColor: "#965CDE" }}
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className={`${
+                    isCollapsed ? "w-6 h-6" : "w-8 h-8"
+                  } bg-bud-purple rounded flex items-center justify-center`}
+                >
+                  <Icon
+                    icon="heroicons-outline:bell"
+                    className="text-white text-lg"
+                  />
+                </div>
+                {!isCollapsed && (
+                  <div>
                     <Text className="text-bud-text-disabled text-xs block">
                       88 New
                     </Text>
                     <Text className="text-bud-text-primary text-sm">
                       Notifications
                     </Text>
-                  </div>)}
-                </div>
-              </Badge>
-            </div>
+                  </div>
+                )}
+              </div>
+            </Badge>
+          </div>
         </div>
 
         {/* Scrollable Content Area */}
@@ -365,9 +375,7 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
           )}
 
           {/* Page Content */}
-          <main className="flex-1 overflow-auto">
-            {children}
-          </main>
+          <main className="flex-1 overflow-auto">{children}</main>
         </div>
       </div>
     </div>
