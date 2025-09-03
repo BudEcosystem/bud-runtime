@@ -201,9 +201,11 @@ class TestBillingServiceNotifications:
         mock_db.execute.return_value.scalars.return_value.all.return_value = [mock_billing_alert]
 
         # Mock the get_current_usage to return high usage
+        # Note: BillingNotificationService is in notification_service module, not services module
+        # Note: BillingNotificationService is in notification_service module, not services module
         with patch.object(service, 'get_current_usage', new_callable=AsyncMock) as mock_get_usage, \
              patch.object(service, 'get_billing_plan') as mock_get_plan, \
-             patch('budapp.billing_ops.services.BillingNotificationService') as MockNotificationService:
+             patch('budapp.billing_ops.notification_service.BillingNotificationService') as MockNotificationService:
 
             mock_get_usage.return_value = {
                 "has_billing": True,
@@ -257,9 +259,10 @@ class TestBillingServiceNotifications:
         ]
         mock_db.execute.return_value.scalars.return_value.all.return_value = [mock_billing_alert]
 
+        # Note: BillingNotificationService is in notification_service module, not services module
         with patch.object(service, 'get_current_usage', new_callable=AsyncMock) as mock_get_usage, \
              patch.object(service, 'get_billing_plan') as mock_get_plan, \
-             patch('budapp.billing_ops.services.BillingNotificationService') as MockNotificationService:
+             patch('budapp.billing_ops.notification_service.BillingNotificationService') as MockNotificationService:
 
             mock_get_usage.return_value = {
                 "has_billing": True,
@@ -368,7 +371,7 @@ class TestBillingServiceNotifications:
 
         with patch.object(service, 'get_current_usage', new_callable=AsyncMock) as mock_get_usage, \
              patch.object(service, 'get_billing_plan') as mock_get_plan, \
-             patch('budapp.billing_ops.services.BillingNotificationService') as MockNotificationService:
+             patch('budapp.billing_ops.notification_service.BillingNotificationService') as MockNotificationService:
 
             # Current usage is 92%
             mock_get_usage.return_value = {
