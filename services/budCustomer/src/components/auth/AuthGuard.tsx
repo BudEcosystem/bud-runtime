@@ -63,14 +63,22 @@ export default function AuthGuard({ children }: AuthGuardProps) {
         return;
       }
 
-      // If token exists but no user data, try to fetch user
-      if (token && !user && !loadingUser) {
+      // Always fetch user data on route change if token exists (like budadmin)
+      if (token && !user?.id) {
         showLoader();
         try {
-          await getUser();
+          const userData = await getUser();
+          // Check if user needs to complete registration
+          if (userData?.data?.result?.status === "invited") {
+            console.log("User needs to complete registration");
+            router.push("/login");
+            return;
+          }
         } catch (error) {
           console.error("Failed to get user data:", error);
-          // Still allow access if token exists
+          // Redirect to login if user fetch fails
+          router.push("/login");
+          return;
         } finally {
           hideLoader();
         }
@@ -80,7 +88,7 @@ export default function AuthGuard({ children }: AuthGuardProps) {
     };
 
     checkAuth();
-  }, [pathname, router, user, getUser, showLoader, hideLoader, loadingUser]);
+  }, [pathname]); // Simplified dependency array - only re-run on pathname change
 
   // Show loading while initializing
   if (!isInitialized) {
