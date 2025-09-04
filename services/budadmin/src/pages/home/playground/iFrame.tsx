@@ -12,7 +12,7 @@ const EmbeddedIframe = ({singleChat = false}: {singleChat?: boolean}) => {
   }
   useEffect(() => {
     if (typeof window !== "undefined") {
-      _setRefreshToken(localStorage.getItem("refresh_token"));
+      _setRefreshToken(localStorage.getItem("refresh_token") || "");
       const iframe = iframeRef.current;
       if (iframe && iframe.contentDocument) {
         const style = iframe.contentDocument.createElement("style");
