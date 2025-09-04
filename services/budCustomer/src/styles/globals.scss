@@ -1102,7 +1102,10 @@ input.ant-input:-webkit-autofill {
   }
 
   .ant-select-item.ant-select-item-option-active {
-    background: #1f1f1f !important;
+    background: var(--bg-primary) !important;
+  }
+  .ant-select-item.ant-select-item-option.ant-select-item-option-selected {
+    background: var(--bg-primary) !important;
   }
 }
 

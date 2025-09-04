@@ -55,7 +55,7 @@ const ProjectSuccess = () => {
               )}
             </div>
 
-            <div className="bg-[#1F1F1F] border border-[#2F2F2F] rounded-[8px] p-[1.5rem] w-full max-w-[500px]">
+            <div className="bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-[8px] p-[1.5rem] w-full max-w-[500px]">
               <Text_13_400_EEEEEE className="text-center">
                 You can now start adding API keys, team members, and deploy your first model to this project.
               </Text_13_400_EEEEEE>
