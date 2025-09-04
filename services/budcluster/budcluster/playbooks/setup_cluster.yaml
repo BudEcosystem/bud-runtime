@@ -183,6 +183,7 @@
                     - class
           topologyUpdater:
             enable: true
+            createCRDs: true
       when: nfd_needs_deployment | default(true)
 
     - name: Wait for NFD master to be ready
