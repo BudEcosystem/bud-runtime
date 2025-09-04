@@ -23,6 +23,7 @@ from datetime import UTC, datetime
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
+import jwt
 from fastapi import status
 
 from budapp.shared.redis_service import RedisService
@@ -260,7 +261,6 @@ class PlaygroundService(SessionMixin):
                 raise ClientException(status_code=status.HTTP_401_UNAUTHORIZED, message="Invalid refresh token")
 
             # Step 2: Extract auth_id (Keycloak user ID) from the new access token
-            import jwt
 
             try:
                 # Decode without verification to get user info (already verified by Keycloak)
