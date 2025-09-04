@@ -283,6 +283,9 @@ class PlaygroundService(SessionMixin):
                 logger.error(f"User not found for auth_id: {auth_id}")
                 raise ClientException(status_code=status.HTTP_404_NOT_FOUND, message="User not found")
 
+            # Set the new access token as raw_token for permission checks
+            db_user.raw_token = token_data["access_token"]
+
             # Step 4: Get user's accessible projects
             project_service = ProjectService(self.session)
 
