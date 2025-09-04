@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Flex, Select, Button, ConfigProvider, Tabs, Skeleton } from "antd";
+import { Flex, Select, Button, ConfigProvider, Tabs, Skeleton, Card, Switch, Modal, Input } from "antd";
 import { Typography } from "antd";
 import { Icon } from "@iconify/react/dist/iconify.js";
 import styles from "./usage.module.scss";
@@ -46,6 +46,14 @@ interface UsageMetrics {
   previousRequests?: number;
 }
 
+interface BillingAlert {
+  id: string;
+  type: "cost" | "usage" | "requests";
+  threshold: number;
+  isActive: boolean;
+  lastTriggered?: string;
+}
+
 export default function UsagePage() {
   const { globalProjects, getGlobalProjects, loading } = useProjects();
   const [timeRange, setTimeRange] = useState("30d");
@@ -86,6 +94,17 @@ export default function UsagePage() {
   // Usage data for charts and table
   const [usageData, setUsageData] = useState<UsageData[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
+  const [showAlertModal, setShowAlertModal] = useState(false);
+  const [alertType, setAlertType] = useState<"cost" | "usage" | "requests">(
+    "cost",
+  );
+  const [alertThreshold, setAlertThreshold] = useState(75);
+  // Mock alerts
+  const [alerts, setAlerts] = useState<BillingAlert[]>([
+    { id: "1", type: "cost", threshold: 75, isActive: true },
+    { id: "2", type: "usage", threshold: 100, isActive: true },
+    // { id: "3", type: "requests", threshold: 8000, isActive: false },
+  ]);
 
   const themeConfig = {
     components: {
@@ -295,6 +314,27 @@ export default function UsagePage() {
     linkElement.click();
   };
 
+
+  const handleCreateAlert = () => {
+    const newAlert: BillingAlert = {
+      id: Date.now().toString(),
+      type: alertType,
+      threshold: alertThreshold,
+      isActive: true,
+    };
+    setAlerts([...alerts, newAlert]);
+    setShowAlertModal(false);
+    setAlertThreshold(100);
+  };
+
+  const toggleAlert = (id: string) => {
+    setAlerts(
+      alerts.map((alert) =>
+        alert.id === id ? { ...alert, isActive: !alert.isActive } : alert,
+      ),
+    );
+  };
+
   return (
     <DashboardLayout>
       <div className={styles.usageContainer}>
@@ -337,6 +377,14 @@ export default function UsagePage() {
               >
                 Export
               </Button>
+              <Button
+                type="primary"
+                icon={<Icon icon="ph:bell" />}
+                className="bg-bud-purple border-bud-purple hover:bg-bud-purple-hover h-[2.5rem] px-[1.5rem]"
+                onClick={() => setShowAlertModal(true)}
+              >
+                Set Alert
+              </Button>
             </div>
           </div>
 
@@ -351,6 +399,7 @@ export default function UsagePage() {
                   ? ((metrics.totalSpend - metrics.previousSpend) / metrics.previousSpend) * 100
                   : 0
               }
+              subtitle={'test'}
             />
             <MetricCard
               title="Total tokens"
@@ -406,12 +455,136 @@ export default function UsagePage() {
             </ConfigProvider>
           </div>
 
+          {/* Billing Alerts */}
+          <Card className="bg-bud-bg-secondary border-bud-border rounded-[12px] mb-[2rem]">
+            <Flex
+              justify="space-between"
+              align="center"
+              className="mb-[1.5rem]"
+            >
+              <Text className="text-bud-text-primary font-semibold text-[15px]">
+                Billing Alerts
+              </Text>
+              <Button
+                type="text"
+                icon={<Icon icon="ph:plus" />}
+                onClick={() => setShowAlertModal(true)}
+                className="text-bud-purple hover:text-bud-purple-hover"
+              >
+                Add Alert
+              </Button>
+            </Flex>
+
+            <div className="space-y-[1rem]">
+              {alerts.map((alert) => (
+                <div
+                  key={alert.id}
+                  className="bg-bud-bg-tertiary rounded-[8px] p-[1rem]"
+                >
+                  <Flex justify="space-between" align="center">
+                    <div>
+                      <Text className="text-bud-text-primary font-medium text-[14px] capitalize">
+                        {alert.type} Alert
+                      </Text>
+                      <Text className="text-bud-text-muted text-[12px] mt-[0.25rem] block">
+                        Triggers when {alert.type} reaches {alert.threshold}
+                        {alert.type === "cost" || alert.type === "usage"
+                          ? " %"
+                          : " requests"}
+                      </Text>
+                    </div>
+                    <Switch
+                      checked={alert.isActive}
+                      onChange={() => toggleAlert(alert.id)}
+                      style={{
+                        backgroundColor: alert.isActive
+                          ? "var(--color-purple)"
+                          : "var(--border-secondary)",
+                      }}
+                    />
+                  </Flex>
+                </div>
+              ))}
+            </div>
+          </Card>
+
           {/* Usage Table */}
           <div className={styles.tableSection}>
             <UsageTable data={usageData} loading={chartLoading} />
           </div>
         </div>
       </div>
+      {/* Create Alert Modal */}
+      <Modal
+        title={
+          <Text className="text-bud-text-primary font-semibold text-[19px]">
+            Create Billing Alert
+          </Text>
+        }
+        open={showAlertModal}
+        onCancel={() => setShowAlertModal(false)}
+        footer={[
+          <Button key="cancel" onClick={() => setShowAlertModal(false)}>
+            Cancel
+          </Button>,
+          <Button
+            key="create"
+            type="primary"
+            onClick={handleCreateAlert}
+            className="bg-bud-purple border-bud-purple hover:bg-bud-purple-hover"
+          >
+            Create Alert
+          </Button>,
+        ]}
+        className={styles.modal}
+      >
+        <div className="space-y-[1rem]">
+          <div>
+            <Text className="text-bud-text-muted text-[12px] mb-[0.5rem] block">
+              Alert Type
+            </Text>
+            <Select
+              value={alertType}
+              onChange={setAlertType}
+              className="w-full"
+              options={[
+                { value: "cost", label: "Cost Alert" },
+                { value: "usage", label: "Token Usage Alert" },
+                // { value: "requests", label: "Request Count Alert" },
+              ]}
+            />
+          </div>
+
+            <div>
+            <Text className="text-bud-text-muted text-[12px] mb-[0.5rem] block">
+              Threshold
+            </Text>
+            <Input
+              type="number"
+              value={alertThreshold}
+              onChange={(e) => {
+              let value = Number(e.target.value);
+              if ((alertType === "cost" || alertType === "usage") && value > 100) {
+                value = 100;
+              }
+              setAlertThreshold(value);
+              }}
+              placeholder="Enter threshold value"
+              max={alertType === "cost" || alertType === "usage" ? 100 : undefined}
+              className="bg-bud-bg-tertiary border-bud-border-secondary"
+              suffix={
+              <Text className="text-bud-text-disabled text-[12px]">
+                {alertType === "cost"
+                ? "%"
+                : alertType === "usage"
+                ? "%"
+                : "requests"}
+              </Text>
+              }
+            />
+            </div>
+        </div>
+      </Modal>
     </DashboardLayout>
   );
 }
