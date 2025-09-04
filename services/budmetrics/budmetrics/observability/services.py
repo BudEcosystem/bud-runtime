@@ -1027,9 +1027,9 @@ class ObservabilityMetricsService:
                 "query_params",
                 "request_headers",
                 "body_size",
-                "ga.api_key_id",
+                "api_key_id",
                 "auth_method",
-                "ga.user_id",
+                "user_id",
                 "ga_project_id",
                 "ga_endpoint_id",
                 "request_timestamp",
@@ -1048,7 +1048,7 @@ class ObservabilityMetricsService:
                 "is_blocked",
                 "block_reason",
                 "block_rule_id",
-                "ga.tags",
+                "tags",
             ]
 
             gateway_field_values = [row_dict.get(field) for field in gateway_field_names]
@@ -1119,9 +1119,9 @@ class ObservabilityMetricsService:
                         query_params=row_dict.get("query_params"),
                         request_headers=safe_dict(row_dict.get("request_headers")),
                         body_size=safe_int(row_dict.get("body_size")),
-                        api_key_id=row_dict.get("ga.api_key_id"),
+                        api_key_id=row_dict.get("api_key_id"),
                         auth_method=row_dict.get("auth_method"),
-                        user_id=row_dict.get("ga.user_id"),
+                        user_id=row_dict.get("user_id"),
                         gateway_processing_ms=safe_int(row_dict.get("gateway_processing_ms")),
                         total_duration_ms=safe_int(row_dict.get("total_duration_ms")),
                         routing_decision=row_dict.get("routing_decision"),
@@ -1134,7 +1134,7 @@ class ObservabilityMetricsService:
                         is_blocked=row_dict.get("is_blocked"),
                         block_reason=row_dict.get("block_reason"),
                         block_rule_id=row_dict.get("block_rule_id"),
-                        tags=safe_dict(row_dict.get("ga.tags")),
+                        tags=safe_dict(row_dict.get("tags")),
                     )
                     logger.info(f"Successfully parsed gateway metadata for inference {inference_id}")
                 except Exception as e:
@@ -1297,9 +1297,9 @@ class ObservabilityMetricsService:
 
             return EnhancedInferenceDetailResponse(
                 object="inference_detail",
-                inference_id=safe_uuid(row_dict.get("mi.inference_id")),
-                timestamp=row_dict.get("mi.timestamp"),
-                model_name=str(row_dict.get("mi.model_name")) if row_dict.get("mi.model_name") else "",
+                inference_id=safe_uuid(row_dict.get("inference_id")),
+                timestamp=row_dict.get("timestamp"),
+                model_name=str(row_dict.get("model_name")) if row_dict.get("model_name") else "",
                 model_provider=str(row_dict.get("model_provider_name"))
                 if row_dict.get("model_provider_name")
                 else "unknown",
