@@ -17,11 +17,11 @@
             kubeconfig: "{{ kubeconfig_path | default(omit) }}"
         ignore_errors: yes
 
-      # Note: We no longer delete PVCs since we're using the shared bud-dev-budeval-dataset-rwx
+      # Note: We no longer delete PVCs since we're using the shared bud-dev-budeval-dataset
       # Job results remain in the PVC under /results/{{ job_name }}/
 
       - name: Display cleanup completion
         debug:
             msg: |
                 Cleanup completed for job {{ job_name }}
-                Note: Results are preserved in bud-dev-budeval-dataset-rwx at /results/{{ job_name }}/
+                Note: Results are preserved in bud-dev-budeval-dataset at /results/{{ job_name }}/

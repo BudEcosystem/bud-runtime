@@ -6,6 +6,7 @@ data:
   tensorzero.toml: |
     [gateway]
     bind_address = "0.0.0.0:3000"
+    debug = true
 
     [gateway.rate_limits]
     enabled = true

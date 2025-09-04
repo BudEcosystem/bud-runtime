@@ -51,18 +51,26 @@ async def start_eval(request: EvaluationRequest):
 async def get_job_status(
     job_id: str,
     kubeconfig: Optional[str] = Query(None, description="Kubernetes configuration as JSON string (optional)"),
+    namespace: Optional[str] = Query(
+        None, description="Kubernetes namespace (optional); defaults to current namespace"
+    ),
 ):
     """Get the status of an evaluation job.
 
     Args:
         job_id (str): The unique identifier of the job.
         kubeconfig (Optional[str]): Kubernetes configuration as JSON string (optional, uses in-cluster config if not provided).
+        namespace (Optional[str]): Kubernetes namespace where the job is running.
+                                   If not provided, uses the current cluster namespace detected from:
+                                   1. NAMESPACE environment variable
+                                   2. Kubernetes service account namespace file
+                                   3. Falls back to 'default'
 
     Returns:
-        dict: Job status information
+        dict: Job status information including state, completion status, and any errors
     """
     try:
-        response = await EvaluationOpsService.get_job_status(job_id, kubeconfig)
+        response = await EvaluationOpsService.get_job_status(job_id, kubeconfig, namespace)
         return response
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get job status: {str(e)}") from e
