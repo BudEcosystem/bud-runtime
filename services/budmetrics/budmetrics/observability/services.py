@@ -1346,7 +1346,7 @@ class ObservabilityMetricsService:
             )
         except Exception as e:
             logger.error(f"Failed to create InferenceDetailResponse: {e}")
-            logger.error(f"Row data columns: {list(row_dict.keys()) if 'row_dict' in locals() else 'N/A'}")
+            logger.error(f"Row data columns: {list(row_dict.keys())}")
             raise ValueError(f"Failed to process inference data: {str(e)}") from e
 
     async def get_inference_feedback(self, inference_id: str) -> InferenceFeedbackResponse:
