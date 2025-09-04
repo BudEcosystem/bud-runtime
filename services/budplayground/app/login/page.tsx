@@ -11,7 +11,7 @@ import { useLoader } from "../context/LoaderContext";
 import GameOfLifeBackground from "../components/bud/components/GameOfLifeBg";
 
 export default function Login() {
-    const { apiKey, login } = useAuth();
+    const { apiKey, login, isLoading: authLoading, isSessionValid } = useAuth();
     const { showLoader, hideLoader, isLoading } = useLoader();
     const router = useRouter();
     const [form] = Form.useForm();
@@ -35,19 +35,20 @@ export default function Login() {
         hideLoader();
     }
 
+    // Handle authentication state changes
     useEffect(() => {
-        // Get refresh_token from URL parameters
-        const params = new URLSearchParams(window.location.search);
-        const refreshToken = params.get('refresh_token');
-
-        if (refreshToken) {
-            // setKey(refreshToken);
-            // Automatically validate the refresh token
-            handleAdd(refreshToken);
-        } else {
-          hideLoader();
+        if (authLoading) {
+            return; // Wait for auth to finish loading
         }
-    }, [hideLoader]);
+
+        if (apiKey || isSessionValid) {
+            // Already authenticated, redirect to chat
+            router.replace('/chat');
+        } else {
+            // Not authenticated, show login form
+            hideLoader();
+        }
+    }, [apiKey, isSessionValid, authLoading, router, hideLoader]);
     return (
       <div className={`w-full h-screen logginBg box-border relative overflow-hidden ${isLoading ? 'opacity-0' : 'opacity-100'}`}>
         <div className="loginWrap w-full h-full loginBg-glass flex justify-between box-border ">

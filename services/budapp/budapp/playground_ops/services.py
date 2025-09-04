@@ -25,6 +25,8 @@ from uuid import UUID
 
 from fastapi import status
 
+from budapp.shared.redis_service import RedisService
+
 from ..auth.schemas import RefreshTokenRequest
 from ..commons import logging
 from ..commons.config import app_settings
@@ -41,7 +43,6 @@ from ..model_ops.services import ModelService
 from ..project_ops.crud import ProjectDataManager
 from ..project_ops.models import Project as ProjectModel
 from ..project_ops.services import ProjectService
-from ..shared.redis_service import RedisService
 from ..user_ops.crud import UserDataManager
 from ..user_ops.models import Tenant, TenantClient
 from ..user_ops.models import User as UserModel

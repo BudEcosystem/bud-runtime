@@ -53,12 +53,41 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       clearTimeout(refreshTimeoutId);
     }
 
-    console.log(`Scheduling session refresh in ${refreshTime / 1000} seconds`);
-
     const timeoutId = setTimeout(async () => {
-      if (refreshToken && isSessionValid) {
-        console.log('Automatically refreshing session...');
-        await refreshSession();
+      // Get fresh values from localStorage
+      const storedRefreshToken = localStorage.getItem('refresh_token');
+
+      // Use stored refresh token as primary source of truth
+      if (storedRefreshToken) {
+        try {
+          // Call refresh directly instead of relying on refreshSession function
+          const response = await axios.post('/api/initialize', { refresh_token: storedRefreshToken });
+
+          if (response.data && response.data.initialization_status === 'success') {
+            const newSessionData = response.data;
+
+            // Update all state and storage
+            setAccessToken(newSessionData.access_token);
+            setRefreshToken(newSessionData.refresh_token);
+            setSessionData(newSessionData);
+            setIsSessionValid(true);
+            setApiKey(newSessionData.access_token);
+
+            localStorage.setItem('access_token', newSessionData.access_token);
+            localStorage.setItem('refresh_token', newSessionData.refresh_token);
+            localStorage.setItem('session_data', JSON.stringify(newSessionData));
+            localStorage.setItem('token', newSessionData.access_token);
+
+            // Schedule next refresh
+            if (newSessionData.refresh_time) {
+              scheduleRefresh(newSessionData.refresh_time);
+            }
+          } else {
+            setIsSessionValid(false);
+          }
+        } catch (error) {
+          setIsSessionValid(false);
+        }
       }
     }, refreshTime);
 
@@ -68,13 +97,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   // Function to refresh the session using stored refresh token
   const refreshSession = async (): Promise<boolean> => {
     if (!refreshToken) {
-      console.error('No refresh token available for session refresh');
       setIsSessionValid(false);
       return false;
     }
 
     try {
-      console.log('Refreshing session with refresh token...');
       const response = await axios.post('/api/initialize', { refresh_token: refreshToken });
 
       if (response.data && response.data.initialization_status === 'success') {
@@ -86,25 +113,26 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         setSessionData(newSessionData);
         setIsSessionValid(true);
 
+        // Update main API token for requests
+        setApiKey(newSessionData.access_token);
+
         // Store updated tokens
         localStorage.setItem('access_token', newSessionData.access_token);
         localStorage.setItem('refresh_token', newSessionData.refresh_token);
         localStorage.setItem('session_data', JSON.stringify(newSessionData));
+        localStorage.setItem('token', newSessionData.access_token);
 
         // Schedule next refresh
         if (newSessionData.refresh_time) {
           scheduleRefresh(newSessionData.refresh_time);
         }
 
-        console.log('Session refreshed successfully');
         return true;
       }
 
-      console.error('Session refresh failed: Invalid response');
       setIsSessionValid(false);
       return false;
     } catch (error) {
-      console.error('Failed to refresh session:', error);
       setIsSessionValid(false);
       return false;
     }
@@ -114,14 +142,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const initializeWithRefreshToken = async (refreshTokenValue: string): Promise<boolean> => {
     // Prevent multiple simultaneous initialization attempts
     if (isInitializing) {
-      console.log('Refresh token initialization already in progress, skipping...');
       return false;
     }
 
     setIsInitializing(true);
 
     try {
-      console.log('Initializing session with refresh token...');
       // Call the initialization API with refresh token
       const response = await axios.post('/api/initialize', { refresh_token: refreshTokenValue });
 
@@ -149,14 +175,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         if (initData.refresh_time) {
           scheduleRefresh(initData.refresh_time);
         }
-
-        console.log('Session initialized successfully with tokens');
         return true;
       }
-      console.error('Session initialization failed: Invalid response');
       return false;
     } catch (error) {
-      console.error('Failed to initialize session:', error);
       // Clean up on failure
       setIsSessionValid(false);
       localStorage.removeItem('access_token');
@@ -172,7 +194,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   // Legacy function - now redirects to refresh token flow
   const initializeWithJWT = async (jwt: string): Promise<boolean> => {
     // For backward compatibility, treat JWT as refresh token
-    console.log('Legacy JWT initialization - treating as refresh token');
     return await initializeWithRefreshToken(jwt);
   };
 
@@ -265,16 +286,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
               if (remainingTime > 0) {
                 // Schedule refresh for remaining time
-                console.log(`Restoring refresh schedule with ${remainingTime / 1000} seconds remaining`);
                 scheduleRefresh(remainingTime);
               } else {
                 // Token should have been refreshed already, refresh now
-                console.log('Session expired during offline time, refreshing...');
                 refreshSession();
               }
             }
           } catch (error) {
-            console.error('Failed to restore session data:', error);
             // Clear corrupted session data
             localStorage.removeItem('session_data');
             setIsSessionValid(false);

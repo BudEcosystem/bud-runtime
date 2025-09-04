@@ -14,23 +14,12 @@ import { Endpoint } from "../types/deployment";
 export default function ChatPage() {
   const { activeChatList, createChat } = useChatStore();
   const { hideLoader } = useLoader();
-  const { apiKey, login } = useAuth();
+  const { apiKey, isLoading, isSessionValid } = useAuth();
   const router = useRouter();
 
   const [hasHydrated, setHasHydrated] = useState(false);
   const [isSingleChat, setIsSingleChat] = useState(false);
   const [selectedModel, setSelectedModel] = useState("");
-
-  const checkRefreshToken = async (refreshToken: string) => {
-    const isLoginSuccessful = await login("", refreshToken);
-    if(isLoginSuccessful) {
-      console.log('Login successful with refresh token');
-      // router.replace(`chat`);
-    } else {
-      // setIsInvalidApiKey(true);
-      router.replace(`login`);
-    }
-  }
 
   const createNewChat = () => {
     const newChatPayload = {
@@ -78,25 +67,33 @@ export default function ChatPage() {
   }, [hasHydrated, activeChatList.length, createNewChat, hideLoader]);
 
   useEffect(() => {
-
+    // Handle URL parameters for page configuration (not authentication)
     const params = new URLSearchParams(window.location.search);
-    const refreshToken = params.get('refresh_token');
     const isSingleChat = params.get('is_single_chat');
     const model = params.get('model');
-    const baseUrl = params.get('base_url');
-    if(refreshToken) {
-      checkRefreshToken(refreshToken);
-    } else {
-      hideLoader();
-    }
+
     if(isSingleChat == "true") {
       setIsSingleChat(true);
     }
     if(model) {
       setSelectedModel(model);
     }
+  }, []);
 
-  }, [checkRefreshToken, hideLoader]);
+  // Handle authentication state changes
+  useEffect(() => {
+    if (isLoading) {
+      return; // Wait for auth to finish loading
+    }
+
+    if (!apiKey && !isSessionValid) {
+      // No authentication, redirect to login
+      router.replace('/login');
+    } else {
+      // Authentication successful, hide loader
+      hideLoader();
+    }
+  }, [apiKey, isSessionValid, isLoading, router, hideLoader]);
 
   return (
     <div
