@@ -1517,7 +1517,7 @@ class ExperimentWorkflowService:
                 workflow = await WorkflowDataManager(self.session).insert_one(
                     WorkflowModel(
                         created_by=current_user_id,
-                        workflow_type=WorkflowTypeEnum.EXPERIMENT_CREATION,
+                        workflow_type=WorkflowTypeEnum.EVALUATION_CREATION,
                         status=WorkflowStatusEnum.IN_PROGRESS,
                         current_step=0,
                         total_steps=request.workflow_total_steps,
@@ -2922,6 +2922,7 @@ class EvaluationWorkflowService:
                 "source": app_settings.source_topic,
                 "source_topic": app_settings.source_topic,
                 "experiment_id": experiment_id,  # Include experiment ID for tracking
+                "evaluation_id": str(workflow_id),  # TODO: Update to actual evaluation ID
             }
 
             # Update all runs status to running
