@@ -192,14 +192,14 @@ export default function BatchesPage() {
       key: "status",
       render: (status: string) => (
         <Flex align="center" gap={8}>
-          <Icon
+          {/* <Icon
             icon={getStatusIcon(status)}
             className={`text-[1rem] ${status === "processing" ? "animate-spin" : ""}`}
             style={{ color: getStatusColor(status) }}
-          />
+          /> */}
           <Tags
             color={getStatusColor(status)}
-            name={status}
+            name={capitalizeFirstLetterLowerRest(status)}
           />
         </Flex>
       ),
@@ -415,6 +415,10 @@ export default function BatchesPage() {
     failed: batches.filter((b) => b.status === "failed").length,
     totalCost: batches.reduce((acc, b) => acc + b.cost, 0),
   };
+  const capitalizeFirstLetterLowerRest = (text: string) => {
+    if (!text) return '';
+    return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
+  }
 
   return (
     <DashboardLayout>

@@ -96,13 +96,13 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
       iconWhite: "/icons/playIcn.png",
       shortcut: "1",
     },
-    {
-      label: "Batches",
-      route: "/batches",
-      icon: "/icons/batchesDark.png",
-      iconWhite: "/icons/batchesLight.png",
-      shortcut: "2",
-    },
+    // {
+    //   label: "Batches",
+    //   route: "/batches",
+    //   icon: "/icons/batchesDark.png",
+    //   iconWhite: "/icons/batchesLight.png",
+    //   shortcut: "2",
+    // },
     {
       label: "Logs",
       route: "/logs",
