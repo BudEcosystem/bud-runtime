@@ -1,0 +1,20 @@
+# Reference: https://docs.dapr.io/reference/components-reference/supported-configuration-stores/redis-configuration-store/
+
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: configstore
+  namespace: development
+spec:
+  type: configuration.redis
+  metadata:
+    - name: redisHost
+      secretKeyRef:
+        name: REDIS_URI
+        key: REDIS_URI
+    - name: redisPassword
+      secretKeyRef:
+        name: REDIS_PASSWORD
+        key: REDIS_PASSWORD
+auth:
+  secretStore: secretstore-local
