@@ -16,502 +16,371 @@
 
 """API routes for guardrail operations."""
 
-from typing import List
+from typing import Optional, Union
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
+from typing_extensions import Annotated
 
-from budapp.commons.dependencies import get_current_user, get_session
-from budapp.commons.schemas import SuccessResponse
-from budapp.guardrails import crud
+from budapp.commons import logging
+from budapp.commons.constants import PermissionEnum
+from budapp.commons.dependencies import get_current_active_user, get_session, parse_ordering_fields
+from budapp.commons.exception import ClientException
+from budapp.commons.permission_handler import require_permissions
+from budapp.commons.schemas import ErrorResponse, SuccessResponse
+from budapp.guardrails.models import GuardrailProbes, GuardrailRules
 from budapp.guardrails.schemas import (
-    CreateGuardrailDeploymentWorkflowRequest,
-    GuardrailDeploymentCreate,
-    GuardrailDeploymentListRequestSchema,
-    GuardrailDeploymentListResponseSchema,
-    GuardrailDeploymentResponse,
-    GuardrailDeploymentUpdate,
-    GuardrailProbeCreate,
-    GuardrailProbeListRequestSchema,
-    GuardrailProbeListResponseSchema,
-    GuardrailProbeResponse,
+    GuardrailFilter,
+    GuardrailProbeDetailResponse,
+    GuardrailProbePaginatedResponse,
     GuardrailProbeUpdate,
     GuardrailRuleCreate,
-    GuardrailRuleListRequestSchema,
-    GuardrailRuleListResponseSchema,
-    GuardrailRuleResponse,
+    GuardrailRuleDetailResponse,
+    GuardrailRulePaginatedResponse,
     GuardrailRuleUpdate,
-    ProbeTagSearchResponse,
+    TagsListResponse,
 )
-from budapp.guardrails.services import (
-    GuardrailDeploymentService,
-    GuardrailDeploymentWorkflowService,
-    GuardrailProbeService,
-    GuardrailRuleService,
-)
-from budapp.user_ops.models import User
-from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
-from budapp.workflow_ops.services import WorkflowService
+from budapp.guardrails.services import GuardrailProbeRuleService
+from budapp.user_ops.schemas import User
+
+
+logger = logging.getLogger(__name__)
 
 
 router = APIRouter(prefix="/guardrails", tags=["Guardrails"])
 
 
-# Probe endpoints
-@router.post(
-    "/probes",
-    response_model=GuardrailProbeResponse,
-    status_code=status.HTTP_201_CREATED,
+@model_router.get(
+    "/tags",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": TagsListResponse,
+            "description": "Successfully searched tags by name",
+        },
+    },
+    description="Search guardrail tags by name with pagination",
 )
-async def create_probe(
-    probe_data: GuardrailProbeCreate,
-    db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-):
-    """Create a new guardrail probe."""
-    probe = await GuardrailProbeService.create_probe(db, probe_data, current_user.id)
-    return probe
-
-
-@router.get(
-    "/probes",
-    response_model=GuardrailProbeListResponseSchema,
-)
-async def get_probes(
-    tags: List[str] = Query(None),
-    provider_id: UUID = Query(None),
-    provider_type: str = Query(None),
-    user_id: UUID = Query(None),
-    project_id: UUID = Query(None),
-    endpoint_id: UUID = Query(None),
-    search: str = Query(None),
+@require_permissions(permissions=[PermissionEnum.MODEL_VIEW])
+async def list_probe_tags(
+    session: Annotated[Session, Depends(get_session)],
+    name: Optional[str] = Query(default=None),
+    current_user: User = Depends(get_current_active_user),
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
-    db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-):
-    """Get probes with filtering and pagination."""
-    filters = GuardrailProbeListRequestSchema(
-        tags=tags,
-        provider_id=provider_id,
-        provider_type=provider_type,
-        user_id=user_id,
-        project_id=project_id,
-        endpoint_id=endpoint_id,
-        search=search,
-    )
-
-    probes, total = await GuardrailProbeService.get_probes(db, filters, current_user.id, page, page_size)
-
-    response = GuardrailProbeListResponseSchema(
-        probes=probes,
-        total_record=total,
-        page=page,
-        limit=page_size,
-        message="Successfully retrieved probes",
-    )
-
-    return response
-
-
-@router.get(
-    "/probes/{probe_id}",
-    response_model=GuardrailProbeResponse,
-)
-async def get_probe(
-    probe_id: UUID,
-    include_rules: bool = Query(False, description="Include rules in the response"),
-    db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-):
-    """Get detailed probe information."""
-    probe = await GuardrailProbeService.get_probe(db, probe_id, current_user.id, include_rules=include_rules)
-    return probe
-
-
-@router.put(
-    "/probes/{probe_id}",
-    response_model=GuardrailProbeResponse,
-)
-async def update_probe(
-    probe_id: UUID,
-    probe_data: GuardrailProbeUpdate,
-    db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-):
-    """Update a probe."""
-    probe = await GuardrailProbeService.update_probe(db, probe_id, probe_data, current_user.id)
-    return probe
-
-
-@router.delete(
-    "/probes/{probe_id}",
-    response_model=None,
-    status_code=status.HTTP_204_NO_CONTENT,
-)
-async def delete_probe(
-    probe_id: UUID,
-    db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-):
-    """Delete a probe."""
-    await GuardrailProbeService.delete_probe(db, probe_id, current_user.id)
-    return None
-
-
-@router.get(
-    "/probes/tags/search",
-    response_model=ProbeTagSearchResponse,
-)
-async def search_probe_tags(
-    search_term: str = Query(..., description="Tag name to search for"),
-    page: int = Query(1, ge=1),
-    limit: int = Query(10, ge=0),
-    db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-):
-    """Search for tags used in guardrail probes."""
+    limit: int = Query(10, ge=1),
+) -> Union[TagsListResponse, ErrorResponse]:
+    """List tags by name with pagination support."""
     offset = (page - 1) * limit
-    tags, total_count = await GuardrailProbeService.search_probe_tags(db, search_term, offset, limit)
 
-    response = ProbeTagSearchResponse(
-        tags=tags,
-        total_record=total_count,
+    try:
+        db_tags, count = await GuardrailProbeRuleService(session).list_probe_tags(name or "", offset, limit)
+    except Exception as e:
+        return ErrorResponse(code=status.HTTP_500_INTERNAL_SERVER_ERROR, message=str(e)).to_http_response()
+
+    return TagsListResponse(
+        tags=db_tags,
+        total_record=count,
         page=page,
         limit=limit,
-        message="Tags retrieved successfully",
-    )
+        object="tags.search",
+        code=status.HTTP_200_OK,
+    ).to_http_response()
 
-    return response
+
+# Probe endpoints
+@router.get(
+    "/probes",
+    response_model=GuardrailProbePaginatedResponse,
+)
+@require_permissions(permissions=[PermissionEnum.MODEL_VIEW])
+async def list_all_probes(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    filters: Annotated[GuardrailFilter, Depends()],
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=0),
+    order_by: Optional[list[str]] = Depends(parse_ordering_fields),
+    search: bool = False,
+) -> Union[GuardrailProbePaginatedResponse, ErrorResponse]:
+    # Calculate offset
+    offset = (page - 1) * limit
+
+    # Construct filters
+    filters_dict = filters.model_dump(exclude_none=True, exclude_unset=True)
+
+    try:
+        db_probes, count = await GuardrailProbeRuleService(session).get_all_probes(
+            offset, limit, filters_dict, order_by, search
+        )
+    except ClientException as e:
+        logger.exception(f"Failed to get all probes: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to get all probes: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get all probes"
+        ).to_http_response()
+
+    return GuardrailProbePaginatedResponse(
+        probes=db_probes,
+        total_record=count,
+        page=page,
+        limit=limit,
+        code=status.HTTP_200_OK,
+        message="Successfully list all probes",
+    ).to_http_response()
 
 
 @router.get(
-    "/probes/{probe_id}/rules",
-    response_model=GuardrailRuleListResponseSchema,
+    "/probe/{probe_id}",
+    response_model=GuardrailProbeDetailResponse,
 )
-async def get_probe_rules(
+@require_permissions(permissions=[PermissionEnum.MODEL_VIEW])
+async def retrieve_probe(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
     probe_id: UUID,
-    search: str = Query(None),
-    scanner_types: List[str] = Query(None),
-    modality_types: List[str] = Query(None),
-    guard_types: List[str] = Query(None),
-    is_enabled: bool = Query(None),
-    is_custom: bool = Query(None),
+) -> Union[GuardrailProbeDetailResponse, ErrorResponse]:
+    """Retrieve details of a probe by its ID."""
+    try:
+        result = await GuardrailProbeRuleService(session).retrieve_probe(probe_id)
+        return result.to_http_response()
+    except ClientException as e:
+        logger.exception(f"Failed to get probe details: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to get probe details: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Failed to retrieve probe details",
+        ).to_http_response()
+
+
+@router.get(
+    "/probe/{probe_id}/rules",
+    response_model=GuardrailRulePaginatedResponse,
+)
+@require_permissions(permissions=[PermissionEnum.MODEL_VIEW])
+async def get_probe_rules(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    probe_id: UUID,
+    filters: Annotated[GuardrailFilter, Depends()],
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
-    db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    limit: int = Query(10, ge=0),
+    order_by: Optional[list[str]] = Depends(parse_ordering_fields),
+    search: bool = False,
 ):
     """Get paginated rules for a specific probe."""
-    filters = GuardrailRuleListRequestSchema(
-        search=search,
-        scanner_types=scanner_types,
-        modality_types=modality_types,
-        guard_types=guard_types,
-        is_enabled=is_enabled,
-        is_custom=is_custom,
-    )
+    # Calculate offset
+    offset = (page - 1) * limit
 
-    rules, total = await GuardrailRuleService.get_rules_paginated(
-        db, probe_id, filters, current_user.id, page, page_size
-    )
+    # Construct filters
+    filters_dict = filters.model_dump(exclude_none=True, exclude_unset=True)
 
-    response = GuardrailRuleListResponseSchema(
-        rules=rules,
-        total_record=total,
+    try:
+        db_rules, count = await GuardrailProbeRuleService(session).get_all_probe_rules(
+            probe_id, offset, limit, filters_dict, order_by, search
+        )
+    except ClientException as e:
+        logger.exception(f"Failed to get all rules for {probe_id}: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to get all rules for {probe_id}: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message=f"Failed to get all rules for {probe_id}"
+        ).to_http_response()
+
+    return GuardrailRulePaginatedResponse(
+        rule=db_rules,
+        total_record=count,
         page=page,
-        limit=page_size,
-        message="Successfully retrieved probe rules",
-    )
-
-    return response
-
-
-# Rule endpoints
-@router.post(
-    "/rules",
-    response_model=GuardrailRuleResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-async def create_rule(
-    rule_data: GuardrailRuleCreate,
-    db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-):
-    """Create a new guardrail rule."""
-    rule = await GuardrailRuleService.create_rule(db, rule_data, current_user.id)
-    return rule
-
-
-@router.get(
-    "/rules/{rule_id}",
-    response_model=GuardrailRuleResponse,
-)
-async def get_rule(
-    rule_id: UUID,
-    db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-):
-    """Get a rule by ID."""
-    rule = await GuardrailRuleService.get_rule(db, rule_id, current_user.id)
-    return rule
+        limit=limit,
+        code=status.HTTP_200_OK,
+        message="Successfully list all rules",
+    ).to_http_response()
 
 
 @router.put(
-    "/rules/{rule_id}",
-    response_model=GuardrailRuleResponse,
+    "/probe/{probe_id}",
+    response_model=GuardrailProbeDetailResponse,
 )
-async def update_rule(
-    rule_id: UUID,
-    rule_data: GuardrailRuleUpdate,
-    db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-):
-    """Update a rule."""
-    rule = await GuardrailRuleService.update_rule(db, rule_id, rule_data, current_user.id)
-    return rule
+@require_permissions(permissions=[PermissionEnum.MODEL_MANAGE])
+async def edit_probe(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    probe_id: UUID,
+    request: GuardrailProbeUpdate,
+) -> Union[GuardrailProbeDetailResponse, ErrorResponse]:
+    """Update a probe."""
+    try:
+        result = await GuardrailProbeRuleService(session).edit_probe(
+            probe_id=probe_id,
+            user_id=current_user.id,
+            name=request.name,
+            description=request.description,
+            tags=request.tags,
+            status=request.status,
+        )
+        return result.to_http_response()
+    except HTTPException as e:
+        return ErrorResponse(code=e.status_code, message=e.detail).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to update probe: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Failed to update probe",
+        ).to_http_response()
 
 
 @router.delete(
-    "/rules/{rule_id}",
-    response_model=None,
-    status_code=status.HTTP_204_NO_CONTENT,
-)
-async def delete_rule(
-    rule_id: UUID,
-    db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-):
-    """Delete a rule."""
-    await GuardrailRuleService.delete_rule(db, rule_id, current_user.id)
-    return None
-
-
-# Deployment endpoints
-@router.post(
-    "/deployments",
-    response_model=GuardrailDeploymentResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-async def create_deployment(
-    deployment_data: GuardrailDeploymentCreate,
-    db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-):
-    """Create a new guardrail deployment."""
-    deployment = await GuardrailDeploymentService.create_deployment(db, deployment_data, current_user.id)
-    return deployment
-
-
-@router.get(
-    "/deployments",
-    response_model=GuardrailDeploymentListResponseSchema,
-)
-async def get_deployments(
-    project_id: UUID = Query(None),
-    endpoint_id: UUID = Query(None),
-    deployment_type: str = Query(None),
-    status: str = Query(None),
-    search: str = Query(None),
-    page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
-    db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-):
-    """Get deployments with filtering and pagination."""
-    filters = GuardrailDeploymentListRequestSchema(
-        project_id=project_id,
-        endpoint_id=endpoint_id,
-        deployment_type=deployment_type,
-        status=status,
-        search=search,
-    )
-
-    deployments, total = await GuardrailDeploymentService.get_deployments(
-        db, filters, current_user.id, page, page_size
-    )
-
-    response = GuardrailDeploymentListResponseSchema(
-        deployments=deployments,
-        total_record=total,
-        page=page,
-        limit=page_size,
-        message="Successfully retrieved deployments",
-    )
-
-    return response
-
-
-@router.get(
-    "/deployments/{deployment_id}",
-    response_model=GuardrailDeploymentResponse,
-)
-async def get_deployment(
-    deployment_id: UUID,
-    db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-):
-    """Get detailed deployment information."""
-    deployment = await GuardrailDeploymentService.get_deployment(db, deployment_id, current_user.id)
-    return deployment
-
-
-@router.put(
-    "/deployments/{deployment_id}",
-    response_model=GuardrailDeploymentResponse,
-)
-async def update_deployment(
-    deployment_id: UUID,
-    deployment_data: GuardrailDeploymentUpdate,
-    db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-):
-    """Update a deployment."""
-    deployment = await GuardrailDeploymentService.update_deployment(
-        db, deployment_id, deployment_data, current_user.id
-    )
-    return deployment
-
-
-@router.delete(
-    "/deployments/{deployment_id}",
-    response_model=None,
-    status_code=status.HTTP_204_NO_CONTENT,
-)
-async def delete_deployment(
-    deployment_id: UUID,
-    db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-):
-    """Delete a deployment."""
-    await GuardrailDeploymentService.delete_deployment(db, deployment_id, current_user.id)
-    return None
-
-
-# Endpoint-specific deployment endpoints
-@router.get(
-    "/endpoints/{endpoint_id}/deployments",
-    response_model=GuardrailDeploymentListResponseSchema,
-)
-async def get_endpoint_deployments(
-    endpoint_id: UUID,
-    page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
-    db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-):
-    """Get all active deployments for a specific endpoint."""
-    filters = GuardrailDeploymentListRequestSchema(endpoint_id=endpoint_id)
-    deployments, total = await GuardrailDeploymentService.get_deployments(
-        db, filters, current_user.id, page, page_size
-    )
-
-    response = GuardrailDeploymentListResponseSchema(
-        deployments=deployments,
-        total_record=total,
-        page=page,
-        limit=page_size,
-        message="Endpoint deployments retrieved successfully",
-    )
-
-    return response
-
-
-# Project-specific deployment endpoints
-@router.get(
-    "/projects/{project_id}/deployments",
-    response_model=GuardrailDeploymentListResponseSchema,
-)
-async def get_project_deployments(
-    project_id: UUID,
-    page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
-    db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-):
-    """Get all active deployments for a specific project."""
-    filters = GuardrailDeploymentListRequestSchema(project_id=project_id)
-    deployments, total = await GuardrailDeploymentService.get_deployments(
-        db, filters, current_user.id, page, page_size
-    )
-
-    response = GuardrailDeploymentListResponseSchema(
-        deployments=deployments,
-        total_record=total,
-        page=page,
-        limit=page_size,
-        message="Project deployments retrieved successfully",
-    )
-
-    return response
-
-
-# Workflow routes
-@router.post(
-    "/deployment-workflow",
-    response_model=RetrieveWorkflowDataResponse,
-    status_code=status.HTTP_200_OK,
-)
-async def create_or_update_deployment_workflow(
-    request: CreateGuardrailDeploymentWorkflowRequest,
-    db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-):
-    """Create or update a guardrail deployment workflow."""
-    workflow = await GuardrailDeploymentWorkflowService(db).create_guardrail_deployment_workflow(
-        current_user.id, request
-    )
-    workflow_data = await WorkflowService(db).retrieve_workflow_data(workflow.id)
-    return workflow_data
-
-
-@router.get(
-    "/deployment-workflow/{workflow_id}",
-    response_model=RetrieveWorkflowDataResponse,
-)
-async def get_deployment_workflow(
-    workflow_id: UUID,
-    db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-):
-    """Get guardrail deployment workflow status and data."""
-    workflow_data = await WorkflowService(db).retrieve_workflow_data(workflow_id)
-    return workflow_data
-
-
-@router.post(
-    "/deployment-workflow/{workflow_id}/complete",
-    response_model=GuardrailDeploymentResponse,
-)
-async def complete_deployment_workflow(
-    workflow_id: UUID,
-    db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-):
-    """Complete the workflow and create the guardrail deployment."""
-    deployment = await GuardrailDeploymentWorkflowService(db).complete_workflow_and_deploy(
-        workflow_id, current_user.id
-    )
-
-    # Get full deployment details
-    deployment_response = await GuardrailDeploymentService.get_deployment(db, deployment.id, current_user.id)
-    return deployment_response
-
-
-@router.delete(
-    "/deployment-workflow/{workflow_id}",
+    "/probe/{probe_id}",
     response_model=SuccessResponse,
 )
-async def delete_deployment_workflow(
-    workflow_id: UUID,
-    db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-):
-    """Cancel and delete a guardrail deployment workflow."""
-    success_message = await WorkflowService(db).delete_workflow(workflow_id, current_user.id)
-    return SuccessResponse(
-        code=status.HTTP_200_OK,
-        object="workflow.delete",
-        message=success_message,
-    )
+@require_permissions(permissions=[PermissionEnum.MODEL_MANAGE])
+async def delete_probe(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    probe_id: UUID,
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Delete a probe."""
+    try:
+        result = await GuardrailProbeRuleService(session).delete_probe(probe_id, current_user.id)
+        return result.to_http_response()
+    except HTTPException as e:
+        return ErrorResponse(code=e.status_code, message=e.detail).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to delete probe: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Failed to delete probe",
+        ).to_http_response()
+
+
+@router.get(
+    "/rule/{rule_id}",
+    response_model=GuardrailRuleDetailResponse,
+)
+@require_permissions(permissions=[PermissionEnum.MODEL_VIEW])
+async def retrieve_rule(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    rule_id: UUID,
+) -> Union[GuardrailRuleDetailResponse, ErrorResponse]:
+    """Retrieve details of a rule by its ID."""
+    try:
+        result = await GuardrailProbeRuleService(session).retrieve_rule(rule_id)
+        return result.to_http_response()
+    except ClientException as e:
+        logger.exception(f"Failed to get rule details: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to get rule details: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Failed to retrieve rule details",
+        ).to_http_response()
+
+
+@router.post(
+    "/rule",
+    response_model=GuardrailRuleDetailResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+@require_permissions(permissions=[PermissionEnum.MODEL_MANAGE])
+async def create_rule(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    request: GuardrailRuleCreate,
+) -> Union[GuardrailRuleDetailResponse, ErrorResponse]:
+    """Create a new rule."""
+    try:
+        result = await GuardrailProbeRuleService(session).create_rule(
+            probe_id=request.probe_id,
+            name=request.name,
+            user_id=current_user.id,
+            status=request.status,
+            description=request.description,
+            tags=request.tags,
+            scanner_types=request.scanner_types,
+            modality_types=request.modality_types,
+            guard_types=request.guard_types,
+            examples=request.examples,
+        )
+        return result.to_http_response()
+    except HTTPException as e:
+        return ErrorResponse(code=e.status_code, message=e.detail).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to create rule: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Failed to create rule",
+        ).to_http_response()
+
+
+@router.put(
+    "/rule/{rule_id}",
+    response_model=GuardrailRuleDetailResponse,
+)
+@require_permissions(permissions=[PermissionEnum.MODEL_MANAGE])
+async def edit_rule(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    rule_id: UUID,
+    request: GuardrailRuleUpdate,
+) -> Union[GuardrailRuleDetailResponse, ErrorResponse]:
+    """Update a rule."""
+    try:
+        result = await GuardrailProbeRuleService(session).edit_rule(
+            rule_id=rule_id,
+            user_id=current_user.id,
+            name=request.name,
+            description=request.description,
+            tags=request.tags,
+            status=request.status,
+            scanner_types=request.scanner_types,
+            modality_types=request.modality_types,
+            guard_types=request.guard_types,
+            examples=request.examples,
+        )
+        return result.to_http_response()
+    except HTTPException as e:
+        return ErrorResponse(code=e.status_code, message=e.detail).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to update rule: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Failed to update rule",
+        ).to_http_response()
+
+
+@router.delete(
+    "/rule/{rule_id}",
+    response_model=SuccessResponse,
+)
+@require_permissions(permissions=[PermissionEnum.MODEL_MANAGE])
+async def delete_rule(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    rule_id: UUID,
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Delete a rule."""
+    try:
+        result = await GuardrailProbeRuleService(session).delete_rule(rule_id, current_user.id)
+        return result.to_http_response()
+    except HTTPException as e:
+        return ErrorResponse(code=e.status_code, message=e.detail).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to delete rule: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Failed to delete rule",
+        ).to_http_response()

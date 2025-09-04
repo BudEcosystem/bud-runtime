@@ -3068,11 +3068,18 @@ class ExperimentWorkflowStepEnum(StrEnum):
     FINALIZE = "finalize"
 
 
-class GuardrailDeploymentTypeEnum(StrEnum):
-    """Guardrail deployment type enumeration."""
+class GuardrailProviderTypeEnum(Enum):
+    """Enumeration of guardrail provider types.
 
-    ENDPOINT_MAPPED = "endpoint_mapped"
-    STANDALONE = "standalone"
+    This enum represents different types of guardrail providers or sources.
+
+    Attributes:
+        CLOUD (str): Represents cloud-based guardrail providers.
+        BUD (str): Represents guardrails from the Bud platform.
+    """
+
+    CLOUD = "cloud"
+    BUD = "bud"
 
 
 class GuardrailDeploymentStatusEnum(StrEnum):
@@ -3087,18 +3094,35 @@ class GuardrailDeploymentStatusEnum(StrEnum):
     PENDING = auto()
 
 
-class GuardrailProviderTypeEnum(Enum):
-    """Enumeration of guardrail provider types.
-
-    This enum represents different types of guardrail providers or sources.
+class GuardrailStatusEnum(StrEnum):
+    """Enumeration of entity statuses in the system.
 
     Attributes:
-        CLOUD_PROVIDER (str): Represents cloud-based guardrail providers.
-        BUD_SENTINEL (str): Represents guardrails from the Bud Sentinel.
+        ACTIVE: Represents an active entity.
+        DELETED: Represents an deleted entity.
     """
 
-    CLOUD_PROVIDER = "cloud_provider"
-    BUD_SENTINEL = "bud_sentinel"
+    ACTIVE = auto()
+    DISABLED = auto()
+    DELETED = auto()
+
+
+class ProviderCapabilityEnum(Enum):
+    """Enumeration for identifying provider capabilities.
+
+    This enum categorizes providers like OpenAI, Azure, and AWS Bedrock based on
+    the specific services they offer, allowing for clear differentiation between
+    their core functionalities.
+
+    Attributes:
+        MODEL: Represents providers that support model hubs or offer direct access
+               to model inference endpoints.
+        MODERATION: Represents providers that offer content moderation, safety, or
+                    guardrail endpoints.
+    """
+
+    MODEL = auto()
+    MODERATION = auto()
 
 
 class AuditActionEnum(StrEnum):
