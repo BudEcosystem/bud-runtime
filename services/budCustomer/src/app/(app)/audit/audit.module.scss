@@ -70,6 +70,7 @@ $primary-color: var(--color-purple);
           }
           .ant-checkbox-inner {
             background-color: $bg-card;
+            border-color: $text-disabled;
           }
         }
 
