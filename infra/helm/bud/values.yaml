@@ -127,6 +127,7 @@ microservices:
         image: budstudio/budmodel:nightly
         daprid: budmodel
         storageClassName: nfs-csi
+        storageSize: "32Gi"
         env:
             LOG_LEVEL: INFO
 
@@ -374,8 +375,6 @@ minio:
             memory: 512Mi
         limits:
             memory: 1024Mi
-    persistence:
-        size: "1024Gi"
     provisioning:
         enabled: true
         buckets:
