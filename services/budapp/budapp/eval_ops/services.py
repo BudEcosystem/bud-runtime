@@ -2060,7 +2060,7 @@ class EvaluationWorkflowService:
 
                 # Trigger Eval
                 trigger_workflow_response = await self._trigger_evaluations_for_experiment_and_get_response(
-                    experiment_id, current_user_id, workflow
+                    experiment_id, current_user_id, workflow.id
                 )
 
                 # for step in trigger_workflow_response["steps"]:
@@ -2918,7 +2918,6 @@ class EvaluationWorkflowService:
                 "extra_args": {},
                 "datasets": ["demo_gsm8k_chat_gen"],  # all_datasets,
                 "kubeconfig": "",  # TODO: Get actual kubeconfig
-                # Ensure budeval knows how to route notifications back to budapp
                 "source": app_settings.source_topic,
                 "source_topic": app_settings.source_topic,
                 "experiment_id": experiment_id,  # Include experiment ID for tracking
