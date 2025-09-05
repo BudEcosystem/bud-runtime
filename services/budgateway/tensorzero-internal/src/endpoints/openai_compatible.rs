@@ -30,6 +30,7 @@ use crate::endpoints::inference::{
 };
 use crate::error::{Error, ErrorDetails};
 use crate::gateway_util::{AppState, AppStateData, StructuredJson};
+use crate::usage_limit::UsageLimitDecision;
 use crate::inference::types::extra_body::UnfilteredInferenceExtraBody;
 use crate::inference::types::extra_headers::UnfilteredInferenceExtraHeaders;
 use crate::inference::types::{
@@ -172,6 +173,25 @@ pub async fn inference_handler(
 
     let original_model_name = model_resolution.original_model_name.to_string();
 
+    // Check usage limits BEFORE processing the request
+    if let Some(usage_limiter) = &usage_limiter {
+        if let Some(user_id) = headers.get("x-tensorzero-user-id").and_then(|v| v.to_str().ok()) {
+            // Force fresh data by clearing cache for this user to avoid stale data
+            usage_limiter.clear_user_cache(user_id).await;
+
+            let usage_decision = usage_limiter.check_usage(user_id, None, None).await;
+
+            if !usage_decision.is_allowed() {
+                return Err(Error::new(ErrorDetails::Config {
+                    message: match usage_decision {
+                        UsageLimitDecision::Deny { reason } => format!("Usage limit exceeded: {}", reason),
+                        _ => "Usage limit exceeded".to_string(),
+                    },
+                }));
+            }
+        }
+    }
+
     // Capture the gateway request (without null values)
     let gateway_request = serialize_without_nulls(&openai_compatible_params).ok();
 
@@ -271,6 +291,7 @@ pub async fn inference_handler(
                 OpenAICompatibleResponse::from((response.clone(), original_model_name.clone()));
 
             // Track usage consumption if usage limiter is enabled
+
             if let Some(usage_limiter) = &usage_limiter {
                 // Extract user_id from headers (set by auth middleware)
                 if let Some(user_id) = headers
@@ -307,6 +328,7 @@ pub async fn inference_handler(
                     };
 
                     // Record the consumption (fire and forget - don't block response)
+
                     let usage_limiter_clone = usage_limiter.clone();
                     let user_id_clone = user_id.to_string();
                     tokio::spawn(async move {
@@ -410,6 +432,10 @@ pub async fn inference_handler(
             Ok(http_response)
         }
         InferenceOutput::Streaming(mut stream) => {
+            // Capture usage limiter and headers for usage tracking after stream completion
+            let usage_limiter_for_tracking = usage_limiter.clone();
+            let headers_for_tracking = headers.clone();
+
             // We need to peek at the first chunk to get the inference_id for analytics
             let mut inference_id_for_header = None;
             let mut first_chunk = None;
@@ -434,10 +460,13 @@ pub async fn inference_handler(
                 }
             };
 
-            let openai_compatible_stream = prepare_serialized_openai_compatible_events(
+            // Create the stream with usage tracking
+            let openai_compatible_stream = prepare_serialized_openai_compatible_events_with_usage_tracking(
                 Box::pin(combined_stream),
-                original_model_name,
+                original_model_name.clone(),
                 stream_options,
+                usage_limiter_for_tracking,
+                headers_for_tracking,
             );
 
             let mut response = Sse::new(openai_compatible_stream)
@@ -1636,6 +1665,127 @@ fn prepare_serialized_openai_compatible_events(
                     })
                 });
         }
+        yield Ok(Event::default().data("[DONE]"));
+    }
+}
+
+/// Enhanced version of prepare_serialized_openai_compatible_events that includes usage tracking
+fn prepare_serialized_openai_compatible_events_with_usage_tracking(
+    mut stream: InferenceStream,
+    model_name: String,
+    stream_options: Option<OpenAICompatibleStreamOptions>,
+    usage_limiter: Option<Arc<crate::usage_limit::UsageLimiter>>,
+    headers: HeaderMap,
+) -> impl Stream<Item = Result<Event, Error>> {
+    async_stream::stream! {
+        let mut tool_id_to_index = HashMap::new();
+        let mut is_first_chunk = true;
+        let mut total_usage = OpenAICompatibleUsage {
+            prompt_tokens: 0,
+            completion_tokens: 0,
+            total_tokens: 0,
+        };
+        let mut inference_id = None;
+        let mut episode_id = None;
+
+        // Process all chunks and accumulate usage
+        while let Some(chunk) = tokio_stream::StreamExt::next(&mut stream).await {
+            let Ok(chunk) = chunk else {
+                continue;
+            };
+            inference_id = Some(chunk.inference_id());
+            episode_id = Some(chunk.episode_id());
+            let chunk_usage = match &chunk {
+                InferenceResponseChunk::Chat(c) => &c.usage,
+                InferenceResponseChunk::Json(c) => &c.usage,
+            };
+            if let Some(chunk_usage) = chunk_usage {
+                total_usage.prompt_tokens += chunk_usage.input_tokens;
+                total_usage.completion_tokens += chunk_usage.output_tokens;
+                total_usage.total_tokens += chunk_usage.input_tokens + chunk_usage.output_tokens;
+            }
+            let openai_compatible_chunks = convert_inference_response_chunk_to_openai_compatible(chunk, &mut tool_id_to_index, &model_name);
+            for chunk in openai_compatible_chunks {
+                let mut chunk_json = serde_json::to_value(chunk).map_err(|e| {
+                    Error::new(ErrorDetails::Inference {
+                        message: format!("Failed to convert chunk to JSON: {e}"),
+                    })
+                })?;
+                if is_first_chunk {
+                    chunk_json["choices"][0]["delta"]["role"] = Value::String("assistant".to_string());
+                    is_first_chunk = false;
+                }
+
+                yield Event::default().json_data(chunk_json).map_err(|e| {
+                    Error::new(ErrorDetails::Inference {
+                        message: format!("Failed to convert Value to Event: {e}"),
+                    })
+                })
+            }
+        }
+
+        // Send usage chunk if requested
+        if stream_options.map(|s| s.include_usage).unwrap_or(false) {
+            let episode_id = episode_id.ok_or_else(|| {
+                Error::new(ErrorDetails::Inference {
+                    message: "Cannot find episode_id - no chunks were produced by TensorZero".to_string(),
+                })
+            })?;
+            let inference_id = inference_id.ok_or_else(|| {
+                Error::new(ErrorDetails::Inference {
+                    message: "Cannot find inference_id - no chunks were produced by TensorZero".to_string(),
+                })
+            })?;
+            let usage_chunk = OpenAICompatibleResponseChunk {
+                id: inference_id.to_string(),
+                episode_id: episode_id.to_string(),
+                choices: vec![],
+                created: current_timestamp() as u32,
+                model: model_name.clone(),
+                system_fingerprint: "".to_string(),
+                object: "chat.completion.chunk".to_string(),
+                service_tier: "".to_string(),
+                usage: Some(OpenAICompatibleUsage {
+                    prompt_tokens: total_usage.prompt_tokens,
+                    completion_tokens: total_usage.completion_tokens,
+                    total_tokens: total_usage.total_tokens,
+                }),
+            };
+            yield Event::default().json_data(usage_chunk).map_err(|e| {
+                Error::new(ErrorDetails::Inference {
+                    message: format!("Failed to convert usage chunk to JSON: {e}"),
+                })
+            });
+        }
+
+        // Track usage consumption after stream completes (fire and forget)
+        if let Some(usage_limiter) = usage_limiter {
+            if let Some(user_id) = headers.get("x-tensorzero-user-id").and_then(|v| v.to_str().ok()) {
+                if total_usage.total_tokens > 0 {
+
+                    // Calculate estimated cost (using same logic as non-streaming)
+                    let tokens_to_consume = total_usage.total_tokens as i64;
+                    let cost_to_consume = if total_usage.total_tokens > 0 {
+                        // Use default pricing for streaming: $0.01 per 1K input tokens, $0.03 per 1K output tokens
+                        // Since we don't have exact input/output breakdown, use average: $0.02 per 1K tokens
+                        let cost = total_usage.total_tokens as f64 * 0.00002;
+                        (cost * 10000.0).round() / 10000.0
+                    } else {
+                        0.0
+                    };
+
+                    // Fire and forget usage tracking
+                    let usage_limiter_clone = usage_limiter.clone();
+                    let user_id_clone = user_id.to_string();
+                    tokio::spawn(async move {
+                        let _result = usage_limiter_clone
+                            .check_usage(&user_id_clone, Some(tokens_to_consume), Some(cost_to_consume))
+                            .await;
+                    });
+                }
+            }
+        }
+
         yield Ok(Event::default().data("[DONE]"));
     }
 }
