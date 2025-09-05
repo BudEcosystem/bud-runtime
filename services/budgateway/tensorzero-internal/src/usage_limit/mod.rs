@@ -17,9 +17,11 @@ pub struct UsageLimitStatus {
     pub reason: Option<String>,
     pub reset_at: Option<String>,
     pub last_updated: std::time::Instant,
-    // Track local consumption since last sync
-    pub local_tokens_consumed: i64,
-    pub local_cost_consumed: f64,
+    // Track the last update_id we've seen from budapp
+    pub last_seen_update_id: u64,
+    // Realtime increments from Redis (already applied to tokens_used/cost_used)
+    pub realtime_tokens: i64,
+    pub realtime_cost: f64,
     // Billing cycle tracking
     pub billing_cycle_start: Option<String>,
     pub billing_cycle_end: Option<String>,
