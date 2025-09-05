@@ -3147,7 +3147,7 @@ class EvaluationWorkflowService:
                         title=experiment.name,
                         message=f"Evaluation {evaluation_status}",
                         icon=getattr(experiment, "icon", None),
-                        result=NotificationResult(target_id=experiment.id, target_type="experiment").model_dump(
+                        result=NotificationResult(target_id=experiment.id, target_type="workflow").model_dump(
                             exclude_none=True, exclude_unset=True
                         ),
                     )
