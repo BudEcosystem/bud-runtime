@@ -1,3 +1,5 @@
+imagePullPolicy: "Always"
+
 ingress:
     enabled: true
     # used to derive public urls for frontend services
@@ -259,6 +261,12 @@ microservices:
 valkey:
     enabled: true
     architecture: standalone
+    commonConfiguration: |-
+        notify-keyspace-events KEA
+
+        # default values from chart
+        appendonly yes
+        save ""
     auth:
         password: bud
 clickhouse:

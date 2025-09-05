@@ -1102,7 +1102,10 @@ input.ant-input:-webkit-autofill {
   }
 
   .ant-select-item.ant-select-item-option-active {
-    background: #1f1f1f !important;
+    background: var(--bg-primary) !important;
+  }
+  .ant-select-item.ant-select-item-option.ant-select-item-option-selected {
+    background: var(--bg-primary) !important;
   }
 }
 
@@ -1333,6 +1336,13 @@ input.ant-input:-webkit-autofill {
 
 .ant-switch-checked {
   background: #965cde !important;
+}
+
+.noScrollbar {
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
 }
 
 // Responsive breakpoints

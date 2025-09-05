@@ -3,6 +3,7 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
+from budeval.commons.storage_config import StorageConfig
 from budeval.core.schemas import (
     EvaluationEngine,
     GenericEvaluationRequest,
@@ -162,7 +163,7 @@ class BaseTransformer(ABC):
             output_volume={
                 "name": "output",
                 "type": "shared_pvc",
-                "claimName": "bud-dev-budeval-dataset-rwx",
+                "claimName": StorageConfig.get_eval_datasets_pvc_name(),
                 "subPath": f"results/{request.eval_request_id}",
                 "mountPath": "/workspace/outputs",
             },

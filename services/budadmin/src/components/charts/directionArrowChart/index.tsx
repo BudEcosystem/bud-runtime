@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import * as echarts from 'echarts';
+import React, { useEffect, useRef } from "react";
+import * as echarts from "echarts";
 interface DirectionArrowChartProps {
   categories?: string[];
   data?: number[];
@@ -22,39 +22,44 @@ const DirectionArrowChart: React.FC<DirectionArrowChartProps> = ({
     const lastIndex = data?.length - 1;
     const lastValue = data[lastIndex];
     const secondLastValue = data[lastIndex - 1] || lastValue;
-    const arrowRotation = lastValue === secondLastValue ? -90 : lastValue > secondLastValue ? -30 : 205;
+    const arrowRotation =
+      lastValue === secondLastValue
+        ? -90
+        : lastValue > secondLastValue
+          ? -30
+          : 205;
 
     const option = {
-      backgroundColor: 'transparent',
+      backgroundColor: "transparent",
       xAxis: {
-        type: 'category',
+        type: "category",
         data: categories,
         axisLine: { show: false },
         axisTick: { show: false },
         axisLabel: { show: false },
       },
       yAxis: {
-        type: 'value',
+        type: "value",
         axisLine: { show: false },
         axisTick: { show: false },
         axisLabel: { show: false },
         splitLine: { show: false },
       },
       grid: {
-        bottom: chartAdjust.bottom ?  chartAdjust.bottom : '0%',
-        top: chartAdjust.top ?  chartAdjust.top : '50%',
+        bottom: chartAdjust.bottom ? chartAdjust.bottom : "0%",
+        top: chartAdjust.top ? chartAdjust.top : "50%",
         left: 3,
-        right: 3
+        right: 3,
       },
       series: [
         {
           data,
-          type: 'line',
+          type: "line",
           lineStyle: {
-            color: '#9462D5',
+            color: "#9462D5",
             width: 1.5,
           },
-          symbol: 'none',
+          symbol: "none",
           markPoint: {
             data: [
               {
@@ -64,9 +69,9 @@ const DirectionArrowChart: React.FC<DirectionArrowChartProps> = ({
           },
           areaStyle: {
             color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: 'rgba(148, 98, 213, 0.28)' }, // Top color
-              { offset: 0.5, color: 'rgba(148, 98, 213, 0.1)' }, // Middle color
-              { offset: 1, color: 'rgba(148, 98, 213, 0)' },     // Bottom color
+              { offset: 0, color: "rgba(148, 98, 213, 0.28)" }, // Top color
+              { offset: 0.5, color: "rgba(148, 98, 213, 0.1)" }, // Middle color
+              { offset: 1, color: "rgba(148, 98, 213, 0)" }, // Bottom color
             ]),
           },
         },
@@ -75,20 +80,26 @@ const DirectionArrowChart: React.FC<DirectionArrowChartProps> = ({
 
     chartInstance.setOption(option);
     const getCoordinatesAndAngle = () => {
-        const lastIndex = data.length - 1;
-        const secondLastIndex = data.length - 2;
-        const lastCoord = chartInstance.convertToPixel('grid', [categories[lastIndex], data[lastIndex]]);
-        const secondLastCoord = chartInstance.convertToPixel('grid', [categories[secondLastIndex], data[secondLastIndex]]);
+      const lastIndex = data.length - 1;
+      const secondLastIndex = data.length - 2;
+      const lastCoord = chartInstance.convertToPixel("grid", [
+        categories[lastIndex],
+        data[lastIndex],
+      ]);
+      const secondLastCoord = chartInstance.convertToPixel("grid", [
+        categories[secondLastIndex],
+        data[secondLastIndex],
+      ]);
 
-        const deltaX = lastCoord[0] - secondLastCoord[0]; // x2 - x1
-        const deltaY = lastCoord[1] - secondLastCoord[1]; // y2 - y1
+      const deltaX = lastCoord[0] - secondLastCoord[0]; // x2 - x1
+      const deltaY = lastCoord[1] - secondLastCoord[1]; // y2 - y1
 
-        const angleInRadians = Math.atan2(deltaY, deltaX);
+      const angleInRadians = Math.atan2(deltaY, deltaX);
 
-        // Convert radians to degrees
-        const angleInDegrees = angleInRadians * (180 / Math.PI);
+      // Convert radians to degrees
+      const angleInDegrees = angleInRadians * (180 / Math.PI);
 
-        return angleInDegrees;
+      return angleInDegrees;
     };
 
     const angleInDegrees = getCoordinatesAndAngle();
@@ -101,10 +112,10 @@ const DirectionArrowChart: React.FC<DirectionArrowChartProps> = ({
             data: [
               {
                 coord: [data.length - 1, data[data.length - 1]],
-                symbol: 'arrow',
+                symbol: "arrow",
                 symbolSize: 7,
                 symbolRotate: 270 - angleInDegrees, // Set the calculated angle for symbol rotation
-                itemStyle: { color: '#9462D5' },
+                itemStyle: { color: "#9462D5" },
               },
             ],
           },
@@ -118,7 +129,13 @@ const DirectionArrowChart: React.FC<DirectionArrowChartProps> = ({
     };
   }, [categories, data, chartAdjust]); // Re-run when categories or data change
 
-  return <div ref={chartRef}  style={{ width: '100%', height: '100%' }}  className={`${classNames}`}/>;
+  return (
+    <div
+      ref={chartRef}
+      style={{ width: "100%", height: "100%" }}
+      className={`${classNames}`}
+    />
+  );
 };
 
 export default DirectionArrowChart;

@@ -312,9 +312,9 @@ export default function AuditPage() {
     if (searchText) {
       filtered = filtered.filter(
         (log) =>
-          log.resource_name.toLowerCase().includes(searchText.toLowerCase()) ||
-          log.user_name.toLowerCase().includes(searchText.toLowerCase()) ||
-          log.resource_id.toLowerCase().includes(searchText.toLowerCase()),
+          log.resource_name?.toLowerCase().includes(searchText?.toLowerCase()) ||
+          log.user_name?.toLowerCase().includes(searchText?.toLowerCase()) ||
+          log.resource_id?.toLowerCase().includes(searchText?.toLowerCase()),
       );
     }
 
@@ -373,6 +373,7 @@ export default function AuditPage() {
         limit: pageSize,
         action: selectedAction,
         resource_type: selectedResource,
+        search: searchText,
         start_date: dateRange?.[0] ? formatDateString(dateRange[0]?.toDate(), false) : undefined,
         end_date: dateRange?.[1] ? formatDateString(dateRange[1]?.toDate(), true) : undefined
       }
@@ -425,18 +426,18 @@ export default function AuditPage() {
         </div>
       ),
     },
-    {
-      title: "User",
-      dataIndex: "user_name",
-      key: "user_name",
-      width: 200,
-      render: (userName: string) => (
-        <div className="flex items-center gap-2">
-          <UserOutlined className="text-bud-text-disabled" />
-          <Text className="text-bud-text-primary text-sm">{userName}</Text>
-        </div>
-      ),
-    },
+    // {
+    //   title: "User",
+    //   dataIndex: "user_name",
+    //   key: "user_name",
+    //   width: 200,
+    //   render: (userName: string) => (
+    //     <div className="flex items-center gap-2">
+    //       <UserOutlined className="text-bud-text-disabled" />
+    //       <Text className="text-bud-text-primary text-sm">{userName}</Text>
+    //     </div>
+    //   ),
+    // },
     {
       title: "Action",
       dataIndex: "action",
@@ -460,33 +461,32 @@ export default function AuditPage() {
       render: (_, record: AuditLog) => (
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
-            {getResourceIcon(record.resource_type)}
+            {/* {getResourceIcon(record.resource_type)} */}
+            <Text className="text-bud-text-disabled text-xs">
+              {record.resource_type.replace("_", " ").toUpperCase()} -
+            </Text>
             <Text className="text-bud-text-primary text-sm font-medium">
               {record.resource_name}
             </Text>
           </div>
-          <Text className="text-bud-text-disabled text-xs">
-            {record.resource_type.replace("_", " ").toUpperCase()} •{" "}
-            {record.resource_id}
-          </Text>
         </div>
       ),
     },
-    {
-      title: "Project",
-      dataIndex: "project_name",
-      key: "project_name",
-      width: 180,
-      render: (projectName?: string) =>
-        projectName ? (
-          <div className="flex items-center gap-2">
-            <Icon icon="ph:folder" className="text-bud-text-disabled" />
-            <Text className="text-bud-text-primary text-sm">{projectName}</Text>
-          </div>
-        ) : (
-          <Text className="text-bud-text-disabled text-sm">—</Text>
-        ),
-    },
+    // {
+    //   title: "Project",
+    //   dataIndex: "project_name",
+    //   key: "project_name",
+    //   width: 180,
+    //   render: (projectName?: string) =>
+    //     projectName ? (
+    //       <div className="flex items-center gap-2">
+    //         <Icon icon="ph:folder" className="text-bud-text-disabled" />
+    //         <Text className="text-bud-text-primary text-sm">{projectName}</Text>
+    //       </div>
+    //     ) : (
+    //       <Text className="text-bud-text-disabled text-sm">—</Text>
+    //     ),
+    // },
     {
       title: "IP Address",
       dataIndex: "ip_address",
@@ -570,6 +570,14 @@ export default function AuditPage() {
     getAuditList();
     getAuditSummary();
   }, [selectedAction,selectedResource, dateRange, currentPage, pageSize])
+
+  useEffect(()=> {
+    const timer = setTimeout(() => {
+      getAuditList();
+      getAuditSummary();
+    }, 500);
+    return () => clearTimeout(timer);
+  } , [searchText])
 
   return (
     <DashboardLayout>
@@ -762,9 +770,9 @@ export default function AuditPage() {
 
         {/* Filters */}
         <Card className="bg-bud-bg-secondary border-bud-border mb-6">
-          <div className="flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-4">
             <Input
-              placeholder="Search by resource, user, or ID..."
+              placeholder="Search by resources"
               prefix={<SearchOutlined className="text-bud-text-disabled" />}
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
@@ -829,7 +837,7 @@ export default function AuditPage() {
         </Card>
 
         {/* Audit Table */}
-        <Card className="bg-bud-bg-secondary border-bud-border">
+        <div className="bg-bud-bg-secondary border border-bud-border rounded-[12px] overflow-hidden mb-[2rem]">
           <div className="space-y-6">
             {/* {Object.entries(groupedLogs).map(([group, logs]) => {
               if (logs.length === 0) return null;
@@ -874,7 +882,7 @@ export default function AuditPage() {
                     }
                   />
                   {/* Pagination */}
-                  <div className="flex justify-end mt-4 CommonCustomPagination">
+                  <div className="flex justify-end my-4 px-3  CommonCustomPagination">
                     <Pagination
                       className='small-pagination'
                       current={currentPage}
@@ -897,7 +905,7 @@ export default function AuditPage() {
               />
             )} */}
           </div>
-        </Card>
+        </div>
       </div>
     </DashboardLayout>
   );

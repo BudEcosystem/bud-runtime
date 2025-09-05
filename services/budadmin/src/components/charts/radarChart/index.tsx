@@ -1,6 +1,6 @@
-import { Box } from '@radix-ui/themes';
-import * as echarts from 'echarts';
-import React, { useEffect, useRef, useState } from 'react';
+import { Box } from "@radix-ui/themes";
+import * as echarts from "echarts";
+import React, { useEffect, useRef, useState } from "react";
 
 interface RadarChartProps {
   data: {
@@ -34,44 +34,44 @@ const RadarChart: React.FC<RadarChartProps> = ({ data }) => {
       }
 
       const myChart = echarts.init(chartRef.current, null, {
-        renderer: 'canvas',
+        renderer: "canvas",
         useDirtyRect: false,
       });
 
       const option = {
-        backgroundColor: 'transparent',
+        backgroundColor: "transparent",
         legend: {
           show: radarChartData.showLegend || false,
-          orient: 'horizontal',
-          left: 'center',
-          bottom: '0%',
+          orient: "horizontal",
+          left: "center",
+          bottom: "0%",
           textStyle: {
-            color: '#B3B3B3',
+            color: "#B3B3B3",
             fontSize: 12,
             fontWeight: 400,
           },
-          icon: 'rect',
+          icon: "rect",
           itemWidth: 12,
           itemHeight: 12,
           itemGap: 20,
         },
         radar: {
-          center: ['50%', '50%'],
-          radius: '80%',
+          center: ["50%", "50%"],
+          radius: "80%",
           startAngle: 90,
           splitNumber: 4,
-          shape: 'circle',
+          shape: "circle",
           axisName: {
-            formatter: '{value}',
-            color: '#B3B3B3',
+            formatter: "{value}",
+            color: "#B3B3B3",
             fontSize: 11,
             fontWeight: 400,
           },
           splitLine: {
             lineStyle: {
-              color: '#6D6D6D',
+              color: "#6D6D6D",
               width: 1,
-              type: 'dashed',
+              type: "dashed",
             },
           },
           splitArea: {
@@ -79,20 +79,20 @@ const RadarChart: React.FC<RadarChartProps> = ({ data }) => {
           },
           axisLine: {
             lineStyle: {
-              color: '#6D6D6D',
+              color: "#6D6D6D",
               width: 1,
-              type: 'dashed',
+              type: "dashed",
             },
           },
           indicator: radarChartData.indicators,
         },
         tooltip: {
-          trigger: 'item',
-          backgroundColor: 'rgba(0,0,0,0.75)',
-          borderColor: '#1F1F1F',
+          trigger: "item",
+          backgroundColor: "rgba(0,0,0,0.75)",
+          borderColor: "#1F1F1F",
           borderWidth: 1,
           textStyle: {
-            color: '#EEEEEE',
+            color: "#EEEEEE",
             fontSize: 12,
             fontWeight: 400,
           },
@@ -102,9 +102,12 @@ const RadarChart: React.FC<RadarChartProps> = ({ data }) => {
             z-index: 9999;
           `,
           formatter: (params: any) => {
-            const values = params.value.map((val: number, idx: number) =>
-              `${radarChartData.indicators[idx].name}: ${val}`
-            ).join('<br/>');
+            const values = params.value
+              .map(
+                (val: number, idx: number) =>
+                  `${radarChartData.indicators[idx].name}: ${val}`,
+              )
+              .join("<br/>");
             return `
               <div style="text-align: left;">
                 ${params.seriesName}<br/>
@@ -114,20 +117,20 @@ const RadarChart: React.FC<RadarChartProps> = ({ data }) => {
         },
         series: radarChartData.series.map((item: any) => ({
           name: item.name,
-          type: 'radar',
-          symbol: 'none',
+          type: "radar",
+          symbol: "none",
           lineStyle: {
             width: 2,
-            color: item.color || '#7E57C2',
+            color: item.color || "#7E57C2",
           },
           areaStyle: item.areaStyle || {
             color: new echarts.graphic.RadialGradient(0.5, 0.5, 1, [
               {
-                color: item.color || 'rgba(126, 87, 194, 0.4)',
+                color: item.color || "rgba(126, 87, 194, 0.4)",
                 offset: 0,
               },
               {
-                color: item.color || 'rgba(126, 87, 194, 0.1)',
+                color: item.color || "rgba(126, 87, 194, 0.1)",
                 offset: 1,
               },
             ]),
@@ -147,10 +150,10 @@ const RadarChart: React.FC<RadarChartProps> = ({ data }) => {
         myChart.resize();
       };
 
-      window.addEventListener('resize', handleResize);
+      window.addEventListener("resize", handleResize);
 
       return () => {
-        window.removeEventListener('resize', handleResize);
+        window.removeEventListener("resize", handleResize);
         myChart.dispose();
       };
     }
@@ -158,7 +161,7 @@ const RadarChart: React.FC<RadarChartProps> = ({ data }) => {
 
   return (
     <Box className="relative h-full w-full">
-      <div ref={chartRef} style={{ width: '100%', height: '100%' }} />
+      <div ref={chartRef} style={{ width: "100%", height: "100%" }} />
     </Box>
   );
 };

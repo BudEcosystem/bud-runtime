@@ -49,51 +49,15 @@ const ExperimentsTable = () => {
 
   // Sample data for testing when API returns no data
   const sampleExperiments: ExperimentData[] = [
-    {
-      id: "exp-1",
-      experimentName: "GPT-4 vs Claude-3 Performance Test",
-      models: "GPT-4, Claude-3",
-      traits: "Accuracy, Speed, Cost",
-      tags: ["production", "benchmark"],
-      status: "Completed",
-      createdDate: "2024-01-15T10:30:00Z"
-    },
-    {
-      id: "exp-2",
-      experimentName: "Multi-Model Language Translation",
-      models: "Llama-2, Mistral-7B, GPT-3.5",
-      traits: "Translation Quality, Latency",
-      tags: ["translation", "multi-lingual"],
-      status: "Running",
-      createdDate: "2024-01-14T14:45:00Z"
-    },
-    {
-      id: "exp-3",
-      experimentName: "Code Generation Benchmark",
-      models: "CodeLlama, StarCoder",
-      traits: "Code Quality, Syntax Accuracy",
-      tags: ["coding", "benchmark"],
-      status: "Failed",
-      createdDate: "2024-01-13T09:15:00Z"
-    },
-    {
-      id: "exp-4",
-      experimentName: "Customer Support Chatbot Eval",
-      models: "GPT-3.5-Turbo, Claude-2",
-      traits: "Response Quality, Customer Satisfaction",
-      tags: ["customer-support", "production"],
-      status: "Completed",
-      createdDate: "2024-01-12T16:20:00Z"
-    },
-    {
-      id: "exp-5",
-      experimentName: "Sentiment Analysis Comparison",
-      models: "BERT, RoBERTa, DistilBERT",
-      traits: "Accuracy, F1-Score",
-      tags: ["nlp", "sentiment"],
-      status: "Running",
-      createdDate: "2024-01-11T11:00:00Z"
-    }
+    // {
+    //   id: "exp-1",
+    //   experimentName: "GPT-4 vs Claude-3 Performance Test",
+    //   models: "GPT-4, Claude-3",
+    //   traits: "Accuracy, Speed, Cost",
+    //   tags: ["production", "benchmark"],
+    //   status: "Completed",
+    //   createdDate: "2024-01-15T10:30:00Z"
+    // },
   ];
 
   // Use Zustand store
@@ -154,12 +118,12 @@ const ExperimentsTable = () => {
   const columns: ColumnsType<ExperimentData> = [
     {
       title: "Experiment name",
-      dataIndex: "experimentName",
-      key: "experimentName",
+      dataIndex: "name",
+      key: "name",
       render: (text) => <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>,
       sorter: true,
       sortOrder:
-        orderBy === "experimentName"
+        orderBy === "name"
           ? order === "-"
             ? "descend"
             : "ascend"
@@ -267,8 +231,8 @@ const ExperimentsTable = () => {
           </svg>
         </div>
       ),
-      dataIndex: "createdDate",
-      key: "createdDate",
+      dataIndex: "created_at",
+      key: "created_at",
       render: (date) => (
         <Text_12_400_EEEEEE>
           {formatDate(date)}
@@ -276,7 +240,7 @@ const ExperimentsTable = () => {
       ),
       sorter: true,
       sortOrder:
-        orderBy === "createdDate"
+        orderBy === "created_at"
           ? order === "-"
             ? "descend"
             : "ascend"

@@ -322,11 +322,24 @@ class NotificationService(SessionMixin):
         Mirrors other workflows: updates the step data and progress, and on completion
         persists any evaluation results metadata if provided.
         """
+        logger.debug(
+            "Eval notification received: type=%s event=%s workflow_id=%s",
+            getattr(payload, "type", None),
+            getattr(payload, "event", None),
+            getattr(payload, "workflow_id", None),
+        )
         # Update workflow step data event
         await self._update_workflow_step_events(BudServeWorkflowStepEventName.EVALUATION_EVENTS.value, payload)
 
         # Update progress in workflow
         await self._update_workflow_progress(BudServeWorkflowStepEventName.EVALUATION_EVENTS.value, payload)
+
+        # Handle evaluation completion/failure events similar to cluster creation
+        if payload.event == "results":
+            from ..eval_ops.services import EvaluationWorkflowService
+
+            await EvaluationWorkflowService(self.session).create_evaluation_from_notification_event(payload)
+            return
 
         # Advance workflow and notify on completion/failure
         if not payload.workflow_id:
@@ -362,7 +375,7 @@ class NotificationService(SessionMixin):
         if status_str in {"COMPLETED", "FAILED"}:
             title = "Evaluation completed" if status_str == "COMPLETED" else "Evaluation failed"
             message = payload.content.message or title
-            result = NotificationResult(target_id=db_workflow.id, target_type="evaluation").model_dump(
+            result = NotificationResult(target_id=db_workflow.id, target_type="workflow").model_dump(
                 exclude_none=True, exclude_unset=True
             )
             try:
@@ -512,6 +525,13 @@ class NotificationService(SessionMixin):
                 updated = True
                 break
 
+        if not updated:
+            logger.warning(
+                "No matching step id found for event '%s' in '%s'. Available step ids: %s",
+                payload.event,
+                event_name,
+                [s.get("id") for s in steps if isinstance(s, dict)],
+            )
         return data if updated else None
 
     async def _update_workflow_progress(self, event_name: str, payload: NotificationPayload) -> None:

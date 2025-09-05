@@ -6,6 +6,7 @@ import { useDrawer } from "@/hooks/useDrawer";
 import { AppRequest } from "@/services/api/requests";
 import { errorToast, successToast } from "@/components/toast";
 import BudDrawer from "@/components/ui/bud/drawer/BudDrawer";
+import { motion } from "framer-motion";
 import {
   Text_12_400_B3B3B3,
   Text_12_400_EEEEEE,
@@ -274,8 +275,17 @@ export default function ApiKeysPage() {
           {/* API Keys Table */}
           <div className='pb-[60px] pt-[.4rem]'>
             {loading ? (
-              <div className="w-full">
-                <Skeleton.Button active block style={{ width: '100%', height: '400px' }} />
+              <div className={styles.loadingContainer}>
+                <motion.div
+                  className={styles.loadingBar}
+                  initial={{ width: "0%" }}
+                  animate={{ width: "100%" }}
+                  transition={{
+                    duration: 1.5,
+                    ease: "easeInOut",
+                    repeat: Infinity,
+                  }}
+                />
               </div>
             ) : (
               <>

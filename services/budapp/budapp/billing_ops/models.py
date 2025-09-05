@@ -58,6 +58,10 @@ class UserBilling(Base, TimestampMixin):
     custom_token_quota: Mapped[Optional[int]] = mapped_column(nullable=True)
     custom_cost_quota: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2), nullable=True)
 
+    # Notification preferences
+    enable_email_notifications: Mapped[bool] = mapped_column(Boolean, default=True)
+    enable_in_app_notifications: Mapped[bool] = mapped_column(Boolean, default=True)
+
     # Status
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_suspended: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -83,6 +87,11 @@ class BillingAlert(Base, TimestampMixin):
     # Last notification tracking
     last_triggered_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     last_triggered_value: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2))
+
+    # Notification tracking
+    last_notification_sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    notification_failure_count: Mapped[int] = mapped_column(default=0)
+    last_notification_error: Mapped[Optional[str]] = mapped_column(String(500))
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 

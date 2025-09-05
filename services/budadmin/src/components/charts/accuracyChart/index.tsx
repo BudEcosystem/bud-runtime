@@ -103,10 +103,12 @@ const AccuracyPopup: React.FC<AccuracyPopupProps> = ({ data }) => {
                      item.color
                    };margin-right:15px;border-radius:2px;font-size:13px;"></span>
                    <span style="margin-right: 15px;display:inline-block;min-width:50px;">${
-                     item.value[item.seriesName] ?  item.value[item.seriesName] + '%' : 'N/A'
+                     item.value[item.seriesName]
+                       ? item.value[item.seriesName] + "%"
+                       : "N/A"
                    }</span>
                    ${item.seriesName}
-                 </div>`
+                 </div>`,
             );
             return `<div style="text-align:left; padding: 20px;position:relative;overflow:hidden;">
                       <img style="position:absolute;bottom:0;right:0;z-index:0;" src="/images/tooltip-pattern.svg"></img>
@@ -114,7 +116,7 @@ const AccuracyPopup: React.FC<AccuracyPopupProps> = ({ data }) => {
                       <img style="display:inline-block;height:20px;width:20px;margin-right:5px;" src="/images/drawer/cloud.png"></img>
                       ${params[0].axisValue}</div>
                       <div style="background-color: #161616;padding: 10px;border-radius:6px;position:relative;z-index:1;">${seriesData.join(
-                        ""
+                        "",
                       )}</div>
                     </div>`;
           },
@@ -167,7 +169,7 @@ const AccuracyPopup: React.FC<AccuracyPopupProps> = ({ data }) => {
             fontWeight: 300,
           },
         },
-        series: series
+        series: series,
       };
 
       myChart.setOption(option);

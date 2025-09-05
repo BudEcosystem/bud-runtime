@@ -15,7 +15,10 @@ if (typeof window !== "undefined") {
 // Request interceptor
 axiosInstance.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("token");
+    // Prioritize access_token for JWT-based sessions, fall back to token
+    const accessToken = localStorage.getItem("access_token");
+    const token = accessToken || localStorage.getItem("token");
+
     if (config.headers) {
       if (token?.startsWith('budserve_')) {
         config.headers['api-key'] = token;

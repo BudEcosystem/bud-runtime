@@ -6,7 +6,7 @@ import {
   Text_14_400_EEEEEE,
   Text_12_400_EEEEEE,
   Text_12_600_EEEEEE,
-  Text_10_400_B3B3B3
+  Text_10_400_B3B3B3,
 } from "@/components/ui/text";
 import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
 
@@ -20,7 +20,7 @@ interface BenchmarkProgressProps {
     eta: string;
     processingRate: number;
     averageScore: number;
-    status: 'Running' | 'Completed';
+    status: "Running" | "Completed";
     progress: number;
   };
 }
@@ -43,15 +43,19 @@ const BenchmarkProgress: React.FC<BenchmarkProgressProps> = ({ benchmark }) => {
         <Text_14_400_EEEEEE className="">{benchmark.title}</Text_14_400_EEEEEE>
         <PrimaryButton
           classNames="!px-[.55] !py-1 !text-xs mt-[.3rem]"
-          onClick={() => { }}
+          onClick={() => {}}
         >
           || Pause
         </PrimaryButton>
       </div>
       <div className="">
         <div className="flex items-center justify-start gap-x-[.3rem] mb-[0.7rem]">
-          <Text_12_600_EEEEEE className="leading-[140%]">Objective: </Text_12_600_EEEEEE>
-          <Text_12_400_EEEEEE className="leading-[140%]">{benchmark.objective}</Text_12_400_EEEEEE>
+          <Text_12_600_EEEEEE className="leading-[140%]">
+            Objective: 
+          </Text_12_600_EEEEEE>
+          <Text_12_400_EEEEEE className="leading-[140%]">
+            {benchmark.objective}
+          </Text_12_400_EEEEEE>
         </div>
 
         {/* Progress Bar */}
@@ -76,7 +80,6 @@ const BenchmarkProgress: React.FC<BenchmarkProgressProps> = ({ benchmark }) => {
               {benchmark.progress}% 013/024 completed
             </Text_10_400_B3B3B3>
           </div>
-
         </div>
       </div>
 
@@ -95,7 +98,9 @@ const BenchmarkProgress: React.FC<BenchmarkProgressProps> = ({ benchmark }) => {
               </div>
               <Text_12_400_B3B3B3>Current Evaluation</Text_12_400_B3B3B3>
             </div>
-            <Text_12_400_EEEEEE>{benchmark.currentEvaluation}</Text_12_400_EEEEEE>
+            <Text_12_400_EEEEEE>
+              {benchmark.currentEvaluation}
+            </Text_12_400_EEEEEE>
           </div>
           <div className="flex justify-start">
             <div className="flex items-center justify-start gap-x-[.3rem] min-w-[36%]">
@@ -140,7 +145,9 @@ const BenchmarkProgress: React.FC<BenchmarkProgressProps> = ({ benchmark }) => {
               </div>
               <Text_12_400_B3B3B3>Processing Rate</Text_12_400_B3B3B3>
             </div>
-            <Text_12_400_EEEEEE>{benchmark.processingRate} prompts/min</Text_12_400_EEEEEE>
+            <Text_12_400_EEEEEE>
+              {benchmark.processingRate} prompts/min
+            </Text_12_400_EEEEEE>
           </div>
           <div className="flex justify-start">
             <div className="flex items-center justify-start gap-x-[.3rem] min-w-[36%]">

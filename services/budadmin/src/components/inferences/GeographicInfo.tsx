@@ -1,5 +1,14 @@
-import React from 'react';
-import { Descriptions, Tag, Space, Typography, Button, Empty, Avatar, Tooltip } from 'antd';
+import React from "react";
+import {
+  Descriptions,
+  Tag,
+  Space,
+  Typography,
+  Button,
+  Empty,
+  Avatar,
+  Tooltip,
+} from "antd";
 import {
   CopyOutlined,
   GlobalOutlined,
@@ -8,9 +17,9 @@ import {
   WifiOutlined,
   BankOutlined,
   InfoCircleOutlined,
-  AimOutlined
-} from '@ant-design/icons';
-import { GeographicInfo as GeographicInfoType } from '@/stores/useInferences';
+  AimOutlined,
+} from "@ant-design/icons";
+import { GeographicInfo as GeographicInfoType } from "@/stores/useInferences";
 
 const { Text, Title } = Typography;
 
@@ -38,9 +47,11 @@ const GeographicInfo: React.FC<GeographicInfoProps> = ({ data, onCopy }) => {
     // Convert country code to flag emoji
     const flag = countryCode
       .toUpperCase()
-      .replace(/./g, char => String.fromCodePoint(char.charCodeAt(0) + 127397));
+      .replace(/./g, (char) =>
+        String.fromCodePoint(char.charCodeAt(0) + 127397),
+      );
 
-    return <span style={{ fontSize: '16px', marginRight: '8px' }}>{flag}</span>;
+    return <span style={{ fontSize: "16px", marginRight: "8px" }}>{flag}</span>;
   };
 
   const renderLocation = () => {
@@ -56,9 +67,9 @@ const GeographicInfo: React.FC<GeographicInfoProps> = ({ data, onCopy }) => {
 
     return (
       <Space>
-        <EnvironmentOutlined style={{ color: '#52c41a' }} />
+        <EnvironmentOutlined style={{ color: "#52c41a" }} />
         {getCountryFlag(data.country_code)}
-        <Text strong>{locationParts.join(', ')}</Text>
+        <Text strong>{locationParts.join(", ")}</Text>
       </Space>
     );
   };
@@ -73,18 +84,18 @@ const GeographicInfo: React.FC<GeographicInfoProps> = ({ data, onCopy }) => {
 
     return (
       <Space>
-        <AimOutlined style={{ color: '#1890ff' }} />
+        <AimOutlined style={{ color: "#1890ff" }} />
         <Text code>{coordinates}</Text>
         <Button
           size="small"
           type="link"
           icon={<CopyOutlined />}
-          onClick={() => handleCopy(coordinates, 'Coordinates')}
+          onClick={() => handleCopy(coordinates, "Coordinates")}
         />
         <Button
           size="small"
           type="link"
-          onClick={() => window.open(mapsUrl, '_blank')}
+          onClick={() => window.open(mapsUrl, "_blank")}
         >
           View on Maps
         </Button>
@@ -99,21 +110,21 @@ const GeographicInfo: React.FC<GeographicInfoProps> = ({ data, onCopy }) => {
 
     try {
       const now = new Date();
-      const timeInZone = now.toLocaleString('en-US', {
+      const timeInZone = now.toLocaleString("en-US", {
         timeZone: data.timezone,
-        weekday: 'short',
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        timeZoneName: 'short'
+        weekday: "short",
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        timeZoneName: "short",
       });
 
       return (
         <Space>
-          <ClockCircleOutlined style={{ color: '#722ed1' }} />
+          <ClockCircleOutlined style={{ color: "#722ed1" }} />
           <Text strong>{data.timezone}</Text>
           <Text type="secondary">({timeInZone})</Text>
         </Space>
@@ -121,7 +132,7 @@ const GeographicInfo: React.FC<GeographicInfoProps> = ({ data, onCopy }) => {
     } catch (error) {
       return (
         <Space>
-          <ClockCircleOutlined style={{ color: '#722ed1' }} />
+          <ClockCircleOutlined style={{ color: "#722ed1" }} />
           <Text strong>{data.timezone}</Text>
         </Space>
       );
@@ -137,7 +148,7 @@ const GeographicInfo: React.FC<GeographicInfoProps> = ({ data, onCopy }) => {
       <Space direction="vertical" size="small">
         {data.isp && (
           <div>
-            <WifiOutlined style={{ color: '#1890ff', marginRight: 8 }} />
+            <WifiOutlined style={{ color: "#1890ff", marginRight: 8 }} />
             <Text strong>ISP:</Text> <Text>{data.isp}</Text>
           </div>
         )}
@@ -171,11 +182,7 @@ const GeographicInfo: React.FC<GeographicInfoProps> = ({ data, onCopy }) => {
                 {data.country_code && ` (${data.country_code.toUpperCase()})`}
               </Tag>
             )}
-            {data.region && (
-              <Tag color="cyan">
-                {data.region}
-              </Tag>
-            )}
+            {data.region && <Tag color="cyan">{data.region}</Tag>}
           </Space>
         </Descriptions.Item>
 

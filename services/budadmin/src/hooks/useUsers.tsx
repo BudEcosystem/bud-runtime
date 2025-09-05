@@ -58,6 +58,7 @@ export const useUsers = create<{
   createdUser: any,
   userPermissions,
   filters: any;
+  userUsageData: any;
 
   getUsers: (parms: GetUserParams) => void;
   setCreatedUser: (data) => void;
@@ -68,6 +69,7 @@ export const useUsers = create<{
   setUsersPermissions: (Id, setUsersPermissions) => void;
   updateUser: (Id, payload) => Promise<any>;
   addUser: (payload) => Promise<any>;
+  getUserUsage: (userId: string) => Promise<any>;
 }>((set, get) => ({
   filters: {},
   totalPages: 0,
@@ -76,6 +78,7 @@ export const useUsers = create<{
   userDetails: [],
   createdUser: {},
   userPermissions: [],
+  userUsageData: null,
   loading: true,
   setCreatedUser: async (data) => {
     set({ createdUser: data });
@@ -161,6 +164,26 @@ export const useUsers = create<{
     }
     let userData = response?.data;
     return userData
+  },
+
+  getUserUsage: async (userId: string) => {
+    set({ loading: true });
+    try {
+      const response: any = await AppRequest.Get(`/billing/user/${userId}/usage`);
+      console.log("Raw API response:", response);
+
+      // Extract the actual usage data from the nested response
+      const usageData = response?.data?.result || response?.result || null;
+      set({ userUsageData: usageData });
+      console.log("Processed usage data:", usageData);
+      return usageData;
+    } catch (error) {
+      console.error("Error fetching user usage:", error);
+      set({ userUsageData: null });
+      throw error;
+    } finally {
+      set({ loading: false });
+    }
   },
 
 }));

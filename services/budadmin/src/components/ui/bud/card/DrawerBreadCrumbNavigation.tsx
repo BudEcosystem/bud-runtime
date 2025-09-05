@@ -84,7 +84,6 @@ export function DeawerCustomBreadcrumb({
   return <Breadcrumb
     separator={<Text_12_400_5B6168 className="mx-2">/</Text_12_400_5B6168>}
     items={data?.map((item, index) => ({
-      href: "#",
       title:
         index === 0 ?
           (

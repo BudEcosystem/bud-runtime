@@ -17,6 +17,7 @@ from budmicroframe.commons.schemas import (
 from budmicroframe.shared.dapr_workflow import DaprWorkflow
 
 from budeval.commons.logging import logging
+from budeval.commons.storage_config import StorageConfig
 from budeval.commons.utils import update_workflow_data_in_statestore
 from budeval.core.schemas import (
     DatasetCategory,
@@ -103,7 +104,6 @@ class EvaluationWorkflow:
                 num_workers=1,
                 timeout_minutes=30,
                 kubeconfig=evaluate_model_request_json.kubeconfig,
-                namespace="budeval",
                 debug=True,
             )
 
@@ -114,9 +114,11 @@ class EvaluationWorkflow:
             transformed = transformer.transform_request(generic_request)
 
             # Create ConfigMap with transformed configuration
+            from budeval.commons.storage_config import StorageConfig
+
             from .configmap_manager import ConfigMapManager
 
-            configmap_manager = ConfigMapManager(namespace="budeval")
+            configmap_manager = ConfigMapManager(namespace=StorageConfig.get_current_namespace())
 
             configmap_result = configmap_manager.create_generic_config_map(
                 eval_request_id=str(generic_request.eval_request_id),
@@ -329,7 +331,8 @@ class EvaluationWorkflow:
         extract_request_json = json.loads(extract_request)
         job_id = extract_request_json["job_id"]
         model_name = extract_request_json["model_name"]
-        namespace = extract_request_json.get("namespace", "budeval")
+        # Resolve namespace with fallback to current cluster namespace
+        namespace = extract_request_json.get("namespace") or StorageConfig.get_current_namespace()
         kubeconfig = extract_request_json.get("kubeconfig")
         experiment_id = extract_request_json.get("experiment_id")
 
@@ -398,7 +401,8 @@ class EvaluationWorkflow:
         monitor_request_json = json.loads(monitor_request)
         job_id = monitor_request_json["job_id"]
         kubeconfig = monitor_request_json["kubeconfig"]
-        namespace = monitor_request_json.get("namespace", "budeval")
+        # Resolve namespace with fallback to current cluster namespace
+        namespace = monitor_request_json.get("namespace") or StorageConfig.get_current_namespace()
 
         response: SuccessResponse | ErrorResponse
         try:
@@ -471,7 +475,7 @@ class EvaluationWorkflow:
             cloud_event=evaluate_model_request_json, name=workflow_name, workflow_id=instance_id
         )
         notification_req = notification_request.model_copy(deep=True)
-        notification_req.payload.event = "evaluation_status"
+        notification_req.payload.event = "monitor_eval_job_progress"
         notification_req.payload.content = NotificationContent(
             title="Model evaluation process is initiated",
             message=f"Model evaluation process is initiated for {evaluate_model_request_json.eval_model_info.model_name}",
@@ -491,7 +495,7 @@ class EvaluationWorkflow:
         eta_minutes = 30
         notification_req.payload.content = NotificationContent(
             title="Estimated time to completion",
-            message=f"{eta_minutes} minutes",
+            message=f"{eta_minutes}",
             status=WorkflowStatus.RUNNING,
         )
         dapr_workflows.publish_notification(
@@ -518,6 +522,21 @@ class EvaluationWorkflow:
                 title="Cluster verification failed",
                 message=verify_cluster_connection_result["message"],
                 status=WorkflowStatus.FAILED,
+                primary_action="retry",
+            )
+            dapr_workflows.publish_notification(
+                workflow_id=instance_id,
+                notification=notification_req,
+                target_topic_name=evaluate_model_request_json.source_topic,
+                target_name=evaluate_model_request_json.source,
+            )
+            # Emit terminal results event
+            notification_req.payload.event = "results"
+            notification_req.payload.content = NotificationContent(
+                title="Evaluation failed",
+                message=verify_cluster_connection_result["message"],
+                status=WorkflowStatus.FAILED,
+                primary_action="retry",
             )
             dapr_workflows.publish_notification(
                 workflow_id=instance_id,
@@ -545,7 +564,7 @@ class EvaluationWorkflow:
         notification_req.payload.event = "eta"
         notification_req.payload.content = NotificationContent(
             title="Estimated time to completion",
-            message=f"{25} minutes",
+            message=f"{25}",
             status=WorkflowStatus.RUNNING,
         )
         dapr_workflows.publish_notification(
@@ -575,11 +594,26 @@ class EvaluationWorkflow:
         if not (200 <= result_code < 300):
             logger.error(f"Engine Configuration Creation Failed: {create_config_result.get('message')}")
             # notify that config creation failed
-            notification_req.payload.event = "create_engine_config"
+            notification_req.payload.event = "preparing_eval_engine"
             notification_req.payload.content = NotificationContent(
                 title="Configuration creation failed",
                 message=create_config_result["message"],
                 status=WorkflowStatus.FAILED,
+                primary_action="retry",
+            )
+            dapr_workflows.publish_notification(
+                workflow_id=instance_id,
+                notification=notification_req,
+                target_topic_name=evaluate_model_request_json.source_topic,
+                target_name=evaluate_model_request_json.source,
+            )
+            # Emit terminal results event
+            notification_req.payload.event = "results"
+            notification_req.payload.content = NotificationContent(
+                title="Evaluation failed",
+                message=create_config_result["message"],
+                status=WorkflowStatus.FAILED,
+                primary_action="retry",
             )
             dapr_workflows.publish_notification(
                 workflow_id=instance_id,
@@ -590,7 +624,7 @@ class EvaluationWorkflow:
             return
 
         # notify that config creation is successful
-        notification_req.payload.event = "create_engine_config"
+        notification_req.payload.event = "preparing_eval_engine"
         configmap_name = create_config_result.get("param", {}).get("configmap_name", "configuration")
         engine_name = evaluate_model_request_json.engine.value
         notification_req.payload.content = NotificationContent(
@@ -654,6 +688,21 @@ class EvaluationWorkflow:
                 title="Deploy evaluation job failed",
                 message=deploy_eval_job_result["message"],
                 status=WorkflowStatus.FAILED,
+                primary_action="retry",
+            )
+            dapr_workflows.publish_notification(
+                workflow_id=instance_id,
+                notification=notification_req,
+                target_topic_name=evaluate_model_request_json.source_topic,
+                target_name=evaluate_model_request_json.source,
+            )
+            # Emit terminal results event
+            notification_req.payload.event = "results"
+            notification_req.payload.content = NotificationContent(
+                title="Evaluation failed",
+                message=deploy_eval_job_result["message"],
+                status=WorkflowStatus.FAILED,
+                primary_action="retry",
             )
             dapr_workflows.publish_notification(
                 workflow_id=instance_id,
@@ -691,6 +740,21 @@ class EvaluationWorkflow:
                 title="Job monitoring failed",
                 message="No job ID found to monitor",
                 status=WorkflowStatus.FAILED,
+                primary_action="retry",
+            )
+            dapr_workflows.publish_notification(
+                workflow_id=instance_id,
+                notification=notification_req,
+                target_topic_name=evaluate_model_request_json.source_topic,
+                target_name=evaluate_model_request_json.source,
+            )
+            # Emit terminal results event
+            notification_req.payload.event = "results"
+            notification_req.payload.content = NotificationContent(
+                title="Evaluation failed",
+                message="No job ID found to monitor",
+                status=WorkflowStatus.FAILED,
+                primary_action="retry",
             )
             dapr_workflows.publish_notification(
                 workflow_id=instance_id,
@@ -701,10 +765,11 @@ class EvaluationWorkflow:
             return
 
         # Prepare monitoring request with initial monitoring data
+        resolved_namespace = StorageConfig.get_current_namespace()
         monitor_request = {
             "job_id": job_id,
             "kubeconfig": evaluate_model_request_json.kubeconfig,
-            "namespace": "budeval",
+            "namespace": resolved_namespace,
             "monitoring_attempt": 0,
             "max_attempts": 360,  # 30 minutes with 5-second intervals
             "notification_data": {
@@ -779,6 +844,21 @@ class EvaluationWorkflow:
                 title="Job monitoring timeout",
                 message=f"Job {job_id} monitoring timed out after {max_attempts} attempts (30 minutes)",
                 status=WorkflowStatus.FAILED,
+                primary_action="retry",
+            )
+            dapr_workflows.publish_notification(
+                workflow_id=instance_id,
+                notification=notification_req,
+                target_topic_name=evaluate_model_request_json.source_topic,
+                target_name=evaluate_model_request_json.source,
+            )
+            # Emit terminal results event
+            notification_req.payload.event = "results"
+            notification_req.payload.content = NotificationContent(
+                title="Evaluation timeout",
+                message=f"Job {job_id} monitoring timed out",
+                status=WorkflowStatus.FAILED,
+                primary_action="retry",
             )
             dapr_workflows.publish_notification(
                 workflow_id=instance_id,
@@ -789,10 +869,11 @@ class EvaluationWorkflow:
             return  # End workflow on timeout
 
         # Check job status
+        resolved_namespace = StorageConfig.get_current_namespace()
         basic_monitor_request = {
             "job_id": job_id,
             "kubeconfig": evaluate_model_request_json.kubeconfig,
-            "namespace": "budeval",
+            "namespace": resolved_namespace,
         }
 
         monitor_result = yield ctx.call_activity(
@@ -857,7 +938,7 @@ class EvaluationWorkflow:
                 extract_request = {
                     "job_id": job_id,
                     "model_name": evaluate_model_request_json.eval_model_info.model_name,
-                    "namespace": "budeval",
+                    "namespace": resolved_namespace,
                     "kubeconfig": evaluate_model_request_json.kubeconfig,
                     "experiment_id": str(evaluate_model_request_json.experiment_id)
                     if evaluate_model_request_json.experiment_id
@@ -940,7 +1021,31 @@ class EvaluationWorkflow:
                     notification_req.payload.content = NotificationContent(
                         title="Job completed - Results extraction failed",
                         message=f"Job {job_id} completed successfully but results extraction failed: {extract_result.get('message')}",
+                        status=WorkflowStatus.FAILED,
+                        primary_action="retry",
+                    )
+                dapr_workflows.publish_notification(
+                    workflow_id=instance_id,
+                    notification=notification_req,
+                    target_topic_name=evaluate_model_request_json.source_topic,
+                    target_name=evaluate_model_request_json.source,
+                )
+                # Emit terminal results event reflecting final state
+                if extract_result.get("code", HTTPStatus.OK.value) == HTTPStatus.OK.value:
+                    notification_req.payload.event = "results"
+                    notification_req.payload.content = NotificationContent(
+                        title="Evaluation results",
+                        message="Results are ready",
                         status=WorkflowStatus.COMPLETED,
+                        result=results_info,
+                    )
+                else:
+                    notification_req.payload.event = "results"
+                    notification_req.payload.content = NotificationContent(
+                        title="Evaluation failed",
+                        message=f"Results extraction failed: {extract_result.get('message')}",
+                        status=WorkflowStatus.FAILED,
+                        primary_action="retry",
                     )
                 dapr_workflows.publish_notification(
                     workflow_id=instance_id,
@@ -956,6 +1061,21 @@ class EvaluationWorkflow:
                     title="Job failed",
                     message=f"Job {job_id} failed with status: {final_status}",
                     status=WorkflowStatus.FAILED,
+                    primary_action="retry",
+                )
+                dapr_workflows.publish_notification(
+                    workflow_id=instance_id,
+                    notification=notification_req,
+                    target_topic_name=evaluate_model_request_json.source_topic,
+                    target_name=evaluate_model_request_json.source,
+                )
+                # Emit terminal results event
+                notification_req.payload.event = "results"
+                notification_req.payload.content = NotificationContent(
+                    title="Evaluation failed",
+                    message=f"Job {job_id} failed with status: {final_status}",
+                    status=WorkflowStatus.FAILED,
+                    primary_action="retry",
                 )
                 dapr_workflows.publish_notification(
                     workflow_id=instance_id,

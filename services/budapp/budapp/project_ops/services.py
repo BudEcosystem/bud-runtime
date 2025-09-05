@@ -86,13 +86,24 @@ class ProjectService(SessionMixin):
         # Permission check
         permission_service = PermissionService(self.session)
 
-        if await ProjectDataManager(self.session).retrieve_by_fields(
-            ProjectModel,
-            {"name": project_data["name"], "status": ProjectStatusEnum.ACTIVE},
-            missing_ok=True,
-            case_sensitive=False,
-        ):
-            raise ClientException("Project already exist with same name")
+        # Check for duplicate project name
+        project_type = project_data.get("project_type", ProjectTypeEnum.CLIENT_APP.value)
+
+        if project_type == ProjectTypeEnum.CLIENT_APP.value:
+            # For CLIENT_APP projects, check only within user's associated projects
+            if await ProjectDataManager(self.session).check_duplicate_name_for_user_projects(
+                project_data["name"], current_user_id, project_type
+            ):
+                raise ClientException("Project already exist with same name")
+        else:
+            # For ADMIN_APP projects, check globally across all projects
+            if await ProjectDataManager(self.session).retrieve_by_fields(
+                ProjectModel,
+                {"name": project_data["name"], "project_type": project_type, "status": ProjectStatusEnum.ACTIVE},
+                missing_ok=True,
+                case_sensitive=False,
+            ):
+                raise ClientException("Project already exist with same name")
 
         project_data["created_by"] = current_user_id
         project_model = ProjectModel(**project_data)
@@ -208,15 +219,28 @@ class ProjectService(SessionMixin):
             raise ClientException("Project type cannot be modified")
 
         if "name" in data:
-            duplicate_project = await ProjectDataManager(self.session).retrieve_by_fields(
-                model=ProjectModel,
-                fields={"name": data["name"], "status": ProjectStatusEnum.ACTIVE},
-                exclude_fields={"id": project_id},
-                missing_ok=True,
-                case_sensitive=False,
-            )
-            if duplicate_project:
-                raise ClientException("Project name already exists")
+            # Apply same project type logic as create method
+            if db_project.project_type == ProjectTypeEnum.CLIENT_APP.value:
+                # For CLIENT_APP projects, check only within user's associated projects
+                if await ProjectDataManager(self.session).check_duplicate_name_for_user_projects(
+                    data["name"], current_user_id, db_project.project_type, exclude_project_id=project_id
+                ):
+                    raise ClientException("Project name already exists")
+            else:
+                # For ADMIN_APP projects, check globally across all projects with same type
+                duplicate_project = await ProjectDataManager(self.session).retrieve_by_fields(
+                    model=ProjectModel,
+                    fields={
+                        "name": data["name"],
+                        "project_type": db_project.project_type,
+                        "status": ProjectStatusEnum.ACTIVE,
+                    },
+                    exclude_fields={"id": project_id},
+                    missing_ok=True,
+                    case_sensitive=False,
+                )
+                if duplicate_project:
+                    raise ClientException("Project name already exists")
 
         db_project = await ProjectDataManager(self.session).update_by_fields(db_project, data)
 

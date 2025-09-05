@@ -30,6 +30,8 @@ import { useModels, cloudProviders } from "@/hooks/useModels";
 import { PrimaryButton, SecondaryButton } from "@/components/ui/button";
 import ModelTags from "@/components/ui/ModelTags";
 import SearchHeaderInput from "@/flows/components/SearchHeaderInput";
+import { motion } from "framer-motion";
+import styles from "./models.module.scss";
 
 // Filter interface
 interface Filters {
@@ -412,8 +414,34 @@ export default function ModelsPage() {
           className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 relative"
         >
           {loading && models.length === 0 ? (
-            <div className="flex justify-center items-center h-64">
-              <Spin size="large" />
+            <div className="flex justify-center items-center">
+              <div className="w-full flex flex-col gap-6">
+              {[0, 1].map((row) => (
+                <div key={row} className="flex gap-6">
+                {[0, 1, 2].map((col) => (
+                  <div
+                  key={col}
+                  className="flex-1 h-[200px] rounded-lg bg-bud-bg-secondary border-bud-border relative overflow-hidden"
+                  style={{ minWidth: 0 }}
+                  >
+                  {/* Animated light pass */}
+                  <div className="absolute inset-0 pointer-events-none">
+                    <motion.div
+                      className={styles.loadingBar}
+                      initial={{ width: "0%" }}
+                      animate={{ width: "100%" }}
+                      transition={{
+                        duration: 1.5,
+                        ease: "easeInOut",
+                        repeat: Infinity,
+                      }}
+                    />
+                  </div>
+                  </div>
+                ))}
+                </div>
+              ))}
+              </div>
             </div>
           ) : models.length === 0 ? (
             <Empty

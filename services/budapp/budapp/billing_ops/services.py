@@ -163,6 +163,7 @@ class BillingService(DataManagerUtils):
                 "billing_period_start": None,  # Return None for Free plan users
                 "billing_period_end": None,  # Return None for Free plan users
                 "plan_name": free_plan.get("name", "Free"),
+                "billing_plan_id": None,  # Return None for Free plan users
                 "base_monthly_price": float(free_plan.get("base_monthly_price", 0)),
                 "usage": {
                     "tokens_used": usage_data["total_tokens"],
@@ -199,6 +200,7 @@ class BillingService(DataManagerUtils):
             "billing_period_start": user_billing.billing_period_start.isoformat(),
             "billing_period_end": user_billing.billing_period_end.isoformat(),
             "plan_name": billing_plan.name,
+            "billing_plan_id": user_billing.billing_plan_id,
             "base_monthly_price": float(billing_plan.base_monthly_price),
             "usage": {
                 "tokens_used": usage_data["total_tokens"],
@@ -223,19 +225,6 @@ class BillingService(DataManagerUtils):
 
         """Check if user has exceeded usage limits."""
         usage = await self.get_current_usage(user_id)
-
-        # Now all users have billing (at least Free plan)
-        if usage.get("is_suspended"):
-            return {"allowed": False, "reason": usage.get("suspension_reason", "Account suspended")}
-
-        # Check token limit
-        if usage["usage"]["tokens_quota"] and usage["usage"]["tokens_used"] >= usage["usage"]["tokens_quota"]:
-            plan_name = usage.get("plan_name", "your plan")
-            return {"allowed": False, "reason": f"Monthly token quota exceeded for {plan_name}"}
-
-        # Check cost limit (Free plan has no cost limit)
-        if usage["usage"]["cost_quota"] and usage["usage"]["cost_used"] >= usage["usage"]["cost_quota"]:
-            return {"allowed": False, "reason": "Monthly cost quota exceeded"}
 
         # Get current usage values
         tokens_used = usage["usage"]["tokens_used"] if usage.get("usage") else 0
@@ -399,60 +388,126 @@ class BillingService(DataManagerUtils):
             return {"error": str(e), "data": []}
 
     def get_billing_alerts(self, user_id: UUID) -> List[BillingAlert]:
-        """Get all billing alerts for a user."""
+        """Get all billing alerts for a user, ordered by threshold percent."""
         user_billing = self.get_user_billing(user_id)
         if not user_billing:
             return []
 
-        stmt = select(BillingAlert).where(
-            BillingAlert.user_billing_id == user_billing.id,
-            BillingAlert.is_active,
+        stmt = (
+            select(BillingAlert)
+            .where(
+                BillingAlert.user_billing_id == user_billing.id,
+                BillingAlert.is_active,
+            )
+            .order_by(BillingAlert.threshold_percent)
         )
         return list(self.session.execute(stmt).scalars().all())
 
     async def check_and_trigger_alerts(self, user_id: UUID) -> List[Dict[str, Any]]:
         """Check usage against alert thresholds and return triggered alerts."""
+        from budapp.billing_ops.notification_service import BillingNotificationService
+
         usage = await self.get_current_usage(user_id)
         if not usage.get("has_billing"):
             return []
 
+        # Get user information for notifications
+        user_billing = self.get_user_billing(user_id)
+        if not user_billing:
+            return []
+
+        # Get user details for email
+        stmt = select(User).where(User.id == user_id)
+        user = self.session.execute(stmt).scalar_one_or_none()
+        if not user:
+            return []
+
         alerts = self.get_billing_alerts(user_id)
         triggered_alerts = []
+        notification_service = BillingNotificationService()
 
         for alert in alerts:
             should_trigger = False
             current_value = None
+            quota_value = None
 
             if alert.alert_type == "token_usage":
                 current_percent = usage["usage"]["tokens_usage_percent"]
                 current_value = usage["usage"]["tokens_used"]
-                should_trigger = current_percent >= alert.threshold_percent
+                quota_value = usage["usage"]["tokens_quota"]
             elif alert.alert_type == "cost_usage":
                 current_percent = usage["usage"]["cost_usage_percent"]
                 current_value = usage["usage"]["cost_used"]
-                should_trigger = current_percent >= alert.threshold_percent
+                quota_value = usage["usage"]["cost_quota"]
+            else:
+                continue  # Skip unknown alert types
 
-            # Check if we should trigger (and haven't already for this value)
+            # Check if threshold is crossed
+            if current_percent >= alert.threshold_percent:
+                # Calculate the threshold value
+                if quota_value:
+                    threshold_value = Decimal(str(quota_value * alert.threshold_percent / 100))
+
+                    # Only trigger if we haven't already triggered for a value >= threshold
+                    # This prevents re-triggering when usage continues to increase
+                    if not alert.last_triggered_value or alert.last_triggered_value < threshold_value:
+                        should_trigger = True
+
             if should_trigger:
-                if (
-                    not alert.last_triggered_at
-                    or alert.last_triggered_value != current_value
-                    or (datetime.now(timezone.utc) - alert.last_triggered_at).days >= 1
-                ):
-                    # Update alert
-                    alert.last_triggered_at = datetime.now(timezone.utc)
-                    alert.last_triggered_value = Decimal(str(current_value))
-                    self.session.commit()
+                # Update alert
+                alert.last_triggered_at = datetime.now(timezone.utc)
+                alert.last_triggered_value = Decimal(str(current_value))
 
-                    triggered_alerts.append(
-                        {
-                            "alert_name": alert.name,
-                            "alert_type": alert.alert_type,
-                            "threshold_percent": alert.threshold_percent,
-                            "current_value": current_value,
-                            "current_percent": current_percent,
-                        }
+                # Send notification
+                try:
+                    notification_preferences = {
+                        "enable_email_notifications": user_billing.enable_email_notifications,
+                        "enable_in_app_notifications": user_billing.enable_in_app_notifications,
+                    }
+
+                    notification_result = await notification_service.send_usage_alert(
+                        user_id=user_id,
+                        user_email=user.email,
+                        alert_type=alert.alert_type,
+                        threshold_percent=alert.threshold_percent,
+                        current_usage_percent=current_percent,
+                        current_usage_value=current_value,
+                        quota_value=quota_value,
+                        plan_name=usage.get("plan_name", "Unknown"),
+                        notification_preferences=notification_preferences,
+                        billing_period_start=user_billing.billing_period_start,
+                        billing_period_end=user_billing.billing_period_end,
                     )
+
+                    # Update notification tracking
+                    if notification_result["success"]:
+                        alert.last_notification_sent_at = datetime.now(timezone.utc)
+                        alert.notification_failure_count = 0
+                        alert.last_notification_error = None
+                    else:
+                        alert.notification_failure_count += 1
+                        alert.last_notification_error = "; ".join(
+                            notification_result.get("errors", ["Unknown error"])
+                        )[:500]
+
+                    logger.info(f"Notification sent for alert {alert.name}: {notification_result}")
+
+                except Exception as e:
+                    logger.error(f"Failed to send notification for alert {alert.name}: {e}")
+                    alert.notification_failure_count += 1
+                    alert.last_notification_error = str(e)[:500]
+
+                self.session.commit()
+
+                triggered_alerts.append(
+                    {
+                        "alert_name": alert.name,
+                        "alert_type": alert.alert_type,
+                        "threshold_percent": alert.threshold_percent,
+                        "current_value": current_value,
+                        "current_percent": current_percent,
+                    }
+                )
 
         return triggered_alerts
 
@@ -489,6 +544,21 @@ class BillingService(DataManagerUtils):
 
         return user_billing
 
+    def reset_user_alerts(self, user_billing_id: UUID) -> None:
+        """Reset all alerts for a user billing (used when billing cycle resets or quota changes)."""
+        stmt = select(BillingAlert).where(BillingAlert.user_billing_id == user_billing_id, BillingAlert.is_active)
+        alerts = self.session.execute(stmt).scalars().all()
+
+        for alert in alerts:
+            alert.last_triggered_at = None
+            alert.last_triggered_value = None
+            alert.last_notification_sent_at = None
+            alert.notification_failure_count = 0
+            alert.last_notification_error = None
+
+        self.session.commit()
+        logger.info(f"Reset {len(alerts)} alerts for user_billing_id {user_billing_id}")
+
     def update_billing_period(self, user_billing: UserBilling) -> None:
         """Update billing period to next month."""
         user_billing.billing_period_start = user_billing.billing_period_end
@@ -502,5 +572,8 @@ class BillingService(DataManagerUtils):
             user_billing.billing_period_end = user_billing.billing_period_end.replace(
                 month=user_billing.billing_period_end.month + 1
             )
+
+        # Reset alerts when billing period updates
+        self.reset_user_alerts(user_billing.id)
 
         self.session.commit()

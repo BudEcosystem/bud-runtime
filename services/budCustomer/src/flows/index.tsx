@@ -7,6 +7,8 @@ import DeleteProject from "./DeleteProject";
 import AddNewKey from "./ApiKeys/AddNewKey";
 import ApiKeySuccess from "./ApiKeys/ApiKeySuccess";
 import ViewApiKey from "./ApiKeys/ViewApiKey";
+import ProjectSuccess from "./Projects/ProjectSuccess";
+import ProjectEditSuccess from "./Projects/ProjectEditSuccess";
 import EditApiKey from "./ApiKeys/EditApiKey";
 import ViewModelDetails from "./ViewModelDetails";
 import ViewProjectDetails from "./ViewProjectDetails";
@@ -141,6 +143,8 @@ const stepComponentNames = [
   "create-batch-job",
   "create-batch-job-success",
   "api-key-success",
+  "project-success",
+  "project-edit-success",
   "edit-api-key",
 ];
 
@@ -161,6 +165,8 @@ StepComponents["edit-project"] = EditProject;
 StepComponents["delete-project"] = DeleteProject;
 StepComponents["add-new-key"] = AddNewKey;
 StepComponents["api-key-success"] = ApiKeySuccess;
+StepComponents["project-success"] = ProjectSuccess;
+StepComponents["project-edit-success"] = ProjectEditSuccess;
 StepComponents["view-api-key"] = ViewApiKey;
 StepComponents["edit-api-key"] = EditApiKey;
 StepComponents["view-model-details"] = ViewModelDetails;

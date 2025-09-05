@@ -409,22 +409,18 @@ class NoteFilter(BaseModel):
 
 
 class PlaygroundInitializeRequest(BaseModel):
-    """Request schema for playground JWT initialization."""
+    """Request schema for playground refresh token initialization."""
 
-    jwt_token: str = Field(..., description="JWT token to initialize playground session")
+    refresh_token: str = Field(
+        ..., description="Refresh token to initialize playground session and generate new tokens"
+    )
 
-    @field_validator("jwt_token")
+    @field_validator("refresh_token")
     @classmethod
-    def validate_jwt_format(cls, v: str) -> str:
-        """Basic JWT format validation."""
+    def validate_refresh_token_format(cls, v: str) -> str:
+        """Basic refresh token format validation."""
         if not v or not v.strip():
-            raise ValueError("JWT token cannot be empty")
-
-        # Basic JWT format check (three parts separated by dots)
-        parts = v.split(".")
-        if len(parts) != 3:
-            raise ValueError("Invalid JWT token format")
-
+            raise ValueError("Refresh token cannot be empty")
         return v.strip()
 
 
@@ -445,9 +441,13 @@ class EndpointInfo(BaseModel):
 
 
 class PlaygroundInitializeResponse(BaseModel):
-    """Response schema for playground JWT initialization."""
+    """Response schema for playground refresh token initialization."""
 
-    user_id: UUID = Field(..., description="User ID from JWT")
+    user_id: UUID = Field(..., description="User ID from refresh token")
     initialization_status: str = Field(default="success", description="Status of initialization")
-    ttl: int | None = Field(None, description="Session TTL in seconds based on JWT expiry")
+    ttl: int | None = Field(None, description="Session TTL in seconds based on access token expiry")
     message: str | None = Field(None, description="Optional message about initialization")
+    access_token: str = Field(..., description="New access token")
+    refresh_token: str = Field(..., description="New refresh token")
+    token_type: str = Field(default="Bearer", description="Token type")
+    expires_in: int | None = Field(None, description="Access token expiry in seconds")

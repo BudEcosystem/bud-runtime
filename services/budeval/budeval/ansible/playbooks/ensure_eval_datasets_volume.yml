@@ -8,7 +8,7 @@
 
   vars:
       k8s_namespace: "{{ namespace | default('nixcd-dev-bud') }}"
-      pvc_name: "{{ pvc_name | default('bud-dev-budeval-dataset-rwx') }}"
+      pvc_name: "{{ pvc_name | default('bud-dev-budeval-dataset') }}"
       opencompass_dataset_url: "{{ opencompass_dataset_url | default('https://github.com/open-compass/opencompass/releases/download/0.2.2.rc1/OpenCompassData-complete-20240207.zip') }}"
       opencompass_dataset_filename: "{{ opencompass_dataset_url | basename }}"
 

@@ -25,7 +25,7 @@ spec:
       containers:
       - name: askbud
         image: {{ .Values.microservices.askbud.image }}
-        imagePullPolicy: Always
+        imagePullPolicy: {{ .Values.imagePullPolicy }}
         command: ["sh", "-c", "uvicorn askbud.main:app --host 0.0.0.0 --port 3000"]
         ports:
         - containerPort: 3000

@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo } from "react";
 import {
   BarChart,
   Bar,
@@ -9,7 +9,6 @@ import {
   ResponsiveContainer,
   Cell,
   ReferenceLine,
-  Rectangle,
 } from "recharts";
 import { motion } from "framer-motion";
 import dayjs from "dayjs";
@@ -84,10 +83,25 @@ const UsageChart: React.FC<UsageChartProps> = ({
     return null;
   };
 
+  const getDayFilterSelected = useMemo(() => {
+    const match = timeRange.match(/^(\d+)d$/);
+    return match ? parseInt(match[1], 10) : 30;
+  }, [timeRange]);
+
   const maxValue = useMemo(() => {
     if (!data || data.length === 0) return 0;
     return Math.max(...data.map((item) => item[chartConfig.dataKey] || 0));
   }, [data, chartConfig.dataKey]);
+
+  // Calculate days with usage and total value with proper memoization
+  const daysWithUsage = useMemo(() => {
+    const count = data.filter(d => d.hasData === true).length;
+    return count;
+  }, [data]); // Recalculates when data changes
+
+  const totalValue = useMemo(() => {
+    return data.reduce((sum, item) => sum + (item[chartConfig.dataKey] || 0), 0);
+  }, [data, chartConfig.dataKey]); // Recalculates when data or dataKey changes
 
   // Custom bar shape with baseline
   const CustomBar = (props: any) => {
@@ -169,12 +183,10 @@ const UsageChart: React.FC<UsageChartProps> = ({
           <div className={styles.chartLegend}>
             <span className={styles.legendDot} style={{ background: chartConfig.color }} />
             <span className={styles.legendText}>
-              {data.filter(d => d.hasData !== false).length} {type === "requests" ? "requests" : "days with usage"}
+              {type === "requests" ? `${data.filter(d => d.hasData !== false).length} requests` : `${getDayFilterSelected} day${getDayFilterSelected > 1 ? 's' : ''} with usage`}
             </span>
             <span className={styles.legendValue}>
-              {chartConfig.formatter(
-                data.reduce((sum, item) => sum + (item[chartConfig.dataKey] || 0), 0)
-              )}
+              {chartConfig.formatter(totalValue)}
             </span>
           </div>
         </div>

@@ -33,7 +33,7 @@ export interface ExperimentData {
   traits: string | any[] | any;  // Can be string, array, or object
   tags: string[] | any[];
   status: "Running" | "Completed" | "Failed" | string;
-  createdDate: string;
+  created_at: string;
 }
 
 export interface Trait {
@@ -287,8 +287,8 @@ export const useEvaluations = create<{
     set({ loading: true });
     try {
       const response: any = await AppRequest.Get(`${tempApiBaseUrl}/experiments/${id}`);
-      set({ experimentDetails: response.data });
-      return response.data;
+      set({ experimentDetails: response.data.experiment });
+      return response.data.experiment;
     } catch (error) {
       console.error("Error fetching experiment details:", error);
       throw error;
