@@ -375,7 +375,7 @@ class NotificationService(SessionMixin):
         if status_str in {"COMPLETED", "FAILED"}:
             title = "Evaluation completed" if status_str == "COMPLETED" else "Evaluation failed"
             message = payload.content.message or title
-            result = NotificationResult(target_id=db_workflow.id, target_type="evaluation").model_dump(
+            result = NotificationResult(target_id=db_workflow.id, target_type="workflow").model_dump(
                 exclude_none=True, exclude_unset=True
             )
             try:

@@ -475,7 +475,7 @@ class EvaluationWorkflow:
             cloud_event=evaluate_model_request_json, name=workflow_name, workflow_id=instance_id
         )
         notification_req = notification_request.model_copy(deep=True)
-        notification_req.payload.event = "evaluation_status"
+        notification_req.payload.event = "monitor_eval_job_progress"
         notification_req.payload.content = NotificationContent(
             title="Model evaluation process is initiated",
             message=f"Model evaluation process is initiated for {evaluate_model_request_json.eval_model_info.model_name}",
