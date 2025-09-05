@@ -2095,9 +2095,35 @@ class EvaluationWorkflowService:
 
                 logger.debug(f"Trigger Workflow Response 01 : {trigger_workflow_response}")
 
+                # Create proper workflow step structure with exact event names that budeval uses
                 evaluation_events_payload = {
-                    BudServeWorkflowStepEventName.EVALUATION_EVENTS.value: trigger_workflow_response
+                    BudServeWorkflowStepEventName.EVALUATION_EVENTS.value: {
+                        "steps": [
+                            {"id": "verify_cluster_connection", "title": "Verify Cluster Connection", "payload": {}},
+                            {"id": "preparing_eval_engine", "title": "Preparing Eval Engine", "payload": {}},
+                            {"id": "deploy_eval_job", "title": "Deploy Evaluation Job", "payload": {}},
+                            {
+                                "id": "monitor_eval_job_progress",
+                                "title": "Monitor Evaluation Job Progress",
+                                "payload": {},
+                            },
+                        ]
+                    }
                 }
+
+                # If trigger_workflow_response has steps, merge them with our structure
+                if isinstance(trigger_workflow_response, dict) and "steps" in trigger_workflow_response:
+                    # Update the steps with the actual response data while preserving the structure
+                    for i, step in enumerate(
+                        evaluation_events_payload[BudServeWorkflowStepEventName.EVALUATION_EVENTS.value]["steps"]
+                    ):
+                        if i < len(trigger_workflow_response["steps"]):
+                            step.update(trigger_workflow_response["steps"][i])
+                else:
+                    # Use the response as the main data structure
+                    evaluation_events_payload[BudServeWorkflowStepEventName.EVALUATION_EVENTS.value] = (
+                        trigger_workflow_response
+                    )
 
                 db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
                     workflow.id, current_step_number, evaluation_events_payload
