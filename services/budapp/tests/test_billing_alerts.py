@@ -49,7 +49,7 @@ class TestBillingAlerts:
         return user_billing
 
     def create_alert(
-        self, user_billing_id, name, alert_type, threshold_percent, last_triggered_at=None
+        self, user_billing_id, name, alert_type, threshold_percent, last_triggered_at=None, last_triggered_value=None
     ):
         """Helper to create a billing alert."""
         alert = MagicMock(spec=BillingAlert)
@@ -60,7 +60,7 @@ class TestBillingAlerts:
         alert.threshold_percent = threshold_percent
         alert.is_active = True
         alert.last_triggered_at = last_triggered_at
-        alert.last_triggered_value = None
+        alert.last_triggered_value = last_triggered_value
         return alert
 
     def setup_database_mocks(self, mock_session, user_billing, alerts):
@@ -195,14 +195,15 @@ class TestBillingAlerts:
         """Test alert cooldown period to prevent spam."""
         user_id = user_billing.user_id
 
-        # Create alert that was recently triggered
+        # Create alert that was recently triggered at a higher usage level
         recent_trigger = datetime.now(timezone.utc) - timedelta(hours=1)
         alert = self.create_alert(
             user_billing.id,
             "50% Token Alert",
             "token_usage",
             50,
-            last_triggered_at=recent_trigger
+            last_triggered_at=recent_trigger,
+            last_triggered_value=Decimal("60000")  # Previously triggered at 60K tokens, same as current usage
         )
 
         # Set up database mocks
