@@ -92,11 +92,14 @@ class TestBillingAlerts:
                 "success_rate": 99.5,
             }
 
-            with patch.object(billing_service, '_send_alert_notification') as mock_send:
+            with patch('budapp.billing_ops.services.BillingNotificationService') as mock_notification_class:
+                mock_notification_service = MagicMock()
+                mock_notification_class.return_value = mock_notification_service
+
                 result = await billing_service.check_and_trigger_alerts(user_id)
 
                 assert len(result) == 0
-                mock_send.assert_not_called()
+                mock_notification_service.send_usage_alert.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_check_alerts_single_trigger(self, billing_service, mock_session, user_billing):
@@ -125,8 +128,10 @@ class TestBillingAlerts:
                 "success_rate": 99.0,
             }
 
-            with patch.object(billing_service, '_send_alert_notification') as mock_send:
-                mock_send.return_value = None
+            with patch('budapp.billing_ops.services.BillingNotificationService') as mock_notification_class:
+                mock_notification_service = MagicMock()
+                mock_notification_service.send_usage_alert.return_value = {"success": True}
+                mock_notification_class.return_value = mock_notification_service
 
                 result = await billing_service.check_and_trigger_alerts(user_id)
 
@@ -166,8 +171,10 @@ class TestBillingAlerts:
                 "success_rate": 98.5,
             }
 
-            with patch.object(billing_service, '_send_alert_notification') as mock_send:
-                mock_send.return_value = None
+            with patch('budapp.billing_ops.services.BillingNotificationService') as mock_notification_class:
+                mock_notification_service = MagicMock()
+                mock_notification_service.send_usage_alert.return_value = {"success": True}
+                mock_notification_class.return_value = mock_notification_service
 
                 result = await billing_service.check_and_trigger_alerts(user_id)
 
@@ -207,12 +214,15 @@ class TestBillingAlerts:
                 "success_rate": 99.0,
             }
 
-            with patch.object(billing_service, '_send_alert_notification') as mock_send:
+            with patch('budapp.billing_ops.services.BillingNotificationService') as mock_notification_class:
+                mock_notification_service = MagicMock()
+                mock_notification_class.return_value = mock_notification_service
+
                 result = await billing_service.check_and_trigger_alerts(user_id)
 
                 # Alert should not trigger again due to cooldown
                 assert len(result) == 0
-                mock_send.assert_not_called()
+                mock_notification_service.send_usage_alert.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_alert_100_percent_trigger(self, billing_service, mock_session, user_billing):
@@ -239,8 +249,10 @@ class TestBillingAlerts:
                 "success_rate": 99.0,
             }
 
-            with patch.object(billing_service, '_send_alert_notification') as mock_send:
-                mock_send.return_value = None
+            with patch('budapp.billing_ops.services.BillingNotificationService') as mock_notification_class:
+                mock_notification_service = MagicMock()
+                mock_notification_service.send_usage_alert.return_value = {"success": True}
+                mock_notification_class.return_value = mock_notification_service
 
                 result = await billing_service.check_and_trigger_alerts(user_id)
 
@@ -277,8 +289,10 @@ class TestBillingAlerts:
                 "success_rate": 98.0,
             }
 
-            with patch.object(billing_service, '_send_alert_notification') as mock_send:
-                mock_send.return_value = None
+            with patch('budapp.billing_ops.services.BillingNotificationService') as mock_notification_class:
+                mock_notification_service = MagicMock()
+                mock_notification_service.send_usage_alert.return_value = {"success": True}
+                mock_notification_class.return_value = mock_notification_service
 
                 result = await billing_service.check_and_trigger_alerts(user_id)
 
@@ -313,8 +327,10 @@ class TestBillingAlerts:
                 "success_rate": 99.0,
             }
 
-            with patch.object(billing_service, '_send_alert_notification') as mock_send:
-                mock_send.return_value = None
+            with patch('budapp.billing_ops.services.BillingNotificationService') as mock_notification_class:
+                mock_notification_service = MagicMock()
+                mock_notification_service.send_usage_alert.return_value = {"success": True}
+                mock_notification_class.return_value = mock_notification_service
 
                 result = await billing_service.check_and_trigger_alerts(user_id)
 
@@ -353,8 +369,10 @@ class TestBillingAlerts:
                 "success_rate": 99.0,
             }
 
-            with patch.object(billing_service, '_send_alert_notification') as mock_send:
-                mock_send.return_value = None
+            with patch('budapp.billing_ops.services.BillingNotificationService') as mock_notification_class:
+                mock_notification_service = MagicMock()
+                mock_notification_service.send_usage_alert.return_value = {"success": True}
+                mock_notification_class.return_value = mock_notification_service
 
                 result = await billing_service.check_and_trigger_alerts(user_id)
 
@@ -387,8 +405,10 @@ class TestBillingAlerts:
             }
 
             # Mock notification failure
-            with patch.object(billing_service, '_send_alert_notification') as mock_send:
-                mock_send.side_effect = Exception("Notification service down")
+            with patch('budapp.billing_ops.services.BillingNotificationService') as mock_notification_class:
+                mock_notification_service = MagicMock()
+                mock_notification_service.send_usage_alert.side_effect = Exception("Notification service down")
+                mock_notification_class.return_value = mock_notification_service
 
                 # Should not raise exception
                 result = await billing_service.check_and_trigger_alerts(user_id)
