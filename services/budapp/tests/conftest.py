@@ -56,18 +56,41 @@ def mock_env_vars():
         "GRAFANA_USERNAME": "admin",
         "GRAFANA_PASSWORD": "admin",
         "CLOUD_MODEL_SEEDER_ENGINE": "openai",
-        "BUD_CONNECT_BASE_URL": "http://localhost:8001"
+        "BUD_CONNECT_BASE_URL": "http://localhost:8001",
+        "PUBLIC_KEY_PATH": "/tmp/test_public_key.pem",
+        "PRIVATE_KEY_PATH": "/tmp/test_private_key.pem",
+        "VAULT_PATH": "/tmp"
     }
 
     # Actually set the environment variables
     for key, value in test_env_vars.items():
         os.environ[key] = value
+    
+    # Create test key files for RSA handler
+    public_key_content = """-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA77W82GAHTupjewJ4Df7Q
++crGYVN1SsIQp1j/3PAGIdcUb2Aw2796HHecuOpPjp5coXopIqUapwqeFYr8PG3e
+pbY7iplt9QNnyZDgDuoBfvz2hJJtTacsBKm+XUr35WqKW8l/NeGwAAZwSlw6fu7f
+3k/ga7GrXo/7AYl43vuEZ+NyiEzAGaACsoEIY9MvB472zOE9R1utYD+bK8RFGypO
+G+7FbqNImu3JSCBNLzHLYr17Mg8/bJeugx/FMvkNi+7c48hf5m2gzXGSFLxPK6k/
+ioehgykSlgApkssHLTkZpW47nKT4vU0D/e10o9XnPUnte6keW4/5KIU88Rr+8K1t
+IQIDAQAB
+-----END PUBLIC KEY-----"""
+    
+    with open("/tmp/test_public_key.pem", "w") as f:
+        f.write(public_key_content)
 
     yield
 
     # Clean up after tests
     for key in test_env_vars.keys():
         os.environ.pop(key, None)
+    
+    # Clean up key files
+    try:
+        os.remove("/tmp/test_public_key.pem")
+    except FileNotFoundError:
+        pass
 
 
 @pytest.fixture
