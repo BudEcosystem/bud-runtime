@@ -26,12 +26,12 @@ from typing_extensions import Annotated
 from budapp.commons import logging
 from budapp.commons.constants import PermissionEnum
 from budapp.commons.dependencies import get_current_active_user, get_session, parse_ordering_fields
-from budapp.commons.exception import ClientException
+from budapp.commons.exceptions import ClientException
 from budapp.commons.permission_handler import require_permissions
 from budapp.commons.schemas import ErrorResponse, SuccessResponse
-from budapp.guardrails.models import GuardrailProbes, GuardrailRules
 from budapp.guardrails.schemas import (
     GuardrailFilter,
+    GuardrailProbeCreate,
     GuardrailProbeDetailResponse,
     GuardrailProbePaginatedResponse,
     GuardrailProbeUpdate,
@@ -45,14 +45,14 @@ from budapp.guardrails.services import GuardrailProbeRuleService
 from budapp.user_ops.schemas import User
 
 
-logger = logging.getLogger(__name__)
+logger = logging.get_logger(__name__)
 
 
 router = APIRouter(prefix="/guardrails", tags=["Guardrails"])
 
 
-@model_router.get(
-    "/tags",
+@router.get(
+    "/probes/tags",
     responses={
         status.HTTP_500_INTERNAL_SERVER_ERROR: {
             "model": ErrorResponse,
@@ -95,7 +95,6 @@ async def list_probe_tags(
     ).to_http_response()
 
 
-# Probe endpoints
 @router.get(
     "/probes",
     response_model=GuardrailProbePaginatedResponse,
@@ -137,6 +136,39 @@ async def list_all_probes(
         code=status.HTTP_200_OK,
         message="Successfully list all probes",
     ).to_http_response()
+
+
+@router.post(
+    "/probe",
+    response_model=GuardrailProbeDetailResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+@require_permissions(permissions=[PermissionEnum.MODEL_MANAGE])
+async def create_probe(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    request: GuardrailProbeCreate,
+) -> Union[GuardrailProbeDetailResponse, ErrorResponse]:
+    """Create a new guardrail probe."""
+    try:
+        result = await GuardrailProbeRuleService(session).create_probe(
+            name=request.name,
+            provider_id=request.provider_id,
+            provider_type=request.provider_type,
+            user_id=current_user.id,
+            status=request.status,
+            description=request.description,
+            tags=request.tags,
+        )
+        return result.to_http_response()
+    except HTTPException as e:
+        return ErrorResponse(code=e.status_code, message=e.detail).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to create probe: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Failed to create probe",
+        ).to_http_response()
 
 
 @router.get(
@@ -200,7 +232,7 @@ async def get_probe_rules(
         ).to_http_response()
 
     return GuardrailRulePaginatedResponse(
-        rule=db_rules,
+        rules=db_rules,
         total_record=count,
         page=page,
         limit=limit,
@@ -309,7 +341,6 @@ async def create_rule(
             user_id=current_user.id,
             status=request.status,
             description=request.description,
-            tags=request.tags,
             scanner_types=request.scanner_types,
             modality_types=request.modality_types,
             guard_types=request.guard_types,
@@ -344,7 +375,6 @@ async def edit_rule(
             user_id=current_user.id,
             name=request.name,
             description=request.description,
-            tags=request.tags,
             status=request.status,
             scanner_types=request.scanner_types,
             modality_types=request.modality_types,

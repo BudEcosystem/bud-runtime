@@ -27,7 +27,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from budapp.commons.constants import (
     GuardrailDeploymentStatusEnum,
-    GuardrailDeploymentTypeEnum,
     GuardrailProviderTypeEnum,
     GuardrailStatusEnum,
 )
@@ -38,14 +37,14 @@ from budapp.project_ops.models import Project
 from budapp.user_ops.models import User
 
 
-class GuardrailProbes(Base, TimestampMixin):
+class GuardrailProbe(Base, TimestampMixin):
     """Guardrail probe model - represents a type of vulnerability or threat detection."""
 
-    __tablename__ = "guardrail_probes"
+    __tablename__ = "guardrail_probe"
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    uri: Mapped[Optional[str]] = mapped_column(String(255), unique=True, nullable=False)
+    uri: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     description: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     examples: Mapped[Optional[List[str]]] = mapped_column(PG_ARRAY(String), nullable=True)
     tags: Mapped[list[dict]] = mapped_column(JSONB, nullable=True)
@@ -74,9 +73,9 @@ class GuardrailProbes(Base, TimestampMixin):
 
     # Relationships
     provider: Mapped["Provider"] = relationship("Provider")
-    rules: Mapped[List["GuardrailRules"]] = relationship("GuardrailRules", back_populates="probe")
-    probe_profiles: Mapped[List["GuardrailProfileEnabledProbes"]] = relationship(
-        "GuardrailProfileEnabledProbes", back_populates="probe"
+    rules: Mapped[List["GuardrailRule"]] = relationship("GuardrailRule", back_populates="probe")
+    probe_profiles: Mapped[List["GuardrailProfileProbe"]] = relationship(
+        "GuardrailProfileProbe", back_populates="probe"
     )
 
     @hybrid_property
@@ -174,17 +173,17 @@ class GuardrailProbes(Base, TimestampMixin):
         return final_query.label("aggregated_examples").as_scalar()
 
 
-class GuardrailRules(Base, TimestampMixin):
+class GuardrailRule(Base, TimestampMixin):
     """Specific rules within each probe."""
 
-    __tablename__ = "guardrail_rules"
+    __tablename__ = "guardrail_rule"
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     probe_id: Mapped[UUID] = mapped_column(
-        ForeignKey("guardrail_probes.id", ondelete="CASCADE"), index=True, nullable=False
+        ForeignKey("guardrail_probe.id", ondelete="CASCADE"), index=True, nullable=False
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    uri: Mapped[Optional[str]] = mapped_column(String(255), unique=True, nullable=False)
+    uri: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     description: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     examples: Mapped[Optional[List[str]]] = mapped_column(PG_ARRAY(String), nullable=True)
     status: Mapped[str] = mapped_column(
@@ -203,18 +202,17 @@ class GuardrailRules(Base, TimestampMixin):
     created_by: Mapped[Optional[UUID]] = mapped_column(ForeignKey("user.id"), nullable=True)
 
     # Relationships
-    probe: Mapped["GuardrailProbes"] = relationship("GuardrailProbes", back_populates="rules")
-    rule_profiles: Mapped[List["GuardrailProfileDisabledRules"]] = relationship(
-        "GuardrailProfileDisabledRules", back_populates="rule"
-    )
+    probe: Mapped["GuardrailProbe"] = relationship("GuardrailProbe", back_populates="rules")
+    rule_profiles: Mapped[List["GuardrailProfileRule"]] = relationship("GuardrailProfileRule", back_populates="rule")
 
 
-class GuardrailProfiles(Base, TimestampMixin):
-    __tablename__ = "guardrail_profiles"
+class GuardrailProfile(Base, TimestampMixin):
+    __tablename__ = "guardrail_profile"
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    tags: Mapped[list[dict]] = mapped_column(JSONB, nullable=True)
     severity_threshold: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     guard_types: Mapped[Optional[List[str]]] = mapped_column(PG_ARRAY(String), nullable=True)
     status: Mapped[str] = mapped_column(
@@ -228,59 +226,68 @@ class GuardrailProfiles(Base, TimestampMixin):
     )
     created_by: Mapped[Optional[UUID]] = mapped_column(ForeignKey("user.id"), nullable=True)
 
-    created_user: Mapped["User"] = relationship(back_populates="created_guardrails", foreign_keys=[created_by])
-    probe_profiles: Mapped[List["GuardrailProfileEnabledProbes"]] = relationship(
-        "GuardrailProfileEnabledProbes", back_populates="profile"
+    created_user: Mapped["User"] = relationship(foreign_keys=[created_by])  # back_populates="created_guardrails"
+    probe_profiles: Mapped[List["GuardrailProfileProbe"]] = relationship(
+        "GuardrailProfileProbe", back_populates="profile"
     )
-    deployments: Mapped[List["GuardrailDeployments"]] = relationship("GuardrailDeployments", back_populates="profile")
+    deployments: Mapped[List["GuardrailDeployment"]] = relationship("GuardrailDeployment", back_populates="profile")
 
 
-class GuardrailProfileEnabledProbes(Base, TimestampMixin):
-    __tablename__ = "guardrail_profiles_enabled_probes"
+class GuardrailProfileProbe(Base, TimestampMixin):
+    __tablename__ = "guardrail_profile_probe"
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
-    profile_id: Mapped[UUID] = mapped_column(ForeignKey("guardrail_profiles.id", ondelete="CASCADE"), nullable=False)
+    profile_id: Mapped[UUID] = mapped_column(ForeignKey("guardrail_profile.id", ondelete="CASCADE"), nullable=False)
     probe_id: Mapped[UUID] = mapped_column(
-        ForeignKey("guardrail_probes.id", ondelete="CASCADE"), index=True, nullable=False
+        ForeignKey("guardrail_probe.id", ondelete="CASCADE"), index=True, nullable=False
     )
     severity_threshold: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     guard_types: Mapped[Optional[List[str]]] = mapped_column(PG_ARRAY(String), nullable=True)
     created_by: Mapped[Optional[UUID]] = mapped_column(ForeignKey("user.id"), nullable=False)
 
-    profile: Mapped["GuardrailProfiles"] = relationship("GuardrailProfiles", back_populates="probe_profiles")
-    probe: Mapped["GuardrailProbes"] = relationship("GuardrailProbes", back_populates="probe_profiles")
-    rule_profiles: Mapped[List["GuardrailProfileDisabledRules"]] = relationship(
-        "GuardrailProfileDisabledRules", back_populates="probe_profile"
+    profile: Mapped["GuardrailProfile"] = relationship("GuardrailProfile", back_populates="probe_profiles")
+    probe: Mapped["GuardrailProbe"] = relationship("GuardrailProbe", back_populates="probe_profiles")
+    rule_profiles: Mapped[List["GuardrailProfileRule"]] = relationship(
+        "GuardrailProfileRule", back_populates="probe_profile"
     )
 
 
-class GuardrailProfileDisabledRules(Base, TimestampMixin):
-    __tablename__ = "guardrail_profiles_disabled_rules"
+class GuardrailProfileRule(Base, TimestampMixin):
+    __tablename__ = "guardrail_profile_rule"
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     profile_probe_id: Mapped[UUID] = mapped_column(
-        ForeignKey("guardrail_profiles_enabled_probes.id", ondelete="CASCADE"), nullable=False
+        ForeignKey("guardrail_profile_probe.id", ondelete="CASCADE"), nullable=False
     )
     rule_id: Mapped[UUID] = mapped_column(
-        ForeignKey("guardrail_rules.id", ondelete="CASCADE"), index=True, nullable=False
+        ForeignKey("guardrail_rule.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    status: Mapped[str] = mapped_column(
+        Enum(
+            GuardrailDeploymentStatusEnum,
+            name="guardrail_deployment_status",
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        nullable=False,
+        default=GuardrailDeploymentStatusEnum.RUNNING.value,
     )
     severity_threshold: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     guard_types: Mapped[Optional[List[str]]] = mapped_column(PG_ARRAY(String), nullable=True)
     created_by: Mapped[Optional[UUID]] = mapped_column(ForeignKey("user.id"), nullable=False)
 
-    rule: Mapped["GuardrailRules"] = relationship("GuardrailRules", back_populates="rule_profiles")
-    probe_profile: Mapped["GuardrailProfileEnabledProbes"] = relationship(
-        "GuardrailProfileEnabledProbes", back_populates="rule_profiles"
+    rule: Mapped["GuardrailRule"] = relationship("GuardrailRule", back_populates="rule_profiles")
+    probe_profile: Mapped["GuardrailProfileProbe"] = relationship(
+        "GuardrailProfileProbe", back_populates="rule_profiles"
     )
 
 
-class GuardrailDeployments(Base, TimestampMixin):
+class GuardrailDeployment(Base, TimestampMixin):
     """Tracks guardrail deployment configurations."""
 
-    __tablename__ = "guardrail_deployments"
+    __tablename__ = "guardrail_deployment"
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
-    profile_id: Mapped[UUID] = mapped_column(ForeignKey("guardrail_profiles.id", ondelete="CASCADE"), nullable=False)
+    profile_id: Mapped[UUID] = mapped_column(ForeignKey("guardrail_profile.id", ondelete="CASCADE"), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     status: Mapped[str] = mapped_column(
@@ -305,4 +312,4 @@ class GuardrailDeployments(Base, TimestampMixin):
     endpoint: Mapped[Optional["Endpoint"]] = relationship("Endpoint")
     user: Mapped["User"] = relationship("User")
     project: Mapped["Project"] = relationship("Project")
-    profile: Mapped["GuardrailProfiles"] = relationship("GuardrailProfiles", back_populates="deployments")
+    profile: Mapped["GuardrailProfile"] = relationship("GuardrailProfile", back_populates="deployments")

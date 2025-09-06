@@ -3122,8 +3122,8 @@ class ProviderCapabilityEnum(Enum):
                     guardrail endpoints.
     """
 
-    MODEL = auto()
-    MODERATION = auto()
+    MODEL = "model"
+    MODERATION = "moderation"
 
 
 class AuditActionEnum(StrEnum):

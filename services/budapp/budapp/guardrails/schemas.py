@@ -17,14 +17,13 @@
 """Guardrail Pydantic schemas for API validation and serialization."""
 
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from budapp.commons.constants import (
     GuardrailDeploymentStatusEnum,
-    GuardrailDeploymentTypeEnum,
     GuardrailProviderTypeEnum,
     GuardrailStatusEnum,
 )
@@ -50,8 +49,8 @@ class GuardrailRuleCreate(BaseModel):
     """Schema for creating guardrail rule."""
 
     name: str
+    uri: Optional[str] = None
     probe_id: UUID
-    user_id: UUID
     status: GuardrailStatusEnum
     description: Optional[str] = None
     scanner_types: Optional[list[str]] = None
@@ -96,8 +95,9 @@ class GuardrailProbeCreate(BaseModel):
     """Schema for creating guardrail probe."""
 
     name: str
+    uri: Optional[str] = None
     provider_id: UUID
-    user_id: UUID
+    provider_type: GuardrailProviderTypeEnum
     status: GuardrailStatusEnum
     description: Optional[str] = None
     tags: Optional[list[Tag]] = None
@@ -118,12 +118,17 @@ class GuardrailProbeResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
+    name: str
+    uri: Optional[str] = None
+    description: Optional[str] = None
+    tags: Optional[list[Tag]] = None
     provider_type: GuardrailProviderTypeEnum
     provider: Provider
     status: GuardrailStatusEnum
     scanner_types: Optional[list[str]] = None
     modality_types: Optional[list[str]] = None
     guard_types: Optional[list[str]] = None
+    examples: Optional[list[str]] = None
     created_by: Optional[UUID] = None
     created_at: datetime
     modified_at: datetime
@@ -160,6 +165,7 @@ class GuardrailProfileCreate(BaseModel):
 
     name: str
     description: Optional[str] = None
+    tags: Optional[list[Tag]] = None
     severity_threshold: Optional[float] = None
     guard_types: Optional[list[str]] = None
     status: GuardrailStatusEnum = GuardrailStatusEnum.ACTIVE
@@ -170,6 +176,7 @@ class GuardrailProfileUpdate(BaseModel):
 
     name: Optional[str] = None
     description: Optional[str] = None
+    tags: Optional[list[Tag]] = None
     severity_threshold: Optional[float] = None
     guard_types: Optional[list[str]] = None
     status: Optional[GuardrailStatusEnum] = None
@@ -184,6 +191,7 @@ class GuardrailProfileResponse(BaseModel):
     name: str
     status: GuardrailStatusEnum
     description: Optional[str] = None
+    tags: Optional[list[Tag]] = None
     severity_threshold: Optional[float] = None
     guard_types: Optional[list[str]] = None
     created_by: Optional[UUID] = None
@@ -204,8 +212,8 @@ class GuardrailProfileDetailResponse(SuccessResponse):
     object: str = "guardrail.profile.get"
 
 
-# GuardrailProfileEnabledProbes schemas
-class GuardrailProfileEnabledProbeCreate(BaseModel):
+# GuardrailProfileProbes schemas
+class GuardrailProfileProbeCreate(BaseModel):
     """Schema for creating enabled probe in profile."""
 
     profile_id: UUID
@@ -214,22 +222,22 @@ class GuardrailProfileEnabledProbeCreate(BaseModel):
     guard_types: Optional[list[str]] = None
 
 
-class GuardrailProfileEnabledProbeUpdate(BaseModel):
+class GuardrailProfileProbeUpdate(BaseModel):
     """Schema for updating enabled probe in profile."""
 
     severity_threshold: Optional[float] = None
     guard_types: Optional[list[str]] = None
 
 
-class GuardrailProfileEnabledProbeResponse(GuardrailProbeResponse):
+class GuardrailProfileProbeResponse(GuardrailProbeResponse):
     """Schema for enabled probe responses."""
 
     severity_threshold: Optional[float] = None
     guard_types: Optional[list[str]] = None
 
 
-# GuardrailProfileDisabledRules schemas
-class GuardrailProfileDisabledRuleCreate(BaseModel):
+# GuardrailProfileRules schemas
+class GuardrailProfileRuleCreate(BaseModel):
     """Schema for creating disabled rule in profile."""
 
     profile_probe_id: UUID
@@ -238,14 +246,14 @@ class GuardrailProfileDisabledRuleCreate(BaseModel):
     guard_types: Optional[list[str]] = None
 
 
-class GuardrailProfileDisabledRuleUpdate(BaseModel):
+class GuardrailProfileRuleUpdate(BaseModel):
     """Schema for updating disabled rule in profile."""
 
     severity_threshold: Optional[float] = None
     guard_types: Optional[list[str]] = None
 
 
-class GuardrailProfileDisabledRuleResponse(GuardrailRuleResponse):
+class GuardrailProfileRuleResponse(GuardrailRuleResponse):
     """Schema for disabled rule responses."""
 
     severity_threshold: Optional[float] = None
