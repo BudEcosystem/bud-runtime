@@ -82,7 +82,7 @@ class TestBillingPlanEndpoints:
 
         client = TestClient(app)
 
-        with patch('budapp.billing_ops.routes.BillingPlan', BillingPlan):
+        with patch('budapp.billing_ops.models.BillingPlan', BillingPlan):
             response = client.get("/billing/plans")
 
         assert response.status_code == status.HTTP_200_OK
@@ -381,7 +381,7 @@ class TestBillingAlertEndpoints:
             "threshold_percent": 80,
         }
 
-        with patch('budapp.billing_ops.routes.BillingAlert') as mock_alert_class:
+        with patch('budapp.billing_ops.models.BillingAlert') as mock_alert_class:
             mock_alert = MagicMock()
             mock_alert_class.return_value = mock_alert
 
