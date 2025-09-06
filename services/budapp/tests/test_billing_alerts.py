@@ -154,7 +154,9 @@ class TestBillingAlerts:
                 result = await billing_service.check_and_trigger_alerts(user_id)
 
                 assert len(result) == 1
-                assert "50% Token Alert" in result
+                assert result[0]["alert_name"] == "50% Token Alert"
+                assert result[0]["alert_type"] == "token_usage"
+                assert result[0]["current_percent"] == 60
                 assert alert_50.last_triggered_at is not None
                 assert alert_75.last_triggered_at is None
 
@@ -242,7 +244,9 @@ class TestBillingAlerts:
                 result = await billing_service.check_and_trigger_alerts(user_id)
 
                 assert len(result) == 1
-                assert "100% Token Alert" in result
+                assert result[0]["alert_name"] == "100% Token Alert"
+                assert result[0]["alert_type"] == "token_usage"
+                assert result[0]["current_percent"] == 100
 
     @pytest.mark.asyncio
     async def test_alert_exceeded_threshold(self, billing_service, mock_session, user_billing):
@@ -299,7 +303,9 @@ class TestBillingAlerts:
 
                 # Only active alert should trigger
                 assert len(result) == 1
-                assert "Active Alert" in result
+                assert result[0]["alert_name"] == "Active Alert"
+                assert result[0]["alert_type"] == "token_usage"
+                assert result[0]["current_percent"] == 60
                 assert active_alert.last_triggered_at is not None
                 assert inactive_alert.last_triggered_at is None
 
