@@ -92,7 +92,7 @@ class TestBillingAlerts:
                 "success_rate": 99.5,
             }
 
-            with patch('budapp.billing_ops.services.BillingNotificationService') as mock_notification_class:
+            with patch('budapp.billing_ops.notification_service.BillingNotificationService') as mock_notification_class:
                 mock_notification_service = MagicMock()
                 mock_notification_class.return_value = mock_notification_service
 
@@ -128,7 +128,7 @@ class TestBillingAlerts:
                 "success_rate": 99.0,
             }
 
-            with patch('budapp.billing_ops.services.BillingNotificationService') as mock_notification_class:
+            with patch('budapp.billing_ops.notification_service.BillingNotificationService') as mock_notification_class:
                 mock_notification_service = MagicMock()
                 mock_notification_service.send_usage_alert.return_value = {"success": True}
                 mock_notification_class.return_value = mock_notification_service
@@ -171,7 +171,7 @@ class TestBillingAlerts:
                 "success_rate": 98.5,
             }
 
-            with patch('budapp.billing_ops.services.BillingNotificationService') as mock_notification_class:
+            with patch('budapp.billing_ops.notification_service.BillingNotificationService') as mock_notification_class:
                 mock_notification_service = MagicMock()
                 mock_notification_service.send_usage_alert.return_value = {"success": True}
                 mock_notification_class.return_value = mock_notification_service
@@ -214,7 +214,7 @@ class TestBillingAlerts:
                 "success_rate": 99.0,
             }
 
-            with patch('budapp.billing_ops.services.BillingNotificationService') as mock_notification_class:
+            with patch('budapp.billing_ops.notification_service.BillingNotificationService') as mock_notification_class:
                 mock_notification_service = MagicMock()
                 mock_notification_class.return_value = mock_notification_service
 
@@ -249,7 +249,7 @@ class TestBillingAlerts:
                 "success_rate": 99.0,
             }
 
-            with patch('budapp.billing_ops.services.BillingNotificationService') as mock_notification_class:
+            with patch('budapp.billing_ops.notification_service.BillingNotificationService') as mock_notification_class:
                 mock_notification_service = MagicMock()
                 mock_notification_service.send_usage_alert.return_value = {"success": True}
                 mock_notification_class.return_value = mock_notification_service
@@ -289,7 +289,7 @@ class TestBillingAlerts:
                 "success_rate": 98.0,
             }
 
-            with patch('budapp.billing_ops.services.BillingNotificationService') as mock_notification_class:
+            with patch('budapp.billing_ops.notification_service.BillingNotificationService') as mock_notification_class:
                 mock_notification_service = MagicMock()
                 mock_notification_service.send_usage_alert.return_value = {"success": True}
                 mock_notification_class.return_value = mock_notification_service
@@ -327,7 +327,7 @@ class TestBillingAlerts:
                 "success_rate": 99.0,
             }
 
-            with patch('budapp.billing_ops.services.BillingNotificationService') as mock_notification_class:
+            with patch('budapp.billing_ops.notification_service.BillingNotificationService') as mock_notification_class:
                 mock_notification_service = MagicMock()
                 mock_notification_service.send_usage_alert.return_value = {"success": True}
                 mock_notification_class.return_value = mock_notification_service
@@ -369,7 +369,7 @@ class TestBillingAlerts:
                 "success_rate": 99.0,
             }
 
-            with patch('budapp.billing_ops.services.BillingNotificationService') as mock_notification_class:
+            with patch('budapp.billing_ops.notification_service.BillingNotificationService') as mock_notification_class:
                 mock_notification_service = MagicMock()
                 mock_notification_service.send_usage_alert.return_value = {"success": True}
                 mock_notification_class.return_value = mock_notification_service
@@ -405,7 +405,7 @@ class TestBillingAlerts:
             }
 
             # Mock notification failure
-            with patch('budapp.billing_ops.services.BillingNotificationService') as mock_notification_class:
+            with patch('budapp.billing_ops.notification_service.BillingNotificationService') as mock_notification_class:
                 mock_notification_service = MagicMock()
                 mock_notification_service.send_usage_alert.side_effect = Exception("Notification service down")
                 mock_notification_class.return_value = mock_notification_service
