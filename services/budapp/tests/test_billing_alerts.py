@@ -63,6 +63,26 @@ class TestBillingAlerts:
         alert.last_triggered_value = None
         return alert
 
+    def setup_database_mocks(self, mock_session, user_billing, alerts):
+        """Helper to set up database mocks for check_and_trigger_alerts method."""
+        # The check_and_trigger_alerts method makes several database calls:
+        # 1. get_user_billing (returns user_billing)
+        # 2. User query (for user email)
+        # 3. get_billing_alerts (returns alerts)
+
+        mock_user_billing_result = MagicMock()
+        mock_user_billing_result.scalar_one_or_none.return_value = user_billing
+
+        mock_user_result = MagicMock()
+        mock_user = MagicMock()
+        mock_user.email = "test@example.com"
+        mock_user_result.scalar_one_or_none.return_value = mock_user
+
+        mock_alerts_result = MagicMock()
+        mock_alerts_result.scalars.return_value.all.return_value = alerts
+
+        mock_session.execute.side_effect = [mock_user_billing_result, mock_user_result, mock_alerts_result]
+
     @pytest.mark.asyncio
     async def test_check_alerts_no_triggers(self, billing_service, mock_session, user_billing):
         """Test checking alerts when none should trigger."""
@@ -74,14 +94,8 @@ class TestBillingAlerts:
             self.create_alert(user_billing.id, "75% Cost", "cost_usage", 75),
         ]
 
-        # Mock database queries
-        mock_execute1 = MagicMock()
-        mock_execute1.scalar_one_or_none.return_value = user_billing
-
-        mock_execute2 = MagicMock()
-        mock_execute2.scalars.return_value.all.return_value = alerts
-
-        mock_session.execute.side_effect = [mock_execute1, mock_execute2]
+        # Set up database mocks
+        self.setup_database_mocks(mock_session, user_billing, alerts)
 
         # Mock low usage (won't trigger alerts)
         with patch.object(billing_service, 'get_usage_from_clickhouse') as mock_get_usage:
@@ -110,14 +124,8 @@ class TestBillingAlerts:
         alert_50 = self.create_alert(user_billing.id, "50% Token Alert", "token_usage", 50)
         alert_75 = self.create_alert(user_billing.id, "75% Token Alert", "token_usage", 75)
 
-        # Mock database queries
-        mock_execute1 = MagicMock()
-        mock_execute1.scalar_one_or_none.return_value = user_billing
-
-        mock_execute2 = MagicMock()
-        mock_execute2.scalars.return_value.all.return_value = [alert_50, alert_75]
-
-        mock_session.execute.side_effect = [mock_execute1, mock_execute2]
+        # Set up database mocks
+        self.setup_database_mocks(mock_session, user_billing, [alert_50, alert_75])
 
         # Mock usage that triggers 50% alert only
         with patch.object(billing_service, 'get_usage_from_clickhouse') as mock_get_usage:
@@ -153,14 +161,8 @@ class TestBillingAlerts:
             self.create_alert(user_billing.id, "50% Cost", "cost_usage", 50),
         ]
 
-        # Mock database queries
-        mock_execute1 = MagicMock()
-        mock_execute1.scalar_one_or_none.return_value = user_billing
-
-        mock_execute2 = MagicMock()
-        mock_execute2.scalars.return_value.all.return_value = alerts
-
-        mock_session.execute.side_effect = [mock_execute1, mock_execute2]
+        # Set up database mocks
+        self.setup_database_mocks(mock_session, user_billing, alerts)
 
         # Mock usage that triggers multiple alerts
         with patch.object(billing_service, 'get_usage_from_clickhouse') as mock_get_usage:
@@ -196,14 +198,8 @@ class TestBillingAlerts:
             last_triggered_at=recent_trigger
         )
 
-        # Mock database queries
-        mock_execute1 = MagicMock()
-        mock_execute1.scalar_one_or_none.return_value = user_billing
-
-        mock_execute2 = MagicMock()
-        mock_execute2.scalars.return_value.all.return_value = [alert]
-
-        mock_session.execute.side_effect = [mock_execute1, mock_execute2]
+        # Set up database mocks
+        self.setup_database_mocks(mock_session, user_billing, [alert])
 
         # Mock usage that would trigger alert
         with patch.object(billing_service, 'get_usage_from_clickhouse') as mock_get_usage:
@@ -231,14 +227,8 @@ class TestBillingAlerts:
 
         alert_100 = self.create_alert(user_billing.id, "100% Token Alert", "token_usage", 100)
 
-        # Mock database queries
-        mock_execute1 = MagicMock()
-        mock_execute1.scalar_one_or_none.return_value = user_billing
-
-        mock_execute2 = MagicMock()
-        mock_execute2.scalars.return_value.all.return_value = [alert_100]
-
-        mock_session.execute.side_effect = [mock_execute1, mock_execute2]
+        # Set up database mocks
+        self.setup_database_mocks(mock_session, user_billing, [alert_100])
 
         # Mock usage at exactly 100%
         with patch.object(billing_service, 'get_usage_from_clickhouse') as mock_get_usage:
@@ -271,14 +261,8 @@ class TestBillingAlerts:
             self.create_alert(user_billing.id, "90% Cost", "cost_usage", 90),
         ]
 
-        # Mock database queries
-        mock_execute1 = MagicMock()
-        mock_execute1.scalar_one_or_none.return_value = user_billing
-
-        mock_execute2 = MagicMock()
-        mock_execute2.scalars.return_value.all.return_value = alerts
-
-        mock_session.execute.side_effect = [mock_execute1, mock_execute2]
+        # Set up database mocks
+        self.setup_database_mocks(mock_session, user_billing, alerts)
 
         # Mock usage exceeding 100%
         with patch.object(billing_service, 'get_usage_from_clickhouse') as mock_get_usage:
@@ -309,14 +293,8 @@ class TestBillingAlerts:
         inactive_alert = self.create_alert(user_billing.id, "Inactive Alert", "token_usage", 50)
         inactive_alert.is_active = False
 
-        # Mock database queries
-        mock_execute1 = MagicMock()
-        mock_execute1.scalar_one_or_none.return_value = user_billing
-
-        mock_execute2 = MagicMock()
-        mock_execute2.scalars.return_value.all.return_value = [active_alert, inactive_alert]
-
-        mock_session.execute.side_effect = [mock_execute1, mock_execute2]
+        # Set up database mocks
+        self.setup_database_mocks(mock_session, user_billing, [active_alert, inactive_alert])
 
         # Mock usage that would trigger both if active
         with patch.object(billing_service, 'get_usage_from_clickhouse') as mock_get_usage:
@@ -351,14 +329,8 @@ class TestBillingAlerts:
 
         alert = self.create_alert(user_billing.id, "50% Custom Token", "token_usage", 50)
 
-        # Mock database queries
-        mock_execute1 = MagicMock()
-        mock_execute1.scalar_one_or_none.return_value = user_billing
-
-        mock_execute2 = MagicMock()
-        mock_execute2.scalars.return_value.all.return_value = [alert]
-
-        mock_session.execute.side_effect = [mock_execute1, mock_execute2]
+        # Set up database mocks
+        self.setup_database_mocks(mock_session, user_billing, [alert])
 
         # Mock usage that's 50% of custom quota
         with patch.object(billing_service, 'get_usage_from_clickhouse') as mock_get_usage:
@@ -386,14 +358,8 @@ class TestBillingAlerts:
 
         alert = self.create_alert(user_billing.id, "50% Alert", "token_usage", 50)
 
-        # Mock database queries
-        mock_execute1 = MagicMock()
-        mock_execute1.scalar_one_or_none.return_value = user_billing
-
-        mock_execute2 = MagicMock()
-        mock_execute2.scalars.return_value.all.return_value = [alert]
-
-        mock_session.execute.side_effect = [mock_execute1, mock_execute2]
+        # Set up database mocks
+        self.setup_database_mocks(mock_session, user_billing, [alert])
 
         # Mock usage that triggers alert
         with patch.object(billing_service, 'get_usage_from_clickhouse') as mock_get_usage:
