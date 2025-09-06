@@ -83,6 +83,26 @@ class TestBillingAlerts:
 
         mock_session.execute.side_effect = [mock_user_billing_result, mock_user_result, mock_alerts_result]
 
+    def create_usage_mock(self, tokens_percent, cost_percent, tokens_quota=100000, cost_quota=200.00):
+        """Helper to create usage data mock for get_current_usage."""
+        tokens_used = int(tokens_quota * tokens_percent / 100)
+        cost_used = float(cost_quota * cost_percent / 100)
+
+        return {
+            "has_billing": True,
+            "usage": {
+                "tokens_used": tokens_used,
+                "tokens_quota": tokens_quota,
+                "tokens_usage_percent": tokens_percent,
+                "cost_used": cost_used,
+                "cost_quota": cost_quota,
+                "cost_usage_percent": cost_percent,
+                "request_count": 1000,
+                "success_rate": 99.0,
+            },
+            "plan_name": "Test Plan"
+        }
+
     @pytest.mark.asyncio
     async def test_check_alerts_no_triggers(self, billing_service, mock_session, user_billing):
         """Test checking alerts when none should trigger."""
@@ -98,13 +118,8 @@ class TestBillingAlerts:
         self.setup_database_mocks(mock_session, user_billing, alerts)
 
         # Mock low usage (won't trigger alerts)
-        with patch.object(billing_service, 'get_usage_from_clickhouse') as mock_get_usage:
-            mock_get_usage.return_value = {
-                "total_tokens": 25000,  # 25% of quota
-                "total_cost": 40.00,  # 20% of quota
-                "request_count": 500,
-                "success_rate": 99.5,
-            }
+        with patch.object(billing_service, 'get_current_usage') as mock_get_current_usage:
+            mock_get_current_usage.return_value = self.create_usage_mock(25, 20)  # 25% tokens, 20% cost
 
             with patch('budapp.billing_ops.notification_service.BillingNotificationService') as mock_notification_class:
                 mock_notification_service = MagicMock()
@@ -128,13 +143,8 @@ class TestBillingAlerts:
         self.setup_database_mocks(mock_session, user_billing, [alert_50, alert_75])
 
         # Mock usage that triggers 50% alert only
-        with patch.object(billing_service, 'get_usage_from_clickhouse') as mock_get_usage:
-            mock_get_usage.return_value = {
-                "total_tokens": 60000,  # 60% of quota (triggers 50% alert)
-                "total_cost": 50.00,
-                "request_count": 1200,
-                "success_rate": 99.0,
-            }
+        with patch.object(billing_service, 'get_current_usage') as mock_get_current_usage:
+            mock_get_current_usage.return_value = self.create_usage_mock(60, 25)  # 60% tokens, 25% cost
 
             with patch('budapp.billing_ops.notification_service.BillingNotificationService') as mock_notification_class:
                 mock_notification_service = MagicMock()
@@ -165,13 +175,8 @@ class TestBillingAlerts:
         self.setup_database_mocks(mock_session, user_billing, alerts)
 
         # Mock usage that triggers multiple alerts
-        with patch.object(billing_service, 'get_usage_from_clickhouse') as mock_get_usage:
-            mock_get_usage.return_value = {
-                "total_tokens": 80000,  # 80% (triggers 25%, 50%, 75%)
-                "total_cost": 120.00,  # 60% (triggers 50% cost)
-                "request_count": 1600,
-                "success_rate": 98.5,
-            }
+        with patch.object(billing_service, 'get_current_usage') as mock_get_current_usage:
+            mock_get_current_usage.return_value = self.create_usage_mock(80, 60)  # 80% tokens, 60% cost
 
             with patch('budapp.billing_ops.notification_service.BillingNotificationService') as mock_notification_class:
                 mock_notification_service = MagicMock()
@@ -202,13 +207,8 @@ class TestBillingAlerts:
         self.setup_database_mocks(mock_session, user_billing, [alert])
 
         # Mock usage that would trigger alert
-        with patch.object(billing_service, 'get_usage_from_clickhouse') as mock_get_usage:
-            mock_get_usage.return_value = {
-                "total_tokens": 60000,  # Still above 50%
-                "total_cost": 50.00,
-                "request_count": 1200,
-                "success_rate": 99.0,
-            }
+        with patch.object(billing_service, 'get_current_usage') as mock_get_current_usage:
+            mock_get_current_usage.return_value = self.create_usage_mock(60, 25)  # 60% tokens, 25% cost
 
             with patch('budapp.billing_ops.notification_service.BillingNotificationService') as mock_notification_class:
                 mock_notification_service = MagicMock()
@@ -231,13 +231,8 @@ class TestBillingAlerts:
         self.setup_database_mocks(mock_session, user_billing, [alert_100])
 
         # Mock usage at exactly 100%
-        with patch.object(billing_service, 'get_usage_from_clickhouse') as mock_get_usage:
-            mock_get_usage.return_value = {
-                "total_tokens": 100000,  # Exactly 100%
-                "total_cost": 150.00,
-                "request_count": 2000,
-                "success_rate": 99.0,
-            }
+        with patch.object(billing_service, 'get_current_usage') as mock_get_current_usage:
+            mock_get_current_usage.return_value = self.create_usage_mock(100, 75)  # 100% tokens, 75% cost
 
             with patch('budapp.billing_ops.notification_service.BillingNotificationService') as mock_notification_class:
                 mock_notification_service = MagicMock()
@@ -265,13 +260,8 @@ class TestBillingAlerts:
         self.setup_database_mocks(mock_session, user_billing, alerts)
 
         # Mock usage exceeding 100%
-        with patch.object(billing_service, 'get_usage_from_clickhouse') as mock_get_usage:
-            mock_get_usage.return_value = {
-                "total_tokens": 150000,  # 150% of quota
-                "total_cost": 250.00,  # 125% of quota
-                "request_count": 3000,
-                "success_rate": 98.0,
-            }
+        with patch.object(billing_service, 'get_current_usage') as mock_get_current_usage:
+            mock_get_current_usage.return_value = self.create_usage_mock(150, 125)  # 150% tokens, 125% cost
 
             with patch('budapp.billing_ops.notification_service.BillingNotificationService') as mock_notification_class:
                 mock_notification_service = MagicMock()
@@ -297,13 +287,8 @@ class TestBillingAlerts:
         self.setup_database_mocks(mock_session, user_billing, [active_alert, inactive_alert])
 
         # Mock usage that would trigger both if active
-        with patch.object(billing_service, 'get_usage_from_clickhouse') as mock_get_usage:
-            mock_get_usage.return_value = {
-                "total_tokens": 60000,  # 60% of quota
-                "total_cost": 50.00,
-                "request_count": 1200,
-                "success_rate": 99.0,
-            }
+        with patch.object(billing_service, 'get_current_usage') as mock_get_current_usage:
+            mock_get_current_usage.return_value = self.create_usage_mock(60, 25)  # 60% tokens, 25% cost
 
             with patch('budapp.billing_ops.notification_service.BillingNotificationService') as mock_notification_class:
                 mock_notification_service = MagicMock()
@@ -333,13 +318,8 @@ class TestBillingAlerts:
         self.setup_database_mocks(mock_session, user_billing, [alert])
 
         # Mock usage that's 50% of custom quota
-        with patch.object(billing_service, 'get_usage_from_clickhouse') as mock_get_usage:
-            mock_get_usage.return_value = {
-                "total_tokens": 75000,  # 50% of custom 150000
-                "total_cost": 100.00,
-                "request_count": 1500,
-                "success_rate": 99.0,
-            }
+        with patch.object(billing_service, 'get_current_usage') as mock_get_current_usage:
+            mock_get_current_usage.return_value = self.create_usage_mock(50, 33, tokens_quota=150000, cost_quota=300.00)  # 50% of custom quotas
 
             with patch('budapp.billing_ops.notification_service.BillingNotificationService') as mock_notification_class:
                 mock_notification_service = MagicMock()
@@ -362,13 +342,8 @@ class TestBillingAlerts:
         self.setup_database_mocks(mock_session, user_billing, [alert])
 
         # Mock usage that triggers alert
-        with patch.object(billing_service, 'get_usage_from_clickhouse') as mock_get_usage:
-            mock_get_usage.return_value = {
-                "total_tokens": 60000,
-                "total_cost": 50.00,
-                "request_count": 1200,
-                "success_rate": 99.0,
-            }
+        with patch.object(billing_service, 'get_current_usage') as mock_get_current_usage:
+            mock_get_current_usage.return_value = self.create_usage_mock(60, 25)  # 60% tokens, 25% cost
 
             # Mock notification failure
             with patch('budapp.billing_ops.notification_service.BillingNotificationService') as mock_notification_class:
