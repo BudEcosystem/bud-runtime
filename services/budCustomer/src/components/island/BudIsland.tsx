@@ -3,7 +3,7 @@ import { Modal, Tooltip } from "antd";
 import { useIsland } from "src/hooks/useIsland";
 import { Image } from "antd";
 import { Text_10_400_B3B3B3, Text_14_400_B3B3B3 } from "../ui/text";
-import { IMessage, useFetchNotifications, useSocket } from "@novu/notification-center";
+import { IMessage, useFetchNotifications, useSocket, useNovuContext } from "@novu/notification-center";
 import { useUser } from "@/stores/useUser";
 import { useWorkflow } from "src/stores/useWorkflow";
 import { useDrawer } from "src/hooks/useDrawer";
@@ -38,6 +38,7 @@ const BudIsland: React.FC = () => {
     const { user } = useUser();
     const { isDrawerOpen, minmizedProcessList, openDrawerWithStep, showMinimizedItem } = useDrawer();
     const { socket } = useSocket();
+    const { isSessionInitialized } = useNovuContext();
     const { workflowList, getWorkflowList } = useWorkflow();
     const [lastNotification, setLastNotification] = React.useState<IMessage>();
     const { data, refetch, isLoading, isRefetching } = useFetchNotifications({
@@ -106,6 +107,13 @@ const BudIsland: React.FC = () => {
         refetch();
         getWorkflowList();
     }, [isOpen, user]);
+
+    // Log session initialization status for debugging
+    useEffect(() => {
+        if (isSessionInitialized) {
+            console.log('Novu session initialized successfully');
+        }
+    }, [isSessionInitialized]);
 
     // Hide the minimized item after 5 seconds
     useEffect(() => {
