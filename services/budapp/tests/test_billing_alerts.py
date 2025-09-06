@@ -68,7 +68,7 @@ class TestBillingAlerts:
         # The check_and_trigger_alerts method makes several database calls:
         # 1. get_user_billing (returns user_billing)
         # 2. User query (for user email)
-        # 3. get_billing_alerts (returns alerts)
+        # 3. get_billing_alerts (returns only active alerts)
 
         mock_user_billing_result = MagicMock()
         mock_user_billing_result.scalar_one_or_none.return_value = user_billing
@@ -78,8 +78,10 @@ class TestBillingAlerts:
         mock_user.email = "test@example.com"
         mock_user_result.scalar_one_or_none.return_value = mock_user
 
+        # Filter alerts to only include active ones (mimics the database query behavior)
+        active_alerts = [alert for alert in alerts if alert.is_active]
         mock_alerts_result = MagicMock()
-        mock_alerts_result.scalars.return_value.all.return_value = alerts
+        mock_alerts_result.scalars.return_value.all.return_value = active_alerts
 
         mock_session.execute.side_effect = [mock_user_billing_result, mock_user_result, mock_alerts_result]
 
