@@ -9,6 +9,8 @@ import dayjs from "dayjs";
 import { AppRequest } from "@/services/api/requests";
 import { formatDate } from "src/utils/formatDate";
 import { useProjects } from "@/hooks/useProjects";
+import { useBillingAlerts } from "@/hooks/useBillingAlerts";
+import { useNotification } from "@/components/toast";
 import { motion, AnimatePresence } from "framer-motion";
 import dynamic from "next/dynamic";
 
@@ -48,14 +50,19 @@ interface UsageMetrics {
 
 interface BillingAlert {
   id: string;
-  type: "cost" | "usage" | "requests";
-  threshold: number;
-  isActive: boolean;
-  lastTriggered?: string;
+  user_id: string;
+  name: string;
+  alert_type: "token_usage" | "cost_usage";
+  threshold_percent: number;
+  is_active: boolean;
+  last_triggered_at?: string;
+  created_at: string;
 }
 
 export default function UsagePage() {
   const { globalProjects, getGlobalProjects, loading } = useProjects();
+  const { alerts, loading: alertsLoading, getBillingAlerts, createBillingAlert, updateBillingAlertStatus, deleteBillingAlert } = useBillingAlerts();
+  const notification = useNotification();
   const [timeRange, setTimeRange] = useState("30d");
   const [selectedProject, setSelectedProject] = useState("all");
   const [availableProjects, setAvailableProjects] = useState<any>([]);
@@ -95,16 +102,9 @@ export default function UsagePage() {
   const [usageData, setUsageData] = useState<UsageData[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
   const [showAlertModal, setShowAlertModal] = useState(false);
-  const [alertType, setAlertType] = useState<"cost" | "usage" | "requests">(
-    "cost",
-  );
+  const [alertType, setAlertType] = useState<"token_usage" | "cost_usage">("cost_usage");
   const [alertThreshold, setAlertThreshold] = useState(75);
-  // Mock alerts
-  const [alerts, setAlerts] = useState<BillingAlert[]>([
-    { id: "1", type: "cost", threshold: 75, isActive: true },
-    { id: "2", type: "usage", threshold: 100, isActive: true },
-    // { id: "3", type: "requests", threshold: 8000, isActive: false },
-  ]);
+  const [alertName, setAlertName] = useState("");
 
   const themeConfig = {
     components: {
@@ -230,6 +230,7 @@ export default function UsagePage() {
   useEffect(() => {
     fetchUsageData();
     getGlobalProjects(1, 1000);
+    getBillingAlerts();
   }, []);
 
   const getDateRange = (option: string) => {
@@ -315,24 +316,52 @@ export default function UsagePage() {
   };
 
 
-  const handleCreateAlert = () => {
-    const newAlert: BillingAlert = {
-      id: Date.now().toString(),
-      type: alertType,
-      threshold: alertThreshold,
-      isActive: true,
-    };
-    setAlerts([...alerts, newAlert]);
-    setShowAlertModal(false);
-    setAlertThreshold(100);
+  const handleCreateAlert = async () => {
+    if (!alertName.trim()) {
+      notification.errorToast("Please enter an alert name");
+      return;
+    }
+
+    // Check if alert with same name already exists
+    const existingAlert = alerts.find(
+      alert => alert.name.toLowerCase() === alertName.trim().toLowerCase()
+    );
+    if (existingAlert) {
+      notification.errorToast("An alert with this name already exists");
+      return;
+    }
+
+    try {
+      await createBillingAlert({
+        name: alertName,
+        alert_type: alertType,
+        threshold_percent: alertThreshold,
+      });
+      notification.successToast("Billing alert created successfully");
+      setShowAlertModal(false);
+      setAlertThreshold(75);
+      setAlertName("");
+    } catch (error: any) {
+      notification.errorToast(error.message || "Failed to create billing alert");
+    }
   };
 
-  const toggleAlert = (id: string) => {
-    setAlerts(
-      alerts.map((alert) =>
-        alert.id === id ? { ...alert, isActive: !alert.isActive } : alert,
-      ),
-    );
+  const toggleAlert = async (id: string, currentStatus: boolean) => {
+    try {
+      await updateBillingAlertStatus(id, !currentStatus);
+      notification.successToast(`Alert ${!currentStatus ? 'enabled' : 'disabled'} successfully`);
+    } catch (error: any) {
+      notification.errorToast(error.message || "Failed to update alert status");
+    }
+  };
+
+  const handleDeleteAlert = async (id: string) => {
+    try {
+      await deleteBillingAlert(id);
+      notification.successToast("Alert deleted successfully");
+    } catch (error: any) {
+      notification.errorToast(error.message || "Failed to delete alert");
+    }
   };
 
   return (
@@ -476,35 +505,58 @@ export default function UsagePage() {
             </Flex>
 
             <div className="space-y-[1rem]">
-              {alerts.map((alert) => (
-                <div
-                  key={alert.id}
-                  className="bg-bud-bg-tertiary rounded-[8px] p-[1rem]"
-                >
-                  <Flex justify="space-between" align="center">
-                    <div>
-                      <Text className="text-bud-text-primary font-medium text-[14px] capitalize">
-                        {alert.type} Alert
-                      </Text>
-                      <Text className="text-bud-text-muted text-[12px] mt-[0.25rem] block">
-                        Triggers when {alert.type} reaches {alert.threshold}
-                        {alert.type === "cost" || alert.type === "usage"
-                          ? " %"
-                          : " requests"}
-                      </Text>
-                    </div>
-                    <Switch
-                      checked={alert.isActive}
-                      onChange={() => toggleAlert(alert.id)}
-                      style={{
-                        backgroundColor: alert.isActive
-                          ? "var(--color-purple)"
-                          : "var(--border-secondary)",
-                      }}
-                    />
-                  </Flex>
+              {alertsLoading ? (
+                <div className="text-center py-[2rem]">
+                  <Text className="text-bud-text-muted">Loading alerts...</Text>
                 </div>
-              ))}
+              ) : alerts.length === 0 ? (
+                <div className="text-center py-[2rem]">
+                  <Text className="text-bud-text-muted">No billing alerts configured</Text>
+                </div>
+              ) : (
+                alerts.map((alert) => (
+                  <div
+                    key={alert.id}
+                    className="bg-bud-bg-tertiary rounded-[8px] p-[1rem]"
+                  >
+                    <Flex justify="space-between" align="center">
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between mb-[0.5rem]">
+                          <Text className="text-bud-text-primary font-medium text-[14px]">
+                            {alert.name}
+                          </Text>
+                        </div>
+                        <Text className="text-bud-text-muted text-[12px] block">
+                          {alert.alert_type === "cost_usage" ? "Cost" : "Token Usage"} Alert - Triggers at {alert.threshold_percent}%
+                        </Text>
+                        {alert.last_triggered_at && (
+                          <Text className="text-bud-text-disabled text-[11px] block mt-[0.25rem]">
+                            Last triggered: {new Date(alert.last_triggered_at).toLocaleDateString()}
+                          </Text>
+                        )}
+                      </div>
+                      <Switch
+                        checked={alert.is_active}
+                        loading={alertsLoading}
+                        onChange={() => toggleAlert(alert.id, alert.is_active)}
+                        style={{
+                          backgroundColor: alert.is_active
+                            ? "var(--color-purple)"
+                            : "var(--border-secondary)",
+                        }}
+                      />
+		      <Button
+                            type="text"
+                            size="small"
+                            danger
+                            icon={<Icon icon="ph:trash" />}
+                            onClick={() => handleDeleteAlert(alert.id)}
+                            className="text-red-400 hover:text-red-300"
+                          />
+                    </Flex>
+                  </div>
+                ))
+              )}
             </div>
           </Card>
 
@@ -522,7 +574,12 @@ export default function UsagePage() {
           </Text>
         }
         open={showAlertModal}
-        onCancel={() => setShowAlertModal(false)}
+        onCancel={() => {
+          setShowAlertModal(false);
+          setAlertName("");
+          setAlertThreshold(75);
+          setAlertType("cost_usage");
+        }}
         footer={[
           <Button key="cancel" onClick={() => setShowAlertModal(false)}>
             Cancel
@@ -541,6 +598,18 @@ export default function UsagePage() {
         <div className="space-y-[1rem]">
           <div>
             <Text className="text-bud-text-muted text-[12px] mb-[0.5rem] block">
+              Alert Name
+            </Text>
+            <Input
+              value={alertName}
+              onChange={(e) => setAlertName(e.target.value)}
+              placeholder="Enter alert name"
+              className="bg-bud-bg-tertiary border-bud-border-secondary"
+            />
+          </div>
+
+          <div>
+            <Text className="text-bud-text-muted text-[12px] mb-[0.5rem] block">
               Alert Type
             </Text>
             <Select
@@ -548,41 +617,34 @@ export default function UsagePage() {
               onChange={setAlertType}
               className="w-full"
               options={[
-                { value: "cost", label: "Cost Alert" },
-                { value: "usage", label: "Token Usage Alert" },
-                // { value: "requests", label: "Request Count Alert" },
+                { value: "cost_usage", label: "Cost Usage Alert" },
+                { value: "token_usage", label: "Token Usage Alert" },
               ]}
             />
           </div>
 
-            <div>
+          <div>
             <Text className="text-bud-text-muted text-[12px] mb-[0.5rem] block">
-              Threshold
+              Threshold (%)
             </Text>
             <Input
               type="number"
               value={alertThreshold}
               onChange={(e) => {
-              let value = Number(e.target.value);
-              if ((alertType === "cost" || alertType === "usage") && value > 100) {
-                value = 100;
-              }
-              setAlertThreshold(value);
+                let value = Number(e.target.value);
+                if (value > 100) value = 100;
+                if (value < 1) value = 1;
+                setAlertThreshold(value);
               }}
-              placeholder="Enter threshold value"
-              max={alertType === "cost" || alertType === "usage" ? 100 : undefined}
+              placeholder="Enter threshold percentage (1-100)"
+              min={1}
+              max={100}
               className="bg-bud-bg-tertiary border-bud-border-secondary"
               suffix={
-              <Text className="text-bud-text-disabled text-[12px]">
-                {alertType === "cost"
-                ? "%"
-                : alertType === "usage"
-                ? "%"
-                : "requests"}
-              </Text>
+                <Text className="text-bud-text-disabled text-[12px]">%</Text>
               }
             />
-            </div>
+          </div>
         </div>
       </Modal>
     </DashboardLayout>

@@ -12,6 +12,7 @@ from budapp.billing_ops.schemas import (
     CreateBillingAlertRequest,
     CreateUserBillingRequest,
     CurrentUsageSchema,
+    UpdateBillingAlertStatusRequest,
     UpdateBillingPlanRequest,
     UpdateNotificationPreferencesRequest,
     UsageHistoryRequest,
@@ -209,9 +210,8 @@ async def setup_user_billing(
                 detail="Only admins can set up billing",
             )
 
-        service = BillingService(db)
-
         # Verify the billing plan exists
+        service = BillingService(db)
         billing_plan = service.get_billing_plan(request.billing_plan_id)
         if not billing_plan:
             raise HTTPException(
@@ -269,9 +269,8 @@ async def update_billing_plan(
                 detail="Only admins can update billing plans",
             )
 
-        service = BillingService(db)
-
         # Verify the billing plan exists
+        service = BillingService(db)
         billing_plan = service.get_billing_plan(request.billing_plan_id)
         if not billing_plan:
             raise HTTPException(
@@ -314,7 +313,7 @@ async def update_billing_plan(
 
         # Reset alerts if quotas were changed
         if quota_changed:
-            service.reset_user_alerts(user_billing.id)
+            service.reset_user_alerts(request.user_id)
             logger.info(f"Reset billing alerts for user {request.user_id} due to quota update")
 
         return SingleResponse(
@@ -338,8 +337,14 @@ async def get_billing_alerts(
 ) -> SingleResponse[List[BillingAlertSchema]]:
     """Get all billing alerts for the authenticated user."""
     try:
-        service = BillingService(db)
-        alerts = service.get_billing_alerts(current_user.id)
+        from sqlalchemy import select
+
+        from budapp.billing_ops.models import BillingAlert
+
+        # Get all alerts for the current user
+        stmt = select(BillingAlert).where(BillingAlert.user_id == current_user.id)
+        alerts = db.execute(stmt).scalars().all()
+
         return SingleResponse(
             result=[BillingAlertSchema.from_orm(alert) for alert in alerts],
             message="Billing alerts retrieved successfully",
@@ -360,19 +365,21 @@ async def create_billing_alert(
 ) -> SingleResponse[BillingAlertSchema]:
     """Create a new billing alert for the authenticated user."""
     try:
-        service = BillingService(db)
-
-        user_billing = service.get_user_billing(current_user.id)
-        if not user_billing:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="No billing information found",
-            )
+        from sqlalchemy import select
 
         from budapp.billing_ops.models import BillingAlert
 
+        # Check if alert with same name already exists for this user
+        existing_alert_stmt = select(BillingAlert).where(
+            BillingAlert.user_id == current_user.id, BillingAlert.name == request.name
+        )
+        existing_alert = db.execute(existing_alert_stmt).scalar_one_or_none()
+
+        if existing_alert:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="An alert with this name already exists")
+
         alert = BillingAlert(
-            user_billing_id=user_billing.id,
+            user_id=current_user.id,
             name=request.name,
             alert_type=request.alert_type,
             threshold_percent=request.threshold_percent,
@@ -393,6 +400,88 @@ async def create_billing_alert(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to create billing alert",
+        )
+
+
+@router.put("/alerts/{alert_id}", response_model=SingleResponse[BillingAlertSchema])
+async def update_billing_alert_status(
+    alert_id: UUID,
+    request: UpdateBillingAlertStatusRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_session),
+) -> SingleResponse[BillingAlertSchema]:
+    """Enable or disable a billing alert for the authenticated user."""
+    try:
+        from sqlalchemy import select
+
+        from budapp.billing_ops.models import BillingAlert
+
+        # Get the alert and verify ownership
+        stmt = select(BillingAlert).where(BillingAlert.id == alert_id, BillingAlert.user_id == current_user.id)
+        alert = db.execute(stmt).scalar_one_or_none()
+
+        if not alert:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Alert not found or access denied",
+            )
+
+        # Update the alert status
+        alert.is_active = request.is_active
+        db.commit()
+        db.refresh(alert)
+
+        return SingleResponse(
+            result=BillingAlertSchema.from_orm(alert),
+            message=f"Alert {'enabled' if request.is_active else 'disabled'} successfully",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating alert status: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update alert status",
+        )
+
+
+@router.delete("/alerts/{alert_id}", response_model=SingleResponse)
+async def delete_billing_alert(
+    alert_id: UUID,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_session),
+) -> SingleResponse:
+    """Delete a billing alert for the authenticated user."""
+    try:
+        from sqlalchemy import select
+
+        from budapp.billing_ops.models import BillingAlert
+
+        # Get the alert and verify ownership
+        stmt = select(BillingAlert).where(BillingAlert.id == alert_id, BillingAlert.user_id == current_user.id)
+        alert = db.execute(stmt).scalar_one_or_none()
+
+        if not alert:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Alert not found or access denied",
+            )
+
+        # Delete the alert
+        db.delete(alert)
+        db.commit()
+
+        return SingleResponse(
+            result={"alert_id": str(alert_id), "deleted": True},
+            message="Alert deleted successfully",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting alert: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete alert",
         )
 
 

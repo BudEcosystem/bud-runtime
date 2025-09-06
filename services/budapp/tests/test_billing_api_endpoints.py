@@ -1,0 +1,547 @@
+"""Integration tests for billing API endpoints."""
+
+import uuid
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+from fastapi import status
+from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
+
+from budapp.billing_ops.models import BillingAlert, BillingPlan, UserBilling
+from budapp.commons.constants import UserTypeEnum
+from budapp.user_ops.schemas import User
+
+
+@pytest.fixture
+def mock_current_user():
+    """Create a mock current user."""
+    user = MagicMock(spec=User)
+    user.id = uuid.uuid4()
+    user.email = "test@example.com"
+    user.user_type = UserTypeEnum.CLIENT
+    return user
+
+
+@pytest.fixture
+def mock_admin_user():
+    """Create a mock admin user."""
+    user = MagicMock(spec=User)
+    user.id = uuid.uuid4()
+    user.email = "admin@example.com"
+    user.user_type = UserTypeEnum.ADMIN
+    return user
+
+
+@pytest.fixture
+def mock_db_session():
+    """Create a mock database session."""
+    return MagicMock(spec=Session)
+
+
+class TestBillingPlanEndpoints:
+    """Test billing plan endpoints."""
+
+    @patch('budapp.billing_ops.routes.get_session')
+    def test_get_billing_plans_success(self, mock_get_session, mock_db_session):
+        """Test successful retrieval of billing plans."""
+        mock_get_session.return_value = mock_db_session
+
+        # Mock billing plans
+        mock_plans = [
+            MagicMock(
+                spec=BillingPlan,
+                id=uuid.uuid4(),
+                name="Free Plan",
+                description="Basic free tier",
+                monthly_token_quota=10000,
+                monthly_cost_quota=Decimal("10.00"),
+                base_monthly_price=Decimal("0.00"),
+                is_active=True,
+            ),
+            MagicMock(
+                spec=BillingPlan,
+                id=uuid.uuid4(),
+                name="Pro Plan",
+                description="Professional tier",
+                monthly_token_quota=100000,
+                monthly_cost_quota=Decimal("200.00"),
+                base_monthly_price=Decimal("99.00"),
+                is_active=True,
+            ),
+        ]
+
+        mock_query = MagicMock()
+        mock_query.filter_by.return_value.all.return_value = mock_plans
+        mock_db_session.query.return_value = mock_query
+
+        # Import here to avoid circular imports
+        from budapp.main import app
+
+        client = TestClient(app)
+
+        with patch('budapp.billing_ops.routes.BillingPlan', BillingPlan):
+            response = client.get("/billing/plans")
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert "result" in data
+        assert len(data["result"]) == 2
+
+    @patch('budapp.billing_ops.routes.get_session')
+    def test_get_billing_plans_error(self, mock_get_session, mock_db_session):
+        """Test error handling in billing plans retrieval."""
+        mock_get_session.return_value = mock_db_session
+        mock_db_session.query.side_effect = Exception("Database error")
+
+        from budapp.main import app
+
+        client = TestClient(app)
+        response = client.get("/billing/plans")
+
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+
+
+class TestCurrentUsageEndpoints:
+    """Test current usage endpoints."""
+
+    @pytest.mark.asyncio
+    @patch('budapp.billing_ops.routes.get_current_active_user')
+    @patch('budapp.billing_ops.routes.get_session')
+    @patch('budapp.billing_ops.routes.BillingService')
+    async def test_get_current_usage_success(
+        self, mock_billing_service_class, mock_get_session, mock_get_user, mock_current_user, mock_db_session
+    ):
+        """Test successful retrieval of current usage."""
+        mock_get_user.return_value = mock_current_user
+        mock_get_session.return_value = mock_db_session
+
+        # Mock billing service
+        mock_service = MagicMock()
+        mock_billing_service_class.return_value = mock_service
+
+        mock_usage = {
+            "has_billing": True,
+            "billing_period_start": "2024-01-01T00:00:00Z",
+            "billing_period_end": "2024-01-31T23:59:59Z",
+            "plan_name": "Standard Plan",
+            "base_monthly_price": 49.00,
+            "usage": {
+                "tokens_used": 25000,
+                "tokens_quota": 100000,
+                "tokens_usage_percent": 25.0,
+                "cost_used": 50.00,
+                "cost_quota": 200.00,
+                "cost_usage_percent": 25.0,
+                "request_count": 500,
+                "success_rate": 99.5,
+            },
+            "is_suspended": False,
+            "suspension_reason": None,
+        }
+
+        mock_service.get_current_usage = AsyncMock(return_value=mock_usage)
+
+        from budapp.main import app
+
+        client = TestClient(app)
+        response = client.get("/billing/current")
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["result"]["has_billing"] is True
+        assert data["result"]["usage"]["tokens_used"] == 25000
+
+    @pytest.mark.asyncio
+    @patch('budapp.billing_ops.routes.get_current_active_user')
+    @patch('budapp.billing_ops.routes.get_session')
+    @patch('budapp.billing_ops.routes.BillingService')
+    async def test_get_current_usage_no_billing(
+        self, mock_billing_service_class, mock_get_session, mock_get_user, mock_current_user, mock_db_session
+    ):
+        """Test current usage when user has no billing."""
+        mock_get_user.return_value = mock_current_user
+        mock_get_session.return_value = mock_db_session
+
+        mock_service = MagicMock()
+        mock_billing_service_class.return_value = mock_service
+
+        mock_usage = {
+            "has_billing": False,
+            "billing_period_start": None,
+            "billing_period_end": None,
+            "plan_name": None,
+            "base_monthly_price": None,
+            "usage": None,
+            "is_suspended": None,
+            "suspension_reason": None,
+        }
+
+        mock_service.get_current_usage = AsyncMock(return_value=mock_usage)
+
+        from budapp.main import app
+
+        client = TestClient(app)
+        response = client.get("/billing/current")
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["result"]["has_billing"] is False
+        assert data["result"]["usage"] is None
+
+
+class TestUserBillingEndpoints:
+    """Test user billing management endpoints."""
+
+    @patch('budapp.billing_ops.routes.get_current_active_user')
+    @patch('budapp.billing_ops.routes.get_session')
+    @patch('budapp.billing_ops.routes.BillingService')
+    def test_get_user_billing_info_admin_success(
+        self, mock_billing_service_class, mock_get_session, mock_get_user, mock_admin_user, mock_db_session
+    ):
+        """Test admin retrieving user billing info."""
+        mock_get_user.return_value = mock_admin_user
+        mock_get_session.return_value = mock_db_session
+
+        target_user_id = uuid.uuid4()
+
+        mock_service = MagicMock()
+        mock_billing_service_class.return_value = mock_service
+
+        mock_user_billing = MagicMock(spec=UserBilling)
+        mock_user_billing.id = uuid.uuid4()
+        mock_user_billing.user_id = target_user_id
+        mock_user_billing.billing_plan_id = uuid.uuid4()
+        mock_user_billing.is_active = True
+        mock_user_billing.is_suspended = False
+
+        mock_service.get_user_billing.return_value = mock_user_billing
+
+        from budapp.main import app
+
+        client = TestClient(app)
+        response = client.get(f"/billing/user/{target_user_id}")
+
+        assert response.status_code == status.HTTP_200_OK
+
+    @patch('budapp.billing_ops.routes.get_current_active_user')
+    @patch('budapp.billing_ops.routes.get_session')
+    def test_get_user_billing_info_non_admin_forbidden(
+        self, mock_get_session, mock_get_user, mock_current_user, mock_db_session
+    ):
+        """Test non-admin cannot retrieve other user's billing info."""
+        mock_get_user.return_value = mock_current_user  # Non-admin user
+        mock_get_session.return_value = mock_db_session
+
+        target_user_id = uuid.uuid4()
+
+        from budapp.main import app
+
+        client = TestClient(app)
+        response = client.get(f"/billing/user/{target_user_id}")
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    @patch('budapp.billing_ops.routes.get_current_active_user')
+    @patch('budapp.billing_ops.routes.get_session')
+    @patch('budapp.billing_ops.routes.BillingService')
+    def test_setup_user_billing_admin_success(
+        self, mock_billing_service_class, mock_get_session, mock_get_user, mock_admin_user, mock_db_session
+    ):
+        """Test admin setting up user billing."""
+        mock_get_user.return_value = mock_admin_user
+        mock_get_session.return_value = mock_db_session
+
+        mock_service = MagicMock()
+        mock_billing_service_class.return_value = mock_service
+
+        # Mock billing plan exists
+        mock_plan = MagicMock(spec=BillingPlan)
+        mock_plan.is_active = True
+        mock_service.get_billing_plan.return_value = mock_plan
+
+        # Mock no existing billing
+        mock_service.get_user_billing.return_value = None
+
+        # Mock create billing
+        new_user_billing = MagicMock(spec=UserBilling)
+        mock_service.create_user_billing.return_value = new_user_billing
+
+        from budapp.main import app
+
+        client = TestClient(app)
+
+        request_data = {
+            "user_id": str(uuid.uuid4()),
+            "billing_plan_id": str(uuid.uuid4()),
+            "custom_token_quota": 75000,
+            "custom_cost_quota": 150.00,
+        }
+
+        response = client.post("/billing/setup", json=request_data)
+
+        assert response.status_code == status.HTTP_200_OK
+
+    @patch('budapp.billing_ops.routes.get_current_active_user')
+    @patch('budapp.billing_ops.routes.get_session')
+    @patch('budapp.billing_ops.routes.BillingService')
+    def test_update_billing_plan_admin_success(
+        self, mock_billing_service_class, mock_get_session, mock_get_user, mock_admin_user, mock_db_session
+    ):
+        """Test admin updating user's billing plan."""
+        mock_get_user.return_value = mock_admin_user
+        mock_get_session.return_value = mock_db_session
+
+        mock_service = MagicMock()
+        mock_billing_service_class.return_value = mock_service
+
+        # Mock billing plan exists
+        mock_plan = MagicMock(spec=BillingPlan)
+        mock_plan.is_active = True
+        mock_service.get_billing_plan.return_value = mock_plan
+
+        # Mock existing user billing
+        mock_user_billing = MagicMock(spec=UserBilling)
+        mock_service.get_user_billing.return_value = mock_user_billing
+
+        from budapp.main import app
+
+        client = TestClient(app)
+
+        request_data = {
+            "user_id": str(uuid.uuid4()),
+            "billing_plan_id": str(uuid.uuid4()),
+            "custom_token_quota": 100000,
+        }
+
+        response = client.put("/billing/plan", json=request_data)
+
+        assert response.status_code == status.HTTP_200_OK
+
+
+class TestBillingAlertEndpoints:
+    """Test billing alert endpoints."""
+
+    @patch('budapp.billing_ops.routes.get_current_active_user')
+    @patch('budapp.billing_ops.routes.get_session')
+    @patch('budapp.billing_ops.routes.BillingService')
+    def test_get_billing_alerts_success(
+        self, mock_billing_service_class, mock_get_session, mock_get_user, mock_current_user, mock_db_session
+    ):
+        """Test retrieving billing alerts."""
+        mock_get_user.return_value = mock_current_user
+        mock_get_session.return_value = mock_db_session
+
+        mock_service = MagicMock()
+        mock_billing_service_class.return_value = mock_service
+
+        mock_alerts = [
+            MagicMock(spec=BillingAlert, name="50% Alert", threshold_percent=50),
+            MagicMock(spec=BillingAlert, name="75% Alert", threshold_percent=75),
+        ]
+
+        mock_service.get_billing_alerts.return_value = mock_alerts
+
+        from budapp.main import app
+
+        client = TestClient(app)
+        response = client.get("/billing/alerts")
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert len(data["result"]) == 2
+
+    @patch('budapp.billing_ops.routes.get_current_active_user')
+    @patch('budapp.billing_ops.routes.get_session')
+    @patch('budapp.billing_ops.routes.BillingService')
+    def test_create_billing_alert_success(
+        self, mock_billing_service_class, mock_get_session, mock_get_user, mock_current_user, mock_db_session
+    ):
+        """Test creating a billing alert."""
+        mock_get_user.return_value = mock_current_user
+        mock_get_session.return_value = mock_db_session
+
+        mock_service = MagicMock()
+        mock_billing_service_class.return_value = mock_service
+
+        # Mock user billing exists
+        mock_user_billing = MagicMock(spec=UserBilling)
+        mock_user_billing.id = uuid.uuid4()
+        mock_service.get_user_billing.return_value = mock_user_billing
+
+        from budapp.main import app
+
+        client = TestClient(app)
+
+        request_data = {
+            "name": "High Usage Alert",
+            "alert_type": "token_usage",
+            "threshold_percent": 80,
+        }
+
+        with patch('budapp.billing_ops.routes.BillingAlert') as mock_alert_class:
+            mock_alert = MagicMock()
+            mock_alert_class.return_value = mock_alert
+
+            response = client.post("/billing/alerts", json=request_data)
+
+            assert response.status_code == status.HTTP_200_OK
+            mock_db_session.add.assert_called_once_with(mock_alert)
+            mock_db_session.commit.assert_called_once()
+
+    @pytest.mark.asyncio
+    @patch('budapp.billing_ops.routes.get_current_active_user')
+    @patch('budapp.billing_ops.routes.get_session')
+    @patch('budapp.billing_ops.routes.BillingService')
+    async def test_check_and_trigger_alerts_success(
+        self, mock_billing_service_class, mock_get_session, mock_get_user, mock_current_user, mock_db_session
+    ):
+        """Test checking and triggering alerts."""
+        mock_get_user.return_value = mock_current_user
+        mock_get_session.return_value = mock_db_session
+
+        mock_service = MagicMock()
+        mock_billing_service_class.return_value = mock_service
+
+        triggered_alerts = ["50% Token Alert", "75% Cost Alert"]
+        mock_service.check_and_trigger_alerts = AsyncMock(return_value=triggered_alerts)
+
+        from budapp.main import app
+
+        client = TestClient(app)
+        response = client.post("/billing/check-alerts")
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert len(data["result"]["triggered_alerts"]) == 2
+
+
+class TestUsageLimitEndpoints:
+    """Test usage limit checking endpoints."""
+
+    @pytest.mark.asyncio
+    @patch('budapp.billing_ops.routes.get_current_active_user')
+    @patch('budapp.billing_ops.routes.get_session')
+    @patch('budapp.billing_ops.routes.BillingService')
+    async def test_check_usage_limits_within_limits(
+        self, mock_billing_service_class, mock_get_session, mock_get_user, mock_current_user, mock_db_session
+    ):
+        """Test checking usage limits when within limits."""
+        mock_get_user.return_value = mock_current_user
+        mock_get_session.return_value = mock_db_session
+
+        mock_service = MagicMock()
+        mock_billing_service_class.return_value = mock_service
+
+        mock_result = {
+            "within_limits": True,
+            "token_limit_exceeded": False,
+            "cost_limit_exceeded": False,
+            "tokens_used": 50000,
+            "tokens_quota": 100000,
+            "cost_used": 100.00,
+            "cost_quota": 200.00,
+        }
+
+        mock_service.check_usage_limits = AsyncMock(return_value=mock_result)
+
+        from budapp.main import app
+
+        client = TestClient(app)
+        response = client.get("/billing/check-limits")
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["result"]["within_limits"] is True
+
+    @pytest.mark.asyncio
+    @patch('budapp.billing_ops.routes.get_current_active_user')
+    @patch('budapp.billing_ops.routes.get_session')
+    @patch('budapp.billing_ops.routes.BillingService')
+    async def test_check_usage_limits_exceeded(
+        self, mock_billing_service_class, mock_get_session, mock_get_user, mock_current_user, mock_db_session
+    ):
+        """Test checking usage limits when exceeded."""
+        mock_get_user.return_value = mock_current_user
+        mock_get_session.return_value = mock_db_session
+
+        mock_service = MagicMock()
+        mock_billing_service_class.return_value = mock_service
+
+        mock_result = {
+            "within_limits": False,
+            "token_limit_exceeded": True,
+            "cost_limit_exceeded": False,
+            "tokens_used": 150000,
+            "tokens_quota": 100000,
+            "cost_used": 150.00,
+            "cost_quota": 200.00,
+        }
+
+        mock_service.check_usage_limits = AsyncMock(return_value=mock_result)
+
+        from budapp.main import app
+
+        client = TestClient(app)
+        response = client.get("/billing/check-limits")
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["result"]["within_limits"] is False
+        assert data["result"]["token_limit_exceeded"] is True
+
+
+class TestUsageHistoryEndpoints:
+    """Test usage history endpoints."""
+
+    @pytest.mark.asyncio
+    @patch('budapp.billing_ops.routes.get_current_active_user')
+    @patch('budapp.billing_ops.routes.get_session')
+    @patch('budapp.billing_ops.routes.BillingService')
+    async def test_get_usage_history_success(
+        self, mock_billing_service_class, mock_get_session, mock_get_user, mock_current_user, mock_db_session
+    ):
+        """Test retrieving usage history."""
+        mock_get_user.return_value = mock_current_user
+        mock_get_session.return_value = mock_db_session
+
+        mock_service = MagicMock()
+        mock_billing_service_class.return_value = mock_service
+
+        mock_history = [
+            {
+                "date": "2024-01-01",
+                "tokens": 5000,
+                "cost": 12.50,
+                "request_count": 100,
+                "success_rate": 99.0,
+            },
+            {
+                "date": "2024-01-02",
+                "tokens": 7500,
+                "cost": 18.75,
+                "request_count": 150,
+                "success_rate": 98.5,
+            },
+        ]
+
+        mock_service.get_usage_history = AsyncMock(return_value=mock_history)
+
+        from budapp.main import app
+
+        client = TestClient(app)
+
+        request_data = {
+            "start_date": "2024-01-01T00:00:00Z",
+            "end_date": "2024-01-31T23:59:59Z",
+            "granularity": "daily",
+        }
+
+        response = client.post("/billing/history", json=request_data)
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert len(data["result"]) == 2
+        assert data["result"][0]["tokens"] == 5000

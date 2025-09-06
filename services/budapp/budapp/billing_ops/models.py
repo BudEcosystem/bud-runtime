@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import Optional
 from uuid import UUID, uuid4
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Numeric, String, func
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Numeric, String, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -69,16 +69,16 @@ class UserBilling(Base, TimestampMixin):
 
     # Relationships
     billing_plan: Mapped["BillingPlan"] = relationship(back_populates="user_billings")
-    alerts: Mapped[list["BillingAlert"]] = relationship(back_populates="user_billing")
 
 
 class BillingAlert(Base, TimestampMixin):
     """Billing alerts configuration."""
 
     __tablename__ = "billing_alerts"
+    __table_args__ = (UniqueConstraint("user_id", "name", name="uq_billing_alert_user_name"),)
 
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
-    user_billing_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("user_billing.id"), nullable=False)
+    user_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("user.id"), nullable=False)
 
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     alert_type: Mapped[str] = mapped_column(String(50), nullable=False)  # 'token_usage', 'cost_usage'
@@ -94,6 +94,3 @@ class BillingAlert(Base, TimestampMixin):
     last_notification_error: Mapped[Optional[str]] = mapped_column(String(500))
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-
-    # Relationships
-    user_billing: Mapped["UserBilling"] = relationship(back_populates="alerts")
