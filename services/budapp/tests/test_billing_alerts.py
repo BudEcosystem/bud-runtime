@@ -49,12 +49,12 @@ class TestBillingAlerts:
         return user_billing
 
     def create_alert(
-        self, user_billing_id, name, alert_type, threshold_percent, last_triggered_at=None, last_triggered_value=None
+        self, user_id, name, alert_type, threshold_percent, last_triggered_at=None, last_triggered_value=None
     ):
         """Helper to create a billing alert."""
         alert = MagicMock(spec=BillingAlert)
         alert.id = uuid.uuid4()
-        alert.user_billing_id = user_billing_id
+        alert.user_id = user_id
         alert.name = name
         alert.alert_type = alert_type
         alert.threshold_percent = threshold_percent
@@ -112,8 +112,8 @@ class TestBillingAlerts:
 
         # Create alerts
         alerts = [
-            self.create_alert(user_billing.id, "50% Token", "token_usage", 50),
-            self.create_alert(user_billing.id, "75% Cost", "cost_usage", 75),
+            self.create_alert(user_billing.user_id, "50% Token", "token_usage", 50),
+            self.create_alert(user_billing.user_id, "75% Cost", "cost_usage", 75),
         ]
 
         # Set up database mocks
@@ -138,8 +138,8 @@ class TestBillingAlerts:
         user_id = user_billing.user_id
 
         # Create alerts
-        alert_50 = self.create_alert(user_billing.id, "50% Token Alert", "token_usage", 50)
-        alert_75 = self.create_alert(user_billing.id, "75% Token Alert", "token_usage", 75)
+        alert_50 = self.create_alert(user_billing.user_id, "50% Token Alert", "token_usage", 50)
+        alert_75 = self.create_alert(user_billing.user_id, "75% Token Alert", "token_usage", 75)
 
         # Set up database mocks
         self.setup_database_mocks(mock_session, user_billing, [alert_50, alert_75])
@@ -169,10 +169,10 @@ class TestBillingAlerts:
 
         # Create multiple alerts
         alerts = [
-            self.create_alert(user_billing.id, "25% Token", "token_usage", 25),
-            self.create_alert(user_billing.id, "50% Token", "token_usage", 50),
-            self.create_alert(user_billing.id, "75% Token", "token_usage", 75),
-            self.create_alert(user_billing.id, "50% Cost", "cost_usage", 50),
+            self.create_alert(user_billing.user_id, "25% Token", "token_usage", 25),
+            self.create_alert(user_billing.user_id, "50% Token", "token_usage", 50),
+            self.create_alert(user_billing.user_id, "75% Token", "token_usage", 75),
+            self.create_alert(user_billing.user_id, "50% Cost", "cost_usage", 50),
         ]
 
         # Set up database mocks
@@ -200,7 +200,7 @@ class TestBillingAlerts:
         # Create alert that was recently triggered at a higher usage level
         recent_trigger = datetime.now(timezone.utc) - timedelta(hours=1)
         alert = self.create_alert(
-            user_billing.id,
+            user_billing.user_id,
             "50% Token Alert",
             "token_usage",
             50,
@@ -230,7 +230,7 @@ class TestBillingAlerts:
         """Test 100% usage alert."""
         user_id = user_billing.user_id
 
-        alert_100 = self.create_alert(user_billing.id, "100% Token Alert", "token_usage", 100)
+        alert_100 = self.create_alert(user_billing.user_id, "100% Token Alert", "token_usage", 100)
 
         # Set up database mocks
         self.setup_database_mocks(mock_session, user_billing, [alert_100])
@@ -258,9 +258,9 @@ class TestBillingAlerts:
 
         # Create various threshold alerts
         alerts = [
-            self.create_alert(user_billing.id, "90% Token", "token_usage", 90),
-            self.create_alert(user_billing.id, "100% Token", "token_usage", 100),
-            self.create_alert(user_billing.id, "90% Cost", "cost_usage", 90),
+            self.create_alert(user_billing.user_id, "90% Token", "token_usage", 90),
+            self.create_alert(user_billing.user_id, "100% Token", "token_usage", 100),
+            self.create_alert(user_billing.user_id, "90% Cost", "cost_usage", 90),
         ]
 
         # Set up database mocks
@@ -286,8 +286,8 @@ class TestBillingAlerts:
         user_id = user_billing.user_id
 
         # Create mix of active and inactive alerts
-        active_alert = self.create_alert(user_billing.id, "Active Alert", "token_usage", 50)
-        inactive_alert = self.create_alert(user_billing.id, "Inactive Alert", "token_usage", 50)
+        active_alert = self.create_alert(user_billing.user_id, "Active Alert", "token_usage", 50)
+        inactive_alert = self.create_alert(user_billing.user_id, "Inactive Alert", "token_usage", 50)
         inactive_alert.is_active = False
 
         # Set up database mocks
@@ -321,7 +321,7 @@ class TestBillingAlerts:
         user_billing.custom_token_quota = 150000  # Higher than plan's 100000
         user_billing.custom_cost_quota = Decimal("300.00")  # Higher than plan's 200.00
 
-        alert = self.create_alert(user_billing.id, "50% Custom Token", "token_usage", 50)
+        alert = self.create_alert(user_billing.user_id, "50% Custom Token", "token_usage", 50)
 
         # Set up database mocks
         self.setup_database_mocks(mock_session, user_billing, [alert])
@@ -345,7 +345,7 @@ class TestBillingAlerts:
         """Test alert continues even if notification fails."""
         user_id = user_billing.user_id
 
-        alert = self.create_alert(user_billing.id, "50% Alert", "token_usage", 50)
+        alert = self.create_alert(user_billing.user_id, "50% Alert", "token_usage", 50)
 
         # Set up database mocks
         self.setup_database_mocks(mock_session, user_billing, [alert])

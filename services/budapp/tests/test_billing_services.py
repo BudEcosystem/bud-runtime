@@ -87,7 +87,7 @@ class TestBillingService:
             mock_response_obj.raise_for_status = AsyncMock()
             mock_async_client.get.return_value = mock_response_obj
 
-            result = await billing_service.get_usage_from_clickhouse(
+            await billing_service.get_usage_from_clickhouse(
                 user_id, start_date, end_date, project_id
             )
 
@@ -179,6 +179,7 @@ class TestBillingService:
         # Mock user billing
         mock_user_billing = MagicMock(spec=UserBilling)
         mock_user_billing.id = user_billing_id
+        mock_user_billing.user_id = user_id
 
         # Mock alerts
         mock_alerts = [
@@ -352,6 +353,7 @@ class TestBillingService:
         # Mock user billing
         mock_user_billing = MagicMock(spec=UserBilling)
         mock_user_billing.id = user_billing_id
+        mock_user_billing.user_id = user_id
         mock_user_billing.billing_plan = mock_plan
         mock_user_billing.custom_token_quota = None
         mock_user_billing.custom_cost_quota = None

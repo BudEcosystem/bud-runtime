@@ -47,7 +47,6 @@ class TestBillingPlanEndpoints:
     @patch('budapp.billing_ops.routes.BillingPlanSchema.from_orm')
     def test_get_billing_plans_success(self, mock_from_orm, mock_db_session):
         """Test successful retrieval of billing plans."""
-
         from datetime import datetime, timezone
 
         # Use simple mock objects since we're mocking the schema serialization
@@ -95,8 +94,8 @@ class TestBillingPlanEndpoints:
         mock_db_session.query.return_value = mock_query
 
         # Import here to avoid circular imports
-        from budapp.main import app
         from budapp.commons.dependencies import get_session
+        from budapp.main import app
 
         # Override the dependency
         app.dependency_overrides[get_session] = lambda: mock_db_session
@@ -113,7 +112,7 @@ class TestBillingPlanEndpoints:
             app.dependency_overrides.clear()
 
         # Debug: Always print response details for debugging
-        print(f"\n=== DEBUG INFO ===")
+        print("\n=== DEBUG INFO ===")
         print(f"Response status: {response.status_code}")
         print(f"Response headers: {dict(response.headers)}")
         try:
@@ -125,7 +124,7 @@ class TestBillingPlanEndpoints:
         # Also print if mocks were called
         print(f"Mock query called: {mock_db_session.query.called}")
         print(f"Mock filter_by called: {mock_query.filter_by.called}")
-        print(f"=== END DEBUG ===\n")
+        print("=== END DEBUG ===\n")
 
         # Verify the mock was called before checking status
         mock_db_session.query.assert_called_once()
@@ -136,9 +135,9 @@ class TestBillingPlanEndpoints:
         if response.status_code != 200:
             try:
                 error_detail = response.json() if response.headers.get('content-type', '').startswith('application/json') else response.text
-            except:
+            except Exception:
                 error_detail = response.text
-            assert False, f"Expected 200 OK but got {response.status_code}. Error: {error_detail}"
+            raise AssertionError(f"Expected 200 OK but got {response.status_code}. Error: {error_detail}")
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -149,8 +148,8 @@ class TestBillingPlanEndpoints:
         """Test error handling in billing plans retrieval."""
         mock_db_session.query.side_effect = Exception("Database error")
 
-        from budapp.main import app
         from budapp.commons.dependencies import get_session
+        from budapp.main import app
 
         # Override the dependency
         app.dependency_overrides[get_session] = lambda: mock_db_session
@@ -173,7 +172,6 @@ class TestCurrentUsageEndpoints:
         self, mock_billing_service_class, mock_current_user, mock_db_session
     ):
         """Test successful retrieval of current usage."""
-
         # Mock billing service
         mock_service = MagicMock()
         mock_billing_service_class.return_value = mock_service
@@ -201,8 +199,8 @@ class TestCurrentUsageEndpoints:
 
         mock_service.get_current_usage = AsyncMock(return_value=mock_usage)
 
+        from budapp.commons.dependencies import get_current_active_user, get_session
         from budapp.main import app
-        from budapp.commons.dependencies import get_session, get_current_active_user
 
         # Override the dependencies
         app.dependency_overrides[get_session] = lambda: mock_db_session
@@ -217,7 +215,7 @@ class TestCurrentUsageEndpoints:
             app.dependency_overrides.clear()
 
         # Debug: Print response details for troubleshooting
-        print(f"\n=== CURRENT USAGE DEBUG ===")
+        print("\n=== CURRENT USAGE DEBUG ===")
         print(f"Response status: {response.status_code}")
         print(f"Response headers: {dict(response.headers)}")
         try:
@@ -225,14 +223,14 @@ class TestCurrentUsageEndpoints:
             print(f"Response body: {response_body}")
         except Exception as e:
             print(f"Error reading response body: {e}")
-        print(f"=== END DEBUG ===\n")
+        print("=== END DEBUG ===\n")
 
         if response.status_code != 200:
             try:
                 error_detail = response.json() if response.headers.get('content-type', '').startswith('application/json') else response.text
-            except:
+            except Exception:
                 error_detail = response.text
-            assert False, f"Expected 200 OK but got {response.status_code}. Error: {error_detail}"
+            raise AssertionError(f"Expected 200 OK but got {response.status_code}. Error: {error_detail}")
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -245,7 +243,6 @@ class TestCurrentUsageEndpoints:
         self, mock_billing_service_class, mock_current_user, mock_db_session
     ):
         """Test current usage when user has no billing."""
-
         mock_service = MagicMock()
         mock_billing_service_class.return_value = mock_service
 
@@ -263,8 +260,8 @@ class TestCurrentUsageEndpoints:
 
         mock_service.get_current_usage = AsyncMock(return_value=mock_usage)
 
+        from budapp.commons.dependencies import get_current_active_user, get_session
         from budapp.main import app
-        from budapp.commons.dependencies import get_session, get_current_active_user
 
         # Override the dependencies
         app.dependency_overrides[get_session] = lambda: mock_db_session
@@ -293,7 +290,6 @@ class TestUserBillingEndpoints:
         self, mock_billing_service_class, mock_from_orm, mock_admin_user, mock_db_session
     ):
         """Test admin retrieving user billing info."""
-
         target_user_id = uuid.uuid4()
 
         mock_service = MagicMock()
@@ -310,7 +306,7 @@ class TestUserBillingEndpoints:
 
         # Mock the schema serialization with all required fields
         from datetime import datetime, timezone
-        
+
         mock_from_orm.return_value = {
             "id": str(mock_user_billing.id),
             "user_id": str(target_user_id),
@@ -326,8 +322,8 @@ class TestUserBillingEndpoints:
             "modified_at": datetime.now(timezone.utc),
         }
 
+        from budapp.commons.dependencies import get_current_active_user, get_session
         from budapp.main import app
-        from budapp.commons.dependencies import get_session, get_current_active_user
 
         # Override the dependencies
         app.dependency_overrides[get_session] = lambda: mock_db_session
@@ -347,11 +343,10 @@ class TestUserBillingEndpoints:
         self, mock_current_user, mock_db_session
     ):
         """Test non-admin cannot retrieve other user's billing info."""
-
         target_user_id = uuid.uuid4()
 
+        from budapp.commons.dependencies import get_current_active_user, get_session
         from budapp.main import app
-        from budapp.commons.dependencies import get_session, get_current_active_user
 
         # Override the dependencies
         app.dependency_overrides[get_session] = lambda: mock_db_session
@@ -367,16 +362,11 @@ class TestUserBillingEndpoints:
 
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
-    @patch('budapp.billing_ops.routes.get_current_active_user')
-    @patch('budapp.billing_ops.routes.get_session')
     @patch('budapp.billing_ops.routes.BillingService')
     def test_setup_user_billing_admin_success(
-        self, mock_billing_service_class, mock_get_session, mock_get_user, mock_admin_user, mock_db_session
+        self, mock_billing_service_class, mock_admin_user, mock_db_session
     ):
         """Test admin setting up user billing."""
-        mock_get_user.return_value = mock_admin_user
-        mock_get_session.return_value = mock_db_session
-
         mock_service = MagicMock()
         mock_billing_service_class.return_value = mock_service
 
@@ -392,7 +382,12 @@ class TestUserBillingEndpoints:
         new_user_billing = MagicMock(spec=UserBilling)
         mock_service.create_user_billing.return_value = new_user_billing
 
+        from budapp.commons.dependencies import get_current_active_user, get_session
         from budapp.main import app
+
+        # Override the dependencies
+        app.dependency_overrides[get_session] = lambda: mock_db_session
+        app.dependency_overrides[get_current_active_user] = lambda: mock_admin_user
 
         client = TestClient(app)
 
@@ -403,20 +398,19 @@ class TestUserBillingEndpoints:
             "custom_cost_quota": 150.00,
         }
 
-        response = client.post("/billing/setup", json=request_data)
+        try:
+            response = client.post("/billing/setup", json=request_data)
+        finally:
+            # Clean up the overrides
+            app.dependency_overrides.clear()
 
         assert response.status_code == status.HTTP_200_OK
 
-    @patch('budapp.billing_ops.routes.get_current_active_user')
-    @patch('budapp.billing_ops.routes.get_session')
     @patch('budapp.billing_ops.routes.BillingService')
     def test_update_billing_plan_admin_success(
-        self, mock_billing_service_class, mock_get_session, mock_get_user, mock_admin_user, mock_db_session
+        self, mock_billing_service_class, mock_admin_user, mock_db_session
     ):
         """Test admin updating user's billing plan."""
-        mock_get_user.return_value = mock_admin_user
-        mock_get_session.return_value = mock_db_session
-
         mock_service = MagicMock()
         mock_billing_service_class.return_value = mock_service
 
@@ -429,7 +423,12 @@ class TestUserBillingEndpoints:
         mock_user_billing = MagicMock(spec=UserBilling)
         mock_service.get_user_billing.return_value = mock_user_billing
 
+        from budapp.commons.dependencies import get_current_active_user, get_session
         from budapp.main import app
+
+        # Override the dependencies
+        app.dependency_overrides[get_session] = lambda: mock_db_session
+        app.dependency_overrides[get_current_active_user] = lambda: mock_admin_user
 
         client = TestClient(app)
 
@@ -439,7 +438,11 @@ class TestUserBillingEndpoints:
             "custom_token_quota": 100000,
         }
 
-        response = client.put("/billing/plan", json=request_data)
+        try:
+            response = client.put("/billing/plan", json=request_data)
+        finally:
+            # Clean up the overrides
+            app.dependency_overrides.clear()
 
         assert response.status_code == status.HTTP_200_OK
 
