@@ -48,7 +48,7 @@ class TestBillingPlanEndpoints:
         """Test successful retrieval of billing plans."""
 
         from datetime import datetime, timezone
-        
+
         # Mock billing plans with all required fields for BillingPlanSchema
         mock_plans = [
             MagicMock(
@@ -70,7 +70,7 @@ class TestBillingPlanEndpoints:
             MagicMock(
                 spec=BillingPlan,
                 id=uuid.uuid4(),
-                name="Pro Plan", 
+                name="Pro Plan",
                 description="Professional tier",
                 monthly_token_quota=100000,
                 monthly_cost_quota=Decimal("200.00"),
