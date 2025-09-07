@@ -64,11 +64,11 @@ def mock_user_billing(mock_user, mock_billing_plan):
 
 
 @pytest.fixture
-def mock_billing_alert(mock_user_billing):
+def mock_billing_alert(mock_user):
     """Create a mock billing alert."""
     alert = Mock(spec=BillingAlert)
     alert.id = uuid4()
-    alert.user_billing_id = mock_user_billing.id
+    alert.user_id = mock_user.id
     alert.name = "75% Token Usage Alert"
     alert.alert_type = "token_usage"
     alert.threshold_percent = 75
@@ -158,7 +158,7 @@ class TestBillingNotificationService:
         service = BillingNotificationService()
 
         # Mock email to fail
-        with patch.object(service, '_send_in_app_notification', new_callable=AsyncMock) as mock_in_app, \
+        with patch.object(service, '_send_in_app_notification', new_callable=AsyncMock), \
              patch.object(service, '_send_email_notification', new_callable=AsyncMock) as mock_email:
 
             mock_email.side_effect = Exception("Email service unavailable")
@@ -341,7 +341,7 @@ class TestBillingServiceNotifications:
         # Create two alerts at different thresholds
         mock_alert_75 = Mock(spec=BillingAlert)
         mock_alert_75.id = uuid4()
-        mock_alert_75.user_billing_id = mock_user_billing.id
+        mock_alert_75.user_id = mock_user.id
         mock_alert_75.name = "75% Token Usage Alert"
         mock_alert_75.alert_type = "token_usage"
         mock_alert_75.threshold_percent = 75
@@ -354,7 +354,7 @@ class TestBillingServiceNotifications:
 
         mock_alert_90 = Mock(spec=BillingAlert)
         mock_alert_90.id = uuid4()
-        mock_alert_90.user_billing_id = mock_user_billing.id
+        mock_alert_90.user_id = mock_user.id
         mock_alert_90.name = "90% Token Usage Alert"
         mock_alert_90.alert_type = "token_usage"
         mock_alert_90.threshold_percent = 90
@@ -417,7 +417,7 @@ class TestBillingServiceNotifications:
         # Create alerts with tracking data
         mock_alert_1 = Mock(spec=BillingAlert)
         mock_alert_1.id = uuid4()
-        mock_alert_1.user_billing_id = mock_user_billing.id
+        mock_alert_1.user_id = mock_user.id
         mock_alert_1.last_triggered_at = datetime.now(timezone.utc)
         mock_alert_1.last_triggered_value = Decimal("750000")
         mock_alert_1.last_notification_sent_at = datetime.now(timezone.utc)
@@ -426,7 +426,7 @@ class TestBillingServiceNotifications:
 
         mock_alert_2 = Mock(spec=BillingAlert)
         mock_alert_2.id = uuid4()
-        mock_alert_2.user_billing_id = mock_user_billing.id
+        mock_alert_2.user_id = mock_user.id
         mock_alert_2.last_triggered_at = datetime.now(timezone.utc)
         mock_alert_2.last_triggered_value = Decimal("900000")
         mock_alert_2.last_notification_sent_at = datetime.now(timezone.utc)
@@ -438,7 +438,7 @@ class TestBillingServiceNotifications:
         mock_db.execute.return_value.scalars.return_value.all.return_value = [mock_alert_1, mock_alert_2]
 
         # Execute
-        service.reset_user_alerts(mock_user_billing.id)
+        service.reset_user_alerts(mock_user.id)
 
         # Verify all tracking fields were reset
         assert mock_alert_1.last_triggered_at is None

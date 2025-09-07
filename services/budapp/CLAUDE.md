@@ -48,6 +48,46 @@ alembic -c ./budapp/alembic.ini upgrade head
 alembic -c ./budapp/alembic.ini revision --autogenerate -m "description"
 ```
 
+### Manual Migration Creation Best Practices
+When creating migrations manually (due to environment issues), follow these steps:
+
+1. **Find the latest revision:**
+```bash
+alembic -c budapp/alembic.ini heads
+```
+
+2. **Check migration history to choose the correct parent:**
+```bash
+alembic -c budapp/alembic.ini history --verbose | head -20
+```
+
+3. **Follow proper naming convention:**
+   - Use format: `{short_hex_id}_{description}.py`
+   - Examples: `a1b2c3d4e5f6_add_user_table.py`, `f93ff02dff8_add_publication_fields.py`
+   - NOT: `20250906_164620_description.py` (avoid timestamp format)
+
+4. **Use the correct revision structure:**
+```python
+"""Migration description
+
+Revision ID: a1b2c3d4e5f6
+Revises: {latest_revision_from_heads_command}
+Create Date: 2025-XX-XX XX:XX:XX.XXXXXX
+
+"""
+```
+
+5. **Handle multiple heads:**
+   - If `alembic heads` shows multiple heads, choose the most relevant parent
+   - Consider creating a merge migration if both branches need to be merged
+   - For billing-related changes, prefer billing-related parent migrations
+
+6. **Migration content guidelines:**
+   - Always include both `upgrade()` and `downgrade()` functions
+   - Use proper SQLAlchemy types (e.g., `postgresql.UUID(as_uuid=True)`)
+   - Include data migration logic when changing foreign keys
+   - Test both upgrade and downgrade paths
+
 ### Testing
 ```bash
 # Run all tests with Dapr

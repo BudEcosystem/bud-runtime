@@ -55,7 +55,7 @@ class BillingAlertSchema(BaseModel):
     """Billing alert schema."""
 
     id: UUID
-    user_billing_id: UUID
+    user_id: UUID
     name: str
     alert_type: str
     threshold_percent: int
@@ -149,3 +149,9 @@ class UpdateNotificationPreferencesRequest(BaseModel):
 
     enable_email_notifications: Optional[bool] = None
     enable_in_app_notifications: Optional[bool] = None
+
+
+class UpdateBillingAlertStatusRequest(BaseModel):
+    """Request to update billing alert status (enable/disable)."""
+
+    is_active: bool
