@@ -44,43 +44,51 @@ def mock_db_session():
 class TestBillingPlanEndpoints:
     """Test billing plan endpoints."""
 
-    def test_get_billing_plans_success(self, mock_db_session):
+    @patch('budapp.billing_ops.routes.BillingPlanSchema.from_orm')
+    def test_get_billing_plans_success(self, mock_from_orm, mock_db_session):
         """Test successful retrieval of billing plans."""
 
         from datetime import datetime, timezone
-
-        # Create real BillingPlan instances instead of mocks for Pydantic compatibility
-        plan1 = BillingPlan()
-        plan1.id = uuid.uuid4()
-        plan1.name = "Free Plan"
-        plan1.description = "Basic free tier"
-        plan1.monthly_token_quota = 10000
-        plan1.monthly_cost_quota = Decimal("10.00")
-        plan1.max_projects = 5
-        plan1.max_endpoints_per_project = 10
-        plan1.base_monthly_price = Decimal("0.00")
-        plan1.overage_token_price = Decimal("0.001")
-        plan1.features = {"api_rate_limit": 100, "support": "community"}
-        plan1.is_active = True
-        plan1.created_at = datetime.now(timezone.utc)
-        plan1.modified_at = datetime.now(timezone.utc)
-
-        plan2 = BillingPlan()
-        plan2.id = uuid.uuid4()
-        plan2.name = "Pro Plan"
-        plan2.description = "Professional tier"
-        plan2.monthly_token_quota = 100000
-        plan2.monthly_cost_quota = Decimal("200.00")
-        plan2.max_projects = 50
-        plan2.max_endpoints_per_project = 100
-        plan2.base_monthly_price = Decimal("99.00")
-        plan2.overage_token_price = Decimal("0.0008")
-        plan2.features = {"api_rate_limit": 1000, "support": "email", "custom_models": True}
-        plan2.is_active = True
-        plan2.created_at = datetime.now(timezone.utc)
-        plan2.modified_at = datetime.now(timezone.utc)
-
-        mock_plans = [plan1, plan2]
+        
+        # Use simple mock objects since we're mocking the schema serialization
+        mock_plans = [
+            MagicMock(spec=BillingPlan),
+            MagicMock(spec=BillingPlan),
+        ]
+        
+        # Mock the schema serialization to return expected data
+        mock_from_orm.side_effect = [
+            {
+                "id": str(uuid.uuid4()),
+                "name": "Free Plan", 
+                "description": "Basic free tier",
+                "monthly_token_quota": 10000,
+                "monthly_cost_quota": "10.00",
+                "max_projects": 5,
+                "max_endpoints_per_project": 10,
+                "base_monthly_price": "0.00",
+                "overage_token_price": "0.001",
+                "features": {"api_rate_limit": 100, "support": "community"},
+                "is_active": True,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "modified_at": datetime.now(timezone.utc).isoformat(),
+            },
+            {
+                "id": str(uuid.uuid4()),
+                "name": "Pro Plan",
+                "description": "Professional tier", 
+                "monthly_token_quota": 100000,
+                "monthly_cost_quota": "200.00",
+                "max_projects": 50,
+                "max_endpoints_per_project": 100,
+                "base_monthly_price": "99.00",
+                "overage_token_price": "0.0008",
+                "features": {"api_rate_limit": 1000, "support": "email", "custom_models": True},
+                "is_active": True,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "modified_at": datetime.now(timezone.utc).isoformat(),
+            }
+        ]
 
         mock_query = MagicMock()
         mock_query.filter_by.return_value.all.return_value = mock_plans
