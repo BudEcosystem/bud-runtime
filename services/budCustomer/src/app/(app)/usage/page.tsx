@@ -364,6 +364,13 @@ export default function UsagePage() {
     }
   };
 
+  const handleModalCancel = () => {
+    setShowAlertModal(false);
+    setAlertName("");
+    setAlertThreshold(75);
+    setAlertType("cost_usage");
+  };
+
   return (
     <DashboardLayout>
       <div className={styles.usageContainer}>
@@ -573,14 +580,9 @@ export default function UsagePage() {
           </Text>
         }
         open={showAlertModal}
-        onCancel={() => {
-          setShowAlertModal(false);
-          setAlertName("");
-          setAlertThreshold(75);
-          setAlertType("cost_usage");
-        }}
+        onCancel={handleModalCancel}
         footer={[
-          <Button key="cancel" onClick={() => setShowAlertModal(false)}>
+          <Button key="cancel" onClick={handleModalCancel}>
             Cancel
           </Button>,
           <Button

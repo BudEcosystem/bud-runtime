@@ -478,54 +478,86 @@ class TestUserBillingEndpoints:
 class TestBillingAlertEndpoints:
     """Test billing alert endpoints."""
 
-    @patch('budapp.billing_ops.routes.get_current_active_user')
-    @patch('budapp.billing_ops.routes.get_session')
     @patch('budapp.billing_ops.routes.BillingService')
     def test_get_billing_alerts_success(
-        self, mock_billing_service_class, mock_get_session, mock_get_user, mock_current_user, mock_db_session
+        self, mock_billing_service_class, mock_current_user, mock_db_session
     ):
         """Test retrieving billing alerts."""
-        mock_get_user.return_value = mock_current_user
-        mock_get_session.return_value = mock_db_session
-
         mock_service = MagicMock()
         mock_billing_service_class.return_value = mock_service
 
-        mock_alerts = [
-            MagicMock(spec=BillingAlert, name="50% Alert", threshold_percent=50),
-            MagicMock(spec=BillingAlert, name="75% Alert", threshold_percent=75),
-        ]
+        # Mock alerts with all required fields for BillingAlertSchema
+        mock_alerts = []
+        for name, threshold in [("50% Alert", 50), ("75% Alert", 75)]:
+            alert = MagicMock(spec=BillingAlert)
+            alert.id = uuid.uuid4()
+            alert.user_id = mock_current_user.id
+            alert.name = name
+            alert.alert_type = "cost_usage"
+            alert.threshold_percent = threshold
+            alert.is_active = True
+            alert.last_triggered_at = None
+            alert.last_triggered_value = None
+            alert.last_notification_sent_at = None
+            alert.notification_failure_count = 0
+            alert.last_notification_error = None
+            alert.created_at = datetime.now(timezone.utc)
+            alert.modified_at = datetime.now(timezone.utc)
+            mock_alerts.append(alert)
 
         mock_service.get_billing_alerts.return_value = mock_alerts
 
+        from budapp.commons.dependencies import get_current_active_user, get_session
         from budapp.main import app
 
+        # Override the dependencies
+        app.dependency_overrides[get_session] = lambda: mock_db_session
+        app.dependency_overrides[get_current_active_user] = lambda: mock_current_user
+
         client = TestClient(app)
-        response = client.get("/billing/alerts")
+
+        try:
+            response = client.get("/billing/alerts")
+        finally:
+            # Clean up the overrides
+            app.dependency_overrides.clear()
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert len(data["result"]) == 2
 
-    @patch('budapp.billing_ops.routes.get_current_active_user')
-    @patch('budapp.billing_ops.routes.get_session')
     @patch('budapp.billing_ops.routes.BillingService')
     def test_create_billing_alert_success(
-        self, mock_billing_service_class, mock_get_session, mock_get_user, mock_current_user, mock_db_session
+        self, mock_billing_service_class, mock_current_user, mock_db_session
     ):
         """Test creating a billing alert."""
-        mock_get_user.return_value = mock_current_user
-        mock_get_session.return_value = mock_db_session
-
         mock_service = MagicMock()
         mock_billing_service_class.return_value = mock_service
 
-        # Mock user billing exists
-        mock_user_billing = MagicMock(spec=UserBilling)
-        mock_user_billing.id = uuid.uuid4()
-        mock_service.get_user_billing.return_value = mock_user_billing
+        # Mock the created alert with all required fields for BillingAlertSchema
+        created_alert = MagicMock(spec=BillingAlert)
+        created_alert.id = uuid.uuid4()
+        created_alert.user_id = mock_current_user.id
+        created_alert.name = "High Usage Alert"
+        created_alert.alert_type = "token_usage"
+        created_alert.threshold_percent = 80
+        created_alert.is_active = True
+        created_alert.last_triggered_at = None
+        created_alert.last_triggered_value = None
+        created_alert.last_notification_sent_at = None
+        created_alert.notification_failure_count = 0
+        created_alert.last_notification_error = None
+        created_alert.created_at = datetime.now(timezone.utc)
+        created_alert.modified_at = datetime.now(timezone.utc)
 
+        mock_service.create_billing_alert.return_value = created_alert
+
+        from budapp.commons.dependencies import get_current_active_user, get_session
         from budapp.main import app
+
+        # Override the dependencies
+        app.dependency_overrides[get_session] = lambda: mock_db_session
+        app.dependency_overrides[get_current_active_user] = lambda: mock_current_user
 
         client = TestClient(app)
 
@@ -535,40 +567,48 @@ class TestBillingAlertEndpoints:
             "threshold_percent": 80,
         }
 
-        # Mock the database execute for existing alert check (should return None)
-        mock_db_session.execute.return_value.scalar_one_or_none.return_value = None
-
-        with patch('budapp.billing_ops.models.BillingAlert') as mock_alert_class:
-            mock_alert = MagicMock()
-            mock_alert_class.return_value = mock_alert
-
+        try:
             response = client.post("/billing/alerts", json=request_data)
+        finally:
+            # Clean up the overrides
+            app.dependency_overrides.clear()
 
-            assert response.status_code == status.HTTP_200_OK
-            mock_db_session.add.assert_called_once_with(mock_alert)
-            mock_db_session.commit.assert_called_once()
+        assert response.status_code == status.HTTP_200_OK
+
+        # Verify service method was called with correct parameters
+        mock_service.create_billing_alert.assert_called_once_with(
+            user_id=mock_current_user.id,
+            name="High Usage Alert",
+            alert_type="token_usage",
+            threshold_percent=80,
+        )
 
     @pytest.mark.asyncio
-    @patch('budapp.billing_ops.routes.get_current_active_user')
-    @patch('budapp.billing_ops.routes.get_session')
     @patch('budapp.billing_ops.routes.BillingService')
     async def test_check_and_trigger_alerts_success(
-        self, mock_billing_service_class, mock_get_session, mock_get_user, mock_current_user, mock_db_session
+        self, mock_billing_service_class, mock_current_user, mock_db_session
     ):
         """Test checking and triggering alerts."""
-        mock_get_user.return_value = mock_current_user
-        mock_get_session.return_value = mock_db_session
-
         mock_service = MagicMock()
         mock_billing_service_class.return_value = mock_service
 
         triggered_alerts = ["50% Token Alert", "75% Cost Alert"]
         mock_service.check_and_trigger_alerts = AsyncMock(return_value=triggered_alerts)
 
+        from budapp.commons.dependencies import get_current_active_user, get_session
         from budapp.main import app
 
+        # Override the dependencies
+        app.dependency_overrides[get_session] = lambda: mock_db_session
+        app.dependency_overrides[get_current_active_user] = lambda: mock_current_user
+
         client = TestClient(app)
-        response = client.post("/billing/check-alerts")
+
+        try:
+            response = client.post("/billing/check-alerts")
+        finally:
+            # Clean up the overrides
+            app.dependency_overrides.clear()
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
