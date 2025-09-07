@@ -287,9 +287,10 @@ class TestCurrentUsageEndpoints:
 class TestUserBillingEndpoints:
     """Test user billing management endpoints."""
 
+    @patch('budapp.billing_ops.routes.UserBillingSchema.from_orm')
     @patch('budapp.billing_ops.routes.BillingService')
     def test_get_user_billing_info_admin_success(
-        self, mock_billing_service_class, mock_admin_user, mock_db_session
+        self, mock_billing_service_class, mock_from_orm, mock_admin_user, mock_db_session
     ):
         """Test admin retrieving user billing info."""
 
@@ -306,6 +307,15 @@ class TestUserBillingEndpoints:
         mock_user_billing.is_suspended = False
 
         mock_service.get_user_billing.return_value = mock_user_billing
+
+        # Mock the schema serialization
+        mock_from_orm.return_value = {
+            "id": str(mock_user_billing.id),
+            "user_id": str(target_user_id),
+            "billing_plan_id": str(mock_user_billing.billing_plan_id),
+            "is_active": True,
+            "is_suspended": False,
+        }
 
         from budapp.main import app
         from budapp.commons.dependencies import get_session, get_current_active_user
