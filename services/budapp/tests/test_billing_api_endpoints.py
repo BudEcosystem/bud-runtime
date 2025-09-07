@@ -77,7 +77,7 @@ class TestBillingPlanEndpoints:
 
         # Import here to avoid circular imports
         from budapp.main import app
-        from budapp.commons.database import get_session
+        from budapp.commons.dependencies import get_session
 
         # Override the dependency
         app.dependency_overrides[get_session] = lambda: mock_db_session
@@ -108,7 +108,7 @@ class TestBillingPlanEndpoints:
         mock_db_session.query.side_effect = Exception("Database error")
 
         from budapp.main import app
-        from budapp.commons.database import get_session
+        from budapp.commons.dependencies import get_session
 
         # Override the dependency
         app.dependency_overrides[get_session] = lambda: mock_db_session
@@ -254,7 +254,7 @@ class TestUserBillingEndpoints:
         target_user_id = uuid.uuid4()
 
         from budapp.main import app
-        from budapp.commons.database import get_session
+        from budapp.commons.dependencies import get_session
 
         # Override the dependency
         app.dependency_overrides[get_session] = lambda: mock_db_session
