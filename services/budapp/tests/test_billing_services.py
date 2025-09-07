@@ -147,29 +147,50 @@ class TestBillingService:
 
     def test_create_user_billing(self, billing_service, mock_session):
         """Test creating user billing."""
+        from budapp.billing_ops.models import UserBilling
         user_id = uuid.uuid4()
         plan_id = uuid.uuid4()
         custom_token_quota = 75000
         custom_cost_quota = Decimal("150.00")
 
-        result = billing_service.create_user_billing(
-            user_id=user_id,
-            billing_plan_id=plan_id,
-            custom_token_quota=custom_token_quota,
-            custom_cost_quota=custom_cost_quota,
-        )
+        # Mock the UserBilling constructor to avoid SQLAlchemy model resolution issues
+        with patch('budapp.billing_ops.services.UserBilling') as MockUserBilling:
+            mock_user_billing = MagicMock(spec=UserBilling)
+            mock_user_billing.user_id = user_id
+            mock_user_billing.billing_plan_id = plan_id
+            mock_user_billing.custom_token_quota = custom_token_quota
+            mock_user_billing.custom_cost_quota = custom_cost_quota
+            mock_user_billing.is_active = True
+            mock_user_billing.is_suspended = False
+            MockUserBilling.return_value = mock_user_billing
 
-        # Verify UserBilling was created
-        assert result.user_id == user_id
-        assert result.billing_plan_id == plan_id
-        assert result.custom_token_quota == custom_token_quota
-        assert result.custom_cost_quota == custom_cost_quota
-        assert result.is_active is True
-        assert result.is_suspended is False
+            result = billing_service.create_user_billing(
+                user_id=user_id,
+                billing_plan_id=plan_id,
+                custom_token_quota=custom_token_quota,
+                custom_cost_quota=custom_cost_quota,
+            )
 
-        # Verify it was added to session
-        mock_session.add.assert_called_once()
-        mock_session.commit.assert_called_once()
+            # Verify UserBilling was created with correct parameters
+            MockUserBilling.assert_called_once()
+            call_args = MockUserBilling.call_args[1]
+            assert call_args['user_id'] == user_id
+            assert call_args['billing_plan_id'] == plan_id
+            assert call_args['custom_token_quota'] == custom_token_quota
+            assert call_args['custom_cost_quota'] == custom_cost_quota
+
+            # Verify returned object has expected attributes
+            assert result.user_id == user_id
+            assert result.billing_plan_id == plan_id
+            assert result.custom_token_quota == custom_token_quota
+            assert result.custom_cost_quota == custom_cost_quota
+            assert result.is_active is True
+            assert result.is_suspended is False
+
+            # Verify it was added to session
+            mock_session.add.assert_called_once_with(mock_user_billing)
+            mock_session.commit.assert_called_once()
+            mock_session.refresh.assert_called_once_with(mock_user_billing)
 
     def test_get_billing_alerts(self, billing_service, mock_session):
         """Test retrieving billing alerts for a user."""
@@ -188,14 +209,10 @@ class TestBillingService:
             MagicMock(spec=BillingAlert, threshold_percent=75),
         ]
 
-        # Setup mock returns
-        mock_execute1 = MagicMock()
-        mock_execute1.scalar_one_or_none.return_value = mock_user_billing
-
-        mock_execute2 = MagicMock()
-        mock_execute2.scalars.return_value.all.return_value = mock_alerts
-
-        mock_session.execute.side_effect = [mock_execute1, mock_execute2]
+        # Setup mock returns - get_billing_alerts only makes one execute call
+        mock_execute = MagicMock()
+        mock_execute.scalars.return_value.all.return_value = mock_alerts
+        mock_session.execute.return_value = mock_execute
 
         result = billing_service.get_billing_alerts(user_id)
 
@@ -232,8 +249,11 @@ class TestBillingService:
         mock_execute.scalar_one_or_none.return_value = mock_user_billing
         mock_session.execute.return_value = mock_execute
 
-        # Mock ClickHouse usage
-        with patch.object(billing_service, 'get_usage_from_clickhouse') as mock_get_usage:
+        # Mock the get_billing_plan method call
+        with patch.object(billing_service, 'get_billing_plan') as mock_get_plan, \
+             patch.object(billing_service, 'get_usage_from_clickhouse') as mock_get_usage:
+
+            mock_get_plan.return_value = mock_plan
             mock_get_usage.return_value = {
                 "total_tokens": 25000,
                 "total_cost": 50.00,
@@ -261,11 +281,36 @@ class TestBillingService:
         mock_execute.scalar_one_or_none.return_value = None
         mock_session.execute.return_value = mock_execute
 
-        result = await billing_service.get_current_usage(user_id)
+        # Mock the methods called when no billing exists to avoid HTTP calls
+        with patch.object(billing_service, 'get_free_billing_plan') as mock_get_free_plan, \
+             patch.object(billing_service, '_get_default_free_plan') as mock_get_default_plan, \
+             patch.object(billing_service, 'get_usage_from_clickhouse') as mock_get_usage:
 
-        assert result["has_billing"] is False
-        assert result["usage"] is None
-        assert result["plan_name"] is None
+            # Return None for free plan from DB, but provide default free plan
+            mock_get_free_plan.return_value = None
+            mock_get_default_plan.return_value = {
+                "name": "Free",
+                "base_monthly_price": 0,
+                "monthly_token_quota": 100000,
+                "monthly_cost_quota": None,
+                "max_projects": 2,
+                "max_endpoints_per_project": 3,
+            }
+            mock_get_usage.return_value = {
+                "total_tokens": 1000,
+                "total_cost": 0.0,
+                "request_count": 10,
+                "success_rate": 100.0,
+            }
+
+            result = await billing_service.get_current_usage(user_id)
+
+            # Free plan users still have "billing" (free plan)
+            assert result["has_billing"] is True
+            assert result["plan_name"] == "Free"
+            assert result["base_monthly_price"] == 0.0
+            assert result["usage"]["tokens_used"] == 1000
+            assert result["usage"]["tokens_quota"] == 100000
 
     @pytest.mark.asyncio
     async def test_check_usage_limits_within_limits(self, billing_service, mock_session):
@@ -298,7 +343,10 @@ class TestBillingService:
         mock_session.query.return_value = mock_query
 
         # Mock ClickHouse usage (below limits)
-        with patch.object(billing_service, 'get_usage_from_clickhouse') as mock_get_usage:
+        with patch.object(billing_service, 'get_billing_plan') as mock_get_plan, \
+             patch.object(billing_service, 'get_usage_from_clickhouse') as mock_get_usage:
+
+            mock_get_plan.return_value = mock_plan
             mock_get_usage.return_value = {
                 "total_tokens": 50000,
                 "total_cost": 100.00,
@@ -308,6 +356,7 @@ class TestBillingService:
 
             result = await billing_service.check_usage_limits(user_id)
 
+            print(f"DEBUG: result = {result}")  # Debug print
             assert result["allowed"] is True
             assert result["status"] == "allowed"
 
@@ -342,7 +391,10 @@ class TestBillingService:
         mock_session.query.return_value = mock_query
 
         # Mock ClickHouse usage (exceeds limits)
-        with patch.object(billing_service, 'get_usage_from_clickhouse') as mock_get_usage:
+        with patch.object(billing_service, 'get_billing_plan') as mock_get_plan, \
+             patch.object(billing_service, 'get_usage_from_clickhouse') as mock_get_usage:
+
+            mock_get_plan.return_value = mock_plan
             mock_get_usage.return_value = {
                 "total_tokens": 150000,  # Exceeds 100000
                 "total_cost": 250.00,  # Exceeds 200.00
