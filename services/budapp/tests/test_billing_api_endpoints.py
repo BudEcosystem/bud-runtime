@@ -308,13 +308,22 @@ class TestUserBillingEndpoints:
 
         mock_service.get_user_billing.return_value = mock_user_billing
 
-        # Mock the schema serialization
+        # Mock the schema serialization with all required fields
+        from datetime import datetime, timezone
+        
         mock_from_orm.return_value = {
             "id": str(mock_user_billing.id),
             "user_id": str(target_user_id),
             "billing_plan_id": str(mock_user_billing.billing_plan_id),
             "is_active": True,
             "is_suspended": False,
+            "billing_period_start": datetime.now(timezone.utc),
+            "billing_period_end": datetime.now(timezone.utc),
+            "custom_token_quota": None,
+            "custom_cost_quota": None,
+            "suspension_reason": None,
+            "created_at": datetime.now(timezone.utc),
+            "modified_at": datetime.now(timezone.utc),
         }
 
         from budapp.main import app
