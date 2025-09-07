@@ -8,7 +8,6 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
-  ReferenceLine,
 } from "recharts";
 import { motion } from "framer-motion";
 import dayjs from "dayjs";
@@ -195,7 +194,7 @@ const UsageChart: React.FC<UsageChartProps> = ({
       <ResponsiveContainer width="100%" height={220}>
         <BarChart
           data={data}
-          margin={{ top: 15, right: 15, left: 25, bottom: 35 }}
+          margin={{ top: 15, right: 15, left: 0, bottom: 10 }}
           barCategoryGap={data.length > 30 ? "10%" : data.length > 14 ? "15%" : data.length > 7 ? "20%" : "25%"}
         >
           <defs>
@@ -208,21 +207,6 @@ const UsageChart: React.FC<UsageChartProps> = ({
             stroke="transparent"
             vertical={false}
             horizontal={false}
-          />
-          {/* Top reference line with label */}
-          <ReferenceLine
-            y={maxValue}
-            stroke="#7c3aed"
-            strokeDasharray="2 2"
-            strokeWidth={1}
-            opacity={0.5}
-            label={{
-              value: chartConfig.formatter(maxValue),
-              position: "left",
-              fill: "#7c3aed",
-              fontSize: 11,
-              opacity: 0.8
-            }}
           />
           {/* Baseline - removed as we'll use custom lines */}
           <XAxis

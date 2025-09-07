@@ -242,13 +242,13 @@ export default function ProjectsPage() {
 
         let description =
           count > 0
-            ? "The deployments are running and you will not be allowed to delete the project. In order to delete the project, you will have to pause or delete all deployments in order to delete the project."
-            : "There are no running deployments, you can delete the project.";
+            ? "This project has active resources. Please pause or delete all resources before deleting the project."
+            : "You can safely delete this project.";
 
         let title =
           count > 0
-            ? "You're not allowed to delete the Project"
-            : "You're about to delete the Project";
+            ? `You're not allowed to delete "${project.name}"`
+            : `You're about to delete "${project.name}"`;
 
         const updateNotificationMessage = openWarning({
           title: title,
