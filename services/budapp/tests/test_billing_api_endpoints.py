@@ -208,7 +208,7 @@ class TestCurrentUsageEndpoints:
         app.dependency_overrides[get_current_active_user] = lambda: mock_current_user
 
         client = TestClient(app)
-        
+
         try:
             response = client.get("/billing/current")
         finally:
@@ -251,7 +251,7 @@ class TestCurrentUsageEndpoints:
         app.dependency_overrides[get_current_active_user] = lambda: mock_current_user
 
         client = TestClient(app)
-        
+
         try:
             response = client.get("/billing/current")
         finally:
