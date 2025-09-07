@@ -1,4 +1,5 @@
-import { notification, Space } from "antd";
+import { Space } from "antd";
+import type { NotificationInstance } from "antd/es/notification/interface";
 import { PrimaryButton, SecondaryButton } from "../ui/bud/form/Buttons";
 import { Text_12_400_757575, Text_14_400_EEEEEE } from "../ui/text";
 
@@ -8,6 +9,7 @@ interface openWarningProps {
   deleteDisabled?: boolean;
   onDelete?: () => void;
   onCancel?: () => void;
+  notification: NotificationInstance;
 }
 
 export const openWarning = ({
@@ -16,6 +18,7 @@ export const openWarning = ({
   onDelete,
   onCancel,
   deleteDisabled = false,
+  notification,
 }: openWarningProps) => {
   const key = `${title}-delete-notification`;
 
@@ -50,7 +53,7 @@ export const openWarning = ({
         border: "1px solid #1F1F1F",
         backdropFilter: "blur(10px)",
       },
-      btn: (
+      actions: (
         <Space>
           <SecondaryButton
             text="Cancel"

@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { ConfigProvider, Form, FormRule, Select, Image } from "antd";
 import { Text_12_300_EEEEEE, Text_12_400_EEEEEE } from "@/components/ui/text";
 import CustomPopover from "@/flows/components/customPopover";
@@ -30,81 +30,6 @@ function CustomSelect(props: BudInputProps) {
   const { effectiveTheme } = useTheme();
   const isLight = effectiveTheme === "light";
 
-  useEffect(() => {
-    // Inject styles for the selected item - make it global to affect dropdown too
-    const styleId = 'custom-select-style-global';
-    let styleElement = document.getElementById(styleId) as HTMLStyleElement;
-
-    if (!styleElement) {
-      styleElement = document.createElement('style');
-      styleElement.id = styleId;
-      document.head.appendChild(styleElement);
-    }
-
-    styleElement.textContent = `
-      /* Selected value in the input */
-      .custom-select-two .ant-select-selection-item,
-      .custom-select-two .ant-select-selection-item span,
-      .custom-select-two .ant-select-single.ant-select-show-arrow .ant-select-selection-item,
-      .custom-select-two .ant-select-selector .ant-select-selection-item {
-        color: ${isLight ? '#1a1a1a' : '#EEEEEE'} !important;
-        opacity: 1 !important;
-      }
-
-      /* Single selector text */
-      .custom-select-two .ant-select-single .ant-select-selector,
-      .custom-select-two .ant-select-single .ant-select-selector .ant-select-selection-search,
-      .custom-select-two .ant-select-single .ant-select-selector .ant-select-selection-placeholder {
-        color: ${isLight ? '#1a1a1a' : '#EEEEEE'} !important;
-      }
-
-      /* Search input */
-      .custom-select-two .ant-select-selection-search-input {
-        color: ${isLight ? '#1a1a1a' : '#EEEEEE'} !important;
-      }
-
-      /* Dropdown container background */
-      .ant-select-dropdown {
-        background-color: ${isLight ? '#ffffff' : '#0d0d0d'} !important;
-      }
-
-      /* Dropdown inner content background */
-      .ant-select-dropdown .rc-virtual-list,
-      .ant-select-dropdown .rc-virtual-list-holder,
-      .ant-select-dropdown .ant-select-item-option {
-        background-color: ${isLight ? '#ffffff' : '#0d0d0d'} !important;
-      }
-
-      /* Dropdown items */
-      .ant-select-dropdown .ant-select-item,
-      .ant-select-dropdown .ant-select-item-option-content {
-        color: ${isLight ? '#1a1a1a' : '#EEEEEE'} !important;
-        background-color: ${isLight ? '#ffffff' : '#0d0d0d'} !important;
-      }
-
-      /* Dropdown item hover */
-      .ant-select-dropdown .ant-select-item-option-active:not(.ant-select-item-option-selected) {
-        background-color: ${isLight ? '#f5f5f5' : '#1a1a1a'} !important;
-      }
-
-      /* Selected dropdown item */
-      .ant-select-dropdown .ant-select-item-option-selected {
-        color: ${isLight ? '#1a1a1a' : '#EEEEEE'} !important;
-        background-color: ${isLight ? '#e6f7ff' : '#2a2a2a'} !important;
-      }
-
-      /* Any span inside selection item */
-      .custom-select-two span.ant-select-selection-item,
-      .custom-select-two .ant-select-selection-item * {
-        color: ${isLight ? '#1a1a1a' : '#EEEEEE'} !important;
-      }
-    `;
-
-    return () => {
-      // Cleanup is optional since we're reusing the same element
-    };
-  }, [isLight]);
-
   return (
     <div
       className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0] hover:bg-[#FFFFFF08] ${props.ClassNames}`}
@@ -133,7 +58,7 @@ function CustomSelect(props: BudInputProps) {
           </div>
         </div>
       )}
-      <div className="custom-select-two w-full rounded-[6px] relative">
+      <div className="custom-select-two bud-custom-select w-full rounded-[6px] relative">
         <ConfigProvider
           theme={{
             token: {
@@ -159,6 +84,7 @@ function CustomSelect(props: BudInputProps) {
             onChange={(value) => {
               props.onChange?.(value)
             }}
+            popupClassName="bud-custom-select-dropdown"
             suffixIcon={
               <img
                 src={`/icons/customArrow.png`}

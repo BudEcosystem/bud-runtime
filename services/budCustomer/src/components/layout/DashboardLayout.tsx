@@ -19,6 +19,7 @@ import ThemeSwitcher from "@/components/ui/ThemeSwitcher";
 import { useTheme } from "@/context/themeContext";
 import { useUser } from "@/stores/useUser";
 import BudIsland from "@/components/island/BudIsland";
+import { useOverlay } from "@/context/overlayContext";
 
 const { Text } = Typography;
 
@@ -75,6 +76,7 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
   const pathname = usePathname();
   const router = useRouter();
   const { effectiveTheme } = useTheme();
+  const { isVisible } = useOverlay();
   const [isHovered, setIsHovered] = useState<string | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
 
@@ -374,6 +376,9 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
           <main className="flex-1 overflow-auto">{children}</main>
         </div>
       </div>
+
+      {/* Overlay for notifications */}
+      <div className={`dashboardOverlay absolute w-full h-full top-0 left-0 z-[1200] ${isVisible ? 'block' : 'hidden'}`}></div>
     </div>
   );
 };

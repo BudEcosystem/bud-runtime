@@ -231,11 +231,24 @@ const handleErrorResponse = (err: any) => {
     return Promise.reject(err.response.data);
   } else {
     console.log(err);
-    if (err && localStorage.getItem("access_token")) {
+    // Only show error toast for endpoints that don't have explicit error handling in components
+    // Avoid showing error toasts for endpoints where components handle their own errors
+    const url = err.config?.url || "";
+    const skipErrorToastEndpoints = [
+      "/credentials/",
+      "users/reset-password",
+      "/auth/login",
+    ];
+
+    const shouldShowErrorToast = !skipErrorToastEndpoints.some(endpoint =>
+      url.includes(endpoint)
+    );
+
+    if (shouldShowErrorToast && err && localStorage.getItem("access_token")) {
       console.log(err.response?.data?.message);
       errorToast(err.response?.data?.message);
     }
-    return false;
+    return Promise.reject(err);
   }
 };
 
