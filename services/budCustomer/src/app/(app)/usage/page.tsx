@@ -344,7 +344,7 @@ export default function UsagePage() {
           <div className={styles.metricsSection}>
             <MetricCard
               title="Total Spend"
-              value={`$${metrics.totalSpend.toFixed(2)}`}
+              value={`$${metrics.totalSpend.toFixed(2)} / $${billingPlan.usage.cost_quota.toFixed(2)}`}
               loading={isLoading}
               trend={
                 metrics.previousSpend
@@ -354,7 +354,11 @@ export default function UsagePage() {
             />
             <MetricCard
               title="Total tokens"
-              value={(metrics.totalTokens / 1000).toFixed(0) + "K"}
+              value={
+                metrics.totalTokens < 10000
+                  ? `${(metrics.totalTokens / 1000).toFixed(1)}K / ${(billingPlan.usage.tokens_quota / 1000).toFixed(1)}K`
+                  : `${(metrics.totalTokens / 1000).toFixed(0)}K / ${(billingPlan.usage.tokens_quota / 1000).toFixed(0)}K`
+              }
               loading={isLoading}
               trend={
                 metrics.previousTokens
