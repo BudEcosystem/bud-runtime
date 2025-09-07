@@ -27,6 +27,9 @@ if TYPE_CHECKING:
 
 import aiohttp
 from fastapi import status
+from sqlalchemy import func, select
+from sqlalchemy.sql import cast
+from sqlalchemy.types import String as SqlAlchemyString
 
 from budapp.commons import logging
 from budapp.commons.db_utils import SessionMixin
@@ -1532,6 +1535,42 @@ class EndpointService(SessionMixin):
         )
         await BudNotifyService().send_notification(notification_request)
 
+    async def _validate_adapter_name(self, adapter_name: str, endpoint_id: UUID, project_id: UUID) -> None:
+        """Validate adapter name for duplicates within endpoint and project.
+        
+        Args:
+            adapter_name: The name to validate
+            endpoint_id: The endpoint ID to check within
+            project_id: The project ID for endpoint name collision check
+            
+        Raises:
+            ClientException: If validation fails
+        """
+        if not adapter_name:
+            return
+            
+        # Check for duplicate adapter names in the same endpoint (case-insensitive)
+        # Use scalars_all() to handle potential multiple results gracefully
+        stmt = select(AdapterModel).filter(
+            func.lower(cast(AdapterModel.name, SqlAlchemyString)) == func.lower(adapter_name),
+            AdapterModel.endpoint_id == endpoint_id,
+            AdapterModel.status != AdapterStatusEnum.DELETED
+        )
+        db_adapters = self.scalars_all(stmt)
+        
+        if db_adapters:
+            raise ClientException("An adapter with this name already exists")
+
+        # Check if adapter name conflicts with endpoint names in the project
+        db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+            EndpointModel,
+            {"name": adapter_name, "project_id": project_id},
+            missing_ok=True,
+            exclude_fields={"status": EndpointStatusEnum.DELETED},
+        )
+        if db_endpoint:
+            raise ClientException("Name already taken in the project")
+
     async def add_adapter_workflow(self, current_user_id: UUID, request: AddAdapterRequest) -> None:
         """Add adapter workflow."""
         step_number = request.step_number
@@ -1609,25 +1648,6 @@ class EndpointService(SessionMixin):
             if db_adapters:
                 raise ClientException("Adapter is already added in the endpoint")
 
-        if adapter_name:
-            db_adapters = await AdapterDataManager(self.session).retrieve_by_fields(
-                AdapterModel,
-                {"name": adapter_name, "endpoint_id": endpoint_id},
-                missing_ok=True,
-                exclude_fields={"status": AdapterStatusEnum.DELETED},
-            )
-            if db_adapters:
-                raise ClientException("Adapter name is already taken in the endpoint")
-
-            db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
-                EndpointModel,
-                {"name": adapter_name, "project_id": project_id},
-                missing_ok=True,
-                exclude_fields={"status": EndpointStatusEnum.DELETED},
-            )
-            if db_endpoint:
-                raise ClientException("Name already taken in the project")
-
         # Prepare workflow step data
         workflow_step_data = AddAdapterWorkflowStepData(
             endpoint_id=endpoint_id,
@@ -1657,6 +1677,9 @@ class EndpointService(SessionMixin):
 
         if db_current_workflow_step:
             logger.info(f"Workflow {db_workflow.id} step {current_step_number} already exists")
+            
+            # Validate adapter name on every call (not just first time)
+            await self._validate_adapter_name(adapter_name, endpoint_id, project_id)
 
             # Update workflow step data in db
             db_workflow_step = await WorkflowStepDataManager(self.session).update_by_fields(
@@ -1666,6 +1689,9 @@ class EndpointService(SessionMixin):
             logger.info(f"Workflow {db_workflow.id} step {current_step_number} updated")
         else:
             logger.info(f"Creating workflow step {current_step_number} for workflow {db_workflow.id}")
+            
+            # Validate adapter name for new workflow steps
+            await self._validate_adapter_name(adapter_name, endpoint_id, project_id)
 
             # Insert step details in db
             db_workflow_step = await WorkflowStepDataManager(self.session).insert_one(
