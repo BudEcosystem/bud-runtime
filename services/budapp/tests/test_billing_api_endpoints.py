@@ -168,15 +168,11 @@ class TestCurrentUsageEndpoints:
     """Test current usage endpoints."""
 
     @pytest.mark.asyncio
-    @patch('budapp.billing_ops.routes.get_current_active_user')
-    @patch('budapp.billing_ops.routes.get_session')
     @patch('budapp.billing_ops.routes.BillingService')
     async def test_get_current_usage_success(
-        self, mock_billing_service_class, mock_get_session, mock_get_user, mock_current_user, mock_db_session
+        self, mock_billing_service_class, mock_current_user, mock_db_session
     ):
         """Test successful retrieval of current usage."""
-        mock_get_user.return_value = mock_current_user
-        mock_get_session.return_value = mock_db_session
 
         # Mock billing service
         mock_service = MagicMock()
@@ -205,9 +201,19 @@ class TestCurrentUsageEndpoints:
         mock_service.get_current_usage = AsyncMock(return_value=mock_usage)
 
         from budapp.main import app
+        from budapp.commons.dependencies import get_session, get_current_active_user
+
+        # Override the dependencies
+        app.dependency_overrides[get_session] = lambda: mock_db_session
+        app.dependency_overrides[get_current_active_user] = lambda: mock_current_user
 
         client = TestClient(app)
-        response = client.get("/billing/current")
+        
+        try:
+            response = client.get("/billing/current")
+        finally:
+            # Clean up the overrides
+            app.dependency_overrides.clear()
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -215,15 +221,11 @@ class TestCurrentUsageEndpoints:
         assert data["result"]["usage"]["tokens_used"] == 25000
 
     @pytest.mark.asyncio
-    @patch('budapp.billing_ops.routes.get_current_active_user')
-    @patch('budapp.billing_ops.routes.get_session')
     @patch('budapp.billing_ops.routes.BillingService')
     async def test_get_current_usage_no_billing(
-        self, mock_billing_service_class, mock_get_session, mock_get_user, mock_current_user, mock_db_session
+        self, mock_billing_service_class, mock_current_user, mock_db_session
     ):
         """Test current usage when user has no billing."""
-        mock_get_user.return_value = mock_current_user
-        mock_get_session.return_value = mock_db_session
 
         mock_service = MagicMock()
         mock_billing_service_class.return_value = mock_service
@@ -242,9 +244,19 @@ class TestCurrentUsageEndpoints:
         mock_service.get_current_usage = AsyncMock(return_value=mock_usage)
 
         from budapp.main import app
+        from budapp.commons.dependencies import get_session, get_current_active_user
+
+        # Override the dependencies
+        app.dependency_overrides[get_session] = lambda: mock_db_session
+        app.dependency_overrides[get_current_active_user] = lambda: mock_current_user
 
         client = TestClient(app)
-        response = client.get("/billing/current")
+        
+        try:
+            response = client.get("/billing/current")
+        finally:
+            # Clean up the overrides
+            app.dependency_overrides.clear()
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
