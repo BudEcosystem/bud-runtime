@@ -1,5 +1,6 @@
 import os
 import sys
+import tempfile
 from typing import Any, AsyncGenerator
 
 import pytest
@@ -32,6 +33,11 @@ def dapr_api_token(request: pytest.FixtureRequest) -> Any:
 
 @pytest.fixture(scope="session", autouse=True)
 def mock_env_vars():
+    # Create secure temporary directory for test keys
+    temp_dir = tempfile.mkdtemp(prefix="budapp_test_")
+    public_key_path = os.path.join(temp_dir, "test_public_key.pem")
+    private_key_path = os.path.join(temp_dir, "test_private_key.pem")
+
     test_env_vars = {
         "POSTGRES_USER": "test_user",
         "POSTGRES_PASSWORD": "test_password",
@@ -57,28 +63,57 @@ def mock_env_vars():
         "GRAFANA_PASSWORD": "admin",
         "CLOUD_MODEL_SEEDER_ENGINE": "openai",
         "BUD_CONNECT_BASE_URL": "http://localhost:8001",
-        "PUBLIC_KEY_PATH": "/tmp/test_public_key.pem",
-        "PRIVATE_KEY_PATH": "/tmp/test_private_key.pem",
-        "VAULT_PATH": "/tmp"
+        "PUBLIC_KEY_PATH": public_key_path,
+        "PRIVATE_KEY_PATH": private_key_path,
+        "VAULT_PATH": temp_dir,
+        "JWT_SECRET_KEY": "test_jwt_secret_key_for_testing_purposes_only",
+        "TENSORZERO_REDIS_URL": "redis://localhost:6379/0",
+        "PASSWORD_SALT": "test_salt_for_testing",
+        "AES_KEY_HEX": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
     }
 
     # Actually set the environment variables
     for key, value in test_env_vars.items():
         os.environ[key] = value
 
-    # Create test key files for RSA handler
-    public_key_content = """-----BEGIN PUBLIC KEY-----
-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA77W82GAHTupjewJ4Df7Q
-+crGYVN1SsIQp1j/3PAGIdcUb2Aw2796HHecuOpPjp5coXopIqUapwqeFYr8PG3e
-pbY7iplt9QNnyZDgDuoBfvz2hJJtTacsBKm+XUr35WqKW8l/NeGwAAZwSlw6fu7f
-3k/ga7GrXo/7AYl43vuEZ+NyiEzAGaACsoEIY9MvB472zOE9R1utYD+bK8RFGypO
-G+7FbqNImu3JSCBNLzHLYr17Mg8/bJeugx/FMvkNi+7c48hf5m2gzXGSFLxPK6k/
-ioehgykSlgApkssHLTkZpW47nKT4vU0D/e10o9XnPUnte6keW4/5KIU88Rr+8K1t
-IQIDAQAB
------END PUBLIC KEY-----"""
+    # Generate test RSA key pair dynamically to avoid hardcoded keys in source
+    try:
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric import rsa
 
-    with open("/tmp/test_public_key.pem", "w") as f:
-        f.write(public_key_content)
+        # Generate a new RSA key pair for testing
+        private_key = rsa.generate_private_key(
+            public_exponent=65537,
+            key_size=2048,
+        )
+
+        # Serialize private key with the expected password
+        private_pem = private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.BestAvailableEncryption(b"bud_encryption_password")
+        )
+
+        # Serialize public key
+        public_key = private_key.public_key()
+        public_pem = public_key.public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo
+        )
+
+        # Write keys to files
+        with open(private_key_path, "wb") as f:
+            f.write(private_pem)
+
+        with open(public_key_path, "wb") as f:
+            f.write(public_pem)
+
+    except ImportError:
+        # Fallback if cryptography is not available - create minimal placeholder files
+        with open(public_key_path, "w") as f:
+            f.write("# Test public key placeholder\n")
+        with open(private_key_path, "w") as f:
+            f.write("# Test private key placeholder\n")
 
     yield
 
@@ -86,10 +121,11 @@ IQIDAQAB
     for key in test_env_vars.keys():
         os.environ.pop(key, None)
 
-    # Clean up key files
+    # Clean up temporary directory and all files
+    import shutil
     try:
-        os.remove("/tmp/test_public_key.pem")
-    except FileNotFoundError:
+        shutil.rmtree(temp_dir)
+    except (FileNotFoundError, OSError):
         pass
 
 
