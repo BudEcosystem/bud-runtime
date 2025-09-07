@@ -71,10 +71,17 @@ class TestQuotaEnforcement:
         """Test token quota check when usage is within limit."""
         user_id = user_billing_standard.user_id
 
-        # Setup mock returns
+        # Setup mock returns for both execute() and query() methods
         mock_execute = MagicMock()
         mock_execute.scalar_one_or_none.return_value = user_billing_standard
         mock_session.execute.return_value = mock_execute
+
+        # Mock the session.query() method that the service actually uses
+        mock_query = MagicMock()
+        mock_filter_by = MagicMock()
+        mock_filter_by.first.return_value = user_billing_standard
+        mock_query.filter_by.return_value = mock_filter_by
+        mock_session.query.return_value = mock_query
 
         # Mock usage below limit (50% of quota)
         with patch.object(billing_service, 'get_current_usage') as mock_get_usage:
@@ -95,20 +102,27 @@ class TestQuotaEnforcement:
 
             result = await billing_service.check_usage_limits(user_id)
 
-            assert result["within_limits"] is True
-            assert result["token_limit_exceeded"] is False
+            assert result["allowed"] is True
+            assert result["status"] == "allowed"
             assert result["tokens_used"] == 50000
             assert result["tokens_quota"] == 100000
-            assert result["tokens_remaining"] == 50000
 
     @pytest.mark.asyncio
     async def test_check_token_quota_exceeded(self, billing_service, mock_session, user_billing_standard):
         """Test token quota check when usage exceeds limit."""
         user_id = user_billing_standard.user_id
 
+        # Setup mock returns for both execute() and query() methods
         mock_execute = MagicMock()
         mock_execute.scalar_one_or_none.return_value = user_billing_standard
         mock_session.execute.return_value = mock_execute
+
+        # Mock the session.query() method that the service actually uses
+        mock_query = MagicMock()
+        mock_filter_by = MagicMock()
+        mock_filter_by.first.return_value = user_billing_standard
+        mock_query.filter_by.return_value = mock_filter_by
+        mock_session.query.return_value = mock_query
 
         # Mock usage exceeding limit
         with patch.object(billing_service, 'get_current_usage') as mock_get_usage:
@@ -119,18 +133,13 @@ class TestQuotaEnforcement:
                     "cost_used": 240.00,
                     "tokens_quota": 100000,
                     "cost_quota": 200.00,
-                    "tokens_remaining": -20000,
-                    "cost_remaining": -40.00,
                 },
-                "within_limits": False,
-                "token_limit_exceeded": True,
-                "cost_limit_exceeded": True,
             }
 
             result = await billing_service.check_usage_limits(user_id)
 
-            assert result["within_limits"] is False
-            assert result["token_limit_exceeded"] is True
+            assert result["allowed"] is False
+            assert result["status"] == "token_limit_exceeded"
             assert result["tokens_used"] == 120000
             assert result["tokens_quota"] == 100000
 
@@ -143,6 +152,18 @@ class TestQuotaEnforcement:
         mock_execute.scalar_one_or_none.return_value = user_billing_standard
         mock_session.execute.return_value = mock_execute
 
+        # Setup mock returns for both execute() and query() methods
+        mock_execute = MagicMock()
+        mock_execute.scalar_one_or_none.return_value = user_billing_standard
+        mock_session.execute.return_value = mock_execute
+
+        # Mock the session.query() method that the service actually uses
+        mock_query = MagicMock()
+        mock_filter_by = MagicMock()
+        mock_filter_by.first.return_value = user_billing_standard
+        mock_query.filter_by.return_value = mock_filter_by
+        mock_session.query.return_value = mock_query
+
         # Mock usage within cost limit
         with patch.object(billing_service, 'get_current_usage') as mock_get_usage:
             mock_get_usage.return_value = {
@@ -152,21 +173,15 @@ class TestQuotaEnforcement:
                     "cost_used": 150.00,  # 75% of 200.00
                     "tokens_quota": 100000,
                     "cost_quota": 200.00,
-                    "tokens_remaining": 20000,
-                    "cost_remaining": 50.00,
                 },
-                "within_limits": True,
-                "token_limit_exceeded": False,
-                "cost_limit_exceeded": False,
             }
 
             result = await billing_service.check_usage_limits(user_id)
 
-            assert result["within_limits"] is True
-            assert result["cost_limit_exceeded"] is False
+            assert result["allowed"] is True
+            assert result["status"] == "allowed"
             assert result["cost_used"] == 150.00
             assert result["cost_quota"] == 200.00
-            assert result["cost_remaining"] == 50.00
 
     @pytest.mark.asyncio
     async def test_check_cost_quota_exceeded(self, billing_service, mock_session, user_billing_standard):
@@ -177,6 +192,18 @@ class TestQuotaEnforcement:
         mock_execute.scalar_one_or_none.return_value = user_billing_standard
         mock_session.execute.return_value = mock_execute
 
+        # Setup mock returns for both execute() and query() methods
+        mock_execute = MagicMock()
+        mock_execute.scalar_one_or_none.return_value = user_billing_standard
+        mock_session.execute.return_value = mock_execute
+
+        # Mock the session.query() method that the service actually uses
+        mock_query = MagicMock()
+        mock_filter_by = MagicMock()
+        mock_filter_by.first.return_value = user_billing_standard
+        mock_query.filter_by.return_value = mock_filter_by
+        mock_session.query.return_value = mock_query
+
         # Mock usage exceeding cost limit
         with patch.object(billing_service, 'get_current_usage') as mock_get_usage:
             mock_get_usage.return_value = {
@@ -186,18 +213,13 @@ class TestQuotaEnforcement:
                     "cost_used": 250.00,  # 125% of 200.00
                     "tokens_quota": 100000,
                     "cost_quota": 200.00,
-                    "tokens_remaining": 10000,
-                    "cost_remaining": -50.00,
                 },
-                "within_limits": False,
-                "token_limit_exceeded": False,
-                "cost_limit_exceeded": True,
             }
 
             result = await billing_service.check_usage_limits(user_id)
 
-            assert result["within_limits"] is False
-            assert result["cost_limit_exceeded"] is True
+            assert result["allowed"] is False
+            assert result["status"] == "cost_limit_exceeded"
             assert result["cost_used"] == 250.00
             assert result["cost_quota"] == 200.00
 
@@ -210,7 +232,19 @@ class TestQuotaEnforcement:
         mock_execute.scalar_one_or_none.return_value = user_billing_standard
         mock_session.execute.return_value = mock_execute
 
-        # Mock usage exceeding both limits
+        # Setup mock returns for both execute() and query() methods
+        mock_execute = MagicMock()
+        mock_execute.scalar_one_or_none.return_value = user_billing_standard
+        mock_session.execute.return_value = mock_execute
+
+        # Mock the session.query() method that the service actually uses
+        mock_query = MagicMock()
+        mock_filter_by = MagicMock()
+        mock_filter_by.first.return_value = user_billing_standard
+        mock_query.filter_by.return_value = mock_filter_by
+        mock_session.query.return_value = mock_query
+
+        # Mock usage exceeding both limits (token limit checked first)
         with patch.object(billing_service, 'get_current_usage') as mock_get_usage:
             mock_get_usage.return_value = {
                 "has_billing": True,
@@ -219,19 +253,14 @@ class TestQuotaEnforcement:
                     "cost_used": 300.00,  # 150% of cost quota
                     "tokens_quota": 100000,
                     "cost_quota": 200.00,
-                    "tokens_remaining": -50000,
-                    "cost_remaining": -100.00,
                 },
-                "within_limits": False,
-                "token_limit_exceeded": True,
-                "cost_limit_exceeded": True,
             }
 
             result = await billing_service.check_usage_limits(user_id)
 
-            assert result["within_limits"] is False
-            assert result["token_limit_exceeded"] is True
-            assert result["cost_limit_exceeded"] is True
+            assert result["allowed"] is False
+            # Token limit is checked first, so status should be token_limit_exceeded
+            assert result["status"] == "token_limit_exceeded"
 
     @pytest.mark.asyncio
     async def test_custom_quota_override(self, billing_service, mock_session, user_billing_standard):
@@ -246,6 +275,18 @@ class TestQuotaEnforcement:
         mock_execute.scalar_one_or_none.return_value = user_billing_standard
         mock_session.execute.return_value = mock_execute
 
+        # Setup mock returns for both execute() and query() methods
+        mock_execute = MagicMock()
+        mock_execute.scalar_one_or_none.return_value = user_billing_standard
+        mock_session.execute.return_value = mock_execute
+
+        # Mock the session.query() method that the service actually uses
+        mock_query = MagicMock()
+        mock_filter_by = MagicMock()
+        mock_filter_by.first.return_value = user_billing_standard
+        mock_query.filter_by.return_value = mock_filter_by
+        mock_session.query.return_value = mock_query
+
         # Mock usage that would exceed plan limits but not custom limits
         with patch.object(billing_service, 'get_current_usage') as mock_get_usage:
             mock_get_usage.return_value = {
@@ -255,25 +296,20 @@ class TestQuotaEnforcement:
                     "cost_used": 250.00,  # Exceeds plan's 200.00 but within custom 300.00
                     "tokens_quota": 150000,  # Custom quota
                     "cost_quota": 300.00,  # Custom quota
-                    "tokens_remaining": 30000,
-                    "cost_remaining": 50.00,
                 },
-                "within_limits": True,
-                "token_limit_exceeded": False,
-                "cost_limit_exceeded": False,
             }
 
             result = await billing_service.check_usage_limits(user_id)
 
-            assert result["within_limits"] is True
-            assert result["token_limit_exceeded"] is False
-            assert result["cost_limit_exceeded"] is False
+            assert result["allowed"] is True
+            assert result["status"] == "allowed"
             assert result["tokens_quota"] == 150000
             assert result["cost_quota"] == 300.00
 
     @pytest.mark.asyncio
     async def test_unlimited_quota_never_exceeded(self, billing_service, mock_session, unlimited_plan):
         """Test unlimited quotas are never exceeded."""
+        from budapp.billing_ops.models import UserBilling
         user_billing = MagicMock(spec=UserBilling)
         user_billing.user_id = uuid.uuid4()
         user_billing.billing_plan = unlimited_plan
@@ -282,10 +318,23 @@ class TestQuotaEnforcement:
         user_billing.billing_period_start = datetime.now(timezone.utc).replace(day=1)
         user_billing.billing_period_end = datetime.now(timezone.utc).replace(month=12)
         user_billing.is_suspended = False
+        user_billing.created_at = datetime.now(timezone.utc)
 
         mock_execute = MagicMock()
         mock_execute.scalar_one_or_none.return_value = user_billing
         mock_session.execute.return_value = mock_execute
+
+        # Setup mock returns for both execute() and query() methods
+        mock_execute = MagicMock()
+        mock_execute.scalar_one_or_none.return_value = user_billing
+        mock_session.execute.return_value = mock_execute
+
+        # Mock the session.query() method that the service actually uses
+        mock_query = MagicMock()
+        mock_filter_by = MagicMock()
+        mock_filter_by.first.return_value = user_billing
+        mock_query.filter_by.return_value = mock_filter_by
+        mock_session.query.return_value = mock_query
 
         # Mock very high usage
         with patch.object(billing_service, 'get_current_usage') as mock_get_usage:
@@ -296,19 +345,13 @@ class TestQuotaEnforcement:
                     "cost_used": 25000.00,  # $25,000
                     "tokens_quota": None,  # Unlimited
                     "cost_quota": None,  # Unlimited
-                    "tokens_remaining": None,
-                    "cost_remaining": None,
                 },
-                "within_limits": True,
-                "token_limit_exceeded": False,
-                "cost_limit_exceeded": False,
             }
 
             result = await billing_service.check_usage_limits(user_billing.user_id)
 
-            assert result["within_limits"] is True
-            assert result["token_limit_exceeded"] is False
-            assert result["cost_limit_exceeded"] is False
+            assert result["allowed"] is True
+            assert result["status"] == "allowed"
             assert result["tokens_quota"] is None  # Unlimited
             assert result["cost_quota"] is None  # Unlimited
 
@@ -323,6 +366,18 @@ class TestQuotaEnforcement:
         mock_execute.scalar_one_or_none.return_value = user_billing_standard
         mock_session.execute.return_value = mock_execute
 
+        # Setup mock returns for both execute() and query() methods
+        mock_execute = MagicMock()
+        mock_execute.scalar_one_or_none.return_value = user_billing_standard
+        mock_session.execute.return_value = mock_execute
+
+        # Mock the session.query() method that the service actually uses
+        mock_query = MagicMock()
+        mock_filter_by = MagicMock()
+        mock_filter_by.first.return_value = user_billing_standard
+        mock_query.filter_by.return_value = mock_filter_by
+        mock_session.query.return_value = mock_query
+
         # Even with low usage, suspended users should be blocked
         with patch.object(billing_service, 'get_current_usage') as mock_get_usage:
             mock_get_usage.return_value = {
@@ -332,12 +387,7 @@ class TestQuotaEnforcement:
                     "cost_used": 1.00,
                     "tokens_quota": 100000,
                     "cost_quota": 200.00,
-                    "tokens_remaining": 99900,
-                    "cost_remaining": 199.00,
                 },
-                "within_limits": False,  # Should be false due to suspension
-                "token_limit_exceeded": False,
-                "cost_limit_exceeded": False,
                 "is_suspended": True,
                 "suspension_reason": "Payment failed",
             }
@@ -345,8 +395,9 @@ class TestQuotaEnforcement:
             result = await billing_service.check_usage_limits(user_id)
 
             # The service should indicate suspension
-            assert result["is_suspended"] is True
-            assert result["suspension_reason"] == "Payment failed"
+            assert result["allowed"] is False
+            assert result["status"] == "suspended"
+            assert result["reason"] == "Payment failed"
 
     @pytest.mark.asyncio
     async def test_no_billing_setup(self, billing_service, mock_session):
@@ -357,18 +408,28 @@ class TestQuotaEnforcement:
         mock_execute.scalar_one_or_none.return_value = None  # No billing setup
         mock_session.execute.return_value = mock_execute
 
+        # Setup mock returns for both execute() and query() methods
+        mock_execute = MagicMock()
+        mock_execute.scalar_one_or_none.return_value = None  # No user billing
+        mock_session.execute.return_value = mock_execute
+
+        # Mock the session.query() method that the service actually uses
+        mock_query = MagicMock()
+        mock_filter_by = MagicMock()
+        mock_filter_by.first.return_value = None  # No user billing
+        mock_query.filter_by.return_value = mock_filter_by
+        mock_session.query.return_value = mock_query
+
         with patch.object(billing_service, 'get_current_usage') as mock_get_usage:
             mock_get_usage.return_value = {
                 "has_billing": False,
-                "within_limits": False,
-                "error": "No billing plan configured",
             }
 
             result = await billing_service.check_usage_limits(user_id)
 
-            assert result["has_billing"] is False
-            assert result["within_limits"] is False
-            assert "No billing plan configured" in result.get("error", "")
+            assert result["allowed"] is True  # Freemium users are allowed
+            assert result["status"] == "no_billing_plan"
+            assert "freemium" in result["reason"].lower()
 
     @pytest.mark.asyncio
     async def test_project_level_quota_check(self, billing_service, mock_session, user_billing_standard):
@@ -380,6 +441,18 @@ class TestQuotaEnforcement:
         mock_execute.scalar_one_or_none.return_value = user_billing_standard
         mock_session.execute.return_value = mock_execute
 
+        # Setup mock returns for both execute() and query() methods
+        mock_execute = MagicMock()
+        mock_execute.scalar_one_or_none.return_value = user_billing_standard
+        mock_session.execute.return_value = mock_execute
+
+        # Mock the session.query() method that the service actually uses
+        mock_query = MagicMock()
+        mock_filter_by = MagicMock()
+        mock_filter_by.first.return_value = user_billing_standard
+        mock_query.filter_by.return_value = mock_filter_by
+        mock_session.query.return_value = mock_query
+
         # Mock project-specific usage
         with patch.object(billing_service, 'get_current_usage') as mock_get_usage:
             mock_get_usage.return_value = {
@@ -389,18 +462,16 @@ class TestQuotaEnforcement:
                     "cost_used": 40.00,
                     "tokens_quota": 100000,
                     "cost_quota": 200.00,
-                    "tokens_remaining": 80000,
-                    "cost_remaining": 160.00,
                 },
-                "within_limits": True,
-                "token_limit_exceeded": False,
-                "cost_limit_exceeded": False,
             }
 
             # Note: This would need to be implemented in the actual service
             # For now, we're testing the concept
             result = await billing_service.check_usage_limits(user_id)
 
+            # Verify the result is within limits
+            assert result["allowed"] is True
+            assert result["status"] == "allowed"
             # Verify usage was retrieved
             mock_get_usage.assert_called_once()
 
@@ -424,6 +495,18 @@ class TestQuotaEnforcement:
             (100000, 100.0),
         ]
 
+        # Setup mock returns for both execute() and query() methods
+        mock_execute = MagicMock()
+        mock_execute.scalar_one_or_none.return_value = user_billing_standard
+        mock_session.execute.return_value = mock_execute
+
+        # Mock the session.query() method that the service actually uses
+        mock_query = MagicMock()
+        mock_filter_by = MagicMock()
+        mock_filter_by.first.return_value = user_billing_standard
+        mock_query.filter_by.return_value = mock_filter_by
+        mock_session.query.return_value = mock_query
+
         for tokens_used, expected_percent in test_cases:
             with patch.object(billing_service, 'get_current_usage') as mock_get_usage:
                 mock_get_usage.return_value = {
@@ -433,12 +516,7 @@ class TestQuotaEnforcement:
                         "cost_used": 0.0,
                         "tokens_quota": 100000,  # From standard plan
                         "cost_quota": 200.00,
-                        "tokens_remaining": 100000 - tokens_used,
-                        "cost_remaining": 200.00,
                     },
-                    "within_limits": tokens_used <= 100000,
-                    "token_limit_exceeded": tokens_used > 100000,
-                    "cost_limit_exceeded": False,
                 }
 
                 result = await billing_service.check_usage_limits(user_id)
