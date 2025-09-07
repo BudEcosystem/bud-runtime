@@ -65,7 +65,7 @@ def mock_env_vars():
     # Actually set the environment variables
     for key, value in test_env_vars.items():
         os.environ[key] = value
-    
+
     # Create test key files for RSA handler
     public_key_content = """-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA77W82GAHTupjewJ4Df7Q
@@ -76,7 +76,7 @@ G+7FbqNImu3JSCBNLzHLYr17Mg8/bJeugx/FMvkNi+7c48hf5m2gzXGSFLxPK6k/
 ioehgykSlgApkssHLTkZpW47nKT4vU0D/e10o9XnPUnte6keW4/5KIU88Rr+8K1t
 IQIDAQAB
 -----END PUBLIC KEY-----"""
-    
+
     with open("/tmp/test_public_key.pem", "w") as f:
         f.write(public_key_content)
 
@@ -85,7 +85,7 @@ IQIDAQAB
     # Clean up after tests
     for key in test_env_vars.keys():
         os.environ.pop(key, None)
-    
+
     # Clean up key files
     try:
         os.remove("/tmp/test_public_key.pem")

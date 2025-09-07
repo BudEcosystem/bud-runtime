@@ -81,12 +81,12 @@ class TestBillingPlanEndpoints:
 
         # Override the dependency
         app.dependency_overrides[get_session] = lambda: mock_db_session
-        
+
         # Verify the override is set
         assert get_session in app.dependency_overrides
-        
+
         client = TestClient(app)
-        
+
         try:
             response = client.get("/billing/plans")
         finally:
@@ -115,7 +115,7 @@ class TestBillingPlanEndpoints:
 
         client = TestClient(app)
         response = client.get("/billing/plans")
-        
+
         # Clean up the override
         app.dependency_overrides.clear()
 
@@ -261,7 +261,7 @@ class TestUserBillingEndpoints:
 
         client = TestClient(app)
         response = client.get(f"/billing/user/{target_user_id}")
-        
+
         # Clean up the override
         app.dependency_overrides.clear()
 
@@ -406,7 +406,7 @@ class TestBillingAlertEndpoints:
 
         # Mock the database execute for existing alert check (should return None)
         mock_db_session.execute.return_value.scalar_one_or_none.return_value = None
-        
+
         with patch('budapp.billing_ops.models.BillingAlert') as mock_alert_class:
             mock_alert = MagicMock()
             mock_alert_class.return_value = mock_alert
