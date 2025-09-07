@@ -49,18 +49,18 @@ class TestBillingPlanEndpoints:
         """Test successful retrieval of billing plans."""
 
         from datetime import datetime, timezone
-        
+
         # Use simple mock objects since we're mocking the schema serialization
         mock_plans = [
             MagicMock(spec=BillingPlan),
             MagicMock(spec=BillingPlan),
         ]
-        
+
         # Mock the schema serialization to return expected data
         mock_from_orm.side_effect = [
             {
                 "id": str(uuid.uuid4()),
-                "name": "Free Plan", 
+                "name": "Free Plan",
                 "description": "Basic free tier",
                 "monthly_token_quota": 10000,
                 "monthly_cost_quota": "10.00",
@@ -76,7 +76,7 @@ class TestBillingPlanEndpoints:
             {
                 "id": str(uuid.uuid4()),
                 "name": "Pro Plan",
-                "description": "Professional tier", 
+                "description": "Professional tier",
                 "monthly_token_quota": 100000,
                 "monthly_cost_quota": "200.00",
                 "max_projects": 50,
@@ -112,7 +112,7 @@ class TestBillingPlanEndpoints:
             # Clean up the override
             app.dependency_overrides.clear()
 
-        # Debug: Always print response details for debugging  
+        # Debug: Always print response details for debugging
         print(f"\n=== DEBUG INFO ===")
         print(f"Response status: {response.status_code}")
         print(f"Response headers: {dict(response.headers)}")
